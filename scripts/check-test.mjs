@@ -38,7 +38,7 @@ ok(p.status === 0, "the starter kit writes a project", p.out);
 const dir = p.dir;
 commit(dir, "the starter kit");
 let r = check(dir);
-ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && !/copies\.yml\//.test(r.out), "a project as the kit writes it passes on a push to main, its copy and its copies checked in core.yml's one job (#376)", r.out);
+ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && /ok {3}copies\.yml\/copies/.test(r.out), "a project as the kit writes it passes on a push to main, its copy and its copies checked", r.out);
 
 const config = path.join(dir, "checks", "copies.json");
 fs.writeFileSync(config, JSON.stringify({ ...JSON.parse(fs.readFileSync(config, "utf8")), code: ["src"] }, null, 2));
@@ -48,9 +48,9 @@ fs.writeFileSync(path.join(dir, "notes.md"), "A note.\n");
 commit(dir, "a note");
 fs.writeFileSync(path.join(tmp, "description.md"), "## What the owner can try\nNothing.\n\n## Readings taken\nNone.\n\nWaits on: nothing\n");
 r = check(dir, "--base", "base", "--description", path.join(tmp, "description.md"));
-ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && !/description check is not run/.test(r.out) && /host security-review\.yml\/[\w-]+: security-review\.yml is not run here/.test(r.out), "a pull request with its description passes, the security review's status named the host's own and not run", r.out);
+ok(r.status === 0 && /ok {3}pr-description\.yml\//.test(r.out) && /host security-review\.yml\/[\w-]+: security-review\.yml is not run here/.test(r.out), "a pull request with its description passes, the security review's status named the host's own and not run", r.out);
 r = check(dir, "--base", "base");
-ok(r.status === 0 && r.out.includes("core.yml's description check is not run here: give --description"), "without a description, the description check is named and not run", r.out);
+ok(r.status === 0 && r.out.includes("pr-description.yml is not run here: give --description"), "without a description, the description check is named and not run", r.out);
 git(dir, "reset", "-q", "--hard", "base");
 fs.writeFileSync(path.join(dir, "core", "README.md"), "edited here\n");
 commit(dir, "an edit to the copy");
@@ -70,12 +70,35 @@ fs.writeFileSync(path.join(dir, "src", "one.js"), `${block}\n`);
 fs.writeFileSync(path.join(dir, "src", "two.js"), `${block}\n`);
 commit(dir, "a copy of code");
 r = check(dir, "--base", "base");
-ok(r.status === 1 && /FAIL core\.yml\/core\/core: its step "The copies, pointer, reading-size, workflow, entry-file, manifest and shape checks" failed/.test(r.out) && /^ +== No new copies$/m.test(r.out) && !/the copy of the core is not the core at its pin/.test(r.out) && mended(r.out), "a new copy of code fails on a pull request, with the copies check's own failure and its mend, a step of core.yml's one job and no failure of the copy", r.out);
-fs.writeFileSync(path.join(dir, "core", "README.md"), "edited here\n");
-commit(dir, "and an edit to the copy");
-r = check(dir, "--base", "base");
-ok(r.status === 1 && /the copy of the core is not the core at its pin, so no other check runs/.test(r.out) && !/its step "The copies, pointer/.test(r.out) && mended(r.out),
-  "where the copy is not the core, the steps core.yml runs of the copy's scripts run no more, the new copy unread", r.out);
+ok(r.status === 1 && /FAIL copies\.yml\/copies\/copies: its step "The copies, pointer, reading-size, workflow, entry-file, manifest and shape checks/.test(r.out) && /^ +== No new copies$/m.test(r.out) && mended(r.out), "a new copy of code fails on a pull request, with the copies check's own failure and its mend", r.out);
+
+// a private project, as the kit writes it: its checks without a secret as steps of core.yml's one job (#376), which a
+// failure of the copy stops here, since each runs the copy's scripts
+{
+  const q = project("a-private-project", "--owner", "someone", "--private");
+  ok(q.status === 0, "the starter kit writes a private project", q.out);
+  commit(q.dir, "the starter kit");
+  const qConfig = path.join(q.dir, "checks", "copies.json");
+  fs.writeFileSync(qConfig, JSON.stringify({ ...JSON.parse(fs.readFileSync(qConfig, "utf8")), code: ["src"] }, null, 2));
+  commit(q.dir, "the code the copies check reads");
+  git(q.dir, "branch", "-q", "base");
+  let s = check(q.dir, "--base", "base", "--description", path.join(tmp, "description.md"));
+  ok(s.status === 0 && /ok {3}core\.yml\/core\/core/.test(s.out) && !/(copies|pr-description)\.yml\//.test(s.out), "its pull request passes, the copies and description checks run in core.yml's one job", s.out);
+  s = check(q.dir, "--base", "base");
+  ok(s.status === 0 && s.out.includes("core.yml's description check is not run here: give --description"), "without a description, the one job's description check is named and not run", s.out);
+  fs.mkdirSync(path.join(q.dir, "src"), { recursive: true });
+  fs.writeFileSync(path.join(q.dir, "src", "one.js"), `${block}\n`);
+  fs.writeFileSync(path.join(q.dir, "src", "two.js"), `${block}\n`);
+  commit(q.dir, "a copy of code");
+  s = check(q.dir, "--base", "base");
+  ok(s.status === 1 && /FAIL core\.yml\/core\/core: its step "The copies, pointer, reading-size, workflow, entry-file, manifest and shape checks" failed/.test(s.out) && /^ +== No new copies$/m.test(s.out) && !/the copy of the core is not the core at its pin/.test(s.out) && mended(s.out),
+    "a new copy of code fails it, with the copies check's own failure and its mend, a step of the one job and no failure of the copy", s.out);
+  fs.writeFileSync(path.join(q.dir, "core", "README.md"), "edited here\n");
+  commit(q.dir, "and an edit to the copy");
+  s = check(q.dir, "--base", "base");
+  ok(s.status === 1 && /the copy of the core is not the core at its pin, so no other check runs/.test(s.out) && !/its step "The copies, pointer/.test(s.out) && mended(s.out),
+    "where the copy is not the core, the steps the one job runs of the copy's scripts run no more, the new copy unread", s.out);
+}
 
 // a change that takes a check's call out still runs it: the calls are the base's
 git(dir, "reset", "-q", "--hard", "base");

@@ -184,19 +184,22 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      outcomes the owner named, each by its direct measure or said to have none yet, then what the work cost, read
      through gh from the pull requests, issues and the label `correction` (`roles/shared/inbox.md`, "A correction is
      marked"; `tasks/cleaning.md`). The look's job runs them with the permissions it has; they add no job.
-   - **Its calls to the core's workflows:** its own `core.yml`, `personal-terms.yml`, `licences.yml`, `codeql.yml`,
-     `delete-merged-branches.yml` and, if it has versions Dependabot cannot see, `versions.yml` keep their triggers and
-     call the core's of the same name (`uses: HaakTuah/agent-core/.github/workflows/<name>.yml@<full commit SHA>`),
-     each with the triggers, the permissions and the inputs its template has (`setup/template/workflows/`, which
-     `scripts/init-test.mjs` holds to the core's workflows; `versions.yml` has none yet).
-   - **The core's checks without a secret run as one job** (#376): `core.yml`, given its inputs, runs after its own check
-     of the copy the copies, pointer, reading-size, workflow, entry-file, manifest and shape checks (`copies`, `sizes`),
-     the description check (`description: true`, on a pull request that is no draft and not Dependabot's) and the
-     package check (`npm` or `nuget`, last, since it runs the pull request's build files), each a step that runs even
+   - **Its calls to the core's workflows:** its own `core.yml`, `personal-terms.yml`, `copies.yml`, `licences.yml`,
+     `codeql.yml`, `delete-merged-branches.yml`, `pr-description.yml` and, if it has versions Dependabot cannot see,
+     `versions.yml` keep their triggers and call the core's of the same name
+     (`uses: HaakTuah/agent-core/.github/workflows/<name>.yml@<full commit SHA>`), each with the triggers, the
+     permissions and the inputs its template has (`setup/template/workflows/`, which `scripts/init-test.mjs` holds to
+     the core's workflows; `versions.yml` has none yet).
+   - **The core's checks without a secret may run as one job** (#376): `core.yml`, given its inputs, runs after its own
+     check of the copy the copies, pointer, reading-size, workflow, entry-file, manifest and shape checks (`copies`,
+     `sizes`), the description check (`description: true`, on a pull request that is no draft and not Dependabot's)
+     and the package checks (`signatures`, the folder of `package-lock.json`, and `nuget`, the licence check's
+     config), last, the NuGet check after all since it runs the pull request's build files; each a step that runs even
      where one before it failed. One job bills one runner's minutes where four or five did, and its status is one,
-     `core / core`. Their steps are the copy's `scripts/checks.mjs`, which a session may also run by hand
+     `core / core`: the starter kit writes it so for a private repository, in place of those checks' own calls
+     (below). Their steps are the copy's `scripts/checks.mjs`, which a session may also run by hand
      (`node core/scripts/checks.mjs`), a tool and no duty; the core's `copies.yml`, `pr-description.yml`,
-     `signatures.yml` and `nuget.yml` run the same steps, each in a job of its own, for a project that still calls them.
+     `signatures.yml` and `nuget.yml` run the same steps, each in a job of its own, for a project that calls them.
    - **A project whose orchestrator does not wake every day** also has a `look.yml` of its own, as its template has it
      (a daily schedule or a start by hand, and one job that may read the repository, its pull requests, checks and
      statuses, and write issues), calling the core's `look.yml`: it keeps one issue open for the owner while the core has
@@ -229,18 +232,18 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      browser origin, with every other Pages site of the account, so a preview's code, which no review has passed yet,
      reads whatever the live game keeps in the browser: a game keeps nothing there that matters beyond its own saves,
      and its threat model says so (core archive 201).
-   - **A project whose packages come from npm** has its signature check, on every pull request, as a step of the one
-     job (`npm:`, the folder of its lock file; or a `signatures.yml` of its own that calls the core's): where the pull
-     request changes a package list, a lock file, an `.npmrc`, the Node version or the calling workflow, an install from the registry alone, running no package's install
+   - **A project whose packages come from npm** has a `signatures.yml` of its own, on every pull request, which calls
+     the core's with the folder of its lock file (a private one, the one job's `signatures:`): where the pull request changes a package list, a lock file, an
+     `.npmrc`, the Node version or that workflow, an install from the registry alone, running no package's install
      script, then npm's own check of the registry's signature on each installed name and version (floor rule 7), and
      `licence-installed.mjs`, which holds each lock entry's licence and version to what the installed package says of
      itself, so that the licence check's reading of that lock file is a reading of the packages (a project with more
      than one lock file calls it for each); where it changes none, the check passes, so a ruleset can require it.
-   - **A project whose packages come from NuGet** runs the NuGet check on each pull request, in the one job given
-     `nuget:` (the licence check's config), or from a `nuget.yml` of its own that calls the core's, which in a private
-     repository may start only on a pull request that changes a file NuGet reads by name: a restore of each project
-     file git knows from its lock file alone (`dotnet restore --locked-mode`, floor rule 15), taking packages from
-     NuGet's own registry and from what the config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads
+   - **A project whose packages come from NuGet** has a `nuget.yml` of its own that calls the core's on every pull
+     request (a private one, the one job's `nuget:`; or its own call, started only on a pull request that changes a
+     file NuGet reads by name, so no other bills a job), with the licence check's config: a restore of each project file git knows from its
+     lock file alone (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from
+     what the config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads
      from NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
      lock files to one exact version (floor rule 7) and to its licence list (floor rule 10), each licence read from the
      manifest of the package the restore brought; what the restore brought that no lock file names is held to the list
@@ -299,8 +302,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      its calls to `core.yml` and `personal-terms.yml`, as the starter kit writes them, also start when a pull request
      is marked ready and skip their job on a draft, so a push to a draft bills none of them and a draft shows no check
      until it is marked ready (#375; `setup/sync-notes.md`, "16 November 2026, checks once a pull request is ready"),
-     and a pull request then starts two jobs, the one job and `personal-terms` (`setup/sync-notes.md`, "17 November
-     2026, the checks as one job"); and the core is synced once a day at
+     and a pull request then starts two jobs, `core.yml`'s one job and `personal-terms` (`setup/sync-notes.md`,
+     "17 November 2026, the checks as one job"); and the core is synced once a day at
      most, a sync PR opened that day being the day's ("Sessions" in `roles/shared/work-flow.md`). On GitHub's free plan it
      has neither rulesets nor auto-merge: there the sessions alone keep floor rule 12 and merge by hand
      (`roles/shared/work-flow.md`, point 1). The core's scripts read npm's lockfiles and NuGet's: what another installer

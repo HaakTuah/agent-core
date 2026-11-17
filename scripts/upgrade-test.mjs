@@ -40,7 +40,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { fill, readyOnly } from "./init.mjs";
+import { fill, oneJob, readyOnly } from "./init.mjs";
 import { scratchEnv } from "./scratch-core.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { STEPS, callers, leads, project as read } from "./steps.mjs";
@@ -463,7 +463,7 @@ function oneJobInPrivate(p) {
     `${p.name}: its calls kept as they were, a pull request once ready starts ${before.length} jobs, each check its own, and fresh.mjs lists the one call`, `${before.join(", ")}\n${fresh()}`);
   git(p.dir, "checkout", "-q", "main");
   const pin = /^Core: \S+ at ([0-9a-f]{40}),/m.exec(fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8"))[1];
-  const kit = readyOnly(fill(fs.readFileSync(path.join(p.dir, "core/setup/template/workflows/core.yml.tmpl"), "utf8"), { core: CORE, pin })) + "      nuget: checks/licences.json\n";
+  const kit = readyOnly(oneJob(fill(fs.readFileSync(path.join(p.dir, "core/setup/template/workflows/core.yml.tmpl"), "utf8"), { core: CORE, pin }), { nuget: "." }));
   fs.writeFileSync(path.join(p.dir, ".github/workflows/core.yml"), kit.replace(/\n/g, "\r\n"));
   for (const f of folded) fs.rmSync(path.join(p.dir, f));
   git(p.dir, "add", "-A");

@@ -158,19 +158,15 @@ ok(!shapeMissed.length && JSON.parse(fs.readFileSync(shapeBaseline, "utf8")).rea
 fs.writeFileSync(shapeBaseline, shapeAsKit);
 
 // ---- a pull request's trigger in each form GitHub takes: one name, a list, a mapping ----
-// (a call of its own to the core's signatures.yml, as the kit wrote one before its checks were one job: #376)
 const signatures = path.join(lockProject, ".github/workflows/signatures.yml");
-const oneJob = path.join(lockProject, ".github/workflows/core.yml"), oneJobAsKit = fs.readFileSync(oneJob, "utf8");
-fs.writeFileSync(oneJob, oneJobAsKit.replace(/^ {6}npm: .*\n/m, ""));
-const asKit = `name: signatures\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  signatures:\n    uses: ${CORE}/.github/workflows/signatures.yml@${PIN}\n    with:\n      directory: "."\n`;
+const asKit = fs.readFileSync(signatures, "utf8");
 for (const form of ["on: pull_request", "on: [pull_request, push]"]) {
   fs.writeFileSync(signatures, asKit.replace(/^on:\n  pull_request:\n/m, `${form}\n`));
   ok(!notDone(lockProject).length, `a signature workflow with "${form}" runs on every pull request, and reads done`, report(notDone(lockProject)));
 }
 fs.writeFileSync(signatures, asKit.replace(/^on:\n  pull_request:\n/m, "on: [push]\n"));
 ok(notDone(lockProject).length === 1, "one that is not started by a pull request is reported", report(notDone(lockProject)));
-fs.rmSync(signatures);
-fs.writeFileSync(oneJob, oneJobAsKit);
+fs.writeFileSync(signatures, asKit);
 
 // ---- a size marks file the reading-size check cannot read: each step that reads it is reported as not read, never as done ----
 const marksFile = path.join(lockProject, "checks/sizes.json"), marksAsKit = fs.readFileSync(marksFile, "utf8");
@@ -229,7 +225,7 @@ const agents = path.join(game, "AGENTS.md");
 fs.writeFileSync(agents, fs.readFileSync(agents, "utf8").replace(/\n## Starting a task\n[\s\S]*?\n## Commands/, "\n## Commands").replace("These whole", "these whole")
   .replace(/at\nthe start of every task\./, "at the start\n  of every task."));
 fs.rmSync(path.join(game, ".github/workflows/look.yml"));
-const wf = path.join(game, ".github/workflows/core.yml");
+const wf = path.join(game, ".github/workflows/copies.yml");
 fs.writeFileSync(wf, fs.readFileSync(wf, "utf8").replace(/@[0-9a-f]{40}/g, `@${"b".repeat(40)}`));
 const manifest = path.join(game, "core-manifest.md");
 fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8").replace(/^\| \*large file\* \|.*\n/m, "").replace("| `docs/PROGRESS.md` |", "| `PLAN.md` |"));
@@ -247,10 +243,9 @@ ok(found.length === 3 && !found.some(d => d.startsWith("AGENTS.md:")), "a file t
 const bare = kit("a-bare-npm-project", { packages: "." });
 fs.writeFileSync(path.join(bare, "package-lock.json"), "{}\n");
 fs.writeFileSync(path.join(bare, ".claude/settings.json"), '{"permissions": {}, "hooks": {}}\n');
-const bareCalls = path.join(bare, ".github/workflows/core.yml");
-fs.writeFileSync(bareCalls, fs.readFileSync(bareCalls, "utf8").replace(/^ {6}npm: .*\n/m, ""));
+fs.rmSync(path.join(bare, ".github/workflows/signatures.yml"));
 found = differences(project(bare), fresh(project(bare)));
-ok(found.some(d => d.startsWith(".claude/settings.json: lacks") && d.includes("Edit(//**/.git/**)")) && found.includes('.github/workflows/core.yml: lacks the line "npm: ".""'),
+ok(found.some(d => d.startsWith(".claude/settings.json: lacks") && d.includes("Edit(//**/.git/**)")) && found.includes(".github/workflows/signatures.yml: missing (the starter kit writes it today)"),
   "hooks' settings emptied, and a signature check lost from an npm project, are listed (its packages read from its lock file too)", found.join("\n"));
 
 // ---- the configs the kit writes beside its templates, and a workflow the core's reader cannot read ----
@@ -698,9 +693,9 @@ fs.mkdirSync(path.join(mixed, "config"));
 fs.writeFileSync(path.join(mixed, "config/npm.json"), JSON.stringify(npmPart, null, 2));
 fs.writeFileSync(path.join(mixed, "config/dotnet.json"), JSON.stringify({ nuget: nugetPart }, null, 2));
 fs.rmSync(path.join(mixed, "checks/licences.json"));
-for (const [wf, key, to] of [["licences.yml", "config", "config/npm.json"], ["core.yml", "nuget", "config/dotnet.json"]]) {
+for (const [wf, to] of [["licences.yml", "config/npm.json"], ["nuget.yml", "config/dotnet.json"]]) {
   const at = path.join(mixed, ".github/workflows", wf);
-  fs.writeFileSync(at, fs.readFileSync(at, "utf8").replace(`${key}: checks/licences.json`, `${key}: ${to}`));
+  fs.writeFileSync(at, fs.readFileSync(at, "utf8").replace("config: checks/licences.json", `config: ${to}`));
 }
 execFileSync("git", ["add", "-A"], { cwd: mixed });
 const mixedP = project(mixed), mixedFound = differences(mixedP, fresh(mixedP));
@@ -714,9 +709,9 @@ ok(late.licences === null && late.nuget === "config/dotnet.json" && fresh(licenc
 // (#368: a call's input that names its config only when the workflow runs, an expression, is never read as a path: that
 // check's config is reported not read and compared nowhere, the licence config without the "nuget" part, and the others
 // read and compared)
-for (const [key, from] of [["copies", "checks/copies.json"], ["nuget", "config/dotnet.json"]]) {
-  const at = path.join(mixed, ".github/workflows/core.yml");
-  fs.writeFileSync(at, fs.readFileSync(at, "utf8").replace(`${key}: ${from}`, `${key}: \${{ vars.${key.toUpperCase()} }}`));
+for (const [wf, from] of [["copies.yml", "checks/copies.json"], ["nuget.yml", "config/dotnet.json"]]) {
+  const at = path.join(mixed, ".github/workflows", wf);
+  fs.writeFileSync(at, fs.readFileSync(at, "utf8").replace(`config: ${from}`, `config: \${{ vars.${wf.split(".")[0].toUpperCase()} }}`));
 }
 execFileSync("git", ["add", "-A"], { cwd: mixed });
 const exprP = project(mixed), exprAt = configs(exprP), exprFound = differences(exprP, fresh(exprP));
@@ -826,11 +821,11 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
   const step = STEPS.find(s => s.lead === "17 November 2026, the checks as one job");
   const wf = (name, uses, w = "") => [name, { text: `jobs:\n  j:\n    uses: ${CORE}/.github/workflows/${uses}@${PIN}\n${w}`, yaml: parseYaml(`jobs:\n  j:\n    uses: ${CORE}/.github/workflows/${uses}@${PIN}\n${w}`) }];
   const of = (...files) => step.check({ workflows: Object.fromEntries(files), files: [], read: () => null, root: "." });
-  const all = "    with:\n      copies: c.json\n      sizes: s.json\n      description: true\n      npm: web\n";
-  ok(of(wf("core.yml", "core.yml")) === null && of(wf("core.yml", "core.yml", all)) === null && of(wf("core.yml", "core.yml", "    with:\n      npm: web\n"), wf("copies.yml", "copies.yml"), wf("d.yml", "pr-description.yml")) === null,
+  const all = "    with:\n      copies: c.json\n      sizes: s.json\n      description: true\n      signatures: web\n";
+  ok(of(wf("core.yml", "core.yml")) === null && of(wf("core.yml", "core.yml", all)) === null && of(wf("core.yml", "core.yml", "    with:\n      signatures: web\n"), wf("copies.yml", "copies.yml"), wf("d.yml", "pr-description.yml")) === null,
     "a call to core.yml alone, or one that folds each check, or one whose other checks are still called on their own, reads done");
   const left = of(wf("core.yml", "core.yml", "    with:\n      description: true\n")), twice = of(wf("core.yml", "core.yml", all), wf("s.yml", "signatures.yml")), bare = of(wf("core.yml", "core.yml", "    with:\n      copies: c.json\n      description: true\n"));
-  ok(/pass it `copies: checks\/copies\.json`/.test(left ?? "") && /`signatures\.yml`, which its `npm:` runs too/.test(twice ?? "") && /`sizes: checks\/sizes\.json` beside its `copies:`/.test(bare ?? ""),
+  ok(/pass it `copies: checks\/copies\.json`/.test(left ?? "") && /`signatures\.yml`, which its `signatures:` runs too/.test(twice ?? "") && /`sizes: checks\/sizes\.json` beside its `copies:`/.test(bare ?? ""),
     "one that leaves the copies checks out, runs the signature check twice, or passes copies without its marks is reported, each with its mend", [left, twice, bare].join("\n"));
 }
 

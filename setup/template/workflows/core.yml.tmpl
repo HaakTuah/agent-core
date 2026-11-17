@@ -1,21 +1,15 @@
-# The core's pull-request checks that need no secret, as one job (#376): the copy of the core (core-manifest.md), which
-# fails a change whose core/ is not the core, whole, at the commit the manifest pins, or whose calls to the core's
-# workflows are pinned where they differ from the core's at that pin; then, as steps of the same job, the copies,
-# pointer, reading-size, workflow, entry-file, manifest and shape checks, with this project's config (checks/copies.json)
-# and marks (checks/sizes.json); the description check ("Each PR has the headings" in core/roles/shared/work-flow.md),
-# on a pull request that is no draft and not Dependabot's, so its types take in an edited description, which is checked
-# again by itself; and the package check, where the starter kit wrote one (npm's signatures, or NuGet's restore), last.
-# One job bills one runner's minutes where four or five did. On every pull request and push to main, docs-only changes
-# included; in a private repository, as the starter kit writes it, on a pull request only once it is no draft
-# (core/scripts/init.mjs, READY_ONLY). Read-only, and no secrets: the description reaches the core's script as data.
-# A session may run the same steps by hand: node core/scripts/checks.mjs.
+# The copy of the core (core-manifest.md): fails a change whose core/ is not the core, whole, at the commit the manifest
+# pins, or whose calls to the core's workflows are pinned where they differ from the core's at that pin. On every pull
+# request and push to main, docs-only changes included; in a private repository, as the starter kit writes it, on a
+# pull request only once it is no draft (core/scripts/init.mjs, READY_ONLY), and with its checks that need no secret
+# as steps of this one job, its inputs naming them (oneJob, #376; a session may run the same steps by hand:
+# node core/scripts/checks.mjs).
 name: core
 
 on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, edited, reopened, synchronize, ready_for_review]
 
 permissions:
   contents: read
@@ -23,7 +17,3 @@ permissions:
 jobs:
   core:
     uses: {{core}}/.github/workflows/core.yml@{{pin}}
-    with:
-      copies: checks/copies.json
-      sizes: checks/sizes.json
-      description: true

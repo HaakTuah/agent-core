@@ -6,22 +6,26 @@
 // - copies: the copies, pointer, reading-size, workflow, entry-file, manifest and shape checks (what each holds, its
 //   own script says; the header of .github/workflows/copies.yml says them together);
 // - description: the description check (pr-description.mjs), given the pull request's description in PR_BODY or a file;
-// - signatures or nuget, the package check: first a look at whether the change touches what it reads, then npm's
-//   install and signature check, or NuGet's restore, each with its licence read. It runs the change's own build files
-//   (a NuGet restore), so it goes last, and the job runs it in a step of its own after the others: nothing that runs
-//   after it reads what a build could have changed.
+// - signatures and nuget, the package checks: first a look at whether the change touches what it reads, then npm's
+//   install and signature check, or NuGet's restore, each with its licence read. They go last, and the job runs each in
+//   a step of its own after the others; the NuGet restore runs the change's own build files, so it goes after all, and
+//   nothing that runs after it reads what a build could have changed.
 //
 // Each check runs even where one before it failed, so every failure is said, each with its mend; within the package
 // check a step runs only where the one before passed, as the steps of a job do. It exits 1 where any failed. What it
 // does not run: the core's own check of the copy (core.yml), which runs the workflow's own shell and nothing of the
-// repository's, since it is what proves this copy is the core; and personal-terms.yml, which needs a secret. With no
+// repository's, since it is what proves this copy is the core (by hand, node core/scripts/check.mjs runs it from plain
+// git, beside every other check); and personal-terms.yml, which needs a secret. By hand the package checks work in the
+// project's own folder, as the job does in its checkout: npm's install replaces node_modules with packages whose
+// install scripts never ran, and a restore writes obj/, so a session that needs its own build after them installs
+// again, or runs them in a worktree of their own. With no
 // part named, it runs each part the project's calls to the core's workflows run, with their inputs, read from its
 // .github/workflows (by hand: pass --description <a file> for the description). Node's own modules; the package checks
 // also npm, or bash, git, jq and the .NET SDK.
 //
 //   node core/scripts/checks.mjs [copies] [description] [signatures | nuget] [--base <commit, or origin/<branch>>]
 //        [--copies <config>] [--sizes <marks>] [--description <file>] [--parts <headings, |-separated>]
-//        [--npm <folder>] [--nuget <licence config>] [--advisory]
+//        [--signatures <folder of package-lock.json>] [--nuget <licence config>] [--advisory]
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -33,7 +37,7 @@ import { started } from "./started.mjs";
 import { parseYaml } from "./workflow-run.mjs";
 
 export const PARTS = ["copies", "description", "signatures", "nuget"];
-const OPTIONS = ["--base", "--copies", "--sizes", "--description", "--parts", "--npm", "--nuget"];
+const OPTIONS = ["--base", "--copies", "--sizes", "--description", "--parts", "--signatures", "--nuget"];
 const FLAGS = ["--advisory"];
 // The checks of the part "copies", in the order its workflow ran them: each its step's name, its script, its argument
 // (an option's name) and the variable that gives it the base.
@@ -83,10 +87,9 @@ export function options(args) {
 }
 
 // Each part named with what it runs with: both package checks, or one with nothing to run it with, fails.
-const NEED = { copies: ["copies", "sizes"], signatures: ["npm"], nuget: ["nuget"] };
+const NEED = { copies: ["copies", "sizes"], signatures: ["signatures"], nuget: ["nuget"] };
 function checked(o) {
-  if (o.parts.includes("signatures") && o.parts.includes("nuget")) fail("both package checks are named, and a project's packages come from one of them.", "name signatures for npm or nuget for NuGet, as the project's call to the core names npm or nuget.");
-  for (const part of o.parts) for (const opt of NEED[part] ?? []) if (!o[opt]) fail(`the part ${part} is named without --${opt}.`, `give --${opt}, as the project's call to the core gives its input ${opt === "npm" ? "npm (the folder of package-lock.json)" : opt}.`);
+  for (const part of o.parts) for (const opt of NEED[part] ?? []) if (!o[opt]) fail(`the part ${part} is named without --${opt}.`, `give --${opt}, as the project's call to the core gives its input ${opt}.`);
   if (o.parts.includes("description") && o.description === undefined && process.env.PR_BODY === undefined) fail("the part description is named with no description to read.", "give --description <a file that holds the pull request's description>.");
   return o;
 }
@@ -94,10 +97,10 @@ function checked(o) {
 // What each call to one of the core's workflows runs here: its parts, each with its settings, read from its inputs.
 const FROM = {
   core: w => [w.copies && ["copies", { copies: w.copies, sizes: w.sizes }], w.description === true && ["description", { headings: w.parts }],
-    w.npm && ["signatures", { npm: w.npm }], w.nuget && ["nuget", { nuget: w.nuget, advisory: w.advisory }]].filter(Boolean),
+    w.signatures && ["signatures", { signatures: w.signatures }], w.nuget && ["nuget", { nuget: w.nuget, advisory: w.advisory }]].filter(Boolean),
   copies: w => [["copies", { copies: w.config, sizes: w.sizes }]],
   "pr-description": w => [["description", { headings: w.parts }]],
-  signatures: w => [["signatures", { npm: w.directory ?? "." }]],
+  signatures: w => [["signatures", { signatures: w.directory ?? "." }]],
   nuget: w => [["nuget", { nuget: w.config, advisory: w.advisory }]],
 };
 
@@ -119,18 +122,18 @@ export function fromCalls(root, given) {
     for (const [k, v] of Object.entries(settings)) if (k === "advisory") found.advisory ||= v === true; else if (v !== undefined && v !== null && v !== "") found[k] ??= String(v);
   }
   if (!found.parts.length) fail("no part is named, and the project calls none of the core's workflows these parts run.", `name a part (${PARTS.join(", ")}) with its options, as the usage line at the top of scripts/checks.mjs shows.`);
-  // (the description, by hand, only where one is given; the package check of one kind, as the project's calls name it)
+  // (the description, by hand, only where one is given)
   if (given.description === undefined && process.env.PR_BODY === undefined) {
     found.parts = found.parts.filter(p => p !== "description");
     console.log("note the description check is not run: give --description <a file that holds the pull request's description>");
   }
-  if (found.parts.includes("nuget")) found.parts = found.parts.filter(p => p !== "signatures");
   return { ...found, ...Object.fromEntries(Object.entries(given).filter(([k, v]) => k !== "parts" && v !== undefined && v !== false)) };
 }
 
 // The base, as a commit: what --base names, fetched where it is origin/<branch> and not here yet (a checkout of one
-// commit, as a workflow's); "" where none is given or it is given empty.
-function baseCommit(base) {
+// commit, as a workflow's); "" where none is given or it is given empty. Where it cannot be had, it fails, or, given
+// `exits` false, throws that failure's line.
+function baseCommit(base, exits = true) {
   if (!base) return "";
   const at = () => execFileSync("git", ["rev-parse", "--verify", "-q", `${base}^{commit}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   try { return at(); } catch { /* (not here yet) */ }
@@ -138,7 +141,9 @@ function baseCommit(base) {
   if (branch) {
     try { execFileSync("git", ["fetch", "--no-tags", "--depth=1", "origin", `+refs/heads/${branch}:refs/remotes/origin/${branch}`], { stdio: ["ignore", "inherit", "inherit"] }); return at(); } catch { /* (below) */ }
   }
-  fail(`--base ${base} is no commit here, and could not be fetched.`, "give the commit the change merges into, such as origin/main after a fetch.");
+  const what = `--base ${base} is no commit here, and could not be fetched.`, mend = "give the commit the change merges into, such as origin/main after a fetch.";
+  if (exits) fail(what, mend);
+  throw new Error(`FAIL ${what} ${MEND}${mend}`);
 }
 
 // A program run with the variables given added to this script's own, its output passed on; whether it passed.
@@ -148,19 +153,20 @@ function run(cmd, args, { env = {}, cwd = undefined } = {}) {
   return r.status === 0;
 }
 const node = (coreAt, script, args, opts) => run(process.execPath, [`${coreAt}scripts/${script}`, ...args], opts);
-// npm with arguments of this script's own, each a fixed word: on Windows, where npm is a script, through its shell, in a
-// call of its own so that no path reaches that shell. Whether it passed.
-function npm(args, cwd) {
-  if (!args.every(a => /^[a-z-]+(=[a-z]+)?$/.test(a))) throw new Error(`npm is given a word of its own: ${args.join(" ")}`);
-  const r = process.platform === "win32" ? spawnSync("cmd.exe", ["/d", "/s", "/c", `npm ${args.join(" ")}`], { cwd, stdio: ["ignore", "inherit", "inherit"] })
-    : spawnSync("npm", args, { cwd, stdio: ["ignore", "inherit", "inherit"] });
-  if (r.error) console.log(`npm could not be started (${r.error.message}).`);
-  return r.status === 0;
-}
+// The registry's packages installed from the lock file, running no package's install script, and their signatures
+// checked: each written out whole, on Windows through its shell, where the program is a script. Whether each passed.
+const shown = { stdio: ["ignore", "inherit", "inherit"] };
+const passed = r => { if (r.error) console.log(`The package manager could not be started (${r.error.message}).`); return r.status === 0; };
+const install = cwd => passed(process.platform === "win32"
+  ? spawnSync("cmd.exe", ["/d", "/s", "/c", "npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none"], { cwd, ...shown })
+  : spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none"], { cwd, ...shown }));
+const signed = cwd => passed(process.platform === "win32" ? spawnSync("cmd.exe", ["/d", "/s", "/c", "npm audit signatures"], { cwd, ...shown })
+  : spawnSync("npm", ["audit", "signatures"], { cwd, ...shown }));
 
 const RUN = {
   copies(o, { coreAt, check }) {
-    if (o.base) baseCommit(o.base);
+    // (a base that cannot be had is a failure of its own, and every check still runs, each saying what it could not read)
+    if (o.base) check("The base the change merges into", () => { try { baseCommit(o.base, false); return true; } catch (e) { console.log(e.message); return false; } });
     for (const [name, script, arg, baseVar] of COPIES) check(name, () => node(coreAt, script, arg ? [o[arg]] : [], { env: baseVar ? { [baseVar]: o.base ?? "" } : {} }));
   },
 
@@ -176,15 +182,15 @@ const RUN = {
   // npm's own install from the lock file and its own check of the registry's signatures (.github/workflows/signatures.yml
   // says what it holds and why), where the change touches what it reads.
   signatures(o, { coreAt, check }) {
-    const dir = o.npm || ".";
+    const dir = o.signatures || ".";
     console.log("== Does the pull request change what this check reads?");
     const look = changes(process.env.BASE_SHA || baseCommit(o.base), [":(glob)**/package.json", ":(glob)**/package-lock.json", ":(glob)**/npm-shrinkwrap.json",
       ":(glob)**/.npmrc", `${coreAt}.node-version`, ".github/workflows/signatures.yml", ...caller()],
     "No package list, lock file, .npmrc, Node version or calling workflow changed: nothing to verify.");
     if (!look) return;
     if (!check("Install from the lock file, from the registry alone, running no package's install script",
-      () => npm(["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none"], dir))) return;
-    if (!check("The registry's signature on each installed name and version", () => npm(["audit", "signatures"], dir))) return;
+      () => install(dir))) return;
+    if (!check("The registry's signature on each installed name and version", () => signed(dir))) return;
     check("Each lock entry's licence and version, as the installed package says them", () => run(process.execPath, [path.resolve(`${coreAt}scripts/licence-installed.mjs`), "."], { cwd: dir }));
   },
 

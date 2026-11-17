@@ -643,12 +643,12 @@ export function marksConfig(p) {
   return inside(slot(p.manifest, "size marks", KIT_CONFIGS.sizes), "the manifest's *size marks* slot");
 }
 // The folder the signature check reads package-lock.json in, from the root: what the calls to the core's
-// signatures.yml pass as `directory` ("." where one passes none), or core.yml as `npm`, undefined where none calls it.
+// signatures.yml pass as `directory` ("." where one passes none), or core.yml as `signatures`, undefined where none calls it.
 export function packagesFolder(p) {
   const found = given(p, "signatures.yml", "directory").map(({ where, value }) => {
     if (value !== undefined && typeof value !== "string") throw new Unread(`${where} passes the core's signatures.yml a directory that is no text`);
     return { where, value: value === undefined ? "." : inside(value, `${where}'s call to the core's signatures.yml`) || "." };
-  }).concat(passedFolded(p, "npm").map(({ where, value }) => ({ where, value: value || "." })));
+  }).concat(passedFolded(p, "signatures").map(({ where, value }) => ({ where, value: value || "." })));
   return one(found, "the signature check's folder");
 }
 

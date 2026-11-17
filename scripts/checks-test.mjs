@@ -51,7 +51,7 @@ const run = (dir, args, extra = {}) => {
   const r = run(dir, ["copies", "--copies", "checks/copies.json", "--sizes", "checks/sizes.json", "--base", head]);
   const ran = [...r.out.matchAll(/^ran (\S+)/gm)].map(m => m[1]);
   ok(r.status === 1 && ran.join() === COPIES.map(([, s]) => s).join() && /^ran copies\.mjs \[checks\/copies\.json\] COPIES_BASE=[0-9a-f]{40}/m.test(r.out) && /^ran reading-size\.mjs \[checks\/sizes\.json\] SIZES_BASE=/m.test(r.out)
-    && /^ran shape\.mjs \[\] SHAPE_BASE=[0-9a-f]{40}/m.test(r.out) && /1 of 7 checks failed/.test(r.out) && mended(r.out),
+    && /^ran shape\.mjs \[\] SHAPE_BASE=[0-9a-f]{40}/m.test(r.out) && /1 of 8 checks failed/.test(r.out) && mended(r.out),
   "copies: each of its seven checks runs, in order, the one that fails not stopping the rest, each with its base and its file; it fails, and says each failure's mend", r.out);
   const none = run(dir, ["copies", "--copies", "c.json", "--sizes", "s.json", "--base", ""]);
   ok(/^ran copies\.mjs \[c\.json\] COPIES_BASE=(,|$)/m.test(none.out), "with the base given empty, as on a push to main, each check is given none", none.out);
@@ -60,11 +60,18 @@ const run = (dir, args, extra = {}) => {
 {
   const dir = project();
   for (const [what, args] of [["a part or option it does not know", ["--fast"]], ["an option with no value", ["copies", "--copies"]], ["copies without its marks", ["copies", "--copies", "c.json"]],
-    ["both package checks", ["signatures", "nuget", "--npm", ".", "--nuget", "x.json"]], ["a description with nothing to read", ["description"]], ["a base that is no commit", ["copies", "--copies", "c", "--sizes", "s", "--base", "nowhere"]],
+    ["a description with nothing to read", ["description"]], ["a base that is no commit", ["copies", "--copies", "c", "--sizes", "s", "--base", "nowhere"]],
     ["no part, and no call to the core's workflows", []]]) {
     const r = run(dir, args);
     ok(r.status === 1 && mended(r.out), `${what}: it fails, saying its mend`, r.out);
   }
+}
+// a base that cannot be had fails as a check of its own, and every check of the part still runs
+{
+  const dir = project();
+  const r = run(dir, ["copies", "--copies", "c.json", "--sizes", "s.json", "--base", "origin/nowhere"]);
+  ok(r.status === 1 && [...r.out.matchAll(/^ran (\S+)/gm)].length === COPIES.length && /^FAIL --base origin\/nowhere is no commit here/m.test(r.out) && mended(r.out),
+    "a base that cannot be fetched fails as a check of its own, saying its mend, and each of the seven checks still runs", r.out);
 }
 // with no part named: what the project's calls run, folded into core.yml, or each in its own
 {
@@ -86,13 +93,13 @@ const run = (dir, args, extra = {}) => {
   const base = git(dir, "rev-parse", "HEAD");
   fs.writeFileSync(path.join(dir, "README.md"), "# p\n\nMore.\n");
   git(dir, "commit", "-q", "-am", "a doc");
-  const npm = run(dir, ["signatures", "--npm", "web"], { BASE_SHA: base });
+  const npm = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base });
   ok(npm.status === 0 && /nothing to verify/.test(npm.out) && !/^== Install/m.test(npm.out), "signatures: a change to a doc alone installs nothing", npm.out);
   fs.mkdirSync(path.join(dir, ".github/workflows"), { recursive: true });
   fs.writeFileSync(path.join(dir, ".github/workflows/core.yml"), "name: core\n");
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "the caller");
-  const called = run(dir, ["signatures", "--npm", "web"], { BASE_SHA: base, CALLER: "o/p/.github/workflows/core.yml@refs/pull/1/merge", GITHUB_REPOSITORY: "o/p" });
+  const called = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base, CALLER: "o/p/.github/workflows/core.yml@refs/pull/1/merge", GITHUB_REPOSITORY: "o/p" });
   ok(/^Changed:\n- \.github\/workflows\/core\.yml$/m.test(called.out) && /^== Install from the lock file/m.test(called.out), "and a change to the workflow that calls it, whatever it is named, is one it reads", called.out);
   const nuget = run(dir, ["nuget", "--nuget", "checks/licences.json"], { BASE_SHA: base });
   ok(nuget.status === 0 && new RegExp(`^ran nuget-look\\.sh BASE=${base} CONFIG=checks/licences\\.json$`, "m").test(nuget.out) && !/^== (Every locked|Restore)/m.test(nuget.out), "nuget: where its look says nothing NuGet reads changed, nothing is fetched or restored", nuget.out);

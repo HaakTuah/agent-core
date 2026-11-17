@@ -11,16 +11,18 @@
 # cases carried and no-floor (the core's reports/staged-cases.json and scripts/staged-tools.json on its main, read as
 # data; a tool that never ran them has not passed), it fails a repository without its own copy of the floor ("Floor
 # copy:"), and a copy that differs from the floor at the pin.
-# A project calls it (workflow_call) on every pull request and push to main, docs-only changes included,
-# pinned to a full commit SHA. Given its inputs, the same job then runs the core's other checks that need no secret, as
-# steps of its own (#376): copies.yml's (copies, sizes), pr-description.yml's (description, parts) and the package check,
-# signatures.yml's (npm) or nuget.yml's (nuget, advisory), each through the copy's scripts/checks.mjs, which holds their
-# steps and says what each holds; each such step runs even where one before it failed, so every failure is said, and
-# the package check goes last, in a step of its own, since it runs the pull request's build files. One job bills one
-# runner's minutes where four or five did (#377); with no such input it runs this check alone, as before. Reads only, with no secret: it fetches this public repository at the pin it reads, which
+# A project calls it (workflow_call) on every pull request and push to main, docs-only changes included, pinned to a
+# full commit SHA. Its own check reads only, with no secret: it fetches this public repository at the pin it reads, which
 # must be a full commit SHA before it is used, and runs nothing from either repository. Its own shell is tested in the
 # core before any project runs it: scripts/core-yml-test.mjs runs this job on scratch projects, and
 # scripts/pure-sync-test.mjs on every way a copy can differ.
+# Given its inputs, the same job then runs the core's other checks that need no secret, as steps of its own (#376):
+# copies.yml's (copies, sizes), pr-description.yml's (description, parts), signatures.yml's (signatures) and nuget.yml's
+# (nuget, advisory), each through the copy's scripts/checks.mjs, which holds their steps and says what each holds, as
+# those workflows run it. Each such step runs even where one before it failed, so every failure is said; the package
+# checks go last, each in a step of its own, and the NuGet check, which runs the pull request's build files, after all.
+# One job bills one runner's minutes where four or five did (#377); with no such input it runs its own check alone, as
+# before.
 name: core
 
 on:
@@ -46,7 +48,7 @@ on:
         required: false
         type: string
         default: ""
-      npm:
+      signatures:
         description: The folder that holds package-lock.json, from the root; given, the signature check runs on a pull request.
         required: false
         type: string
@@ -68,8 +70,8 @@ permissions:
 jobs:
   core:
     runs-on: ubuntu-latest
-    # (each part's own: this check 5 minutes, those of the copy's scripts 5, the package check 10)
-    timeout-minutes: ${{ (inputs.npm != '' || inputs.nuget != '') && 20 || (inputs.copies != '' || inputs.description) && 10 || 5 }}
+    # (each part's own: this check 5 minutes, those of the copy's scripts 5, each package check 10)
+    timeout-minutes: ${{ (inputs.signatures != '' && inputs.nuget != '') && 30 || (inputs.signatures != '' || inputs.nuget != '') && 20 || (inputs.copies != '' || inputs.description) && 10 || 5 }}
     # (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is; a run on
     # main, a schedule or a start by hand is its own group and is never cancelled; #388)
     concurrency:
@@ -288,10 +290,10 @@ jobs:
           exit "$bad"
       # The core's other checks that need no secret, where the caller's inputs name them (#376): each step runs the copy's
       # scripts/checks.mjs, which holds their steps, and runs even where a step before it failed, so every failure is
-      # said. The package check runs last: it runs the pull request's build files, so no step runs after it.
+      # said. The package checks run last, the NuGet check after all: it runs the pull request's build files.
       - name: Where the core's copy stands, for the checks of its scripts (core-manifest.md's "Core:" line; the core's tasks/repositories.md)
         id: core-at
-        if: ${{ !cancelled() && (inputs.copies != '' || inputs.description || inputs.npm != '' || inputs.nuget != '') }}
+        if: ${{ !cancelled() && (inputs.copies != '' || inputs.description || inputs.signatures != '' || inputs.nuget != '') }}
         run: |
           rm -rf .core-at-pin .lib-at-pin # (this check's own fetches, which no check after it reads as the project's)
           at=$(sed -n -E 's#^Core: [^ ]+( at [0-9a-f]{40}, copied whole|, carried by (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)) under (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)( .*)?$#\4 \2#p' core-manifest.md 2>/dev/null | head -n 1)
@@ -318,15 +320,23 @@ jobs:
           GH_TOKEN: ${{ github.token }} # (read only: the base's commits and copy, and the issues a pull request queues or closes)
           PARTS: ${{ inputs.parts }}
         run: node "$CORE_AT"scripts/checks.mjs description --parts "$PARTS"
-      - name: The package check, last
-        if: ${{ !cancelled() && steps.core-at.outcome == 'success' && (inputs.npm != '' || inputs.nuget != '') && github.event_name == 'pull_request' }}
+      - name: The signature check
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.signatures != '' && github.event_name == 'pull_request' }}
         timeout-minutes: 10
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           CALLER: ${{ github.workflow_ref }} # the calling workflow, by its own path, whatever it is named
-          NPM: ${{ inputs.npm }}
-          NUGET: ${{ inputs.nuget }}
+          FOLDER: ${{ inputs.signatures }}
+        run: node "$CORE_AT"scripts/checks.mjs signatures --signatures "$FOLDER"
+      # (last of all: the NuGet check runs the pull request's build files, so no step runs after it)
+      - name: The NuGet check, last
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.nuget != '' && github.event_name == 'pull_request' }}
+        timeout-minutes: 10
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CALLER: ${{ github.workflow_ref }} # the calling workflow, by its own path, whatever it is named
+          CONFIG: ${{ inputs.nuget }}
           ADVISORY: ${{ inputs.advisory }}
         run: |
-          if [ -n "$NUGET" ]; then set -- nuget --nuget "$NUGET"; [ "$ADVISORY" != true ] || set -- "$@" --advisory; else set -- signatures --npm "$NPM"; fi
+          set -- nuget --nuget "$CONFIG"; [ "$ADVISORY" != true ] || set -- "$@" --advisory
           node "$CORE_AT"scripts/checks.mjs "$@"

@@ -289,7 +289,7 @@ function readyOnlyHolds(p) {
 // checks and the description check each folded into it, still called on their own or run by a workflow of the project's,
 // the copies checks with their marks,
 // and none both folded and called, which would bill its job twice. Null where no call folds any part.
-const FOLDS = [["copies", "copies.yml"], ["description", "pr-description.yml"], ["npm", "signatures.yml"], ["nuget", "nuget.yml"]];
+const FOLDS = [["copies", "copies.yml"], ["description", "pr-description.yml"], ["signatures", "signatures.yml"], ["nuget", "nuget.yml"]];
 function oneJobHolds(p) {
   readable(p, text => /\/\.github\/workflows\/(core|copies|pr-description|signatures|nuget)\.ya?ml@/i.test(text));
   if (!FOLDS.some(([key]) => folded(p, key).length)) return null;
@@ -565,7 +565,7 @@ export const STEPS = [
     partly: "whether every input is listed, and whether its tests try each case, is a reading of the project, held by the security review" },
   { lead: "16 November 2026, secret scanning with push protection", cost: COST.read, unread: "whether secret scanning and its push protection are on is GitHub's setting, not a file's: `gh api repos/<owner>/<repo>` answers it under `security_and_analysis`, and the entry says how a session switches them on or names them to the owner" },
   { lead: "16 November 2026, the NuGet check where it can matter", cost: COST.workflow, check: nugetPathsHold,
-    partly: "whether the repository is private is GitHub's setting, not a file's: `core/scripts/fresh.mjs`, which every sync runs, lists the `paths:` a private project's call lacks" },
+    partly: "whether the repository is private is GitHub's setting, not a file's; the starter kit now runs a private project's NuGet check as a step of `core.yml`'s one job (17 November 2026), so `core/scripts/fresh.mjs` lists that call, not these `paths:`" },
   { lead: "16 November 2026, what a screen is held to", cost: COST.read, unread: "whether people use a project through a screen is a reading of what it builds, not a file's to say; where they do, its *direction* is the first step of its next pull request that changes a screen (`core/tasks/screens.md`, point 1), and the critique asks for it there" },
   { lead: "16 November 2026, how strong the tests are", cost: COST.workflow, check: strengthNamed,
     partly: "which mutation tool fits the project's language is a reading of the project; the row says it, or `none` with its reason" },

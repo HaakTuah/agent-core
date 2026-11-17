@@ -12,7 +12,7 @@
 # of the registry's, and the rest of rule 7's source check (the same publisher and repository, a provenance kept where
 # the old version had one, the diff read against the release notes): those stay with the reviews, which read the lock
 # file's diff. A project calls it (workflow_call) from a workflow of its own of the same name, on every pull request,
-# pinned to a full commit SHA ("How a project takes the core" in README.md, point 5), or calls core.yml with npm, which
+# pinned to a full commit SHA ("How a project takes the core" in README.md, point 5), or calls core.yml with signatures, which
 # runs the same in its one job (#376); its steps are the project's own core/scripts/checks.mjs's. It looks itself whether the pull
 # request changes a package list, a lock or shrinkwrap file, an `.npmrc`, the Node version, this workflow or the calling one
 # (git's own diff against the base), installs and checks only then, and passes otherwise: so it reports on every pull
@@ -57,5 +57,5 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }} # empty where the caller runs on anything but a pull request
           CALLER: ${{ github.workflow_ref }} # the calling workflow, by its own path, whatever it is named
-          NPM: ${{ inputs.directory }}
-        run: node "$CORE_AT"scripts/checks.mjs signatures --npm "$NPM"
+          FOLDER: ${{ inputs.directory }}
+        run: node "$CORE_AT"scripts/checks.mjs signatures --signatures "$FOLDER"

@@ -15,14 +15,13 @@
 //   --owner    the owner's GitHub login: the *owner's account* (floor rule 4), the issue forms' assignee
 //   --name     the project's name in its rule files; left out, its folder's
 //   --at       the commit of the core's main the project starts from; left out, the clone's own HEAD
-//   --npm      its packages come from npm: the signature check (a step of core.yml's one job) and Dependabot's npm
-//              updates, for that folder
-//   --nuget    its packages come from NuGet (.NET): the NuGet check (a step of core.yml's one job) and Dependabot's
-//              NuGet updates, for the folder
+//   --npm      its packages come from npm: the signature check and Dependabot's npm updates, for that folder
+//   --nuget    its packages come from NuGet (.NET): the NuGet check and Dependabot's NuGet updates, for the folder
 //              that holds its solution or project files (. for the root)
 //   --private  a private repository without GitHub's paid code security: no call to the core's CodeQL and licence
-//              workflows, which need it (README.md, point 5, "A private repository"), and each pull-request check
-//              started only once a pull request is no draft (READY_ONLY)
+//              workflows, which need it (README.md, point 5, "A private repository"), its checks without a secret as
+//              steps of core.yml's one job (oneJob), and each pull-request check started only once a pull request is
+//              no draft (READY_ONLY)
 //   --game     a game: the module game-design.md with the others
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -70,12 +69,17 @@ export const FILES = [
   ["issue-bug.md.tmpl", ".github/ISSUE_TEMPLATE/bug_report.md"],
   ["issue-idea.md.tmpl", ".github/ISSUE_TEMPLATE/feature_request.md"],
   ["workflows/core.yml.tmpl", ".github/workflows/core.yml"],
+  // (a private repository's checks without a secret run as steps of core.yml's one job instead: oneJob, #376)
+  ["workflows/copies.yml.tmpl", ".github/workflows/copies.yml", o => !o.private],
+  ["workflows/pr-description.yml.tmpl", ".github/workflows/pr-description.yml", o => !o.private],
   ["workflows/security-review.yml.tmpl", ".github/workflows/security-review.yml"],
   ["workflows/personal-terms.yml.tmpl", ".github/workflows/personal-terms.yml"],
   ["workflows/delete-merged-branches.yml.tmpl", ".github/workflows/delete-merged-branches.yml"],
   ["workflows/look.yml.tmpl", ".github/workflows/look.yml"],
   ["workflows/codeql.yml.tmpl", ".github/workflows/codeql.yml", o => !o.private],
   ["workflows/licences.yml.tmpl", ".github/workflows/licences.yml", o => !o.private],
+  ["workflows/signatures.yml.tmpl", ".github/workflows/signatures.yml", o => o.packages !== undefined && !o.private],
+  ["workflows/nuget.yml.tmpl", ".github/workflows/nuget.yml", o => o.nuget !== undefined && !o.private],
 ];
 // What the script makes itself, beside the templates' files: none of these may exist either.
 const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "core"];
@@ -189,14 +193,20 @@ export function files(o, pin, moduleNames, read) {
       if (o.packages !== undefined) text += fill(read("dependabot-npm.yml.tmpl"), { ...words, npm: folder(o.packages) });
       if (o.nuget !== undefined) text += fill(read("dependabot-nuget.yml.tmpl"), { ...words, nuget: folder(o.nuget) });
     }
-    // (the package check, a step of the one job, last: npm's signatures, for the folder of package-lock.json, in quotes
-    // since a folder named true or null is still a folder's name; or NuGet's, with the licence check's config; #376)
-    if (to === ".github/workflows/core.yml" && o.packages !== undefined) text += `      npm: ${JSON.stringify(o.packages)}\n`;
-    if (to === ".github/workflows/core.yml" && o.nuget !== undefined) text += "      nuget: checks/licences.json\n";
+    if (to === ".github/workflows/core.yml" && o.private) text = oneJob(text, o);
     if (READY_ONLY.includes(to) && o.private) text = readyOnly(text);
     return [to, text];
   });
 }
+
+// A private repository's checks without a secret as steps of core.yml's one job (#376), where each job is a billed
+// minute: its call given the copies check's config and marks, the description check, whose types it takes, and the
+// package check, last: the signature check, for the folder of package-lock.json, in quotes since a folder named true or
+// null is still a folder's name, or the NuGet check, with the licence check's config. A public repository's minutes are
+// free, so it keeps a call of its own to each.
+export const oneJob = (text, o) => `${text.replace(/^ {2}pull_request:(\r?\n)/m, (on, eol) => `${on}    types: [opened, edited, reopened, synchronize, ready_for_review]${eol}`)
+}    with:\n      copies: checks/copies.json\n      sizes: checks/sizes.json\n      description: true\n${o.packages !== undefined ? `      signatures: ${JSON.stringify(o.packages)}\n` : ""}${
+  o.nuget !== undefined ? "      nuget: checks/licences.json\n" : ""}`;
 
 // A private repository's pull-request checks start only once a pull request is ready (#375): each of these calls also
 // triggers when one is marked ready, and its job is skipped on a draft, so a push to a draft bills no job and marking
