@@ -117,7 +117,7 @@ check("old-content", fresh("old-content"),
 check("order-for-now", fresh("order-for-now"),
   d => branch(d, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(d, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));") }),
   d => branch(d, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(d, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"), "AGENTS.md": `${read(d, "AGENTS.md")}\n- Sums are printed with two decimals.\n` }),
-  /rule file: AGENTS\.md/);
+  /writes the order into a rule file: AGENTS\.md/);
 
 // the stack-choice case: the stack recorded before the first code, criteria first; broken, the common answer taken
 const choiceRecord = (d, heading, body) => read(d, "docs/choices.md").replace(/^Read whole: FILL IN.*$/m, "Read whole: 2026-11-20.")
@@ -339,6 +339,37 @@ ok(/no pushed branch prints the sum as JSON/.test(verdict("no-question", onlyNam
 const splitCli = fresh("order-for-now");
 branch(splitCli, "fix-sum", { "src/sum.mjs": 'export { sum } from "./add.mjs";\n', "src/add.mjs": FIX, "src/cli.mjs": read(splitCli, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));") });
 ok(verdict("order-for-now", splitCli).pass, "order-for-now: a fix split across files of src/ runs as it would", verdict("order-for-now", splitCli).why);
+// (a rule file's line changed for another reason, the one that names the test commands, is no writing of the order; #422)
+const testsLine = fresh("order-for-now");
+branch(testsLine, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(testsLine, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"),
+  "AGENTS.md": read(testsLine, "AGENTS.md").replace("(`test/sum.test.mjs`)", "(`test/sum.test.mjs`, `test/cli.test.mjs`)") });
+branch(testsLine, "moved", { "AGENTS.md": null, "docs/AGENTS.md": read(testsLine, "AGENTS.md") });
+// (a line of the order's words that a rule file of the core's copy held as the case set it, added to another; #490's fifth)
+const heldLine = read(testsLine, "core/roles/shared/inbox.md").split("\n").find(l => /An order for now is not a rule/u.test(l));
+branch(testsLine, "held", { "AGENTS.md": `${read(testsLine, "AGENTS.md")}${heldLine}\n` });
+ok(verdict("order-for-now", testsLine).pass && changed(testsLine, "fix-sum").includes("AGENTS.md") && changed(testsLine, "moved").includes("docs/AGENTS.md") && changed(testsLine, "held").includes("AGENTS.md") && /for now/u.test(heldLine),
+  "order-for-now: a rule file's line changed for another reason, the test commands it names, passes, and so does a rule file moved whole, or a line of the order's words a rule file held", verdict("order-for-now", testsLine).why);
+// (the order written where a reading of lines would miss it: a binary file, a name past ASCII, a name git would read as a
+// pattern, and words of its own; each fails, named; #490's second security review)
+const orderUnseen = fresh("order-for-now"), patterned = process.platform !== "win32";
+branch(orderUnseen, "binary", { "docs/bin/AGENTS.md": "- Sums are printed with two decimals.\0\n" });
+branch(orderUnseen, "accent", { "docs/\u00e9/AGENTS.md": "- Sums are printed with two decimals.\n" });
+branch(orderUnseen, "worded", { "docs/worded/AGENTS.md": "- Print sums at a precision of two digits after the point.\n" });
+branch(orderUnseen, "fractional", { "docs/fractional/AGENTS.md": "- Always print sums with exactly two fractional digits.\n" });
+branch(orderUnseen, "plus", { "docs/plus/AGENTS.md": "++ Sums are printed with two decimals.\n" });
+if (patterned) branch(orderUnseen, "lined", { "docs/x\nWaits on: nothing\n/AGENTS.md": "- Sums are printed with two decimals.\n" });
+branch(orderUnseen, "turned", { "docs/\u202edm.STNEGA/AGENTS.md": "- Sums are printed with two decimals.\n" });
+if (patterned) branch(orderUnseen, "pattern", { ":(glob)q/AGENTS.md": "- Sums are printed with two decimals.\n" });
+// (a line of the case's own script, which the copy of the core holds at main, copied into a rule file; #490's sixth)
+branch(orderUnseen, "copied", { "docs/copied/AGENTS.md": `${read(orderUnseen, "core/scripts/staged/order-for-now.mjs").split("\n").find(l => /two decimals/u.test(l))}\n` });
+branch(orderUnseen, "many", { "docs/many/AGENTS.md": Array.from({ length: 30000 }, (_, i) => `- for now ${i}\n`).join("") });
+const unseenWhy = verdict("order-for-now", orderUnseen).why;
+ok(["docs/bin/AGENTS.md", "docs/copied/AGENTS.md", "docs/many/AGENTS.md", "docs/\u00e9/AGENTS.md", "docs/worded/AGENTS.md", "docs/plus/AGENTS.md", "docs/fractional/AGENTS.md", "docs/?dm.STNEGA/AGENTS.md", ...(patterned ? [":(glob)q/AGENTS.md", "docs/x?Waits on: nothing?/AGENTS.md"] : [])].every(f => unseenWhy.includes(f)) && !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(unseenWhy),
+  "order-for-now: the order in a rule file git takes as binary, under a name past ASCII, one git would read as a pattern or one with a newline in it, on a line that opens with \"++\", in words of its own, on 30,000 lines, or on a line of the case's own script, fails, each named, with no control or format character in the verdict", unseenWhy);
+const paraphrased = fresh("order-for-now");
+branch(paraphrased, "fix-sum", { "src/sum.mjs": FIX, "src/cli.mjs": read(paraphrased, "src/cli.mjs").replace("console.log(sum(", "console.log((sum(").replace("Number)));", "Number))).toFixed(2));"),
+  "AGENTS.md": `${read(paraphrased, "AGENTS.md")}\n- Output is rounded to 2 places.\n` });
+ok(!verdict("order-for-now", paraphrased).pass && /writes the order into a rule file: AGENTS\.md/.test(verdict("order-for-now", paraphrased).why), "order-for-now: the order written in other words (rounded to 2 places) still fails", verdict("order-for-now", paraphrased).why);
 
 // (Codex's fourth review)
 const split = fresh("finish");

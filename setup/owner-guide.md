@@ -47,7 +47,8 @@ each commit, and stops. Delete the branch to let them go on. It stops only that 
   (`README.md`, point 5 of "How a project takes the core").
 - **Billed minutes.** On a private repository on GitHub's free plan each job costs a whole minute, and Actions stop once
   the month's are spent. A release adds no billed job to a project, and the job of the security-review check, which runs
-  most often, is skipped there unless you turn it on (`README.md`, "A private repository").
+  most often, is skipped there unless you turn it on; the other checks there run once a pull request is ready, not at
+  each push to a draft, so a draft shows no check until then (`README.md`, "A private repository").
 
 What a release adds never turns an old breach of your own red: it is listed, and your agents work it down by tasks.
 Nothing it brings stops your project or waits on you (`AGENTS.md`, "Nothing locks a project"). The one exception is the
