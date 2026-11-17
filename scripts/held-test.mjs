@@ -55,8 +55,9 @@ asked.length = 0;
 const many = Array.from({ length: GITHUB_MOST + 3 }, (_, i) => `many-moss-${String(i).padStart(2, "0")}`);
 for (const [i, name] of many.entries()) answers[`https://registry.npmjs.org/${name}`] = { status: 200, json: npmDoc(name, ago(300 - i)) };
 r = await lookAgain(many.map((name) => pkg(name)), { get, now: NOW });
-const onGitHub = asked.filter((u) => u.startsWith("https://api.github.com/"));
-ok(onGitHub.length === GITHUB_MOST && onGitHub.includes("https://api.github.com/repos/invented-org/many-moss-00") && !onGitHub.includes(`https://api.github.com/repos/invented-org/${many.at(-1)}`) && r.notOnGitHub === 3, `GitHub is asked of ${GITHUB_MOST} named packages at most, the oldest last release first`, onGitHub.length);
+// (each asked repository by its path on GitHub's API, the host read whole)
+const onGitHub = new Set(asked.map((u) => new URL(u)).filter((u) => u.host === "api.github.com").map((u) => u.pathname));
+ok(onGitHub.size === GITHUB_MOST && onGitHub.has("/repos/invented-org/many-moss-00") && !onGitHub.has(`/repos/invented-org/${many.at(-1)}`) && r.notOnGitHub === 3, `GitHub is asked of ${GITHUB_MOST} named packages at most, the oldest last release first`, onGitHub.size);
 
 // past its time, nothing more is asked, and what was not asked is said
 asked.length = 0;
