@@ -188,6 +188,13 @@ const accented = fresh("stack-choice");
 git(accented, "checkout", "-q", "-b", "first-version"); write(accented, "docs/décision.md", "notes\n"); git(accented, "add", "-A"); git(accented, "commit", "-q", "-m", "notes");
 write(accented, "docs/choices.md", choiceRecord(accented, "Go", GO)); write(accented, "main.go", "package main\n"); git(accented, "add", "-A"); git(accented, "commit", "-q", "-m", "record and code"); git(accented, "push", "-q", "origin", "first-version");
 ok(verdict("stack-choice", accented).pass, "stack-choice: a doc named beyond ASCII, before the record, is not read as code", verdict("stack-choice", accented).why);
+// (a package file of a runtime the aims rule out fails, at the root and in a folder named beyond ASCII, whose name git
+// would quote but for -z; #437)
+for (const [at, where] of [["package.json", "at the root"], ["\u00e9/package.json", "in a folder named beyond ASCII"]]) {
+  const ruledOut = fresh("stack-choice");
+  branch(ruledOut, "stack", { "docs/choices.md": choiceRecord(ruledOut, "Go", GO), [at]: "{}\n" });
+  ok(/stack adds a package file of a runtime the aims rule out/.test(verdict("stack-choice", ruledOut).why), `stack-choice: a ruled-out runtime's package file ${where} fails`, verdict("stack-choice", ruledOut).why);
+}
 const shell = fresh("stack-choice");
 branch(shell, "stack", { "docs/choices.md": choiceRecord(shell, "A BusyBox shell script with awk, not Node", GO.replace("Picked: Go", "Picked: the shell script")) });
 ok(verdict("stack-choice", shell).pass, "stack-choice: the plain option picked, its heading naming the common one it is not, passes", verdict("stack-choice", shell).why);
