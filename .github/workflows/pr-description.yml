@@ -6,8 +6,9 @@
 # the merge commit against its first parent, the base). A draft is not asked (it claims a
 # lane and says little), nor Dependabot's own PRs (floor rule 17). A project calls it (workflow_call) from a workflow of its own of the same name, on pull_request
 # with the types opened, edited, reopened, synchronize and ready_for_review, so that a description put right is checked
-# again by itself, pinned to a full commit SHA ("How a project takes the core" in README.md, point 5). It runs the
-# project's own core/scripts/pr-description.mjs on the core's one exact Node; gh and Node's own modules only, no package
+# again by itself, pinned to a full commit SHA ("How a project takes the core" in README.md, point 5); or it calls core.yml with
+# description: true, which runs the same in its one job (#376). It runs the project's own core/scripts/pr-description.mjs,
+# through its checks.mjs, which holds the step, on the core's one exact Node; gh and Node's own modules only, no package
 # installed. Read-only, with no secret, its token reading only the base's commits and copy and, where it can, the
 # issues the pull request queues or closes, a dozen at most (the core's tasks/done-when.md): the description, which anyone who opens a pull request writes, reaches the
 # script through env and is never written into a run line (floor rule 2).
@@ -54,4 +55,4 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           GH_TOKEN: ${{ github.token }} # (read only: the base's commits and copy, for the day it gained a line, and the issues a pull request queues or closes)
           PARTS: ${{ inputs.parts }}
-        run: node "$CORE_AT"scripts/pr-description.mjs "$PARTS"
+        run: node "$CORE_AT"scripts/checks.mjs description --parts "$PARTS"

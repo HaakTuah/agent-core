@@ -14,7 +14,7 @@ import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { COMMAND } from "./helper-call.mjs";
 import { FILES, files, fill, filtered, GAME_ROWS, licences, linked, modules, named, options, READ, READY_ONLY, sizes, startOf, TEMPLATES } from "./init.mjs";
 import { scratch } from "./scratch-core.mjs";
-import { evaluate, parseYaml, pathsLetThrough } from "./workflow-run.mjs";
+import { evaluate, parseYaml } from "./workflow-run.mjs";
 import { mended } from "./mend.mjs";
 
 let failed = 0, count = 0;
@@ -80,13 +80,18 @@ ok(JSON.stringify(startOf(Object.fromEntries(files({ owner: "someone", name: "P"
 const dependabot = o => files({ owner: "someone", name: "P", ...o }, A, ["git.md"], fromFolder).find(([to]) => to === ".github/dependabot.yml")[1];
 const ecosystems = text => (text.match(/package-ecosystem: "/g) ?? []).length;
 ok(dependabot({ nuget: "." }).includes('package-ecosystem: "nuget"\n    directory: "/"\n') && ecosystems(dependabot({ nuget: "." })) === 2 && dependabot({ nuget: "src" }).includes('directory: "/src"\n') && ecosystems(dependabot({})) === 1 && !dependabot({}).includes("nuget"), "a project whose packages come from NuGet gets Dependabot's updates for them, for its folder, beside the actions' own, and one that named no installer gets the actions' alone");
-// a private repository's NuGet check starts only where a pull request changes a file NuGet reads by name (#373)
-const nugetCall = o => parseYaml(files({ owner: "someone", name: "P", nuget: ".", ...o }, A, ["git.md"], fromFolder).find(([to]) => to === ".github/workflows/nuget.yml")[1]);
-const privateCall = nugetCall({ private: true }), publicCall = nugetCall({});
-const filter = privateCall.on.pull_request?.paths ?? [];
-ok(filter.length > 0 && pathsLetThrough(filter, ["App.csproj"]) && pathsLetThrough(filter, ["src/App/packages.lock.json"]) && pathsLetThrough(filter, ["NuGet.Config"]) && pathsLetThrough(filter, ["src/App.CSPROJ"]) && pathsLetThrough(filter, ["Packages.Lock.Json"]) && pathsLetThrough(filter, ["a/packages.net8.0.lock.json"]) && pathsLetThrough(filter, ["checks/licences.json"])
-  && !pathsLetThrough(filter, ["README.md", "src/App/Program.cs", "core/scripts/nuget.mjs"]) && privateCall.jobs.nuget.with.config === "checks/licences.json" && publicCall.on.pull_request === null,
-  "a private project's NuGet check starts only on a pull request that changes a file NuGet reads by name, in any case, so no other bills a job; a public one's on every pull request", JSON.stringify(privateCall.on));
+// a private repository's checks without a secret run as steps of core.yml's one job (#376): its call given the copies
+// check's config and marks, the description check, whose types it takes, and the package check of the project's kind,
+// with no call of its own to those checks; a public one keeps a call to each
+const kitOf = o => Object.fromEntries(files({ owner: "someone", name: "P", ...o }, A, ["git.md"], fromFolder).map(([to, text]) => [to, text]));
+const oneCall = o => parseYaml(kitOf({ private: true, ...o })[".github/workflows/core.yml"]);
+const withNuget = oneCall({ nuget: "." }), withNpm = oneCall({ packages: "tools" }), withBoth = oneCall({ packages: "web", nuget: "." }), withNone = oneCall({});
+const separate = to => /\/(copies|pr-description|signatures|nuget)\.yml$/.test(to);
+ok(withNuget.jobs.core.with.nuget === "checks/licences.json" && withNuget.jobs.core.with.signatures === undefined && withNpm.jobs.core.with.signatures === "tools" && withNpm.jobs.core.with.nuget === undefined
+  && withBoth.jobs.core.with.signatures === "web" && withBoth.jobs.core.with.nuget === "checks/licences.json" && withNone.jobs.core.with.signatures === undefined && withNone.jobs.core.with.nuget === undefined
+  && JSON.stringify(withNone.jobs.core.with) === JSON.stringify({ copies: "checks/copies.json", sizes: "checks/sizes.json", description: true }) && withNone.on.pull_request.types.join() === "opened,edited,reopened,synchronize,ready_for_review"
+  && !Object.keys(kitOf({ private: true, packages: "web", nuget: "." })).some(separate) && Object.keys(kitOf({ packages: "web", nuget: "." })).filter(separate).length === 4 && parseYaml(kitOf({ packages: "web" })[".github/workflows/core.yml"]).jobs.core.with === undefined,
+  "a private project's one call is given the copies check's files, the description check and the package checks of its kind, and its types take in an edited description, with no call of its own to those; a public one's calls are each its own", JSON.stringify([withNuget, withNpm, withNone]));
 // a private repository's pull-request checks start only once a pull request is ready (#375): each call also triggers
 // when one is marked ready, its job skipped on a draft and run on a push to main; a public one's as they were
 const callsOf = o => Object.fromEntries(files({ owner: "someone", name: "P", nuget: ".", packages: ".", ...o }, A, ["git.md"], fromFolder).filter(([to]) => READY_ONLY.includes(to)).map(([to, text]) => [to, parseYaml(text)]));
@@ -94,9 +99,9 @@ const privateCalls = callsOf({ private: true }), publicCalls = callsOf({});
 const asked = (wf, action, draft, event = "pull_request") => Object.values(wf.jobs).map(job => evaluate(String(job.if ?? "true").replace(/^\$\{\{|\}\}$/g, ""), { github: { event_name: event, event: event === "pull_request" ? { action, pull_request: { draft } } : {} } }))
   .every(Boolean) && (event !== "pull_request" || (wf.on.pull_request?.types ?? ["opened", "reopened", "synchronize"]).includes(action));
 ok(Object.keys(privateCalls).length === READY_ONLY.length && Object.values(privateCalls).every(wf => !asked(wf, "synchronize", true) && !asked(wf, "opened", true) && asked(wf, "ready_for_review", false) && asked(wf, "synchronize", false) && asked(wf, "opened", false) && (!wf.on.push || asked(wf, null, null, "push")))
-  && privateCalls[".github/workflows/personal-terms.yml"].on.pull_request.types.join() === "opened,edited,synchronize,reopened,ready_for_review" && privateCalls[".github/workflows/nuget.yml"].on.pull_request.paths?.length > 0
+  && privateCalls[".github/workflows/personal-terms.yml"].on.pull_request.types.join() === "opened,edited,synchronize,reopened,ready_for_review" && privateCalls[".github/workflows/core.yml"].on.pull_request.types.join() === "opened,edited,reopened,synchronize,ready_for_review"
   && Object.values(publicCalls).every(wf => asked(wf, "synchronize", true) && Object.values(wf.jobs).every(job => job.if === undefined)),
-  "a private project's calls to the core's pull-request checks start no job on a push to a draft, and each once it is marked ready, pushed to once ready or opened ready, and on a push to main; its personal-terms and NuGet calls keep their own types and paths; a public one's start on every push as before", JSON.stringify(privateCalls));
+  "a private project's calls to the core's pull-request checks start no job on a push to a draft, and each once it is marked ready, pushed to once ready or opened ready, and on a push to main; its personal-terms call keeps its own types, and the one job lists ready_for_review once; a public one's start on every push as before", JSON.stringify(privateCalls));
 const both = dependabot({ packages: "web", nuget: "." });
 ok(ecosystems(both) === 3 && both.indexOf('directory: "/web"') > 0 && both.indexOf('directory: "/web"') < both.indexOf('"nuget"') && (both.match(/^version: 2$/gm) ?? []).length === 1, "a project with both installers gets both, in one config");
 ok(JSON.parse(fromFolder("claude-settings.json.tmpl")).hooks.PreToolUse[0].hooks[0].command === COMMAND, "the helper hook's command in the settings template is, letter for letter, the one helper-call.mjs holds and its test runs");
@@ -360,8 +365,8 @@ const t = project("a-folder-named-true", "--owner", "x", "--npm", "true");
 ok(t.status === 0 && fs.readFileSync(path.join(t.dir, ".github/workflows/signatures.yml"), "utf8").includes('directory: "true"') && fs.readFileSync(path.join(t.dir, ".github/dependabot.yml"), "utf8").includes('directory: "/true"'), "a folder whose name YAML would read as something else is written in quotes, so it stays a name");
 const n = project("a-dotnet-project", "--owner", "x", "--nuget", "src", "--private");
 const nRead = f => fs.readFileSync(path.join(n.dir, f), "utf8");
-ok(n.status === 0 && nRead(".github/workflows/nuget.yml").includes("config: checks/licences.json") && !/^\s*advisory:/m.test(nRead(".github/workflows/nuget.yml")) && JSON.stringify(JSON.parse(nRead("checks/licences.json")).nuget) === '{"ships":[],"tools":[]}' && nRead(".github/dependabot.yml").includes('directory: "/src"') && !fs.existsSync(path.join(n.dir, ".github/workflows/signatures.yml")) && n.out.includes("RestorePackagesWithLockFile"),
-  "a project whose packages come from NuGet gets the call to the NuGet check, which fails from the first day, the config's part for its lock files, and is told to turn lock files on; a private one too, since that check needs nothing GitHub sells", n.out.slice(0, 400));
+ok(n.status === 0 && nRead(".github/workflows/core.yml").includes("      nuget: checks/licences.json\n") && !/^\s*advisory:/m.test(nRead(".github/workflows/core.yml")) && !fs.existsSync(path.join(n.dir, ".github/workflows/nuget.yml")) && JSON.stringify(JSON.parse(nRead("checks/licences.json")).nuget) === '{"ships":[],"tools":[]}' && nRead(".github/dependabot.yml").includes('directory: "/src"') && !fs.existsSync(path.join(n.dir, ".github/workflows/signatures.yml")) && n.out.includes("RestorePackagesWithLockFile"),
+  "a project whose packages come from NuGet gets the NuGet check, which fails from the first day (here, private, a step of the one job), the config's part for its lock files, and is told to turn lock files on; a private one too, since that check needs nothing GitHub sells", n.out.slice(0, 400));
 ok(!fs.existsSync(path.join(t.dir, ".github/workflows/nuget.yml")) && JSON.parse(fs.readFileSync(path.join(t.dir, "checks/licences.json"), "utf8")).nuget === undefined, "and one that named no NuGet folder gets neither");
 ok(p.status !== 0 || /\*\*the trusted builder:\*\*\n\s+FILL IN:/.test(read("SECURITY.md")) && p.out.includes("who may change the protected files"), "who may change the protected files, where the project narrows floor rule 3, is left for the project to say, and listed with what is left");
 // the kit is read from the commit, never from the clone's working folder: an edit not yet committed reaches no project

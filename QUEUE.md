@@ -14,7 +14,6 @@ it merges last.
 | #519 | rule builder, hard work, by #515's process whether or not #515 has merged; #515's point 2 trial runs first or with it, as its evidence | |
 | #515, points 1 and 3 to 14 | rule builder; point 12 changes what a reviewer reads, with the owner's yes on the issue | |
 | #488, points 1, 2 and 6 | rule builder; it changes the floor (rules 15 and 7) | |
-| #376 | rule builder | #375, which changes the same files |
 | #488, points 3 to 5, 7 and 8 | builder | #488's points 1 and 2 |
 | #303 | rule builder | |
 | #306 | rule builder | |
