@@ -371,30 +371,37 @@ function movedPaths(p) {
   return wrong.length ? `${first(found)} one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.` : null;
 }
 
-// Each job of a workflow, with the commands its steps run (shell comments left out, as check-configs.mjs's reader
-// reads them) and whether its checkout holds the base beside the head (a fetch-depth of 0, or 2 or more). A workflow
-// whose YAML cannot be read is read as one job, its whole text its one command list.
+// Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads
+// them), in order; the commands that count as a run of the lookup, of a step that fails where the command fails (no
+// continue-on-error, no "||" after the lookup) in a workflow a pull request starts; and whether its checkout holds the
+// base beside the head (a fetch-depth of 0, or 2 or more, and no ref of another commit). A workflow whose YAML cannot
+// be read is read as one job, its whole text its one command list, and none of it counts as a lookup.
 function jobsOf(w) {
   const deep = (v) => /^(?:0|[2-9]|\d{2,})$/u.test(String(v ?? "").trim());
   const jobs = w.yaml?.jobs && typeof w.yaml.jobs === "object" ? Object.values(w.yaml.jobs) : null;
-  if (!jobs) return [{ runs: commands(w.text ?? ""), deep: /fetch-depth:\s*["']?(?:0|[2-9]|\d{2,})\b/u.test(w.text ?? "") }];
+  if (!jobs) return [{ runs: commands(w.text ?? ""), counted: [], deep: false }];
+  const started = onPullRequests(w.yaml?.on);
   return jobs.map(job => {
     const steps = Array.isArray(job?.steps) ? job.steps : [];
-    return { runs: steps.flatMap(st => (typeof st?.run === "string" ? commands(st.run) : [])),
-      deep: steps.some(st => typeof st?.uses === "string" && /^actions\/checkout@/u.test(st.uses) && deep(st.with?.["fetch-depth"])) };
+    const runOf = st => (typeof st?.run === "string" ? commands(st.run) : []);
+    const fails = st => typeof st?.run === "string" && !st["continue-on-error"] && !/lookup\.mjs[^\n]*\|\|/u.test(st.run);
+    return { runs: steps.flatMap(runOf), counted: started ? steps.flatMap(st => (fails(st) ? runOf(st) : [[]])) : [],
+      deep: steps.some(st => typeof st?.uses === "string" && /^actions\/checkout@/u.test(st.uses) && deep(st.with?.["fetch-depth"]) && st.with?.ref === undefined) };
   });
 }
-// Whether a job runs the NuGet lookup before anything that may run the pull request's build files: dotnet, or the
-// NuGet check's scripts, which a workflow runs after its restore.
-const lookedUpFirst = (runs, copy) => {
-  const first = runs.findIndex(c => running(c, "lookup.mjs", true, copy));
-  const builds = runs.findIndex(c => /(?:^|[\\/])dotnet(?:\.exe)?$/iu.test(c[0]?.text ?? "") || running(c, "nuget.mjs", undefined, copy) || running(c, "nuget-fetch.mjs", undefined, copy));
+// Whether a job runs the NuGet lookup, as counted, before anything that may build the pull request's code: dotnet,
+// msbuild or nuget, or the NuGet check's scripts, which a workflow runs after its restore.
+const lookedUpFirst = (job, copy) => {
+  const first = job.counted.findIndex(c => looksUp(c, true, copy));
+  const builds = job.counted.findIndex(c => /(?:^|[\\/])(?:dotnet|msbuild|nuget)(?:\.exe)?$/iu.test(c[0]?.text ?? "") || running(c, "nuget.mjs", undefined, copy) || running(c, "nuget-fetch.mjs", undefined, copy));
   return first >= 0 && (builds < 0 || first < builds);
 };
-// Whether a command runs the script `name` of the copy at `copy` (the manifest's path, core/ by default), and, given
+// Whether a command names the script `name` of the copy at `copy` (the manifest's path, core/ by default), and, given
 // `flag`, with that flag (true) or without it (false).
 const running = (words, name, flag, copy = "core/") => words.some(w => new RegExp(`(?:^|/)${copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")}scripts/${name.replace(".", "\\.")}$`, "u").test(w.text))
   && (flag === undefined || words.some(w => w.text === "--nuget") === flag);
+// Whether a command runs the lookup itself: node, then the copy's script.
+const looksUp = (words, flag, copy) => /(?:^|[\\/])node(?:\.exe)?$/iu.test(words[0]?.text ?? "") && words.length > 1 && running([words[1]], "lookup.mjs", undefined, copy) && running(words, "lookup.mjs", flag, copy);
 
 export const STEPS = [
   { lead: "12 November 2026, builders named by role", cost: COST.line,
@@ -594,13 +601,14 @@ export const STEPS = [
       const wrong = Object.entries(p.workflows).flatMap(([f, w]) => {
         const jobs = jobsOf(w), at = `\`.github/workflows/${shown(f)}\``, copy = corePath(p.root) || "core/";
         const any = (name, flag) => jobs.some(j => j.runs.some(c => running(c, name, flag, copy)));
+        const looked = (flag) => jobs.some(j => j.counted.some(c => looksUp(c, flag, copy)));
         return [
-          any("exact-versions.mjs") && !any("lookup.mjs", false) ? `in ${at}, beside the step that runs \`${copy}scripts/exact-versions.mjs\`, add one that runs \`node ${copy}scripts/lookup.mjs <the licence check's config>\`` : null,
-          (any("nuget.mjs") || any("nuget-fetch.mjs")) && !jobs.some(j => lookedUpFirst(j.runs, copy)) ? `in ${at}, before any step that runs \`dotnet\` or \`${copy}scripts/nuget.mjs\` (a restore runs the pull request's own build files, which could change what the lookup reads), add one that runs \`node ${copy}scripts/lookup.mjs <the licence check's config> --nuget\`` : null,
-          jobs.some(j => !j.deep && j.runs.some(c => running(c, "lookup.mjs", undefined, copy))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\`` : null,
+          any("exact-versions.mjs") && !looked(false) ? `in ${at}, beside the step that runs \`${copy}scripts/exact-versions.mjs\`, add one that runs \`node ${copy}scripts/lookup.mjs <the licence check's config>\`` : null,
+          (any("nuget.mjs") || any("nuget-fetch.mjs")) && !jobs.some(j => lookedUpFirst(j, copy)) ? `in ${at}, before any step that builds or restores (\`dotnet\`, \`msbuild\`, a build script) or runs \`${copy}scripts/nuget.mjs\` (a restore runs the pull request's own build files, which could change what the lookup reads), add one that runs \`node ${copy}scripts/lookup.mjs <the licence check's config> --nuget\`` : null,
+          jobs.some(j => !j.deep && j.counted.some(c => looksUp(c, undefined, copy))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\` and no \`ref:\`` : null,
         ].filter(Boolean);
       });
-      return wrong.length ? `On every pull request, ${wrong.join("; ")}; the checkout with \`fetch-depth: 2\` holds the pull request's base, which the lookup reads against.` : null;
+      return wrong.length ? `On every pull request, ${wrong.join("; ")}; each lookup as a step of its own that fails where it fails (no \`continue-on-error\`, no \`||\` after it), in a workflow a pull request starts, its checkout with \`fetch-depth: 2\` holding the pull request's base, which the lookup reads against.` : null;
     },
     partly: "a project that calls the core's `licences.yml` or `nuget.yml` takes the step with the call, and the check passing is held by that check" },
 ];

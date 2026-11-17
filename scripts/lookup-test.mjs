@@ -174,6 +174,12 @@ try {
   r = await run(config, { root: tmp, base, get, now: NOW });
   const out = r.lines.join("\n");
   ok(r.code === 1 && mended(out) && /^FAIL: package-lock\.json: never-published-moss@1\.0\.0/mu.test(out) && !/tidy-moss-format/u.test(out) && /1 of 1 new package fail/u.test(out), `an update passes unlooked, and a new name the registry lacks fails, saying the mend, though a lock file the config does not name held it (${r.lines})`);
+  // A lock file merged as data, which the pull request then names in the config: its names are new, not held.
+  writeFileSync(join(tmp, "licences.json"), JSON.stringify({ lockfiles: ["package-lock.json", "fixtures/package-lock.json"], ships: [] }));
+  write({ "node_modules/tidy-moss-format": { version: "1.1.0", resolved: tgz("tidy-moss-format") }, "node_modules/never-published-moss": { version: "1.0.0", resolved: tgz("never-published-moss", "1.0.0") } });
+  r = await run(config, { root: tmp, base, get, now: NOW });
+  ok(r.code === 1 && /^FAIL: package-lock\.json: never-published-moss@1\.0\.0/mu.test(r.lines.join("\n")), `a lock file the pull request newly names in the config makes no name held (${r.lines})`);
+  writeFileSync(join(tmp, "licences.json"), JSON.stringify({ lockfiles: ["package-lock.json"], ships: [] }));
   writeFileSync(join(tmp, "package-lock.json"), "{ not json");
   r = await run(config, { root: tmp, base, get, now: NOW });
   ok(r.code === 1 && mended(r.lines.join("\n")), `a lock file that cannot be read fails, saying the mend (${r.lines})`);
@@ -201,7 +207,7 @@ try {
   const nugetJob = (...lines) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n${lines.map((l) => `      - run: ${l}\n`).join("")}`);
   nugetJob("dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget");
   missed = notDone(tmp, step);
-  ok(missed.length === 1 && /before any step that runs `dotnet`/u.test(missed[0].mend), `a NuGet lookup after the restore, which runs the pull request's build files, does not count (${missed.map((m) => m.mend)})`);
+  ok(missed.length === 1 && /before any step that builds or restores/u.test(missed[0].mend), `a NuGet lookup after the restore, which runs the pull request's build files, does not count (${missed.map((m) => m.mend)})`);
   nugetJob("node core/scripts/lookup.mjs c.json --nuget", "dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json");
   ok(notDone(tmp, step).length === 0, "and before it, it does");
   writeFileSync(join(tmp, "core-manifest.md"), `# Manifest\n\nCore: ${CORE} at ${"0".repeat(40)}, copied whole under shared/\n`);
@@ -210,6 +216,21 @@ try {
   ok(missed.length === 1 && /runs `node shared\/scripts\/lookup\.mjs/u.test(missed[0].mend), `where the manifest puts the core under shared/, its scripts are read there (${missed.map((m) => m.mend)})`);
   nugetJob("node shared/scripts/lookup.mjs c.json", "node shared/scripts/exact-versions.mjs c.json");
   ok(notDone(tmp, step).length === 0, "and its lookup there counts");
+  writeFileSync(join(tmp, "core-manifest.md"), "# Manifest\n");
+  for (const [what, line] of [["named by an echo", "echo core/scripts/lookup.mjs c.json"], ["allowed to fail", "node core/scripts/lookup.mjs c.json || true"]]) {
+    nugetJob("node core/scripts/exact-versions.mjs c.json", line);
+    missed = notDone(tmp, step);
+    ok(missed.length === 1 && /add one that runs `node core\/scripts\/lookup\.mjs/u.test(missed[0].mend), `a lookup ${what} does not count (${missed.map((m) => m.mend)})`);
+  }
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  push:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
+  ok(notDone(tmp, step).length === 1, "nor one in a workflow no pull request starts");
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n        continue-on-error: true\n");
+  ok(notDone(tmp, step).length === 1, "nor one in a step allowed to fail");
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n          ref: ${{ github.event.pull_request.head.sha }}\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /no `ref:`/u.test(missed[0].mend), `and a checkout of another commit than the merge does not hold the base (${missed.map((m) => m.mend)})`);
+  nugetJob("msbuild -t:Restore", "node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/nuget.mjs c.json");
+  ok(notDone(tmp, step).length === 1, "a NuGet lookup after an msbuild restore does not count");
 } finally { rmSync(tmp, { recursive: true, force: true }); }
 
 console.log(failed ? `${failed} failing` : "ok   lookup.mjs");

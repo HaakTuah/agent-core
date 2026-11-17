@@ -85,17 +85,21 @@ jobs:
         with:
           node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       # (before anything of the pull request's runs here: the first look below may itself restore)
-      # (its verdict is kept as the step's output, which nothing after it in this job can change, and read by the last
-      # step, so that the restore and the licence check still run and say what they find)
+      # (it fails by itself, before anything of the pull request's runs, so that nothing a restore runs after it can
+      # undo its verdict; the steps after it still run on its failure alone, to say what they find)
       - name: Each package new to the project looked up in NuGet's registry (floor topic 15)
         id: lookup
         env:
           CONFIG: ${{ inputs.config }}
           LOOKUP_BASE: ${{ github.event.pull_request.base.sha }} # empty where the caller runs on anything but a pull request
+          ADVISORY: ${{ inputs.advisory }}
         run: |
-          if node "$CORE_AT"scripts/lookup.mjs "$CONFIG" --nuget; then echo "failed=false" >> "$GITHUB_OUTPUT"; else echo "failed=true" >> "$GITHUB_OUTPUT"; fi
+          node "$CORE_AT"scripts/lookup.mjs "$CONFIG" --nuget && exit 0
+          [ "$ADVISORY" = true ] || exit 1
+          echo "Advisory: nothing fails for it yet."
       - name: Does the pull request change what NuGet reads?
         id: what
+        if: ${{ !cancelled() && (success() || steps.lookup.outcome == 'failure') }}
         env:
           BASE: ${{ github.event.pull_request.base.sha }} # empty where the caller runs on anything but a pull request
           CONFIG: ${{ inputs.config }}
@@ -192,7 +196,7 @@ jobs:
           echo "run=$run" >> "$GITHUB_OUTPUT"
       - name: Every locked package and tool, fetched before the restore and held to its list
         # (anything but a plain no checks, and only before any build of the pull request's has run in this job)
-        if: steps.what.outputs.run != 'false' && steps.what.outputs.built != 'true'
+        if: ${{ !cancelled() && (success() || steps.lookup.outcome == 'failure') && steps.what.outputs.run != 'false' && steps.what.outputs.built != 'true' }}
         env:
           CONFIG: ${{ inputs.config }}
           ADVISORY: ${{ inputs.advisory }}
@@ -208,7 +212,7 @@ jobs:
             echo "Advisory: nothing fails for it yet."
           fi
       - name: Restore each project file from its lock file alone
-        if: steps.what.outputs.run != 'false' # anything but a plain no checks
+        if: ${{ !cancelled() && (success() || steps.lookup.outcome == 'failure') && steps.what.outputs.run != 'false' }} # anything but a plain no checks
         env:
           CONFIG: ${{ inputs.config }}
           ADVISORY: ${{ inputs.advisory }}
@@ -240,7 +244,7 @@ jobs:
             echo "Advisory: nothing fails for it yet."
           fi
       - name: Every package one exact version, and under a licence on its list
-        if: steps.what.outputs.run != 'false' # anything but a plain no checks
+        if: ${{ !cancelled() && (success() || steps.lookup.outcome == 'failure') && steps.what.outputs.run != 'false' }} # anything but a plain no checks
         env:
           CONFIG: ${{ inputs.config }}
           ADVISORY: ${{ inputs.advisory }}
@@ -248,11 +252,3 @@ jobs:
         run: |
           if [ "$ADVISORY" = true ]; then node "$CORE_AT"scripts/nuget.mjs "$CONFIG" --packages "$NUGET_PACKAGES" --advisory
           else node "$CORE_AT"scripts/nuget.mjs "$CONFIG" --packages "$NUGET_PACKAGES"; fi
-      - name: The lookup's verdict, taken before anything of the pull request's ran (floor topic 15)
-        if: ${{ !cancelled() && steps.lookup.outputs.failed != 'false' }}
-        env:
-          ADVISORY: ${{ inputs.advisory }}
-        run: |
-          echo "FAIL: a package new to the project failed the lookup, or the lookup could not run, as the step \"Each package new to the project looked up in NuGet's registry\" says above. Mend: do what that step's failure says, and push"
-          [ "$ADVISORY" = true ] || exit 1
-          echo "Advisory: nothing fails for it yet."

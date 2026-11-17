@@ -258,14 +258,15 @@ async function pool(items, size, work) {
 // ---- The project
 
 /** The lock files of `nuget` or npm the config names, and the base's own of the same kind, each read to packages. */
-/** The lock files of `nuget` or npm the config names, each read to packages, and the base's: the same paths, and those
- *  the config as the base held it named (`baseConfig`), as the base held them. Only a lock file a config names counts
- *  as held, so no file merged as data first makes a name count as held. */
+/** The lock files of `nuget` or npm the config names, each read to packages, and the base's: those the config as the
+ *  base held it named (`baseConfig`), as the base held them. Only a lock file the base's own config named counts as
+ *  held, so no file merged as data first, and named in the config only by the pull request, makes a name count as held:
+ *  a lock file the pull request newly names is new, and each of its packages is looked up. */
 export function packagesOf(config, root, base, nuget, baseConfig = null) {
   const named = (c) => { try { return nuget ? [...nugetConfig(c).ships, ...nugetConfig(c).tools] : Array.isArray(c?.lockfiles) ? c.lockfiles : []; } catch { return []; } };
   const read = nuget ? nugetPackages : npmPackages;
   const head = named(config).map((f) => [f, read(readFileSync(posix.join(root, f), "utf8"), f)]);
-  const baseFiles = [...new Set([...named(config), ...named(baseConfig)].map((f) => posix.normalize(f)))];
+  const baseFiles = [...new Set(named(baseConfig).map((f) => posix.normalize(f)))];
   const baseLists = baseFiles.map((f) => { try { return read(textAt(root, base, f) ?? "", f); } catch { return []; } });
   return { head, base: baseLists };
 }
