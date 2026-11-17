@@ -481,7 +481,8 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   const own = at => notFile(listing(root, rev ?? "HEAD"), at) || shownNotBlob(root, rev ?? "HEAD", at) || (!rev && (() => { try { const st = fs.lstatSync(path.join(root, at)); return st.isSymbolicLink() || st.isDirectory(); } catch { return false; } })());
   const linked = at => own(at) || linkedOnMain(at);
   const project = configured(read, skills, names, linked);
-  for (const [at, want] of misnamed(rev ? [...listing(root, rev).blobs, ...listing(root, rev).links] : tracked(root))) {
+  // (in the working tree, one ignored is no file of the project's, as `read` has it)
+  for (const [at, want] of misnamed(rev ? [...listing(root, rev).blobs, ...listing(root, rev).links] : toolPaths(root)).filter(([at]) => rev || !ignored(at))) {
     const problem = `${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`;
     project.problems.push(problem);
     // (with what the tool reads through it, so one the base held is noted only while that stands letter for letter)
@@ -545,9 +546,23 @@ function through(at, want, read, names) {
   })));
   return [at, read(at), ...files, ...folders].join("\0\0");
 }
-// The paths the working tree holds of the project's, tracked or not but never ignored, git asked once.
-function tracked(root) {
-  try { return execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }).split("\0").filter(Boolean); } catch { return []; }
+// The paths of the working tree on the way to a tool's file, in whatever case they stand, read from the folders
+// themselves, so it costs no git process: each entry whose name in lower case is a step of WAYS, and what the tool
+// folders hold, a few deep; a link is named there, never followed.
+function toolPaths(root) {
+  const out = [], folders = TOOL_FOLDERS.map(d => d.slice(0, -1));
+  const visit = (at, depth) => {
+    let entries = [];
+    try { entries = fs.readdirSync(path.join(root, at), { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const p = at ? `${at}/${e.name}` : e.name, low = p.toLowerCase();
+      if (!WAYS.has(low) && !folders.some(d => low.startsWith(`${d}/`))) continue;
+      out.push(p);
+      if (e.isDirectory() && depth < 4) visit(p, depth + 1);
+    }
+  };
+  visit("", 0);
+  return out;
 }
 
 // At the commit `rev`, git's own tree is walked as the working tree is, a name at a time as the file system walks it:
