@@ -1,4 +1,4 @@
-// For the tests alone (steps-test.mjs and upgrade-test.mjs, beside this file): for each step steps.mjs reads with a
+// For the tests alone (tests/steps-test.mjs and tests/upgrade-test.mjs): for each step steps.mjs reads with a
 // check, how a project that missed it holds it (`stage`, written into the project at `dir`) and its mend as the step
 // words it (`mend`), so that a test can take a step out of a synced project, see the sync report exactly that, and
 // see the mend as written make it done. A step with a check and no entry here fails steps-test.mjs. One marked
