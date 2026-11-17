@@ -77,6 +77,23 @@ const real = (p, kind) => {
   if (st.isSymbolicLink() || (kind === "dir" ? !st.isDirectory() : !st.isFile())) throw new Unreadable(`${p} is not a plain ${kind === "dir" ? "folder" : "file"}`);
   return true;
 };
+// A JSON file of the case's (github.json, a memo of its seal), read through one descriptor: a plain file, never a link
+// (refused as it is opened, where the system can, and opened without waiting, so that a pipe swapped in stops nothing)
+// nor a second name of another file, of 16 MB or less; anything else, and text that is no JSON, is Unreadable, its
+// message naming the file and quoting none of its text (#435).
+const JSON_MAX = 16 << 20;
+const jsonOf = at => {
+  if (!real(at, "file")) throw new Unreadable(`${at} is not there`);
+  let fd;
+  try { fd = fs.openSync(at, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0)); } catch { throw new Unreadable(`${at} is not a plain file`); }
+  try {
+    const st = fs.fstatSync(fd);
+    if (!st.isFile() || st.nlink !== 1 || st.size > JSON_MAX) throw new Unreadable(`${at} is not a plain file of its own, of 16 MB or less`);
+    let text;
+    try { text = fs.readFileSync(fd, "utf8"); } catch { throw new Unreadable(`${at} could not be read`); }
+    try { return JSON.parse(text); } catch { throw new Unreadable(`${at} is not JSON`); }
+  } finally { fs.closeSync(fd); }
+};
 const SHA = /^[0-9a-f]{40}$/;
 // Every ref of a git folder, as its files hold them (loose refs over packed ones), and with `reflog` each commit its
 // reflogs name, as refs of their own; a link anywhere fails the reading.
@@ -295,8 +312,8 @@ function stateOf(issues, comments, github) {
 
 // ---- the readers: what the session did, read from the scratch project ----
 
-// GitHub's state as the stand-in holds it now.
-export const github = dir => JSON.parse(fs.readFileSync(path.join(dir, "github.json"), "utf8"));
+// GitHub's state as the stand-in holds it now (#435).
+export const github = dir => jsonOf(path.join(dir, "github.json"));
 
 // The origin's branches and their commits: { name: sha }, read from its files.
 export function branchesOf(dir) {
@@ -308,7 +325,11 @@ export function branchesOf(dir) {
 // and each case's own memo.
 export const sealOf = dir => `${path.resolve(dir)}.seal`;
 export const memo = (dir, name, value) => fs.writeFileSync(path.join(sealOf(dir), `${name}.json`), `${JSON.stringify(value, null, 2)}\n`);
-export const memoOf = (dir, name) => JSON.parse(fs.readFileSync(path.join(sealOf(dir), `${name}.json`), "utf8"));
+// (the seal's own folder a real one, never a link to another holding memos of the session's making)
+export const memoOf = (dir, name) => {
+  if (!real(sealOf(dir), "dir")) throw new Unreadable(`${sealOf(dir)} is not there`);
+  return jsonOf(path.join(sealOf(dir), `${name}.json`));
+};
 // (the project's git objects by their files' names: a commit made and then undone, its reflog cleared, still leaves one)
 // (a plain folder, none of its own folders a link, at most a few deep, as git writes it: anything else is Unreadable)
 const objectsOf = dir => {
