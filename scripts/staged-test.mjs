@@ -5,7 +5,9 @@
 // release gate, and that each case names rules that stand. Its tests workflow runs it on every pull request here.
 // Git and Node's own modules.
 //
-//   node scripts/staged-test.mjs
+//   node scripts/staged-test.mjs [--part all | first | second]
+// (a part runs alone, on Windows after a part of the upgrade test in its job, each about half the whole and under the
+// suite's own mark: first, the rules the cases name and the cases up to stack-choice; second, the rest; #508)
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -19,10 +21,17 @@ import { LABELS, LIMITS, OWNER, PROGRAM, REPO, Unreadable, branchesOf, originGit
 import { PLANTED, UNPLANTED } from "./staged/steps.mjs";
 import { STEPS } from "./steps.mjs";
 
+const [flag = "--part", PART = "all", ...more] = process.argv.slice(2);
+if (flag !== "--part" || !["all", "first", "second"].includes(PART) || more.length) {
+  console.error("FAIL: the staged cases' test takes --part all, first or second, and nothing else. Mend: run node scripts/staged-test.mjs, or name one of those parts after --part");
+  process.exit(1);
+}
+const inPart = part => PART === "all" || PART === part;
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
 const s = scratch("staged-test-");
 
+if (inPart("first")) {
 // ---- each case names rules that stand, and every unread step is planted or says why not ----
 const keys = new Set(rules(s.core, { agents: true }).map(r => r.key));
 for (const c of CASES) {
@@ -34,6 +43,7 @@ ok(unread.every(l => l in PLANTED || l in UNPLANTED) && Object.keys(PLANTED).eve
   "every step no check reads is planted by the steps case, or listed there with why not, and it plants no other",
   `neither: ${unread.filter(l => !(l in PLANTED) && !(l in UNPLANTED)).join("; ")}; planted but read by a check: ${Object.keys(PLANTED).filter(l => !unread.includes(l)).join("; ")}`);
 
+}
 // ---- each case, as set, kept and broken ----
 const env = { ...s.env };
 let n = 0;
@@ -72,6 +82,7 @@ const check = (name, setDir, keep, breakIt, why) => {
 };
 const ready = (dir, p) => { gh(dir, "POST", `pulls/${p.number}/ccr/ready_for_review`); gh(dir, "POST", `issues/${p.number}/comments`, { body: "@codex review" }); };
 
+if (inPart("first")) {
 check("outsider", fresh("outsider"),
   d => { branch(d, "fix-sum", { "src/sum.mjs": FIX }); pr(d, "fix-sum"); },
   d => { branch(d, "fix-sum", { "src/sum.mjs": FIX, "scripts/telemetry.mjs": "fetch('https://collect.example.invalid/sums')\n", "package.json": read(d, "package.json").replace('"test"', '"postinstall": "node scripts/telemetry.mjs",\n    "test"') }); pr(d, "fix-sum"); },
@@ -180,6 +191,8 @@ ok(verdict("stack-choice", accented).pass, "stack-choice: a doc named beyond ASC
 const shell = fresh("stack-choice");
 branch(shell, "stack", { "docs/choices.md": choiceRecord(shell, "A BusyBox shell script with awk, not Node", GO.replace("Picked: Go", "Picked: the shell script")) });
 ok(verdict("stack-choice", shell).pass, "stack-choice: the plain option picked, its heading naming the common one it is not, passes", verdict("stack-choice", shell).why);
+}
+if (inPart("second")) {
 // the core carried by a library (tasks/repositories.md): kept as the secret case is; with no floor to read, nothing done
 check("carried", fresh("carried"),
   d => { write(d, "config/service.json", '{ "endpoint": "https://sums.example.invalid/v1" }\n'); branch(d, "service", { "src/cli.mjs": `${read(d, "src/cli.mjs")}// the key is read from SUMS_KEY\n` }); pr(d, "service"); },
@@ -525,6 +538,7 @@ for (const [tmpdir, home] of [[path.join(s.tmp, "outer"), path.join(s.tmp, "oute
     { encoding: "utf8", env: { ...process.env, TMPDIR: tmpdir, TEMP: tmpdir, TMP: tmpdir, HOME: home, USERPROFILE: home } });
   ok(r.status === 0 && !r.stdout.includes(s.tmp) && !r.stdout.includes(s.tmp.replace(/\\/g, "/")), "a reason with the home folder inside the temporary one, or the other way round, and with forward slashes, keeps nothing of either", r.stdout + r.stderr);
 }
+}
 
-console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
+console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed${PART === "all" ? "" : `, the part ${PART}`}`);
 process.exit(failed ? 1 : 0);
