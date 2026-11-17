@@ -438,6 +438,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const linkFetch = project({ "scripts/tree.sh": "echo the branch's\n", ...listing() });
     fs.symlinkSync("./tree.sh", path.join(linkFetch, "scripts/format.sh"));
     fails(run(pr(linkFetch, { ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK)) })), "a hook in the kit's form that fetches a link from main fails", 'fetches "scripts/format.sh" from main, which the project holds as a link');
+    // (#476's code review of ac42a35: the starter kit's own hooks too, where what they fetch is a link)
+    const kitLink = project({ "scripts/tree.sh": "echo the branch's\n", ...listing() });
+    fs.mkdirSync(path.join(kitLink, "core/scripts"), { recursive: true });
+    fs.symlinkSync("../../scripts/tree.sh", path.join(kitLink, "core/scripts/work-saved.sh"));
+    fails(run(pr(kitLink, { "README.md": "a change of its own\n" }), "--core"), "a hook of the starter kit's own, unchanged, whose fetched file is a link, fails", 'fetches "core/scripts/work-saved.sh" from main, which the project holds as a link');
     // (#476's code review of a76614d: and where main holds it as a link that the pull request makes a file, since the hook
     // fetches from main until the pull request merges)
     const mainLink = project({ "scripts/tree.sh": "echo the branch's\n", ...listing() });

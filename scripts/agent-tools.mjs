@@ -79,18 +79,18 @@ const TREE = "the working tree";
 const show = value => JSON.stringify(value) ?? String(value);
 
 // The tools a project's files configure, as "kind name" keys, each with the file that configures it; the problems met
-// reading them; `sources`, each hook with a command not in the starter kit's form (hook-source.mjs). `read(file)` gives a
+// reading them; `sources`, each hook that does not run its copy on main, with why (readSource()). `read(file)` gives a
 // file's text or null; `skills()` the names of the folders under .claude/skills/ that hold a SKILL.md; `files(dir)` the
-// names in a folder of the project (here .kiro/hooks); `kit` that these are the starter kit's own files (kitHooks()),
-// whose hooks are read for their source too.
-export function configured(read, skills, files = () => [], kit = false, linked = () => false) {
+// names in a folder of the project (here .kiro/hooks); `linked(path)` whether the project, or main, holds a path as a
+// link.
+export function configured(read, skills, files = () => [], linked = () => false) {
   // (each tool's name, as the list writes it, and what it is: for a hook its tool, event, matcher and the whole hook,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
   // (`texts`: each problem met reading a file, with that file's text, so one the base held as it stands can be told)
   const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map();
   const flag = (problem, file, text = read(file)) => { problems.push(problem); texts.set(problem, `${file}\0${text}`); };
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
-  const state = { tools, problems, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, kit, linked };
+  const state = { tools, problems, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, linked };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -235,9 +235,7 @@ function addHook(state, file, { tool, event, matcher, given = matcher, hook, run
   state.shapes.set(name, kinds);
   state.add(name, id);
   state.tools.set(name, file);
-  // (the starter kit's own hooks, as this copy writes them, fetch what they run from main; their reading would only cost
-  // a listing of the project's files)
-  if (!state.kit && kitIds().has(id)) return;
+  // (the starter kit's own hooks too: they are in its form, and what they fetch must be no link, as any hook's)
   readSource(state, name, commands);
 }
 // Each hook with a command that is not the starter kit's form, into `state.sources` with why: nothing shows it runs its
@@ -335,12 +333,10 @@ function npxPackage(args) {
 // The hooks the starter kit writes, Claude Code's, Kiro's and Codex's, each by what it is (configured()'s ids): the
 // core's, listed by it. `template(name)` gives the text of one of the kit's templates as a copy holds it, or null.
 const kitTemplate = name => { try { return fs.readFileSync(path.join(KIT_DIR, name), "utf8"); } catch { return null; } };
-let kitOwn = null;
-const kitIds = () => (kitOwn ??= new Set(kitHooks()));
 export function kitHooks(template = kitTemplate) {
   const read = f => (Object.hasOwn(KITS, f) ? template(KITS[f]) : null);
   const files = dir => Object.keys(KITS).filter(f => path.posix.dirname(f) === dir).map(f => path.posix.basename(f));
-  return [...configured(read, () => [], files, true).ids.values()].flatMap(set => [...set]);
+  return [...configured(read, () => [], files).ids.values()].flatMap(set => [...set]);
 }
 
 // The list a config holds: { keys, versions, from, problems }, keys the "kind name" of each well-formed entry, versions
@@ -465,7 +461,7 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   // (or on main, as `linkedOnMain` says: the base, which a hook fetches from until the pull request merges)
   const own = rev ? at => listing(root, rev).linked.has(at) : at => { try { return fs.lstatSync(path.join(root, at)).isSymbolicLink(); } catch { return false; } };
   const linked = at => own(at) || linkedOnMain(at);
-  const project = configured(read, skills, names, false, linked);
+  const project = configured(read, skills, names, linked);
   for (const [at, want] of misnamed(rev ? [...listing(root, rev).blobs, ...listing(root, rev).links] : tracked(root))) {
     const problem = `${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`;
     project.problems.push(problem);
