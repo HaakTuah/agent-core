@@ -1,7 +1,6 @@
 # The core's queue
 
-The order this repository's open issues are built in (`AGENTS.md`, "The queue"). The first line that
-waits on nothing is next.
+The first line that waits on nothing is next.
 
 **Who:** *builder*, any builder session; *rule builder*, a builder on Opus; *the owner*, no session takes it up before
 the owner's own word. A line on points of #460, #484, #486, #488 or #534 has its PR say "Part of" that issue, or "Fixes" it if
@@ -17,8 +16,8 @@ it merges last.
 | #527, step 2 | rule builder | #526 |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | the inventory, and #488's points 1 and 3 to 5 |
 | #528, step 3 | rule builder | #527, the inventory, and #488's points 1 and 3 to 5 |
-| #529, step 4 | builder | #528, and the inventory |
-| #530, step 5 | builder | #529, and the inventory |
+| #529, step 4 | builder | #528 |
+| #530, step 5 | builder | #529 |
 | #534, point 8 | rule builder | #530 |
 | #488, points 1, 2 and 6 | rule builder; it changes the floor (rules 15 and 7) | |
 | #488, points 3 to 5, 7 and 8 | builder; #534's tools wait on points 3 to 5 | #488's points 1 and 2 |
