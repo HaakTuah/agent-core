@@ -534,7 +534,19 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   write(besideBase, ".Codex/config.toml", "notify = [\"bash\", \"x.sh\"]\n");
   const besideRun = run(pr(besideBase, { "README.md": "a change of its own\n" }));
   ok(besideRun.status === 0 && /\.Codex is \.codex in another case/.test(besideRun.out), "an ignored file beside a tracked one under it leaves it noted", besideRun.out);
+  // (#600's fallback security review of 72e6450: names are compared as a file system that folds case does)
+  fails(run(pr(project({ ...listing() }), { ".claude/\u017fkills/notes/SKILL.md": "# notes\n" })), "a name that differs only by a letter a full case fold matches fails too", "in another case");
   if (LINKS) {
+    // (#600's fallback security review of 72e6450: a link of the tool's own name to a folder in the checkout is followed,
+    // as the rest of the check follows it, so a file in another case behind it is read too)
+    for (const [link, inside, says] of [[".codex", "Config.toml", "Mend: rename it to .codex/config.toml"], [".kiro/hooks", "x.JSON", "Mend: rename it to .kiro/hooks/x.json"], [".claude/skills/notes", "Skill.md", "Mend: rename it to .claude/skills/notes/SKILL.md"]]) {
+      const behind = project({ ...listing() });
+      fs.mkdirSync(path.join(behind, "cfg"), { recursive: true });
+      fs.writeFileSync(path.join(behind, "cfg", inside), "{}\n");
+      fs.mkdirSync(path.dirname(path.join(behind, link)), { recursive: true });
+      fs.symlinkSync(path.relative(path.dirname(path.join(behind, link)), path.join(behind, "cfg")), path.join(behind, link));
+      fails(run(behind, "--core"), `a file in another case behind ${link}, a link of its own name, fails`, says);
+    }
     // (a folder or a link in another case on the way to a tool's file)
     const aliased = project({ "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n", ...listing() });
     fs.symlinkSync("config", path.join(aliased, ".Codex"));

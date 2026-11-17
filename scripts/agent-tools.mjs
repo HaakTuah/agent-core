@@ -481,7 +481,12 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   const own = at => notFile(listing(root, rev ?? "HEAD"), at) || shownNotBlob(root, rev ?? "HEAD", at) || (!rev && (() => { try { const st = fs.lstatSync(path.join(root, at)); return st.isSymbolicLink() || st.isDirectory(); } catch { return false; } })());
   const linked = at => own(at) || linkedOnMain(at);
   const project = configured(read, skills, names, linked);
-  for (const [at, want] of misnamed(rev ? [...listing(root, rev).blobs, ...listing(root, rev).links] : unignored(root, toolPaths(root)))) {
+  // (the files and links on the way to a tool's file, found through `names`, which follows a link inside the checkout
+  // at the commit as in the working tree, as the rest of the check reads them)
+  const isFile = rev ? at => resolve(at)?.type === "blob" : at => !outside(at) && (() => { try { return fs.statSync(path.join(root, at)).isFile(); } catch { return false; } })();
+  const isLink = rev ? at => listing(root, rev).linked.has(at) : at => { try { return fs.lstatSync(path.join(root, at)).isSymbolicLink(); } catch { return false; } };
+  const paths = toolPaths(names, isFile, isLink);
+  for (const [at, want] of misnamed(rev ? paths : unignored(root, paths))) {
     const problem = `${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`;
     project.problems.push(problem);
     // (with what the tool reads through it, so one the base held is noted only while that stands letter for letter)
@@ -512,6 +517,9 @@ function shownNotBlob(root, rev, at) {
   }
   return shown.get(key);
 }
+// A name as a file system that folds case compares it: wholly, so a letter whose upper case is another's ("\u017f" and
+// "s") is the same, which lower case alone does not make it.
+const fold = name => name.toUpperCase().toLowerCase();
 // The tools' files this check reads, and their folders, as each tool names them.
 const TOOL_FILES = [".claude/settings.json", ".claude/settings.local.json", ".mcp.json", ".kiro/settings/mcp.json", ".codex/hooks.json", ".codex/config.toml"];
 const TOOL_FOLDERS = [".claude/skills/", ".kiro/hooks/"];
@@ -525,11 +533,11 @@ function misnamed(paths) {
   for (const at of paths) {
     const parts = at.split("/");
     for (let i = 1; i <= parts.length; i++) {
-      const step = parts.slice(0, i).join("/"), low = step.toLowerCase();
+      const step = parts.slice(0, i).join("/"), low = fold(step);
       if (WAYS.has(low) && step !== low) { out.set(step, low); break; }
     }
     if (path.posix.dirname(at) === ".kiro/hooks" && /\.json$/iu.test(at) && !at.endsWith(".json")) out.set(at, at.replace(/\.json$/iu, ".json"));
-    if (parts.length === 4 && at.startsWith(".claude/skills/") && parts[3].toLowerCase() === "skill.md" && parts[3] !== "SKILL.md") out.set(at, `${parts.slice(0, 3).join("/")}/SKILL.md`);
+    if (parts.length === 4 && at.startsWith(".claude/skills/") && fold(parts[3]) === "skill.md" && parts[3] !== "SKILL.md") out.set(at, `${parts.slice(0, 3).join("/")}/SKILL.md`);
   }
   return [...out];
 }
@@ -539,7 +547,7 @@ function misnamed(paths) {
 // ignores case finds it, every one that matches.
 function through(at, want, read, names) {
   const under = f => f === want || f.startsWith(`${want}/`);
-  const found = (from, rest) => rest.split("/").filter(Boolean).reduce((dirs, step) => dirs.flatMap(d => names(d).filter(n => n.toLowerCase() === step.toLowerCase()).sort().map(n => `${d}/${n}`)), [from]);
+  const found = (from, rest) => rest.split("/").filter(Boolean).reduce((dirs, step) => dirs.flatMap(d => names(d).filter(n => fold(n) === fold(step)).sort().map(n => `${d}/${n}`)), [from]);
   // (a file read as nothing, ignored or no file, is left out, so the working tree's reading and the base's name the same)
   const text = (name, a) => { const t = read(a); return t === null ? [] : [`${name}\0${a}\0${t}`]; };
   const files = TOOL_FILES.filter(under).flatMap(f => found(at, f.slice(want.length)).flatMap(a => text(f, a)));
@@ -550,19 +558,18 @@ function through(at, want, read, names) {
   })));
   return [at, read(at), ...files, ...folders].join("\0\0");
 }
-// The files of the working tree on the way to a tool's file, in whatever case they stand, read from the folders
-// themselves, so it costs no git process: each entry, not a folder, whose name in lower case is a step of WAYS or lies
-// in a tool folder, a few deep; a link is named there, never followed.
-function toolPaths(root) {
+// The files and links on the way to a tool's file, in whatever case they stand: each entry, not a folder, whose name
+// folded is a step of WAYS or lies in a tool folder, a few deep, found through `names`, so a link inside the checkout is
+// followed as the rest of the check follows it, and named itself where it is one.
+function toolPaths(names, isFile, isLink) {
   const out = [], folders = TOOL_FOLDERS.map(d => d.slice(0, -1));
   const visit = (at, depth) => {
-    let entries = [];
-    try { entries = fs.readdirSync(path.join(root, at), { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      const p = at ? `${at}/${e.name}` : e.name, low = p.toLowerCase();
+    for (const n of names(at || ".")) {
+      const p = at ? `${at}/${n}` : n, low = fold(p);
       if (!WAYS.has(low) && !folders.some(d => low.startsWith(`${d}/`))) continue;
-      if (!e.isDirectory()) out.push(p);
-      else if (depth < 4) visit(p, depth + 1);
+      const file = isFile(p);
+      if (file || isLink(p)) out.push(p);
+      if (!file && depth < 4) visit(p, depth + 1);
     }
   };
   visit("", 0);
