@@ -10,9 +10,11 @@ rule 14, which are the higher right's, its approvals aside.
 (on GitHub: the role `write`, `maintain` or `admin`), read from the host each time and kept in no list: any of them may
 give the project's agents a task and settle an open reading, and their word is the owner's word (floor rule 4). Where
 the host's rights cannot be read, the *owner's account* alone is an owner, and the session says so in its report. The
-`security-review` status reads them so (#412): a posted review counts from each, with nothing named. It does not mean that an app or a bot the host lets write is an owner, nor an account the project's agents
-sign in with (`setup/server.md`), whose words are an agent's, that a right to read or triage is one, nor that a comment
-from an owner's account with an agent's attribution line is that owner's word. Reason: in a team's project every person
+`security-review` status reads them so (#412): a posted review counts from each, with nothing named. It does not mean
+that an app or a bot the host lets write is an owner, nor an account the project's agents sign in with
+(`setup/server.md`), whose words are an agent's, though the status counts its posted review as a person's, since the
+host tells the two apart nowhere, that a right to read or triage is one, nor that a comment from an owner's account with
+an agent's attribution line is that owner's word. Reason: in a team's project every person
 with the right to write is an owner, and a list kept beside the host's rights goes stale. Held, for a posted security
 review, by the `security-review` status; whose word a session followed leaves no mark a check reads.
 
