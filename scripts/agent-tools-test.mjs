@@ -324,6 +324,17 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   git(walked, "add", "-A"); git(walked, "commit", "-q", "-m", "hooks through two links");
   const walkedKept = run(pr(walked, { "README.md": "a change of its own\n" }));
   ok(walkedKept.status === 0 && /nothing fails here: the hook "Kiro PostFileSave/.test(walkedKept.out), "a hook under a link whose \"..\" follows the links before it, the base's, is noted, not failed", walkedKept.out);
+  // (#476's code review of 56c2716: a file on a link's way is no folder, so ".." after it leads nowhere, as in the tree)
+  const blocked = project({ "blocker": "a file\n", "hooks/lint.json": kiroHook("bash scripts/run.sh"), "scripts/run.sh": "", ...listing() });
+  fs.mkdirSync(path.join(blocked, ".kiro"), { recursive: true });
+  fs.symlinkSync("../blocker/../hooks", path.join(blocked, ".kiro/hooks"));
+  git(blocked, "add", "-A"); git(blocked, "commit", "-q", "-m", "a link through a file");
+  git(blocked, "checkout", "-q", "-B", "change");
+  fs.unlinkSync(path.join(blocked, ".kiro/hooks"));
+  fs.symlinkSync("../hooks", path.join(blocked, ".kiro/hooks"));
+  git(blocked, "add", "-A"); git(blocked, "commit", "-q", "-m", "the link mended");
+  git(blocked, "checkout", "-q", "main"); git(blocked, "merge", "-q", "--no-ff", "-m", "merge", "change");
+  fails(run(blocked), "a hook a link turns on, where the base's link went through a file and so led nowhere, is new", 'the hook "Kiro PostFileSave');
   const kiroServer = { ".kiro/settings/mcp.json": { mcpServers: { docs: { command: "npx", args: ["-y", "docs-server"] } } } };
   fails(run(pr(project({ ...listing() }), { ...kiroServer, ...listing({ kind: "server", name: "Kiro docs", publisher: "Example Tools", version: "2.0.0" }) })), "a Kiro tool server is held to the pin its configuration gives", 'the tool server "Kiro docs" is fetched at no fixed version: .kiro/settings/mcp.json, in the arguments of "docs", names no version');
   fails(run(project({ ...kiroServer, ".mcp.json": { mcpServers: { "Kiro docs": { command: "x" } } }, ...listing() })), "one server name in two files is refused", 'the tool server "Kiro docs" is configured in .mcp.json too');

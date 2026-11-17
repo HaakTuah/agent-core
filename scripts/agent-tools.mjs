@@ -468,7 +468,9 @@ function walk(root, rev, f) {
       left.unshift(...to.split("/"));
       continue;
     }
-    if (!blobs.has(here) && !dirs.has(here) && !others.has(here)) return null;
+    // (a name with more of the path after it must be a folder: the file system goes neither into a file nor back out of
+    // one by "..")
+    if (!dirs.has(here) && (left.length || (!blobs.has(here) && !others.has(here)))) return null;
     at.push(name);
   }
   return reached(at.join("/") || ".", blobs, dirs);
