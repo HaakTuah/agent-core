@@ -590,14 +590,16 @@ function through(at, want, read, names) {
 // The files and links on the way to a tool's file, in whatever case they stand: each entry, not a folder, whose name
 // folded is a step of WAYS or lies in a tool folder, a few deep, found through `names`, so a link inside the checkout is
 // followed as the rest of the check follows it, and named itself where it is one.
+const READS = /^(?:\.kiro\/hooks\/[^/]+\.json|\.claude\/skills\/[^/]+\/skill\.md)$/u;
 function toolPaths(names, isFile, isLink) {
   const out = [], folders = TOOL_FOLDERS.map(d => d.slice(0, -1));
   const visit = (at, depth) => {
     for (const n of names(at || ".")) {
-      const p = at ? `${at}/${n}` : n, low = fold(p);
-      if (!WAYS.has(low) && !folders.some(d => low.startsWith(`${d}/`))) continue;
+      const p = at ? `${at}/${n}` : n, low = fold(p), inFolder = folders.some(d => low.startsWith(`${d}/`));
+      if (!WAYS.has(low) && !inFolder) continue;
       const file = isFile(p);
-      if (file || isLink(p)) out.push(p);
+      // (in a tool folder, only what the tool reads there names the folders on its way: a hook file, a skill's SKILL.md)
+      if ((file || isLink(p)) && (!inFolder || READS.test(low))) out.push(p);
       if (!file && depth < 4) visit(p, depth + 1);
     }
   };
