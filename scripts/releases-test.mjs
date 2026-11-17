@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "./core-address.mjs";
 import { OWN, costed, held, inTheCore, next, older } from "./release.mjs";
 import { STEPS } from "./steps.mjs";
-import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "./releases.mjs";
+import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "./releases.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -28,6 +28,24 @@ ok(followsOf(manifest("someone-else", "|*follows*|  `main`  |\n")) === "main", "
 ok(followsOf(manifest(OWNER, "| *follows* | releases |\n")) === null && followsOf(manifest(OWNER, "| *follows* | `main` or `releases` |\n")) === null && followsOf(manifest(OWNER, "| *follows* | `tags` |\n")) === null, "a row that says anything else, or says it without backticks, gives no answer");
 ok(followsOf(manifest(OWNER, "| *follows* | `main` |\n| *follows* | `releases` |\n")) === null, "two rows give no answer");
 ok(followsOf("| *owner's account* | someone |\n") === null, "no row and no owner's account to go by give no answer");
+// (#481: with no row at all, the repository's own account where the host says a person holds it; a row still decides)
+const PERSON = { login: "someone", type: "User" }, ORG = { login: "a-team", type: "Organization" }, BARE = "# Core manifest\n\n| Slot | Here |\n| --- | --- |\n";
+ok(ownerOf(BARE, PERSON) === "someone" && ownerOf(BARE, ORG) === null && ownerOf(BARE) === null, "with no row, the owner's account is read where a person's account holds the repository, and only there");
+ok(ownerOf(manifest("other"), PERSON) === "other" && ownerOf("| *owner's account* | someone |\n", PERSON) === null && ownerOf(`${manifest("a")}| *owner's account* | \`b\` |\n`, PERSON) === null, "a row decides over what was read, and a row of another form, or two, give no answer and are never read past");
+ok(ownerOf(BARE, { login: "a;b", type: "User" }) === null && ownerOf(BARE, { login: "x", type: "user" }) === null, "a login of no form, and a type other than the host's own word, read as nothing");
+ok(followsOf(BARE, { login: OWNER, type: "User" }) === "main" && followsOf(BARE, PERSON) === "releases" && followsOf(BARE, ORG) === null, "with no row, what the project follows goes by the account read");
+{ // the host's account: from the workflow's event, else from gh, else nothing
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "host-account-")), event = path.join(dir, "event.json"), asked = [];
+  try {
+    fs.writeFileSync(event, JSON.stringify({ repository: { owner: { login: "someone", type: "User", id: 1 } } }));
+    const gh = text => args => { asked.push(args.join(" ")); return text; };
+    ok(JSON.stringify(hostAccount({ GITHUB_EVENT_PATH: event }, gh("{}"))) === JSON.stringify(PERSON) && !asked.length, "the event's own account is read, and gh is not asked");
+    ok(JSON.stringify(hostAccount({ GITHUB_REPOSITORY: "a-team/x" }, gh(JSON.stringify(ORG)))) === JSON.stringify(ORG) && asked.at(-1) === "api repos/a-team/x --jq .owner | {login, type}", "with no event, gh is asked of the repository's own route", asked.join("; "));
+    ok(hostAccount({ GITHUB_REPOSITORY: "../x" }, gh(JSON.stringify(PERSON))) === null && hostAccount({ GITHUB_REPOSITORY: "a/x" }, () => { throw new Error("no gh"); }) === null && hostAccount({ GITHUB_REPOSITORY: "a/x" }, gh("not json")) === null, "no repository's name, no gh, or an answer of no form: nothing read, never a guess");
+    fs.writeFileSync(event, JSON.stringify({ repository: { owner: { login: "a b", type: "User" } } }));
+    ok(JSON.stringify(hostAccount({ GITHUB_EVENT_PATH: event, GITHUB_REPOSITORY: "a-team/x" }, gh(JSON.stringify(ORG)))) === JSON.stringify(ORG), "an event's login of no form is passed over for gh's answer");
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
 ok(RELEASE.test("release-1") && RELEASE.test("release-120") && !RELEASE.test("release-0") && !RELEASE.test("release-01") && !RELEASE.test("release-1a") && !RELEASE.test("v1") && !RELEASE.test("release-1\n"), "a release's name is the word and a whole number above zero");
 
 // a scratch core: main with four commits, a side branch, and tags

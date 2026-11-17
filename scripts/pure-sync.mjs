@@ -14,7 +14,8 @@
 // that pin, compared as copy-tree.mjs compares (and says why), without the folder the core keeps to itself; and every
 // call to a core workflow is pinned to a commit of the core's main.
 // It prints the head it checked, for the merge call's `sha` (`tasks/github-calls.md`), so nothing pushed after the
-// check can merge. Git and Node's own modules only; it changes nothing.
+// check can merge. Git and Node's own modules only, and gh where no workflow's event says whose account holds the
+// repository (releases.mjs, hostAccount); it changes nothing.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -22,7 +23,7 @@ import { join } from "node:path";
 import { copyTree, coreIsFolder, entries } from "./copy-tree.mjs";
 import { CORE as ADDRESS, CORE_SOURCE as A } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
-import { followsOf, inBare, releasesIn } from "./releases.mjs";
+import { followsOf, hostAccount, inBare, releasesIn } from "./releases.mjs";
 
 const CORE = `https://github.com/${ADDRESS}.git`;
 const raw = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
@@ -88,7 +89,7 @@ try {
   if (oldPin && pin && !inCore(["merge-base", "--is-ancestor", oldPin, pin])) fail.push(`the pin goes back: ${pin} is not past ${oldPin}`);
   // (a project that follows the core's releases takes, unreviewed, only what the core's owner chose to hand on: a sync
   // to any other commit of main is reviewed like any PR, and merges after its review; core archive 201)
-  const follows = followsOf(show(head, "core-manifest.md"));
+  const follows = followsOf(show(head, "core-manifest.md"), hostAccount);
   if (pin && follows !== "main" && !releasesIn(dir).some((r) => r.sha === pin)) {
     // (and how to take a release instead: a copy older than release-1 lands here, its own sync script taking main; #365)
     const [newest] = releasesIn(dir);

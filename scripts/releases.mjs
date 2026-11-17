@@ -7,7 +7,10 @@
 // project at all (staysAt). Every function reads; none writes but fetchCore, into the empty folder it is given. Git and
 // Node's own modules only.
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
 import { CORE, OWNER } from "./core-address.mjs";
+import { aRepository } from "./guards.mjs";
+import { repoOf } from "./inbox.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
 import { MODULES } from "./reading.mjs";
 
@@ -29,20 +32,43 @@ export const inBare = (dir, args, options = {}) =>
 const git = (args, dir) => inBare(dir, args).trim();
 const holds = (args, dir) => { try { git(args, dir); return true; } catch { return false; } };
 
-// The manifest's *owner's account* (core.yml checks the row's form), or null where it has no one such row.
-export function ownerOf(manifest) {
-  const found = [...manifest.matchAll(/^\| \*owner's account\* \| `([A-Za-z0-9-]+)` \|$/gm)];
-  return found.length === 1 ? found[0][1] : null;
+// A GitHub login: letters, digits and hyphens, as the row's form has it.
+const LOGIN = /^[A-Za-z0-9-]+$/;
+
+// The repository's own account as the host gives it, { login, type } (type "User" where a person holds it, as GitHub
+// says), or null where it cannot be read: from the event GitHub's runner hands a workflow (GITHUB_EVENT_PATH), else
+// asked of gh for `repo` (owner/name: GITHUB_REPOSITORY, else origin's address on github.com). It reads, and never
+// guesses (AGENTS.md, "What can be read is never asked or declared"; #481).
+export function hostAccount(env = process.env, ask = args => execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30000 })) {
+  const said = o => (typeof o?.login === "string" && LOGIN.test(o.login) && typeof o?.type === "string" ? { login: o.login, type: o.type } : null);
+  try { const o = said(JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, "utf8"))?.repository?.owner); if (o) return o; } catch { /* (no event to read) */ }
+  let repo = env.GITHUB_REPOSITORY;
+  if (!repo) try { repo = repoOf(execFileSync("git", ["remote", "get-url", "origin"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })); } catch { /* (no origin) */ }
+  if (!aRepository(repo)) return null;
+  try { return said(JSON.parse(ask(["api", `repos/${repo}`, "--jq", ".owner | {login, type}"]))); } catch { return null; }
+}
+
+// The manifest's *owner's account* (core.yml checks the row's form), or, with no such row at all, the repository's own
+// account where the host says a person holds it (`host`: as hostAccount gives it, or a function that gives it, asked
+// only where no row stands). Null where a row is there twice or in another form, or none is and an organisation, or
+// nothing read, holds the repository: whose word counts is never guessed.
+export function ownerOf(manifest, host = null) {
+  const rows = String(manifest).split(/\r?\n/).filter(l => /^\|[ \t]*\*owner's account\*[ \t]*\|/.test(l));
+  const found = rows.map(l => /^\| \*owner's account\* \| `([A-Za-z0-9-]+)` \|$/.exec(l)?.[1]);
+  if (rows.length) return found.length === 1 && found[0] ? found[0] : null;
+  const read = typeof host === "function" ? host() : host;
+  return read?.type === "User" && LOGIN.test(read.login ?? "") ? read.login : null;
 }
 
 // What the project follows, "main" or "releases": its manifest's *follows* row (| *follows* | `releases` |), and with
-// no such row, by whose project it is. Null where the row is there twice or says anything else, or where there is no
-// row and no one owner's account to go by: a script that gets null stops, and never guesses.
-export function followsOf(manifest) {
+// no such row, by whose project it is (its owner's account, read as ownerOf reads it with `host`). Null where the row
+// is there twice or says anything else, or where there is no row and no one owner's account to go by: a script that
+// gets null stops, and never guesses.
+export function followsOf(manifest, host = null) {
   const rows = [...manifest.matchAll(/^\|[ \t]*\*follows\*[ \t]*\|(.*)\|[ \t]*$/gm)];
   if (rows.length > 1) return null;
   if (rows.length === 1) return /^`(main|releases)`$/.exec(rows[0][1].trim())?.[1] ?? null;
-  const owner = ownerOf(manifest);
+  const owner = ownerOf(manifest, host);
   if (owner === null) return null;
   return owner.toLowerCase() === OWNER.toLowerCase() ? "main" : "releases";
 }

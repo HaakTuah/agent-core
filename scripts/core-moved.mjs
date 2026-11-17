@@ -17,7 +17,7 @@ import path from "node:path";
 import { aRepository } from "./guards.mjs";
 import { CORE } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
-import { fetchCore, followsOf, newestRelease, ownerOf, staysAt } from "./releases.mjs";
+import { fetchCore, followsOf, hostAccount, newestRelease, ownerOf, staysAt } from "./releases.mjs";
 import { started } from "./started.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
@@ -88,8 +88,11 @@ function main(dry) {
   try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { fail("run it from a project's root, beside core-manifest.md"); }
   const pin = pinHere(manifest, fail);
   if (!pin) return;
-  const follows = followsOf(manifest);
-  if (!follows) fail("core-manifest.md does not say what the project follows: its *follows* row is `main` or `releases`, once, or left out beside one *owner's account* row");
+  // (whose account holds the repository, asked of the host only where the manifest has no row that says it)
+  let read;
+  const host = () => (read === undefined ? (read = hostAccount()) : read);
+  const follows = followsOf(manifest, host);
+  if (!follows) fail("core-manifest.md does not say what the project follows: its *follows* row is `main` or `releases`, once, or left out where the owner's account is read: its one row, or the repository's own account where the host says a person holds it");
   let newest, moved, release = "", stays = false;
   if (follows === "main") {
     newest = run("git", ["ls-remote", `https://github.com/${CORE}`, "refs/heads/main"]).split(/\s/)[0];
@@ -125,7 +128,7 @@ function main(dry) {
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "core-moved-")), "body.md");
   fs.writeFileSync(file, body(pin, newest, release));
   if (what === "update") { run("gh", ["issue", "edit", open, "--repo", repo, "--body-file", file]); return; }
-  const owner = ownerOf(manifest) ?? fail("core-manifest.md has no one *owner's account* row");
+  const owner = ownerOf(manifest, host) ?? fail("core-manifest.md has no one *owner's account* row, and the host says no person holds the repository");
   run("gh", ["issue", "create", "--repo", repo, "--title", TITLE, "--body-file", file, "--label", "enhancement", "--assignee", owner]);
 }
 
