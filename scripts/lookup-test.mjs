@@ -277,6 +277,8 @@ try {
     lic(extra);
     ok(notDone(tmp, step).length === 1, `a NuGet lookup after a step with ${what} does not count`);
   }
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: ./tools/node core/scripts/lookup.mjs c.json --nuget\n      - run: node core/scripts/nuget.mjs c.json\n");
+  ok(notDone(tmp, step).length === 1, "nor a lookup run by a node of the project's");
   lic("      - run: node core/scripts/licences.mjs c.json\n");
   ok(notDone(tmp, step).length === 0, "and after the licence script alone, it does");
   nugetJob("echo PATH=./tools >> \"$GITHUB_PATH\"", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json");

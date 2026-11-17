@@ -515,9 +515,10 @@ const placed = (cfg, dir) => (typeof cfg === "string" && dir && !path.posix.isAb
 // Whether a counted lookup step runs the lookup, given `flag`, with the config `at.cfg` the check's step gives; a config
 // named by a variable is matched only where both steps give that variable the same value (or neither sets it), one
 // an action's input names, where its caller gave none, is matched by none, and a lookup that may run more than its
-// words show (hides), or that runs after a step that writes what later steps run with, counts for none.
+// words show (hides), that runs a program named node other than the runner's own, or that runs after a step that writes
+// what later steps run with, counts for none.
 const lookupOf = (st, flag, copy, at) => {
-  if (/\$\{\{\s*inputs\./u.test(at.cfg ?? "") || st.hidden || st.tainted) return false;
+  if (/\$\{\{\s*inputs\./u.test(at.cfg ?? "") || st.hidden || st.tainted || !/^node(?:\.exe)?$/iu.test(st.cmds[0]?.[0]?.text ?? "")) return false;
   if (!st.counts || !looksUp(st.cmds[0], flag, copy) || placed(configOf(st.cmds[0], "lookup.mjs", copy), st.dir) !== at.cfg) return false;
   const name = /\$\{?(\w+)|%(\w+)%/u.exec(at.cfg ?? "");
   return !name || st.env[name[1] ?? name[2]] === at.step.env[name[1] ?? name[2]];
