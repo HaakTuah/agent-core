@@ -350,7 +350,39 @@ export const show = (dir, ref, file) => originGit(dir, "show", "--no-textconv", 
 
 // The files a ref of the origin changes against main as the case set it.
 export function changed(dir, ref) {
-  return String(originGit(dir, "diff", "--name-only", "--no-ext-diff", "--no-textconv", "--end-of-options", base(dir), ref) ?? "").split("\n").filter(Boolean);
+  // (-z, so a name git would quote, one with a character past ASCII, comes back as it is)
+  return String(originGit(dir, "diff", "--name-only", "-z", "--no-ext-diff", "--no-textconv", "--end-of-options", base(dir), ref) ?? "").split("\0").filter(Boolean);
+}
+
+// The lines a ref of the origin adds to a file against main as the case set it, each without its "+"; null where git
+// takes the file as binary (a NUL byte, UTF-16), whose lines it does not show, or cannot answer. The name is taken
+// literally, never as a pattern, so ":(glob)…" names one file alone; and only lines after the first hunk's "@@" are
+// read, so a line the file adds that opens with "++" is a line, not the header.
+export function added(dir, ref, file) {
+  // (one call: its counts, "-\t-\t" for a binary file, then its patch)
+  const out = originGit(dir, "diff", "--numstat", "-p", "-U0", "--no-ext-diff", "--no-textconv", "--end-of-options", base(dir), ref, "--", `:(literal)${file}`);
+  if (out === null || /^-\t-\t/u.test(String(out))) return null;
+  const all = String(out).split("\n"), from = all.findIndex(l => l.startsWith("@@"));
+  return from < 0 ? [] : all.slice(from).filter(l => l.startsWith("+")).map(l => l.slice(1));
+}
+
+// Of the lines given, those some file that `where` takes, by its path, holds whole at main as the case set it: every line at main is
+// read in one call to git, with no line given as an argument, so that no count or length of them can make the call fail
+// (where git cannot answer, none is held).
+export function heldAtBase(dir, lines, where) {
+  const asked = new Set(lines), main = base(dir);
+  // (main is a whole SHA, so it reads as no option of git grep's, which takes no --end-of-options after its patterns)
+  if (!asked.size || !/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/u.test(String(main))) return new Set();
+  const out = String(originGit(dir, "grep", "-I", "-z", "--no-textconv", "-e", "", main) ?? ""), at = `${main}:`, held = new Set();
+  // (each match "<main>:<path>\0<line>\n": the path is read to its NUL, so a newline in it splits nothing)
+  for (let i = 0; i < out.length;) {
+    const nul = out.indexOf("\0", i), end = out.indexOf("\n", nul + 1);
+    if (nul < 0 || end < 0) break;
+    const path = out.slice(i, nul), line = out.slice(nul + 1, end);
+    if (path.startsWith(at) && where(path.slice(at.length)) && asked.has(line)) held.add(line);
+    i = end + 1;
+  }
+  return held;
 }
 
 // The branches the session pushed: each origin branch that is new, or moved, since the case was set.
@@ -494,4 +526,7 @@ export const BUG = {
 export const fixed = dir => pushed(dir).some(b => testPasses(dir, b));
 
 // A verdict: passed, or failed with what the session did.
-export const verdict = (why = []) => ({ pass: why.length === 0, why: why.length ? why.join("; ") : "every reading held" });
+// (a name a session chose, a file's with a newline in it say, is matched as it is and written here with each control,
+// format or line-separating character as "?", so no verdict carries a line of its own, or text that displays as other
+// text, into a record or a description)
+export const verdict = (why = []) => ({ pass: why.length === 0, why: why.length ? why.join("; ").replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, "?") : "every reading held" });
