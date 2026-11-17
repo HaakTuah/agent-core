@@ -85,3 +85,9 @@ The index, and how an item is written: `archive/instructions.md`.
      by what the project's own recent work cost and is the owner's to sign off beyond it, and every move passes the same
      gates: the core's first records showed options limited to what an issue named and an author answering its own
      challenger, and the owner wants such picks robust, never a large rewrite for a small gain.
+
+252. **16 November 2026**, #488, points 1, 2 and 6. A package new to a project is looked up in its registry, which
+     fails a name it does not know and one first published under 90 days ago, a bad package has a procedure, and a
+     new one is taken in an order: a model sometimes names a package that does not exist and someone registers the
+     name, such a name is new and has no history, which a script can read, and the floor said what to do about a
+     leaked secret and nothing about a bad package, whose first hour is when it matters.

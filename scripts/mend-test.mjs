@@ -34,6 +34,7 @@ const CHECKS = {
   "scripts/workflows.mjs": "scripts/workflows-test.mjs",
   "scripts/licences.mjs": "scripts/licence-scan-test.mjs",
   "scripts/exact-versions.mjs": "scripts/exact-versions-test.mjs",
+  "scripts/lookup.mjs": "scripts/lookup-test.mjs",
   "scripts/agent-tools.mjs": "scripts/agent-tools-test.mjs",
   "scripts/licence-installed.mjs": "scripts/licence-installed-test.mjs",
   "scripts/nuget.mjs": "scripts/nuget-test.mjs",

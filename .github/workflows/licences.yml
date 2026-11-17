@@ -11,10 +11,14 @@
 # the dependency review reads GitHub's own licence data. A project calls it (workflow_call) from its own .github/workflows/licences.yml on every pull request, pinned to
 # a full commit SHA ("How a project takes the core" in README.md, point 5), passing its config's path. Reads only, with
 # no secret: nothing is installed, and besides GitHub's dependency review nothing runs but the caller's own
-# core/scripts/licences.mjs, core/scripts/exact-versions.mjs and core/scripts/agent-tools.mjs, which core.yml holds to the
+# core/scripts/licences.mjs, core/scripts/exact-versions.mjs, core/scripts/lookup.mjs and core/scripts/agent-tools.mjs, which core.yml holds to the
 # core pin. The second holds floor rule 7's "one exact version, never a range" for the same lockfiles: each dependency
 # a package list of the project's own asks for is one version as SemVer writes one and, letter for letter, the version
 # its lockfile installs.
+# The lookup, core/scripts/lookup.mjs, asks npm's registry of each package the pull request brings into a lockfile that
+# no lockfile of its base held (floor topic 15, "A new one is looked up in its registry"): it fails a name the registry
+# does not know and one first published under 90 days ago, and prints the rest for the review; it reaches npm's
+# registry and GitHub's public API and raw files, with no token.
 # The third, core/scripts/agent-tools.mjs, holds floor topic 15's list of the agents' own tools against what the
 # project configures for them (read against the base, the first parent of the merge, until the list is written), and
 # a plug-in's or tool server's listed version against the pin its configuration gives, where it gives one.
@@ -77,6 +81,12 @@ jobs:
         env:
           CONFIG: ${{ inputs.config }}
         run: node "$CORE_AT"scripts/exact-versions.mjs "$CONFIG"
+      - name: Each package new to the project looked up in npm's registry (floor topic 15)
+        if: ${{ !cancelled() }}
+        env:
+          CONFIG: ${{ inputs.config }}
+          LOOKUP_BASE: ${{ github.event.pull_request.base.sha }} # empty where the caller runs on anything but a pull request
+        run: node "$CORE_AT"scripts/lookup.mjs "$CONFIG"
       - name: Every tool the agents load listed, with its publisher and version (floor topic 15)
         if: ${{ !cancelled() }}
         env:

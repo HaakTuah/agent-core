@@ -190,39 +190,63 @@ export const shownAs = (name, own, isPrivate) => (own && !isPrivate ? `\`${name}
 export const reportOf = (issues, owner) => [...issues].filter(i => /^State report, \d{4}-\d\d$/.test(i.title) && !i.pull_request
   && ["github-actions[bot]", String(owner).toLowerCase()].includes(String(i.user?.login ?? "").toLowerCase())).sort((a, b) => b.title.localeCompare(a.title))[0] ?? null;
 
+// Whether the account is a collaborator of a repository.
+const collaboratorOf = (gh, account, name) => { try { gh(`repos/${name}/collaborators/${account}`); return true; } catch { return false; } };
+
+// The repositories to read, as { private, owner, shared } by full name: the ones named, or all the account reaches.
+function reached(gh, account, named) {
+  const found = new Map();
+  // (a named repository counts as given access where it is private and readable, or the account is its collaborator,
+  // read-only too, as GitHub answers; else, a public one of another owner, only by its row)
+  if (named.length) for (const name of named) {
+    const r = JSON.parse(gh(`repos/${name}`)), theirs = String(r.owner?.login).toLowerCase() !== account.toLowerCase();
+    found.set(r.full_name, { private: r.private, owner: r.owner?.login, shared: theirs && !r.private && !r.permissions?.push && !collaboratorOf(gh, account, r.full_name) });
+  }
+  else for (const r of pagesOf("user/repos?affiliation=owner,collaborator", gh)) found.set(r.full_name, { private: r.private, owner: r.owner?.login, shared: false });
+  return found;
+}
+
+// The projects whose manifests say they share their counts, added to `found`.
+function addSharing(gh, found) {
+  try {
+    const hits = JSON.parse(gh("-X", "GET", "search/code", "-f", 'q="shares its counts" filename:core-manifest.md'));
+    for (const h of hits.items ?? []) if (!found.has(h.repository.full_name)) found.set(h.repository.full_name, { private: h.repository.private, owner: h.repository.owner?.login, shared: true });
+  } catch { console.log("- (GitHub's code search gave no answer: projects that share their counts without giving access are not listed this time.)"); }
+}
+
+// A project's counts, as its row says them, from its newest state report.
+function countsOf(gh, name, r, own) {
+  let counts = "its counts could not be read here: a session started in it reads its newest state report and passes back the lines under its heading";
+  try {
+    const report = reportOf(pagesOf(`repos/${name}/issues?state=all&labels=by%3Alook`, gh), r.owner);
+    const read = report && countsFrom(report.body, own && !r.private, undefined, !r.private);
+    if (read) counts = `from its report of ${report.title.slice(-7)}: ${read}`;
+    else if (!report) counts = "it has no state report yet";
+  } catch { /* (the default above) */ }
+  return counts;
+}
+
+// A project's row, or null where it is the core, has no readable manifest that pins one, or does not share its counts.
+function rowOf(gh, account, name, r) {
+  if (name.toLowerCase() === CORE.toLowerCase()) return null;
+  let manifest;
+  try { manifest = Buffer.from(JSON.parse(gh(`repos/${name}/contents/core-manifest.md`)).content ?? "", "base64").toString("utf8"); } catch { return null; }
+  if (!pinOf(manifest) || (r.shared && !SHARES.test(manifest))) return null;
+  const own = String(r.owner).toLowerCase() === account.toLowerCase();
+  const shown = shownAs(name, own, r.private);
+  return `- ${shown}: ${countsOf(gh, name, r, own)}.`;
+}
+
 // --projects: each project the account reaches, with its kind and the counts from its own newest state report.
 function projects(named) {
   const gh = ghApi;
   const account = gh("user", "--jq", ".login").trim();
-  const found = new Map();
-  // (a named repository counts as given access where it is private and readable, or the account is its collaborator,
-  // read-only too, as GitHub answers; else, a public one of another owner, only by its row)
-  const collaborator = name => { try { gh(`repos/${name}/collaborators/${account}`); return true; } catch { return false; } };
-  if (named.length) for (const name of named) {
-    const r = JSON.parse(gh(`repos/${name}`)), theirs = String(r.owner?.login).toLowerCase() !== account.toLowerCase();
-    found.set(r.full_name, { private: r.private, owner: r.owner?.login, shared: theirs && !r.private && !r.permissions?.push && !collaborator(r.full_name) });
-  }
-  else for (const r of pagesOf("user/repos?affiliation=owner,collaborator", gh)) found.set(r.full_name, { private: r.private, owner: r.owner?.login, shared: false });
-  if (!named.length) try {
-    const hits = JSON.parse(gh("-X", "GET", "search/code", "-f", 'q="shares its counts" filename:core-manifest.md'));
-    for (const h of hits.items ?? []) if (!found.has(h.repository.full_name)) found.set(h.repository.full_name, { private: h.repository.private, owner: h.repository.owner?.login, shared: true });
-  } catch { console.log("- (GitHub's code search gave no answer: projects that share their counts without giving access are not listed this time.)"); }
+  const found = reached(gh, account, named);
+  if (!named.length) addSharing(gh, found);
   const rows = [];
   for (const [name, r] of found) {
-    if (name.toLowerCase() === CORE.toLowerCase()) continue;
-    let manifest;
-    try { manifest = Buffer.from(JSON.parse(gh(`repos/${name}/contents/core-manifest.md`)).content ?? "", "base64").toString("utf8"); } catch { continue; }
-    if (!pinOf(manifest) || (r.shared && !SHARES.test(manifest))) continue;
-    const own = String(r.owner).toLowerCase() === account.toLowerCase();
-    const shown = shownAs(name, own, r.private);
-    let counts = "its counts could not be read here: a session started in it reads its newest state report and passes back the lines under its heading";
-    try {
-      const report = reportOf(pagesOf(`repos/${name}/issues?state=all&labels=by%3Alook`, gh), r.owner);
-      const read = report && countsFrom(report.body, own && !r.private, undefined, !r.private);
-      if (read) counts = `from its report of ${report.title.slice(-7)}: ${read}`;
-      else if (!report) counts = "it has no state report yet";
-    } catch { /* (the default above) */ }
-    rows.push(`- ${shown}: ${counts}.`);
+    const row = rowOf(gh, account, name, r);
+    if (row) rows.push(row);
   }
   console.log([`**The projects that take the core** (read ${new Date().toISOString().slice(0, 10)} by \`node scripts/state-report.mjs --projects\`, counts and conclusions only)`, ...(rows.length ? rows : ["- None found."])].join("\n"));
 }
