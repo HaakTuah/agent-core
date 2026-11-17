@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ARGUED, DAYS, KIT, LISTED, MEASURES, MOST, TITLE, TRIPPED, argued, atCommit, checkOf, due, look, parse, records, report, signs, tripped, trippedBody, where } from "./choices.mjs";
+import { ARGUED, DAYS, KIT, LISTED, MEASURES, MOST, TITLE, TRIPPED, argued, atCommit, baseRecords, checkOf, due, look, parse, records, report, signs, tripped, trippedBody, where } from "./choices.mjs";
 import { DUE } from "./look.mjs";
 import { mended } from "./mend.mjs";
 
@@ -164,6 +164,9 @@ const full = "## Choice: full\n- Looked for: none found, in the registry and the
 const half = "## Choice: half\n- The blind pick: another.\n- Looked for:\n- Reopens it: x.\n";
 ok(parse(full).records[0].lacks.length === 0 && parse(half).records[0].lacks.join() === "Looked for:,The judgment:" && parse("## Choice: n\n").records[0].lacks.join() === ARGUED.join(),
   "a record is read for each line it is argued on, as a list item, bold or plain, and an empty line is none", JSON.stringify(parse(half).records));
+const longHead = `## Choice: ${"the project's foundations, ".repeat(5)}judged again as if written today\n- The suggestion: #3\n`;
+ok(parse(longHead).records[0].today && parse(longHead).records[0].name.length <= 120 && !parse("## Choice: judged again as if written today, not\n").records[0].today,
+  "a heading past the printed length is still read whole for its ending, and one that does not end so is not");
 ok(parse("## Choice: q\nSee: The judgment: elsewhere.\n## Choice: r\nThe judgment: x\n").records[0].lacks.includes("The judgment:"), "a line is read only where it opens so, and under its own record");
 const old = `## Choice: old\n- Reopens it: x.\n\n${full}`;
 const both = argued(`${old}\n${half}`, old);
@@ -196,6 +199,14 @@ ok(atCommit(base, "docs/choices.md", hist) === old && atCommit(empty, "docs/choi
 ok(checkOf({ file: "docs/choices.md", unread: "a link" }, base, hist)[1] === true && mended(checkOf({ file: "docs/choices.md", unread: "a link" }, base, hist)[0].join("\n"))
   && checkOf({ file: "docs/choices.md", unread: "a link" }, empty, hist)[1] === false && checkOf({ file: "docs/choices.md", text: null }, base, hist)[1] === false,
   "records the change makes unreadable fail, saying the mend; ones unreadable at the base as well, or none at all, fail nothing");
+// records moved with the slot that names them, in one change: the base's records are read where the base's rules put them
+fs.writeFileSync(path.join(hist, "core-manifest.md"), "| *choice records* | `docs/choices.md` |\n"); h("add", "-A"); h("commit", "-q", "-m", "a manifest");
+const slotted = h("rev-parse", "HEAD").trim();
+fs.renameSync(path.join(hist, "docs/choices.md"), path.join(hist, "records.md"));
+fs.writeFileSync(path.join(hist, "core-manifest.md"), "| *choice records* | `records.md` |\n");
+c = check(slotted);
+ok(c.status === 0 && /listed, not failed: "old"/.test(c.out) && /listed, not failed: "half"/.test(c.out) && !/FAIL/.test(c.out), "records moved to the path the change names are read at the base where the base named them, and stay listed", c.out);
+ok(baseRecords(slotted, hist) === `${old}\n${half}` && baseRecords(empty, hist) === null && baseRecords("nowhere", hist) === undefined, "the base's records are its own slot's, none where it held none, and nothing where there is no such commit");
 fs.rmSync(hist, { recursive: true, force: true });
 
 fs.rmSync(tmp, { recursive: true, force: true });

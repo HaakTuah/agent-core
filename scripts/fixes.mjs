@@ -13,7 +13,7 @@ import { started } from "./started.mjs";
 
 // A script the checker is run on: one of scripts/, and no test.
 export const SCRIPT = /^scripts\/[^/]+\.mjs$/u;
-export const scriptOf = file => SCRIPT.test(file) && !file.endsWith("-test.mjs");
+export const scriptOf = file => SCRIPT.test(file) && !/-test\.mjs$/u.test(file);
 
 // The issues a commit's message says it fixes: "Fixes #12", "closes #3, fixes #4" (GitHub's own words for it).
 export const fixedBy = message => [...String(message ?? "").matchAll(/\b(?:fix(?:e[sd])?|close[sd]?|resolve[sd]?)\s*:?\s+#(\d+)\b/giu)].map(m => Number(m[1]));

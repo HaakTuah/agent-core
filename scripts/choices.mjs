@@ -81,17 +81,18 @@ const opens = (body, label) => new RegExp(`^[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*)?${
 // be built on today"; #515), whose line "The suggestion:" names the issue filed to the project's owner.
 export const TODAY = /judged again as if written today\s*$/u;
 
-// What a records file holds: each record's name, whether it names its sign, the lines of ARGUED it lacks (`lacks`),
-// whether it records a choice already made (a line "Stood before:"), the issue its line "The suggestion:" names ("#12",
-// or null), and its line "Trips when:" (`conditions`, `unknown`), the day of the last pass (null where the line is missing or holds no day), and how many lines are still
-// left to fill in (FILL IN). A record whose heading is still the starter kit's, left to fill in, is no record yet, so a
-// new project's file makes no pass due.
+// What a records file holds: each record's name (cut to its printed length), whether its whole heading ends as TODAY's
+// (`today`), whether it names its sign, the lines of ARGUED it lacks (`lacks`), whether it records a choice already made
+// (a line "Stood before:"), the issue its line "The suggestion:" names ("#12", or null), and its line "Trips when:"
+// (`conditions`, `unknown`); the day of the last pass (null where the line is missing or holds no day); and how many
+// lines are still left to fill in (FILL IN). A record whose heading is still the starter kit's, left to fill in, is no
+// record yet, so a new project's file makes no pass due.
 export function parse(text) {
   const t = String(text ?? "").replace(/\r\n/gu, "\n");
   const heads = [...t.matchAll(/^## Choice: (.+)$/gmu)];
   const records = heads.map((m, i) => {
     const body = t.slice(m.index + m[0].length, i + 1 < heads.length ? heads[i + 1].index : t.length).split(/^#{1,2} /mu)[0];
-    return { name: plain(m[1]), sign: opens(body, "Reopens it:"), lacks: ARGUED.filter(label => !opens(body, label)),
+    return { name: plain(m[1]), today: TODAY.test(m[1]), sign: opens(body, "Reopens it:"), lacks: ARGUED.filter(label => !opens(body, label)),
       stood: opens(body, "Stood before:"), suggestion: /^[ \t]*(?:[-*][ \t]+)?(?:\*\*)?The suggestion:(?:\*\*)?[ \t]*(#\d+)\b/mu.exec(body)?.[1] ?? null, ...tripsOf(body) };
   }).filter(r => !r.name.startsWith("FILL IN:"));
   const read = /^(?:\*\*)?Read whole:(?:\*\*)?[ \t]*(\d{4}-\d\d-\d\d)\b/mu.exec(t)?.[1] ?? null;
@@ -237,11 +238,21 @@ export function atCommit(commit, file, root = ".") {
   } catch { return null; }
 }
 
+// The records at the base, by the path the base's own rules name (its manifest's row, or the core's AGENTS.md), so a
+// pull request that moves them reads the records they held: their text, null where the base held none, undefined where
+// `base` is no commit here.
+export function baseRecords(base, root = ".") {
+  const manifest = atCommit(base, "core-manifest.md", root);
+  if (manifest === undefined) return undefined;
+  const file = where(manifest ?? atCommit(base, "AGENTS.md", root) ?? "");
+  return file ? atCommit(base, file, root) : null;
+}
+
 // What the check prints and whether it failed: `got`, the records at the head (records()); `base`, the commit the
 // change merges into ("" for none). [lines, failed].
 export function checkOf(got, base, root = ".") {
   const rule = 'core/tasks/choices.md, "A choice that is hard to undo gets a record"';
-  const then = base && got.file ? atCommit(base, got.file, root) : undefined;
+  const then = base ? baseRecords(base, root) : undefined;
   if (got.unread) {
     const was = then !== undefined && then !== null;
     return [[was ? `FAIL: the choice records could not be read (${got.unread}), and the base held them as a file. ${MEND}name a regular file inside the project as the *choice records*, under ${MOST} bytes, as the base had it.`

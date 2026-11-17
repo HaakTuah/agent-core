@@ -21,7 +21,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tools.mjs";
-import { TODAY, parse as parseChoices, where as choicesAt } from "./choices.mjs";
+import { parse as parseChoices, where as choicesAt } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
@@ -611,7 +611,7 @@ export const STEPS = [
       const file = choicesAt(p.manifest);
       if (!file) throw new Unread("the *choice records* the manifest names is no plain path inside the project");
       const text = p.read(file), found = parseChoices(text ?? "");
-      if (found.records.some(r => TODAY.test(r.name) && r.suggestion)) return null;
+      if (found.records.some(r => r.today && r.suggestion)) return null;
       if (found.records.every(r => !r.lacks.length)) return null;
       return `Run once the process of \`core/tasks/choices.md\`, "What the project would be built on today", in a pull request of its own: write in \`${file}\` a record headed \`## Choice: \` and what the project is built on, ending "judged again as if written today", argued on its lines \`Looked for:\`, \`The blind pick:\` and \`The judgment:\`, with the second judgment, what a move would take and gain here, apart; file one issue to the project's owner, labelled \`enhancement\`, saying what the pick would have been and, apart, what a move would cost and gain; and write that issue's number on the record's line \`The suggestion: #<its number>\`.`;
     } },
