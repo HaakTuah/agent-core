@@ -431,22 +431,7 @@ export function readProject(root, rev = null) {
     }
     return false;
   };
-  // At a commit, git's own tree is walked as the working tree is: a link inside the repository is followed (eight hops at
-  // most), one that leads out of it is not, and names are read as git stores them (-z: no quoting); each part of a path
-  // is looked up in the commit's one listing, so a file read costs git no process but its text's.
-  const resolve = (f, hops = 0) => {
-    // (the checkout's root, which no listing names, as a link to ".." from a folder at the root leads to)
-    if (f === ".") return { f, type: "tree" };
-    const parts = f.split("/"), { blobs, links, dirs, others } = listing(root, rev);
-    for (let i = 1; i <= parts.length; i++) {
-      const at = parts.slice(0, i).join("/");
-      if (!links.includes(at)) { if (blobs.has(at) || dirs.has(at) || others.has(at)) continue; return null; }
-      const to = path.posix.normalize(path.posix.join(path.posix.dirname(at), textAt(root, rev, at) ?? "/"));
-      if (hops >= 8 || to === ".." || to.startsWith("../") || path.posix.isAbsolute(to)) return null;
-      return resolve(path.posix.normalize([to, ...parts.slice(i)].join("/")), hops + 1);
-    }
-    return { f, type: blobs.has(f) ? "blob" : dirs.has(f) ? "tree" : "commit" };
-  };
+  const resolve = f => walk(root, rev, f);
   // (in the working tree, a file git ignores is a person's or a machine's own, as a .claude/settings.local.json mostly
   // is, and no file of the project's: floor rule 18)
   const ignored = f => { try { execFileSync("git", ["check-ignore", "-q", "--", f], { cwd: root, stdio: "ignore" }); return true; } catch { return false; } };
@@ -472,6 +457,38 @@ export function readProject(root, rev = null) {
   return { ...configured(read, skills, names, rev ? heldAt(root, rev, read) : f => read(f) !== null), links };
 }
 
+// At the commit `rev`, git's own tree is walked as the working tree is, a name at a time as the file system walks it:
+// a link inside the repository is followed (eight hops at most), its target put before what is left of the path, so a
+// ".." in it steps back from the folder the links before it led to; one that leads out of the repository is not. Names
+// are read as git stores them (-z: no quoting), each looked up in the commit's one listing, so a file read costs git no
+// process but its text's.
+function walk(root, rev, f) {
+  const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
+  let hops = 0;
+  while (left.length) {
+    const name = left.shift();
+    if (name === "" || name === ".") continue;
+    if (name === "..") { if (!at.length) return null; at.pop(); continue; }
+    const here = [...at, name].join("/");
+    if (linked.has(here)) {
+      const to = textAt(root, rev, here) ?? "/";
+      if (++hops > 8 || path.posix.isAbsolute(to)) return null;
+      left.unshift(...to.split("/"));
+      continue;
+    }
+    if (!blobs.has(here) && !dirs.has(here) && !others.has(here)) return null;
+    at.push(name);
+  }
+  return reached(at.join("/") || ".", blobs, dirs);
+}
+
+// The path a walk at a commit reached, and what it is there: the checkout's root, which no listing names (as a link to
+// ".." from a folder at the root leads to), and any folder a "tree", a file a "blob", anything else a submodule's.
+function reached(f, blobs, dirs) {
+  if (f === "." || dirs.has(f)) return { f, type: "tree" };
+  return { f, type: blobs.has(f) ? "blob" : "commit" };
+}
+
 // Whether the commit `rev` holds a file at a path, as configured()'s `holds` asks it word by word of a hook's command:
 // from one listing of the commit, git asked once, and through read() only where a link stands on the path's way.
 function heldAt(root, rev, read) {
@@ -481,7 +498,7 @@ function heldAt(root, rev, read) {
   };
 }
 
-// The files and links of the commit `rev`, git asked once for each commit: { blobs, links, others, dirs, children }.
+// The files and links of the commit `rev`, git asked once for each commit: { blobs, links, linked, others, dirs, children }.
 const listings = new Map();
 function listing(root, rev) {
   const key = `${root}\0${rev}`;
@@ -491,6 +508,7 @@ function listing(root, rev) {
   const entries = out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"); return [l.slice(0, tab).split(" ")[0], l.slice(tab + 1)]; });
   // (a file is a plain or an executable blob; a submodule's entry, 160000, is no file the commit holds)
   const found = { blobs: new Set(entries.filter(([mode]) => mode === "100644" || mode === "100755").map(([, at]) => at)), links: entries.filter(([mode]) => mode === "120000").map(([, at]) => at) };
+  found.linked = new Set(found.links);
   // (and any other entry, a submodule's among them, and the folders on every entry's way, each by its path)
   found.others = new Set(entries.filter(([mode]) => mode !== "100644" && mode !== "100755" && mode !== "120000").map(([, at]) => at));
   found.dirs = new Set(entries.flatMap(([, at]) => at.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/"))));

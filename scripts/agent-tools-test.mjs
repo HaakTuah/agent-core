@@ -316,6 +316,14 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   git(rootLinked, "add", "-A"); git(rootLinked, "commit", "-q", "-m", "hooks at the root");
   const rootKept = run(pr(rootLinked, { "README.md": "a change of its own\n" }));
   ok(rootKept.status === 0 && /nothing fails here: the hook "Kiro PostFileSave/.test(rootKept.out), "a hook under a folder linked to the checkout's root, the base's, is noted, not failed", rootKept.out);
+  // (#476's code review of b786c88: a link's ".." steps back from where the links before it led, as the file system walks it)
+  const walked = project({ "config/sub/keep.md": "", "config/hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), "hooks/other.md": "", ...listing() });
+  fs.mkdirSync(path.join(walked, ".kiro"), { recursive: true });
+  fs.symlinkSync("config/sub", path.join(walked, "tools"));
+  fs.symlinkSync("../tools/../hooks", path.join(walked, ".kiro/hooks"));
+  git(walked, "add", "-A"); git(walked, "commit", "-q", "-m", "hooks through two links");
+  const walkedKept = run(pr(walked, { "README.md": "a change of its own\n" }));
+  ok(walkedKept.status === 0 && /nothing fails here: the hook "Kiro PostFileSave/.test(walkedKept.out), "a hook under a link whose \"..\" follows the links before it, the base's, is noted, not failed", walkedKept.out);
   const kiroServer = { ".kiro/settings/mcp.json": { mcpServers: { docs: { command: "npx", args: ["-y", "docs-server"] } } } };
   fails(run(pr(project({ ...listing() }), { ...kiroServer, ...listing({ kind: "server", name: "Kiro docs", publisher: "Example Tools", version: "2.0.0" }) })), "a Kiro tool server is held to the pin its configuration gives", 'the tool server "Kiro docs" is fetched at no fixed version: .kiro/settings/mcp.json, in the arguments of "docs", names no version');
   fails(run(project({ ...kiroServer, ".mcp.json": { mcpServers: { "Kiro docs": { command: "x" } } }, ...listing() })), "one server name in two files is refused", 'the tool server "Kiro docs" is configured in .mcp.json too');
