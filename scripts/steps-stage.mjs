@@ -11,6 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { copiesConfig } from "./check-configs.mjs";
+import { where } from "./choices.mjs";
 import { MOVED_GLOB, MOVED_GLOBS, callers, moved, project } from "./steps.mjs";
 
 const at = (dir, f) => path.join(dir, f);
@@ -287,6 +288,18 @@ export const STAGES = {
     mend: dir => {
       const manifest = read(dir, "core-manifest.md"), reason = "`repositories.md` (one repository, which no library carries the core into)";
       write(dir, "core-manifest.md", /^Not taken: /m.test(manifest) ? manifest.replace(/^(Not taken: .*?)\.?$/m, `$1, ${reason}.`) : manifest.replace(/^(Floor: .*)$/m, `$1\nNot taken: ${reason}.`));
+    },
+  },
+  "17 November 2026, what the project would be built on today": {
+    // (a record that stood before the rule, argued on none of its lines; the mend writes the record as the step words
+    // it, argued in full, so the records' check passes the pull request that adds it)
+    stage: dir => {
+      const file = where(read(dir, "core-manifest.md"));
+      write(dir, file, `${(fs.existsSync(at(dir, file)) ? read(dir, file) : "# Choices\n").replace(/\n*$/, "\n")}\n## Choice: one language\n\n- Reopens it: a test takes over a minute.\n`);
+    },
+    mend: dir => {
+      const file = where(read(dir, "core-manifest.md"));
+      write(dir, file, `${(fs.existsSync(at(dir, file)) ? read(dir, file) : "# Choices\n").replace(/\n*$/, "\n")}\n## Choice: the project's foundations, judged again as if written today\n\n- Looked for: none the list lacked, in the registry and on the web.\n- The blind pick: the same stack.\n- The judgment: it stands; staying is the answer.\n- The suggestion: #1\n- Reopens it: a need in numbers the stack misses.\n`);
     },
   },
 };
