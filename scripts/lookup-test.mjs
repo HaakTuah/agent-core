@@ -333,6 +333,8 @@ try {
   ok(notDone(tmp, step).length === 0, "and after the licence script alone, it does");
   lic("      - uses: actions/setup-node@v4\n        with:\n          node-version-file: .node-version\n");
   ok(notDone(tmp, step).length === 0, "and after a setup action given only its version, it does");
+  lic("      - uses: actions/setup-node@v5\n        with:\n          node-version: 22\n          package-manager-cache: false\n");
+  ok(notDone(tmp, step).length === 0, "and after one whose cache is turned off, it does");
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    container:\n      image: node:22\n      env:\n        NODE_OPTIONS: --require ./evil.js\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/lookup.mjs c.json --nuget\n      - run: node core/scripts/nuget.mjs c.json\n");
   ok(notDone(tmp, step).length === 1, "nor a lookup in a job run in a container of its own");
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    services:\n      s:\n        image: node:22\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/lookup.mjs c.json --nuget\n      - run: node core/scripts/nuget.mjs c.json\n");

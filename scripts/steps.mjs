@@ -501,10 +501,12 @@ const hides = (st, env, job, w) => {
 };
 // Whether an action's step may stand before a lookup as it is given: no env of its own and none a runner reads from its
 // job or workflow; for the checkout, no other repository, folder or commit than the pull request's; and for a setup
-// action, only the version, distribution and architecture to set up, no cache or install named, which could run the
-// pull request's own files (a cache an action takes by default runs only the package manager's own query).
+// action, only the version, distribution and architecture to set up, and a cache only turned off, since a cache or an
+// install could run the pull request's own files (a cache an action takes by default runs the package manager in the
+// project's folder, under its config: the step's advisory reading, which a project's own workflow, a protected file, holds).
 const plainAction = (st, job, w) => Object.keys(st.env).length === 0 && visible({}, job, w).every(plainKey)
-  && Object.keys(st.with ?? {}).every(k => (/^actions\/checkout@/u.test(st.uses) ? ["fetch-depth", "persist-credentials"].includes(k) : /^(?:[\w-]*version(?:-file)?|distribution|architecture)$/u.test(k)));
+  && Object.entries(st.with ?? {}).every(([k, v]) => (/^actions\/checkout@/u.test(st.uses) ? ["fetch-depth", "persist-credentials"].includes(k)
+    : /^(?:[\w-]*version(?:-file)?|distribution|architecture)$/u.test(k) || (/^(?:package-manager-)?cache$/u.test(k) && String(v) === "false")));
 // Whether a job runs in a container of its own, or beside service containers, which may mount its folder: it runs as
 // they are given, their env and options too, so nothing counts there.
 const boxedJob = job => job?.container !== undefined || job?.services !== undefined;
