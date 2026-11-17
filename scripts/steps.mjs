@@ -636,11 +636,14 @@ export const STEPS = [
         const jobs = jobsOf(w), at = `\`.github/workflows/${shown(f)}\``, copy = corePath(p.root) || "core/";
         // (each config a check is given is matched by a lookup given the same config, since the lookup reads only the
         // lock files of the config it is given)
-        const configs = (...names) => [...new Set(jobs.flatMap(j => j.runs.flatMap(c => names.flatMap(n => (running(c, n, undefined, copy) ? [configOf(c, n, copy)] : [])))))];
-        const looked = (flag, config) => jobs.some(j => counted(j).some(c => looksUp(c, flag, copy) && configOf(c, "lookup.mjs", copy) === config));
+        // (a config named only when the workflow runs, "$CONFIG", may name another file in each job: there the lookup is
+        // looked for in the check's own job alone)
+        const configs = (...names) => jobs.flatMap(j => j.runs.flatMap(c => names.flatMap(n => (running(c, n, undefined, copy) ? [{ cfg: configOf(c, n, copy), job: j }] : []))));
+        const within = ({ cfg, job }) => (/[$%]/u.test(cfg ?? "") ? [job] : jobs);
+        const looked = (flag, at) => within(at).some(j => counted(j).some(c => looksUp(c, flag, copy) && configOf(c, "lookup.mjs", copy) === at.cfg));
         return [
-          configs("exact-versions.mjs").some(cfg => !looked(false, cfg)) ? `in ${at}, beside the step that runs \`${copy}scripts/exact-versions.mjs\`, add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config, for each config it is given` : null,
-          configs("nuget.mjs", "nuget-fetch.mjs").some(cfg => !jobs.some(j => lookedUpFirst(j, copy, cfg))) ? `in ${at}, before any step that builds or restores (\`dotnet\`, \`msbuild\`, a build script) or runs \`${copy}scripts/nuget.mjs\` (a restore runs the pull request's own build files, which could change what the lookup reads), add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config and \`--nuget\`, for each config it is given` : null,
+          configs("exact-versions.mjs").some(at => !looked(false, at)) ? `in ${at}, beside the step that runs \`${copy}scripts/exact-versions.mjs\`, add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config, for each config it is given` : null,
+          configs("nuget.mjs", "nuget-fetch.mjs").some(at => !within(at).some(j => lookedUpFirst(j, copy, at.cfg))) ? `in ${at}, before any step that builds or restores (\`dotnet\`, \`msbuild\`, a build script) or runs \`${copy}scripts/nuget.mjs\` (a restore runs the pull request's own build files, which could change what the lookup reads), add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config and \`--nuget\`, for each config it is given` : null,
           jobs.some(j => !j.deep && counted(j).some(c => looksUp(c, undefined, copy))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\` and no \`ref:\`` : null,
         ].filter(Boolean);
       });

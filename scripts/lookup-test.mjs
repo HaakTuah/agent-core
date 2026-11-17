@@ -256,6 +256,9 @@ try {
   ok(missed.length === 1 && /with the same config, for each config/u.test(missed[0].mend), `a lookup of one config does not stand for another config's check (${missed.map((m) => m.mend)})`);
   nugetJob("node core/scripts/exact-versions.mjs checks/frontend.json", "node core/scripts/exact-versions.mjs checks/backend.json", "node core/scripts/lookup.mjs checks/frontend.json", "node core/scripts/lookup.mjs checks/backend.json");
   ok(notDone(tmp, step).length === 0, "and with a lookup of each, the step is done");
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  front:\n    runs-on: ubuntu-latest\n    env:\n      CONFIG: checks/frontend.json\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs \"$CONFIG\"\n      - run: node core/scripts/lookup.mjs \"$CONFIG\"\n  back:\n    runs-on: ubuntu-latest\n    env:\n      CONFIG: checks/backend.json\n    steps:\n      - run: node core/scripts/exact-versions.mjs \"$CONFIG\"\n");
+  missed = notDone(tmp, step);
+  ok(missed.length === 1, `a config named only when the workflow runs is matched in its own job alone (${missed.map((m) => m.mend)})`);
 } finally { rmSync(tmp, { recursive: true, force: true }); }
 
 console.log(failed ? `${failed} failing` : "ok   lookup.mjs");
