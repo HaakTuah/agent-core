@@ -1,5 +1,6 @@
 // Hostile tests of one input the core names under floor rule 5 (floor/topics/input.md): what GitHub's API answers
-// (releases and tags, workflow and check runs, pull requests and their merges). Each reader is tried, as its shape
+// (releases and tags, workflow and check runs, pull requests and their merges, and whose account holds a repository,
+// releases.mjs's hostAccount). Each reader is tried, as its shape
 // allows, with too long, the wrong type, markup, a file path, a number or date out of range and nothing at all, and
 // takes nothing of it as a pass or a value: core-moved.mjs (with a stand-in git and gh), releases.mjs and release.mjs
 // (in a scratch repository), wait.mjs, stalled.mjs, core-cost.mjs, clean-merges.mjs and look.mjs's checksOf.
@@ -14,7 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { TITLE, openIssue } from "./core-moved.mjs";
-import { RELEASE, elsewhere, fetchCore, releasesIn } from "./releases.mjs";
+import { RELEASE, elsewhere, fetchCore, hostAccount, ownerOf, releasesIn } from "./releases.mjs";
 import { OWN, held } from "./release.mjs";
 import { line, measure, median, waited } from "./wait.mjs";
 import { openPulls, print, stalled } from "./stalled.mjs";
@@ -164,5 +165,11 @@ ok(measure({ repo, gh: () => "" }).median === null && measure({ repo, gh: () => 
 ok(stalled([], Date.now(), 3).length === 0 && /^No lane stalled/.test(print([], 0, 3)) && readings([], repo, 1).length === 0 && priced([]).size === 0, "no pull requests: no lane, no reading, nothing priced");
 ok(checksOf([], null) === "none" && checksOf([], { total_count: 0, state: "failure" }) === "none", "no runs and no status: no checks, never green");
 ok(openIssue("") === null && openIssue("\n\n") === null && openPulls(repo, () => "").length === 0, "no issue lines or pull request lines: none kept");
+// whose account holds the repository, as gh answers it (#481): an answer of no form reads as nothing, never a guess
+for (const answer of ["", "null", "[]", '{"login":"a b","type":"User"}', '{"login":["x"],"type":"User"}', '{"login":"x"}', '{"login":"x","type":7}', "<html>", '{"login":"x\\n::error::y","type":"User"}']) {
+  const host = hostAccount({ GITHUB_REPOSITORY: repo }, () => answer);
+  ok(host === null && ownerOf("# no row\n", host) === null, `the host's account answered as ${JSON.stringify(answer)} reads as nothing, and no owner is read from it`);
+}
+ok(ownerOf("# no row\n", { login: "x", type: "Organization" }) === null && ownerOf("# no row\n", { login: "x", type: "User\n" }) === null, "an account the host does not say a person holds gives no owner");
 
 process.exit(failed ? 1 : 0);

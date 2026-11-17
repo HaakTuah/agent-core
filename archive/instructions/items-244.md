@@ -58,3 +58,10 @@ The index, and how an item is written: `archive/instructions.md`.
      wants the core to read whatever stack is best for a project, not a project's stack fitted to what the core reads,
      and a format someone else defines read by a package, not by hand, how such a package reaches a project settled
      once in that record.
+
+248. **16 November 2026**, #481. A fact about a project's set-up that can be read exactly is read by a script, a row of
+     the manifest or the owner's word only overriding it, and a choice has a default the owner's word changes, so that
+     nothing waits on a setting: a project that takes the core on trust sets nothing, and twice in one day a rule had an
+     owner state something about the set-up that another owner would never say. It stands behind the mark on each slot
+     of the README's table, the owner's account read where a person's account holds the repository, and the tools a
+     project's record shows read before the core's default.

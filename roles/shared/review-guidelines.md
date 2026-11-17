@@ -73,3 +73,5 @@ makes a process measure its goal (`tasks/cleaning.md`).
 - Blocking: a rule of the core (its floor, modules or `AGENTS.md`) written or changed without a part of the pattern in
   the core's `AGENTS.md`, "A rule is written to one pattern", or holding what that pattern keeps out.
 - A finding: a rule that adds text without replacing any, or makes anyone wait for the owner beyond floor rules 3 and 14.
+- Blocking: a rule or a slot that takes a fact about a project's set-up and says neither where it is read from nor why
+  it cannot be read (the core's `AGENTS.md`, "What can be read is never asked or declared").
