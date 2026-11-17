@@ -6,7 +6,7 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { NONE, readPulls, said, tally } from "./tools-read.mjs";
+import { NONE, ownerFor, readPulls, said, tally } from "./tools-read.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, more = "") => { count++; if (!cond) { failed++; console.error(`FAIL: ${what}${more ? `\n${more}` : ""}`); } };
@@ -49,6 +49,33 @@ ok(read.map(p => p.number).join() === "6,7" && !asked.some(a => /\/(5|8)\//.test
 const out = said("o/r", read, tally(read, "o"), "o");
 ok(/the last 2 merged pull requests of o\/r \(#7 to #6\), as the owner's account \(o\) and bots wrote them:/.test(out) && /built by: Another Tool 1, Claude Code 1/.test(out) && /reviewed by: a-reviewer\[bot\] 1, Claude Code 1/.test(out) && /a row written there decides/.test(out), "it prints what it read and that a row decides", out);
 ok(!said("o/r", [{ number: 1 }], { builders: [["x\n::error::y", 1]], reviewers: [] }).includes("\n::"), "a name read from the record never starts a line of the log");
+
+// page by page: closed pull requests updated lately but never merged fill the first page, and the merges stand after it
+{
+  const at = i => new Date(Date.UTC(2026, 10, 10) - i * 60000).toISOString(), routes = [];
+  const unmerged = Array.from({ length: 100 }, (_, i) => ({ number: 1000 + i, merged_at: null, updated_at: at(i) }));
+  const page2 = [{ user: { login: "o", type: "User" }, number: 9, merged_at: at(200), updated_at: at(101) },
+    ...Array.from({ length: 99 }, (_, i) => ({ number: 2000 + i, merged_at: null, updated_at: at(300 + i) }))];
+  const page3 = [{ user: { login: "o", type: "User" }, number: 8, merged_at: at(500), updated_at: at(500) }];
+  const ask = args => { const r = args[1]; routes.push(r); const page = Number(/[?&]page=(\d+)/.exec(r)?.[1] ?? 0);
+    if (/\/pulls\?state=closed/.test(r)) return JSON.stringify([[], unmerged, page2, page3][page] ?? []); return "[]"; };
+  const two = readPulls("o/r", 2, ask);
+  ok(two.map(p => p.number).join() === "9,8" && routes.filter(r => /state=closed/.test(r)).length === 3, "the merges past a first page of unmerged updates are found, page by page", routes.join("\n"));
+  routes.length = 0;
+  const one = readPulls("o/r", 1, ask);
+  ok(one.map(p => p.number).join() === "9" && routes.filter(r => /state=closed/.test(r)).length === 3 - 1, "once a page's oldest update stands before the n-th merge, no later page is read", routes.join("\n"));
+}
+
+// the owner's account of the repository named, never of this checkout
+{
+  const routes = [], quiet = () => {};
+  const gh = (manifest, owner) => args => { const r = args.at(-1) === ".owner | {login, type}" ? args[1] : args.at(-1); routes.push(r);
+    if (/contents\/core-manifest\.md$/.test(r)) { if (manifest === null) throw new Error("404"); return manifest; }
+    if (/^repos\/[^/]+\/[^/]+$/.test(r)) return JSON.stringify(owner); throw new Error(r); };
+  ok(ownerFor("other/project", false, gh(null, { login: "other", type: "User" }), quiet, { GITHUB_REPOSITORY: "local/project" }) === "other" && routes.includes("repos/other/project") && !routes.some(r => r.includes("local")), "another repository's owner is read from its own host's answer, never this checkout's", routes.join("\n"));
+  ok(ownerFor("other/project", false, gh("| *owner's account* | `someone` |\n", { login: "other", type: "User" }), quiet) === "someone", "its own manifest's row decides");
+  ok(ownerFor("a-team/project", false, gh(null, { login: "a-team", type: "Organization" }), quiet) === null, "an organisation's, with no row, is not read");
+}
 
 // the program: no repository it can name, and gh that cannot answer, are each said and fail nothing
 const here = path.dirname(fileURLToPath(import.meta.url));

@@ -16,7 +16,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { aRepository, logged } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
-import { hostSaid, ownerOf } from "./releases.mjs";
+import { hostAccount, hostSaid, ownerOf } from "./releases.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./stand-in-record.mjs";
 
@@ -52,11 +52,20 @@ function reviewedBy(p, owner) {
 }
 
 // The last `n` pull requests merged into the repository, newest first, each with its reviews and comments, as `ask`
-// (gh's arguments, its output back) gives them.
-export function readPulls(repo, n, ask) {
+// (gh's arguments, its output back) gives them. The closed ones come newest update first, a page at a time, and a pull
+// request is updated when it merges, if not later: once `n` are merged and a page's oldest update stands before the
+// n-th newest merge, no page after it holds a newer one (at most `pages` pages are read).
+export function readPulls(repo, n, ask, pages = 20) {
   const json = args => JSON.parse(ask(["api", ...args]));
-  const closed = json([`repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100`]);
-  const merged = closed.filter(p => p?.merged_at).sort((a, b) => String(b.merged_at).localeCompare(String(a.merged_at))).slice(0, n);
+  const byMerge = list => list.sort((a, b) => String(b.merged_at).localeCompare(String(a.merged_at)));
+  let merged = [];
+  for (let page = 1; page <= pages; page++) {
+    const closed = json([`repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`]);
+    if (!Array.isArray(closed)) break;
+    merged = byMerge([...merged, ...closed.filter(p => p?.merged_at)]).slice(0, n);
+    const oldest = String(closed.at(-1)?.updated_at ?? "");
+    if (closed.length < 100 || (merged.length === n && oldest < String(merged.at(-1).merged_at))) break;
+  }
   const people = list => list.map(x => ({ login: String(x?.user?.login ?? ""), type: String(x?.user?.type ?? ""), body: String(x?.body ?? "") }));
   return merged.map(p => ({ number: p.number, login: String(p?.user?.login ?? ""), type: String(p?.user?.type ?? ""), body: String(p.body ?? ""),
     reviews: people(json([`repos/${repo}/pulls/${Number(p.number)}/reviews?per_page=100`])),
@@ -71,19 +80,26 @@ export function said(repo, pulls, { builders, reviewers, others = 0 }, owner = n
     "where the manifest's \"Tools\" table has no \"Builder\" row, the tools that built come first, most first, then the core's default, and a tool shown reviewing is at hand (core/tasks/roles.md, \"Tools are preferences\"); a row written there decides"].join("\n");
 }
 
+// The owner's account of the repository read (`repo`): its manifest's row, else whose account the host says holds it,
+// asked of that repository, never of this checkout where it is another (`local` false), each through `ask` (gh).
+export function ownerFor(repo, local, ask, say = console.log, env = process.env) {
+  let manifest = "";
+  try { manifest = local ? fs.readFileSync("core-manifest.md", "utf8") : ask(["api", "-H", "Accept: application/vnd.github.raw", `repos/${repo}/contents/core-manifest.md`]); } catch { /* (the core's own repository holds none) */ }
+  return ownerOf(manifest, hostSaid(say, () => hostAccount(local ? env : { GITHUB_REPOSITORY: repo }, ask)));
+}
+
 function main(args) {
   const at = name => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
   const n = Number(at("--last") ?? 10);
-  let repo = at("--repo") ?? process.env.GITHUB_REPOSITORY;
-  if (!repo) try { repo = repoOf(execFileSync("git", ["remote", "get-url", "origin"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })); } catch { /* (no origin) */ }
+  let here = process.env.GITHUB_REPOSITORY;
+  if (!here) try { here = repoOf(execFileSync("git", ["remote", "get-url", "origin"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })); } catch { /* (no origin) */ }
+  const repo = at("--repo") ?? here, local = repo === here;
   // (nothing read is said so, and the core's default stands: it fails nothing)
   if (!aRepository(repo) || !(Number.isInteger(n) && n > 0)) { console.log("note the record could not be read: give --repo <owner/name> and --last a whole number; the core's default stands (core/tasks/roles.md)"); return 0; }
   const ask = a => execFileSync("gh", a, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 });
   let pulls;
   try { pulls = readPulls(repo, n, ask); } catch { console.log(`note gh could not read ${repo}'s merged pull requests; the core's default stands (core/tasks/roles.md)`); return 0; }
-  let manifest = "";
-  try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { /* (the core's own repository holds none) */ }
-  const owner = ownerOf(manifest, hostSaid());
+  const owner = ownerFor(repo, local, ask);
   console.log(said(repo, pulls, tally(pulls, owner), owner));
   return 0;
 }
