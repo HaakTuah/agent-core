@@ -448,6 +448,15 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   git(emptyBase, "reset", "-q", "--hard");
   const rootKit = KIT_HOOK.replace("main:scripts/format.sh", "main:format.sh");
   fails(run(pr(emptyBase, { ".claude/settings.json": withHook(rootKit), ...listing(entry(rootKit)) })), "and one whose fetched path main holds as an empty folder", 'fetches "format.sh" from main, which the project holds as no plain file');
+  // (#476's fallback security review of de6baf6: and where the merge itself holds an empty folder there, main a file)
+  const emptyHead = project({ "format.sh": "echo a file\n", ...listing() }), inHead = { cwd: emptyHead, env, encoding: "utf8" };
+  pr(emptyHead, { ".claude/settings.json": withHook(rootKit), ...listing(entry(rootKit)) });
+  const headEmpty = execFileSync("git", ["mktree"], { ...inHead, input: "" }).trim();
+  const lines = git(emptyHead, "ls-tree", "HEAD").split("\n").filter(l => !l.endsWith("\tformat.sh"));
+  const headTree = execFileSync("git", ["mktree"], { ...inHead, input: `${lines.join("\n")}\n040000 tree ${headEmpty}\tformat.sh\n` }).trim();
+  git(emptyHead, "update-ref", "refs/heads/main", git(emptyHead, "commit-tree", headTree, "-p", "HEAD^1", "-p", "HEAD^2", "-m", "merge"));
+  git(emptyHead, "reset", "-q", "--hard");
+  fails(run(emptyHead), "and one whose merge holds an empty folder at the fetched path, main a file", 'fetches "format.sh" from main, which the project holds as no plain file');
   // (#476's security review of a74309b: what the kit's form fetches from main must be a file, not a link, whose target's
   // name main would give in the script's place)
   if (LINKS) {

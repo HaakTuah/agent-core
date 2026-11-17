@@ -469,16 +469,18 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
 
 // Whether a commit's listing holds `at` as anything but a plain file: a link, a folder or a submodule's entry.
 const notFile = (l, at) => l.linked.has(at) || l.dirs.has(at) || l.others.has(at);
-// Whether what git shows at `rev:at` is an object of another kind than a file's, as git show resolves it, whatever its
-// mode says (a folder the listing leaves out as empty, an entry whose mode names a file and whose object is not one);
-// git asked once a path a commit, and a path it shows nothing at is no script either way.
+// Whether what git shows at `rev:at` is no plain file, asked of git for that path alone, so one broken entry elsewhere
+// cannot empty what the listing gives: its mode, a link's, a folder's (an empty one too, which the listing leaves out)
+// or a submodule's; or the object it resolves to, of another kind than a file's whatever its mode says. Replace objects
+// are not read, as the kit's form reads none; git asked once a path a commit, and a path it holds nothing at is no
+// script either way.
 const shown = new Map();
 function shownNotBlob(root, rev, at) {
   const key = `${root}\0${rev}\0${at}`;
   if (!shown.has(key)) {
-    let type = "";
-    try { type = execFileSync("git", ["cat-file", "-t", `${rev}:${at}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { /* (nothing there) */ }
-    shown.set(key, type !== "" && type !== "blob");
+    const ask = args => { try { return execFileSync("git", ["--no-replace-objects", ...args], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return ""; } };
+    const mode = ask(["ls-tree", "-z", rev, "--", at]).split(" ")[0], type = ask(["cat-file", "-t", `${rev}:${at}`]).trim();
+    shown.set(key, (mode !== "" && mode !== "100644" && mode !== "100755") || (type !== "" && type !== "blob"));
   }
   return shown.get(key);
 }
@@ -523,7 +525,7 @@ function listing(root, rev) {
   const key = `${root}\0${rev}`;
   if (listings.has(key)) return listings.get(key);
   let out = "";
-  try { out = execFileSync("git", ["ls-tree", "-r", "-z", rev], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (none) */ }
+  try { out = execFileSync("git", ["--no-replace-objects", "ls-tree", "-r", "-z", rev], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (none) */ }
   const entries = out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"); return [l.slice(0, tab).split(" ")[0], l.slice(tab + 1)]; });
   // (a file is a plain or an executable blob; a submodule's entry, 160000, is no file the commit holds)
   const found = { blobs: new Set(entries.filter(([mode]) => mode === "100644" || mode === "100755").map(([, at]) => at)), links: entries.filter(([mode]) => mode === "120000").map(([, at]) => at) };
