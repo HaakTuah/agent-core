@@ -60,7 +60,7 @@ function main() {
   process.chdir(root);
   const o = options(process.argv.slice(2));
   if (!o.parts.length) Object.assign(o, fromCalls(root, o));
-  const coreAt = `${path.relative(root, path.dirname(path.dirname(fileURLToPath(import.meta.url)))).replace(/\\/g, "/")}/`;
+  const coreAt = copyAt(root);
   const temp = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "core-checks-"));
   const results = [];
   const check = (name, fn) => { console.log(`== ${name}`); const passed = fn(); results.push([name, passed]); return passed; };
@@ -70,6 +70,16 @@ function main() {
   const failed = results.filter(([, passed]) => !passed).map(([name]) => name);
   console.log(failed.length ? `${failed.length} of ${results.length} checks failed, each saying its mend above: ${failed.join("; ")}` : `ok   ${results.length} checks passed`);
   process.exitCode = failed.length ? 1 : 0;
+}
+
+// Where the copy of the core stands, from the project's root, ending in "/": as the workflow's step read it from the
+// manifest (CORE_AT), where it holds this script; else this script's own folder, both paths made real first, since on
+// Windows git names the root by its long name where Node may name a temporary folder by its short one.
+function copyAt(root) {
+  const here = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+  const at = process.env.CORE_AT;
+  if (at && /\/$/.test(at) && fs.existsSync(path.join(root, at, "scripts/checks.mjs")) && fs.realpathSync.native(path.join(root, at)) === fs.realpathSync.native(here)) return at;
+  return `${path.relative(fs.realpathSync.native(root), fs.realpathSync.native(here)).replace(/\\/g, "/")}/`;
 }
 
 // The parts and options given, each checked.

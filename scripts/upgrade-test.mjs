@@ -762,7 +762,7 @@ function preRelease(name, { windows }) {
     git(dir, "push", "-q", "origin", "main");
     const main2 = git(dir, "rev-parse", "HEAD");
     const look = checks(p, "pull_request", docs(main2), { baseSha: main2, only: "nuget.yml" });
-    const said = look.flatMap(([, r]) => r.steps).find(x => x.name === "Does the pull request change what NuGet reads?")?.out ?? "";
+    const said = look.flatMap(([, r]) => r.steps).find(x => x.name === "Does the pull request change what NuGet reads?" || (x.out ?? "").includes("== Does the pull request change what NuGet reads?"))?.out ?? "";
     if (sdk) ok(!failures(look) && /nothing to restore/.test(said) && !ran(look, "nuget.yml", "Restore each project file from its lock file alone"),
       `${name}: with packageSourceMapping, the NuGet check's first look finds nothing to restore on a pull request that changes nothing NuGet reads, and its restore does not run (#380)`, `${failures(look)}\n${said}`);
     git(dir, "checkout", "-q", "main");
