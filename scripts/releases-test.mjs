@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "./core-address.mjs";
 import { OWN, costed, held, inTheCore, next, older } from "./release.mjs";
 import { STEPS } from "./steps.mjs";
-import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "./releases.mjs";
+import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "./releases.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -34,6 +34,14 @@ ok(ownerOf(BARE, PERSON) === "someone" && ownerOf(BARE, ORG) === null && ownerOf
 ok(ownerOf(manifest("other"), PERSON) === "other" && ownerOf("| *owner's account* | someone |\n", PERSON) === null && ownerOf(`${manifest("a")}| *owner's account* | \`b\` |\n`, PERSON) === null, "a row decides over what was read, and a row of another form, or two, give no answer and are never read past");
 ok(ownerOf(BARE, { login: "a;b", type: "User" }) === null && ownerOf(BARE, { login: "x", type: "user" }) === null, "a login of no form, and a type other than the host's own word, read as nothing");
 ok(followsOf(BARE, { login: OWNER, type: "User" }) === "main" && followsOf(BARE, PERSON) === "releases" && followsOf(BARE, ORG) === null, "with no row, what the project follows goes by the account read");
+{ // asked once, only when called, saying what it read
+  const lines = [], calls = [];
+  const host = hostSaid(l => lines.push(l), () => { calls.push(1); return PERSON; });
+  ok(ownerOf(manifest("other"), host) === "other" && !calls.length && !lines.length, "with a row, the host is not asked and nothing is said");
+  ok(ownerOf(BARE, host) === "someone" && followsOf(BARE, host) === "releases" && calls.length === 1 && lines.length === 1 && /^read from the host: someone, a person's account, holds the repository; a row/.test(lines[0]), "with none, it is asked once and says what it read", lines.join("\n"));
+  const none = [];
+  ok(ownerOf(BARE, hostSaid(l => none.push(l), () => null)) === null && /nothing/.test(none[0]) && /an account of the type x%0Ay/.test((() => { const l = []; hostSaid(x => l.push(x), () => ({ login: "a", type: "x\ny" }))(); return l[0]; })()), "nothing read is said so, and a type of no form is only quoted");
+}
 { // the host's account: from the workflow's event, else from gh, else nothing
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "host-account-")), event = path.join(dir, "event.json"), asked = [];
   try {

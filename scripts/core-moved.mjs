@@ -17,7 +17,7 @@ import path from "node:path";
 import { aRepository } from "./guards.mjs";
 import { CORE } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
-import { fetchCore, followsOf, hostAccount, newestRelease, ownerOf, staysAt } from "./releases.mjs";
+import { fetchCore, followsOf, hostSaid, newestRelease, ownerOf, staysAt } from "./releases.mjs";
 import { started } from "./started.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
@@ -82,8 +82,7 @@ function pinHere(manifest, fail) {
 }
 
 // Whose account holds the repository, asked of the host once, and only where the manifest has no row that says it.
-let held;
-const host = () => (held === undefined ? (held = hostAccount()) : held);
+const host = hostSaid();
 
 function main(dry) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };

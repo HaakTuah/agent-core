@@ -339,8 +339,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 Where projects differ only in a name, a path or an example, the core leaves a **slot**, in italics (*progress file*),
 and a manifest's row says what fills it. A task is a project's unit of work; the main lane is its queue.
 Each slot carries the mark the core's `AGENTS.md` asks ("What can be read is never asked or declared"), in the third
-column; a row overrides what was read and the default alike, and a project leaves out every row it does not need
-(`scripts/manifest-reads.mjs` holds each mark to its parts).
+column; a row overrides what was read and the default alike, and a slot with no row takes them, so no row is asked
+for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit still writes its rows.
 
 | Slot | What the project fills in | Mark |
 | --- | --- | --- |

@@ -25,7 +25,7 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
-import { NOTES, asksBetween, fetchCore, followsOf, hostAccount, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
+import { NOTES, asksBetween, fetchCore, followsOf, hostSaid, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
 // git's own variables that point elsewhere left out: releases.mjs)
@@ -69,7 +69,7 @@ function sync(tmp) {
   if (arg && !/^[0-9a-f]{40}$/.test(arg)) fail("give the core's commit as a full SHA");
   let pin = arg ?? (first ? old : null), release = "";
   if (!pin) {
-    const follows = followsOf(text, hostAccount) ?? fail(`${manifest} does not say what the project follows: its *follows* row is \`main\` or \`releases\`, once, or left out where the owner's account is read: its one row, or the repository's own account where the host says a person holds it`);
+    const follows = followsOf(text, hostSaid()) ?? fail(`${manifest} does not say what the project follows: its *follows* row is \`main\` or \`releases\`, once, or left out where the owner's account is read: its one row, or the repository's own account where the host says a person holds it`);
     if (follows === "main") pin = git(["rev-parse", "refs/heads/main"], tmp);
     else {
       const newest = newestRelease(old, tmp);

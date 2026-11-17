@@ -4,12 +4,12 @@
 // with no such row, main where its *owner's account* is the account the core is under, the releases where its owner is
 // another, who then takes only what the core's owner chose to hand on. The sync and the core-moved check (sync.mjs,
 // core-moved.mjs) ask here what a project follows, which release is the newest, and whether it asks a sync of the
-// project at all (staysAt). Every function reads; none writes but fetchCore, into the empty folder it is given. Git and
-// Node's own modules only.
+// project at all (staysAt). Every function reads; none writes but fetchCore, into the empty folder it is given. Git,
+// Node's own modules, and gh where no workflow's event says whose account holds the repository (hostAccount).
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { CORE, OWNER } from "./core-address.mjs";
-import { aRepository } from "./guards.mjs";
+import { aRepository, logged } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
 import { MODULES } from "./reading.mjs";
@@ -58,6 +58,18 @@ export function ownerOf(manifest, host = null) {
   if (rows.length) return found.length === 1 && found[0] ? found[0] : null;
   const read = typeof host === "function" ? host() : host;
   return read?.type === "User" && LOGIN.test(read.login ?? "") ? read.login : null;
+}
+
+// hostAccount asked once, and only when called (as ownerOf calls it, where no row stands), saying through `say` what it
+// read, so that a wrong reading is seen and a row written over it (#481).
+export function hostSaid(say = console.log, read = hostAccount) {
+  let held;
+  return () => {
+    if (held !== undefined) return held;
+    held = read();
+    say(held ? `read from the host: ${held.login}, ${held.type === "User" ? "a person's account" : `an account of the type ${logged(held.type)}`}, holds the repository; a row of core-manifest.md's slots says otherwise where it is wrong` : "read from the host: nothing, so whose account holds the repository is not known");
+    return held;
+  };
 }
 
 // What the project follows, "main" or "releases": its manifest's *follows* row (| *follows* | `releases` |), and with
