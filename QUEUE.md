@@ -42,6 +42,7 @@ it merges last.
 | #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, which change `scripts/look.mjs` |
 | #355 | builder | |
 | #391 | builder; the look's work-down of the core's listed functions, which overlaps #355 | |
+| #542 | rule builder; it changes what the orchestrator reads at its start | #457, whose rule its point 5 follows, and #355 and #391, which change `scripts/look.mjs` |
 | #337 | builder | |
 | #426 | builder; a .NET reader it files waits on #529 | |
 | #404 | builder | |
