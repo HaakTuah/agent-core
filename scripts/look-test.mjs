@@ -114,6 +114,8 @@ ok(/no baseline may stand/.test(core) && /Not read: `scripts\/holders\.mjs` coul
 ok(core.includes("runs `node scripts/review-record.mjs --since 2026-10-01` and, for each rule it lists under \"Found twice\" that no open issue takes, files an issue as `tasks/reviews.md`, point 8, says.")
   && proj0().includes("runs `node core/scripts/review-record.mjs --since 2026-10-01` and, for each rule it lists under \"Found twice\" that no open issue takes, files an issue as `core/tasks/reviews.md`, point 8, says."),
   "each report, the core's and a project's, names the step that files a check for each rule the reviews found twice, from the month before", core);
+ok([core, proj0()].every(r => r.includes("**The rounds of review**\n- Not read by GitHub's job. The same session adds, as a note, the last two lines that run printed under \"Rounds of review\": the median over the last 30 merged pull requests beside the last report's, and the five that took the most rounds.")),
+  "each report names the step that adds the rounds of review, the median beside the last report's and the five that took the most (#477)", core);
 function proj0() { return body({ core: false, month: "2026-11", measures: null, previous: null, overdue: [], counts: null, scripts: "core/scripts" }); }
 const proj = body({ core: false, month: "2026-11", measures: { at: "checks/copies-baseline.json", count: 4 }, previous: "**x**\n- copies: 6 old copies", overdue: [{ number: 7, title: "Steps of a release not done", since: "2026-11-01T05:41:00Z" }],
   counts: { pin: "a".repeat(40), behind: 3, steps: 2, merged: { all: 4, sync: 1, upkeep: 1, update: 0, own: 2 } }, scripts: "core/scripts" });
