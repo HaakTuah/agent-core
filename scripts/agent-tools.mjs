@@ -94,7 +94,8 @@ export function configured(read, skills, files = () => [], holds = f => read(f) 
   // (whether the project holds a path is asked once a path: a hook may name one a thousand times, and the asking reads
   // the file and may start git)
   const asked = new Map(), holdsOnce = f => { if (!asked.has(f)) asked.set(f, holds(f)); return asked.get(f); };
-  const state = { tools, problems, flag, add, shapes: new Map(), clashed: new Set(), sources, unread, holds: holdsOnce, servers, kit };
+  const listed = new Map(), folder = f => { if (!listed.has(f)) listed.set(f, files(f).length > 0); return listed.get(f); };
+  const state = { tools, problems, flag, add, shapes: new Map(), clashed: new Set(), sources, unread, holds: holdsOnce, folder, servers, kit };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -238,7 +239,7 @@ function addHook(state, file, { tool, event, matcher, given = matcher, hook, run
 }
 // What a hook's commands take from the working tree, into `state.sources`, and whether one is not read, into `state.unread`.
 function readSource(state, name, commands) {
-  const read = commands.map(c => fromTree(c, state.holds)), taken = read.flatMap(paths => paths ?? []);
+  const read = commands.map(c => fromTree(c, state.holds, state.folder)), taken = read.flatMap(paths => paths ?? []);
   if (read.includes(null)) state.unread.add(name);
   if (taken.length) state.sources.set(name, [...new Set([...(state.sources.get(name) ?? []), ...taken])]);
 }

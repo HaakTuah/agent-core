@@ -401,11 +401,16 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(many), ...listing(entry(many)) })), "a hook that names a file a thousand times is read at once", 'takes "scripts/format.sh"');
     ok(Date.now() - began < 20000, "in seconds", `${Date.now() - began} ms`);
   }
+  {
+    // (a folder a hook tells its program to work in, as the project's own reader answers it)
+    const moved = "env -C scripts -u A -u B -u C -u D -u E -u F -u G -u H bash format.sh";
+    fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(moved), ...listing(entry(moved)) })), "a hook that runs a file from a folder it tells its program to work in takes it from the working tree", 'takes "scripts/format.sh"');
+  }
   const step = STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed");
   ok(notDone(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK)) }), step)[0]?.mend.includes('takes "scripts/format.sh" from the working tree'), "the sync note's step reads not done while a hook takes a file from the working tree unmarked");
   ok(!notDone(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK, fromWorkingTree)) }), step).length, "and done once it is marked, listed in the baseline");
   // (the reading itself, of a plain command only: each word and each part of it that names a file of the project)
-  const files = ["scripts/a.sh", "scripts/a b.sh", "scripts/r:x.sh", "a.sh"], holds = f => files.includes(f);
+  const files = ["scripts/a.sh", "scripts/a b.sh", "scripts/r:x.sh", "scripts/in/a.sh", "a.sh"], holds = f => files.includes(f), folder = f => f === "scripts" || f === "scripts/in";
   for (const [command, want] of [["bash scripts/a.sh", ["scripts/a.sh"]], ["node \"$CLAUDE_PROJECT_DIR/scripts/a.sh\"", ["scripts/a.sh"]], ["\"$CLAUDE_PROJECT_DIR\"/scripts/a.sh", ["scripts/a.sh"]],
     ["bash ${CLAUDE_PROJECT_DIR}/scripts/a.sh", ["scripts/a.sh"]], ["bash 'scripts/a b.sh'", ["scripts/a b.sh"]], ["bash scripts/'a b'.sh", ["scripts/a b.sh"]], ["node --require=scripts/a.sh x", ["scripts/a.sh"]],
     ["java -cp lib:scripts/a.sh Main", ["scripts/a.sh"]], ["git show refs/remotes/origin/main:scripts/a.sh", ["scripts/a.sh"]], ["test -f scripts/a.sh", ["scripts/a.sh"]], ["cat ./scripts/a.sh", ["scripts/a.sh"]],
@@ -422,24 +427,30 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ["PATH=scripts runner", null], ["FOO=1 bash a.sh", null], ["env PATH=scripts runner", null], ["bash 'scripts/a\tb.sh'", null], ["bash\tscripts/a.sh", null],
     // (#476's code review of 3ffa29e: a path from the root may lead into the checkout)
     ["bash /tmp/project/scripts/a.sh", null], ["node --require=/x/scripts/a.sh", null], ["bash /scripts/a.sh", null],
-    // (#476's code review of adeba79: a word after one that names a folder a program works in is read from it too)
-    ["env -C scripts bash a.sh", ["a.sh", "scripts/a.sh"]], ["make --directory=scripts a.sh", ["a.sh", "scripts/a.sh"]], [`bash${" x".repeat(1000)}`, null]])
-    ok(JSON.stringify(fromTree(command, holds)) === JSON.stringify(want), `the command ${JSON.stringify(command)} ${want === null ? "is not read" : `takes ${want.length ? want.join(", ") : "nothing"} from the working tree`}`, JSON.stringify(fromTree(command, holds)));
+    // (#476's code reviews of adeba79 and 378a61a: a part is read from each folder another part names or ends in, as a
+    // program told to work there reads it, wherever the two stand; and a command that would ask too much is not read)
+    ["env -C scripts bash a.sh", ["a.sh", "scripts/a.sh"]], ["make --directory=scripts a.sh", ["a.sh", "scripts/a.sh"]], ["env -C scripts -u A -u B -u C -u D -u E -u F -u G -u H bash a.sh", ["a.sh", "scripts/a.sh"]],
+    ["env -Cscripts bash a.sh", ["a.sh", "scripts/a.sh"]], ["bash a.sh -C scripts", ["a.sh", "scripts/a.sh"]], ["env -C scripts env -C in bash a.sh", ["a.sh", "scripts/a.sh", "scripts/in/a.sh"]],
+    ["bash scripts/a.sh", ["scripts/a.sh"]], [Array.from({ length: 3000 }, (_, i) => `${"w".repeat(40)}${i}`).join(" "), null]])
+    ok(JSON.stringify(fromTree(command, holds, folder)) === JSON.stringify(want), `the command ${JSON.stringify(command).slice(0, 100)} ${want === null ? "is not read" : `takes ${want.length ? want.join(", ") : "nothing"} from the working tree`}`, JSON.stringify(fromTree(command, holds, folder)));
   // (a file at the root that cmd runs in the place of the first word)
   for (const shadow of ["git.bat", "git.exe", "git.vbs", "git"])
-    ok(JSON.stringify(fromTree("git status", f => f === shadow)) === JSON.stringify([shadow]), `a ${shadow} at the project's root, which cmd runs in git's place, is taken`);
+    ok(JSON.stringify(fromTree("git status", f => f === shadow, folder)) === JSON.stringify([shadow]), `a ${shadow} at the project's root, which cmd runs in git's place, is taken`);
   // (a path through a link inside the checkout is what holds() reads: the word itself is asked)
-  ok(JSON.stringify(fromTree("bash tools/run.sh", f => f === "tools/run.sh")) === '["tools/run.sh"]', "a path through a link inside the checkout is asked as written");
+  ok(JSON.stringify(fromTree("bash tools/run.sh", f => f === "tools/run.sh", folder)) === '["tools/run.sh"]', "a path through a link inside the checkout is asked as written");
   // (the kit's forms are the core's: of one, only the plain words after its script are read)
   const kitForm = word => `bash -c 'f=$(git -C "\${CLAUDE_PROJECT_DIR:-.}" --no-replace-objects show refs/remotes/origin/main:scripts/a.sh 2>/dev/null) || exit 0; bash -c "$f"${word}'`;
-  ok(JSON.stringify(fromTree(kitForm(""), holds)) === "[]" && JSON.stringify(fromTree(kitForm(" a.sh"), holds)) === '["a.sh"]', "the kit's form takes nothing from the working tree, save a word after its script that names a file");
-  ok(fromTree(kitForm("'; bash scripts/a.sh; '"), holds) === null, "and one broken out of its quote is no kit's form, and not read");
+  ok(JSON.stringify(fromTree(kitForm(""), holds, folder)) === "[]" && JSON.stringify(fromTree(kitForm(" a.sh"), holds, folder)) === '["a.sh"]', "the kit's form takes nothing from the working tree, save a word after its script that names a file");
+  ok(fromTree(kitForm("'; bash scripts/a.sh; '"), holds, folder) === null, "and one broken out of its quote is no kit's form, and not read");
   {
     const began = Date.now();
-    for (const command of ["a.sh ".repeat(1 << 18), "\"".repeat(1 << 20), "'a b' ".repeat(1 << 17), "a=b:c,d@e ".repeat(1 << 16), `${kitForm("")}${" x".repeat(1 << 18)}`]) fromTree(command, holds);
+    for (const command of ["a.sh ".repeat(1 << 18), "\"".repeat(1 << 20), "'a b' ".repeat(1 << 17), "a=b:c,d@e ".repeat(1 << 16), `${kitForm("")}${" x".repeat(1 << 18)}`]) fromTree(command, holds, folder);
     ok(Date.now() - began < 5000, "and a command a megabyte long is read at once", `${Date.now() - began} ms`);
+    // (#476's code review of 378a61a: two quoted words of a thousand parts each, in a project where each names a folder)
+    const wide = n => `'${Array.from({ length: n }, (_, i) => `${"ab"[n % 2]}${i}`).join(" ")}'`, also = Date.now();
+    ok(fromTree(`echo ${wide(1000)} ${wide(1001)}`, () => false, () => true) === null && Date.now() - also < 5000, "and one that would ask a folder of each of its parts for each other part is not read, at once", `${Date.now() - also} ms`);
   }
-  ok(JSON.stringify(kitHooks().map(id => JSON.parse(id)).flatMap(id => { const h = id[id.length - 1]; return [h.command, h.action?.command].filter(Boolean); }).flatMap(c => fromTree(c, p => /\.(?:sh|mjs|json|md)$/u.test(p)))) === "[]", "the starter kit's hooks take nothing from the working tree, whatever files the project holds");
+  ok(JSON.stringify(kitHooks().map(id => JSON.parse(id)).flatMap(id => { const h = id[id.length - 1]; return [h.command, h.action?.command].filter(Boolean); }).flatMap(c => fromTree(c, p => /\.(?:sh|mjs|json|md)$/u.test(p), p => p === "scripts"))) === "[]", "the starter kit's hooks take nothing from the working tree, whatever files the project holds");
 }
 
 // ---- the TOML reader Codex's config is read with ----
