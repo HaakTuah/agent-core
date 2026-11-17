@@ -7,7 +7,8 @@
 //   own script says; the header of .github/workflows/copies.yml says them together);
 // - description: the description check (pr-description.mjs), given the pull request's description in PR_BODY or a file;
 // - signatures and nuget, the package checks: first a look at whether the change touches what it reads, then npm's
-//   install and signature check, or NuGet's restore, each with its licence read. They go last, and the job runs each in
+//   install and signature check, or NuGet's restore, each with its licence read. Before any part, each NuGet call's
+//   lookup of the packages new to the project (lookup.mjs), since a restore runs the change's own build files. They go last, and the job runs each in
 //   a step of its own after the others; the NuGet restore runs the change's own build files, so it goes after all, and
 //   nothing that runs after it reads what a build could have changed.
 //
@@ -69,6 +70,9 @@ function main() {
   const results = [];
   const check = (name, fn) => { console.log(`== ${name}`); const passed = fn(); results.push([name, passed]); return passed; };
   try {
+    // (first, each NuGet call's lookup of the packages new to the project, floor topic 15: before any part runs a
+    // restore, which runs the pull request's own build files, so that no config's restore runs before another's lookup)
+    if (o.parts.includes("nuget")) for (const settings of runsOf(o, "nuget")) lookUp({ ...o, ...settings }, { coreAt, check });
     // (each part once for each call that runs it with settings of its own, as two calls for two lock files' folders)
     for (const part of PARTS.filter(p => o.parts.includes(p))) for (const settings of runsOf(o, part)) RUN[part]({ ...o, ...settings }, { coreAt, temp, check });
   } finally { fs.rmSync(temp, { recursive: true, force: true }); }
@@ -189,6 +193,15 @@ const install = cwd => passed(process.platform === "win32"
 const signed = cwd => passed(process.platform === "win32" ? spawnSync(COMSPEC, ["/d", "/s", "/c", "npm audit signatures"], { cwd, ...shown })
   : spawnSync("npm", ["audit", "signatures"], { cwd, ...shown }));
 
+// Where advisory, a failure said and passed.
+const advised = o => passed => { if (passed) return true; if (!o.advisory) return false; console.log("Advisory: nothing fails for it yet."); return true; };
+// Each package new to the project looked up in NuGet's registry (lookup.mjs, floor topic 15), for one NuGet call: run
+// for every call before any part restores, its verdict recorded, and the checks after it run on its failure too.
+function lookUp(o, { coreAt, check }) {
+  check("Each package new to the project looked up in NuGet's registry (floor topic 15)", () => advised(o)(node(coreAt, "lookup.mjs", [o.nuget, "--nuget"],
+    { env: { LOOKUP_BASE: process.env.BASE_SHA || baseCommit(o.base) } })));
+}
+
 const RUN = {
   copies(o, { coreAt, check }) {
     // (a base that cannot be had is a failure of its own, and every check still runs, each saying what it could not read)
@@ -226,14 +239,13 @@ const RUN = {
     const dotnet = { DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_NOLOGO: "1", EnableWindowsTargeting: "true" };
     const output = path.join(temp, "look");
     fs.writeFileSync(output, "");
+    const advisory = o.advisory ? ["--advisory"] : [], verdict = advised(o);
     const looked = check("Does the pull request change what NuGet reads?", () => run("bash", ["-e", `${coreAt}scripts/nuget-look.sh`], { env: {
       BASE: process.env.BASE_SHA || baseCommit(o.base), CONFIG: o.nuget, CALLER: process.env.CALLER ?? "", CORE_AT: coreAt,
       NUGET_PACKAGES: path.join(temp, "nuget-look"), GITHUB_OUTPUT: output, ...dotnet } }));
     if (!looked) return;
     const said = Object.fromEntries(fs.readFileSync(output, "utf8").split(/\r?\n/).filter(l => l.includes("=")).map(l => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
     if (said.run === "false") return;
-    const advisory = o.advisory ? ["--advisory"] : [];
-    const verdict = passed => { if (passed) return true; if (!o.advisory) return false; console.log("Advisory: nothing fails for it yet."); return true; };
     // (before the restore, which runs the pull request's own build files: each package's file held to its lock file's
     // content hash, and its licence read from it, in a step no build has run in; where the look restored, it is left out)
     if (said.built !== "true" && !check("Every locked package and tool, fetched before the restore and held to its list", () => {

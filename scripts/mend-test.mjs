@@ -2,7 +2,9 @@
 // failures for their mend (AGENTS.md, "A check that fails says the mend"; #254): every script a workflow of the core or
 // of the starter kit names, and every workflow with a step that fails by itself, is a check below with its test, or is
 // listed with why it fails no pull request; and each check's test calls mended() of mend.mjs. A new check, or a test
-// that stops reading the mend, fails here. Its tests workflow runs it on every pull request here. Node's own modules.
+// that stops reading the mend, fails here. It holds too that each script a workflow or a session's hook names, and each
+// workflow of the core, has its line in the inventory of the core's parts (INVENTORY.md; #534, point 4), and that each
+// file a line there names is there. Its tests workflow runs it on every pull request here. Node's own modules.
 //
 //   node scripts/mend-test.mjs
 import fs from "node:fs";
@@ -32,6 +34,7 @@ const CHECKS = {
   "scripts/workflows.mjs": "scripts/workflows-test.mjs",
   "scripts/licences.mjs": "scripts/licence-scan-test.mjs",
   "scripts/exact-versions.mjs": "scripts/exact-versions-test.mjs",
+  "scripts/lookup.mjs": "scripts/lookup-test.mjs",
   "scripts/agent-tools.mjs": "scripts/agent-tools-test.mjs",
   "scripts/licence-installed.mjs": "scripts/licence-installed-test.mjs",
   "scripts/nuget.mjs": "scripts/nuget-test.mjs",
@@ -83,17 +86,44 @@ const workflows = [
   ...fs.readdirSync(path.join(root, "setup/template/workflows")).map(f => `setup/template/workflows/${f}`),
 ];
 const unlisted = new Set();
+// what runs: each script a workflow or a session's hook names, a test aside (the hooks' settings: Claude Code's here,
+// and each tool's that the starter kit writes)
+const named = new Set();
+const hooks = [".claude/settings.json", ...fs.readdirSync(path.join(root, "setup/template"))
+  .filter(f => /(?:hook|settings).*\.json/u.test(f)).map(f => `setup/template/${f}`)];
+for (const hook of hooks) for (const m of fs.readFileSync(path.join(root, hook), "utf8").matchAll(/scripts\/([a-z0-9-]+\.(?:mjs|sh))/gu)) {
+  if (!m[1].endsWith("-test.mjs")) named.add(`scripts/${m[1]}`);
+}
 for (const wf of workflows) {
   // each line without its comment: a "#" that starts the line or follows a space
   const code = fs.readFileSync(path.join(root, wf), "utf8").split(/\r?\n/u).map(l => l.replace(/(^|\s)#.*$/u, ""));
   for (const line of code) for (const m of line.matchAll(/scripts\/([a-z0-9-]+\.(?:mjs|sh))/gu)) {
     const name = `scripts/${m[1]}`;
+    if (!name.endsWith("-test.mjs")) named.add(name);
     if (!name.endsWith("-test.mjs") && !(name in CHECKS) && !(name in NOT_CHECKS)) unlisted.add(`${name} (named in ${wf})`);
   }
   if (code.some(l => /(?:^|[;&|{\s])exit\s+(?:1\b|"?\$)/u.test(l)) && !(wf in CHECKS) && !(wf in NOT_CHECKS)) unlisted.add(`${wf} (a step of its own fails)`);
 }
 ok(unlisted.size === 0, `every script a workflow names, and every workflow with a step that fails by itself, is a check with its test or is said to fail no pull request${unlisted.size ? `: not so for ${[...unlisted].join(", ")}. Mend: add it to CHECKS in scripts/mend-test.mjs with the test that reads its failures, or to NOT_CHECKS with why it fails no pull request` : ""}`);
 for (const [name, why] of Object.entries(NOT_CHECKS)) ok(fs.existsSync(path.join(root, name)) && why, `${name} is there, and says why it is no check`);
+
+// the inventory: a part's line is a bullet, its lines joined; the files it names are the backticked ones before its
+// first ": "
+const inventory = fs.readFileSync(path.join(root, "INVENTORY.md"), "utf8");
+const parts = new Set();
+for (const part of inventory.split(/\r?\n(?! )/u).filter(l => /^- /u.test(l))) {
+  for (const m of part.replace(/\s*\r?\n\s*/gu, " ").split(": ")[0].matchAll(/`([^`]+)`/gu)) parts.add(m[1]);
+}
+const runs = [...named, ...fs.readdirSync(path.join(root, ".github/workflows")).map(f => `.github/workflows/${f}`)];
+const left = runs.filter(name => !parts.has(name)).sort();
+ok(left.length === 0, `each script a workflow or a hook names, and each workflow, has its line in INVENTORY.md${left.length
+  ? `: not so for ${left.join(", ")}. Mend: add a line for each to INVENTORY.md, under the heading it belongs to, as its "How a line reads" says: what it does, where it must run, what else does it (searched on the web too), and a verdict`
+  : ""}`);
+const gone = [...parts].filter(name => /^(?:scripts|\.github|setup)\//u.test(name)
+  && (name.split("/").includes("..") || !fs.existsSync(path.join(root, name)))).sort();
+ok(gone.length === 0, `each file a line of INVENTORY.md names is there${gone.length
+  ? `: not so for ${gone.join(", ")}. Mend: in INVENTORY.md, name the file where it went, or take out the line of a part that is gone`
+  : ""}`);
 
 for (const [check, test] of Object.entries(CHECKS)) {
   let text = "";
