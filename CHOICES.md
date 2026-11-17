@@ -12,8 +12,8 @@ were the core written today, from nothing, what would it be written in and built
 runtime of the scripts; whether their code is typed and checked; how a language or a format someone else defines is
 read, and whether what reads it is carried or fetched; and how the core reaches a project. It argues again the first
 three records below and the fourth, the copy. The target is judged on merit first, the cost of moving left out; the path
-and its cost are a second judgment, apart. The trial's commands and its numbers in full are in the pull request that adds
-this record.
+and its cost are a second judgment, apart. The trial's commands and its numbers in full are in the pull request that
+adds this record.
 
 - **The constraints.** Fixed, and not argued: the floor; "Nothing locks a project"; and that the core's checks run
   wherever sessions run (a cloud session, the host's runners, the owner's computer, Linux and Windows), in a project of
@@ -145,7 +145,7 @@ this record.
   4. *How the core reaches a project:* the exact copy under `core/`, pinned, as now, but without the core's own tests,
      which no project runs: 1.6 MB of 4.0 left in the core, as its reports are. One copy for every project, not one cut
      to each project's stack, so one comparison proves it exact.
-- **The blind pick:** a fresh session (Opus, at high), given the problem and the criteria alone, never this record:
+- The blind pick: a fresh session (Opus, at high), given the problem and the criteria alone, never this record:
   "(1) TypeScript run straight by Node.js, one pinned LTS line, no build step; (2) typed, with strict checking by `tsc`
   in the core's own CI only; (3) tree-sitter grammars compiled to WASM (`web-tree-sitter`) for source code, plus a few
   small pure-JS readers for the data formats, all carried inside the core at exact versions and never fetched while a
@@ -183,13 +183,89 @@ this record.
      and the manifest. Settled by packing two versions of the C# grammar and measuring the growth.
   7. Conceded: JavaScript on Node, tree-sitter over readers by hand, carried over fetched, the formats by packages,
      the core's tests out of the copy, and the drops of the submodule, the container and the plug-in.
-- **The answer:** the author grants 2 (the listing is to be sorted in a pull request of its own, as a bug) and 4 (the
+- **The answer:** the author grants 2 (the listing is sorted as a bug of its own, #522) and 4 (the
   mark binds a hook's entry file, not the core's types), and leaves 1, 3, 5 and 6 to the judge, with the cheap trials
   their case names.
-- **The judgment:** (pending)
-- **The second judgment, the path:** (pending)
+- The judgment: a fresh session (Opus, at high) that wrote no part of the record, on the target alone, the cost of
+  moving left out: "All four picks stand: JavaScript on Node, no type checker, tree-sitter and small format packages
+  carried in the copy, and one exact copy under `core/` without the core's tests. On the pin I change one thing: the
+  exact pin stays for the checks that decide a pull request, and the scripts also promise to run on a stated least
+  long-term Node, tested in the core's CI. Sessions then use the machine's Node when it meets that least version."
+  It settled objections by trial where one was cheap:
+  1. *The pin* (objection 1, taken in part): the core's 73 test files on Node 24.22.1 all passed, as on 22.23.4, so the
+     exact pin bought nothing the trials measured; it stays where a verdict must repeat (the host's runners, which read
+     `.node-version`), and a session uses its machine's Node at or above a least version the core's CI tests, sparing a
+     fetch of 30 to 40 MB on each fresh cloud machine (criteria 1 and 9).
+  2. *Types* (objection 3, rejected on its trial): the checker in loose mode and with null checks on the tree before
+     each of 134 commits, from the last 90 merged pull requests, that followed a review's finding or a failed check
+     inside its pull request and changed 1,744 lines of scripts that are no test: 5 findings at a changed line in 2
+     commits, and 51 in 20 with null checks, each read; none points at what the commit mended (each a pattern the
+     checker cannot follow: `fail()` not known to exit, `[]` read as `never[]`, a `Buffer` given to `JSON.parse`, a
+     property set by `Object.assign`, a null filtered out first). With the 33 fixed bugs and the ten scripts of the
+     record below, three replays found no fault (criterion 2).
+  3. *The 100 ms mark* (objection 4, overtaken): the helper hook 30 times on Node 22 took 36 ms as JavaScript and 77 as
+     TypeScript; on Node 24, 38, and 82 cold and 38 with Node's compile cache. Start-up is no case against TypeScript
+     on Node 24 and later with the cache; the case for no checker rests on the faults found alone.
+  4. *The grammars' growth* (objection 6, rejected on its trial): the C# grammar 0.23.1 (5.9 MB) and 0.23.5 (5.35 MB)
+     committed in turn into a scratch repository: 356 KB and 320 KB packed alone, 632 KB both, so an update adds about
+     0.3 MB to a project's history. A copy cut to each project's stacks would hang the copy on the project's code, and
+     a project that adds a language would go unread or red until it synced; one copy is proven exact by one comparison
+     (criteria 2 and 8).
+  Its verdicts on the open constraints: nothing installed in a project, kept; no network while a check runs, kept (a
+  fetch fails on the owner's computer offline); the pin, exact in the host's checks with a least long-term line tested
+  in the core's CI and used by sessions; the size, about 2.4 MB of scripts and 1.1 MB of grammars as git stores them,
+  one copy for every stack. What it could not settle: Windows, where nothing here runs; the pinned Node 26.13.0, not on
+  this machine; and objection 5, how well agents write each form, which the author then put to a trial and the judge
+  read again:
+  5. *How agents write each form* (objection 5, rejected on its trial): five tasks, each in three equal forms (plain
+     JavaScript; types in comments checked strictly; strict TypeScript run by Node 24, the checker run before the
+     tests), each writer a fresh session that saw only its folder and 5 or 6 public tests, scored on hidden ones. Three
+     tasks written fresh (a Markdown table, 40 hidden cases; a `git diff` reader, 39; a configuration of time marks,
+     39), one writer a form, Opus at high; two changes to a program of 7 modules (a failure's record reshaped across
+     them, 38 hidden cases, 31 of them old behaviour; a configuration's list made a map with fields moved, 36, 26 old),
+     two writers a form on Opus at high and two on Sonnet at high. A stale field left in one module, planted to test the
+     tasks, passed the public tests in JavaScript, failed 2 to 5 hidden cases, and was caught by the checker in both
+     typed forms. Of 33 sessions, none left a hidden case failing, in any form; one run in 33 was red for a fault in
+     code, a parse error in JavaScript, which Node itself names. The typed forms ran 8 to 57% longer on the fresh tasks.
+     The judge: "Nothing changes; all four picks stand as I judged them."
+- **The second judgment, the path:** a fresh session (Opus, at high) that wrote no part of the record, given the
+  target and #515's points 9 to 14 on moving code: "move, in five kinds of small pull request, none of them a
+  rewrite." In order, each an ordinary pull request that leaves `main` working, each its own line in the queue on the
+  owner's word, and the sync of each asking nothing of a project unless it says so:
+  1. *A least long-term Node beside the pin* (Node 22 now, 24 once 22 ends in April 2027): `scripts/node.sh` keeps a
+     machine's Node at or above it and fetches the pin otherwise, and the core's suites run on it too, on Linux on each
+     pull request and on Windows on each push to `main`. About one session, and two security reviews, since the cloud
+     setup runs it. Proved by the old and new `node.sh` on three machines (Node at the pin, below the least, none), and
+     by the suites on both Nodes, which settles Windows.
+  2. *The core's tests out of the copy,* in two pull requests a release apart: first the copy's comparison
+     (`scripts/copy-tree.mjs`, `core.yml`) learns a folder `tests` that nothing yet leaves out; then
+     `scripts/*-test.mjs` move to `tests/`, kept out of the copy by `.gitattributes`, every path that names them moved
+     with them, and no script a project calls moved. About two sessions. A move by rule: every past release gives the
+     same copy under the old and new comparison, every test runs the same cases with the same results, a check fails a
+     test left behind, and its review reads the rule and a sample (#515, point 12).
+  3. *How the core carries a package,* once #488's points 1, 3 and 4 have merged: one folder, a list of each package's
+     version, digest and licence that a test reads, and its notices; the first the YAML package, for
+     `scripts/yaml-keys.mjs`. About one and a half sessions, through every gate of #515's point 10, and proving that no
+     check of a project reads the carried files as the project's own (copies, licences, size, personal terms).
+  4. *The parser and one grammar, with the first new reader a queued line needs* (#426's .NET reader, or Rust's), the
+     held-out hand count its proof; each further grammar arrives with its reader, never all seven at once. Its sync
+     asks one step: the new check's list, written and failing nothing.
+  5. *The readers by hand replaced one at a time,* most bugs first, at the dose: the YAML of `comment-only.mjs`, the
+     reading under the licence checks, the shell readers, file patterns on `path.matchesGlob`, TOML; then the lexers of
+     the shape check, Markdown and schemas last. About one session each, ten to twelve over several batches, each a
+     port with its behaviour kept, old against new, its definition mended only after, in a pull request of its own.
+  Not done: several readers in one pull request, a port that changes its definition, a path a project calls moved,
+  the pin dropped, the copy cut by stack, anything fetched while a check runs, and anything of types. The count of the
+  move (#515, point 11) is the inventory's stand-ins replaced. The bug the Bun run found, an unsorted folder listing in
+  a test, is #522, fixed apart.
 - **What a sync asks of a project:** nothing, by this record; each step of the path says what its own sync asks.
-- Reopens it: (pending)
+- Reopens it: the suites' verdicts differ between the least Node and the pin, on Linux or Windows (the least
+  goes); a hook's start passes 100 ms on Windows; a carried file turns a project's check red or raises its code
+  scanning's alerts; a port's comparison differs beyond its definition's mend (that reader stays); the replay of fixed
+  bugs and fixes inside pull requests finds 5 or more faults the checker points at in code a project runs; the writing
+  trial, on a lighter model, vaguer tasks or longer changes, shows types cutting hidden failures or real red runs by a
+  third or more; the grammars add more than 1 MB a year to a project's history, or the files carried pass 20 MB; or the
+  move's cost passes twice the estimates above, or no step of it merges for 30 days (#515, points 11 and 14).
 
 ## Choice: the scripts in JavaScript on Node, with nothing installed in a project
 
@@ -203,6 +279,10 @@ this record.
   (the third record below). What gives way: a format or a language someone else defines is read by a package carried
   in the copy at one exact version, or by a tool that runs only in the core's own checks (#486, points 6 to 8); the
   parser of the next record is the first, and its inventory says what follows.
+- Judged again on 17 November 2026 (#519, the record above), on merit: it stands. "Nothing installed in a project"
+  was argued there and kept, as was no fetch while a check runs. What gives way: the one exact Node stays the pin of
+  the host's checks, beside a least long-term Node the scripts promise to run on, tested in the core's suites and used
+  by a session whose machine holds it (the path's first step).
 - Reopens it: a package the core needs cannot run on the pinned Node from the copy with nothing installed (it needs a
   native build or an install script), or the packages carried in the copy pass 20 MB.
 
@@ -352,6 +432,9 @@ counter and its commands are in the pull request that adds this record (#487).
   - **Kept:** the finding of copies (`scripts/copies.mjs`, 314 lines, 9 bugs), since what a copy is the core's own
     rule defines; its reading of code goes through the parser once the readers of languages do. Left as they are, as
     #486 says: the core's own mutation tool, and the readers of the core's own rule files.
+- Judged again on 17 November 2026 (#519): it stands, carried and never fetched while a check runs. A grammar comes
+  with the reader that needs it, never all at once, and Microsoft's `@vscode/tree-sitter-wasm` (one publisher's runtime
+  and grammars) is weighed as their source when the first arrives (the path's third and fourth steps).
 - Reopens it: the counts of a reader built this way differ from a count by hand on code it was not written against,
   or from real code of a project's, beyond a mend of its definition; a grammar a project of the owner's needs is
   missing, or fails to parse more than 1 file in 100 of that project's code; a runtime update leaves a grammar the
@@ -406,6 +489,9 @@ The same record weighs types for the core's own scripts (#486, point 4), written
   scripts; C adds to that a rename of every path a project calls. So point 5 of #486 has no steps to take while this
   stands.
 - **What a sync asks of a project:** nothing.
+- Judged again on 17 November 2026 (#519): it stands. The checker over the 33 fixed bugs that changed a script and
+  over 134 fixes inside pull requests, and 33 sessions writing and changing code in each form, found no fault a
+  checker would have caught that the tests did not.
 - Reopens it: at a pass over these records, the trial's run (the checker in loose mode with null checks over the ten
   scripts changed most, the settings in #487) finds a fault in code a project runs; or a move to one stable entry
   (#376) renames the scripts for its own reasons.
@@ -415,6 +501,8 @@ The same record weighs types for the core's own scripts (#486, point 4), written
 - Chosen for: every reader of the rules (Claude Code's imports, another provider's reviewer on GitHub, any other tool)
   reads the repository's own files and installs nothing, and the hooks run the copy that was reviewed (core archive
   165); a pure sync needs no review of its own (floor rule 8).
+- Judged again on 17 November 2026 (#519): it stands, one copy for every project, and the core's own tests leave it
+  (the path's second step).
 - Reopens it: a project made of several repositories would hold the copy more than once (#285).
 
 ## Choice: the rules as Markdown files, one for each thing a reader looks up
