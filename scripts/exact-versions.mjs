@@ -111,7 +111,7 @@ function packageProblems(lockfile, root, packages, key, read) {
   try { list = parseBounded(read(file)); } catch (e) { return [`${file}: cannot be read as JSON (${logged(e.message)}). Mend: correct it to JSON`]; }
   const problems = [];
   if (key === "" && list?.overrides !== undefined) overrides(list.overrides, list, file, "", problems);
-  for (const kind of KINDS) problems.push(...kindProblems(file, kind, list?.[kind], lockfile, packages, key));
+  for (const kind of KINDS) for (const problem of kindProblems(file, kind, list?.[kind], lockfile, packages, key)) problems.push(problem); // (one at a time: a spread of a long list overflows the stack)
   return problems;
 }
 
@@ -123,7 +123,7 @@ export function check(lockfile, read) {
   if (packages === null || typeof packages !== "object" || Array.isArray(packages)) return [`${lockfile}: holds no "packages" (lockfileVersion 2 or later is needed)`];
   const root = posix.dirname(lockfile);
   if (!Object.hasOwn(packages, "")) problems.push(`${lockfile}: holds no entry for the project's own root (""), whose list would go unread. Mend: write the lock file anew with npm: its install, given --package-lock-only`);
-  for (const key of Object.keys(packages).filter(own)) problems.push(...packageProblems(lockfile, root, packages, key, read));
+  for (const key of Object.keys(packages).filter(own)) for (const problem of packageProblems(lockfile, root, packages, key, read)) problems.push(problem);
   return problems;
 }
 
