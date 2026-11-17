@@ -529,6 +529,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const ignoredBase = project({ ".gitignore": ".Codex/*\n", ...listing() });
   write(ignoredBase, ".Codex/config.toml", "notify = [\"bash\", \"x.sh\"]\n");
   passes(run(pr(ignoredBase, { "README.md": "a change of its own\n" })), "and a folder in another case whose files are all ignored is none of the project's");
+  // (#600's code review of e380041: and an ignored file beside a tracked one is none of what the tool's note is held to)
+  const besideBase = project({ ".gitignore": ".Codex/config.toml\n", ".Codex/hooks.json": "{}\n", ...listing() });
+  write(besideBase, ".Codex/config.toml", "notify = [\"bash\", \"x.sh\"]\n");
+  const besideRun = run(pr(besideBase, { "README.md": "a change of its own\n" }));
+  ok(besideRun.status === 0 && /\.Codex is \.codex in another case/.test(besideRun.out), "an ignored file beside a tracked one under it leaves it noted", besideRun.out);
   if (LINKS) {
     // (a folder or a link in another case on the way to a tool's file)
     const aliased = project({ "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n", ...listing() });

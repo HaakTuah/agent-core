@@ -540,11 +540,13 @@ function misnamed(paths) {
 function through(at, want, read, names) {
   const under = f => f === want || f.startsWith(`${want}/`);
   const found = (from, rest) => rest.split("/").filter(Boolean).reduce((dirs, step) => dirs.flatMap(d => names(d).filter(n => n.toLowerCase() === step.toLowerCase()).sort().map(n => `${d}/${n}`)), [from]);
-  const files = TOOL_FILES.filter(under).flatMap(f => found(at, f.slice(want.length)).map(a => `${f}\0${a}\0${read(a)}`));
+  // (a file read as nothing, ignored or no file, is left out, so the working tree's reading and the base's name the same)
+  const text = (name, a) => { const t = read(a); return t === null ? [] : [`${name}\0${a}\0${t}`]; };
+  const files = TOOL_FILES.filter(under).flatMap(f => found(at, f.slice(want.length)).flatMap(a => text(f, a)));
   // (of a tool folder's entries, only what the tool reads there: a hook file of Kiro's, a skill's SKILL.md)
   const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => found(at, d.slice(want.length, -1)).flatMap(dir => names(dir).sort().flatMap(n => {
     const reads = d === ".kiro/hooks/" ? (/\.json$/iu.test(n) ? [`${dir}/${n}`] : []) : found(`${dir}/${n}`, "SKILL.md");
-    return reads.map(a => `${d}${n}\0${a}\0${read(a)}`);
+    return reads.flatMap(a => text(`${d}${n}`, a));
   })));
   return [at, read(at), ...files, ...folders].join("\0\0");
 }
