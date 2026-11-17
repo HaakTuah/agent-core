@@ -295,8 +295,13 @@ function stateOf(issues, comments, github) {
 
 // ---- the readers: what the session did, read from the scratch project ----
 
-// GitHub's state as the stand-in holds it now.
-export const github = dir => JSON.parse(fs.readFileSync(path.join(dir, "github.json"), "utf8"));
+// GitHub's state as the stand-in holds it now, read as the session's files are: a plain file, never through a link
+// that could lead out of the case, and, where it is no JSON, Unreadable, so that no part of its text is printed (#435).
+export const github = dir => {
+  const at = path.join(dir, "github.json");
+  if (!real(at, "file")) throw new Unreadable(`${at} is not there`);
+  try { return JSON.parse(fs.readFileSync(at, "utf8")); } catch { throw new Unreadable(`${at} is not JSON`); }
+};
 
 // The origin's branches and their commits: { name: sha }, read from its files.
 export function branchesOf(dir) {

@@ -305,7 +305,18 @@ if (process.platform !== "win32") {
   fs.renameSync(path.join(swapped, "origin.git", "refs"), path.join(swapped, "elsewhere-refs")); fs.symlinkSync(path.join(swapped, "elsewhere-refs"), path.join(swapped, "origin.git", "refs"));
   const r = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "stop", swapped], { encoding: "utf8" });
   ok(/stop: fail: its repositories could not be read: .* is not a plain folder/.test(r.stdout), "a case whose repositories hold a link the reader would follow fails, read as unreadable", `${r.stdout}${r.stderr}`);
+  // (GitHub's state, github.json, read through a link to a file outside the case: unreadable, none of its text shown; #435)
+  const secret = path.join(s.tmp, "someone-elses-key"), aside = fresh("finish");
+  fs.writeFileSync(secret, "not json: the words of a key\n");
+  fs.rmSync(path.join(aside, "github.json")); fs.symlinkSync(secret, path.join(aside, "github.json"));
+  const viaLink = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", aside], { encoding: "utf8" });
+  ok(/finish: fail: .*github\.json is not a plain file/.test(viaLink.stdout) && !/words of a key/.test(`${viaLink.stdout}${viaLink.stderr}`),
+    "a case whose github.json is a link to a file outside it fails, read as unreadable, and shows none of that file's text", `${viaLink.stdout}${viaLink.stderr}`);
 }
+const garbled = fresh("finish"); fs.writeFileSync(path.join(garbled, "github.json"), "not json: what the session wrote\n");
+const notJson = spawnSync(process.execPath, [path.join(s.core, "scripts", "staged.mjs"), "--read", "finish", garbled], { encoding: "utf8" });
+ok(/finish: fail: .*github\.json is not JSON/.test(notJson.stdout) && !/what the session wrote/.test(`${notJson.stdout}${notJson.stderr}`),
+  "a case whose github.json is no JSON fails, read as unreadable, and shows none of its text", `${notJson.stdout}${notJson.stderr}`);
 const common = fresh("stop"); fs.writeFileSync(path.join(common, "project", ".git", "commondir"), "../../elsewhere\n");
 let threw = null; try { touched(common); } catch (e) { threw = e; }
 ok(threw instanceof Unreadable, "a project whose git folder names another as its common one is not read");
