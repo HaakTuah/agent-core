@@ -19,8 +19,9 @@
 //   --nuget    its packages come from NuGet (.NET): the NuGet check and Dependabot's NuGet updates, for the folder
 //              that holds its solution or project files (. for the root)
 //   --private  a private repository without GitHub's paid code security: no call to the core's CodeQL and licence
-//              workflows, which need it (README.md, point 5, "A private repository"), and a NuGet check started only
-//              by a pull request that changes a file NuGet reads by name
+//              workflows, which need it (README.md, point 5, "A private repository"), a NuGet check started only
+//              by a pull request that changes a file NuGet reads by name, and each pull-request check started only
+//              once a pull request is no draft (READY_ONLY)
 //   --game     a game: the module game-design.md with the others
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -194,9 +195,23 @@ export function files(o, pin, moduleNames, read) {
     // (a private repository's NuGet check starts only where a pull request changes a file NuGet reads by name: no other
     // pull request bills its job; AGENTS.md, "Nothing locks a project")
     if (to === ".github/workflows/nuget.yml" && o.private) text = text.replace(/^ {2}pull_request:\r?\n/m, on => `${on}${fill(read("workflows/nuget-paths.yml.tmpl"), words)}`);
+    if (READY_ONLY.includes(to) && o.private) text = readyOnly(text);
     return [to, text];
   });
 }
+
+// A private repository's pull-request checks start only once a pull request is ready (#375): each of these calls also
+// triggers when one is marked ready, and its job is skipped on a draft, so a push to a draft bills no job and marking
+// it ready runs each once. The trigger and the condition stand together in the project's own file, so a project that
+// keeps its calls as they were runs every check as before (AGENTS.md, "Nothing locks a project").
+export const READY_ONLY = ["core.yml", "copies.yml", "personal-terms.yml", "signatures.yml", "nuget.yml"].map(f => `.github/workflows/${f}`);
+export const READY = "${{ !github.event.pull_request.draft }}";
+export const readyOnly = text => text
+  // (the trigger's own types, where it lists them, gain the one more; else it lists them: GitHub's three and that one)
+  .replace(/^ {2}pull_request:(\r?\n)((?: {4}.*\r?\n)*)/m, (on, eol, block) => /^ {4}types: \[/m.test(block)
+    ? on.replace(/^( {4}types: \[[^\]\r\n]*)\]/m, "$1, ready_for_review]")
+    : `  pull_request:${eol}    types: [opened, reopened, synchronize, ready_for_review]${eol}${block}`)
+  .replace(/^(jobs:\r?\n {2}[\w-]+:(\r?\n))/m, (job, _, eol) => `${job}    if: ${READY}${eol}`);
 
 // The reading-size check's first marks: each file every session reads at about 20 KB, and the total of the project's
 // own among them (the core's copy under core/ is held to the core's own cap) at what they come to today, rounded up
