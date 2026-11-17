@@ -421,7 +421,7 @@ function sourcesOf(head, list, file, problems) {
 
 // The project at `root`, at its working tree or at a commit `rev`: configured()'s answer, and `links`, each link on the
 // way to a file that leads out of the checkout, which is not followed (a link inside it is, at a commit as in the tree).
-export function readProject(root, rev = null) {
+export function readProject(root, rev = null, linkedOnMain = () => false) {
   const links = [], top = fs.realpathSync(root);
   const outside = f => {
     const parts = f.split("/");
@@ -462,7 +462,9 @@ export function readProject(root, rev = null) {
   };
   const skills = () => names(".claude/skills").filter(n => read(`.claude/skills/${n}/SKILL.md`) !== null);
   // (whether the project holds a path as a link: git's mode 120000 at a commit, a link in the working tree)
-  const linked = rev ? at => listing(root, rev).linked.has(at) : at => { try { return fs.lstatSync(path.join(root, at)).isSymbolicLink(); } catch { return false; } };
+  // (or on main, as `linkedOnMain` says: the base, which a hook fetches from until the pull request merges)
+  const own = rev ? at => listing(root, rev).linked.has(at) : at => { try { return fs.lstatSync(path.join(root, at)).isSymbolicLink(); } catch { return false; } };
+  const linked = at => own(at) || linkedOnMain(at);
   const project = configured(read, skills, names, false, linked);
   for (const [at, want] of misnamed(rev ? [...listing(root, rev).blobs, ...listing(root, rev).links] : tracked(root))) {
     const problem = `${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`;
@@ -622,7 +624,7 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   try { config = parseBounded(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
     return { fail: [`${file} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`], notes: [] };
   }
-  const head = readProject(root);
+  const head = readProject(root, null, base ? at => listing(root, base).linked.has(at) : undefined);
   const atBase = name => textAt(root, base, path.relative(root, path.join(KIT_DIR, name)).split(path.sep).join("/"));
   const kit = [...kitHooks(), ...(base ? kitHooks(atBase) : [])];
   let list = listed(config, file);

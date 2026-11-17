@@ -434,6 +434,13 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const linkFetch = project({ "scripts/tree.sh": "echo the branch's\n", ...listing() });
     fs.symlinkSync("./tree.sh", path.join(linkFetch, "scripts/format.sh"));
     fails(run(pr(linkFetch, { ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK)) })), "a hook in the kit's form that fetches a link from main fails", 'fetches "scripts/format.sh" from main, which the project holds as a link');
+    // (#476's code review of a76614d: and where main holds it as a link that the pull request makes a file, since the hook
+    // fetches from main until the pull request merges)
+    const mainLink = project({ "scripts/tree.sh": "echo the branch's\n", ...listing() });
+    fs.symlinkSync("./tree.sh", path.join(mainLink, "scripts/format.sh"));
+    git(mainLink, "add", "-A"); git(mainLink, "commit", "-q", "-m", "a link on main");
+    git(mainLink, "checkout", "-q", "-B", "change"); fs.unlinkSync(path.join(mainLink, "scripts/format.sh"));
+    fails(run(pr(mainLink, { "scripts/format.sh": "echo a file\n", ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK)) })), "and so does one whose fetched link the pull request makes a file, main holding the link until it merges", 'fetches "scripts/format.sh" from main, which the project holds as a link');
   }
   const step = STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed");
   ok(notDone(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK)) }), step)[0]?.mend.includes(NOT_KIT), "the sync note's step reads not done while a hook not in the kit's form stands unmarked");
