@@ -199,18 +199,19 @@ export function runEngine(dir, root, files) {
         { cwd: root, encoding: "utf8", env: engineEnv(home), maxBuffer: 1 << 28, timeout: 600000 });
       let out;
       try { out = JSON.parse(r.stdout); } catch { return { failed: `the engine gave no answer it could read (exit ${r.status ?? r.signal ?? r.error?.code}): ${logged(String(r.stderr ?? "").trim().split("\n").pop() ?? "")}` }; }
-      for (const f of out.results ?? []) findings.push({ file: String(f.path).replace(/\\/gu, "/").replace(/^\.\//u, ""), line: f.start?.line, end: f.end?.line, rule: String(f.check_id).split(".").pop(), message: f.extra?.message ?? "" });
+      for (const f of out.results ?? []) findings.push({ file: String(f.path).replace(/\\/gu, "/").replace(/^\.\//u, ""), line: f.start?.line, from: f.start?.offset, to: f.end?.offset, rule: String(f.check_id).split(".").pop(), message: f.extra?.message ?? "" });
       for (const e of out.errors ?? []) errors.push(e.message ?? e.type ?? "an error");
     }
   } finally { fs.rmSync(home, { recursive: true, force: true }); }
   return { findings, errors };
 }
 
-/** A finding's key: its file, its rule and the code it points at, its spaces made one, so that the same finding is
- *  known at the base and at the head wherever its lines moved. */
+/** A finding's key: its file, its rule and the code the engine matched (its bytes, from its start to its end), its
+ *  spaces made one, so that the same finding is known at the base and at the head wherever it moved, and whatever
+ *  else changed on its lines. */
 function keyOf(root, f, texts) {
-  if (!texts.has(f.file)) { try { texts.set(f.file, fs.readFileSync(path.join(root, f.file), "utf8").split(/\r?\n/u)); } catch { texts.set(f.file, []); } }
-  const code = texts.get(f.file).slice(f.line - 1, Math.max(f.line, f.end ?? f.line)).join(" ").replace(/\s+/gu, " ").trim();
+  if (!texts.has(f.file)) { try { texts.set(f.file, fs.readFileSync(path.join(root, f.file))); } catch { texts.set(f.file, Buffer.alloc(0)); } }
+  const code = texts.get(f.file).subarray(f.from ?? 0, f.to ?? 0).toString("utf8").replace(/\s+/gu, " ").trim();
   return `${f.file}\0${f.rule}\0${code}`;
 }
 

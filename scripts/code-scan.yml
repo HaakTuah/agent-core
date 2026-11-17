@@ -113,10 +113,13 @@ rules:
     - pattern-inside: "$T $M(..., string $X, ...) { ... }"
     - pattern: $X
   pattern-sinks:
-  - pattern: File.ReadAllText(...)
-  - pattern: File.ReadAllBytes(...)
-  - pattern: File.WriteAllText(...)
-  - pattern: File.OpenRead(...)
+  - patterns:
+    - pattern-either:
+      - pattern: File.ReadAllText($P, ...)
+      - pattern: File.ReadAllBytes($P, ...)
+      - pattern: File.WriteAllText($P, ...)
+      - pattern: File.OpenRead($P, ...)
+    - focus-metavariable: $P
 - id: cs-deserialize
   languages: [csharp]
   severity: ERROR

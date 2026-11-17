@@ -127,6 +127,7 @@ public class Handlers {
   public void Ok3(SqlConnection c) { const string q = "SELECT 1"; new SqlCommand(q, c).ExecuteReader(); } // SAFE
   public string Ok4(string unused) { return File.ReadAllText("appsettings.json"); } // SAFE
   public void Ok5(string unused) { Process.Start("git", "log --oneline " + "-5"); } // SAFE
+  public void Ok6(string text) { File.WriteAllText("output.txt", text); } // SAFE
 }
 `,
     "tasks.py": `import ast, os, pickle, subprocess
@@ -178,11 +179,11 @@ def ok5(cur):
 
   // (before the pull request: a file whose name is a pattern to git, with a weakness that stands, and a link)
   fs.writeFileSync(path.join(repo, "flow.js"), "const { exec } = require(\"child_process\");\nfunction route(app) {\n  app.get(\"/r\", (req, res) => {\n    const command = \"uptime\";\n    exec(command);\n  });\n}\n");
-  fs.writeFileSync(path.join(repo, "[id].ts"), "export function h(req, res, db) {\n  db.query(\"SELECT \" + req.query.id);\n  return res;\n  // a note\n}\n");
+  fs.writeFileSync(path.join(repo, "[id].ts"), "export function h(req, res, db) {\n  db.query(\"SELECT \" + req.query.id); // old comment\n  return res;\n  // a note\n}\n");
   let linked = false;
   try { fs.symlinkSync("tasks.py", path.join(repo, "handler.py")); linked = true; } catch { /* (no links made here, as on Windows without the right) */ }
   git("add", "-A"); git("commit", "-q", "-m", "more");
-  fs.writeFileSync(path.join(repo, "[id].ts"), fs.readFileSync(path.join(repo, "[id].ts"), "utf8").replace("// a note", "// a note, changed"));
+  fs.writeFileSync(path.join(repo, "[id].ts"), fs.readFileSync(path.join(repo, "[id].ts"), "utf8").replace("// a note", "// a note, changed").replace("// old comment", "// updated comment"));
   fs.writeFileSync(path.join(repo, "i.ts"), "export const a = 1;\nexport const b = 2;\n");
   fs.writeFileSync(path.join(repo, "flow.js"), fs.readFileSync(path.join(repo, "flow.js"), "utf8").replace("\"uptime\"", "req.query.command"));
   if (linked) { fs.rmSync(path.join(repo, "handler.py")); fs.writeFileSync(path.join(repo, "handler.py"), "import os\ndef run(user_input):\n    os.system(user_input)\n"); }
@@ -199,7 +200,7 @@ def ok5(cur):
   ok(failing.status === 1 && /FAIL: tasks\.py:\d+: a parameter reaches a shell command \(py-command\), which this change brings/u.test(out) && mended(out), "a weakness the change brings fails, saying its mend", out);
   ok((out.match(/^FAIL: tasks\.py:/gmu) ?? []).length === 2, "a comment in the code silences no finding", out);
   ok(ODD.every(f => out.includes(`FAIL: ${f}:3:`)), "a file whose name git quotes, or that reads as an option, is scanned, its finding failing", out);
-  ok(/reported, not failed: \[id\]\.ts:2:/u.test(out) && !out.includes("FAIL: [id].ts"), "a file whose name is a pattern to git is read by its name alone: a finding that stood in it is reported, not failed for another file's lines", out);
+  ok(/reported, not failed: \[id\]\.ts:2:/u.test(out) && !out.includes("FAIL: [id].ts"), "a file whose name is a pattern to git is read by its name alone, and a finding that stood in it, its line's comment changed, is reported, not failed", out);
   ok(!linked || out.includes("FAIL: handler.py:3:"), "a link the change makes a file is scanned, its finding failing", out);
   ok(out.includes("FAIL: flow.js:5:"), "input the change brings to a sink whose line it leaves as it was fails: the base held no such finding", out);
   ok(/reported, not failed: tasks\.py:5: .* which stood before this change/u.test(out) && !/^FAIL: (web|Handlers)/mu.test(out), "a weakness on a line that stood before is reported, and passes", out);
