@@ -5,8 +5,8 @@
 // baseline only shrinks. A copy may move (cut from one place, pasted in another), since its places do not grow: moving
 // is how a fact reaches its better home. Against the base the config holds too: the baseline stays at the base's path,
 // and every file the base's config, and the base's SECURITY.md where it is asked, read is read still, as the same kind,
-// one renamed by its new name (#348, #371); a path may be added; and a config moved, with the call that names it, is
-// held to the one the base called (#370). It also lists the near-copies, the runs of code that match once names and numbers are set aside, and fails
+// one renamed by its new name, or by the file that took in most of its lines (#348, #371, #434); a path may be
+// added; and a config moved, with the call that names it, is held to the one the base called (#370). It also lists the near-copies, the runs of code that match once names and numbers are set aside, and fails
 // none of them. Node's own modules only, so the check needs no install. It runs from the project's root, whatever the
 // directory it is started from.
 // The files an agent tool takes its instructions from are rule files too, read since #405 (rule-files.mjs, `toolFiles`),
@@ -176,10 +176,10 @@ function lsAt(commit, specs) {
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 // What became of a commit's files in the tree as git holds it now: { to: each renamed file's new name, gone: those
-// deleted }. A file of the core's copy (core/ in a project) that moved counts as gone, not followed: a sync moves
-// those, and the core's own pull request held the move, so a sync never fails for it.
+// deleted, grown: those added or changed }. A file of the core's copy (core/ in a project) that moved counts as gone, not
+// followed: a sync moves those, and the core's own pull request held the move, so a sync never fails for it.
 function renamed(commit) {
-  const to = new Map(), gone = new Set(), parts = git(["diff", "-M", "--name-status", "-z", "--cached", commit, "--"]).split("\0");
+  const to = new Map(), gone = new Set(), grown = new Set(), parts = git(["diff", "-M", "--name-status", "-z", "--cached", commit, "--"]).split("\0");
   for (let i = 0; i + 1 < parts.length;) {
     const status = parts[i];
     if (/^[RC]/u.test(status)) {
@@ -187,9 +187,35 @@ function renamed(commit) {
       else if (status[0] === "R") to.set(parts[i + 1], parts[i + 2]);
       i += 3;
     }
-    else { if (status === "D") gone.add(parts[i + 1]); i += 2; }
+    else { if (status === "D") gone.add(parts[i + 1]); else if (status === "A" || status === "M") grown.add(parts[i + 1]); i += 2; }
   }
-  return { to, gone };
+  return { to, gone, grown };
+}
+// The lines of a text that hold a word, each once, trimmed: what a file "holds" of another's.
+const wordLines = text => new Set(String(text ?? "").split(/\r\n|\r|\n/u).map(l => l.trim()).filter(l => /\w/u.test(l)));
+// Where the text of a commit's files that git calls deleted went: to the file the tree adds or changes whose new
+// lines hold more than half of its own, so that one renamed and rewritten past half, which git reads as deleted and
+// added, or one moved into another file, is followed all the same (#434); null where none does, the file deleted with
+// its text. Only the lines a file gained count, so a copy that stood before is never taken for the text moved. A file
+// of the core's copy is never followed.
+function linesMoved(commit, { gone, grown }) {
+  const index = new Map(), to = new Map(), show = readAt(commit);
+  for (const f of grown) {
+    if (CORE && f.startsWith(CORE)) continue;
+    let text = "";
+    try { text = git(["show", `:${f}`]); } catch { /* (no such file in the index: it holds none) */ }
+    const had = wordLines(show(f));
+    for (const l of wordLines(text)) if (!had.has(l)) (index.get(l) ?? index.set(l, []).get(l)).push(f);
+  }
+  return f => {
+    if (!gone.has(f) || (CORE && f.startsWith(CORE)) || !index.size) return null;
+    if (!to.has(f)) {
+      const was = wordLines(show(f)), held = new Map();
+      for (const l of was) for (const a of index.get(l) ?? []) held.set(a, (held.get(a) ?? 0) + 1);
+      to.set(f, [...held].find(([, n]) => n * 2 > was.size)?.[0] ?? null);
+    }
+    return to.get(f);
+  };
 }
 // A config of this check's at a path of a commit, or null: an object of this check's keys alone that names its
 // baseline, and that baseline, there, an object of "windows", so that another check's config (the shape check's, which
@@ -289,10 +315,11 @@ if (from) {
   // The config is held to the base's too, so that the check never reads less than it did there (#348): the baseline
   // stays where the base keeps it (one moved would be held to nothing), and every file the base's config read is read
   // still, as code or prose as it was: each the base's specs read in the tree as it stands, and each they read at the
-  // base, followed through a rename, a file deleted being no narrowing (#371). The base's config is the one at this
-  // path, or, where the base holds none here, each config its workflows called that the tree's workflows call no more,
-  // so that a config moved with its call is held all the same (#370). A config beside one still called, or where the
-  // base called none, is the check's first on that branch, held to nothing. Any widening passes.
+  // base, followed through a rename, or to the file that took in most of its lines, a file deleted with its text
+  // being no narrowing (#371, #434). The base's config is the one at this path, or, where the base holds none here,
+  // each config its workflows called that the tree's workflows call no more, so that a config moved with its call is
+  // held all the same (#370). A config beside one still called, or where the base called none, is the check's first
+  // on that branch, held to nothing. Any widening passes.
   const held = heldTo(from);
   if (held.length) {
     const at = held.map(h => h.at).join(" and "), moved = held[0].at !== CONFIG_AT;
@@ -301,11 +328,12 @@ if (from) {
     if (!held.some(h => h.config.baseline === BASELINE)) fail(`${who} moves the baseline from ${held.map(h => h.config.baseline).join(" and ")} to ${BASELINE} against ${from}, and a baseline moved is held to nothing there. ${back}`);
     // (each config the base called read on its own: one's ":!" leaves out only what that one read)
     const specs = (h, key) => Array.isArray(h.config[key]) ? h.config[key].filter(x => typeof x === "string" && x) : [];
-    const moves = renamed(from);
+    const moves = renamed(from), movedTo = linesMoved(from, moves), was = new Map();
     const lost = (kind, before, now) => {
-      const keep = new Set(ls(now));
-      const read = new Set([...ls(before), ...lsAt(from, before).filter(f => !moves.gone.has(f)).map(f => moves.to.get(f) ?? f)]);
-      return [...read].filter(f => !keep.has(f)).map(f => `${f} (${kind})`);
+      const keep = new Set(ls(now)), at = lsAt(from, before);
+      for (const f of at.filter(f => moves.gone.has(f))) { const to = movedTo(f); if (to) was.set(to, f); }
+      const read = new Set([...ls(before), ...at.map(f => (moves.gone.has(f) ? movedTo(f) : moves.to.get(f) ?? f)).filter(Boolean)]);
+      return [...read].filter(f => !keep.has(f)).map(f => `${f} (${kind}${was.has(f) ? `, which took in most of the lines of ${was.get(f)}, deleted` : ""})`);
     };
     // (the base's rule files as its own SECURITY.md lists them, so a file taken off that list is no narrowing unseen)
     let wasRules = [];
