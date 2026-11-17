@@ -10,9 +10,8 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { crc32, deflateRawSync } from "node:zlib";
 import { mended, unmended } from "./mend.mjs";
-import { scratchDir, tally } from "./scratch-core.mjs";
+import { scratchDir, tally, zip } from "./scratch-core.mjs";
 import { cut, fetchAll as fetchedAll, fileAddress, named, nuspecOf, toolsOf } from "./nuget-fetch.mjs";
 import { REGISTRY, check as checked } from "./nuget.mjs";
 
@@ -27,25 +26,6 @@ const { ok, done } = tally();
 const throws = fn => { try { fn(); return false; } catch { return true; } };
 const tmp = scratchDir("nuget-fetch-test-");
 
-// a zip, as a package file is one: each [name, text, deflated]
-function zip(files) {
-  const locals = [], centrals = [];
-  let at = 0;
-  for (const [name, text, deflate = true] of files) {
-    const raw = Buffer.from(text), data = deflate ? deflateRawSync(raw) : raw, n = Buffer.from(name);
-    const head = Buffer.alloc(30);
-    head.writeUInt32LE(0x04034b50, 0); head.writeUInt16LE(20, 4); head.writeUInt16LE(deflate ? 8 : 0, 8);
-    head.writeUInt32LE(crc32(raw), 14); head.writeUInt32LE(data.length, 18); head.writeUInt32LE(raw.length, 22); head.writeUInt16LE(n.length, 26);
-    const central = Buffer.alloc(46);
-    central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt16LE(deflate ? 8 : 0, 10);
-    central.writeUInt32LE(crc32(raw), 16); central.writeUInt32LE(data.length, 20); central.writeUInt32LE(raw.length, 24); central.writeUInt16LE(n.length, 28); central.writeUInt32LE(at, 42);
-    locals.push(head, n, data); centrals.push(central, n);
-    at += 30 + n.length + data.length;
-  }
-  const dir = Buffer.concat(centrals), end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10); end.writeUInt32LE(dir.length, 12); end.writeUInt32LE(at, 16);
-  return Buffer.concat([...locals, dir, end]);
-}
 const nuspec = (id, version, licence) => `<?xml version="1.0" encoding="utf-8"?>\n<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">\n  <metadata>\n    <id>${id}</id>\n    <version>${version}</version>\n    <license type="expression">${licence}</license>\n  </metadata>\n</package>\n`;
 const pkg = (id, version, licence) => zip([[`${id}.nuspec`, nuspec(id, version, licence)], ["lib/net9.0/x.dll", "not a real assembly", false]]);
 const hash = bytes => createHash("sha512").update(bytes).digest("base64");

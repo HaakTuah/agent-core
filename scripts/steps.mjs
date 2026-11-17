@@ -859,6 +859,7 @@ export const STEPS = [
     } },
   { lead: "17 November 2026, packages from the registry, the week's wait and pinned downloads", cost: COST.check, check: packagesHeld },
   { lead: "17 November 2026, held packages looked up again", cost: COST.read, unread: "whether a package has gone stale is its registry's answer on the day, and GitHub's, not a file's: the session that syncs runs `node core/scripts/held.mjs` once and puts what it prints in the sync pull request's description, each package gone stale a task; the scheduled look runs it again each month" },
+  { lead: "17 November 2026, a private project's code scanned", cost: COST.line, unread: "whether a cloud environment's set-up script runs `node core/scripts/code-scan.mjs --fetch` is the environment's setting, not a file's: the session that syncs reads it (its environment's own tool where it has one) and proposes the line where it is missing, in a project no workflow of which calls `codeql.yml`; a step of `core.yml` fetches the engine on the runners by itself" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

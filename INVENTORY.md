@@ -163,10 +163,15 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   **Keep:** nothing fits; both read the core's own rule files.
 - `.github/workflows/codeql.yml`: runs the host's CodeQL on a public project's pull requests, its pushes and weekly.
   *Runs:* the runners. *Else:* it is the host's maintained tool already. On a private repository it is paid, so a
-  private project does not call it (`README.md`, "A private repository") and has no scan of its code; Semgrep's
-  engine (LGPL-2.1, from PyPI), with the core's own rules, will give it one (`CHOICES.md`, "Choice: a private
-  project's code is scanned by Semgrep's engine, with the core's own rules"; built under #546). *Bugs:* 1. **Keep**
-  for a public project.
+  private project does not call it (`README.md`, "A private repository"), and `scripts/code-scan.mjs` scans it in
+  its place. *Bugs:* 1. **Keep** for a public project.
+- `scripts/code-scan.mjs`, `scripts/code-scan.yml`: where no workflow calls `codeql.yml`, fetches Semgrep's engine by
+  its wheel's digest at set-up and scans the code a pull request adds or alters with the core's own rules, failing a
+  finding on an added line. *Runs:* a cloud session's set-up and any session, and a step of `core.yml`'s one job.
+  *Else:* argued in `CHOICES.md`, "Choice: a private project's code is scanned by Semgrep's engine, with the core's own
+  rules" (#546): ast-grep, Opengrep and a score more weighed there; the rules are the core's since no maintained set
+  carries a licence the floor allows. *Bugs:* 0. **Keep:** the engine is a maintained tool already; the rules and the
+  glue are the core's.
 
 ## The tests and the strength of the tests
 

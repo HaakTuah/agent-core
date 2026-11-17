@@ -10,13 +10,14 @@
 // for the three) and no transport but local files, so no call reaches the network or the real core, and with git
 // finding no bare repository by itself (safe.bareRepository=explicit, Git 3.0's default), so a script that makes one
 // must name it (releases.mjs), save where a test runs older releases' scripts; and the stand-in for actions/checkout
-// the first two hand workflow-run.mjs. Tests only: no project and no workflow of the core's uses it. Git and Node's own
+// the first two hand workflow-run.mjs; and a zip made in memory (nuget-fetch-test.mjs, code-scan-test.mjs). Tests only: no project and no workflow of the core's uses it. Git and Node's own
 // modules only.
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { crc32, deflateRawSync } from "node:zlib";
 import { CORE } from "./core-address.mjs";
 
 /** The core's root, where these scripts stand. */
@@ -114,4 +115,24 @@ console.log(JSON.stringify(a.includes("--slurp") ? [found[1]] : found[1]));
   const n = Number(env.GIT_CONFIG_COUNT);
   return { ghData, ghLog, env: { ...env, [PATHKEY]: `${stubs}${path.delimiter}${env[PATHKEY]}`, GH_DATA: ghData, GH_LOG: ghLog,
     GIT_CONFIG_COUNT: String(n + 1), [`GIT_CONFIG_KEY_${n}`]: `url.${slash(origin)}.insteadOf`, [`GIT_CONFIG_VALUE_${n}`]: "https://github.com/someone/project.git" } };
+}
+
+/** A zip, as a package file or a wheel is one: each entry [name, text or bytes, deflated (the default) or stored]. */
+export function zip(files) {
+  const locals = [], centrals = [];
+  let at = 0;
+  for (const [name, text, deflate = true] of files) {
+    const raw = Buffer.from(text), data = deflate ? deflateRawSync(raw) : raw, n = Buffer.from(name);
+    const head = Buffer.alloc(30);
+    head.writeUInt32LE(0x04034b50, 0); head.writeUInt16LE(20, 4); head.writeUInt16LE(deflate ? 8 : 0, 8);
+    head.writeUInt32LE(crc32(raw), 14); head.writeUInt32LE(data.length, 18); head.writeUInt32LE(raw.length, 22); head.writeUInt16LE(n.length, 26);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt16LE(deflate ? 8 : 0, 10);
+    central.writeUInt32LE(crc32(raw), 16); central.writeUInt32LE(data.length, 20); central.writeUInt32LE(raw.length, 24); central.writeUInt16LE(n.length, 28); central.writeUInt32LE(at, 42);
+    locals.push(head, n, data); centrals.push(central, n);
+    at += 30 + n.length + data.length;
+  }
+  const dir = Buffer.concat(centrals), end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10); end.writeUInt32LE(dir.length, 12); end.writeUInt32LE(at, 16);
+  return Buffer.concat([...locals, dir, end]);
 }

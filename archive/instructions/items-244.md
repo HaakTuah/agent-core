@@ -107,3 +107,10 @@ The index, and how an item is written: `archive/instructions.md`.
      sorting was done at once: the owner, asking how far the core's rules are enforced, learned that 189 of its 310
      rules were held by being read alone, the kind a study found followed at more cost with no gain. It stands behind
      the order of the pruning's list and `reports/unheld.json`.
+
+255. **17 November 2026**, #546. A private project gets a scan of its code in place of the host's CodeQL, paid there:
+     Semgrep's engine, a program that only runs, fetched at set-up by its digest from PyPI and run with no Python, reads
+     what a pull request adds or alters with rules the core writes, since no maintained rule set carries a licence the
+     floor allows, and a finding is handled as floor rule 9 handles CodeQL's, so a private project has the same check as
+     a public one; the choice was argued in `CHOICES.md`. It stands behind "CodeQL" in `tasks/updates.md`,
+     `scripts/code-scan.mjs` and its rules.
