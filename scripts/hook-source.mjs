@@ -48,10 +48,10 @@ function words(command) {
   for (let i = 0; i < command.length; i++) {
     const c = command[i];
     if (c === "$") {
-      ROOT.lastIndex = i;
-      if (quote === "'" || !ROOT.test(command)) return null;
+      const end = rootAt(command, i, quote);
+      if (end < 0) return null;
       word = (word ?? "") + ".";
-      i = ROOT.lastIndex - 1;
+      i = end - 1;
       continue;
     }
     if (quote) { if (c === quote) quote = null; else word += c; continue; }
@@ -62,6 +62,12 @@ function words(command) {
   if (quote) return null;
   if (word !== null) out.push(word);
   return out;
+}
+
+// Where the root's name that starts at `i` ends, or -1 where none does or it stands in single quotes, written as is.
+function rootAt(command, i, quote) {
+  ROOT.lastIndex = i;
+  return quote !== "'" && ROOT.test(command) ? ROOT.lastIndex : -1;
 }
 
 // Each word, and each part of it, that names a file the project holds.
