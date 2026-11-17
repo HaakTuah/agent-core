@@ -41,6 +41,24 @@ commit(dir, "the starter kit");
 let r = check(dir);
 ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && /ok {3}copies\.yml\/copies/.test(r.out), "a project as the kit writes it passes on a push to main, its copy and its copies checked", r.out);
 
+// (programs named as those the checks start, committed at the change's root, never run in their place: on Windows a
+// program started by its bare name is looked for in its folder first, unless told not to, so the test's own git is
+// told so too, while check.mjs is given an environment that does not tell it; #513)
+if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
+const planted = process.platform === "win32" ? ["bash.exe", "git.exe"] : ["bash", "git"];
+for (const f of planted) {
+  if (process.platform === "win32") fs.copyFileSync(path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "whoami.exe"), path.join(dir, f));
+  else fs.writeFileSync(path.join(dir, f), "#!/bin/sh\nexit 3\n", { mode: 0o755 });
+}
+commit(dir, "programs named as the checks' own");
+{
+  const untold = Object.fromEntries(Object.entries(env).filter(([name]) => name.toLowerCase() !== "nodefaultcurrentdirectoryinexepath"));
+  const u = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs")], { cwd: dir, env: untold, encoding: "utf8" });
+  r = { status: u.status, out: `${u.stdout}${u.stderr}` };
+}
+ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out), "programs named bash and git at the change's root run in place of none the checks start", r.out);
+git(dir, "reset", "-q", "--hard", "HEAD~1");
+
 const config = path.join(dir, "checks", "copies.json");
 fs.writeFileSync(config, JSON.stringify({ ...JSON.parse(fs.readFileSync(config, "utf8")), code: ["src"] }, null, 2));
 commit(dir, "the code the copies check reads");

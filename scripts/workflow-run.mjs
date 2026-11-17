@@ -433,6 +433,21 @@ function runUses(jr, step, name, env) {
   result.steps.push({ name, ran: did !== false, passed: true, out: did === false ? "GitHub's own, not run here" : "" });
 }
 
+// The program a name stands for, by its full path from the PATH's own folders, never from the folder it would start in:
+// on Windows a program started by its bare name is looked for there first, by Node and by cmd.exe alike, and a step's
+// folder holds the change under check (#513). Null where the PATH holds none.
+export function onPath(name, env = process.env) {
+  const exts = process.platform === "win32" ? ["", ...String(env.PATHEXT ?? ".COM;.EXE").split(";").filter(Boolean)] : [""];
+  const pathOf = Object.entries(env).find(([k]) => k.toUpperCase() === "PATH")?.[1] ?? "";
+  for (const folder of String(pathOf).split(path.delimiter).filter(f => path.isAbsolute(f))) {
+    for (const ext of exts) {
+      const file = path.join(folder, `${name}${ext}`);
+      try { if (fs.statSync(file).isFile()) return file; } catch { /* (not here) */ }
+    }
+  }
+  return null;
+}
+
 // A `run` step in bash, its outputs and its GITHUB_ENV read when it ends.
 function runScript(jr, step, name, env) {
   const { rt, job, ctx, state, result, tmp, dir, id } = jr;
@@ -443,8 +458,11 @@ function runScript(jr, step, name, env) {
   // (as GitHub runs it: a step that names no shell in bash with -e alone; one whose shell is bash, by its own word or
   // the defaults', with --noprofile --norc -e -o pipefail)
   const shell = shellOf(step, job, rt.defaults, id);
-  const r = spawnSync("bash", shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
-    ...rt.base, ...env, CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
+  // (bash by its full path from the PATH the step is given, and, on Windows, what it starts never looked for in its folder)
+  const bash = onPath("bash", { ...rt.base, ...env });
+  if (!bash) throw new Error("bash is on no folder of the PATH: install Git for Windows, whose bash runs the steps, or put bash on the PATH");
+  const r = spawnSync(bash, shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
+    ...rt.base, ...env, ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}), CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
     GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(rt.github.repository), GITHUB_EVENT_NAME: str(rt.github.event_name), RUNNER_TEMP: tmp, RUNNER_OS: ctx.runner.os } });
   const passed = r.status === 0;
   carryEnv(path.join(tmp, "env"), ctx.env, id);

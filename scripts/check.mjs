@@ -80,6 +80,9 @@ const call = new RegExp(`^${CORE_SOURCE}/\\.github/workflows/([\\w.-]+)@([0-9a-f
 if (started(import.meta.url)) main();
 
 function main() {
+  // (on Windows, no program is looked for in the folder a check runs in, which the change under check fills: neither git
+  // here nor bash and what it starts in a step, as checks.mjs holds too; every other system looks only on the PATH; #513)
+  if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
   const p = project(options());
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
