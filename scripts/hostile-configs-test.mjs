@@ -85,15 +85,16 @@ ok(fails(sizes(marks({ past: { "../outside/x": 1 } }))), "reading-size.mjs: refu
 const pipe = at => process.platform !== "win32" && spawnSync("mkfifo", [at]).status === 0;
 if (pipe(path.join(outside, "pipe"))) {
   fs.symlinkSync(path.join(outside, "pipe"), path.join(p, "zero.md"));
+  fs.symlinkSync(path.join(outside, "x"), path.join(p, "out.md"));
   fs.mkdirSync(path.join(p, "folder.md"));
   fs.writeFileSync(path.join(p, "folder.md/x"), "x\n");
-  gitP("add", "zero.md", "folder.md/x");
-  for (const f of ["zero.md", "folder.md"]) {
+  gitP("add", "zero.md", "out.md", "folder.md/x");
+  for (const f of ["zero.md", "out.md", "folder.md"]) {
     r = sizes(marks({ read: { "a.md": 20000, [f]: 5 } }));
-    ok(fails(r) && (f === "folder.md" ? r.out.includes("is no tracked file") || r.out.includes("is no regular file") : r.out.includes("is no regular file")) && r.ms < 5000, `reading-size.mjs: refuses with its mend a file read that is ${f === "zero.md" ? "a link to a pipe" : "a folder"}, never reading it, in ${r.ms} ms`);
+    ok(fails(r) && (f === "folder.md" ? r.out.includes("is no tracked file") || r.out.includes("is no regular file") : r.out.includes("is no regular file")) && r.ms < 5000, `reading-size.mjs: refuses with its mend a file read that is ${{ "zero.md": "a link to a pipe", "out.md": "a link to a file outside the project" }[f] ?? "a folder"}, never reading it, in ${r.ms} ms`);
   }
-  gitP("rm", "-q", "--cached", "zero.md", "folder.md/x");
-  fs.rmSync(path.join(p, "zero.md")); fs.rmSync(path.join(p, "folder.md"), { recursive: true });
+  gitP("rm", "-q", "--cached", "zero.md", "out.md", "folder.md/x");
+  fs.rmSync(path.join(p, "zero.md")); fs.rmSync(path.join(p, "out.md")); fs.rmSync(path.join(p, "folder.md"), { recursive: true });
 } else console.log("skip reading-size.mjs: a file read that is a link to a pipe: no pipe can be made here (Windows)");
 r = sizes(marks({ read: Object.fromEntries(Array.from({ length: BIG }, (_, i) => [`f${i}.md`, 5])) }));
 ok(fails(r) && r.ms < 5000, `reading-size.mjs: refuses with its mend ${BIG} files read that are not there, in ${r.ms} ms`);

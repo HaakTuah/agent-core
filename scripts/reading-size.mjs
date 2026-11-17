@@ -25,6 +25,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { corePath, floorCopy, projectAt } from "./core-path.mjs";
 import { sizeOf as size } from "./file-size.mjs";
+import { leadsOut } from "./guards.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 const MARKS = process.argv[2];
@@ -54,8 +55,9 @@ const fail = [], notes = [];
 let total = 0, core = 0;
 for (const [f, mark] of Object.entries(marks.read)) {
   if (!tracked.has(f)) { fail.push(`${f} is listed under "read" in ${MARKS} but is no tracked file. Mend: in ${MARKS}, name it as it now stands, or take it out where no session reads it`); continue; }
-  // (a device, a pipe or a folder, or a link to one, is never read: a device can be endless, and a pipe never ends; #446)
-  if (!fs.statSync(f, { throwIfNoEntry: false })?.isFile()) { fail.push(`${f} is listed under "read" in ${MARKS} but is no regular file (a folder, a device, a pipe, or a link to one), which no session reads. Mend: make it a file of the project's own, or take it out of "read" in ${MARKS}`); continue; }
+  // (a device, a pipe or a folder, or a link to one, is never read: a device can be endless, and a pipe never ends; nor
+  // is a link that leads out of the project, to no file of its own; #446)
+  if (leadsOut(".", f) || !fs.statSync(f, { throwIfNoEntry: false })?.isFile()) { fail.push(`${f} is listed under "read" in ${MARKS} but is no regular file of the project's own (a folder, a device, a pipe, a link to one, or a link that leads out of the project), which no session reads. Mend: make it a file of the project's own, or take it out of "read" in ${MARKS}`); continue; }
   const n = size(f);
   if (ofCore.some(p => f.startsWith(p))) core += n; else total += n;
   if (n > mark) fail.push(`${f} is ${n} bytes, past its mark of ${mark}. Mend: make it smaller, moving what no session needs at every start to a file read when needed; or, once a fresh session that wrote none of it has read the project's own such files whole for more to trim and found too little, raise its mark in ${MARKS}`);
@@ -73,7 +75,8 @@ if (total > marks.total) fail.push(`the project's own files every session reads 
 
 // Step 0: files past the split mark that the PR changes
 // (a file is read to be counted only where its bytes on disk are past the mark: counted, it is never larger)
-const big = [...tracked].filter(f => !skip.some(s => f.startsWith(s)) && fs.existsSync(f) && fs.statSync(f).size > marks.split
+// (a link that leads out of the project is none of its own, and is never read: #446)
+const big = [...tracked].filter(f => !skip.some(s => f.startsWith(s)) && fs.existsSync(f) && !leadsOut(".", f) && fs.statSync(f).size > marks.split
   && !fs.readFileSync(f).subarray(0, 8000).includes(0) && size(f) > marks.split);
 let base = process.env.SIZES_BASE;
 if (!base) try { base = git(["merge-base", "origin/main", "HEAD"]).trim(); } catch { base = ""; }
