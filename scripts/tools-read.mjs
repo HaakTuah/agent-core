@@ -24,14 +24,19 @@ export function tally(pulls) {
   const builders = new Map(), reviewers = new Map();
   const add = (map, name) => map.set(name, (map.get(name) ?? 0) + 1);
   for (const p of pulls) {
-    add(builders, toolOf(p.body) ?? NONE);
-    const by = new Set();
-    for (const r of p.reviews ?? []) { const t = toolOf(r.body) ?? (r.type === "Bot" ? r.login : null); if (t) by.add(t); }
-    for (const c of p.comments ?? []) { if (!LED.test(String(c.body ?? ""))) continue; const t = toolOf(c.body) ?? (c.type === "Bot" ? c.login : null); if (t) by.add(t); }
-    for (const t of by) add(reviewers, t);
+    add(builders, toolOf(p?.body) ?? NONE);
+    for (const t of reviewedBy(p ?? {})) add(reviewers, t);
   }
   const order = map => [...map].sort(([a, x], [b, y]) => y - x || a.localeCompare(b));
   return { builders: order(builders), reviewers: order(reviewers) };
+}
+
+// The tools that reviewed one pull request, each once: a review's attribution line, else a bot's login; and a comment led
+// "Security review:" or "Code review:" the same way.
+function reviewedBy(p) {
+  const tool = x => toolOf(x?.body) ?? (x?.type === "Bot" ? String(x.login ?? "") : null);
+  const led = (p.comments ?? []).filter(c => LED.test(String(c?.body ?? "")));
+  return new Set([...(p.reviews ?? []), ...led].map(tool).filter(Boolean));
 }
 
 // The last `n` pull requests merged into the repository, newest first, each with its reviews and comments, as `ask`

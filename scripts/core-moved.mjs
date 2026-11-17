@@ -81,6 +81,10 @@ function pinHere(manifest, fail) {
   return null;
 }
 
+// Whose account holds the repository, asked of the host once, and only where the manifest has no row that says it.
+let held;
+const host = () => (held === undefined ? (held = hostAccount()) : held);
+
 function main(dry) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
   const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
@@ -88,9 +92,6 @@ function main(dry) {
   try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { fail("run it from a project's root, beside core-manifest.md"); }
   const pin = pinHere(manifest, fail);
   if (!pin) return;
-  // (whose account holds the repository, asked of the host only where the manifest has no row that says it)
-  let read;
-  const host = () => (read === undefined ? (read = hostAccount()) : read);
   const follows = followsOf(manifest, host);
   if (!follows) fail("core-manifest.md does not say what the project follows: its *follows* row is `main` or `releases`, once, or left out where the owner's account is read: its one row, or the repository's own account where the host says a person holds it");
   let newest, moved, release = "", stays = false;
