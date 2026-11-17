@@ -6,8 +6,8 @@ The rules shared by the owner's agent-built projects, written once so a change i
 alike (core archive 68). The reasoning behind each rule: `archive/instructions.md`, in the core's words; the owner's own
 words stay in this repository alone (`words/`; #252). A project of another owner takes the core the same way, its
 *owner's account* its own (read, or filled in: "Slots"), and in its copy "the owner" is its own (core archive 148),
-save in `archive/`, whose reasoning stays the core's owner's: its stand-in weighs it after its own owner's words, and marks an answer that rests
-on it alone unsure (`roles/shared/inbox.md`; core archive 166).
+save in `archive/`, whose reasoning stays the core's owner's: its stand-in weighs it after its own owner's words, and
+marks an answer that rests on it alone unsure (`roles/shared/inbox.md`; core archive 166).
 
 A person who owns a project that takes the core reads `setup/owner-guide.md` first: one plain page on what it does for
 the project, the yeses it asks, the stop switch, what it costs and the settings that are theirs.
