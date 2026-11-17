@@ -90,6 +90,12 @@ const run = (dir, args, extra = {}) => {
   const two = project({ "web/package.json": "{}\n", "api/package.json": "{}\n", ".github/workflows/signatures.yml": ["web", "api"].map((d, k) => `${k ? "" : "name: signatures\non: pull_request\njobs:\n"}  s${k}:\n    uses: ${CORE}/.github/workflows/signatures.yml@${"a".repeat(40)}\n    with:\n      directory: ${d}\n`).join("") });
   const both = run(two, [], { BASE_SHA: git(two, "rev-parse", "HEAD") });
   ok(both.status === 0 && (both.out.match(/^== Does the pull request change what this check reads\?$/gm) ?? []).length === 2, "two calls of the signature check, for two folders, each run by hand, as their workflows run them", both.out);
+  // (two calls of the NuGet check, each with a config of its own: both lookups run before either look, which may restore)
+  const nugets = project({ ".github/workflows/nuget.yml": ["checks/a.json", "checks/b.json"].map((c, k) => `${k ? "" : "name: nuget\non: pull_request\njobs:\n"}  n${k}:\n    uses: ${CORE}/.github/workflows/nuget.yml@${"a".repeat(40)}\n    with:\n      config: ${c}\n`).join("") });
+  const order = run(nugets, [], { BASE_SHA: git(nugets, "rev-parse", "HEAD") });
+  const at = what => order.out.indexOf(what);
+  ok(at("ran lookup.mjs [checks/a.json") >= 0 && at("ran lookup.mjs [checks/b.json") >= 0 && at("ran lookup.mjs [checks/b.json") < at("ran nuget-look.sh"),
+    "two calls of the NuGet check: every config's lookup runs before any look, which may run the change's build files", order.out);
 }
 // the package checks look first: with nothing they read changed, nothing is installed or restored
 {

@@ -262,6 +262,8 @@ try {
   ok(notDone(tmp, step).length === 0, "and after the checkout and a setup action alone, it counts");
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n        env:\n          NODE_OPTIONS: --import ./build.mjs\n      - run: node core/scripts/lookup.mjs c.json --nuget\n      - run: node core/scripts/nuget.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
   ok(notDone(tmp, step).length === 1, "nor after a core script Node is told to load a file of the project's before");
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/lookup.mjs c.json --nuget\n        env:\n          NODE_OPTIONS: --import ./build.mjs\n      - run: node core/scripts/nuget.mjs c.json\n");
+  ok(notDone(tmp, step).length === 1, "nor a lookup Node is told to load a file of the project's before");
   writeFileSync(join(tmp, "core-manifest.md"), `# Manifest\n\nCore: ${CORE} at ${"0".repeat(40)}, copied whole under shared/\n`);
   nugetJob("node shared/scripts/exact-versions.mjs c.json");
   missed = notDone(tmp, step);

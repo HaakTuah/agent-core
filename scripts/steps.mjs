@@ -505,10 +505,11 @@ function jobsOf(w, read = () => null) {
 // A config as a step names it, from the folder the step runs in, so that one name in two folders is two configs.
 const placed = (cfg, dir) => (typeof cfg === "string" && dir && !path.posix.isAbsolute(cfg) ? path.posix.normalize(path.posix.join(dir, cfg)) : cfg);
 // Whether a counted lookup step runs the lookup, given `flag`, with the config `at.cfg` the check's step gives; a config
-// named by a variable is matched only where both steps give that variable the same value (or neither sets it), and one
-// an action's input names, where its caller gave none, is matched by none.
+// named by a variable is matched only where both steps give that variable the same value (or neither sets it), one
+// an action's input names, where its caller gave none, is matched by none, and a lookup that may run more than its
+// words show (hides) counts for none.
 const lookupOf = (st, flag, copy, at) => {
-  if (/\$\{\{\s*inputs\./u.test(at.cfg ?? "")) return false;
+  if (/\$\{\{\s*inputs\./u.test(at.cfg ?? "") || st.hidden) return false;
   if (!st.counts || !looksUp(st.cmds[0], flag, copy) || placed(configOf(st.cmds[0], "lookup.mjs", copy), st.dir) !== at.cfg) return false;
   const name = /\$\{?(\w+)|%(\w+)%/u.exec(at.cfg ?? "");
   return !name || st.env[name[1] ?? name[2]] === at.step.env[name[1] ?? name[2]];
