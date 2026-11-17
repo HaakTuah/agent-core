@@ -127,6 +127,13 @@ const equal = (a, b) => {
 
 /** The value of an expression (without its `${{ }}`), in the contexts given and the job's state so far. */
 export function evaluate(expr, contexts, state = { failed: false }) {
+  const ps = { expr, contexts, tokens: tokenize(expr), p: 0, fns: expressionFunctions(state) };
+  const out = orExpr(ps);
+  if (ps.p !== ps.tokens.length) throw new Error(`an expression this reader does not know: ${expr}`);
+  return out;
+}
+
+function tokenize(expr) {
   const tokens = [];
   for (let k = 0; k < expr.length;) {
     const rest = expr.slice(k);
@@ -139,10 +146,12 @@ export function evaluate(expr, contexts, state = { failed: false }) {
     else throw new Error(`an expression this reader does not know: ${expr}`);
     k += m[0].length;
   }
-  let p = 0;
-  const peek = op => tokens[p]?.op === op;
-  const take = op => { if (!peek(op)) throw new Error(`"${op}" expected in: ${expr}`); p++; };
-  const fns = {
+  return tokens;
+}
+
+// The functions an expression may call, by their lower-case names.
+function expressionFunctions(state) {
+  return {
     startswith: (a, b) => str(a).toLowerCase().startsWith(str(b).toLowerCase()),
     endswith: (a, b) => str(a).toLowerCase().endsWith(str(b).toLowerCase()),
     contains: (a, b) => (Array.isArray(a) ? a.some(x => equal(x, b)) : str(a).toLowerCase().includes(str(b).toLowerCase())),
@@ -150,46 +159,69 @@ export function evaluate(expr, contexts, state = { failed: false }) {
     format: (f, ...args) => str(f).replace(/\{\{|\}\}|\{(\d+)\}/g, (m, k) => (m === "{{" ? "{" : m === "}}" ? "}" : str(args[Number(k)]))),
     always: () => true, cancelled: () => !!state.cancelled, success: () => !state.failed, failure: () => state.failed,
   };
-  const primary = () => {
-    const t = tokens[p++];
-    if (!t) throw new Error(`an expression ends too soon: ${expr}`);
-    if (t.op === "(") { const v = or(); take(")"); return v; }
-    if ("s" in t) return t.s;
-    if ("n" in t) return t.n;
-    if (t.id === "true" || t.id === "false") return t.id === "true";
-    if (t.id === "null") return null;
-    if (t.id && peek("(")) {
-      const fn = fns[t.id.toLowerCase()];
-      if (!fn) throw new Error(`a function this reader does not know: ${t.id}`);
-      take("(");
-      const args = [];
-      while (!peek(")")) { args.push(or()); if (!peek(")")) take(","); }
-      take(")");
-      return fn(...args);
-    }
-    if (t.id) { if (!(t.id in contexts)) throw new Error(`a context this test does not give: ${t.id} (in ${expr})`); return contexts[t.id]; }
-    throw new Error(`an expression this reader does not know: ${expr}`);
-  };
-  const postfix = () => {
-    let v = primary();
-    for (;;) {
-      if (peek(".")) { p++; const t = tokens[p++]; if (!t?.id) throw new Error(`a property name expected in: ${expr}`); v = v?.[t.id] ?? null; }
-      else if (peek("[")) { p++; const k = or(); take("]"); v = v?.[k] ?? null; }
-      else return v;
-    }
-  };
-  const unary = () => (peek("!") ? (p++, !truthy(unary())) : postfix());
-  const compare = () => {
-    let v = unary();
-    while (["<", ">", "<=", ">="].includes(tokens[p]?.op)) { const op = tokens[p++].op, w = unary(); v = op === "<" ? num(v) < num(w) : op === ">" ? num(v) > num(w) : op === "<=" ? num(v) <= num(w) : num(v) >= num(w); }
-    return v;
-  };
-  const eq = () => { let v = compare(); while (peek("==") || peek("!=")) { const op = tokens[p++].op, w = compare(); v = op === "==" ? equal(v, w) : !equal(v, w); } return v; };
-  const and = () => { let v = eq(); while (peek("&&")) { p++; const w = eq(); v = truthy(v) ? w : v; } return v; };
-  const or = () => { let v = and(); while (peek("||")) { p++; const w = and(); v = truthy(v) ? v : w; } return v; };
-  const out = or();
-  if (p !== tokens.length) throw new Error(`an expression this reader does not know: ${expr}`);
-  return out;
+}
+
+// The parser `ps` holds the expression, its tokens, the place it stands at, its contexts and its functions.
+const peek = (ps, op) => ps.tokens[ps.p]?.op === op;
+const take = (ps, op) => { if (!peek(ps, op)) throw new Error(`"${op}" expected in: ${ps.expr}`); ps.p++; };
+
+function callExpr(ps, name) {
+  const fn = ps.fns[name.toLowerCase()];
+  if (!fn) throw new Error(`a function this reader does not know: ${name}`);
+  take(ps, "(");
+  const args = [];
+  while (!peek(ps, ")")) { args.push(orExpr(ps)); if (!peek(ps, ")")) take(ps, ","); }
+  take(ps, ")");
+  return fn(...args);
+}
+
+function primaryExpr(ps) {
+  const t = ps.tokens[ps.p++];
+  if (!t) throw new Error(`an expression ends too soon: ${ps.expr}`);
+  if (t.op === "(") { const v = orExpr(ps); take(ps, ")"); return v; }
+  if ("s" in t) return t.s;
+  if ("n" in t) return t.n;
+  if (t.id === "true" || t.id === "false") return t.id === "true";
+  if (t.id === "null") return null;
+  if (t.id && peek(ps, "(")) return callExpr(ps, t.id);
+  if (t.id) { if (!(t.id in ps.contexts)) throw new Error(`a context this test does not give: ${t.id} (in ${ps.expr})`); return ps.contexts[t.id]; }
+  throw new Error(`an expression this reader does not know: ${ps.expr}`);
+}
+
+function postfixExpr(ps) {
+  let v = primaryExpr(ps);
+  for (;;) {
+    if (peek(ps, ".")) { ps.p++; const t = ps.tokens[ps.p++]; if (!t?.id) throw new Error(`a property name expected in: ${ps.expr}`); v = v?.[t.id] ?? null; }
+    else if (peek(ps, "[")) { ps.p++; const k = orExpr(ps); take(ps, "]"); v = v?.[k] ?? null; }
+    else return v;
+  }
+}
+
+const unaryExpr = ps => (peek(ps, "!") ? (ps.p++, !truthy(unaryExpr(ps))) : postfixExpr(ps));
+
+const ordered = { "<": (a, b) => a < b, ">": (a, b) => a > b, "<=": (a, b) => a <= b, ">=": (a, b) => a >= b };
+function compareExpr(ps) {
+  let v = unaryExpr(ps);
+  while (["<", ">", "<=", ">="].includes(ps.tokens[ps.p]?.op)) { const op = ps.tokens[ps.p++].op, w = unaryExpr(ps); v = ordered[op](num(v), num(w)); }
+  return v;
+}
+
+function eqExpr(ps) {
+  let v = compareExpr(ps);
+  while (peek(ps, "==") || peek(ps, "!=")) { const op = ps.tokens[ps.p++].op, w = compareExpr(ps); v = op === "==" ? equal(v, w) : !equal(v, w); }
+  return v;
+}
+
+function andExpr(ps) {
+  let v = eqExpr(ps);
+  while (peek(ps, "&&")) { ps.p++; const w = eqExpr(ps); v = truthy(v) ? w : v; }
+  return v;
+}
+
+function orExpr(ps) {
+  let v = andExpr(ps);
+  while (peek(ps, "||")) { ps.p++; const w = andExpr(ps); v = truthy(v) ? v : w; }
+  return v;
 }
 
 /** A text with each `${{ }}` in it filled in. */
@@ -328,77 +360,102 @@ function carryEnv(file, env, id) {
   fs.rmSync(file);
 }
 
-// A step that failed: its job fails, and, where `stop` holds for its name, the rest of the job is cancelled.
-function failed(state, result, stop, name) {
-  state.failed = true;
-  result.passed = false;
-  if (stop && stop(name)) state.cancelled = true;
-}
-
-export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir() }) {
-  const wf = parseYaml(text);
-  const defaults = wf.defaults?.run?.shell;
+// The inputs the workflow is called with, the declared ones' defaults filled in; a call that gives one the workflow does
+// not take, or leaves out a required input or secret, throws.
+function callInputs(wf, inputs, secrets) {
   const declared = wf.on?.workflow_call?.inputs ?? {};
   const given = Object.fromEntries(Object.entries(declared).map(([name, d]) => [name, name in inputs ? inputs[name] : d?.default ?? (d?.type === "boolean" ? false : "")]));
   for (const name of Object.keys(inputs)) if (!(name in declared)) throw new Error(`an input the workflow does not take: ${name}`);
   for (const [name, d] of Object.entries(declared)) if (d?.required && !(name in inputs)) throw new Error(`the call leaves out a required input: ${name}`);
   for (const [name, d] of Object.entries(wf.on?.workflow_call?.secrets ?? {})) if (d?.required && !(name in secrets)) throw new Error(`the call leaves out a required secret: ${name}`);
+  return given;
+}
+
+export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = null, temp = os.tmpdir() }) {
+  const wf = parseYaml(text);
+  const rt = { defaults: wf.defaults?.run?.shell, github, base, workspace, uses, runner, dry, until, stop, temp };
+  const given = callInputs(wf, inputs, secrets);
   const results = [];
   for (const [id, job] of Object.entries(wf.jobs ?? {})) {
     const top = { github, inputs: given, secrets, vars: {} };
     if (!holds(job.if, top, { failed: false })) { results.push({ job: id, ran: false, passed: true, steps: [], outputs: {} }); continue; }
     // (a matrix makes a job of each of its combinations, each one billed, named by its values as GitHub names it)
-    for (const matrix of combinations(job.strategy?.matrix, top)) {
-      const tmp = fs.mkdtempSync(path.join(temp, "runner-temp-"));
-      const ctx = { ...top, runner: { temp: tmp, os: "Linux", ...runner }, env: {}, steps: {}, matrix: matrix ?? {} };
-      const state = { failed: false };
-      const result = { job: matrix ? `${id} (${Object.values(matrix).map(str).join(", ")})` : id, ran: true, passed: true, steps: [], outputs: ctx.steps };
-      results.push(result);
-      try { if (!dry) runJob(job, id, ctx, state, result, tmp); } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
-    }
+    for (const matrix of combinations(job.strategy?.matrix, top)) runMatrixJob(rt, job, id, top, matrix, results);
   }
   return results;
+}
 
-  function runJob(job, id, ctx, state, result, tmp) {
-    const dir = workspace(id);
-    ctx.env = Object.fromEntries(Object.entries(job.env ?? {}).map(([k, v]) => [k, fill(str(v), ctx, state)]));
-    for (const step of job.steps ?? []) {
-      const name = step.name ?? step.uses ?? step.run?.split("\n")[0];
-      if (!holds(step.if, ctx, state)) { result.steps.push({ name, ran: false, passed: true, out: "" }); continue; }
-      const env = { ...ctx.env, ...Object.fromEntries(Object.entries(step.env ?? {}).map(([k, v]) => [k, fill(str(v), ctx, state)])) };
-      if (step.uses) {
-        const action = step.uses.split("@")[0];
-        const handler = uses[action];
-        if (!handler) throw new Error(`an action this test has no part for: ${action} (in ${id})`);
-        const w = Object.fromEntries(Object.entries(step.with ?? {}).map(([k, v]) => [k, fill(str(v), ctx, state)]));
-        let did;
-        try {
-          did = handler(w, dir, env);
-        } catch (e) {
-          // (a stand-in that refuses what the step asks of it fails the step, as the action would)
-          result.steps.push({ name, ran: true, passed: false, out: `${e.message}\n` });
-          state.failed = true; result.passed = false;
-          continue;
-        }
-        result.steps.push({ name, ran: did !== false, passed: true, out: did === false ? "GitHub's own, not run here" : "" });
-        continue;
-      }
-      const output = path.join(tmp, `output-${result.steps.length}`);
-      const script = path.join(tmp, `step-${result.steps.length}.sh`);
-      fs.writeFileSync(script, fill(step.run, ctx, state));
-      const cwd = step["working-directory"] ? path.join(dir, fill(str(step["working-directory"]), ctx, state)) : dir;
-      // (as GitHub runs it: a step that names no shell in bash with -e alone; one whose shell is bash, by its own word or
-      // the defaults', with --noprofile --norc -e -o pipefail)
-      const shell = shellOf(step, job, defaults, id);
-      const r = spawnSync("bash", shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
-        ...base, ...env, CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
-        GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(github.repository), GITHUB_EVENT_NAME: str(github.event_name), RUNNER_TEMP: tmp, RUNNER_OS: ctx.runner.os } });
-      const passed = r.status === 0;
-      carryEnv(path.join(tmp, "env"), ctx.env, id);
-      result.steps.push({ name, ran: true, passed, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` });
-      if (step.id) ctx.steps[step.id] = { outputs: outputsOf(output), outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
-      if (!passed) failed(state, result, stop, name);
-      if (until && step.id === until) return;
-    }
+// One job of a workflow for one combination of its matrix (null for none): its runner folder made, the job run, the folder removed.
+function runMatrixJob(rt, job, id, top, matrix, results) {
+  const tmp = fs.mkdtempSync(path.join(rt.temp, "runner-temp-"));
+  const ctx = { ...top, runner: { temp: tmp, os: "Linux", ...rt.runner }, env: {}, steps: {}, matrix: matrix ?? {} };
+  const state = { failed: false };
+  const result = { job: matrix ? `${id} (${Object.values(matrix).map(str).join(", ")})` : id, ran: true, passed: true, steps: [], outputs: ctx.steps };
+  results.push(result);
+  try { if (!rt.dry) runJob({ rt, job, id, ctx, state, result, tmp }); } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+}
+
+// A map's values, each with its `${{ }}` filled in as text.
+const fillValues = (map, ctx, state) => Object.fromEntries(Object.entries(map ?? {}).map(([k, v]) => [k, fill(str(v), ctx, state)]));
+
+// The steps of a job, in order, each one's result put in `jr.result`; `jr` holds the run's settings (`rt`), the job, its
+// id, its contexts, its state, its result and its temporary folder.
+function runJob(jr) {
+  const { rt, job, id, ctx, state, result } = jr;
+  jr.dir = rt.workspace(id);
+  ctx.env = fillValues(job.env, ctx, state);
+  for (const step of job.steps ?? []) {
+    const name = step.name ?? step.uses ?? step.run?.split("\n")[0];
+    if (!holds(step.if, ctx, state)) { result.steps.push({ name, ran: false, passed: true, out: "" }); continue; }
+    const env = { ...ctx.env, ...fillValues(step.env, ctx, state) };
+    if (step.uses) { runUses(jr, step, name, env); continue; }
+    runScript(jr, step, name, env);
+    if (rt.until && step.id === rt.until) return;
   }
+}
+
+// A `uses` step, by the handler the caller gave for its action.
+function runUses(jr, step, name, env) {
+  const { rt, ctx, state, result, dir, id } = jr;
+  const action = step.uses.split("@")[0];
+  const handler = rt.uses[action];
+  if (!handler) throw new Error(`an action this test has no part for: ${action} (in ${id})`);
+  const w = fillValues(step.with, ctx, state);
+  let did;
+  try {
+    did = handler(w, dir, env);
+  } catch (e) {
+    // (a stand-in that refuses what the step asks of it fails the step, as the action would)
+    result.steps.push({ name, ran: true, passed: false, out: `${e.message}\n` });
+    state.failed = true; result.passed = false;
+    return;
+  }
+  result.steps.push({ name, ran: did !== false, passed: true, out: did === false ? "GitHub's own, not run here" : "" });
+}
+
+// A `run` step in bash, its outputs and its GITHUB_ENV read when it ends.
+function runScript(jr, step, name, env) {
+  const { rt, job, ctx, state, result, tmp, dir, id } = jr;
+  const output = path.join(tmp, `output-${result.steps.length}`);
+  const script = path.join(tmp, `step-${result.steps.length}.sh`);
+  fs.writeFileSync(script, fill(step.run, ctx, state));
+  const cwd = step["working-directory"] ? path.join(dir, fill(str(step["working-directory"]), ctx, state)) : dir;
+  // (as GitHub runs it: a step that names no shell in bash with -e alone; one whose shell is bash, by its own word or
+  // the defaults', with --noprofile --norc -e -o pipefail)
+  const shell = shellOf(step, job, rt.defaults, id);
+  const r = spawnSync("bash", shell === "bash" ? ["--noprofile", "--norc", "-eo", "pipefail", script] : ["-e", script], { cwd, encoding: "utf8", env: {
+    ...rt.base, ...env, CI: "true", GITHUB_ACTIONS: "true", GITHUB_OUTPUT: output, GITHUB_ENV: path.join(tmp, "env"), GITHUB_STEP_SUMMARY: path.join(tmp, "summary"),
+    GITHUB_WORKSPACE: dir, GITHUB_REPOSITORY: str(rt.github.repository), GITHUB_EVENT_NAME: str(rt.github.event_name), RUNNER_TEMP: tmp, RUNNER_OS: ctx.runner.os } });
+  const passed = r.status === 0;
+  carryEnv(path.join(tmp, "env"), ctx.env, id);
+  result.steps.push({ name, ran: true, passed, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` });
+  if (step.id) ctx.steps[step.id] = { outputs: outputsOf(output), outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
+  if (!passed) failed(state, result, rt.stop, name);
+}
+
+// A step that failed: its job fails, and, where `stop` holds for its name, the rest of the job is cancelled.
+function failed(state, result, stop, name) {
+  state.failed = true;
+  result.passed = false;
+  if (stop && stop(name)) state.cancelled = true;
 }
