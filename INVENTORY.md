@@ -4,7 +4,8 @@ The inventory of #534, point 4: a line for each part of the core (each script a 
 each mechanism), saying what it does, where it must run, what else does it, and a verdict. It grows the inventory of
 #486, point 10 (`CHOICES.md`, "Choice: one parser, tree-sitter, carried in the copy, reads every language's structure",
 its list "What is written by hand today"), which weighed the readers inside the checks and stays the word on them: a
-line here points to it where a part holds such a reader, and weighs the whole part.
+line here points to it where a part holds such a reader, and weighs the whole part. It lists too, under a heading of its
+own, what the core lacks that a maintained tool gives at once, first a general linter for its own scripts.
 
 It decides nothing by itself. A **replace** or a **try** becomes a line of `QUEUE.md` only on the owner's word, each a
 pull request of its own that shows the comparison, old against new (#534, point 2); no tool or package arrives before
@@ -55,8 +56,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   link checker, run offline, for the form `[text](path)` and a project's own documents (with #486's group 5); **keep**
   the core's own forms: nothing fits, they are the core's.
 - `scripts/reading-size.mjs`: fails a file every session reads that passes its mark. *Runs:* any session and the
-  runners. *Else:* size-limit and bundlesize, dropped on fact: they weigh a built bundle, not a file read whole. *Bugs:*
-  2. **Keep:** nothing fits; what a session reads is the core's own list.
+  runners. *Else:* size-limit and bundlesize, dropped on fact: they weigh a built bundle, not a file read whole.
+  *Bugs:* 2. **Keep:** nothing fits; what a session reads is the core's own list.
 - `scripts/workflows.mjs`: fails a workflow or action in which the word `pull_request_target` stands, and, through
   `scripts/yaml-keys.mjs`, one that gives a key twice. *Runs:* any session and the runners. *Else:* zizmor (MIT, a
   program for each system, its audit `dangerous-triggers` among some 30), kept, tried above; actionlint (MIT, Go, its
@@ -115,25 +116,26 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
 - `scripts/exact-versions.mjs`: fails a dependency of the project's own written as a range. *Runs:* any session and the
   runners. *Else:* npm's `save-exact`, dropped on fact: it writes exact versions and checks none already written.
   *Bugs:* 1. **Keep:** small and stable, a read of `package.json`.
-- `scripts/lookup.mjs`: asks its registry of each package a pull request brings in new, and fails a name the
-  registry does not know or one first published days ago, printing the rest for the review (#488, point 1, merged
-  later the same day). *Runs:* any session and the runners, with the registry reachable. *Else:* `npm view` and NuGet's
-  own API, which it already asks; deps.dev and Socket, dropped on fact: hosted services (#534, point 6); OpenSSF
-  Scorecard, dropped on fact: it scores a repository's practices, not whether a name is new, and wants a token.
-  *Bugs:* 0. **Keep:** nothing fits; the registries are asked through their own interfaces, and the rule is the core's.
+- `scripts/lookup.mjs`: asks its registry of each package a pull request brings in new, and fails a name the registry
+  does not know or one first published days ago, printing the rest for the review (#488, point 1, merged later the same
+  day). *Runs:* any session and the runners, with the registry reachable. *Else:* npm's own `npm view`, dropped on fact:
+  the script asks npm's registry and NuGet's directly, as `npm view` would, with no npm needed; deps.dev and Socket,
+  dropped on fact: hosted services (#534, point 6); OpenSSF Scorecard, dropped on fact: it scores a repository's
+  practices, not whether a name is new, and wants a token. *Bugs:* 0. **Keep:** nothing fits; the registries are asked
+  through their own interfaces, and the rule is the core's.
 - `scripts/agent-tools.mjs`: fails a plug-in, tool server, skill or hook a project configures for its agents that its
   licence config does not list with a publisher and one exact version. *Runs:* any session and the runners. *Else:* none
   found that reads every tool's own settings. *Bugs:* 2. **Keep:** nothing fits; the list is the core's policy. Its TOML
   reader goes with #486's group 2.
 - `.github/workflows/signatures.yml`: installs the packages with their scripts off, runs `npm audit signatures`, and
-  reads each installed licence back. *Runs:* the runners, and any session. *Else:* it is npm's own tool already. *Bugs:*
-  1. **Keep:** the job is npm's; the core holds only its call.
+  reads each installed licence back. *Runs:* the runners, and any session. *Else:* it is npm's own tool already.
+  *Bugs:* 1. **Keep:** the job is npm's; the core holds only its call.
 - `scripts/nuget.mjs`, `scripts/nuget-fetch.mjs`, `scripts/nuget-look.sh`, `.github/workflows/nuget.yml`: for a .NET
   project, every package one exact version under a licence on the list, each read from a package fetched before the pull
   request's build files run. *Runs:* any session with the .NET SDK, and the runners. *Else:* nuget-license (a .NET tool
   that holds packages to a list of licences), kept; `dotnet list package --include-transitive --format json`, kept, for
-  the packages; dotnet-project-licenses, dropped on an assumption: less kept up than nuget-license. *Bugs:* 7, 1, 0 and
-  4. **Try** nuget-license and the SDK's own list for the reading; **keep** the fetch before the build, which is a
+  the packages; dotnet-project-licenses, dropped on an assumption: less kept up than nuget-license. *Bugs:* 7, 1, 0
+  and 4. **Try** nuget-license and the SDK's own list for the reading; **keep** the fetch before the build, which is a
   boundary of the floor's (what a build could write never decides a licence), and the policy.
 - `.github/workflows/core.yml`, `scripts/copy-tree.mjs`, `scripts/core-path.mjs`, `scripts/core-address.mjs`: fail a
   project whose copy is not the core, whole, at the commit its manifest pins, or whose calls to the core's workflows are
@@ -252,6 +254,42 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
 - **The rule text** (the floor, the roles, the modules, the choice records, the stand-in and the owner's word, the rules
   for games): **keep** its content, exempt as #534's point 9 says; its form is the skills' trial above.
 
+## What the core lacks that a maintained tool gives at once
+
+Each weighed as a tool that only runs (#534, points 4 and 5), with the same verdicts: **try** where a trial decides
+whether it comes in, **keep** where the core stays without it, with the exception it rests on. Tried on 17 November 2026
+as the trials above were, over the scripts on `main` that day (36,896 lines of JavaScript and shell, tests included).
+
+- **A general linter for the core's own scripts,** which have none. *Runs:* any session and the runners. *Else:* oxlint
+  1.94.0 (MIT, one program for each system, no package of its own), kept, tried: 140 findings in 0.1 s with its
+  defaults, among them 13 names declared or imported and never used, which "Keep it lean" asks gone, and 3 expressions
+  whose value is thrown away; Biome 2.6.8 (MIT or Apache-2.0, one program, no package of its own, a formatter beside its
+  linter), kept, tried: 283 findings in 0.4 s, more of them on how the code is written; ESLint 10 with its recommended
+  rules, kept, untried: 30 packages of its own, the reference the other two follow. **Try** oxlint first, then Biome,
+  each on its defaults with a baseline of what stands that may only shrink ("Nothing locks a project"), its findings
+  read by kind before a kind is turned on; ESLint where neither reads a rule the trial wants.
+- **A check of the shell scripts** (the scripts whose names end `.sh`, and each workflow step's script). *Runs:* any
+  session and the runners. *Else:* ShellCheck (GPL-3.0, allowed for a tool that only runs, one program for each system),
+  kept, untried: not on this machine; actionlint runs it over the steps' scripts where it is installed. **Try** with the
+  replacement of the workflow check, which brings actionlint.
+- **Code nothing uses,** across files: exports no file imports, and files nothing starts. *Runs:* any session and the
+  runners. *Else:* knip (ISC, 11 packages of its own), kept, untried: it reads a project from its `package.json`, which
+  the core has none of. **Try** after the linter, whose unused names cover one file at a time; drop it where the linter
+  leaves nothing it would find.
+- **A spell checker** for the rule files and the scripts. *Else:* typos 1.52.2 (MIT or Apache-2.0, one program), tried:
+  none in the floor, the roles, the modules, `AGENTS.md` and `README.md`, and 31 in the scripts, each read as test data
+  or a name written on purpose. **Keep** without it, on the trial: it would find nothing worth its upkeep.
+- **A formatter.** *Else:* Biome's formatter and Prettier (MIT, 0 packages of its own). **Keep** without it, on an
+  assumption: its first run rewrites most of the 36,896 lines, which every baseline of the copies and shape checks would
+  read as new, for a style the sessions already keep; a trial on one file measures it if the linter's trial asks.
+- **A scan of the packages for known faults.** *Else:* the host's Dependabot alerts, free on a private repository too,
+  whose alerts the owner reads and passes on (floor rule 9); OSV-Scanner (Apache-2.0, one program). **Keep** without
+  one: the core carries no package yet, and the first comes only after #488's points 1, 3, 4 and 5; weighed again then.
+- **A type checker.** **Keep** without it: #519's record weighed it on 33 fixed bugs and a writing trial, and found no
+  fault it would have caught.
+- **A linter for Markdown.** *Else:* markdownlint-cli2 (MIT). **Keep** without it, on an assumption: its rules ask a
+  style (line lengths, heading forms) the core does not, and the rule files' form is held by the core's own checks.
+
 ## What the verdicts ask, in #534's order
 
 Each waits on the owner's word to become a line, and on #488's points 1, 3, 4 and 5 before anything arrives.
@@ -259,7 +297,8 @@ Each waits on the owner's word to become a line, and on #488's points 1, 3, 4 an
 1. The tools that only run: **replace** the matching of `personal-terms.yml` with gitleaks or Betterleaks; **replace**
    `scripts/workflows.mjs` with zizmor and actionlint; **replace** `scripts/mutate.mjs` with Stryker; **try** a link
    checker, offline, under `scripts/pointers.mjs`; **try** jscpd under `scripts/copies.mjs`; **try** a harness under the
-   staged cases.
+   staged cases; and of what the core lacks, **try** a general linter for its scripts (oxlint, then Biome), ShellCheck
+   with actionlint, and knip after the linter.
 2. The reading under the package checks: **replace** with `npm sbom`; **try** nuget-license and the SDK's own list.
 3. The packages carried in the copy: as #486's inventory and #519's path have them.
 4. The form the rules are delivered in: **try** the skill format (#534, point 8).
