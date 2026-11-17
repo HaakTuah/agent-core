@@ -502,9 +502,11 @@ const shown = new Map();
 function shownNotBlob(root, rev, at) {
   const key = `${root}\0${rev}\0${at}`;
   if (!shown.has(key)) {
-    const ask = args => { try { return execFileSync("git", ["--no-replace-objects", ...args], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return ""; } };
+    const ask = (args, input = "") => { try { return execFileSync("git", ["--no-replace-objects", ...args], { cwd: root, encoding: "utf8", input, stdio: ["pipe", "pipe", "ignore"] }); } catch { return ""; } };
     const [mode = "", , oid = ""] = ask(["ls-tree", "-z", rev, "--", at]).split("\0")[0].split("\t")[0].split(" ");
-    const type = ask(["cat-file", "-t", `${rev}:${at}`]).trim(), resolved = ask(["rev-parse", "-q", "--verify", `${rev}:${at}`]).trim();
+    // (the object git show resolves and its kind, asked in one process: "<object> <kind> <size>", or "<name> missing";
+    // a path that holds a line's end could not be asked so, and is no plain file either)
+    const [resolved = "", type = ""] = /[\r\n]/u.test(at) ? ["?", "?"] : /^([0-9a-f]{40,64}) (\w+) \d+$/u.exec(ask(["cat-file", "--batch-check"], `${rev}:${at}\n`).trim())?.slice(1) ?? [];
     // (and the entry named must be the object git show resolves: where a tree git would refuse holds two of a name, or
     // out of order, the two can differ, and then nothing shows what is run)
     shown.set(key, resolved !== oid || (mode !== "" && mode !== "100644" && mode !== "100755") || (type !== "" && type !== "blob"));
