@@ -94,9 +94,14 @@ ok(/^- No holder: 4 rules \(`scripts\/holders\.mjs`\), worst first, each with it
   "the rules with no holder lead the list, ahead of what the pruning read, one read at a role's start first", led.slice(0, 7).join("\n"));
 ok(led[at(early.key)] === `- ${early.key}: no holder, read at a role's start. Its proposal: check (#9), a script reads it.` && led[at(bare.key)] === `- ${bare.key}: no holder, read on need. Its proposal: goes, no breach recorded.`,
   "each says where it is read and its proposal, a check with the issue that builds it", `${led[at(early.key)]}\n${led[at(bare.key)]}`);
-ok(/^- floor\/security\.md: 3\. Bare: no holder, read on need\. Its proposal: goes, it costs much\. It guards against rare and severe harm, so it is never proposed to go: the session proposes it a holder\.$/u.test(led[at(floorBare.key)])
+ok(/^- floor\/security\.md: 3\. Bare: no holder, read on need\. Its proposal: goes, it costs much\. It guards against rare and severe harm, so it is proposed a holder, a check or a staged case, and nothing else\.$/u.test(led[at(floorBare.key)])
   && /No proposal yet: the session that takes the pruning gives it one in `reports\/unheld\.json`/u.test(led[at(unproposed.key)]),
   "a floor rule proposed to go is said to need a holder instead, and a rule with no proposal is said to need one");
+const lone = list({ all: [bare, floorBare], named, numbers, record: rec(), cases, steps, starts: new Set(), joined: () => 40, none: [bare.key, floorBare.key],
+  proposals: { [bare.key]: { mark: "check", why: "a script could read it" }, [floorBare.key]: { mark: "move", why: "read rarely" } } });
+ok(lone.some(l => l === `- ${bare.key}: no holder, read on need. Its proposal: check, no issue filed yet: the session files one where its upkeep pays, which joins the queue as any check for a rule that stands does, a script could read it.`)
+  && lone.some(l => l.startsWith(`- ${floorBare.key}:`) && l.endsWith("so it is proposed a holder, a check or a staged case, and nothing else.")) && !lone.slice(1).some(l => l.includes("the owner's")),
+  "a check with no issue is the session's to file, never the owner's, and a floor rule proposed a move is said to need a holder", lone.join("\n"));
 ok(led.includes(`- Proposed for a rule that now has a holder or no longer stands, to take out of \`reports/unheld.json\`: ${loud.key}; tasks/gone.md: Gone.`) && !led.some(l => l.startsWith(`- ${loud.key}: no holder`)),
   "a proposal whose rule now has a holder, or is gone, is named to be taken out");
 ok(list({ all: [bare], named, numbers, record: rec(), cases, steps, starts: new Set(), joined: () => 40, none: [bare.key], proposals: {} }).at(-1).startsWith("- No pruning is recorded yet")

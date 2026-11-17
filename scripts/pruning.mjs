@@ -15,7 +15,7 @@
 // Ahead of those, the rules holders.mjs (beside this file) counts as having no holder, worst first, a rule read at a
 // role's start before one read on need, each with its proposal from UNHELD (#545): "check" or "case" (a check or a
 // staged case could hold it, "by" the issue queued to build it), "move" (to a module read on need), "goes", or
-// "describes"; one with none, or a rule that guards against rare and severe harm proposed to go, is said so, and a
+// "describes"; one with none, or a rule that guards against rare and severe harm proposed anything but a holder, is said so, and a
 // proposal whose rule now has a holder or no longer stands is named to be taken out.
 // Each listed with its step of the pruning: a rule read at a role's start (an AGENTS.md rule is, here) is at step 1, to
 // move to a module read on need; one read on need is at step 2, to go where nothing changed since it moved. A rule
@@ -177,11 +177,11 @@ export function unheldLines({ all, none, starts, proposals, numbers = {} }) {
   const say = r => {
     const x = proposals[r.key], where = starts.has(r.key) ? "read at a role's start" : "read on need";
     if (!x || !MARKS.includes(x.mark)) return `- ${r.key}: no holder, ${where}. No proposal yet: the session that takes the pruning gives it one in \`${UNHELD}\`, a check or staged case that could hold it, a move to a module read on need, or that it goes.`;
-    const warn = x.mark === "goes" && rare(r, numbers[r.key]) ? " It guards against rare and severe harm, so it is never proposed to go: the session proposes it a holder." : "";
-    return `- ${r.key}: no holder, ${where}. Its proposal: ${x.mark}${x.by ? ` (${x.by})` : x.mark === "check" || x.mark === "case" ? ", not queued: the owner's" : ""}, ${x.why ?? "with no reason given"}.${warn}`;
+    const warn = !["check", "case"].includes(x.mark) && rare(r, numbers[r.key]) ? " It guards against rare and severe harm, so it is proposed a holder, a check or a staged case, and nothing else." : "";
+    return `- ${r.key}: no holder, ${where}. Its proposal: ${x.mark}${x.by ? ` (${x.by})` : x.mark === "check" || x.mark === "case" ? ", no issue filed yet: the session files one where its upkeep pays, which joins the queue as any check for a rule that stands does" : ""}, ${x.why ?? "with no reason given"}.${warn}`;
   };
   return [
-    `- No holder: ${keys.length} rule${keys.length === 1 ? "" : "s"} (\`scripts/holders.mjs\`), worst first, each with its proposal (\`${UNHELD}\`). The checks are queued without a further word; the moves and removals are the owner's, a few at a time.`,
+    `- No holder: ${keys.length} rule${keys.length === 1 ? "" : "s"} (\`scripts/holders.mjs\`), worst first, each with its proposal (\`${UNHELD}\`). Each check is filed as an issue, which joins the queue without a further word; the moves and removals are the owner's, a few at a time.`,
     ...[...keys.filter(r => starts.has(r.key)), ...keys.filter(r => !starts.has(r.key))].map(say),
     ...(rest.length ? [`- Proposed for a rule that now has a holder or no longer stands, to take out of \`${UNHELD}\`: ${rest.join("; ")}.`] : []),
   ];
