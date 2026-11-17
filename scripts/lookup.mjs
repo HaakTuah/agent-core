@@ -311,8 +311,9 @@ export async function run(configPath, { root, base, nuget = false, get = fetched
   let found, sources = 0;
   try {
     // (the config is the pull request's: a link out of the project is refused before it is opened, and loadConfig's
-    // error quotes none of its text)
-    if (leadsOut(root, configPath)) throw new Error(`the config ${logged(configPath)} leads out of the project, through a link. Mend: make it a file of the project's own`);
+    // error quotes none of its text; it is read against the working folder too, which names it, since on Windows the
+    // two may spell one folder differently, a short name against a long one)
+    if (leadsOut(root, configPath) && leadsOut(process.cwd(), configPath)) throw new Error(`the config ${logged(configPath)} leads out of the project, through a link. Mend: make it a file of the project's own`);
     const config = loadConfig(configPath);
     const { head, base: held } = packagesOf(config, root, base, nuget, configAt(root, base, configPath));
     found = newPackages(head, held, nuget);
