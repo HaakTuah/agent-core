@@ -45,11 +45,12 @@ jobs:
   # checks, with the hostile tests of build files and packages (licences); and the rest (rest). Each step's condition
   # names its part in the job's list "parts", whose names hold none of one another. On Windows, where a suite that
   # starts many processes runs several times slower, each part is a job; on Linux two jobs take them, kit, core and
-  # licences in one, projects and rest, with the steps run once on Linux, in the other. Each part is sized by its
-  # steps' times on the slow runner, which takes half as long again as another, so that it ends within its mark there
-  # too, no mark raised: on Windows, by three runs on main before #425, about 370 of 600, 320 of 600, 270 of 450, 270
-  # of 450 and 280 of 480 seconds; on Linux, by a858f14's run, which took 314 s for the whole (#489), about 160 and 150
-  # of 240. Beside them the upgrade job, which takes longer; #387, #405, #411, #424, #425, #489)
+  # licences in one, projects and rest, with the steps run once on Linux, in the other, which keeps the name of the
+  # suite that was whole and so its mark, lowered. Each part is sized by its steps' times on the slow runner, which
+  # takes half as long again as another, so that it ends within its mark there too, no mark raised: on Windows, by
+  # three runs on main before #425, about 370 of 600, 320 of 600, 270 of 450, 270 of 450 and 280 of 480 seconds; on
+  # Linux, by a858f14's run, which took 314 s for the whole (#489), about 160 and 150 of 240. Beside them the upgrade
+  # job, which takes longer; #387, #405, #411, #424, #425, #489)
   suites:
     name: suites (${{ matrix.os }}, ${{ matrix.parts }})
     strategy:
@@ -57,7 +58,7 @@ jobs:
       matrix:
         include:
           - { os: ubuntu-latest, parts: kit core licences, suite: suites-kit-core-licences }
-          - { os: ubuntu-latest, parts: projects rest, suite: suites-projects-rest }
+          - { os: ubuntu-latest, parts: projects rest, suite: suites }
           - { os: windows-latest, parts: projects, suite: suites-projects }
           - { os: windows-latest, parts: kit, suite: suites-kit }
           - { os: windows-latest, parts: core, suite: suites-core }
