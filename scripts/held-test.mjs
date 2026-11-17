@@ -3,7 +3,7 @@
 // registry gives, trimmed to what it reads, and handed to it in place of the network (floor rule 8: no live call, no
 // real package). Run: node scripts/held-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -99,6 +99,13 @@ try {
   process.chdir(dir);
   try { held = heldPackages(dir, [["absent.json", false]]); } finally { process.chdir(here); }
   ok(held.packages.length === 0 && held.unread.length === 1 && held.unread[0].startsWith("absent.json:"), "a config that cannot be read is said, never taken as holding nothing", JSON.stringify(held));
+  // (a config the project makes a link out of itself is never opened, and nothing of what it holds is printed)
+  const outside = mkdtempSync(join(tmpdir(), "held-outside-"));
+  writeFileSync(join(outside, "secret.json"), JSON.stringify({ lockfiles: ["invented-outside-path"] }));
+  symlinkSync(join(outside, "secret.json"), join(dir, "linked.json"));
+  process.chdir(dir);
+  try { held = heldPackages(dir, [["linked.json", false]]); } finally { process.chdir(here); rmSync(outside, { recursive: true, force: true }); }
+  ok(held.packages.length === 0 && held.unread.length === 1 && /leads out of the project/u.test(held.unread[0]) && !held.unread[0].includes("invented-outside-path"), "a config that links out of the project is not opened, and nothing of it printed", JSON.stringify(held));
 } finally { rmSync(dir, { recursive: true, force: true }); }
 
 // ---- A config the workflows name only when they run is said unread, and the issue left as it stands (exit 3)

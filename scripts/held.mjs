@@ -17,7 +17,7 @@
 //   node core/scripts/held.mjs --issue    the look's issue body: nothing where nothing is stale; exit 3 where nothing
 //                                         could be read
 import path from "node:path";
-import { logged } from "./guards.mjs";
+import { leadsOut, logged } from "./guards.mjs";
 import { loadConfig } from "./licences.mjs";
 import { GITHUB_MOST, archived, fetched, packagesOf, pool, registry } from "./lookup.mjs";
 import { nugetConfig } from "./nuget.mjs";
@@ -35,7 +35,10 @@ export function heldPackages(root, configs) {
   const out = new Map(), unread = [];
   for (const [configPath, nuget] of configs) {
     let config;
-    try { config = loadConfig(path.resolve(root, configPath)); } catch (e) { unread.push(`${said(configPath)}: ${said(e.message)}`); continue; }
+    // (a config that a link leads out of the project is never opened, floor rule 5; and a config's own errors, which
+    // may quote its values, are not printed: only that it could not be read)
+    if (leadsOut(root, path.resolve(root, configPath))) { unread.push(`${said(configPath)}: it leads out of the project, through a link, so it is not read`); continue; }
+    try { config = loadConfig(path.resolve(root, configPath)); } catch { unread.push(`${said(configPath)}: it cannot be read as the licence check's config, which that check says why`); continue; }
     let sources = 0;
     try { sources = nuget ? nugetConfig(config).sources.length : 0; } catch { /* (no NuGet part: no sources of its own) */ }
     let head = [];

@@ -13,6 +13,8 @@ import { notDone, STEPS } from "./steps.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { if (!cond) { failed++; console.error(`FAIL ${what}`); } };
+// (an integrity value of npm's form, its bytes invented)
+const INVENTED_SUM = `sha512-${"A".repeat(86)}==`;
 const NOW = Date.parse("2026-11-16T12:00:00Z");
 const ago = (days) => new Date(NOW - days * 86400000).toISOString();
 
@@ -187,7 +189,7 @@ ok(r.failures.length === 1 && /outside the registry/u.test(r.failures[0]), "NuGe
   try {
     g("init", "-q");
     writeFileSync(join(at, "licences.json"), JSON.stringify({ lockfiles: ["package-lock.json"], ships: [] }));
-    const put = (packages) => writeFileSync(join(at, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/tidy-moss-format": { version: "1.1.0", resolved: tgz("tidy-moss-format"), integrity: "sha512-invented" }, ...packages } }));
+    const put = (packages) => writeFileSync(join(at, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/tidy-moss-format": { version: "1.1.0", resolved: tgz("tidy-moss-format"), integrity: INVENTED_SUM }, ...packages } }));
     const old = { "node_modules/from-git": { version: "1.0.0", resolved: "git+https://example.invalid/from-git.git#0123456" } };
     put(old);
     g("add", "-A"); g("commit", "-qm", "base");
@@ -195,12 +197,14 @@ ok(r.failures.length === 1 && /outside the registry/u.test(r.failures[0]), "NuGe
     let r = await run(config, { root: at, base, get, now: NOW });
     ok(r.code === 0 && r.lines.some((l) => /^REPORT: package-lock\.json: from-git@1\.0\.0 .*a git address.*the pull request's base held it so/u.test(l)), `an entry from git the base held is reported and passes (${r.lines})`);
     const cases = [
-      ["a web address", { "node_modules/from-web": { version: "2.0.0", resolved: "https://example.invalid/from-web-2.0.0.tgz", integrity: "sha512-invented" } }, /from-web@2\.0\.0 .*a web address on example\.invalid/u],
+      ["a web address", { "node_modules/from-web": { version: "2.0.0", resolved: "https://example.invalid/from-web-2.0.0.tgz", integrity: INVENTED_SUM } }, /from-web@2\.0\.0 .*a web address on example\.invalid/u],
       ["no integrity value, deep in the tree", { "node_modules/tidy-moss-format/node_modules/deep-moss": { version: "1.0.0", resolved: tgz("deep-moss", "1.0.0") } }, /deep-moss@1\.0\.0 .*no integrity value/u],
       ["a git address at another commit", { "node_modules/from-git": { version: "1.0.1", resolved: "git+https://example.invalid/from-git.git#89abcde" } }, /from-git@1\.0\.1 .*a git address/u],
       ["another git address under a held name and version", { "node_modules/from-git": { version: "1.0.0", resolved: "git+https://example.invalid/elsewhere.git#0123456" } }, /from-git@1\.0\.0 .*a git address/u],
       ["a second entry of a held one, nested", { ...old, "node_modules/tidy-moss-format/node_modules/from-git": { version: "1.0.0", resolved: "git+https://example.invalid/from-git.git#0123456" } }, /from-git@1\.0\.0 \(at node_modules\/tidy-moss-format\/node_modules\/from-git\)/u],
-      ["a packed file outside the project", { "node_modules/far-moss": { version: "1.0.0", resolved: "file:../elsewhere/far-moss-1.0.0.tgz", integrity: "sha512-invented" } }, /far-moss@1\.0\.0 .*a packed file named by its path/u],
+      ["a mark of being bundled, beside a git address of its own", { "node_modules/says-bundled": { version: "1.0.0", resolved: "git+ssh://git@example.invalid/anyone/says-bundled.git#0123456", inBundle: true } }, /says-bundled@1\.0\.0 .*a git address/u],
+      ["an integrity value npm cannot read", { "node_modules/odd-sum": { version: "1.0.0", resolved: tgz("odd-sum", "1.0.0"), integrity: "x" } }, /odd-sum@1\.0\.0 .*no integrity value/u],
+      ["a packed file outside the project", { "node_modules/far-moss": { version: "1.0.0", resolved: "file:../elsewhere/far-moss-1.0.0.tgz", integrity: INVENTED_SUM } }, /far-moss@1\.0\.0 .*a packed file named by its path/u],
     ];
     for (const [what, packages, said] of cases) {
       put(packages);
@@ -208,7 +212,7 @@ ok(r.failures.length === 1 && /outside the registry/u.test(r.failures[0]), "NuGe
       const out = r.lines.join("\n");
       ok(r.code === 1 && mended(out) && r.lines.some((l) => l.startsWith("FAIL: ") && said.test(l)) && /not from npm's registry with an integrity value/u.test(out), `an entry the pull request brings with ${what} fails, saying the mend (${r.lines})`);
     }
-    put({ ...old, "node_modules/tidy-moss-format/node_modules/tidy-moss-helper": { version: "1.1.0", inBundle: true }, "node_modules/own-moss": { version: "1.0.0", resolved: "file:vendor/own-moss-1.0.0.tgz", integrity: "sha512-invented" } });
+    put({ ...old, "node_modules/tidy-moss-format/node_modules/tidy-moss-helper": { version: "1.1.0", inBundle: true }, "node_modules/own-moss": { version: "1.0.0", resolved: "file:vendor/own-moss-1.0.0.tgz", integrity: INVENTED_SUM } });
     r = await run(config, { root: at, base, get, now: NOW });
     ok(r.code === 0 && !r.lines.some((l) => /tidy-moss-helper|own-moss/u.test(l) && /integrity|not npm.s registry/u.test(l)), `a package inside another's file, and a packed file of the project's own, pass (${r.lines})`);
   } finally { rmSync(at, { recursive: true, force: true }); }
@@ -222,10 +226,10 @@ try {
   writeFileSync(join(tmp, "licences.json"), JSON.stringify({ lockfiles: ["package-lock.json"], ships: [] }));
   writeFileSync(join(tmp, "package.json"), "{}");
   // (each entry with an integrity value, as npm writes one, unless the test says otherwise)
-  const write = (packages) => writeFileSync(join(tmp, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, ...Object.fromEntries(Object.entries(packages).map(([k, e]) => [k, { integrity: "sha512-invented", ...e }])) } }));
+  const write = (packages) => writeFileSync(join(tmp, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, ...Object.fromEntries(Object.entries(packages).map(([k, e]) => [k, { integrity: INVENTED_SUM, ...e }])) } }));
   write({ "node_modules/tidy-moss-format": { version: "1.1.0", resolved: tgz("tidy-moss-format") } });
   mkdirSync(join(tmp, "fixtures"), { recursive: true });
-  writeFileSync(join(tmp, "fixtures/package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/never-published-moss": { version: "1.0.0", resolved: tgz("never-published-moss", "1.0.0"), integrity: "sha512-invented" } } }));
+  writeFileSync(join(tmp, "fixtures/package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/never-published-moss": { version: "1.0.0", resolved: tgz("never-published-moss", "1.0.0"), integrity: INVENTED_SUM } } }));
   git("add", "-A"); git("commit", "-qm", "base");
   const base = git("rev-parse", "HEAD");
   const config = join(tmp, "licences.json");

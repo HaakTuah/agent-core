@@ -75,10 +75,14 @@ export function npmPackages(text, lockPath) {
   // (an entry from anywhere but npm's registry is kept too, marked with where it comes from: it is printed, never asked)
   return Object.entries(packages).filter(([p, e]) => lockInstalled(p) && e && typeof e === "object" && !e.link)
     .map(([p, e]) => ({ name: nameOf(p), ...(!e.resolved || registryName(e.resolved) ? {} : { from: source(e.resolved) }), version: String(e.version ?? ""), path: p, direct: direct.has(p),
-      integrity: typeof e.integrity === "string" && e.integrity !== "", bundled: e.inBundle === true, own: ownFile(e.resolved, lockPath), resolved: typeof e.resolved === "string" ? e.resolved : "",
+      integrity: SRI.test(String(e.integrity ?? "")), bundled: e.inBundle === true && !e.resolved, own: ownFile(e.resolved, lockPath), resolved: typeof e.resolved === "string" ? e.resolved : "",
       get brings() { return reach(p, next).size; },
       get by() { return direct.has(p) ? [] : [...reach(p, before)].filter((d) => direct.has(d)).map(nameOf); } }));
 }
+
+// An integrity value as npm writes and checks one: an algorithm it knows, then base64 (one that npm cannot read it
+// does not check, so it counts as none).
+const SRI = /^(?:sha512|sha384|sha256|sha1)-[A-Za-z0-9+/]{20,}={0,2}(?:\s+(?:sha512|sha384|sha256|sha1)-[A-Za-z0-9+/]{20,}={0,2})*$/u;
 
 // Whether a lock entry's address is a packed file of the project's own, which git holds: `file:` and a path that stays
 // inside the project from the lock file's folder.
@@ -174,8 +178,10 @@ export function newPackages(head, base, nuget = false) {
 // ---- Where each comes from (floor rule 7, "from a known publisher" and "one exact version"; #488, point 4)
 
 /** What keeps an npm lock entry from being npm's registry's own, held to what was locked: the address it comes from
- *  instead, or that it names no integrity value; null where it is the registry's with one, and for a package inside
- *  another's file (inBundle), which that file's integrity holds, or a packed file of the project's own, which git holds. */
+ *  instead, or that it names no integrity value npm reads; null where it is the registry's with one, and for a package
+ *  inside another's file (inBundle, and naming no address of its own, since npm fetches one that names one: the mark
+ *  alone is the lock file's word), which that file's integrity holds, or a packed file of the project's own, which git
+ *  holds. */
 export function offRegistry(p) {
   if (p.bundled || p.own) return null;
   if (p.from) return `it comes from ${p.from}, not npm's registry`;
