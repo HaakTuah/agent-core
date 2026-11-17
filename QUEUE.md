@@ -11,11 +11,11 @@ it merges last. #579 to #591 wait on #593's point 7.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #486, points 6 to 8 and 11 | rule builder | |
-| #527, step 2 | rule builder | #526 |
+| #527, step 2, its second pull request | rule builder | |
 | #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue | |
 | #528, step 3 | rule builder | #527 |
 | #529, step 4 | builder | #528 |
-| #530, step 5 | builder; the licence readers after #585 and #586 | #529 |
+| #530, step 5 | builder; licence readers after #585 and #586 | #529 |
 | #593, point 5 | rule builder | |
 | #534, point 13 | rule builder | |
 | #593, points 1 to 3 | rule builder | |
@@ -34,7 +34,7 @@ it merges last. #579 to #591 wait on #593's point 7.
 | #591 | builder | #589 |
 | #585 | builder | |
 | #586 | builder | |
-| #546 | rule builder; a workflow, two security reviews | |
+| #546 | rule builder; two security reviews | |
 | #587 | rule builder; it may change the floor's topics and what every role reads at its start | #530 |
 | #306 | rule builder | |
 | #307 | rule builder | |
