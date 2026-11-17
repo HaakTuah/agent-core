@@ -3,7 +3,7 @@
 // (pr-description.mjs, beside this file): such a pull request quotes, under its heading "The owner's word", in lines
 // that open with ">", words found word for word in the text of an issue it names ("Fixes #n", "Part of #n" and the like),
 // in the issue's description or a comment written by an account the host gives its higher right (on GitHub, the role
-// `maintain` or `admin`). A quoted line passes where it is found so: whitespace counts as one blank, the issue's own
+// `maintain` or `admin`, of an account whose type is User: tasks/github-calls.md). A quoted line passes where it is found so: whitespace counts as one blank, the issue's own
 // ">" marks are read through, and "[…]" (floor rule 11's details left out) splits a line into pieces each found in
 // one text. It never guesses: it reads text and the host's answer on each account's right. What it does not read:
 // whether the quote covers the change (the design check's), and who last edited a text (the host gives its author).
@@ -73,10 +73,10 @@ export function textsOf(repo, issues, gh = route => { const r = spawnSync("gh", 
   // (a login of no account's form, a bot's among them, is no owner; one the host does not answer on is unread)
   const higher = login => {
     if (!/^[A-Za-z0-9-]{1,39}$/u.test(login)) return false;
-    if (!rights.has(login)) rights.set(login, gh(`repos/${repo}/collaborators/${login}/permission`)?.role_name ?? null);
-    const role = rights.get(login);
-    if (role === null) read = false;
-    return HIGHER.has(String(role));
+    if (!rights.has(login)) { const got = gh(`repos/${repo}/collaborators/${login}/permission`); rights.set(login, got?.role_name ? got : null); }
+    const right = rights.get(login);
+    if (right === null) read = false;
+    return HIGHER.has(String(right?.role_name)) && right?.user?.type === "User";
   };
   try {
     for (const n of issues) {

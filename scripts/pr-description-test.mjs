@@ -115,11 +115,12 @@ ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon"
   ok(issuesOf("Fixes #548. Part of #545, closes #12, resolved #7, Fixes #548").join() === "548,545,12" && issuesOf("See #3 and #4.").length === 0, "the issues a description names as its own, at most three, each once; one only mentioned is none");
   ok(found("a […] c", [readable("a b c")]) && !found("a […] c", [readable("a b"), readable("c")]) && !found("[…]", [readable("x")]), "the pieces of a quote stand in one text, and a quote of marks alone is none");
   // the texts, through a host that answers as gh would: the description and comments of each issue, those by an account with maintain or admin
-  const host = { "repos/o/r/issues/9": { user: { login: "boss" }, body: record }, "repos/o/r/issues/9/comments?per_page=100&page=1": [{ user: { login: "writer" }, body: "> my yes, as a writer" }, { user: { login: "helper[bot]" }, body: "> my yes, as a bot" }, { user: { login: "keeper" }, body: "> my yes, as a maintainer" }],
-    "repos/o/r/collaborators/boss/permission": { role_name: "admin" }, "repos/o/r/collaborators/writer/permission": { role_name: "write" }, "repos/o/r/collaborators/keeper/permission": { role_name: "maintain" } };
+  const host = { "repos/o/r/issues/9": { user: { login: "boss" }, body: record }, "repos/o/r/issues/9/comments?per_page=100&page=1": [{ user: { login: "writer" }, body: "> my yes, as a writer" }, { user: { login: "helper[bot]" }, body: "> my yes, as a bot" }, { user: { login: "app" }, body: "> my yes, as an app" }, { user: { login: "keeper" }, body: "> my yes, as a maintainer" }],
+    "repos/o/r/collaborators/boss/permission": { role_name: "admin", user: { type: "User" } }, "repos/o/r/collaborators/writer/permission": { role_name: "write", user: { type: "User" } },
+    "repos/o/r/collaborators/keeper/permission": { role_name: "maintain", user: { type: "User" } }, "repos/o/r/collaborators/app/permission": { role_name: "admin", user: { type: "Bot" } } };
   const asked = [], got = textsOf("o/r", [9], route => (asked.push(route), host[route] ?? null));
-  ok(got.read && got.texts.length === 2 && got.texts.some(x => x.includes("my yes, as a maintainer")) && !got.texts.some(x => /as a (writer|bot)/.test(x)) && !asked.some(r => r.includes("helper")),
-    "the issue's text by an admin and a comment by a maintainer count; a writer's and a bot's do not, and no right is asked of a bot");
+  ok(got.read && got.texts.length === 2 && got.texts.some(x => x.includes("my yes, as a maintainer")) && !got.texts.some(x => /as an? (writer|bot|app)/.test(x)) && !asked.some(r => r.includes("helper")),
+    "the issue's text by an admin and a comment by a maintainer count; a writer's, a bot's and an admin account that is no person's do not, and no right is asked of a bot's login");
   const lost = textsOf("o/r", [9], route => (route.endsWith("keeper/permission") ? null : host[route] ?? null));
   ok(!lost.read && lost.texts.length === 1 && textsOf("o/r", [10], route => host[route] ?? null).read === false, "an account the host does not answer on, or an issue it does not give, leaves it unread, what was read kept");
 }
