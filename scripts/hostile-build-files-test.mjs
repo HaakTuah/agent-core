@@ -3,8 +3,9 @@
 // "nuget" and "agentTools", .github/workflows/*.yml, an agent tool's settings), which anyone who opens a pull request
 // writes. Read by licences.mjs (its lock and config readers), exact-versions.mjs, nuget.mjs (its lock and config
 // readers; its build files' XML has its own hostile block in nuget-test.mjs, "const hostile", near line 223, not
-// repeated here), workflows.mjs with yaml-keys.mjs, and agent-tools.mjs (its links out of the checkout: agent-tools-test.mjs,
-// near line 119). Each case is refused: nothing of it is taken as a pass or a value, and a failure says its mend. Run
+// repeated here; its project readers' links out of the project), workflows.mjs with yaml-keys.mjs, sync.mjs (the move
+// of the pins in the workflows), and agent-tools.mjs (its links out of the checkout: agent-tools-test.mjs, near line
+// 119). Each case is refused: nothing of it is taken as a pass or a value, and a failure says its mend. Run
 // by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node scripts/hostile-build-files-test.mjs
@@ -17,7 +18,10 @@ import { check as exactCheck, exact } from "./exact-versions.mjs";
 import { check as licenceCheck, licenceOk, loadConfig, lockPathOk, workspacesIn } from "./licences.mjs";
 import { quick, said, scratch } from "./hostile.mjs";
 import { mended } from "./mend.mjs";
-import { lockPackages, nugetConfig, plainText } from "./nuget.mjs";
+import { CORE } from "./core-address.mjs";
+import { NOT_A_FILE, lockPackages, nugetConfig, plainText, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
+import { ownFiles } from "./own-files.mjs";
+import { moveCalls } from "./sync.mjs";
 import { lines, readable, repeated } from "./workflows.mjs";
 import { twice } from "./yaml-keys.mjs";
 
@@ -105,6 +109,19 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   for (const a of [["init", "-q"], ["add", "-A"]]) spawnSync("git", a, { cwd: root });
   const run = spawnSync(process.execPath, ["core/scripts/workflows.mjs"], { cwd: root, encoding: "utf8", timeout: 20000 });
   ok(run.status === 1 && mended(run.stdout) && /a\.yml: a link/u.test(run.stdout) && /c\.yml: not UTF-8/u.test(run.stdout) && !/\n\s+at /u.test(run.stderr), "the workflow check fails a workflow that is a link out of the project, unread, and one in UTF-16, each with its mend");
+  // the sync's move of the pins, and NuGet's readers, on a workflow and a build file that are links out (#446)
+  const call = `jobs:\n  a:\n    uses: ${CORE}/.github/workflows/x.yml@${"a".repeat(40)}\n`;
+  const away = path.join(fresh({ "outside.yml": call, "outside.props": "<Project></Project>\n", "in/.github/workflows/b.yml": "on: push\n" }), "in");
+  fs.symlinkSync(path.join(away, "../outside.yml"), path.join(away, ".github/workflows/a.yml"));
+  fs.mkdirSync(path.join(away, "build"));
+  fs.symlinkSync(path.join(away, "../outside.props"), path.join(away, "build/x.xml"));
+  for (const a of [["init", "-q"], ["add", "-A"]]) spawnSync("git", a, { cwd: away });
+  const here = process.cwd();
+  process.chdir(away);
+  let calls;
+  try { calls = moveCalls("b".repeat(40), path.join(away, "no-core"), ownFiles(away)); } finally { process.chdir(here); }
+  ok(calls.moved.length === 0 && calls.unread.join() === ".github/workflows/a.yml" && fs.readFileSync(path.join(away, "../outside.yml"), "utf8") === call, "the sync reads no workflow that is a link out of the project, names it unread, and writes nothing through it");
+  ok(readBuildFile(away, ".github/workflows/a.yml") === NOT_A_FILE && readBuildFile(away, "build/x.xml") === NOT_A_FILE && projectFilesByContent(away, ["build/x.xml"]).length === 0, "NuGet's readers read no file through a link out of the project, and take none for a project file");
 }
 
 // ---- a number out of range ----

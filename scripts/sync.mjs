@@ -25,6 +25,8 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
+import { READ_MOST, ownFiles } from "./own-files.mjs";
+import { started } from "./started.mjs";
 import { NOTES, asksBetween, fetchCore, followsOf, hostSaid, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
@@ -78,13 +80,14 @@ function releaseToTake({ text, old, at }, tmp) {
   return { pin: newest.sha, release: ` (${newest.name})` };
 }
 
-// Each call to a core workflow whose workflow changed between its pin and `pin`, moved to `pin`; the list of those moved.
-function moveCalls(pin, tmp) {
-  const moved = [];
-  const wf = ".github/workflows";
-  for (const file of fs.existsSync(wf) ? fs.readdirSync(wf).filter(f => /\.ya?ml$/.test(f)) : []) {
-    const p = path.join(wf, file);
-    const src = fs.readFileSync(p, "utf8");
+// Each call to a core workflow whose workflow changed between its pin and `pin`, moved to `pin`: { moved, unread }, the
+// calls moved and the workflows not read. A workflow is read as the steps read it (`own`: own-files.mjs): one that is no
+// regular file of the project's own, a link that leads out among them, is left as it is, named, and never written through.
+export function moveCalls(pin, tmp, own) {
+  const moved = [], unread = [];
+  for (const p of own.listed.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(f))) {
+    const file = p.slice(".github/workflows/".length), src = own.read(p, true);
+    if (src === null) { unread.push(p); continue; }
     const out = src.replace(new RegExp(`${CORE}/\\.github/workflows/([A-Za-z0-9._-]+\\.ya?ml)@([0-9a-f]{40})`, "g"),
       (call, name, sha) => {
         let same = false;
@@ -95,16 +98,17 @@ function moveCalls(pin, tmp) {
       });
     if (out !== src) fs.writeFileSync(p, out);
   }
-  return moved;
+  return { moved, unread };
 }
 
 // What the sync moved (the copy, the manifest's line and the workflow calls), and what it asks beyond the copy.
-function sayMoved({ at, old, pin, release, manifest, moved }, tmp) {
+function sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp) {
   const changed = git(["diff", "--stat", "--format=", old, pin], tmp).split("\n").pop() || "no files";
   console.log(`${at} ${old.slice(0, 7)} -> ${pin.slice(0, 7)}${release} (${changed.trim()}); ${manifest} moved.`);
   console.log(moved.length
     ? `Workflow calls moved:\n  ${moved.join("\n  ")}`
     : "No workflow call moved: the PR changes no workflow.");
+  if (unread.length) console.log(`Workflows not read, so no call in them moved, each no regular file of the project's own of at most ${READ_MOST} bytes: ${unread.join(", ")}. Make each a file of the project's own, then move its calls by hand to ${pin}.`);
   // What this sync asks of the project beyond the copy: the entries the core's sync notes gained between the two pins.
   // (A pin from before the notes gives every entry. Where the entries cannot be read, it says so: never an all-clear.)
   const asks = asksBetween(old, pin, tmp);
@@ -147,8 +151,12 @@ function report(at, dir, kits) {
 
 function sync(tmp) {
   const manifest = "core-manifest.md";
-  if (!fs.existsSync(manifest)) fail(`run it from a project's root, beside ${manifest}`);
-  const text = fs.readFileSync(manifest, "utf8"), line = ownCopy(text);
+  // (read as the steps read it: own-files.mjs; one that is no regular file of the project's own is none)
+  let own;
+  try { own = ownFiles("."); } catch { fail(`run it from a project's root, a git repository, beside ${manifest}`); }
+  const text = own.read(manifest, true);
+  if (text === null) fail(`run it from a project's root, beside ${manifest}, a regular file of the project's own of at most ${READ_MOST} bytes`);
+  const line = ownCopy(text);
   if (!line) return;
   const at = line.path, dir = at.slice(0, -1), old = line.pin, lineRe = new RegExp(`^Core: ${CORE} at ([0-9a-f]{40}), copied whole under `, "m");
   const first = !fs.existsSync(dir); // (the first copy: the manifest is written, the copy not yet)
@@ -166,19 +174,21 @@ function sync(tmp) {
   execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(tmp, ["archive", pin], { encoding: "buffer", maxBuffer: 1 << 28 }) });
   fs.writeFileSync(manifest, text.replace(lineRe, line => line.replace(old, pin)));
 
-  const moved = moveCalls(pin, tmp);
+  const { moved, unread } = moveCalls(pin, tmp, own);
   if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); return; }
-  sayMoved({ at, old, pin, release, manifest, moved }, tmp);
+  sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp);
   report(at, dir, kitsOf(old, tmp));
 }
 
 // The core is fetched into a temporary folder, removed however the sync ends.
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-sync-"));
-try {
-  sync(tmp);
-} catch (e) {
-  console.error(`FAIL: ${e instanceof Failure ? e.message : e.stack}`);
-  process.exitCode = 1;
-} finally {
-  fs.rmSync(tmp, { recursive: true, force: true });
+if (started(import.meta.url)) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-sync-"));
+  try {
+    sync(tmp);
+  } catch (e) {
+    console.error(`FAIL: ${e instanceof Failure ? e.message : e.stack}`);
+    process.exitCode = 1;
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }

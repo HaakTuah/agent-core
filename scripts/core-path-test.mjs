@@ -100,6 +100,7 @@ if (process.platform !== "win32") {
   fs.mkdirSync(linked); fs.mkdirSync(outside);
   fs.symlinkSync(outside, path.join(linked, "vendor"));
   fs.writeFileSync(path.join(linked, "core-manifest.md"), copied("vendor/the-core/"));
+  spawnSync("git", ["init", "-q"], { cwd: linked }); // (a project is a git repository, whose files the sync reads: own-files.mjs)
   const r = spawnSync(process.execPath, [fileURLToPath(new URL("./sync.mjs", import.meta.url))], { cwd: linked, encoding: "utf8" });
   ok(r.status === 1 && /vendor, on the way to the copy's path vendor\/the-core\/, is a link/.test(r.stderr) && mended(r.stderr) && fs.readdirSync(outside).length === 0, "the sync refuses a path through a link, saying the mend, and writes nothing", r.stderr);
 } else console.log("note a link cannot be made here (Windows), so the sync's refusal of one is not tried");
