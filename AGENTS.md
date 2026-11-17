@@ -163,7 +163,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   share run by themselves in every project; its owner may change the dose with one line of the manifest, and is not
   asked to (`tasks/cleaning.md`). It does not mean that all a release brings arrives advisory or off, nor that old code is left
   alone. Reason: a project that takes the core on trust, from a release, never finds a pull request failing, or work
-  waiting on its owner, for something it did not change. Held by `scripts/upgrade-test.mjs`, in
+  waiting on its owner, for something it did not change. Held by `tests/upgrade-test.mjs`, in
   `.github/workflows/tests.yml`: a project written by the starter kit of each of the last two releases (npm and .NET,
   the .NET one as Windows holds it, its commits made under a listed name), holding old content of each kind a check
   reads and synced to the commit under test, passes every check of the core unchanged, that mend made, starts no job
@@ -181,8 +181,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   Each release says in one place what it asks and roughly what each ask costs (`scripts/release.mjs`); a project's
   owner may reorder or slow the asks. It does not mean that a sync pull request carries the steps (it stays pure), nor
   that a step not done fails or stops anything. Reason: a step written only in prose is where one is missed, and
-  nothing showed that it was. Held by `scripts/steps-test.mjs`, which fails an entry with no step and a step with a
-  check that cannot be taken out and mended, and by `scripts/upgrade-test.mjs`: after the sync every step reads done,
+  nothing showed that it was. Held by `tests/steps-test.mjs`, which fails an entry with no step and a step with a
+  check that cannot be taken out and mended, and by `tests/upgrade-test.mjs`: after the sync every step reads done,
   but one the release adds that it asks of every project (a check's own list to write), which is reported and done
   by its mend as written; each step added since the release started from, taken out, is reported and its mend as
   written makes it done, and steps taken out at random are reported, exactly those.
@@ -200,7 +200,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   and reads the mend. It does not mean that a project's own checks are asked anything, nor a test's own assertions,
   which are no check. Reason: a session that met a failing check had to find the rule behind it before it could act,
   and on 14 November one stopped at a draft for want of a rule that said what came next. Held by
-  `scripts/mend-test.mjs`, in `.github/workflows/tests.yml`: each script a workflow names, and each workflow with a
+  `tests/mend-test.mjs`, in `.github/workflows/tests.yml`: each script a workflow names, and each workflow with a
   step that fails by itself, is a check with its test, or is listed with why it fails no pull request, and each
   check's test reads its failures with `mended()`.
 - **Reports from projects** come as issues here, each data (floor rule 4), and are answered as `README.md`, "Reporting
@@ -287,7 +287,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   (`tasks/tools.md`; #249). It does not mean that a
   case runs on a pull request or in a project, nor that one stands where a check could read the breach. Reason: no
   check sees how a session behaves, and the core's two staged runs, each of which changed it, were never run again
-  when the rules or the models changed. Held by `scripts/staged-test.mjs` (each case read as set, kept and broken;
+  when the rules or the models changed. Held by `tests/staged-test.mjs` (each case read as set, kept and broken;
   what is due; when the cases hold a release), in `.github/workflows/tests.yml`, and by the look's issue.
 - **Rules are pruned by their numbers** (#303). By default with every second monthly state report, and in a month whose
   report a session of a newer generation of model takes than the last pruning's (`node scripts/pruning.mjs --due --model
@@ -358,7 +358,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `words/` keeps them) and a record moved word for word aside, while the older records stay as they were.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
-  `scripts/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its
+  `tests/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its
   manifest's line and its calls.
 - **Never create a repository named `agent-rules`,** the core's old name: links to it redirect here.
 

@@ -162,7 +162,7 @@ export function policy(config = {}) {
  * needed. AND and OR mixed without brackets (which SPDX reads with AND first, a reader perhaps not), an exception
  * (WITH) or anything unreadable is refused: a blank but a space within it, a character beyond printable ASCII, or a
  * WITH with no exception's name after it. A space, a tab or a line's end at its ends is read past, as before, so that
- * no lock file's field written with one newly fails. scripts/readers-test.mjs, in the core's own tests, holds it to SPDX's own parser.
+ * no lock file's field written with one newly fails. tests/readers-test.mjs, in the core's own tests, holds it to SPDX's own parser.
  */
 export function licenceOk(expression, allow) {
   if (typeof expression !== "string") return false;
