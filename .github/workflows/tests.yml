@@ -12,7 +12,7 @@
 # A third takes four packages from npm's registry, each at one exact version and held to its sha512 before it is
 # unpacked, with no script of theirs run: the reference parsers the hand-written readers are held to, tools that only
 # run, in the core's audit (scripts/readers-test.mjs, on Linux).
-# Each part of the suites, two on Linux and five on Windows, and the upgrade test, are each held to a time mark (the
+# Each job of the suites, two on Linux and six on Windows, and the upgrade test, are each held to a time mark (the
 # "suites" of .github/shape.json, by scripts/shape.mjs; tasks/tests.md, "The tests have a time mark").
 # On a pull request each job runs only the suites its change can reach, against the merge's first parent, its base, and
 # says on its summary what it ran; a push to main, and a re-run, runs every suite (scripts/select.mjs; tasks/tests.md,

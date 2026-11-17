@@ -91,7 +91,7 @@ function check(files = {}, { branch = "main", at = B, without = null, under = "c
   const [job] = runWorkflow(workflow, { github, base, temp: tmp, workspace: () => dir, uses: { "actions/checkout": checkoutStandIn(env, tmp) } });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
-// (each case runs only in its section's part)
+// (each case runs only in its section's part: a case that calls ok() itself stands in a block gated so too)
 const passes = (what, ...args) => { if (!inPart(section)) return; const r = check(...args); ok(r.passed, `${what}: passes`, r.out); };
 const fails = (what, words, ...args) => { if (!inPart(section)) return; const r = check(...args); ok(!r.passed && r.out.includes(words) && mended(r.out), `${what}: fails, saying so and its mend`, r.out); };
 
@@ -104,7 +104,7 @@ passes("a heading inside a fenced block, and the floor named outside the section
 fails("a manifest without its pin line", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^Core: .*\n/m, "") });
 fails("a manifest with two", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^(Core: .*\n)/m, "$1$1") });
 fails("a manifest without the owner's account, an organisation's account holding the repository", "owner's account", { "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") });
-{ // (#481: read where the host says a person's account holds it; a row, there, still decides)
+if (inPart(section)) { // (#481: read where the host says a person's account holds it; a row, there, still decides)
   const r = check({ "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") }, { held: { login: "someone", type: "User" } });
   ok(r.passed && r.out.includes("The owner's account is read: someone"), "a manifest without the owner's account, a person's account holding the repository: passes, saying what it read", r.out);
 }
