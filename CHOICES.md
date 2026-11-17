@@ -5,6 +5,167 @@ rule came.
 
 Read whole: 2026-11-15
 
+## Choice: the core's foundations, judged again as if written today
+
+The record of #519, written and argued on 17 November 2026 by the process of #515 (points 1 and 3 to 7): one question,
+were the core written today, from nothing, what would it be written in and built on? Its four parts: the language and
+runtime of the scripts; whether their code is typed and checked; how a language or a format someone else defines is
+read, and whether what reads it is carried or fetched; and how the core reaches a project. It argues again the first
+three records below and the fourth, the copy. The target is judged on merit first, the cost of moving left out; the path
+and its cost are a second judgment, apart. The trial's commands and its numbers in full are in the pull request that adds
+this record.
+
+- **The constraints.** Fixed, and not argued: the floor; "Nothing locks a project"; and that the core's checks run
+  wherever sessions run (a cloud session, the host's runners, the owner's computer, Linux and Windows), in a project of
+  any stack. Every other one is argued below, never assumed: that nothing is installed in a project; that a check
+  needs no network when it runs; that one runtime is pinned; and the size of what a project carries.
+- **Criteria, before the options.**
+  1. Runs everywhere with what is there: the tools a place must already hold before a check starts (today Git, and a
+     runtime `scripts/node.sh` fetches by its digest where the machine's differs).
+  2. Correct: faults the tests and reviews miss, counted on the bugs fixed so far; for another language, counts equal
+     to a hand count on code written to trip a reader, held out from whoever wrote it.
+  3. Fast where it is paid: a hook starts in under 100 ms; a check reads 100,000 lines in under 5 s; the core's suites
+     stay inside their time marks on the slowest runner (Windows, where starting a process costs most).
+  4. Trust and upkeep under the floor: the fewest publishers, the least code no one reads by eye, each update one exact
+     version read against its notes, licences on the allowed list.
+  5. What a project carries and pays: the copy's bytes (4.0 MB today, 1.6 MB of it the core's own tests) and the minutes
+     its checks add.
+  6. How well agents work in it: written right the first time, no build step to change one script, faults said before
+     the tests run.
+  7. A new language or format costs hours, not days.
+  8. What leaving costs later, and how long the choice lives (its upkeep, its promises of compatibility).
+  9. Works with the network a session has: only the package registries and the host reachable, or none on the owner's
+     computer; a fetch that fails says its mend and turns nothing red that stood before.
+- **The long list,** searched on the web as well as known, each kept or dropped against a criterion.
+  - *Language and runtime.*
+    - JavaScript on the pinned Node: kept.
+    - TypeScript, only the syntax Node strips, run by the same Node: kept.
+    - Bun, which runs the same JavaScript: kept, as the stand-in for a faster JavaScript runtime.
+    - Deno 2: dropped on criterion 1, on no runner or session machine, and its trial read from Bun's, the same profile.
+    - Python 3: kept.
+    - Go, a static binary for each system: kept, as the stand-in for a compiled language.
+    - Rust: dropped on criterion 6; compiled like Go, slower to write and to build for some 90 commands.
+    - C# on .NET (a file run by `dotnet run`): dropped on criterion 1, an SDK of hundreds of MB no npm project or cloud
+      session holds, and 3, its start-up.
+    - PowerShell 7: dropped on criterion 1, on no Linux session by default.
+    - Bash with the usual tools: dropped on criteria 1 (Windows has it only through Git Bash) and 2.
+    - Lua, Nim, Zig, Kotlin on the JVM: dropped on criteria 6 and 1, and the JVM on 3.
+  - *Types.*
+    - None, as now: kept.
+    - Types in comments (JSDoc), checked by TypeScript's checker: kept.
+    - TypeScript's own syntax, erasable, the checker run in the core's own tests: kept.
+    - TypeScript built to JavaScript and the output committed: dropped on criterion 6, a build step on every change and
+      the code held twice.
+    - Flow: dropped on criterion 8, its upkeep outside its maker narrow.
+    - A checker of the picked language's own (mypy or Pyright for Python; Go's compiler): follows the language.
+  - *Reading another's language or format.*
+    - Readers written by hand, as now: kept.
+    - Tree-sitter, its grammars run as WebAssembly by Node (`web-tree-sitter`), carried in the copy: kept.
+    - The same, fetched by digest when a check first needs it: kept.
+    - Each language's own tooling (Roslyn, the Rust compiler, Python's `ast`, Go's parser): kept.
+    - Lizard (a counter of functions and their branching in some 30 languages, Godot's among them; Python): kept.
+    - ast-grep (tree-sitter inside a native binary for each system, queries in YAML): dropped on criteria 4 and 5, a
+      native binary for each system and processor no one reads, holding the grammars `web-tree-sitter` runs as they are.
+    - Mozilla's rust-code-analysis (tree-sitter, Rust): dropped on criterion 8, its last release over three years old.
+    - scc and tokei: dropped on criterion 2; they count a file's keywords, not functions.
+    - Semgrep: dropped on criteria 1 and 4, a native engine and a Python install.
+    - srcML: dropped on criteria 1 and 7, a native tool for a few languages.
+    - ANTLR's community grammars with its JavaScript runtime: dropped on criteria 3 and 8, slower parsers and grammars
+      of uneven upkeep.
+    - A language server for each language: dropped on criterion 1, each needs its toolchain.
+    - A parser for one language alone (acorn, oxc, Babel for JavaScript): dropped on criterion 7, as the base for
+      every language; it may still read one.
+    - For the formats: YAML by `yaml` (one publisher, no dependency, reports a key given twice) or `js-yaml`; TOML by
+      `smol-toml`; Markdown by `markdown-it` or `micromark`; file patterns by Node's own `path.matchesGlob`: kept, each
+      as #486's inventory weighs it, and not tried here, since they read formats with one exact answer and change
+      nothing of the foundations.
+  - *How the core reaches a project.*
+    - An exact copy under `core/`, pinned to one commit, as now: kept.
+    - The same copy cut to what a project runs, with no tests: kept.
+    - A git submodule: dropped on criterion 1; a checkout without its submodules holds an empty folder, so the rule
+      files every session and every outside reviewer reads at its start are missing.
+    - A git subtree: dropped on criterion 5; a copy that carries the core's history into each project.
+    - A package in the project's own package manager: dropped on criterion 1 and on "Nothing locks a project"; a .NET
+      or Python project has no npm, and an install would be the project's.
+    - A release archive fetched by digest into an ignored folder at a session's start and in each check's job: kept.
+    - The checks reached as the host's reusable workflows at a pinned commit, with no copy for them: kept, for the
+      checks alone, since the rules must still be files in the repository.
+    - One binary for each system, fetched by digest (Go, or JavaScript built into one by `bun build --compile` or
+      Node's single executable, still "active development" in Node 26): dropped on criterion 4, a binary no one reads
+      for each system and processor, and on 8 for Node's.
+    - A container image: dropped on criterion 1; no container runs in a cloud session or on a Windows runner as a step.
+    - An agent tool's plug-in: dropped on the third fixed constraint; it reaches one tool, and every tool reads the
+      rules.
+    - A template repository copied once: dropped on criterion 8; nothing reaches a project after its start.
+    - The rules read from an address at a session's start: dropped on the floor (rule 4: text the project did not
+      review) and on criterion 9.
+- **The trial,** on what decides, each run in a scratch folder outside the repository, nothing of it committed.
+  - *Start-up,* on Linux here, each the mean of 20 runs: Node (22.23.4; the pinned 26.13.0 is not on this machine)
+    37 ms for nothing, Bun (1.4.4) 5, Python (3.13) 12, a Go (1.24) binary 3; a TypeScript file 65 ms on Node, the
+    stripping about 28 ms of it, and 6 on Bun. The core's helper hook (`scripts/helper-call.mjs`) given a call: 76 ms
+    on Node, 26 on Bun, and 104 on Node as TypeScript, past the 100 ms mark on Linux before Windows is reached. A Go
+    binary that prints one line: 2.2 MB for Linux and 2.3 MB for Windows, one for each system and processor.
+  - *The core's own tests, unchanged, under Node and Bun:* the 72 test files that fetch nothing and are not the long
+    upgrade or staged ones. Node: 322 s, every case passed. Bun: 274 s, 15% less, with 3 cases failing in 2 files (a
+    hostile test's "nothing was written outside the project", and two git cases of `reading-test.mjs`), and the file
+    that starts the most processes (`check-test.mjs`) slower, 90 s against 80. Python and Go were not given a port of
+    a script: what they save is what they start faster, about 25 and 34 ms a process; Python is on the host's runners
+    and in the cloud session, not on the owner's computer unless installed, and its own library reads TOML but no
+    YAML.
+  - *Types, over every fixed bug* (#515, point 2): of the 44 closed issues labelled `bug`, the 33 whose fix changed a
+    script that is no test, each on the tree just before its fix (30 trees), TypeScript's checker (6.0.2, with Node's
+    types 26.6.6, `allowJs` and `checkJs`) in loose mode and with its checks of null. Findings at a line a fix changed:
+    loose at 1 fix, null at 6; findings that point at the fault: none of 33 in either mode. None of the 33 bugs was of a
+    kind a type check reaches: each was a rule, a text, a pattern, YAML, git's settings, a path or a platform (npm
+    started on Windows, a bare repository, line endings, a link to a device). In `strict`, the tree before #422 gives
+    7,332 findings, 4,951 of them a value with no declared type. Each tree took 4 to 17 s a mode.
+  - *Reading other languages:* the numbers of the record below (#487) stand and were not run again: tree-sitter exact
+    on held-out files in Rust and C#, the hand reader off by its definition on C# and absent on Rust, each language's
+    tooling unable to run where the sessions work or to take the core's definition. Lizard 1.21.6 was fetched at that
+    exact version, but this session's permission check refused to run its code, so its code was read: its definitions
+    are fixed in it (in Rust a `match` counts once and not each arm, an error's `?` and a type's `where` count as
+    branches, a closure is no function; in C# `??` counts and `when` does not), so it cannot count by the core's
+    definition without a change to its own code. It reads Godot's language, which no grammar of a known publisher does.
+  - *What a project carries:* the copy is 4.0 MB unpacked, of which the core's own tests are 1.6 MB, which no project
+    runs; without them, 2.4 MB. The grammars the record below picks add 11.9 MB unpacked, 1.1 MB as git stores them.
+- **The author's pick,** which the judge settles.
+  1. *Language and runtime:* JavaScript on one pinned Node. Bun saves 15% of the tests' time on Linux and fails 3
+     cases the core holds, is on no runner, and its gain is start-up, which a test that calls a check's function in its
+     own process gains on any runtime. Go and Python start faster still, but Go puts a binary no one reads in each copy
+     for each system (criterion 4) and a build step on each change (6), and Python is missing on the owner's computer
+     (1) and reads no YAML of its own.
+  2. *Types:* none, as now. Over 33 fixed bugs the checker pointed at no fault in any mode, and none of them was of the
+     kind it reaches; `strict` asks about 5,000 annotations in the scripts that are no test. TypeScript run by Node adds
+     about 28 ms to each start, which takes the helper hook past its mark. The gain at the moment of writing is not
+     measured, and is the case for a checker.
+  3. *Reading another's language or format:* tree-sitter, run as WebAssembly by Node, for every language's structure,
+     and a small package for each format, each carried in the copy at one exact version and never fetched while a check
+     runs, as the record below has it. Carried: a copy works offline and on Windows and is held byte for byte, at 1.1 MB
+     as git stores the grammars.
+  4. *How the core reaches a project:* the exact copy under `core/`, pinned, as now, but without the core's own tests,
+     which no project runs: 1.6 MB of 4.0 left in the core, as its reports are. One copy for every project, not one cut
+     to each project's stack, so one comparison proves it exact.
+- **The blind pick:** a fresh session (Opus, at high), given the problem and the criteria alone, never this record:
+  "(1) TypeScript run straight by Node.js, one pinned LTS line, no build step; (2) typed, with strict checking by `tsc`
+  in the core's own CI only; (3) tree-sitter grammars compiled to WASM (`web-tree-sitter`) for source code, plus a few
+  small pure-JS readers for the data formats, all carried inside the core at exact versions and never fetched while a
+  check runs; (4) a pinned, reviewed snapshot committed into each project, cut down to that project's stacks." Its
+  runners-up: Go (a build for each script and an unreadable binary for each system), Deno (on no runner), types in
+  comments (agents write them less well), each language's compiler, readers by hand, a release fetched by digest (each
+  fresh machine fetches it, and the rule files are missing until then), a submodule. Its open constraints: nothing
+  installed in a project, kept; no network while a check runs, kept; one pinned runtime, kept as one long-term line
+  with a least version; the size carried, cut to each project's stacks, tests and reports never carried. It took about
+  15% of shipped JavaScript bugs to be caught by a checker (a study of 2017), "to test against" the core's own bugs, and
+  named its pick wrong where fewer than about 5 of them a checker would catch, or where a hook's start as TypeScript
+  passes 100 ms on Windows.
+- **Looked for:** (pending)
+- **The case against** (pending)
+- **The answer.** (pending)
+- **The judgment:** (pending)
+- **The second judgment, the path:** (pending)
+- **What a sync asks of a project:** nothing, by this record; each step of the path says what its own sync asks.
+- Reopens it: (pending)
+
 ## Choice: the scripts in JavaScript on Node, with nothing installed in a project
 
 - Chosen for: a project runs the core's scripts from its copy with nothing installed, so no package of the core's
