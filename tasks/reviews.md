@@ -45,11 +45,14 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    - **What a posted review stands for** (#99): by default the commit it names, and the head only
      where nothing but updates from `main` follow that commit; after any other commit, where no review of the head has
      run, the fallback reviewer checks it and posts one naming the head, or the session posts the note that none is
-     needed, naming the head. It counts from the repository's owner (the *owner's account*, where that owns it), and
-     from another account only where the project names it to the check (its input `reviewers`). A pure sync needs
-     none: the check proves it with `pure-sync.mjs` and waits only for a review that started by itself. It does not
-     mean an update from `main` is reviewed again (point 6), that a review Codex completed on the head needs a posted
-     one, nor that the status shows who reviewed: builder and reviewer post under one login (#187). Reason: a review of
+     needed, naming the head. It counts from the repository's owner (the *owner's account*, where that owns it), from
+     a person's account the host lets write, each owner of a team's project (`roles/shared/teams.md`), whose rights
+     the check reads from the host each run (#412), and from another account only where the project names it to the
+     check (its input `reviewers`). A pure sync needs none: the check proves it with `pure-sync.mjs` and waits only for
+     a review that started by itself. It does not mean an update from `main` is reviewed again (point 6), that a review
+     Codex completed on the head needs a posted one, nor that the status shows who reviewed: builder and reviewer post
+     under one login (#187), and an account the agents sign in with that the host lets write counts as a person's,
+     since the host tells it from no owner's. Reason: a review of
      one commit stood for later commits no one checked, and any collaborator's comment passed a pull request. Held by
      the `security-review` status, which waits where it is broken, in the core, and holds the merge once a ruleset
      requires it (#320).
