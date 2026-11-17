@@ -266,18 +266,18 @@ function suitesOnPins(p) {
   return started.length ? `A sync that only moves the pin of a call to the core's workflows starts no suite of the project's own: each workflow named lists in its \`paths-ignore\`, beside \`core/**\` and \`core-manifest.md\`, each file that holds only such calls by its exact path, or, where it filters with \`paths\`, takes each out with \`!<its path>\` after its patterns (\`core.yml\` checks those pins on every pull request). Started by such a file alone: ${started.join("; ")}.` : null;
 }
 
-// Where a workflow of the project's filters its pull requests by their paths and lets through a change under the copy's
-// scripts, a change under the packages they run beside them alike, as the copy's folder of them holds them; null where
-// each does.
+// Where a workflow of the project's filters its pull requests by their paths and runs on a change to a script of the
+// copy, each file of the packages the copy carries for them (its own files, as the project holds them), a change to it
+// let through alike; null where each workflow does.
 function scriptsWithPackages(p) {
-  const copy = corePath(p.root) || "core/", scripts = `${copy}scripts/a.mjs`, packages = `${copy}${THIRD_PARTY}a/b.js`;
+  const copy = corePath(p.root) || "core/", scripts = p.files.filter(f => f.startsWith(`${copy}scripts/`)), packages = p.files.filter(f => f.startsWith(`${copy}${THIRD_PARTY}`));
   readable(p, text => /paths(-ignore)?\s*:/.test(text));
   const wrong = Object.entries(p.workflows).filter(([, w]) => {
     const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];
     const through = f => (Array.isArray(only) ? pathsLetThrough(only, [f]) : Array.isArray(ignore) ? !pathsLetThrough(ignore, [f]) : true);
-    return through(scripts) && !through(packages);
+    return scripts.some(through) && packages.some(f => !through(f));
   }).map(([f]) => `\`.github/workflows/${shown(f)}\``);
-  return wrong.length ? `In one small pull request, let a change under \`${copy}${THIRD_PARTY}\` through wherever a change under \`${copy}scripts/\` is, in the \`paths:\` (add \`'${copy}${THIRD_PARTY}**'\`) or \`paths-ignore:\` of ${wrong.join(", ")}: the scripts there run the packages the copy carries in that folder.` : null;
+  return wrong.length ? `In one small pull request, let a change under \`${copy}${THIRD_PARTY}\` through wherever a change to a script under \`${copy}scripts/\` is, in the \`paths:\` (add \`'${copy}${THIRD_PARTY}**'\`) or \`paths-ignore:\` of ${wrong.join(", ")}: those scripts run the packages the copy carries in that folder.` : null;
 }
 
 // Where the project's call to the NuGet check starts only on the paths it names, each build file a build reads by

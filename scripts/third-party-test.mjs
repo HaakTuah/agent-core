@@ -51,6 +51,7 @@ try {
     ["a file the entry does not name", d => fs.writeFileSync(path.join(d, "third-party/yaml/README.md"), "# yaml\n"), /differs from "files": README\.md not named/],
     ["a path the entry names, gone", d => fs.rmSync(path.join(d, "third-party/yaml/dist"), { recursive: true }), /differs from "files": dist\/ holds nothing/],
     ["its licence file gone", d => { fs.rmSync(path.join(d, "third-party/yaml/LICENSE")); }, /carries no licence file/],
+    ["the notices emptied", d => fs.writeFileSync(path.join(d, "third-party/NOTICES.md"), ""), /NOTICES\.md has no section "## yaml 2\.9\.1"/],
     ["its notice gone", d => fs.writeFileSync(path.join(d, "third-party/NOTICES.md"), "# Notices\n"), /NOTICES\.md has no section "## yaml 2\.9\.1"/],
     ["its copyright line left out of the notice", d => fs.writeFileSync(path.join(d, "third-party/NOTICES.md"), fs.readFileSync(path.join(d, "third-party/NOTICES.md"), "utf8").replace(/^Copyright.*$/mu, "")), /NOTICES\.md has no section/],
     ["a folder in no entry", d => fs.mkdirSync(path.join(d, "third-party/other")), /other\/ is in no entry of list\.json/],

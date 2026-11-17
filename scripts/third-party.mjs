@@ -85,7 +85,7 @@ export function faults(root = ROOT, now = Date.now()) {
   if (!Array.isArray(list?.packages)) { fail("list.json has no list \"packages\"", "give it one, an entry for each package the folder holds"); return out; }
   const notices = textOf(path.join(at, "NOTICES.md"));
   if (notices === null) fail("NOTICES.md is not there", "write it, a section for each package: its name, version and licence, and its copyright lines");
-  const c = { root, at, now, fail, notices: notices ?? "", floor: new Set(floorList().any), names: new Set() };
+  const c = { root, at, now, fail, notices, floor: new Set(floorList().any), names: new Set() };
   for (const p of list.packages) entryFaults(c, p);
   folderFaults(c);
   return out;
@@ -142,8 +142,8 @@ function filesFaults(c, p, name, where) {
 function noticeFaults(c, p, name, licences) {
   if (!licences.length) return c.fail(`${name}/ carries no licence file`, "carry the package's own LICENSE, which its licence asks to travel with it");
   const copyright = licences.flatMap(f => (textOf(path.join(c.at, name, f), "")).split(/\r?\n/u).map(l => l.trim()).filter(l => /^copyright\b/iu.test(l)));
-  const section = c.notices.split(/^## /mu).find(s => s.startsWith(`${name} ${p.version}\n`)) ?? "";
-  if (c.notices && (!section.includes(String(p.licence)) || copyright.some(l => !section.includes(l)))) c.fail(`NOTICES.md has no section "## ${name} ${p.version}" naming ${logged(String(p.licence))} and the package's copyright lines`, `write the section: its heading, the licence, each copyright line of ${name}/'s licence file, and where its text is`);
+  const section = c.notices?.split(/^## /mu).find(s => s.startsWith(`${name} ${p.version}\n`)) ?? "";
+  if (c.notices !== null && (!section.includes(String(p.licence)) || copyright.some(l => !section.includes(l)))) c.fail(`NOTICES.md has no section "## ${name} ${p.version}" naming ${logged(String(p.licence))} and the package's copyright lines`, `write the section: its heading, the licence, each copyright line of ${name}/'s licence file, and where its text is`);
 }
 
 // The folder itself: no folder the list leaves out, its package.json and its .gitignore.
