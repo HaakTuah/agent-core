@@ -574,7 +574,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     for (const command of ["bash 'tools/$notify/a b.sh'", "bash tools/\\$notify/a\\ b.sh", "sh -c 'bash \"tools/\\$notify/a b.sh\"'"])
       ok(JSON.stringify(fromTree(command, f => f === "tools/$notify/a b.sh", index)) === JSON.stringify(["tools/$notify/a b.sh"]), `the command ${JSON.stringify(command)} takes the file a link inside the checkout leads to`);
     // (#476's code review of 0f4ae74: a word whose quoted and unquoted parts join, holding a blank, through such a link)
-    for (const command of ["bash tools/\"my hook.sh\"", "bash 'tools/my'\" hook.sh\"", "sh -c 'bash tools/\"my hook.sh\"'"])
+    for (const command of ["bash tools/\"my hook.sh\"", "bash 'tools/my'\" hook.sh\"", "sh -c 'bash tools/\"my hook.sh\"'", "bash tools/$'my hook.sh'", "bash tools/$'my\\x20hook.sh'", "bash tools/$\"my hook.sh\""])
       ok(JSON.stringify(fromTree(command, f => f === "tools/my hook.sh", index)) === JSON.stringify(["tools/my hook.sh"]), `the command ${JSON.stringify(command)} takes the file a link inside the checkout leads to`);
     for (const shadow of ["git.bat", "git.exe", "test.cmd", "git.vbs"]) {
       const own = [...files, shadow], ownHas = f => own.includes(f);

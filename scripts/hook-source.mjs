@@ -239,8 +239,8 @@ function literals(written, take) {
   for (const level of [written, ...dequotings(written)]) for (const m of level.matchAll(LITERAL)) once(m[0].replace(/\\(.)/gsu, "$1"), windowAt(level, m.index), false);
 }
 
-// A script's words as the shell reads them, each whole: its quoted and unquoted parts joined (tools/"my hook.sh" is one
-// word), a backslash keeping the next character, a blank or an operator outside quotes ending it. Each is [its text, where
+// A script's words as the shell reads them, each whole: its quoted and unquoted parts joined (tools/"my hook.sh" and
+// tools/$'my hook.sh' are each one word), a backslash keeping the next character, a blank or an operator outside quotes ending it. Each is [its text, where
 // it starts, whether a quote stood in it].
 function shellWords(script) {
   const words = [];
@@ -251,8 +251,11 @@ function shellWords(script) {
     if (/[\s;&|()<>]/u.test(c)) { end(); continue; }
     if (word === null) { word = ""; from = i; }
     if (c === "\\") { word += script[i + 1] ?? ""; i++; continue; }
-    if (c !== "'" && c !== '"') { word += c; continue; }
-    const [text, next] = quotedAt(script, i + 1, c);
+    // (bash's $'...' with its escapes read, and $"..." as "...")
+    const dollar = c === "$" && (script[i + 1] === "'" || script[i + 1] === '"');
+    if (c !== "'" && c !== '"' && !dollar) { word += c; continue; }
+    const q = dollar ? (script[i + 1] === "'" ? "$'" : '"') : c;
+    const [text, next] = quotedAt(script, i + (dollar ? 2 : 1), q);
     word += text; quoted = true; i = next - 1;
   }
   end();
