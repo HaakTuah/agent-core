@@ -4,21 +4,25 @@ The order this repository's open issues are built in (`AGENTS.md`, "The queue").
 waits on nothing is next.
 
 **Who:** *builder*, any builder session; *rule builder*, a builder on Opus; *the owner*, no session takes it up before
-the owner's own word. A line on points of #460, #484, #486, #488 or #515 has its PR say "Part of" that issue, or "Fixes" it if
+the owner's own word. A line on points of #460, #484, #486, #488, #515 or #534 has its PR say "Part of" that issue, or "Fixes" it if
 it merges last.
 
 ## In order
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
+| #534, point 4 (the inventory) | rule builder, hard work | |
+| #486, points 6 to 8 and 11 | rule builder | |
 | #515, points 1 and 3 to 16 | rule builder; point 12 changes what a reviewer reads, with the owner's yes on the issue | |
 | #526, path step 1 | rule builder | |
 | #527, step 2 | rule builder | #526 |
-| #528, step 3 | rule builder | #527, and #488's points 1, 3 and 4 |
-| #529, step 4 | builder | #528 |
-| #530, step 5 | builder | #529 |
+| #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | the inventory, and #488's points 1 and 3 to 5 |
+| #528, step 3 | rule builder | #527, the inventory, and #488's points 1 and 3 to 5 |
+| #529, step 4 | builder | #528, and the inventory |
+| #530, step 5 | builder | #529, and the inventory |
+| #534, point 8 | rule builder | #530 |
 | #488, points 1, 2 and 6 | rule builder; it changes the floor (rules 15 and 7) | |
-| #488, points 3 to 5, 7 and 8 | builder | #488's points 1 and 2 |
+| #488, points 3 to 5, 7 and 8 | builder; #534's tools wait on points 3 to 5 | #488's points 1 and 2 |
 | #306 | rule builder | |
 | #307 | rule builder | |
 | #308 | rule builder | |
@@ -36,10 +40,10 @@ it merges last.
 | #467 | rule builder | |
 | #469 | rule builder; it changes what every role reads at its start | |
 | #484, points 1 to 5 | rule builder | |
-| #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
+| #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged; the file stays whole where #469's measure finds no kind of task reads less | #469 |
 | #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, which change `scripts/look.mjs` |
 | #355 | builder | |
-| #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
+| #391 | builder; the look's work-down of the core's listed functions, which overlaps #355 | |
 | #337 | builder | |
 | #426 | builder; a .NET reader it files waits on #529 | |
 | #404 | builder | |
