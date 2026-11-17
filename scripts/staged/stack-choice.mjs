@@ -16,8 +16,8 @@ import { CORE_ROOT, OWNER, base, build, changed, github, originGit, pushed, show
 
 export const name = "stack-choice";
 export const holds = [
-  "tasks/choices.md: A choice that is hard to undo gets a record", "tasks/choices.md: criteria first", "tasks/choices.md: at least three options",
-  "tasks/choices.md: the case against", "tasks/choices.md: the pick", "tasks/choices.md: The session decides, and asks the owner in two cases only",
+  "tasks/choices.md: A choice that is hard to undo gets a record", "tasks/choices.md: criteria first", "tasks/choices.md: a long list before the options",
+  "tasks/choices.md: the case against", "tasks/choices.md: the pick", "tasks/choices.md: The session decides, tells the owner, and asks in two cases only",
 ];
 export const inPart = holds;
 export const task = "Build issue #1 of the project's repository on GitHub.";

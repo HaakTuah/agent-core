@@ -77,7 +77,16 @@ The index, and how an item is written: `archive/instructions.md`.
      which goes stale; a list named to the check stays for an account that is no owner. It stands behind who the
      `security-review` status counts.
 
-251. **17 November 2026**, #526, the first step of the path #519's judgment set out. The core's scripts promise to run
+251. **17 November 2026**, #515. A choice that is hard to undo is argued as a case is: a long list before the options,
+     each drop saying whether it rests on a fact, each option kept tried on the hardest part, a challenger that first
+     searches for what the list lacks, a pick made blind, sessions of two providers where two are at hand, and a judge
+     that wrote no part of the record, the owner told and able to overturn with nothing waiting; each project is asked
+     once what it would be built on today, a move that ships in steps is built, one that must happen at once is capped
+     by what the project's own recent work cost and is the owner's to sign off beyond it, and every move passes the same
+     gates: the core's first records showed options limited to what an issue named and an author answering its own
+     challenger, and the owner wants such picks robust, never a large rewrite for a small gain.
+
+252. **17 November 2026**, #526, the first step of the path #519's judgment set out. The core's scripts promise to run
      on the least long-term Node line as well as on the pin: a project's machine keeps its own Node where it is at or
      above that line, or fetches the pin where it is below or has none, and the core's suites run on both, so that every
      later step of the path stands on a Node a project's machine already holds while the checks keep one exact Node. It
