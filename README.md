@@ -110,11 +110,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    a release that may bring it nothing. Held by `scripts/releases-test.mjs`, `scripts/core-moved-test.mjs` and
    `scripts/upgrade-test.mjs`.
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
-   core's words, and what fills each slot. Every session reads it at the start. A list of modules does not grow by
-   itself: when the core gains a module, a note says so (`setup/sync-notes.md`), and `scripts/manifest-reads.mjs`, a
-   step of the copies workflow, reads the list against the core's modules on every pull request: a module the list
-   neither takes nor leaves out with a reason, and a slot a taken module uses that no row fills, each are reported
-   with the line to add, and never fail.
+   core's words, and a row for each slot it fills otherwise than the core reads it or leaves it ("Slots"). Every
+   session reads it at the start. A list of modules does not grow by itself: when the core gains a module, a note says
+   so (`setup/sync-notes.md`), and `scripts/manifest-reads.mjs`, a step of the copies workflow, reads the list against
+   the core's modules on every pull request: a module the list neither takes nor leaves out with a reason is reported
+   with the line to add, and never fails.
 3. **Pointer lines:** its `AGENTS.md` names the manifest and every file a builder reads at the start of every task, each
    on a line of its own, and the reading script for any other role and for the modules a task calls for
    (`core/scripts/reading.mjs`; Claude Code imports the lines through `CLAUDE.md`, Kiro and Antigravity through the entry files the starter
@@ -369,7 +369,7 @@ each mark to that).
 | *choice records* | the file that holds its records of the choices that are hard to undo, in backticks (`tasks/choices.md`; `scripts/choices.mjs` reads it) | choice: left out, `docs/choices.md`, which the starter kit writes |
 | *owner's choices* | the kinds of choice the owner keeps, each asked of the owner (`tasks/choices.md`) | choice: left out, none |
 | *other builders' checks* | what a session of another tool than Claude Code runs before it finishes (`tools/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync | choice: left out, the project's own tests |
-| *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so (`tasks/roles.md`, "Tools are preferences") | read: for a row left out, the tools that built and reviewed the last merged pull requests, most first, then the core's default (`scripts/tools-read.mjs`) |
+| *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so (`tasks/roles.md`, "Tools are preferences") | read: with no "Builder" row, the tools that built the last merged pull requests, most first, then the core's default, and a tool shown reviewing them is at hand (`scripts/tools-read.mjs`) |
 | *pace* | the manifest's lines under "Pace", each a pace the owner sets, of the kinds `roles/orchestrator.md`, "The pace is the owner's", names | choice: left out, no pace but the default |
 | *other builders*, *code reviewers*, *security reviewer* | rows of the *tools* table, "Builder", "Code reviewer" and "Security reviewer"; one still standing among the slots is read as that row | read: as the *tools* (`scripts/tools-read.mjs`) |
 | *direction* | the file that holds what the project's screens are held to: who uses it, its main size, what each screen is for, its mood, its references, what it uses and never uses, and where its system's values and its reference screen stand (`tasks/screens.md`, points 1 and 2) | choice: left out, `docs/direction.md`, written before its first screen |

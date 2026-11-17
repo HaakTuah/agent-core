@@ -1,9 +1,9 @@
 // The tools a project's record shows (AGENTS.md of the core, "What can be read is never asked or declared"; #481): which
 // tool built each of its last merged pull requests, by the attribution line its description ends with (floor rule 4),
 // and which reviewed them, by a review a bot's account posted and by a comment led "Security review:" or "Code review:"
-// that ends with an attribution line, each counted once a pull request. Where the manifest's "Tools" table has no row
-// for a role, the tools read here come first, most first, then the core's default (tasks/roles.md, "Tools are
-// preferences"). It prints what it read, so a wrong reading is seen and a row written over it; it fails nothing and
+// that ends with an attribution line, each counted once a pull request. Where the manifest's "Tools" table has no
+// "Builder" row, the tools that built come first, most first, then the core's default, and a tool shown reviewing is at
+// hand (tasks/roles.md, "Tools are preferences"). It prints what it read, so a wrong reading is seen and a row written over it; it fails nothing and
 // changes nothing. The repository: --repo, else GITHUB_REPOSITORY, else origin's address on github.com. gh and Node's
 // own modules only.
 //
@@ -51,7 +51,7 @@ export function said(repo, pulls, { builders, reviewers }) {
   const list = l => (l.length ? l.map(([name, k]) => `${logged(name)} ${k}`).join(", ") : "none");
   return [`the last ${pulls.length} merged pull requests of ${repo}${pulls.length ? ` (#${pulls.at(-1).number} to #${pulls[0].number})` : ""}:`,
     `  built by: ${list(builders)}`, `  reviewed by: ${list(reviewers)}`,
-    "where the manifest's \"Tools\" table has no row for a role, these come first, most first, then the core's default (core/tasks/roles.md, \"Tools are preferences\"); a row written there decides"].join("\n");
+    "where the manifest's \"Tools\" table has no \"Builder\" row, the tools that built come first, most first, then the core's default, and a tool shown reviewing is at hand (core/tasks/roles.md, \"Tools are preferences\"); a row written there decides"].join("\n");
 }
 
 function main(args) {
