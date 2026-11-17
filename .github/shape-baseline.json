@@ -123,16 +123,6 @@
       "depth": 0,
       "branches": 24
     },
-    "function: scripts/licences.mjs#check": {
-      "lines": 97,
-      "depth": 3,
-      "branches": 98
-    },
-    "function: scripts/licences.mjs#loadConfig": {
-      "lines": 43,
-      "depth": 2,
-      "branches": 45
-    },
     "function: scripts/look.mjs#main": {
       "lines": 140,
       "depth": 4,
