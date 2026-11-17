@@ -202,6 +202,9 @@ jobs:
       - name: The core-moved check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-moved-test.mjs ')) }}
         run: node scripts/core-moved-test.mjs
+      - name: The one script of the core's checks without a secret (once, on Linux; the NuGet check's test runs it on Windows too)
+        if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/checks-test.mjs ')) }}
+        run: node scripts/checks-test.mjs
       - name: Where the core's copy stands, as the manifest names it
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/core-path-test.mjs ')) }}
         run: node scripts/core-path-test.mjs
