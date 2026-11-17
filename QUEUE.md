@@ -26,7 +26,6 @@ it merges last.
 | #591 | builder | #589 |
 | #585 | builder | |
 | #586 | builder | |
-| #528, step 3 | rule builder | #527 |
 | #529, step 4 | builder | #528 |
 | #530, step 5 | builder | #529 |
 | #587 | rule builder; it may change the floor's topics and what every role reads at its start | #530 |

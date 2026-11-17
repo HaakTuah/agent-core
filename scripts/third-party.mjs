@@ -92,7 +92,7 @@ export function faults(root = ROOT, now = Date.now()) {
     names.add(name);
     if (wrong.length) fail(`${where} lacks or holds keys it should not: ${wrong.join(", ")}`, `give it exactly ${KEYS.join(", ")}`);
     if (!exact(p.version)) fail(`${where}: "version" is not one exact version`, "write the one version carried, as its tarball's package.json gives it");
-    if (typeof p.integrity !== "string" || !SHA512.test(p.integrity)) fail(`${where}: "integrity" is no sha512 value`, "write the registry's sha512 of the tarball, as npm pack prints it (sha512-...)");
+    if (typeof p.integrity !== "string" || !SHA512.test(p.integrity)) fail(`${where}: "integrity" is no sha512 value`, "write the registry's sha512 of the tarball, its dist.integrity (sha512-...)");
     if (!licenceOk(p.licence, floor)) fail(`${where}: its licence ${logged(String(p.licence))} is not on floor rule 10's list for what ships`, "take another package, one under a licence the list names: the copy reaches every project");
     const published = typeof p.published === "string" && DATE.test(p.published) ? Date.parse(p.published) : NaN;
     const taken = typeof p.taken === "string" && /^\d{4}-\d\d-\d\d$/u.test(p.taken) ? Date.parse(`${p.taken}T23:59:59Z`) : NaN;
