@@ -91,7 +91,7 @@ export function configured(read, skills, files = () => [], linked = () => false)
   const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map();
   const flag = (problem, file, text = read(file)) => { problems.push(problem); texts.set(problem, `${file}\0${text}`); };
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
-  const state = { tools, problems, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, linked };
+  const state = { tools, problems, texts, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, linked };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -114,6 +114,7 @@ export function configured(read, skills, files = () => [], linked = () => false)
     const settings = json(file);
     declaredMarkets(settings, file, markets);
     readHooks(state, file, settings);
+    readEnv(state, file, "env", settings?.env);
     for (const [name, on] of Object.entries(entries(file, "enabledPlugins", settings?.enabledPlugins, "each plug-in's \"name@marketplace\" to true"))) if (on) { tools.set(`plugin ${name}`, file); plugins.push(name); }
   }
   // (a plug-in is what its name and its marketplace's declared source make it, so one fetched from elsewhere is another;
@@ -190,6 +191,23 @@ function readCodex(state, json, read) {
     addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [command] });
   }
   addServers(state, ".codex/config.toml", state.entries(".codex/config.toml", "mcp_servers", config.mcp_servers, SERVERS), "Codex ");
+  const policy = state.entries(".codex/config.toml", "shell_environment_policy", config.shell_environment_policy, "its settings");
+  readEnv(state, ".codex/config.toml", "shell_environment_policy.set", policy.set);
+}
+
+// The variables a shell, git, Node or the system's loader reads as a program starts, before what it was given to run:
+// set by a tool's settings for the programs it starts, hooks among them, they change what a hook runs, so that main's
+// copy is not all it runs (floor rule 3). Names read as Windows reads them, whatever their case.
+const STARTS = /^(?:BASH_ENV|ENV|PATH|NODE_OPTIONS|NODE_PATH|SHELLOPTS|BASHOPTS|PS4|IFS|CDPATH|GLOBIGNORE|GIT_.*|LD_.*|DYLD_.*|BASH_FUNC_.*)$/iu;
+// Each such variable a tool's setting `key` in `file` sets, as a problem with the entry's own text, so one the base held
+// is noted while that entry stands, whatever else of the file changes.
+function readEnv(state, file, key, env) {
+  for (const [name, value] of Object.entries(state.entries(file, key, env, "each variable's name to its value"))) {
+    if (!STARTS.test(name)) continue;
+    const problem = `${file}: "${key}" sets the variable "${name}", which changes how the programs a hook runs start, so nothing shows a hook runs main's copy alone (floor rule 3). Mend: take it out of "${key}", in this pull request; where a tool needs it, the owner sets it on the machine`;
+    state.problems.push(problem);
+    state.texts.set(problem, `${file}\0${key}\0${name}\0${JSON.stringify(value)}`);
+  }
 }
 
 // What a plug-in's marketplace declares of it, for its id: the source, or of a "settings" source its own fields and the
