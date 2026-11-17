@@ -16,7 +16,6 @@ it merges last.
 | #375 | rule builder | |
 | #376 | rule builder | #375, which changes the same files |
 | #488, points 3 to 5 and 7 | builder | #488's points 1 and 2 |
-| #481 | rule builder; it changes `AGENTS.md` and the README's table of slots | |
 | #303 | rule builder | |
 | #306 | rule builder | |
 | #307 | rule builder | |
