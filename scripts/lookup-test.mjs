@@ -65,6 +65,8 @@ const lock = { lockfileVersion: 3, packages: {
   local: { version: "1.0.0" },
 } };
 const read = npmPackages(JSON.stringify(lock), "package-lock.json");
+const omitted = npmPackages(JSON.stringify({ lockfileVersion: 3, packages: { "": { dependencies: { "brand-new-moss": "1.1.0", "moss-alias": "npm:tidy-moss-helper@1.1.0" } }, "node_modules/brand-new-moss": { version: "1.1.0", integrity: "sha512-AAAA" }, "node_modules/moss-alias": { name: "tidy-moss-helper", version: "1.1.0", integrity: "sha512-AAAA" } } }), "package-lock.json");
+ok(omitted.length === 2 && omitted.every((p) => !p.from) && omitted.map((p) => p.name).sort().join() === "brand-new-moss,tidy-moss-helper", `npm: a lock file written with the registry's address left out reads each entry as the registry's, by its name or its alias's real name (${JSON.stringify(omitted)})`);
 const by = (name) => read.find((p) => p.name === name);
 ok(by("dev-moss")?.direct === true && by("dev-moss")?.brings === 0, "npm: a development dependency of the project's own is named by it, and an installed package's own development dependencies bring nothing");
 ok(read.length === 6 && by("from-git")?.from === "a git address" && read.filter((p) => p.from).length === 1, `npm: the five packages npm's registry gives are read, and the one from git marked so, the link left out (${read.map((p) => p.name)})`);
@@ -226,6 +228,8 @@ try {
   ok(notDone(tmp, step).length === 1, "nor one in a workflow no pull request starts");
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n        continue-on-error: true\n");
   ok(notDone(tmp, step).length === 1, "nor one in a step allowed to fail");
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n        if: false\n");
+  ok(notDone(tmp, step).length === 1, "nor one under a condition the reader cannot tell");
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n          ref: ${{ github.event.pull_request.head.sha }}\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /no `ref:`/u.test(missed[0].mend), `and a checkout of another commit than the merge does not hold the base (${missed.map((m) => m.mend)})`);

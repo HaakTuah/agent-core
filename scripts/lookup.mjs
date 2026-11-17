@@ -55,10 +55,10 @@ export function npmPackages(text, lockPath) {
   const direct = new Set([...own].flatMap((p) => names(packages[p], [...KINDS, "devDependencies"]).map((n) => resolve(packages, p, n)).filter(Boolean)));
   const next = (at) => names(packages[at]).map((n) => resolve(packages, at, n)).filter(Boolean);
   const reached = new Map([...direct].map((d) => [d, reach(d, next)]));
-  const nameOf = (p) => registryName(packages[p]?.resolved) ?? p.slice(p.lastIndexOf("node_modules/") + 13);
+  const nameOf = (p) => entryName(packages[p], p);
   // (an entry from anywhere but npm's registry is kept too, marked with where it comes from: it is printed, never asked)
   return Object.entries(packages).filter(([p, e]) => lockInstalled(p) && e && typeof e === "object" && !e.link)
-    .map(([p, e]) => ({ name: registryName(e.resolved) ?? nameOf(p), ...(registryName(e.resolved) ? {} : { from: source(e.resolved) }), version: String(e.version ?? ""), path: p, direct: direct.has(p), brings: reach(p, next).size,
+    .map(([p, e]) => ({ name: nameOf(p), ...(e.resolved === undefined || registryName(e.resolved) ? {} : { from: source(e.resolved) }), version: String(e.version ?? ""), path: p, direct: direct.has(p), brings: reach(p, next).size,
       by: direct.has(p) ? [] : [...reached].filter(([, set]) => set.has(p)).map(([d]) => nameOf(d)) }));
 }
 
@@ -68,6 +68,16 @@ function source(resolved) {
   if (/^(?:git\+|git:|github:|gitlab:|bitbucket:)/u.test(resolved)) return "a git address";
   const host = /^https?:\/\/([^/:@?#]{1,100})/u.exec(resolved)?.[1];
   return host ? `a web address on ${host}` : "an address of another kind";
+}
+
+// The name a lock entry at `path` installs: the one its registry address gives, or, for an entry with no "resolved" at
+// all, which is npm's registry's as npm writes a lock file with that field left out (omit-lockfile-registry-resolved),
+// its "name" where an alias gives one; else its folder's.
+function entryName(entry, path) {
+  const named = registryName(entry?.resolved);
+  if (named) return named;
+  if (entry?.resolved === undefined && typeof entry?.name === "string" && entry.name) return entry.name;
+  return path.slice(path.lastIndexOf("node_modules/") + 13);
 }
 
 // The lock entry that an install puts in place for `name`, as seen from the package at `from`: the nearest node_modules going up.
