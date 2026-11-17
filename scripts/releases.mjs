@@ -57,12 +57,12 @@ export function hostAccount(env = process.env, ask = args => execFileSync("gh", 
 // only where no row stands). Null where a row is there twice or in another form, or none is and an organisation, or
 // nothing read, holds the repository: whose word counts is never guessed.
 export function ownerOf(manifest, host = null) {
-  // (the one row of its form decides, as before #481; with none, a row whose lead is cased or spelt otherwise is still a
-  // row, which no host's answer is read past)
+  // (the one row of its form decides, as before #481; with none, any row whose first cell names the owner's account,
+  // however spelt, is still a row, which no host's answer is read past)
   const lines = String(manifest).split(/\r?\n/);
   const found = lines.map(l => /^\| \*owner's account\* \| `([A-Za-z0-9-]+)` \|$/.exec(l)?.[1]).filter(Boolean);
   if (found.length) return found.length === 1 ? found[0] : null;
-  if (lines.some(l => /^\|[ \t]*\*+[ \t]*owner['’`]?s account[ \t]*\*+[ \t]*\|/i.test(l))) return null;
+  if (lines.some(l => /^\|[^|\n]*owner['’`]?s[ \t]+account[^|\n]*\|/i.test(l))) return null;
   const read = typeof host === "function" ? host() : host;
   return read?.type === "User" && LOGIN.test(read.login ?? "") ? read.login : null;
 }
