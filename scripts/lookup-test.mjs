@@ -198,6 +198,8 @@ ok(r.failures.length === 1 && /outside the registry/u.test(r.failures[0]), "NuGe
       ["a web address", { "node_modules/from-web": { version: "2.0.0", resolved: "https://example.invalid/from-web-2.0.0.tgz", integrity: "sha512-invented" } }, /from-web@2\.0\.0 .*a web address on example\.invalid/u],
       ["no integrity value, deep in the tree", { "node_modules/tidy-moss-format/node_modules/deep-moss": { version: "1.0.0", resolved: tgz("deep-moss", "1.0.0") } }, /deep-moss@1\.0\.0 .*no integrity value/u],
       ["a git address at another commit", { "node_modules/from-git": { version: "1.0.1", resolved: "git+https://example.invalid/from-git.git#89abcde" } }, /from-git@1\.0\.1 .*a git address/u],
+      ["another git address under a held name and version", { "node_modules/from-git": { version: "1.0.0", resolved: "git+https://example.invalid/elsewhere.git#0123456" } }, /from-git@1\.0\.0 .*a git address/u],
+      ["a second entry of a held one, nested", { ...old, "node_modules/tidy-moss-format/node_modules/from-git": { version: "1.0.0", resolved: "git+https://example.invalid/from-git.git#0123456" } }, /from-git@1\.0\.0 \(at node_modules\/tidy-moss-format\/node_modules\/from-git\)/u],
       ["a packed file outside the project", { "node_modules/far-moss": { version: "1.0.0", resolved: "file:../elsewhere/far-moss-1.0.0.tgz", integrity: "sha512-invented" } }, /far-moss@1\.0\.0 .*a packed file named by its path/u],
     ];
     for (const [what, packages, said] of cases) {

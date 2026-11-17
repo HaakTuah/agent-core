@@ -75,7 +75,7 @@ export function npmPackages(text, lockPath) {
   // (an entry from anywhere but npm's registry is kept too, marked with where it comes from: it is printed, never asked)
   return Object.entries(packages).filter(([p, e]) => lockInstalled(p) && e && typeof e === "object" && !e.link)
     .map(([p, e]) => ({ name: nameOf(p), ...(!e.resolved || registryName(e.resolved) ? {} : { from: source(e.resolved) }), version: String(e.version ?? ""), path: p, direct: direct.has(p),
-      integrity: typeof e.integrity === "string" && e.integrity !== "", bundled: e.inBundle === true, own: ownFile(e.resolved, lockPath),
+      integrity: typeof e.integrity === "string" && e.integrity !== "", bundled: e.inBundle === true, own: ownFile(e.resolved, lockPath), resolved: typeof e.resolved === "string" ? e.resolved : "",
       get brings() { return reach(p, next).size; },
       get by() { return direct.has(p) ? [] : [...reach(p, before)].filter((d) => direct.has(d)).map(nameOf); } }));
 }
@@ -183,16 +183,20 @@ export function offRegistry(p) {
 }
 
 /** Each entry of the lock files `head` that offRegistry finds: { failures, reports }, one the base's lock files held
- *  the same (its name and version, and the same fault) reported, never failed (AGENTS.md, "Nothing locks a project"). */
+ *  the same (its name, version and address, and the same fault), as often, reported, never failed (AGENTS.md,
+ *  "Nothing locks a project"): another address, or one more entry of the same, fails. */
 export function sourceFaults(head, base) {
-  const key = (p) => `${p.name}@${p.version}\u0000${offRegistry(p)}`;
-  const held = new Set(base.flat().filter(offRegistry).map(key)), failures = [], reports = [];
+  const key = (p) => `${p.name}@${p.version}\u0000${p.resolved ?? ""}\u0000${offRegistry(p)}`;
+  const left = new Map(), failures = [], reports = [];
+  for (const p of base.flat().filter(offRegistry)) left.set(key(p), (left.get(key(p)) ?? 0) + 1);
   for (const [lockPath, packages] of head) for (const p of packages) {
     const fault = offRegistry(p);
     if (!fault) continue;
+    const n = left.get(key(p)) ?? 0;
+    left.set(key(p), n - 1);
     const at = `${said(lockPath)}: ${said(p.name)}@${said(p.version)} (at ${said(p.path)}): ${said(fault)}`;
     const mend = `take ${said(p.name)} from npm's registry at one exact version, by npm's own install in the lock file's folder with --save-exact and --ignore-scripts (for one another package brings, a version of that package which takes it from the registry), so that npm writes its address and integrity value; never edit the lock file by hand`;
-    if (held.has(key(p))) reports.push(`${at}; the pull request's base held it so, so it passes: ${mend}, as the sync's step asks`);
+    if (n > 0) reports.push(`${at}; the pull request's base held it so, so it passes: ${mend}, as the sync's step asks`);
     else failures.push(`${at} (floor rule 7). Mend: ${mend}`);
   }
   return { failures: failures.sort(), reports: reports.sort() };

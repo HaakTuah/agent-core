@@ -17,8 +17,9 @@
 //     PowerShell's Invoke-WebRequest and the like): each of those passes
 //     only in a file an entry's "files" names, that entry its hand audit; and where such a file downloads by address
 //     (curl, wget, PowerShell's) and an entry covering it audits what may be a program (no data, asset, font, service
-//     of GitHub's or the owner's own work), each such entry names its version and the file holds a checksum for each
-//     download, to check it by (floor rule 7), a file that stood unpinned at the pull request's base reported;
+//     of GitHub's or the owner's own work), each such entry names its version and the file holds, for each download,
+//     a checksum of its own and a command that checks by one (sha256sum, shasum, Get-FileHash and the like) (floor
+//     rule 7), a file that stood unpinned at the pull request's base reported;
 //   - an entry covering each script in a language it cannot read (Python, Ruby, PowerShell and the like): the entries
 //     of what it uses;
 //   - an entry covering each file but prose (Markdown, text) carrying a licence notice, code in any language or a text
@@ -217,8 +218,11 @@ function fetches(c, text, f, literal = false) {
 
 // What is no program a download could fetch: the owner's own work, data, an asset, a font, a service of GitHub's.
 const NO_PROGRAM = new Set(["own", "data", "asset", "font", "github-service"]);
-// A checksum written out: SHA-256 or SHA-512 as hex, or an integrity value as npm writes one.
+// A checksum written out: SHA-256 or SHA-512 as hex, or an integrity value as npm writes one; and the commands that
+// check a file against one, an allow-list: sha256sum, sha512sum and shasum, PowerShell's Get-FileHash, certutil's
+// -hashfile and Node's createHash.
 const CHECKSUM = /(?<![0-9a-f])(?:[0-9a-f]{64}){1,2}(?![0-9a-f])|sha(?:256|384|512)-[A-Za-z0-9+/]{43,}={0,2}/iu;
+const VERIFIER = /(?<![\w-])(?:sha(?:256|512)sum|shasum|Get-FileHash|certutil(?:\.exe)?\s+-hashfile|createHash)(?![\w-])/giu;
 
 /** What the code `code` of the file `f` (codeOf) lacks for the program it downloads by address to be pinned, or null:
  *  of the audit's `entries` covering `f` that audit what may be a program, each names its version, and the file holds
@@ -228,10 +232,12 @@ export function pinFault(entries, auditPath, f, code) {
   if (!tools.length || !downloads(code).length) return null;
   const bare = tools.filter((e) => typeof e.version !== "string" || !e.version.trim()).map((e) => e.name);
   if (bare.length) return { what: `${bare.join(", ")}, in ${auditPath}, names no version`, mend: `write the exact version ${f} downloads as "version" on ${bare.length === 1 ? "that entry" : "those entries"}` };
-  // (each download its own: as many checksums as downloads, none counted twice; which check a download meets is
-  // left to the review, since reading that needs a reader of the shell's data flow)
+  // (each download its own: as many checksums, none counted twice, and as many checks by a command of VERIFIER, as
+  // downloads; which check a download meets is left to the review, since reading that needs a reader of the shell's
+  // data flow)
   const sums = new Set([...code.matchAll(new RegExp(CHECKSUM.source, "giu"))].map((m) => m[0].toLowerCase())), count = downloads(code).length;
-  if (sums.size < count) return { what: sums.size ? `${f} holds ${sums.size} checksum${sums.size === 1 ? "" : "s"} for ${count} downloads, so one is checked by none` : `${f} holds no checksum to check it by`, mend: `write the download's SHA-256 in ${f} and check the file against it before it runs, refusing one that differs, as the core's scripts/node.sh does (sha256sum -c, or Get-FileHash in PowerShell)` };
+  const checks = [...code.matchAll(VERIFIER)].length, have = Math.min(sums.size, checks);
+  if (have < count) return { what: !sums.size ? `${f} holds no checksum to check it by` : !checks ? `${f} holds a checksum and no command that checks a file by it` : `${f} holds ${sums.size} checksum${sums.size === 1 ? "" : "s"} and ${checks} check${checks === 1 ? "" : "s"} for ${count} downloads, so one is checked by none`, mend: `write the download's SHA-256 in ${f} and check the file against it before it runs, refusing one that differs, as the core's scripts/node.sh does (sha256sum -c, or Get-FileHash in PowerShell)` };
   return null;
 }
 

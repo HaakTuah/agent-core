@@ -283,7 +283,11 @@ for (const [what, change, why] of [
     ok(r.failures.length === 1, "and so does the same download made twice", JSON.stringify(r));
     put("scripts/get.sh", `#!/usr/bin/env bash\n${GET}curl -fsSLo other.tgz https://mossgrip.example/other-1.0.0.tgz\necho "${SUM}  moss.tgz" | sha256sum -c -\n`);
     r = licenceCheck(config, dir, "HEAD", config);
-    ok(r.failures.length === 1 && /holds 1 checksum for 2 downloads/u.test(r.failures[0]), "one checksum for two downloads leaves one checked by none, and fails", JSON.stringify(r));
+    ok(r.failures.length === 1 && /holds 1 checksum and 1 check for 2 downloads/u.test(r.failures[0]), "one checksum for two downloads leaves one checked by none, and fails", JSON.stringify(r));
+    put("scripts/get.sh", `#!/usr/bin/env bash\nSUM=${SUM}\n${GET}echo "$SUM  moss.tgz" | sha256sum -c -\n`); git("commit", "-q", "-m", "pinned, the sum in a variable");
+    put("scripts/get.sh", `#!/usr/bin/env bash\nSUM=${SUM}\n${GET}`);
+    r = licenceCheck(config, dir, "HEAD", config);
+    ok(r.failures.length === 1 && /holds a checksum and no command that checks a file by it/u.test(r.failures[0]), "a checksum left with no command that checks by it fails", JSON.stringify(r));
     put("scripts/get.sh", `#!/usr/bin/env bash\necho "${SUM}  moss.tgz" | sha256sum -c -\n${GET}`);
     const WF = ".github/workflows/get.yml", job = (lines) => `name: get\non: push\njobs:\n  get:\n    runs-on: windows-latest\n    steps:\n${lines.map((l) => `      - run: ${l}\n`).join("")}`;
     put(WF, job(["Invoke-WebRequest https://mossgrip.example/moss.zip -OutFile moss.zip"]));
