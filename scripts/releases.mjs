@@ -57,10 +57,12 @@ export function hostAccount(env = process.env, ask = args => execFileSync("gh", 
 // only where no row stands). Null where a row is there twice or in another form, or none is and an organisation, or
 // nothing read, holds the repository: whose word counts is never guessed.
 export function ownerOf(manifest, host = null) {
-  // (a row whose lead is cased or spelt otherwise is still a row, which no host's answer is read past)
-  const rows = String(manifest).split(/\r?\n/).filter(l => /^\|[ \t]*\*+[ \t]*owner['’`]?s account[ \t]*\*+[ \t]*\|/i.test(l));
-  const found = rows.map(l => /^\| \*owner's account\* \| `([A-Za-z0-9-]+)` \|$/.exec(l)?.[1]);
-  if (rows.length) return found.length === 1 && found[0] ? found[0] : null;
+  // (the one row of its form decides, as before #481; with none, a row whose lead is cased or spelt otherwise is still a
+  // row, which no host's answer is read past)
+  const lines = String(manifest).split(/\r?\n/);
+  const found = lines.map(l => /^\| \*owner's account\* \| `([A-Za-z0-9-]+)` \|$/.exec(l)?.[1]).filter(Boolean);
+  if (found.length) return found.length === 1 ? found[0] : null;
+  if (lines.some(l => /^\|[ \t]*\*+[ \t]*owner['’`]?s account[ \t]*\*+[ \t]*\|/i.test(l))) return null;
   const read = typeof host === "function" ? host() : host;
   return read?.type === "User" && LOGIN.test(read.login ?? "") ? read.login : null;
 }

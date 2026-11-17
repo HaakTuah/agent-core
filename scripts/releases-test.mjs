@@ -33,6 +33,7 @@ const PERSON = { login: "someone", type: "User" }, ORG = { login: "a-team", type
 ok(ownerOf(BARE, PERSON) === "someone" && ownerOf(BARE, ORG) === null && ownerOf(BARE) === null, "with no row, the owner's account is read where a person's account holds the repository, and only there");
 ok(ownerOf(manifest("other"), PERSON) === "other" && ownerOf("| *owner's account* | someone |\n", PERSON) === null && ownerOf(`${manifest("a")}| *owner's account* | \`b\` |\n`, PERSON) === null, "a row decides over what was read, and a row of another form, or two, give no answer and are never read past");
 ok(["| *Owner's Account* | `x` |", "| *owner’s account* | `x` |", "|**owner's account**| `x` |", "| *owners account* | x |"].every(row => ownerOf(`${BARE}${row}\n`, PERSON) === null), "a row whose lead is cased or spelt otherwise is still a row: no answer, and the host's account is never read past it");
+ok(ownerOf(`${manifest("other")}| *Owner's account* | \`x\` |\n`, PERSON) === "other", "the one row of its form decides beside a row spelt otherwise, as before");
 ok(ownerOf(BARE, { login: "a;b", type: "User" }) === null && ownerOf(BARE, { login: "x", type: "user" }) === null, "a login of no form, and a type other than the host's own word, read as nothing");
 ok(followsOf(BARE, { login: OWNER, type: "User" }) === "main" && followsOf(BARE, PERSON) === "releases" && followsOf(BARE, ORG) === null, "with no row, what the project follows goes by the account read");
 { // asked once, only when called, saying what it read

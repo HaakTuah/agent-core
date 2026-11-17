@@ -126,13 +126,17 @@ jobs:
           fi
           # whose word counts (floor rule 4) is never left to a guess: the slot's one row, one GitHub login, or, with no
           # row at all, read: the repository's own account, where the host says a person holds it (README.md, "Slots")
-          # (a row whose lead is cased or spelt otherwise is still a row, and fails below: never read past)
+          # (the one row of its form decides, as before #481; with none, a row whose lead is cased or spelt otherwise is
+          # still a row, and fails below: never read past)
+          one=$(grep -cE "^\| \*owner's account\* \| \`[A-Za-z0-9-]+\` \|$" core-manifest.md || true)
           rows=$(grep -ciE "^\|[[:space:]]*\*+[[:space:]]*owner('|’|\`)?s account[[:space:]]*\*+[[:space:]]*\|" core-manifest.md || true)
-          if [ "$rows" = 0 ] && [ "$HELD_AS" = User ] && [[ "$HELD_BY" =~ ^[A-Za-z0-9-]+$ ]]; then
+          if [ "$one" = 1 ]; then
+            :
+          elif [ "$rows" = 0 ] && [ "$HELD_AS" = User ] && [[ "$HELD_BY" =~ ^[A-Za-z0-9-]+$ ]]; then
             echo "The owner's account is read: $HELD_BY, a person's account, holds this repository, and core-manifest.md has no row that says otherwise."
           elif [ "$rows" = 0 ]; then
             echo "FAIL core-manifest.md has no row \"| *owner's account* | \`<GitHub login>\` |\", and the host does not say that a person's account holds this repository, so whose word counts cannot be read. Mend: write that one row among its slots, with the GitHub login of the project's owner (in a team's project, one of its owners)."; exit 1
-          elif [ "$(grep -cE "^\| \*owner's account\* \| \`[A-Za-z0-9-]+\` \|$" core-manifest.md)" -ne 1 ] || [ "$rows" != 1 ]; then
+          else
             echo "FAIL core-manifest.md has no one \"| *owner's account* | \`<GitHub login>\` |\" row. Mend: write that one row among its slots, with the GitHub login of the project's owner, or, where a person's account holds the repository, take the row out and it is read."; exit 1
           fi
           # (the floor's own copy a repository keeps while its core is carried and a tool has not passed: below)
