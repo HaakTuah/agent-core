@@ -44,13 +44,13 @@ import fs from "node:fs";
 import { doneMends, ownerAt, queueAt, readItem, takesIt } from "./done-when.mjs";
 import { isPart, milestoneMends } from "./milestones.mjs";
 import { NUMBER } from "./outcomes.mjs";
-import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, taken } from "./reading.mjs";
+import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, taken, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
 
 // The line a description ends with, saying what the pull request waits on: nothing (its builder goes on), a review, its
 // checks, another item ("#241"), or the owner, with the question in one sentence after a colon.
 export const WAITS = "Waits on:";
-const FORMS = [["nothing", /^nothing$/], ["a review", /^a review$/], ["checks", /^checks$/], ["item", /^#\d+$/], ["the owner", /^the owner: \S.*\?$/]];
+const FORMS = [["nothing", /^nothing$/], ["a review", /^a review$/], ["checks", /^checks$/], ["item", /^#[1-9]\d{0,8}$/], ["the owner", /^the owner: \S.*\?$/]];
 export const WAITS_SINCE = "2026-11-16T00:00:00Z";
 // The day from which the line "Read for it:" is asked, of a pull request opened since the copy on its base held this.
 export const READS_SINCE = "2026-11-16T00:00:00Z";
@@ -96,7 +96,7 @@ export const planAsked = (created, then) => String(created) >= PLAN_SINCE && Boo
 // What a description says it waits on: its last line that starts with "Waits on:", as { said, kind }, kind null where
 // the line is in none of the forms; null where there is no such line.
 export function waitsOn(body) {
-  const line = String(body ?? "").split(/\r\n|\r|\n/u).map(l => l.trim()).filter(l => l.startsWith(WAITS)).at(-1);
+  const line = textOf(body).split(/\r\n|\r|\n/u).map(l => l.trim()).filter(l => l.startsWith(WAITS)).at(-1);
   if (line === undefined) return null;
   const said = line.slice(WAITS.length).trim();
   return { said, kind: FORMS.find(([, form]) => form.test(said))?.[0] ?? null };
@@ -145,7 +145,7 @@ export function asked(arg) {
 // The parts, of those asked for, that the description has no heading for.
 export function missing(body, parts = PARTS) {
   // a heading's words: what follows the #, read as milestones.mjs, beside this file, reads a part's heading
-  const headings = String(body ?? "").split(/\r\n|\r|\n/u).map(line => /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(line)?.[1]).filter(Boolean);
+  const headings = textOf(body).split(/\r\n|\r|\n/u).map(line => /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(line)?.[1]).filter(Boolean);
   return parts.filter(part => !headings.some(h => isPart(h, part)));
 }
 

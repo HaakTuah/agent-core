@@ -9,6 +9,7 @@
 //   node core/scripts/stalled.mjs [--hours N] [--repo owner/name]
 import { execFileSync } from "node:child_process";
 import { REPO } from "./core-cost.mjs";
+import { timeOf } from "./moment.mjs";
 import { started } from "./started.mjs";
 
 // How long a lane may go without a push before it counts as stalled, unless --hours says otherwise.
@@ -18,8 +19,8 @@ export const HOURS = 3;
 // had no push for longer than `hours` at `now`, oldest first, each with how long it has waited.
 export function stalled(pulls, now, hours) {
   return pulls
-    .filter(p => p.own && !String(p.ref).startsWith("dependabot/") && Number.isFinite(Date.parse(p.at)))
-    .map(p => ({ ...p, waited: (now - Date.parse(p.at)) / 3600000 }))
+    .filter(p => p.own && !String(p.ref).startsWith("dependabot/") && timeOf(p.at) !== null)
+    .map(p => ({ ...p, waited: (now - timeOf(p.at)) / 3600000 }))
     .filter(p => p.waited > hours)
     .sort((a, b) => b.waited - a.waited);
 }

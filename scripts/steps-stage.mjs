@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { copiesConfig } from "./check-configs.mjs";
+import { copiesConfig, licenceConfig } from "./check-configs.mjs";
 import { where } from "./choices.mjs";
 import { MOVED_GLOB, MOVED_GLOBS, callers, moved, project } from "./steps.mjs";
 
@@ -295,6 +295,15 @@ export const STAGES = {
       const manifest = read(dir, "core-manifest.md"), reason = "`repositories.md` (one repository, which no library carries the core into)";
       write(dir, "core-manifest.md", /^Not taken: /m.test(manifest) ? manifest.replace(/^(Not taken: .*?)\.?$/m, `$1, ${reason}.`) : manifest.replace(/^(Floor: .*)$/m, `$1\nNot taken: ${reason}.`));
     },
+  },
+  "17 November 2026, packages from the registry, the week's wait and pinned downloads": {
+    // (an .npmrc that keeps install scripts off and that stood without the week's wait; the mend adds the line the step words)
+    stage: dir => {
+      const file = licenceConfig(project(dir)), config = JSON.parse(read(dir, file));
+      write(dir, "stage-wait/.npmrc", "ignore-scripts=true\n");
+      write(dir, file, `${JSON.stringify({ ...config, ignoreScriptsIn: [...(config.ignoreScriptsIn ?? []), "stage-wait/.npmrc"] }, null, 2)}\n`);
+    },
+    mend: dir => write(dir, "stage-wait/.npmrc", `${read(dir, "stage-wait/.npmrc")}min-release-age=7\n`),
   },
   "17 November 2026, what the project would be built on today": {
     // (a record that stood before the rule, argued on none of its lines; the mend writes the record as the step words

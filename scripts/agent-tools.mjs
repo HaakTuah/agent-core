@@ -69,14 +69,21 @@ export function configured(read, skills) {
     problems.push(`${file} cannot be read as a JSON object, nested no deeper than ${DEEPEST} objects and lists. Mend: correct it to JSON, as the tool that reads it takes it`);
     return null;
   };
+  // (a list, or any other value that is no object, is refused as the wrong shape, never read by its indexes)
+  const entries = (file, key, v, form) => {
+    if (v === undefined || v === null) return {};
+    if (typeof v === "object" && !Array.isArray(v)) return v;
+    problems.push(`${file}: "${key}" is not a JSON object. Mend: write it as one, of ${form}, as the tool that reads it takes it`);
+    return {};
+  };
   const markets = new Map(), plugins = [];
   for (const file of [".claude/settings.json", ".claude/settings.local.json"]) {
     const settings = json(file);
     declaredMarkets(settings, file, markets);
     readHooks(state, file, settings);
-    for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) { tools.set(`plugin ${name}`, file); add(`plugin ${name}`, `plugin ${name}`); plugins.push(name); }
+    for (const [name, on] of Object.entries(entries(file, "enabledPlugins", settings?.enabledPlugins, "each plug-in's \"name@marketplace\" to true"))) if (on) { tools.set(`plugin ${name}`, file); add(`plugin ${name}`, `plugin ${name}`); plugins.push(name); }
   }
-  const servers = json(".mcp.json")?.mcpServers ?? {};
+  const servers = entries(".mcp.json", "mcpServers", json(".mcp.json")?.mcpServers, "each tool server's name to its settings");
   for (const name of Object.keys(servers)) { tools.set(`server ${name}`, ".mcp.json"); add(`server ${name}`, `server ${name}`); }
   for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
   return { tools, ids, problems, pins: pinsOf(plugins, markets, servers) };

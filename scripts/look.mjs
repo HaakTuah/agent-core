@@ -21,7 +21,10 @@
 //     baseline no smaller than at the last audit; in the core alone, the staged cases due (staged.mjs); and of the
 //     choices that are hard to undo (choices.mjs), the pass over them twice a year, and a sign written in a measure the
 //     shape check keeps, while it holds.
-//   - Once a month, the state report (state-report.mjs, beside this file), opened once and not touched again.
+//   - Once a month, the state report (state-report.mjs, beside this file), opened once and not touched again; and, in a
+//     project, the packages it holds that have gone stale (held.mjs, beside this file, run as a process of its own, since
+//     it asks the registries over the network): no release within the year, gone from their registry, or their
+//     repository archived, each a task.
 // Its record is the body of one closed issue, "The scheduled look's record", which it writes on each run. A run by a
 // session (not GitHub's job) where the record shows a run less than SOON hours before does nothing more, so an
 // orchestrator's hourly wake makes one look a day. Where this repository's issues cannot be read and written
@@ -39,6 +42,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { look as choicesDue, signs } from "./choices.mjs";
 import { report as citedReport } from "./cited.mjs";
 import { report as outcomesReport } from "./outcomes-read.mjs";
@@ -51,6 +55,7 @@ import { pathIn } from "./reading.mjs";
 import { ownerOf } from "./releases.mjs";
 import { HOURS, openPulls, stalled } from "./stalled.mjs";
 import { started } from "./started.mjs";
+import { timeOf } from "./moment.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
 import { before as monthBefore, copies, monthOf, pushWait, readCounts, shape, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
 import { notDone, report as stepsReport } from "./steps.mjs";
@@ -65,6 +70,7 @@ export const TITLES = {
   steps: "Steps of a release not done",
   labels: "Labels and openers to mend",
   missed: "The scheduled look missed a run",
+  stale: "Packages gone stale",
 };
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
 // issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over
@@ -123,7 +129,7 @@ function relabel({ repo, issue, finding, dry }) {
 }
 
 // The time of the last run its record holds, or null.
-export const lastRun = body => /^Last run: (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)/m.exec(String(body ?? ""))?.[1] ?? null;
+export const lastRun = body => { const at = /^Last run: (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ)/m.exec(String(body ?? ""))?.[1]; return timeOf(at) === null ? null : at; };
 
 // Hours from one time to another, as a number with one decimal.
 const hoursBetween = (from, to) => Math.round((Date.parse(to) - Date.parse(from)) / 360000) / 10;
@@ -132,6 +138,8 @@ const hoursBetween = (from, to) => Math.round((Date.parse(to) - Date.parse(from)
 // security-review and code-review among them) as GitHub gives them: green where every one ended well, red where one
 // failed, waiting while one runs or a status is pending, none where there are none.
 export function checksOf(runs, status = null) {
+  // (a status whose count is no whole number, text "1" among them, is not read, and so never counted green)
+  if (status !== null && !(Number.isSafeInteger(status?.total_count) && status.total_count >= 0)) return "not read (the commit's status is not in GitHub's form)";
   const states = status && status.total_count > 0 ? [status.state] : [];
   if (!runs.length && !states.length) return "none";
   if (runs.some(r => ["failure", "cancelled", "timed_out", "action_required", "startup_failure", "stale"].includes(r.conclusion)) || states.some(s => s === "failure" || s === "error")) return "red";
@@ -242,6 +250,14 @@ function idleFinding(repo, add) {
   } catch {
     add(TITLES.idle, null, `the open pull requests could not be read: the token here may not read them. A project's daily job reads them where it calls the core's \`look.yml\` with \`pull-requests: read\`, \`checks: read\` and \`statuses: read\`, as \`core/setup/template/workflows/look.yml.tmpl\` has it`);
   }
+}
+
+// The packages the project holds that have gone stale (held.mjs's --issue): its body, null where none has, or unread
+// where they could not be looked up.
+export function staleFinding(run = () => spawnSync(process.execPath, [fileURLToPath(new URL("./held.mjs", import.meta.url)), "--issue"], { encoding: "utf8", timeout: 180000, maxBuffer: 1 << 24 })) {
+  const r = run();
+  if (r.status === 0) return { title: TITLES.stale, what: r.stdout.trim() || null, unread: null };
+  return { title: TITLES.stale, what: null, unread: "the packages the project holds could not be looked up in their registries this time" };
 }
 
 // What the look finds, kind by kind, each { title, what, unread }; and `stepsLeft`, the count of a release's steps not
@@ -392,6 +408,8 @@ function main(args) {
   const { findings, stepsLeft } = findingsOf(ctx, reach, last);
   // the state report, once a month
   const report = monthlyOf(ctx, reach, kept, stepsLeft);
+  // (what the project holds, looked up again once a month, with the state report: #488, point 8)
+  if (report.monthly !== null && ctx.manifest !== null) findings.push(staleFinding());
 
   // what is done with each
   if (!reach.yes) { toFolder(ctx, reach, findings, report); return 0; }

@@ -45,7 +45,7 @@ jobs:
   # plain git on whole scratch projects, with the hostile tests of the core's inputs (projects); the sync and its proof
   # (sync); the starter kit (kit); the steps' test (steps); the check of the core's copy (core.yml) on scratch projects (core), on
   # Windows in two halves of its test, the faults it names and where the copy stands (faults, places); the
-  # personal-terms check's own job (terms); the licence, NuGet, lookup and agent-tools checks, with the hostile tests of build
+  # personal-terms check's own job (terms); the licence, NuGet, lookup (and its lookup again) and agent-tools checks, with the hostile tests of build
   # files and packages (licences); and the rest (rest). Each step's condition names its part in the job's list "parts",
   # read by substring: no name holds another, but that core is named beside its half. On Windows, where a suite that
   # starts many processes runs several times slower, a job takes kit with steps, the second half with terms, and each
@@ -126,6 +126,9 @@ jobs:
       - name: The lookup of a new package, on recorded answers
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/lookup-test.mjs ')) }}
         run: node scripts/lookup-test.mjs
+      - name: The lookup again of what a project holds, on recorded answers
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/held-test.mjs ')) }}
+        run: node scripts/held-test.mjs
       - name: The agent-tools check
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' scripts/agent-tools-test.mjs ')) }}
         run: node scripts/agent-tools-test.mjs

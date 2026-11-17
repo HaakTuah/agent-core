@@ -5,7 +5,7 @@
 //
 //   node scripts/licences-test.mjs
 import { readable } from "./licence-yes.mjs";
-import { actionLists, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, scriptsOff } from "./licences.mjs";
+import { actionLists, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "./licences.mjs";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -97,6 +97,40 @@ ok(!ships.has("MS-PL") && policy().allowedFor("x", false).has("MS-PL") && movedO
     ok(kept.failures.length === 0 && kept.reports.length === 1 && swapped.reports.length === 0 && swapped.failures.some((f) => f.includes("compat@1.0.0")), "an alias the base shipped is reported; one moved to another package of the same version fails, known by what it is", JSON.stringify([kept, swapped]));
     const none = check(config, dir, null);
     ok(none.reports.length === 1 && none.reports[0].includes("no base to read") && none.failures.length === 0, "with no base to read (a checkout of one commit), it is reported and passes, as it passed before: no sync fails a project over it", JSON.stringify(none));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+// the week's wait in the package manager's own settings (#488, point 3): min-release-age in each .npmrc that keeps
+// install scripts off, failing only where a pull request takes it out or adds such a file without it
+ok(WAIT === 7 && releaseAge("ignore-scripts=true\nmin-release-age=7\n") === 7 && releaseAge("min-release-age=3\nmin-release-age = 10\n") === 10 && releaseAge("# min-release-age=7\n") === null && releaseAge("min-release-age=seven\n") === null,
+  "reads the wait an .npmrc sets, its last line counting, and none from a comment or a word");
+ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 && JSON.stringify(registryOverrides("min-release-age-exclude[]=@x/*\nbefore=2026-01-01\n")) === JSON.stringify(["min-release-age-exclude[]=@x/*", "before=2026-01-01"]),
+  "takes the wait among the harmless settings, and never what undoes it");
+{
+  const dir = mkdtempSync(join(tmpdir(), "licences-test-wait-"));
+  const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+  const git = (...args) => execFileSync("git", args, { cwd: dir, env: gitEnv, stdio: ["ignore", "pipe", "pipe"] });
+  const commit = (files) => { for (const [f, text] of Object.entries(files)) writeFileSync(join(dir, f), text); git("add", "-A"); git("commit", "-q", "-m", "c"); };
+  const config = { ships: [], lockfiles: [], ignoreScriptsIn: [".npmrc"] };
+  const waits = (r) => [...r.failures, ...r.reports].filter((m) => m.includes("min-release-age"));
+  try {
+    git("init", "-q");
+    commit({ ".npmrc": "ignore-scripts=true\n" });
+    commit({ "README.md": "a change of its own\n" });
+    let r = check(config, dir, "HEAD^1", config);
+    ok(r.failures.length === 0 && waits(r).length === 1 && r.reports.some((m) => m.includes(".npmrc does not set min-release-age=7") && m.includes("at the pull request's base")), "an .npmrc that stood without the wait is reported and passes", JSON.stringify(r));
+    r = check(config, dir, null, config);
+    ok(r.failures.length === 0 && r.reports.some((m) => m.includes("min-release-age") && m.includes("no base to read")), "with no base to read, it is reported and passes", JSON.stringify(r));
+    commit({ ".npmrc": "ignore-scripts=true\nmin-release-age=7\n" });
+    r = check(config, dir, "HEAD^1", config);
+    ok(r.failures.length === 0 && waits(r).length === 0, "an .npmrc with the wait passes, and says nothing", JSON.stringify(r));
+    commit({ ".npmrc": "ignore-scripts=true\nmin-release-age=3\n" });
+    r = check(config, dir, "HEAD^1", config);
+    ok(r.failures.length === 1 && r.failures[0].includes("Mend: add the line min-release-age=7 to .npmrc"), "a pull request that shortens the wait fails, saying the mend", JSON.stringify(r));
+    git("rm", "-q", ".npmrc"); git("commit", "-q", "-m", "none");
+    writeFileSync(join(dir, ".npmrc"), "ignore-scripts=true\n");
+    r = check(config, dir, "HEAD", config);
+    ok(r.failures.some((m) => m.includes("min-release-age")), "an .npmrc the base did not hold, added without the wait, fails", JSON.stringify(r));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 

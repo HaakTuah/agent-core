@@ -145,7 +145,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      that ships with its notice; beside it `exact-versions.mjs`, which reads the same config's lockfiles and fails a
      dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7; `lookup.mjs`,
      which asks npm's registry of each package new to the lockfiles, as floor topic 15's "A new one is looked up in
-     its registry" says; and
+     its registry" says, and fails a lock entry a pull request brings from anywhere but npm's registry or with no
+     integrity value: floor rule 7; the licence check also holds each `.npmrc` of "ignoreScriptsIn" to the week's wait
+     (`min-release-age=7`), and a program a file downloads by address to a version and a checksum, failing only what
+     a pull request adds and reporting what its base held: floor rule 7; and
      `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents that
      the config's "agentTools" does not list, with its publisher and version, a plug-in or tool server at the version its
      configuration pins where it pins one: floor topic 15). A package or
@@ -212,7 +215,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      statuses, and write issues), calling the core's `look.yml`: it keeps one issue open for the owner while the core has
      moved past the project's pin (point 1; `core/scripts/core-moved.mjs`), then runs the scheduled look
      (`core/scripts/look.mjs`, `roles/orchestrator.md`), and opens no pull request, since one a workflow opens gets
-     no checks. A project whose daily job still calls the core's `core-moved.yml` runs both there too, the look
+     no checks. Once a month, with the state report, the look asks the registries again of every package the project
+     holds (`core/scripts/held.mjs`) and keeps the issue "Packages gone stale". A project whose daily job still calls the core's `core-moved.yml` runs both there too, the look
      reading no pull request, check or status with that job's token, until it moves to the template's. A builder
      session started with no orchestrator asks the same at its start
      (`core/scripts/core-moved.mjs`, with `--dry`) and syncs first where the core has moved ("Sessions" in
