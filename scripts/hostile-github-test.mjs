@@ -67,7 +67,9 @@ for (const v of [null, {}, [], "1", true]) {
   ok(held({ total_count: v, workflow_runs: [run("tests")] }).join() === UNREAD && held({ total_count: 1, workflow_runs: v }).length === 1,
     `a count or a list of runs that is ${what} holds the release`);
   ok(held(runs([run("tests", v, "success")])).length === 1 && held(runs([run("tests", "completed", v)])).length === 1, `a run whose status or conclusion is ${what} holds the release`);
-  if (typeof v !== "string") ok(stalled([{ number: 1, ref: "a", own: true, at: v }], Date.parse(at(10)), 3).length === 0, `a lane whose last push is ${what} is not stalled`);
+  ok(stalled([{ number: 1, ref: "a", own: true, at: v }], Date.parse(at(10)), 3).length === 0, `a lane whose last push is ${what} is not stalled`);
+  ok(waited([{ started_at: v, completed_at: at(2), conclusion: "success" }, { started_at: at(1), completed_at: v, conclusion: "success" }]) === null, `checks whose start or end is ${what} wait no time that can be read`);
+  ok(!/^(?:green|red|waiting|none)$/u.test(checksOf([run("x")], { total_count: v, state: "failure" })), `a status whose count is ${what} is not read, so no check is called green or none by it`);
   ok(readings([[1, v, "Session so far: 1 answers"]], repo, 1).length === 0 && reading(v) === null, `a description from a branch that is ${what}, or that is ${what} itself, is not read`);
   ok(proved(v, v, scratch).length === 0 && proved({ head: { sha: v } }, [], scratch).length === 0, `a pull request or its commits as ${what} prove no merge`);
 }
@@ -108,7 +110,15 @@ ok(waited([{ started_at: at(5), completed_at: at(1), conclusion: "success" }]) =
 ok(stalled(["+099999-01-01T00:00:00Z", "99999-01-01T00:00:00Z", "not a date"].map((d, k) => ({ number: k, ref: "a", own: true, at: d })), Date.parse(at(10)), 3).length === 0,
   "a last push in year 99999 or at no readable time stalls no lane");
 ok(["99999999999999999", "-5"].every(n => reading(`Session so far: ${n} answers, tokens in 1, cache written 1, cache read 1, out 1.`) === null), "a count past safe or negative in a cost line is not read");
-ok(readings([[NaN, repo, "x"], [-1, repo, "x"], [0, repo, "x"]], repo, 1).length === 0, "a pull request numbered NaN, negative or below the oldest merge is not read");
+ok(readings([[NaN, repo, "x"], [-1, repo, "x"], [0, repo, "x"], ["12", repo, "x"], [Number.MAX_SAFE_INTEGER + 2, repo, "x"], [1.5, repo, "x"]], repo, 1).length === 0, "a pull request numbered NaN, negative, below the oldest merge, as text, past safe or a fraction is not read");
+for (const d of ["2026-13-45T99:99:99Z", "2027-02-30T00:00:00Z", "1", "5"]) {
+  ok(waited([{ started_at: d, completed_at: at(2), conclusion: "success" }]) === null && stalled([{ number: 1, ref: "a", own: true, at: d }], Date.parse(at(10)), 3).length === 0,
+    `a check's start or a lane's last push of ${d}, no time that can be, waits no time and stalls no lane`);
+}
+ok(stalled([{ number: 1, ref: "a", own: true, at: 5 }], Date.parse(at(10)), 3).length === 0, "a last push given as the number 5, never a date in 1970, stalls no lane");
+ok(!/NaN/u.test(line({ median: median([waited([{ started_at: "2026-13-45T99:99:99Z", completed_at: at(2), conclusion: "success" }])].filter(t => t !== null)), read: 0 })), "a check run at an impossible time prints no \"NaN min\"");
+ok(!/^(?:green|none)$/u.test(checksOf([run("x")], { total_count: "1", state: "failure" })) && !/^(?:green|none)$/u.test(checksOf([], { total_count: Number.MAX_SAFE_INTEGER + 2, state: "failure" })),
+  "a status counted as text or past safe is not read, never green");
 
 // ---- the releases, in a scratch core ----
 {

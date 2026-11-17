@@ -344,7 +344,12 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const codexListed = listing({ kind: "server", name: "Codex search", publisher: "Example Tools", version: "1.2.3" }, { kind: "hook", name: "Codex notify: notify-send done", publisher: "this project" }, { kind: "hook", name: "Codex PreToolUse ^Bash$: echo checked", publisher: "this project" });
   passes(run(project({ ...kits, ".codex/config.toml": toml, ...codexListed })), "Codex's config.toml is read: its tool servers, its notify and its hooks, each listed");
   fails(run(project({ ".codex/config.toml": toml, ...listing() })), "each of them unlisted fails", 'the tool server "Codex search"', 'the hook "Codex notify: notify-send done"', 'the hook "Codex PreToolUse ^Bash$: echo checked"');
-  passes(run(project({ ".kiro/settings/mcp.json": { mcpServers: ["docs"] }, ".codex/config.toml": "mcp_servers = \"docs\"\n", ...listing() })), "tool servers given as a list or a text, not a table, configure nothing");
+  // (the shapes main's readers refuse in Claude Code's files are refused in Kiro's and Codex's too, each with its mend)
+  fails(run(project({ ".kiro/settings/mcp.json": { mcpServers: ["docs"] }, ...listing() })), "Kiro's tool servers given as a list are refused", '.kiro/settings/mcp.json: "mcpServers" is not a JSON object');
+  fails(run(project({ ".codex/config.toml": "mcp_servers = \"docs\"\n", ...listing() })), "Codex's tool servers given as a text are refused", '.codex/config.toml: "mcp_servers" is not a TOML table');
+  fails(run(project({ ".codex/config.toml": "hooks = 1\n", ...listing() })), "and so are Codex's hooks given as a number in config.toml", '.codex/config.toml: "hooks" is not a TOML table');
+  fails(run(project({ ".codex/hooks.json": { hooks: ["Stop"] }, ...listing() })), "and Codex's hooks given as a list in hooks.json", '.codex/hooks.json: "hooks" is not a JSON object');
+  fails(run(project({ ".kiro/hooks/x.json": { version: "v1", hooks: { name: "x" } }, ...listing() })), "and a Kiro hook file whose hooks are no list", '.kiro/hooks/x.json: "hooks" is not a JSON list');
   fails(run(project({ ".kiro/hooks/ask.json": { version: "v1", hooks: [{ name: "ask", trigger: "Stop", matcher: 5, action: { type: "agent", prompt: "review it" } }] }, ...listing() })),
     "a Kiro hook that asks the agent is named by the whole hook, and a matcher that is no text is no matcher", 'the hook "Kiro Stop: {\\"name\\":\\"ask\\",\\"trigger\\":\\"Stop\\",\\"matcher\\":5,\\"action\\":{\\"type\\":\\"agent\\"');
   fails(run(project({ ".kiro/hooks/odd.json": { version: "v1", hooks: [{ name: "odd", trigger: "Stop", action: { type: "command", command: ["echo"] } }] }, ...listing() })),

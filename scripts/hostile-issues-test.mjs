@@ -70,6 +70,12 @@ ok(lacking([{ issue: "1", title: "t", owner: "true" }, { issue: "2", title: "t",
 ok(answer({ has_issues: "true", permissions: { push: true } }).yes === false && answer({ has_issues: true, permissions: "push" }).yes === false && answer({ has_issues: true, permissions: null }).yes === false,
   "issues switched on as the text \"true\", or rights as a word or null, read as no");
 ok(toMake([{ name: "queued", color: 0x0e8a16, description: LIST.state.queued.description }]).some(l => l.name === "queued" && l.how === "set"), "a colour given as a number is not taken as the list's: the label is set");
+for (const [what, have] of [["null", null], ["an object", { queued: {} }], ["a text", "queued"], ["a list holding null, a number and a nameless label", [null, 5, { color: "0e8a16" }]]])
+  ok(toMake(have).length === all.length && toMake(have).every(l => l.how === "make"), `the repository's labels given as ${what} are read as none held: every label is to make`);
+for (const [what, labels] of [["null", null], ["a text", "queued"], ["an object", { name: "queued" }], ["a list holding null", [null, ...L("queued")]]]) {
+  const on = l => { try { return JSON.stringify(check({ issues: [{ number: 4, user: me, labels: l, body: "x", created_at: late }], owner, have: all })); } catch (e) { return `threw ${e.name}`; } };
+  ok(on(labels) === on(Array.isArray(labels) ? L("queued") : []), `an issue's labels given as ${what} throw nothing: what is no label counts as none`);
+}
 
 // ---- markup ----
 ok(verdict(`> ${sure}`) === null && verdict(`\`\`\`\n${sure}\n\`\`\``) === null && verdict(`<!--\n${sure}\n-->`) === null, "a verdict quoted, in a code fence, or on a line of an HTML comment is none");
@@ -125,11 +131,15 @@ ok(broughtBy("Brought in by: #../../etc/passwd") === null && mine([{ number: 1, 
 }
 
 // ---- a number or date out of range ----
-for (const d of ["99999-01-01T00:00:00Z", "+099999-01-01T00:00:00Z", "-000001-01-01T00:00:00Z", "not a date", String(Number.MAX_SAFE_INTEGER + 2)])
-  ok(cameOn(d) === SINCE, `a day of ${d} moves the rule's day nowhere`);
+for (const d of ["99999-01-01T00:00:00Z", "+099999-01-01T00:00:00Z", "-000001-01-01T00:00:00Z", "not a date", String(Number.MAX_SAFE_INTEGER + 2), "2026-13-45T99:99:99Z", "2027-02-30T00:00:00Z", "2027-01-01T24:00:00Z"]) {
+  let got;
+  try { got = cameOn(d); } catch (e) { got = `threw ${e.name}`; }
+  ok(got === SINCE, `a day of ${d} moves the rule's day nowhere, and throws nothing`);
+}
 ok(lastRun("Last run: 99999-01-01T00:00:00Z") === null && lastRun("Last run: -1") === null, "a last run in year 99999, or negative, is none");
-ok(["Brought in by: #-5", "Brought in by: #9999999999", `Brought in by: #${Number.MAX_SAFE_INTEGER + 2}`, "Brought in by: #NaN"].every(b => broughtBy(b) === null),
-  "a pull request's number negative, past nine digits or not a number is none");
+ok(["2026-13-45T99:99:99Z", "2027-02-30T00:00:00Z", "2027-01-01T24:00:00Z"].every(d => lastRun(`Last run: ${d}`) === null), "a last run on a day or at a time that cannot be (month 13, 30 February, hour 24) is none, so a missed run is never hidden by NaN");
+ok(["Brought in by: #0", "Brought in by: #00", "Brought in by: #-5", "Brought in by: #9999999999", `Brought in by: #${Number.MAX_SAFE_INTEGER + 2}`, "Brought in by: #NaN"].every(b => broughtBy(b) === null),
+  "a pull request's number nought, negative, past nine digits or not a number is none");
 ok(blockingOf("Blocking findings: -1.") === null && blockingOf("Blocking findings: 9999999.") === null && blockingOf("Blocking findings: NaN.") === null,
   "a count of blocking findings negative, past six digits or not a number is not read");
 {

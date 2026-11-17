@@ -99,22 +99,33 @@ export function configured(read, skills, files = () => [], linked = () => false)
     flag(problem, file, text);
     return null;
   };
+  // (a list, or any other value that is no object, is refused as the wrong shape, never read by its indexes; here and in
+  // Kiro's and Codex's files, as `state.entries`)
+  const entries = (file, key, v, form) => {
+    if (v === undefined || v === null) return {};
+    if (typeof v === "object" && !Array.isArray(v)) return v;
+    flag(`${file}: "${key}" is not ${file.endsWith(".toml") ? "a TOML table" : "a JSON object"}. Mend: write it as one, of ${form}, as the tool that reads it takes it`, file);
+    return {};
+  };
+  state.entries = entries;
   const markets = new Map(), plugins = [];
   for (const file of [".claude/settings.json", ".claude/settings.local.json"]) {
     const settings = json(file);
     declaredMarkets(settings, file, markets);
     readHooks(state, file, settings);
-    for (const [name, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on) { tools.set(`plugin ${name}`, file); plugins.push(name); }
+    for (const [name, on] of Object.entries(entries(file, "enabledPlugins", settings?.enabledPlugins, "each plug-in's \"name@marketplace\" to true"))) if (on) { tools.set(`plugin ${name}`, file); plugins.push(name); }
   }
   // (a plug-in is what its name and its marketplace's declared source make it, so one fetched from elsewhere is another;
   // of a marketplace of the "settings" kind, its own fields and this plug-in's entries alone, as pluginPin() reads it)
   for (const name of plugins) add(`plugin ${name}`, canonical(["plugin", name, marketOf(name, markets)]));
-  addServers(state, ".mcp.json", json(".mcp.json")?.mcpServers, "");
+  addServers(state, ".mcp.json", entries(".mcp.json", "mcpServers", json(".mcp.json")?.mcpServers, SERVERS), "");
   for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
   readKiro(state, json, files);
   readCodex(state, json, read);
   return { tools, ids, problems, texts, sources, pins: pinsOf(plugins, markets, servers) };
 }
+
+const SERVERS = "each tool server's name to its settings";
 
 // The tool servers of one file's "mcpServers" (or Codex's "mcp_servers"), into configured()'s `state`, each named
 // with its tool before it where it is not Claude Code's, as "Kiro docs"; one name configured in two files is refused,
@@ -138,6 +149,8 @@ function addServers(state, file, servers, tool) {
 function readKiro(state, json, files) {
   for (const name of files(".kiro/hooks").filter(n => n.endsWith(".json")).sort()) {
     const file = `.kiro/hooks/${name}`, hooks = json(file)?.hooks;
+    // (and a "hooks" that is no list is refused as the wrong shape, as the readers of Claude Code's files refuse theirs)
+    if (hooks !== undefined && hooks !== null && !Array.isArray(hooks)) state.flag(`${file}: "hooks" is not a JSON list. Mend: write it as one, of each hook's settings, as Kiro reads it`, file);
     for (const hook of Array.isArray(hooks) ? hooks : []) {
       const action = hook?.action, runs = action?.type === "command" && typeof action.command === "string";
       const confirm = hook?.confirm, options = Array.isArray(confirm?.options) ? confirm.options : [];
@@ -146,7 +159,7 @@ function readKiro(state, json, files) {
       addHook(state, file, { tool: "Kiro", event: String(hook?.trigger), matcher, hook, runs, text: runs ? action.command : JSON.stringify(hook), commands });
     }
   }
-  addServers(state, ".kiro/settings/mcp.json", json(".kiro/settings/mcp.json")?.mcpServers, "Kiro ");
+  addServers(state, ".kiro/settings/mcp.json", state.entries(".kiro/settings/mcp.json", "mcpServers", json(".kiro/settings/mcp.json")?.mcpServers, SERVERS), "Kiro ");
 }
 
 // What Codex configures in the project (tools/codex.md; its pages on hooks and on its config, read on 16 November
@@ -154,7 +167,9 @@ function readKiro(state, json, files) {
 // Code's are, each named "Codex <event> <matcher>: <command>"; config.toml's "notify", the program Codex starts at
 // each turn's end, as the hook "Codex notify: <its words>"; and config.toml's "mcp_servers", as "Codex <name>".
 function readCodex(state, json, read) {
-  readHooks(state, ".codex/hooks.json", json(".codex/hooks.json"), "Codex");
+  const hooksFile = json(".codex/hooks.json");
+  state.entries(".codex/hooks.json", "hooks", hooksFile?.hooks, "each event to its hooks");
+  readHooks(state, ".codex/hooks.json", hooksFile, "Codex");
   const text = read(".codex/config.toml");
   if (text === null) return;
   let config;
@@ -163,6 +178,7 @@ function readCodex(state, json, read) {
     state.flag(problem, ".codex/config.toml", text);
     return;
   }
+  state.entries(".codex/config.toml", "hooks", config.hooks, "each event to its hooks");
   readHooks(state, ".codex/config.toml", config, "Codex");
   const notify = config.notify;
   if (Array.isArray(notify) && notify.length && notify.every(w => typeof w === "string")) {
@@ -172,7 +188,7 @@ function readCodex(state, json, read) {
     const command = notify.map(w => (/^[\w./:@%+,=-]+$/u.test(w) ? w : `'${w.replace(/'/gu, "'\\''")}'`)).join(" ");
     addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [command] });
   }
-  addServers(state, ".codex/config.toml", config.mcp_servers, "Codex ");
+  addServers(state, ".codex/config.toml", state.entries(".codex/config.toml", "mcp_servers", config.mcp_servers, SERVERS), "Codex ");
 }
 
 // What a plug-in's marketplace declares of it, for its id: the source, or of a "settings" source its own fields and the

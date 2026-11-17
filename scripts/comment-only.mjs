@@ -26,6 +26,7 @@
 // "Security review:" comment says of, file by file, why each runs neither by itself nor with credentials
 // (tasks/reviews.md, point 3). It prints the head it checked, for that comment and the merge. Git and Node's own
 // modules only; it changes nothing.
+import "./whole-output.mjs";
 import { execFileSync } from "node:child_process";
 import { started } from "./started.mjs";
 
@@ -244,8 +245,8 @@ if (started(import.meta.url)) {
   }
   let base = git(["merge-base", main, head]).trim();
   if (process.argv[2]) {
-    base = git(["rev-parse", "--verify", "--end-of-options", `${process.argv[2]}^{commit}`]).trim();
-    let grew = base !== head;
+    try { base = git(["rev-parse", "--verify", "--quiet", "--end-of-options", `${process.argv[2]}^{commit}`]).trim(); } catch { base = ""; }
+    let grew = Boolean(base) && base !== head;
     try { git(["merge-base", "--is-ancestor", base, head]); } catch { grew = false; }
     if (!grew) {
       console.log(`${clean(process.argv[2])} is no commit before the head that it grew from: a later commit is read only against one before it`);
