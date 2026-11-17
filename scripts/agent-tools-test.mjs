@@ -561,6 +561,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ok(JSON.stringify(fromTree(command, has, index)) === JSON.stringify(want), `with the project's files, the command ${JSON.stringify(command)} takes ${want.length ? want.join(", ") : "nothing"} from the working tree`, JSON.stringify(fromTree(command, has, index)));
     ok(JSON.stringify(fromTree("bash -c 'f=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" --no-replace-objects show refs/remotes/origin/main:scripts/x.py 2>/dev/null) || exit 0; bash -c \"$f\" a.sh'", has, index)) === JSON.stringify(["a.sh"]),
       "in the kit's form, a word after its script that names a file of the working tree is that file's");
+    // (#476's code review of fd9135b: a literal "$" in a name reached through a link inside the checkout, which no list of the project's files holds)
+    for (const command of ["bash 'tools/$notify/a b.sh'", "bash tools/\\$notify/a\\ b.sh", "sh -c 'bash \"tools/\\$notify/a b.sh\"'"])
+      ok(JSON.stringify(fromTree(command, f => f === "tools/$notify/a b.sh", index)) === JSON.stringify(["tools/$notify/a b.sh"]), `the command ${JSON.stringify(command)} takes the file a link inside the checkout leads to`);
     for (const shadow of ["git.bat", "git.exe", "test.cmd"]) {
       const own = [...files, shadow], ownHas = f => own.includes(f);
       ok(JSON.stringify(fromTree(shadow.startsWith("git") ? "git show origin/main:scripts/x.py | bash" : "test -f scripts/x.py", ownHas, pathsIndex(own))) === JSON.stringify(["scripts/x.py"]),
@@ -579,11 +582,14 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const want = '{"__proto__":"p","a":{"b":1},"s":"é\\n","m":"x y","l":"z","t":{"d":"1979-05-27T07:32:00Z","i":{"k":[1,"two",[true]]}},"r":[{"n":1},{"n":2}]}';
   ok(JSON.stringify(t) === want && Object.getPrototypeOf(t) === Object.prototype, "TOML is read as JSON would hold it, a key \"__proto__\" a key like any other", JSON.stringify(t));
   const headers = Array.from({ length: 200 }, (_, i) => `[[${Array(i + 1).fill("a").join(".")}]]`).join("\n");
-  for (const [bad, says] of [[`${headers}\n${Array(199).fill("b").join(".")} = 1\n`, "nests deeper than 200"], ["a = 1\na = 2", "given twice"], ["a = \"x", "not closed"], ["[a]\n[a]", "given twice"], ["a = [1", "commas"], ["a = 1 b", "more follows"], ["a = \"\\q\"", "no escape"], [`a = ${"[".repeat(300)}`, "nests deeper than 200"]]) {
+  for (const [bad, says] of [[`${headers}\n${Array(199).fill("b").join(".")} = 1\n`, "nests deeper than 200"], ["a = 1\na = 2", "given twice"], ["a = \"x", "not closed"], ["[a]\n[a]", "given twice"], ["a = [1", "commas"], ["a = 1 b", "more follows"], ["x = [{ a = 1 }]\n[[x]]", "a value and as an array of tables"], ["a = \"\\q\"", "no escape"], [`a = ${"[".repeat(300)}`, "nests deeper than 200"]]) {
     let message = "";
     try { parseToml(bad); } catch (e) { message = e.message; }
     ok(message.includes(says), `TOML that is no TOML is refused: ${says}`, message);
   }
+  // (#476's code review of fd9135b: each [[...]] header appends without reading the entries before it again)
+  const began = Date.now(), many = parseToml("[[x]]\n".repeat(200000));
+  ok(many.x.length === 200000 && Date.now() - began < 3000, "an array of 200,000 tables is read at once", `${Date.now() - began} ms`);
 }
 
 // ---- no key of a project's file reaches an object's prototype (#476's fallback security review) ----

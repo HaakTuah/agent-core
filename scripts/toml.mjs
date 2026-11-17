@@ -32,10 +32,11 @@ export function parseToml(text) {
     }
   };
   const ctx = { s, at: () => i, move: n => { i = n; }, fail, blank };
-  const root = {}, defined = new Set([root]);
+  // (the tables a header gave, and the arrays [[...]] headers made: only those take another [[...]], as TOML has it)
+  const root = {}, defined = new Set([root]), arrays = new Set();
   let current = root;
   for (blank(true); i < s.length; blank(true)) {
-    if (s[i] === "[") current = header(ctx, root, defined);
+    if (s[i] === "[") current = header(ctx, root, defined, arrays);
     else assign(ctx, current, 0);
     blank();
     if (i < s.length && s[i] !== "\n") fail("more follows a key's value or a table's name on its line");
@@ -68,7 +69,7 @@ function readKey(ctx) {
 }
 
 // `[a.b]` or `[[a.b]]`: the table the lines below it fill.
-function header(ctx, root, defined) {
+function header(ctx, root, defined, arrays) {
   const many = ctx.s.startsWith("[[", ctx.at());
   ctx.move(ctx.at() + (many ? 2 : 1));
   const parts = readKey(ctx), close = many ? "]]" : "]";
@@ -79,9 +80,9 @@ function header(ctx, root, defined) {
   for (const part of parts.slice(0, -1)) table = into(ctx, table, part);
   const last = parts[parts.length - 1], there = own(table, last);
   if (many) {
-    if (there !== undefined && !(Array.isArray(there) && there.every(isTable))) ctx.fail(`${JSON.stringify(last)} is given as a value and as an array of tables`);
+    if (there !== undefined && !arrays.has(there)) ctx.fail(`${JSON.stringify(last)} is given as a value and as an array of tables`);
     const made = {};
-    if (there === undefined) put(table, last, [made]); else there.push(made);
+    if (there === undefined) arrays.add(put(table, last, [made])[last]); else there.push(made);
     defined.add(made);
     return made;
   }

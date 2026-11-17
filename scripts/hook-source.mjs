@@ -220,6 +220,19 @@ function scanAll(written, raw, text, index, holds, found, tests, fetches) {
   for (const variant of [written, ...dequotings(written)]) scan(variant, index, holds, found, tests, fetches, dollar);
 }
 
+// (a word or quoted text that holds a "$" or a "%" its quoting keeps, as 'tools/$notify/a b.sh', read from the command as
+// written, its variables not marked, at each level of its quoting, so a name through a link inside the checkout is
+// found too, as the list of the project's files alone would not find it)
+// (each word read whole, a backslash keeping the next character; its two parts take no character in common, so nothing
+// backtracks)
+const LITERAL = /(?:[^\s'"`;|&()<>{}\\=,]|\\[^\n])+/gu;
+function literals(written, take) {
+  // (each word once: no exemption holds where a "$" or "%" stands, so where it stands changes nothing)
+  const seen = new Set(), once = (word, before, quoted) => { if (/[$%]/u.test(word) && !seen.has(word)) { seen.add(word); take(word, before, quoted); } };
+  for (const [body, before] of quotedTexts(written)) once(body.replace(/\\(?=[\w.%-])/gu, "/"), before, true);
+  for (const level of [written, ...dequotings(written)]) for (const m of level.matchAll(LITERAL)) once(m[0].replace(/\\(.)/gsu, "$1"), windowAt(level, m.index), false);
+}
+
 // Of a command in one of the kit's forms, the words after its script that name a file of the working tree; else null.
 function kitWords(command, holds) {
   const kit = KIT_FORMS.map(f => f.exec(command)).find(Boolean);
@@ -254,6 +267,7 @@ export function fromTree(command, holds, index = null, operand = false) {
   }
   for (const m of text.matchAll(ESCAPED)) if (m[0].includes("\\ ")) take(m[0].replace(/\\ /gu, " "), windowAt(text, m.index));
   for (const [body, before] of quotedTexts(raw)) take(body.replace(/\\(?=[\w.%-])/gu, "/"), before, true);
+  literals(String(command), take);
   if (index) scanAll(String(command), raw, text, index, holds, found, tests, fetches);
   for (const word of operands) for (const at of fromTree(word, holds, index, true)) found.add(at);
   return [...found];
