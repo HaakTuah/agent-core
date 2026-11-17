@@ -12,7 +12,12 @@
 # data; a tool that never ran them has not passed), it fails a repository without its own copy of the floor ("Floor
 # copy:"), and a copy that differs from the floor at the pin.
 # A project calls it (workflow_call) on every pull request and push to main, docs-only changes included,
-# pinned to a full commit SHA. Reads only, with no secret: it fetches this public repository at the pin it reads, which
+# pinned to a full commit SHA. Given its inputs, the same job then runs the core's other checks that need no secret, as
+# steps of its own (#376): copies.yml's (copies, sizes), pr-description.yml's (description, parts) and the package check,
+# signatures.yml's (npm) or nuget.yml's (nuget, advisory), each through the copy's scripts/checks.mjs, which holds their
+# steps and says what each holds; each such step runs even where one before it failed, so every failure is said, and
+# the package check goes last, in a step of its own, since it runs the pull request's build files. One job bills one
+# runner's minutes where four or five did (#377); with no such input it runs this check alone, as before. Reads only, with no secret: it fetches this public repository at the pin it reads, which
 # must be a full commit SHA before it is used, and runs nothing from either repository. Its own shell is tested in the
 # core before any project runs it: scripts/core-yml-test.mjs runs this job on scratch projects, and
 # scripts/pure-sync-test.mjs on every way a copy can differ.
@@ -20,6 +25,42 @@ name: core
 
 on:
   workflow_call:
+    inputs:
+      copies:
+        description: The copies check's config, a JSON file of the caller's (core/scripts/copies.mjs); given, the copies, pointer, reading-size, workflow, entry-file, manifest and shape checks run.
+        required: false
+        type: string
+        default: ""
+      sizes:
+        description: The reading-size check's marks, a JSON file of the caller's (core/scripts/reading-size.mjs), with copies.
+        required: false
+        type: string
+        default: ""
+      description:
+        description: Whether the description check runs, on a pull request that is no draft and not Dependabot's.
+        required: false
+        type: boolean
+        default: false
+      parts:
+        description: The headings a description must have, separated by |. Left out, the core's two.
+        required: false
+        type: string
+        default: ""
+      npm:
+        description: The folder that holds package-lock.json, from the root; given, the signature check runs on a pull request.
+        required: false
+        type: string
+        default: ""
+      nuget:
+        description: The licence check's config, with its "nuget"; given, the NuGet check runs on a pull request.
+        required: false
+        type: string
+        default: ""
+      advisory:
+        description: Whether the NuGet check only says what it would fail (true, while a fault of the check's own is mended).
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -27,7 +68,8 @@ permissions:
 jobs:
   core:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # (each part's own: this check 5 minutes, those of the copy's scripts 5, the package check 10)
+    timeout-minutes: ${{ (inputs.npm != '' || inputs.nuget != '') && 20 || (inputs.copies != '' || inputs.description) && 10 || 5 }}
     # (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is; a run on
     # main, a schedule or a start by hand is its own group and is never cancelled; #388)
     concurrency:
@@ -41,6 +83,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false # nothing after the checkout needs the token
+          fetch-depth: 2 # the merge commit and its parents: the base the description and package checks read the change against
       - name: The default branch is main
         env:
           DEFAULT: ${{ github.event.repository.default_branch }}
@@ -243,3 +286,47 @@ jobs:
             bad=1
           fi
           exit "$bad"
+      # The core's other checks that need no secret, where the caller's inputs name them (#376): each step runs the copy's
+      # scripts/checks.mjs, which holds their steps, and runs even where a step before it failed, so every failure is
+      # said. The package check runs last: it runs the pull request's build files, so no step runs after it.
+      - name: Where the core's copy stands, for the checks of its scripts (core-manifest.md's "Core:" line; the core's tasks/repositories.md)
+        id: core-at
+        if: ${{ !cancelled() && (inputs.copies != '' || inputs.description || inputs.npm != '' || inputs.nuget != '') }}
+        run: |
+          rm -rf .core-at-pin .lib-at-pin # (this check's own fetches, which no check after it reads as the project's)
+          at=$(sed -n -E 's#^Core: [^ ]+( at [0-9a-f]{40}, copied whole|, carried by (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)) under (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)( .*)?$#\4 \2#p' core-manifest.md 2>/dev/null | head -n 1)
+          set -- ${at:-core/}; [ -z "${2:-}" ] || [ -e "$1scripts" ] || git submodule update --init --depth 1 -- "${2%/}" || { echo "FAIL the library ${2%/}, a submodule that carries the core, could not be fetched here. Mend: commit the library's files in this repository, or make the submodule one this workflow can fetch with no token."; exit 1; }; echo "CORE_AT=$1" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' }}
+        with:
+          node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
+      - name: The copies, pointer, reading-size, workflow, entry-file, manifest and shape checks
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.copies != '' }}
+        timeout-minutes: 5
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+          COPIES: ${{ inputs.copies }}
+          SIZES: ${{ inputs.sizes }}
+        run: node "$CORE_AT"scripts/checks.mjs copies --copies "$COPIES" --sizes "$SIZES" --base "$BASE"
+      - name: The description has its parts
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.description && github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.pull_request.user.login != 'dependabot[bot]' }}
+        timeout-minutes: 5
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_CREATED: ${{ github.event.pull_request.created_at }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GH_TOKEN: ${{ github.token }} # (read only: the base's commits and copy, and the issues a pull request queues or closes)
+          PARTS: ${{ inputs.parts }}
+        run: node "$CORE_AT"scripts/checks.mjs description --parts "$PARTS"
+      - name: The package check, last
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' && (inputs.npm != '' || inputs.nuget != '') && github.event_name == 'pull_request' }}
+        timeout-minutes: 10
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CALLER: ${{ github.workflow_ref }} # the calling workflow, by its own path, whatever it is named
+          NPM: ${{ inputs.npm }}
+          NUGET: ${{ inputs.nuget }}
+          ADVISORY: ${{ inputs.advisory }}
+        run: |
+          if [ -n "$NUGET" ]; then set -- nuget --nuget "$NUGET"; [ "$ADVISORY" != true ] || set -- "$@" --advisory; else set -- signatures --npm "$NPM"; fi
+          node "$CORE_AT"scripts/checks.mjs "$@"

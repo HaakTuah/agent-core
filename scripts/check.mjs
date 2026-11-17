@@ -7,7 +7,8 @@
 // the project's .github/workflows, or, where it has none, as on another host, the starter kit's in the base's copy,
 // each with the inputs the kit gives them (a template the kit fills in with more than the core's address and pin is
 // left out, and said so). core.yml runs first, and where the copy of the core is not the core at its pin no other check
-// runs, since each runs the copy's scripts; with no call to core.yml, or none run, it fails. Each called workflow is
+// runs, since each runs the copy's scripts (the steps core.yml runs after its own, given its inputs, among them: a step that
+// fails in its job stops the rest here, as a run cancelled there; #376); with no call to core.yml, or none run, it fails. Each called workflow is
 // read from the core at the call's pin, fetched from the core's address by git, as GitHub reads it, never from the
 // copy under core/, which the change may have edited; and a pipeline runs this script itself from a clone of the core,
 // not from that copy (tasks/hosts.md). It runs in a scratch clone of the commit, removed at its end, so it changes
@@ -90,7 +91,7 @@ function main() {
   for (const j of jobs) {
     const r = run(j.file, j.id, j.job);
     failed += r.failed; ran += r.ran;
-    if (j.name === "core.yml" && r.failed) { warn(`FAIL the copy of the core is not the core at its pin, so no other check runs: each would run the copy's scripts. ${MEND}mend what core.yml says above, commit, and run this check again.`); break; }
+    if (j.name === "core.yml" && r.copy) { warn(`FAIL the copy of the core is not the core at its pin, so no other check runs: each would run the copy's scripts. ${MEND}mend what core.yml says above, commit, and run this check again.`); break; }
   }
   if (!failed && !ran) fail("no check of the core ran on this change.", "call the core's workflows in the base the change merges into, as the starter kit writes them.");
   say(failed ? `${failed} of the core's checks failed` : `ok   every check of the core that runs from plain git passed (${ran})`);
@@ -241,9 +242,10 @@ function runner(p, tmp) {
     // (a caller's `with:` reads no secret, as on GitHub; its `secrets:` reads the one list this script is given)
     const value = (v, secrets) => (typeof v === "string" && v.includes("${{") ? evaluate(v.replace(/^\s*\$\{\{|\}\}\s*$/g, ""), { github, inputs: {}, secrets, vars: {} }) : v);
     const inputs = Object.fromEntries(Object.entries(job.with ?? {}).map(([k, v]) => [k, value(v, {})]));
+    if (name === "core.yml" && inputs.description === true && !p.described) { inputs.description = false; say(`note ${file}/${id}: core.yml's description check is not run here: give --description <a file> that holds the pull request's description`); }
     const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, value(v, { PERSONAL_TERMS: terms })]));
     try {
-      return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp }), p.event);
+      return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp, stop: name === "core.yml" }), p.event);
     } catch (e) {
       warn(`FAIL ${file}/${id}: ${name} cannot be run from plain git here (${e.message}). ${MEND}run that check on the host meanwhile, and report it to the core (core/README.md, "Reporting to the core").`);
       return { failed: 1, ran: 0 };
@@ -287,9 +289,9 @@ function checkout(tmp) {
 }
 
 // Prints each job's verdict, each step the host alone runs, and each failing step with what it printed, every term of
-// the personal-terms list masked; gives how many of its jobs ran and how many failed.
+// the personal-terms list masked; gives how many of its jobs ran and how many failed, and whether a step of core.yml's own failed.
 function report(where, results, event) {
-  let failed = 0, ran = 0;
+  let failed = 0, ran = 0, copy = false;
   for (const r of results) {
     const at = `${where}/${r.job}`;
     if (!r.ran) { say(`skip ${at}: its condition does not hold for this ${event === "push" ? "push" : "pull request"}`); continue; }
@@ -297,10 +299,13 @@ function report(where, results, event) {
     for (const s of r.steps.filter(s => s.ran === false && s.out)) say(`host ${at}: "${s.name}" is the host's own, not run here`);
     if (r.passed) { say(`ok   ${at}`); continue; }
     failed++;
+    // (a failure of core.yml's own steps, before those it runs of the copy's scripts, which begin where it reads where the copy stands)
+    const parts = r.steps.findIndex(s => s.name.startsWith("Where the core's copy stands"));
+    if (r.steps.some((s, i) => !s.passed && (parts < 0 || i < parts))) copy = true;
     for (const s of r.steps.filter(s => !s.passed)) {
       warn(`FAIL ${at}: its step "${s.name}" failed, as it printed below. ${MEND}do what its own failure below says, commit, and run this check again.`);
       warn(s.out.trim().split("\n").map(l => `  ${l}`).join("\n"));
     }
   }
-  return { failed, ran };
+  return { failed, ran, copy };
 }

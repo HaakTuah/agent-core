@@ -40,7 +40,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { READY_ONLY, readyOnly } from "./init.mjs";
+import { fill, readyOnly } from "./init.mjs";
 import { scratchEnv } from "./scratch-core.mjs";
 import { STAGES } from "./steps-stage.mjs";
 import { STEPS, callers, leads, project as read } from "./steps.mjs";
@@ -232,6 +232,8 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
       if (!call) { out.push([`${file}/${id}`, { job: id, ran: true, passed: true, steps: [], own: true }]); continue; }
       // (a call whose own condition is false starts no job, as a call skipped on a draft: #375)
       if (job.if !== undefined && !evaluate(String(job.if).trim().replace(/^\$\{\{|\}\}$/g, ""), { github, inputs: {}, secrets: {}, vars: {} })) { out.push([`${file}/${id}`, { job: id, ran: false, passed: true, steps: [] }]); continue; }
+      // (the NuGet check as a step of core.yml's one job, #376: its input left out where there is no SDK, and said so)
+      if (call[1] === "core.yml" && !sdk && job.with?.nuget) { job.with = { ...job.with }; delete job.with.nuget; console.log(`note ${p.name}: no .NET SDK here, so core.yml's NuGet step is not run`); }
       if (call[1] === "nuget.yml" && !sdk) { out.push([`${file}/${id}`, { job: id, ran: true, passed: true, steps: [] }]); console.log(`note ${p.name}: no .NET SDK here, so the NuGet check is not run`); continue; }
       const text = git(theCore, "show", `${call[2]}:.github/workflows/${call[1]}`);
       const callerCtx = { github, inputs: {}, secrets: { PERSONAL_TERMS: terms }, vars: {} };
@@ -247,7 +249,8 @@ const failures = results => results.filter(([, r]) => !r.passed).map(([where, r]
 const started = results => results.filter(([, r]) => r.ran).map(([where]) => where).sort();
 
 // Whether a step of a workflow of the project's ran, in a set of results.
-const ran = (results, file, step) => results.some(([where, r]) => where.startsWith(`${file}/`) && r.steps.some(x => x.name === step && x.ran));
+// (a step of the core's own, or one of those scripts/checks.mjs runs within it, which it names on a line "== <name>")
+const ran = (results, file, step) => results.some(([where, r]) => where.startsWith(`${file}/`) && r.steps.some(x => x.ran && (x.name === step || (x.out ?? "").split(/\r?\n/).includes(`== ${step}`))));
 const jobRan = (results, file) => results.some(([where, r]) => where.startsWith(`${file}/`) && r.ran);
 
 function upgrade(p, from, ownChanges, expect) {
@@ -428,7 +431,8 @@ function nugetInPrivate(p) {
 // does a push once it is ready.
 function readyInPrivate(p) {
   git(p.dir, "checkout", "-q", "main");
-  const gated = READY_ONLY.filter(f => fs.existsSync(path.join(p.dir, f))), main0 = git(p.dir, "rev-parse", "HEAD");
+  // (the calls the kit wrote before its checks were one job, #376, each of which the entry of 16 November gates)
+  const gated = ["core.yml", "copies.yml", "personal-terms.yml", "signatures.yml", "nuget.yml"].map(f => `.github/workflows/${f}`).filter(f => fs.existsSync(path.join(p.dir, f))), main0 = git(p.dir, "rev-parse", "HEAD");
   const fresh = () => node(p.dir, "core/scripts/fresh.mjs").out;
   const change = from => { git(p.dir, "checkout", "-q", "-B", "change", from); fs.appendFileSync(path.join(p.dir, "README.md"), "\nMore words.\n"); git(p.dir, "commit", "-q", "-am", "a change of its own"); git(p.dir, "push", "-q", "-f", "origin", "change"); const head = git(p.dir, "rev-parse", "HEAD"); git(p.dir, "checkout", "-q", "main"); return head; };
   const ofThem = (head, base, o) => started(checks(p, "pull_request", head, { baseSha: base, dry: true, ...o })).filter(w => gated.some(f => w.startsWith(`${path.posix.basename(f)}/`)));
@@ -439,9 +443,45 @@ function readyInPrivate(p) {
   git(p.dir, "commit", "-q", "-am", "checks once a pull request is ready");
   git(p.dir, "push", "-q", "origin", "main");
   const main1 = git(p.dir, "rev-parse", "HEAD"), head = change(main1);
-  ok(!gated.some(f => fresh().includes(`${f}:`)), `${p.name}: with the starter kit's trigger and condition, fresh.mjs lists nothing of those calls`, fresh());
+  ok(!gated.some(f => new RegExp(`${f}: lacks [^\\n]*(ready_for_review|pull_request\\.draft)`).test(fresh())), `${p.name}: with the starter kit's trigger and condition, fresh.mjs lists neither of those calls`, fresh());
   ok(!ofThem(head, main1, { draft: true }).length && ofThem(head, main1, { action: "ready_for_review" }).length === gated.length && ofThem(head, main1).length === gated.length,
     `${p.name}: and a push to a draft starts none of their jobs, marking it ready starts each, and so does a push once it is ready`);
+}
+
+// The checks as one job (#376), on a private project that took the entry of 16 November: with its calls as they were, a
+// pull request once ready starts each check's own job, and fresh.mjs lists the one call; with the starter kit's call in
+// their place it starts two jobs, the one job and personal-terms, its status still "core / core", and each check of the
+// calls it took out runs as a step of it, a new copy failing it with that check's own mend.
+function oneJobInPrivate(p) {
+  git(p.dir, "checkout", "-q", "main");
+  const main0 = git(p.dir, "rev-parse", "HEAD"), fresh = () => node(p.dir, "core/scripts/fresh.mjs").out;
+  const folded = [".github/workflows/copies.yml", ".github/workflows/pr-description.yml", ".github/workflows/nuget.yml"].filter(f => fs.existsSync(path.join(p.dir, f)));
+  const change = (from, extra = () => {}) => { git(p.dir, "checkout", "-q", "-B", "change", from); fs.appendFileSync(path.join(p.dir, "README.md"), "\nMore words again.\n"); extra(); git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "a change of its own"); git(p.dir, "push", "-q", "-f", "origin", "change"); return git(p.dir, "rev-parse", "HEAD"); };
+  const before = started(checks(p, "pull_request", change(main0), { baseSha: main0, dry: true }));
+  ok(folded.length === 3 && before.length >= 4 && folded.every(f => before.some(w => w.startsWith(`${path.posix.basename(f)}/`))) && /\.github\/workflows\/core\.yml: lacks [^\n]*copies: checks\/copies\.json/.test(fresh()),
+    `${p.name}: its calls kept as they were, a pull request once ready starts ${before.length} jobs, each check its own, and fresh.mjs lists the one call`, `${before.join(", ")}\n${fresh()}`);
+  git(p.dir, "checkout", "-q", "main");
+  const pin = /^Core: \S+ at ([0-9a-f]{40}),/m.exec(fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8"))[1];
+  const kit = readyOnly(fill(fs.readFileSync(path.join(p.dir, "core/setup/template/workflows/core.yml.tmpl"), "utf8"), { core: CORE, pin })) + "      nuget: checks/licences.json\n";
+  fs.writeFileSync(path.join(p.dir, ".github/workflows/core.yml"), kit.replace(/\n/g, "\r\n"));
+  for (const f of folded) fs.rmSync(path.join(p.dir, f));
+  git(p.dir, "add", "-A");
+  git(p.dir, "commit", "-q", "-m", "the checks as one job");
+  git(p.dir, "push", "-q", "origin", "main");
+  const main1 = git(p.dir, "rev-parse", "HEAD"), head = change(main1);
+  const listed = fresh();
+  ok(![".github/workflows/core.yml", ...folded].some(f => listed.includes(`${f}:`)), `${p.name}: with the starter kit's one call, fresh.mjs lists nothing of the calls`, listed);
+  const after = started(checks(p, "pull_request", head, { baseSha: main1, dry: true }));
+  const results = checks(p, "pull_request", head, { baseSha: main1 });
+  ok(after.length === 2 && after.includes("core.yml/core/core") && after.some(w => w.startsWith("personal-terms.yml/")) && !failures(results)
+    && ["No new copies", "Nothing new in how the code is put together", "The description has its parts", ...(sdk ? ["Does the pull request change what NuGet reads?"] : [])].every(s => ran(results, "core.yml", s)),
+    `${p.name}: and a pull request starts two jobs, the one job, whose status is still "core / core", and personal-terms; each check of the calls taken out runs as its step and passes`, `${after.join(", ")}\n${failures(results)}`);
+  const block = Array.from({ length: 40 }, (_, i) => `export function f${i}(a, b) { const c = a * ${i} + b; if (c > ${i}) { return c - a; } return c + b * ${i}; }`).join("\n");
+  const copied = change(main1, () => { fs.writeFileSync(path.join(p.dir, "src/App/one.js"), `${block}\n`); fs.writeFileSync(path.join(p.dir, "src/App/two.js"), `${block}\n`);
+    const cfg = path.join(p.dir, "checks/copies.json"); fs.writeFileSync(cfg, JSON.stringify({ ...JSON.parse(fs.readFileSync(cfg, "utf8")), code: ["src"] }, null, 2)); });
+  const failed = checks(p, "pull_request", copied, { baseSha: main1, only: "core.yml" });
+  ok(/No new copies/.test(failures(failed)) && /Mend: /.test(failures(failed)) && ran(failed, "core.yml", "The description has its parts"), `${p.name}: a new copy of code fails the one job with the copies check's own failure and its mend, the steps after it still run`, failures(failed));
+  git(p.dir, "checkout", "-q", "main");
 }
 
 // The inbox as inbox.mjs finds it, GitHub answering for the repository with `repo` (left out: gh gives no answer at
@@ -568,7 +608,7 @@ for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newe
   (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
     ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
   nugetInPrivate(dotnetProject);
-  if (tag === starts.at(-1)) readyInPrivate(dotnetProject); // (the kit's calls are the same from either release)
+  if (tag === starts.at(-1)) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); } // (the kit's calls are the same from either release)
 }
 
 // A release that brings nothing a project takes asks no sync of it (#242, #342): with the copy it has just taken, the

@@ -38,7 +38,7 @@ ok(p.status === 0, "the starter kit writes a project", p.out);
 const dir = p.dir;
 commit(dir, "the starter kit");
 let r = check(dir);
-ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && /ok {3}copies\.yml\/copies/.test(r.out), "a project as the kit writes it passes on a push to main, its copy and its copies checked", r.out);
+ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && !/copies\.yml\//.test(r.out), "a project as the kit writes it passes on a push to main, its copy and its copies checked in core.yml's one job (#376)", r.out);
 
 const config = path.join(dir, "checks", "copies.json");
 fs.writeFileSync(config, JSON.stringify({ ...JSON.parse(fs.readFileSync(config, "utf8")), code: ["src"] }, null, 2));
@@ -48,9 +48,9 @@ fs.writeFileSync(path.join(dir, "notes.md"), "A note.\n");
 commit(dir, "a note");
 fs.writeFileSync(path.join(tmp, "description.md"), "## What the owner can try\nNothing.\n\n## Readings taken\nNone.\n\nWaits on: nothing\n");
 r = check(dir, "--base", "base", "--description", path.join(tmp, "description.md"));
-ok(r.status === 0 && /ok {3}pr-description\.yml\//.test(r.out) && /host security-review\.yml\/[\w-]+: security-review\.yml is not run here/.test(r.out), "a pull request with its description passes, the security review's status named the host's own and not run", r.out);
+ok(r.status === 0 && /ok {3}core\.yml\/core\/core/.test(r.out) && !/description check is not run/.test(r.out) && /host security-review\.yml\/[\w-]+: security-review\.yml is not run here/.test(r.out), "a pull request with its description passes, the security review's status named the host's own and not run", r.out);
 r = check(dir, "--base", "base");
-ok(r.status === 0 && r.out.includes("pr-description.yml is not run here: give --description"), "without a description, the description check is named and not run", r.out);
+ok(r.status === 0 && r.out.includes("core.yml's description check is not run here: give --description"), "without a description, the description check is named and not run", r.out);
 git(dir, "reset", "-q", "--hard", "base");
 fs.writeFileSync(path.join(dir, "core", "README.md"), "edited here\n");
 commit(dir, "an edit to the copy");
@@ -70,7 +70,7 @@ fs.writeFileSync(path.join(dir, "src", "one.js"), `${block}\n`);
 fs.writeFileSync(path.join(dir, "src", "two.js"), `${block}\n`);
 commit(dir, "a copy of code");
 r = check(dir, "--base", "base");
-ok(r.status === 1 && /FAIL copies\.yml\/copies\/copies: its step "No new copies" failed/.test(r.out) && mended(r.out), "a new copy of code fails on a pull request, with the copies check's own failure and its mend", r.out);
+ok(r.status === 1 && /FAIL core\.yml\/core\/core: its step "The copies, pointer, reading-size, workflow, entry-file, manifest and shape checks" failed/.test(r.out) && /^ +== No new copies$/m.test(r.out) && !/the copy of the core is not the core at its pin/.test(r.out) && mended(r.out), "a new copy of code fails on a pull request, with the copies check's own failure and its mend, a step of core.yml's one job and no failure of the copy", r.out);
 
 // a change that takes a check's call out still runs it: the calls are the base's
 git(dir, "reset", "-q", "--hard", "base");

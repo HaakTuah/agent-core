@@ -14,7 +14,7 @@ import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { COMMAND } from "./helper-call.mjs";
 import { FILES, files, fill, filtered, GAME_ROWS, licences, linked, modules, named, options, READ, READY_ONLY, sizes, startOf, TEMPLATES } from "./init.mjs";
 import { scratch } from "./scratch-core.mjs";
-import { evaluate, parseYaml, pathsLetThrough } from "./workflow-run.mjs";
+import { evaluate, parseYaml } from "./workflow-run.mjs";
 import { mended } from "./mend.mjs";
 
 let failed = 0, count = 0;
@@ -69,7 +69,8 @@ for (const [template] of FILES.filter(([t]) => t.startsWith("workflows/"))) {
 }
 // what the README leaves to the templates to say (its point 5 points here for them): each workflow's triggers and permissions
 const template = name => fs.readFileSync(path.join(root, TEMPLATES, "workflows", name), "utf8").replace(/\r\n/g, "\n");
-ok(template("pr-description.yml.tmpl").includes("on:\n  pull_request:\n    types: [opened, edited, reopened, synchronize, ready_for_review]\n"), "the description check runs when a pull request opens, is edited, reopened, pushed to or marked ready");
+ok(template("core.yml.tmpl").includes("on:\n  push:\n    branches: [main]\n  pull_request:\n    types: [opened, edited, reopened, synchronize, ready_for_review]\n") && template("core.yml.tmpl").includes("    with:\n      copies: checks/copies.json\n      sizes: checks/sizes.json\n      description: true\n"),
+  "the one job of the core's checks (#376) runs on a push to main and when a pull request opens, is edited, reopened, pushed to or marked ready, so the description check, one of its steps, runs again on an edited description; it is given the copies check's config, the marks and the description check");
 ok(template("security-review.yml.tmpl").includes("on:\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\n  issue_comment:\n    types: [created, edited]\n") && template("security-review.yml.tmpl").includes("    permissions:\n      contents: read\n      pull-requests: read\n      statuses: write\n"), "the security-review check has its two triggers, and its job its three permissions");
 ok(/^on:\n  schedule:\n    - cron: '\d+ \d+ \* \* \*'.*\n  workflow_dispatch:\n/m.test(template("look.yml.tmpl")) && template("look.yml.tmpl").includes("    permissions:\n      contents: read\n      issues: write\n      pull-requests: read\n      checks: read\n      statuses: read\n"), "the daily look runs daily or by hand, in a job that may read the repository, its pull requests, checks and statuses, and write issues");
 const fromFolder = name => fs.readFileSync(path.join(root, TEMPLATES, name), "utf8");
@@ -80,13 +81,12 @@ ok(JSON.stringify(startOf(Object.fromEntries(files({ owner: "someone", name: "P"
 const dependabot = o => files({ owner: "someone", name: "P", ...o }, A, ["git.md"], fromFolder).find(([to]) => to === ".github/dependabot.yml")[1];
 const ecosystems = text => (text.match(/package-ecosystem: "/g) ?? []).length;
 ok(dependabot({ nuget: "." }).includes('package-ecosystem: "nuget"\n    directory: "/"\n') && ecosystems(dependabot({ nuget: "." })) === 2 && dependabot({ nuget: "src" }).includes('directory: "/src"\n') && ecosystems(dependabot({})) === 1 && !dependabot({}).includes("nuget"), "a project whose packages come from NuGet gets Dependabot's updates for them, for its folder, beside the actions' own, and one that named no installer gets the actions' alone");
-// a private repository's NuGet check starts only where a pull request changes a file NuGet reads by name (#373)
-const nugetCall = o => parseYaml(files({ owner: "someone", name: "P", nuget: ".", ...o }, A, ["git.md"], fromFolder).find(([to]) => to === ".github/workflows/nuget.yml")[1]);
-const privateCall = nugetCall({ private: true }), publicCall = nugetCall({});
-const filter = privateCall.on.pull_request?.paths ?? [];
-ok(filter.length > 0 && pathsLetThrough(filter, ["App.csproj"]) && pathsLetThrough(filter, ["src/App/packages.lock.json"]) && pathsLetThrough(filter, ["NuGet.Config"]) && pathsLetThrough(filter, ["src/App.CSPROJ"]) && pathsLetThrough(filter, ["Packages.Lock.Json"]) && pathsLetThrough(filter, ["a/packages.net8.0.lock.json"]) && pathsLetThrough(filter, ["checks/licences.json"])
-  && !pathsLetThrough(filter, ["README.md", "src/App/Program.cs", "core/scripts/nuget.mjs"]) && privateCall.jobs.nuget.with.config === "checks/licences.json" && publicCall.on.pull_request === null,
-  "a private project's NuGet check starts only on a pull request that changes a file NuGet reads by name, in any case, so no other bills a job; a public one's on every pull request", JSON.stringify(privateCall.on));
+// the package check, a step of the one job (#376): its input for the kind of packages the project names, and none else
+const oneCall = o => parseYaml(files({ owner: "someone", name: "P", ...o }, A, ["git.md"], fromFolder).find(([to]) => to === ".github/workflows/core.yml")[1]).jobs.core.with;
+const withNuget = oneCall({ nuget: "." }), withNpm = oneCall({ packages: "tools" }), withNone = oneCall({ private: true });
+ok(withNuget.nuget === "checks/licences.json" && withNuget.npm === undefined && withNpm.npm === "tools" && withNpm.nuget === undefined && withNone.npm === undefined && withNone.nuget === undefined && withNuget.advisory === undefined
+  && !files({ owner: "someone", name: "P", nuget: ".", packages: "web", private: true }, A, ["git.md"], fromFolder).some(([to]) => /\/(copies|pr-description|signatures|nuget)\.yml$/.test(to)),
+  "the one call is given the NuGet check's config, or npm's folder, as the project's packages come, and fails from the first day; the kit writes no separate call to the checks it folds", JSON.stringify([withNuget, withNpm, withNone]));
 // a private repository's pull-request checks start only once a pull request is ready (#375): each call also triggers
 // when one is marked ready, its job skipped on a draft and run on a push to main; a public one's as they were
 const callsOf = o => Object.fromEntries(files({ owner: "someone", name: "P", nuget: ".", packages: ".", ...o }, A, ["git.md"], fromFolder).filter(([to]) => READY_ONLY.includes(to)).map(([to, text]) => [to, parseYaml(text)]));
@@ -94,9 +94,9 @@ const privateCalls = callsOf({ private: true }), publicCalls = callsOf({});
 const asked = (wf, action, draft, event = "pull_request") => Object.values(wf.jobs).map(job => evaluate(String(job.if ?? "true").replace(/^\$\{\{|\}\}$/g, ""), { github: { event_name: event, event: event === "pull_request" ? { action, pull_request: { draft } } : {} } }))
   .every(Boolean) && (event !== "pull_request" || (wf.on.pull_request?.types ?? ["opened", "reopened", "synchronize"]).includes(action));
 ok(Object.keys(privateCalls).length === READY_ONLY.length && Object.values(privateCalls).every(wf => !asked(wf, "synchronize", true) && !asked(wf, "opened", true) && asked(wf, "ready_for_review", false) && asked(wf, "synchronize", false) && asked(wf, "opened", false) && (!wf.on.push || asked(wf, null, null, "push")))
-  && privateCalls[".github/workflows/personal-terms.yml"].on.pull_request.types.join() === "opened,edited,synchronize,reopened,ready_for_review" && privateCalls[".github/workflows/nuget.yml"].on.pull_request.paths?.length > 0
+  && privateCalls[".github/workflows/personal-terms.yml"].on.pull_request.types.join() === "opened,edited,synchronize,reopened,ready_for_review" && privateCalls[".github/workflows/core.yml"].on.pull_request.types.join() === "opened,edited,reopened,synchronize,ready_for_review"
   && Object.values(publicCalls).every(wf => asked(wf, "synchronize", true) && Object.values(wf.jobs).every(job => job.if === undefined)),
-  "a private project's calls to the core's pull-request checks start no job on a push to a draft, and each once it is marked ready, pushed to once ready or opened ready, and on a push to main; its personal-terms and NuGet calls keep their own types and paths; a public one's start on every push as before", JSON.stringify(privateCalls));
+  "a private project's calls to the core's pull-request checks start no job on a push to a draft, and each once it is marked ready, pushed to once ready or opened ready, and on a push to main; its personal-terms call keeps its own types, and the one job lists ready_for_review once; a public one's start on every push as before", JSON.stringify(privateCalls));
 const both = dependabot({ packages: "web", nuget: "." });
 ok(ecosystems(both) === 3 && both.indexOf('directory: "/web"') > 0 && both.indexOf('directory: "/web"') < both.indexOf('"nuget"') && (both.match(/^version: 2$/gm) ?? []).length === 1, "a project with both installers gets both, in one config");
 ok(JSON.parse(fromFolder("claude-settings.json.tmpl")).hooks.PreToolUse[0].hooks[0].command === COMMAND, "the helper hook's command in the settings template is, letter for letter, the one helper-call.mjs holds and its test runs");
@@ -113,7 +113,7 @@ if (p.status === 0) {
   ok(FILES.every(([, to, when]) => has(to) === (!when || !!when({ packages: "tools" }))) && has("checks/sizes.json") && has("checks/licences.json") && has("checks/copies-baseline.json") && has("checks/shape-baseline.json") && has("core/floor/security.md") && !has("core/reports"), "every file its options ask for is there and no other of the kit's, with the copy of the core, without what the core keeps to itself");
   const manifest = read("core-manifest.md");
   ok(new RegExp(`^Core: ${CORE_SOURCE} at ${pin}, copied whole under core/`, "m").test(manifest) && /^\| \*owner's account\* \| `someone-else` \|$/m.test(manifest), "the manifest pins the commit and names the owner's account, as core.yml reads them");
-  ok(read("AGENTS.md").startsWith("# a-project\n") && read(".github/workflows/signatures.yml").includes('directory: "tools"') && read(".github/dependabot.yml").includes('directory: "/tools"') && read(".github/ISSUE_TEMPLATE/bug_report.md").includes("assignees: someone-else"), "the project's name is its folder's, and the npm folder and the owner are where they belong");
+  ok(read("AGENTS.md").startsWith("# a-project\n") && read(".github/workflows/core.yml").includes('npm: "tools"') && read(".github/dependabot.yml").includes('directory: "/tools"') && read(".github/ISSUE_TEMPLATE/bug_report.md").includes("assignees: someone-else"), "the project's name is its folder's, and the npm folder and the owner are where they belong");
   ok(JSON.parse(read(".claude/settings.json")).hooks.PreToolUse[0].hooks[0].command.includes("core/scripts/helper-call.mjs") && JSON.parse(read("checks/licences-audit.json")).entries.length === 0, "the settings and the audit are JSON, and the hooks are the core's");
   ok(git(p.dir, "status", "--porcelain").split("\n").every(l => l.startsWith("A  ")), "everything it wrote is staged, and nothing else is touched");
   git(p.dir, "commit", "-q", "-m", "the starter kit");
@@ -343,7 +343,7 @@ if (p.status === 0) {
   ok(again.status === 1 && again.out.includes("never overwrites") && git(p.dir, "status", "--porcelain") === "", "run again, it overwrites nothing and says which files stand");
 }
 const q = project("private-game", "--owner", "x", "--private", "--game", "--name", "A private game");
-ok(q.status === 0 && !fs.existsSync(path.join(q.dir, ".github/workflows/codeql.yml")) && !fs.existsSync(path.join(q.dir, ".github/workflows/licences.yml")) && !fs.existsSync(path.join(q.dir, ".github/workflows/signatures.yml")) && fs.existsSync(path.join(q.dir, "checks/licences.json")), "a private project without npm gets no call to CodeQL, the licence workflow or the signature check, and still its licence config", q.out.slice(0, 400));
+ok(q.status === 0 && !fs.existsSync(path.join(q.dir, ".github/workflows/codeql.yml")) && !fs.existsSync(path.join(q.dir, ".github/workflows/licences.yml")) && !/^\s+npm:/m.test(fs.readFileSync(path.join(q.dir, ".github/workflows/core.yml"), "utf8")) && fs.existsSync(path.join(q.dir, "checks/licences.json")), "a private project without npm gets no call to CodeQL, the licence workflow or the signature check, and still its licence config", q.out.slice(0, 400));
 // (every kind the program writes: the core's manifest check, run in the project, gives no note on its first day, #329)
 for (const [what, r] of [["an npm project", p], ["a private game", q]]) {
   if (r.status !== 0) continue;
@@ -357,12 +357,12 @@ if (q.status === 0) {
 }
 if (q.status === 0) ok(/^Floor: whole\. Modules: all\.$/m.test(fs.readFileSync(path.join(q.dir, "core-manifest.md"), "utf8")) && fs.readFileSync(path.join(q.dir, "AGENTS.md"), "utf8").startsWith("# A private game\n"), "a game takes every module, and a name given is the name used");
 const t = project("a-folder-named-true", "--owner", "x", "--npm", "true");
-ok(t.status === 0 && fs.readFileSync(path.join(t.dir, ".github/workflows/signatures.yml"), "utf8").includes('directory: "true"') && fs.readFileSync(path.join(t.dir, ".github/dependabot.yml"), "utf8").includes('directory: "/true"'), "a folder whose name YAML would read as something else is written in quotes, so it stays a name");
+ok(t.status === 0 && fs.readFileSync(path.join(t.dir, ".github/workflows/core.yml"), "utf8").includes('npm: "true"') && fs.readFileSync(path.join(t.dir, ".github/dependabot.yml"), "utf8").includes('directory: "/true"'), "a folder whose name YAML would read as something else is written in quotes, so it stays a name");
 const n = project("a-dotnet-project", "--owner", "x", "--nuget", "src", "--private");
 const nRead = f => fs.readFileSync(path.join(n.dir, f), "utf8");
-ok(n.status === 0 && nRead(".github/workflows/nuget.yml").includes("config: checks/licences.json") && !/^\s*advisory:/m.test(nRead(".github/workflows/nuget.yml")) && JSON.stringify(JSON.parse(nRead("checks/licences.json")).nuget) === '{"ships":[],"tools":[]}' && nRead(".github/dependabot.yml").includes('directory: "/src"') && !fs.existsSync(path.join(n.dir, ".github/workflows/signatures.yml")) && n.out.includes("RestorePackagesWithLockFile"),
+ok(n.status === 0 && nRead(".github/workflows/core.yml").includes("nuget: checks/licences.json") && !/^\s*advisory:/m.test(nRead(".github/workflows/core.yml")) && JSON.stringify(JSON.parse(nRead("checks/licences.json")).nuget) === '{"ships":[],"tools":[]}' && nRead(".github/dependabot.yml").includes('directory: "/src"') && !/^\s+npm:/m.test(nRead(".github/workflows/core.yml")) && n.out.includes("RestorePackagesWithLockFile"),
   "a project whose packages come from NuGet gets the call to the NuGet check, which fails from the first day, the config's part for its lock files, and is told to turn lock files on; a private one too, since that check needs nothing GitHub sells", n.out.slice(0, 400));
-ok(!fs.existsSync(path.join(t.dir, ".github/workflows/nuget.yml")) && JSON.parse(fs.readFileSync(path.join(t.dir, "checks/licences.json"), "utf8")).nuget === undefined, "and one that named no NuGet folder gets neither");
+ok(!/^\s+nuget:/m.test(fs.readFileSync(path.join(t.dir, ".github/workflows/core.yml"), "utf8")) && JSON.parse(fs.readFileSync(path.join(t.dir, "checks/licences.json"), "utf8")).nuget === undefined, "and one that named no NuGet folder gets neither");
 ok(p.status !== 0 || /\*\*the trusted builder:\*\*\n\s+FILL IN:/.test(read("SECURITY.md")) && p.out.includes("who may change the protected files"), "who may change the protected files, where the project narrows floor rule 3, is left for the project to say, and listed with what is left");
 // the kit is read from the commit, never from the clone's working folder: an edit not yet committed reaches no project
 const edited = path.join(core, TEMPLATES, "workflows", "core.yml.tmpl");

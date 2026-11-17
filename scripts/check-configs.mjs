@@ -42,6 +42,13 @@ const passed = (p, name, key = "config") => given(p, name, key).map(({ where, va
   if (typeof value !== "string" || !value.trim()) throw new Unread(`${where} calls the core's ${name} with no ${key} that names a file`);
   return { where, value: inside(value, `${where}'s call to the core's ${name}`) };
 });
+// The calls to the core's core.yml that run a part of its one job (#376) with the input `key`: a call that gives none
+// runs no such part, and is left out; one that gives no text is not read.
+export const folded = (p, key) => given(p, "core.yml", key).filter(({ value }) => value !== undefined && value !== null && value !== "" && value !== false);
+const passedFolded = (p, key) => folded(p, key).map(({ where, value }) => {
+  if (typeof value !== "string") throw new Unread(`${where} calls the core's core.yml with a ${key} that names no file`);
+  return { where, value: inside(value, `${where}'s call to the core's core.yml`) };
+});
 // A path as the project's root reads it: "./" and a slash at its end left out, and any "." or ".." in it taken.
 const tidy = f => path.posix.normalize(trimSlashes(f)).replace(/^\.\//u, "");
 // A path with the "/" at its end left out, walked back over (no regex, so no run of "/" makes it slow).
@@ -608,9 +615,9 @@ export function licenceConfig(p) {
   notElsewhere(p, ["licences.mjs", "agent-tools.mjs"]);
   return nugetOwn(p) ?? KIT_CONFIGS.licences;
 }
-// The NuGet check's own config: what the calls to the core's nuget.yml pass and the project's own runs of its script.
+// The NuGet check's own config: what the calls to the core's nuget.yml (or core.yml's nuget) pass and the project's own runs of its script.
 function nugetOwn(p) {
-  const found = one([...passed(p, "nuget.yml"), ...fromRuns(p, "nuget.mjs")], "the NuGet check's config");
+  const found = one([...passed(p, "nuget.yml"), ...passedFolded(p, "nuget"), ...fromRuns(p, "nuget.mjs")], "the NuGet check's config");
   if (found === undefined) notElsewhere(p, ["nuget.mjs"]);
   return found;
 }
@@ -620,28 +627,28 @@ export const nugetConfig = (p, licences = () => licenceConfig(p)) => nugetOwn(p)
 // The copies check's config: the calls' and the project's own runs', else the manifest's *copies check* slot (the
 // backticked file in its own cell that is neither the script nor a command), else the kit's.
 export function copiesConfig(p) {
-  const found = one([...passed(p, "copies.yml"), ...fromRuns(p, "copies.mjs")], "the copies check's config");
+  const found = one([...passed(p, "copies.yml"), ...passedFolded(p, "copies"), ...fromRuns(p, "copies.mjs")], "the copies check's config");
   if (found !== undefined) return found;
   notElsewhere(p, ["copies.mjs"]);
   const cell = /^\|\s*\*copies check\*\s*\|([^|\n]*)/m.exec(p.manifest)?.[1].match(/`[^`]+`/g) ?? [];
   const named = cell.map(v => v.slice(1, -1)).find(v => !/\s/.test(v) && !/^(\.\/)?core\//.test(v));
   return named === undefined ? KIT_CONFIGS.copies : inside(named, "the manifest's *copies check* slot");
 }
-// The size marks: what the calls to the core's copies.yml pass as `sizes` and the project's own runs of the
+// The size marks: what the calls to the core's copies.yml (or core.yml) pass as `sizes` and the project's own runs of the
 // reading-size script, else the manifest's *size marks* slot, else the kit's.
 export function marksConfig(p) {
-  const found = one([...passed(p, "copies.yml", "sizes"), ...fromRuns(p, "reading-size.mjs")], "the size marks");
+  const found = one([...passed(p, "copies.yml", "sizes"), ...passedFolded(p, "sizes"), ...fromRuns(p, "reading-size.mjs")], "the size marks");
   if (found !== undefined) return found;
   notElsewhere(p, ["reading-size.mjs"]);
   return inside(slot(p.manifest, "size marks", KIT_CONFIGS.sizes), "the manifest's *size marks* slot");
 }
 // The folder the signature check reads package-lock.json in, from the root: what the calls to the core's
-// signatures.yml pass as `directory` ("." where one passes none), undefined where none calls it.
+// signatures.yml pass as `directory` ("." where one passes none), or core.yml as `npm`, undefined where none calls it.
 export function packagesFolder(p) {
   const found = given(p, "signatures.yml", "directory").map(({ where, value }) => {
     if (value !== undefined && typeof value !== "string") throw new Unread(`${where} passes the core's signatures.yml a directory that is no text`);
     return { where, value: value === undefined ? "." : inside(value, `${where}'s call to the core's signatures.yml`) || "." };
-  });
+  }).concat(passedFolded(p, "npm").map(({ where, value }) => ({ where, value: value || "." })));
   return one(found, "the signature check's folder");
 }
 

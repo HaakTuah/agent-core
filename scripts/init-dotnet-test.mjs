@@ -73,7 +73,7 @@ git(dir, "commit", "-q", "-m", "a .NET project");
 const kit = run(dir, script, "--owner", "someone-else", "--name", "A .NET project", "--nuget", ".");
 ok(kit.status === 0 && kit.out.includes("The starter kit is written") && kit.out.includes("its NuGet packages: lock files turned on"), "the kit writes into a .NET project, and says what its NuGet packages still need", kit.out.slice(0, 800));
 if (kit.status === 0) {
-  ok(fs.readFileSync(path.join(dir, ".github/dependabot.yml"), "utf8").includes('package-ecosystem: "nuget"\n    directory: "/"\n') && !fs.existsSync(path.join(dir, ".github/workflows/signatures.yml")) && fs.existsSync(path.join(dir, ".github/workflows/nuget.yml")), "Dependabot is told of its NuGet packages, the NuGet check is called, and npm's signature check is not");
+  ok(fs.readFileSync(path.join(dir, ".github/dependabot.yml"), "utf8").includes('package-ecosystem: "nuget"\n    directory: "/"\n') && /^ {6}nuget: checks\/licences\.json$/m.test(fs.readFileSync(path.join(dir, ".github/workflows/core.yml"), "utf8")) && !/^ {6}npm:/m.test(fs.readFileSync(path.join(dir, ".github/workflows/core.yml"), "utf8")), "Dependabot is told of its NuGet packages, the NuGet check is a step of the one job, and npm's signature check is not");
   // (what the kit leaves to the project: its lock files, named as those of what ships)
   const lockFiles = git(dir, "ls-files", "--", "*packages.lock.json").split("\n").filter(Boolean);
   const licencesConfig = JSON.parse(fs.readFileSync(path.join(dir, "checks/licences.json"), "utf8"));

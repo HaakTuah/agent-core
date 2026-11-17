@@ -148,7 +148,7 @@ export function evaluate(expr, contexts, state = { failed: false }) {
     contains: (a, b) => (Array.isArray(a) ? a.some(x => equal(x, b)) : str(a).toLowerCase().includes(str(b).toLowerCase())),
     fromjson: a => JSON.parse(str(a)), tojson: a => JSON.stringify(a ?? null),
     format: (f, ...args) => str(f).replace(/\{\{|\}\}|\{(\d+)\}/g, (m, k) => (m === "{{" ? "{" : m === "}}" ? "}" : str(args[Number(k)]))),
-    always: () => true, cancelled: () => false, success: () => !state.failed, failure: () => state.failed,
+    always: () => true, cancelled: () => !!state.cancelled, success: () => !state.failed, failure: () => state.failed,
   };
   const primary = () => {
     const t = tokens[p++];
@@ -246,7 +246,8 @@ const outputsOf = file => {
  * fresh folder for a job's runner; `uses` maps an action (its name before @) to a handler (step `with`, filled in;
  * the job's folder; the job's env) that does its part, or returns false where it stands for a step not run here.
  * With `dry`, it only says which jobs would start: each one that starts is a job the repository's owner pays for.
- * With `until`, a job stops after the step of that id (each job's `outputs` hold its steps' outputs). Each job's own
+ * With `until`, a job stops after the step of that id (each job's `outputs` hold its steps' outputs). With `stop`, a
+ * failed step cancels the rest of its job, as a run cancelled there: a step that runs where `!cancelled()` runs no more. Each job's own
  * temporary folder is made under `temp` and removed when the job ends.
  */
 // Whether a trigger's `paths:` filter lets a change through, as GitHub's cheat sheet reads one: `*` (no slash), `**`
@@ -326,7 +327,7 @@ function carryEnv(file, env, id) {
   fs.rmSync(file);
 }
 
-export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, temp = os.tmpdir() }) {
+export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, workspace, uses, runner = {}, dry = false, until = null, stop = false, temp = os.tmpdir() }) {
   const wf = parseYaml(text);
   const defaults = wf.defaults?.run?.shell;
   const declared = wf.on?.workflow_call?.inputs ?? {};
@@ -388,7 +389,7 @@ export function runWorkflow(text, { inputs = {}, secrets = {}, github, base, wor
       carryEnv(path.join(tmp, "env"), ctx.env, id);
       result.steps.push({ name, ran: true, passed, out: `${r.stdout ?? ""}${r.stderr ?? ""}${r.error?.message ?? ""}` });
       if (step.id) ctx.steps[step.id] = { outputs: outputsOf(output), outcome: passed ? "success" : "failure", conclusion: passed ? "success" : "failure" };
-      if (!passed) { state.failed = true; result.passed = false; }
+      if (!passed) { state.failed = true; result.passed = false; state.cancelled = stop; }
       if (until && step.id === until) return;
     }
   }
