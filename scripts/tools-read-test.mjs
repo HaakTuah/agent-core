@@ -66,6 +66,17 @@ ok(!said("o/r", [{ number: 1 }], { builders: [["x\n::error::y", 1]], reviewers: 
   ok(one.map(p => p.number).join() === "9" && routes.filter(r => /state=closed/.test(r)).length === 3 - 1, "once a page's oldest update stands before the n-th merge, no later page is read", routes.join("\n"));
 }
 
+// every page of a pull request's reviews and comments, and a number of no form read as no pull request
+{
+  const routes = [];
+  const ask = args => { const r = args[1]; routes.push(r); const page = Number(/[?&]page=(\d+)/.exec(r)?.[1] ?? 0);
+    if (/state=closed/.test(r)) return JSON.stringify([{ user: { login: "o", type: "User" }, number: 4, merged_at: "2026-11-01T00:00:00Z" }, { number: "4/../x", merged_at: "2026-11-02T00:00:00Z" }]);
+    if (/issues\/4\/comments/.test(r)) return JSON.stringify(page === 1 ? Array.from({ length: 100 }, () => ({ user: { login: "o", type: "User" }, body: "x" })) : [{ user: { login: "o", type: "User" }, body: `Security review: x${sig("Last Tool")}` }]);
+    return "[]"; };
+  const read = readPulls("o/r", 5, ask);
+  ok(read.length === 1 && read[0].comments.length === 101 && tally(read, "o").reviewers[0]?.[0] === "Last Tool" && !routes.some(r => r.includes("..")), "a review comment past a pull request's first hundred is read, and a number of no form names no route", routes.join("\n"));
+}
+
 // the owner's account of the repository named, never of this checkout
 {
   const routes = [], quiet = () => {};

@@ -99,6 +99,7 @@ fails("a manifest without the owner's account, an organisation's account holding
   ok(r.passed && r.out.includes("The owner's account is read: someone"), "a manifest without the owner's account, a person's account holding the repository: passes, saying what it read", r.out);
 }
 fails("a manifest without the owner's account, a login of no form holding the repository", "owner's account", { "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") }, { held: { login: "a;b", type: "User" } });
+fails("an owner's account row whose lead is spelt otherwise, a person's account holding the repository: never read past", "owner's account", { "core-manifest.md": MANIFEST().replace("| *owner's account* |", "| *owner’s Account* |") }, { held: { login: "someone", type: "User" } });
 fails("an owner's account that is no login, a person's account holding the repository", "owner's account", { "core-manifest.md": MANIFEST().replace(`\`${OWNER}\``, "`two words`") }, { held: { login: "someone", type: "User" } });
 fails("a manifest with the owner's account twice", "owner's account", { "core-manifest.md": MANIFEST().replace(/^(\| \*owner's account\*.*\n)/m, "$1$1") });
 fails("an owner's account that is no login", "owner's account", { "core-manifest.md": MANIFEST().replace(`\`${OWNER}\``, "`two words`") });

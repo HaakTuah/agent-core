@@ -67,9 +67,11 @@ export function readPulls(repo, n, ask, pages = 20) {
     if (closed.length < 100 || (merged.length === n && oldest < String(merged.at(-1).merged_at))) break;
   }
   const people = list => list.map(x => ({ login: String(x?.user?.login ?? ""), type: String(x?.user?.type ?? ""), body: String(x?.body ?? "") }));
-  return merged.map(p => ({ number: p.number, login: String(p?.user?.login ?? ""), type: String(p?.user?.type ?? ""), body: String(p.body ?? ""),
-    reviews: people(json([`repos/${repo}/pulls/${Number(p.number)}/reviews?per_page=100`])),
-    comments: people(json([`repos/${repo}/issues/${Number(p.number)}/comments?per_page=100`])) }));
+  // (every page of a pull request's reviews and comments, a review posted last the likeliest)
+  const all = route => { const out = []; for (let page = 1; page <= pages; page++) { const got = json([`${route}?per_page=100&page=${page}`]); if (!Array.isArray(got)) break; out.push(...got); if (got.length < 100) break; } return out; };
+  return merged.filter(p => Number.isSafeInteger(p?.number) && p.number > 0).map(p => ({ number: p.number, login: String(p?.user?.login ?? ""), type: String(p?.user?.type ?? ""), body: String(p.body ?? ""),
+    reviews: people(all(`repos/${repo}/pulls/${p.number}/reviews`)),
+    comments: people(all(`repos/${repo}/issues/${p.number}/comments`)) }));
 }
 
 // What it prints: the counts, each name as the record writes it, its control characters taken out (floor rule 4: data).

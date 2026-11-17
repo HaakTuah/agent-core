@@ -32,6 +32,7 @@ ok(followsOf("| *owner's account* | someone |\n") === null, "no row and no owner
 const PERSON = { login: "someone", type: "User" }, ORG = { login: "a-team", type: "Organization" }, BARE = "# Core manifest\n\n| Slot | Here |\n| --- | --- |\n";
 ok(ownerOf(BARE, PERSON) === "someone" && ownerOf(BARE, ORG) === null && ownerOf(BARE) === null, "with no row, the owner's account is read where a person's account holds the repository, and only there");
 ok(ownerOf(manifest("other"), PERSON) === "other" && ownerOf("| *owner's account* | someone |\n", PERSON) === null && ownerOf(`${manifest("a")}| *owner's account* | \`b\` |\n`, PERSON) === null, "a row decides over what was read, and a row of another form, or two, give no answer and are never read past");
+ok(["| *Owner's Account* | `x` |", "| *owner’s account* | `x` |", "|**owner's account**| `x` |", "| *owners account* | x |"].every(row => ownerOf(`${BARE}${row}\n`, PERSON) === null), "a row whose lead is cased or spelt otherwise is still a row: no answer, and the host's account is never read past it");
 ok(ownerOf(BARE, { login: "a;b", type: "User" }) === null && ownerOf(BARE, { login: "x", type: "user" }) === null, "a login of no form, and a type other than the host's own word, read as nothing");
 ok(followsOf(BARE, { login: OWNER, type: "User" }) === "main" && followsOf(BARE, PERSON) === "releases" && followsOf(BARE, ORG) === null, "with no row, what the project follows goes by the account read");
 { // asked once, only when called, saying what it read
@@ -48,6 +49,9 @@ ok(followsOf(BARE, { login: OWNER, type: "User" }) === "main" && followsOf(BARE,
     fs.writeFileSync(event, JSON.stringify({ repository: { owner: { login: "someone", type: "User", id: 1 } } }));
     const gh = text => args => { asked.push(args.join(" ")); return text; };
     ok(JSON.stringify(hostAccount({ GITHUB_EVENT_PATH: event }, gh("{}"))) === JSON.stringify(PERSON) && !asked.length, "the event's own account is read, and gh is not asked");
+    fs.writeFileSync(event, JSON.stringify({ repository: { full_name: "Someone/Project", owner: { login: "someone", type: "User" } } }));
+    ok(JSON.stringify(hostAccount({ GITHUB_EVENT_PATH: event, GITHUB_REPOSITORY: "someone/project" }, gh("{}"))) === JSON.stringify(PERSON), "an event of the repository asked about is read, whatever its case");
+    ok(JSON.stringify(hostAccount({ GITHUB_EVENT_PATH: event, GITHUB_REPOSITORY: "a-team/x" }, gh(JSON.stringify(ORG)))) === JSON.stringify(ORG), "an event of another repository is passed over for gh's answer on the one asked about");
     ok(JSON.stringify(hostAccount({ GITHUB_REPOSITORY: "a-team/x" }, gh(JSON.stringify(ORG)))) === JSON.stringify(ORG) && asked.at(-1) === "api repos/a-team/x --jq .owner | {login, type}", "with no event, gh is asked of the repository's own route", asked.join("; "));
     ok(hostAccount({ GITHUB_REPOSITORY: "../x" }, gh(JSON.stringify(PERSON))) === null && hostAccount({ GITHUB_REPOSITORY: "a/x" }, () => { throw new Error("no gh"); }) === null && hostAccount({ GITHUB_REPOSITORY: "a/x" }, gh("not json")) === null, "no repository's name, no gh, or an answer of no form: nothing read, never a guess");
     fs.writeFileSync(event, JSON.stringify({ repository: { owner: { login: "a b", type: "User" } } }));

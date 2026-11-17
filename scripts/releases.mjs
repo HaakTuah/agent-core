@@ -41,7 +41,11 @@ const LOGIN = /^[A-Za-z0-9-]+$/;
 // guesses (AGENTS.md, "What can be read is never asked or declared"; #481).
 export function hostAccount(env = process.env, ask = args => execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30000 })) {
   const said = o => (typeof o?.login === "string" && LOGIN.test(o.login) && typeof o?.type === "string" ? { login: o.login, type: o.type } : null);
-  try { const o = said(JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, "utf8"))?.repository?.owner); if (o) return o; } catch { /* (no event to read) */ }
+  // (the event's own account, where the event is of the repository asked about: GITHUB_REPOSITORY, where it is set)
+  try {
+    const r = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, "utf8"))?.repository, o = said(r?.owner);
+    if (o && (!env.GITHUB_REPOSITORY || String(r?.full_name ?? "").toLowerCase() === env.GITHUB_REPOSITORY.toLowerCase())) return o;
+  } catch { /* (no event to read) */ }
   let repo = env.GITHUB_REPOSITORY;
   if (!repo) try { repo = repoOf(execFileSync("git", ["remote", "get-url", "origin"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })); } catch { /* (no origin) */ }
   if (!aRepository(repo)) return null;
@@ -53,7 +57,8 @@ export function hostAccount(env = process.env, ask = args => execFileSync("gh", 
 // only where no row stands). Null where a row is there twice or in another form, or none is and an organisation, or
 // nothing read, holds the repository: whose word counts is never guessed.
 export function ownerOf(manifest, host = null) {
-  const rows = String(manifest).split(/\r?\n/).filter(l => /^\|[ \t]*\*owner's account\*[ \t]*\|/.test(l));
+  // (a row whose lead is cased or spelt otherwise is still a row, which no host's answer is read past)
+  const rows = String(manifest).split(/\r?\n/).filter(l => /^\|[ \t]*\*+[ \t]*owner['’`]?s account[ \t]*\*+[ \t]*\|/i.test(l));
   const found = rows.map(l => /^\| \*owner's account\* \| `([A-Za-z0-9-]+)` \|$/.exec(l)?.[1]);
   if (rows.length) return found.length === 1 && found[0] ? found[0] : null;
   const read = typeof host === "function" ? host() : host;

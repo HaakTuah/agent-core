@@ -126,7 +126,8 @@ jobs:
           fi
           # whose word counts (floor rule 4) is never left to a guess: the slot's one row, one GitHub login, or, with no
           # row at all, read: the repository's own account, where the host says a person holds it (README.md, "Slots")
-          rows=$(grep -cE "^\|[[:space:]]*\*owner's account\*[[:space:]]*\|" core-manifest.md || true)
+          # (a row whose lead is cased or spelt otherwise is still a row, and fails below: never read past)
+          rows=$(grep -ciE "^\|[[:space:]]*\*+[[:space:]]*owner('|’|\`)?s account[[:space:]]*\*+[[:space:]]*\|" core-manifest.md || true)
           if [ "$rows" = 0 ] && [ "$HELD_AS" = User ] && [[ "$HELD_BY" =~ ^[A-Za-z0-9-]+$ ]]; then
             echo "The owner's account is read: $HELD_BY, a person's account, holds this repository, and core-manifest.md has no row that says otherwise."
           elif [ "$rows" = 0 ]; then
