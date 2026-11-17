@@ -189,10 +189,10 @@ try {
   const own = (...lines) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n${lines.map((l) => `      - run: ${l}\n`).join("")}`);
   own("node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget.mjs c.json");
   let missed = notDone(tmp, step);
-  ok(missed.length === 1 && /runs `node core\/scripts\/lookup\.mjs <the licence check's config>`/u.test(missed[0].mend) && !/--nuget`/u.test(missed[0].mend), `the NuGet lookup does not stand in for the npm one (${missed.map((m) => m.mend)})`);
+  ok(missed.length === 1 && /runs `node core\/scripts\/lookup\.mjs` with the same config, for each/u.test(missed[0].mend) && !/`--nuget`/u.test(missed[0].mend), `the NuGet lookup does not stand in for the npm one (${missed.map((m) => m.mend)})`);
   own("node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget-fetch.mjs c.json", "node core/scripts/lookup.mjs c.json");
   missed = notDone(tmp, step);
-  ok(missed.length === 1 && /--nuget`/u.test(missed[0].mend), `nor the npm lookup for the NuGet one (${missed.map((m) => m.mend)})`);
+  ok(missed.length === 1 && /with the same config and `--nuget`/u.test(missed[0].mend), `nor the npm lookup for the NuGet one (${missed.map((m) => m.mend)})`);
   own("node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json");
   missed = notDone(tmp, step);
   ok(missed.length === 1 && /give its checkout `fetch-depth: 2`/u.test(missed[0].mend), `with both, a checkout of one commit is still reported, since the lookup would read no base (${missed.map((m) => m.mend)})`);
@@ -231,6 +231,11 @@ try {
   ok(missed.length === 1 && /no `ref:`/u.test(missed[0].mend), `and a checkout of another commit than the merge does not hold the base (${missed.map((m) => m.mend)})`);
   nugetJob("msbuild -t:Restore", "node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/nuget.mjs c.json");
   ok(notDone(tmp, step).length === 1, "a NuGet lookup after an msbuild restore does not count");
+  nugetJob("node core/scripts/exact-versions.mjs checks/frontend.json", "node core/scripts/exact-versions.mjs checks/backend.json", "node core/scripts/lookup.mjs checks/frontend.json");
+  missed = notDone(tmp, step);
+  ok(missed.length === 1 && /with the same config, for each config/u.test(missed[0].mend), `a lookup of one config does not stand for another config's check (${missed.map((m) => m.mend)})`);
+  nugetJob("node core/scripts/exact-versions.mjs checks/frontend.json", "node core/scripts/exact-versions.mjs checks/backend.json", "node core/scripts/lookup.mjs checks/frontend.json", "node core/scripts/lookup.mjs checks/backend.json");
+  ok(notDone(tmp, step).length === 0, "and with a lookup of each, the step is done");
 } finally { rmSync(tmp, { recursive: true, force: true }); }
 
 console.log(failed ? `${failed} failing` : "ok   lookup.mjs");

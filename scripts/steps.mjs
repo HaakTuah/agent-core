@@ -407,8 +407,8 @@ function jobsOf(w) {
 }
 // Whether a job runs the NuGet lookup, as counted, before anything that may build the pull request's code: dotnet,
 // msbuild or nuget, or the NuGet check's scripts, which a workflow runs after its restore.
-const lookedUpFirst = (job, copy) => {
-  const first = job.counted.findIndex(c => looksUp(c, true, copy));
+const lookedUpFirst = (job, copy, config) => {
+  const first = job.counted.findIndex(c => looksUp(c, true, copy) && configOf(c, "lookup.mjs", copy) === config);
   const builds = job.counted.findIndex(c => /(?:^|[\\/])(?:dotnet|msbuild|nuget)(?:\.exe)?$/iu.test(c[0]?.text ?? "") || running(c, "nuget.mjs", undefined, copy) || running(c, "nuget-fetch.mjs", undefined, copy));
   return first >= 0 && (builds < 0 || first < builds);
 };
@@ -416,6 +416,11 @@ const lookedUpFirst = (job, copy) => {
 // `flag`, with that flag (true) or without it (false).
 const running = (words, name, flag, copy = "core/") => words.some(w => new RegExp(`(?:^|/)${copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")}scripts/${name.replace(".", "\\.")}$`, "u").test(w.text))
   && (flag === undefined || words.some(w => w.text === "--nuget") === flag);
+// The config a command gives the copy's script `name`: its first argument after the script that is no flag.
+const configOf = (words, name, copy) => {
+  const at = words.findIndex(w => running([w], name, undefined, copy));
+  return at < 0 ? null : words.slice(at + 1).find(w => !w.text.startsWith("--"))?.text ?? null;
+};
 // Whether a command runs the lookup itself: node, then the copy's script.
 const looksUp = (words, flag, copy) => /(?:^|[\\/])node(?:\.exe)?$/iu.test(words[0]?.text ?? "") && words.length > 1 && running([words[1]], "lookup.mjs", undefined, copy) && running(words, "lookup.mjs", flag, copy);
 
@@ -618,11 +623,13 @@ export const STEPS = [
       // where it runs the NuGet check)
       const wrong = Object.entries(p.workflows).flatMap(([f, w]) => {
         const jobs = jobsOf(w), at = `\`.github/workflows/${shown(f)}\``, copy = corePath(p.root) || "core/";
-        const any = (name, flag) => jobs.some(j => j.runs.some(c => running(c, name, flag, copy)));
-        const looked = (flag) => jobs.some(j => j.counted.some(c => looksUp(c, flag, copy)));
+        // (each config a check is given is matched by a lookup given the same config, since the lookup reads only the
+        // lock files of the config it is given)
+        const configs = (...names) => [...new Set(jobs.flatMap(j => j.runs.flatMap(c => names.flatMap(n => (running(c, n, undefined, copy) ? [configOf(c, n, copy)] : [])))))];
+        const looked = (flag, config) => jobs.some(j => j.counted.some(c => looksUp(c, flag, copy) && configOf(c, "lookup.mjs", copy) === config));
         return [
-          any("exact-versions.mjs") && !looked(false) ? `in ${at}, beside the step that runs \`${copy}scripts/exact-versions.mjs\`, add one that runs \`node ${copy}scripts/lookup.mjs <the licence check's config>\`` : null,
-          (any("nuget.mjs") || any("nuget-fetch.mjs")) && !jobs.some(j => lookedUpFirst(j, copy)) ? `in ${at}, before any step that builds or restores (\`dotnet\`, \`msbuild\`, a build script) or runs \`${copy}scripts/nuget.mjs\` (a restore runs the pull request's own build files, which could change what the lookup reads), add one that runs \`node ${copy}scripts/lookup.mjs <the licence check's config> --nuget\`` : null,
+          configs("exact-versions.mjs").some(cfg => !looked(false, cfg)) ? `in ${at}, beside the step that runs \`${copy}scripts/exact-versions.mjs\`, add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config, for each config it is given` : null,
+          configs("nuget.mjs", "nuget-fetch.mjs").some(cfg => !jobs.some(j => lookedUpFirst(j, copy, cfg))) ? `in ${at}, before any step that builds or restores (\`dotnet\`, \`msbuild\`, a build script) or runs \`${copy}scripts/nuget.mjs\` (a restore runs the pull request's own build files, which could change what the lookup reads), add one that runs \`node ${copy}scripts/lookup.mjs\` with the same config and \`--nuget\`, for each config it is given` : null,
           jobs.some(j => !j.deep && j.counted.some(c => looksUp(c, undefined, copy))) ? `in ${at}, which runs the lookup, give its checkout \`fetch-depth: 2\` and no \`ref:\`` : null,
         ].filter(Boolean);
       });
