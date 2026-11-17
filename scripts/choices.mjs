@@ -75,7 +75,9 @@ function tripsOf(body) {
 // The lines a record is argued on (tasks/choices.md, "A choice that is hard to undo gets a record"; #515): the
 // challenger's search for what the list lacks, the pick of a session that never saw the record, and the judge's.
 export const ARGUED = ["Looked for:", "The blind pick:", "The judgment:"];
-const opens = (body, label) => new RegExp(`^[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*)?${label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?:\\*\\*)?[ \\t]*\\S`, "mu").test(body);
+// (the label bold whole, or plain and not followed by the bold's close, then content: an empty bold label is none)
+const labelled = label => { const l = label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"); return `^[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*${l}\\*\\*|${l}(?!\\*))[ \\t]*`; };
+const opens = (body, label) => new RegExp(`${labelled(label)}\\S`, "mu").test(body);
 
 // The heading's end of the record of what a project would be built on today (tasks/choices.md, "What the project would
 // be built on today"; #515), whose line "The suggestion:" names the issue filed to the project's owner.
@@ -93,7 +95,7 @@ export function parse(text) {
   const records = heads.map((m, i) => {
     const body = t.slice(m.index + m[0].length, i + 1 < heads.length ? heads[i + 1].index : t.length).split(/^#{1,2} /mu)[0];
     return { name: plain(m[1]), today: TODAY.test(m[1]), sign: opens(body, "Reopens it:"), lacks: ARGUED.filter(label => !opens(body, label)),
-      stood: opens(body, "Stood before:"), suggestion: /^[ \t]*(?:[-*][ \t]+)?(?:\*\*)?The suggestion:(?:\*\*)?[ \t]*(#\d+)\b/mu.exec(body)?.[1] ?? null, ...tripsOf(body) };
+      stood: opens(body, "Stood before:"), suggestion: new RegExp(`${labelled("The suggestion:")}(#\\d+)\\b`, "mu").exec(body)?.[1] ?? null, ...tripsOf(body) };
   }).filter(r => !r.name.startsWith("FILL IN:"));
   const read = /^(?:\*\*)?Read whole:(?:\*\*)?[ \t]*(\d{4}-\d\d-\d\d)\b/mu.exec(t)?.[1] ?? null;
   return { records, read: read && Number.isFinite(Date.parse(`${read}T00:00:00Z`)) ? read : null, open: (t.match(/FILL IN:/gu) ?? []).length };
@@ -226,13 +228,16 @@ export function argued(head, base) {
 }
 
 // A file's text at a commit, read from git, or null where the commit does not hold it as a file of at most MOST bytes;
-// undefined where `commit` is no commit here, or a name git would read as an option.
+// undefined where `commit` is no commit here, or a name git would read as an option, or where the file is a link there.
 export function atCommit(commit, file, root = ".") {
   const git = args => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: MOST * 2 });
   // (a name that opens with "-" would be read by git as an option: it is no commit)
   if (String(commit).startsWith("-")) return undefined;
   try { git(["rev-parse", "--verify", "-q", `${commit}^{commit}`]); } catch { return undefined; }
   try {
+    // (a link at the base is no file the records were read from there, as records() reads none at the head: the base
+    // reads as unreadable, so the check fails nothing for it)
+    if (/^120000 /u.test(git(["ls-tree", commit, "--", file]))) return undefined;
     if (git(["cat-file", "-t", `${commit}:${file}`]).trim() !== "blob" || Number(git(["cat-file", "-s", `${commit}:${file}`])) > MOST) return null;
     return git(["show", `${commit}:${file}`]);
   } catch { return null; }

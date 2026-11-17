@@ -43,9 +43,15 @@ export const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 export const parentsOf = text => String(text ?? "").split("\n").map(l => l.trim().split(" ")).filter(ids => ids[0] && ids.every(id => OID.test(id)))
   .map(([sha, parent = null, second = null]) => ({ sha, parent, second }));
 
-// The fixes of the issues `bugs` (their numbers) among the commits `log` ([{ sha, parent, message }], newest first),
-// each { issue, sha, parent }: every commit with a parent that says it fixes one, so a bug fixed twice shows both.
-export const fixesOf = (bugs, log) => log.filter(c => c.parent).flatMap(c => fixedBy(c.message).filter(n => bugs.includes(n)).map(issue => ({ issue, sha: c.sha, parent: c.parent })));
+// The fixes of the issues `bugs` (their numbers) among the commits `log` ([{ sha, parent, message, brought }], newest
+// first; `brought`, of a merge, the commits it brought in), each { issue, sha, parent }: every commit with a parent
+// that says it fixes one, so a bug fixed twice shows both, save a merge's own word for an issue a commit it brought
+// already fixes, which is that one fix said again.
+export const fixesOf = (bugs, log) => log.filter(c => c.parent).flatMap(c => {
+  const own = fixedBy(c.message).filter(n => bugs.includes(n) && !(c.brought ?? []).some(b => fixedBy(b.message).includes(n)))
+    .map(issue => ({ issue, sha: c.sha, parent: c.parent }));
+  return [...own, ...fixesOf(bugs, c.brought ?? [])];
+});
 
 function main(argv) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
@@ -66,8 +72,8 @@ function main(argv) {
   const commits = range => parentsOf(git(["log", "--format=%H %P", ...range]))
     .map(c => ({ ...c, message: git(["log", "-1", "--format=%B", c.sha]) }));
   const log = commits(["--first-parent", `--since=${since}T00:00:00Z`, ref]);
-  const merged = log.filter(c => c.second && c.parent).flatMap(c => { try { return commits([`${c.parent}..${c.second}`]); } catch { return []; } });
-  const fixes = fixesOf(bugs, [...log, ...merged]);
+  for (const c of log) if (c.second && c.parent) try { c.brought = commits([`${c.parent}..${c.second}`]); } catch { c.brought = []; }
+  const fixes = fixesOf(bugs, log);
   let read = 0, unread = 0;
   for (const f of fixes) {
     let diff;

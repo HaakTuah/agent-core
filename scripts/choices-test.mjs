@@ -167,6 +167,8 @@ ok(parse(full).records[0].lacks.length === 0 && parse(half).records[0].lacks.joi
 const longHead = `## Choice: ${"the project's foundations, ".repeat(5)}judged again as if written today\n- The suggestion: #3\n`;
 ok(parse(longHead).records[0].today && parse(longHead).records[0].name.length <= 120 && !parse("## Choice: judged again as if written today, not\n").records[0].today,
   "a heading past the printed length is still read whole for its ending, and one that does not end so is not");
+const emptyBold = parse("## Choice: e\n- **Looked for:**\n- **The blind pick:**  \n- **The judgment:** *none found*\n- **The suggestion:** #4\n").records[0];
+ok(emptyBold.lacks.join() === "Looked for:,The blind pick:" && emptyBold.suggestion === "#4", "a bold label with nothing after it is no line, and one with content is, its content opening with an asterisk too", JSON.stringify(emptyBold));
 ok(parse("## Choice: q\nSee: The judgment: elsewhere.\n## Choice: r\nThe judgment: x\n").records[0].lacks.includes("The judgment:"), "a line is read only where it opens so, and under its own record");
 const old = `## Choice: old\n- Reopens it: x.\n\n${full}`;
 const both = argued(`${old}\n${half}`, old);
@@ -207,6 +209,12 @@ fs.writeFileSync(path.join(hist, "core-manifest.md"), "| *choice records* | `rec
 c = check(slotted);
 ok(c.status === 0 && /listed, not failed: "old"/.test(c.out) && /listed, not failed: "half"/.test(c.out) && !/FAIL/.test(c.out), "records moved to the path the change names are read at the base where the base named them, and stay listed", c.out);
 ok(baseRecords(slotted, hist) === `${old}\n${half}` && baseRecords(empty, hist) === null && baseRecords("nowhere", hist) === undefined, "the base's records are its own slot's, none where it held none, and nothing where there is no such commit");
+// a records file that was a link at the base stays unread there, so nothing in it fails
+fs.writeFileSync(path.join(hist, "target.md"), half); fs.rmSync(path.join(hist, "records.md")); fs.symlinkSync("target.md", path.join(hist, "records.md"));
+h("add", "-A"); h("commit", "-q", "-m", "a link"); const linkedAt = h("rev-parse", "HEAD").trim();
+ok(atCommit(linkedAt, "records.md", hist) === undefined && atCommit(linkedAt, "target.md", hist) === half, "a file that is a link at a commit is not read there, and a file is");
+ok(checkOf({ file: "records.md", unread: "a link" }, linkedAt, hist)[1] === false && checkOf({ file: "records.md", text: half }, linkedAt, hist)[1] === false,
+  "records that were a link at the base fail nothing, still a link or made a file");
 fs.rmSync(hist, { recursive: true, force: true });
 
 fs.rmSync(tmp, { recursive: true, force: true });

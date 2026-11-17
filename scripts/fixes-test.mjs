@@ -34,6 +34,9 @@ const read = parentsOf(`${a} ${b} ${c}\n${b} ${c}\n${c}\nHEAD --output=../../tar
 ok(JSON.stringify(read) === JSON.stringify([{ sha: a, parent: b, second: c }, { sha: b, parent: c, second: null }, { sha: c, parent: null, second: null }]),
   "a commit's hash and parents are read only as whole object ids: a line with anything else, an option among them, is left out", JSON.stringify(read));
 ok(fixesOf([5], [{ sha: c, parent: null, message: "Fixes #5" }]).length === 0, "a commit with no parent here is no fix to read");
+const merge = { sha: a, parent: b, message: "Merge pull request #9\n\nFixes #5, fixes #6", brought: [{ sha: c, parent: b, message: "The mend. Fixes #5" }] };
+ok(JSON.stringify(fixesOf([5, 6], [merge])) === JSON.stringify([{ issue: 6, sha: a, parent: b }, { issue: 5, sha: c, parent: b }]),
+  "a merge's word for an issue a commit it brought fixes is that one fix, counted once; one it alone names is its own", JSON.stringify(fixesOf([5, 6], [merge])));
 const r = spawnSync(process.execPath, [path.join(here, "fixes.mjs"), "--since", "soon"], { encoding: "utf8" });
 ok(r.status === 1 && /--since takes a day/.test(r.stderr), "a day that is none is refused", r.stderr);
 
