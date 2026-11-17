@@ -573,13 +573,16 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     // (#476's code review of fd9135b: a literal "$" in a name reached through a link inside the checkout, which no list of the project's files holds)
     for (const command of ["bash 'tools/$notify/a b.sh'", "bash tools/\\$notify/a\\ b.sh", "sh -c 'bash \"tools/\\$notify/a b.sh\"'"])
       ok(JSON.stringify(fromTree(command, f => f === "tools/$notify/a b.sh", index)) === JSON.stringify(["tools/$notify/a b.sh"]), `the command ${JSON.stringify(command)} takes the file a link inside the checkout leads to`);
+    // (#476's code review of 0f4ae74: a word whose quoted and unquoted parts join, holding a blank, through such a link)
+    for (const command of ["bash tools/\"my hook.sh\"", "bash 'tools/my'\" hook.sh\"", "sh -c 'bash tools/\"my hook.sh\"'"])
+      ok(JSON.stringify(fromTree(command, f => f === "tools/my hook.sh", index)) === JSON.stringify(["tools/my hook.sh"]), `the command ${JSON.stringify(command)} takes the file a link inside the checkout leads to`);
     for (const shadow of ["git.bat", "git.exe", "test.cmd", "git.vbs"]) {
       const own = [...files, shadow], ownHas = f => own.includes(f);
       ok(JSON.stringify(fromTree(shadow.startsWith("git") ? "git show origin/main:scripts/x.py | bash" : "test -f scripts/x.py", ownHas, pathsIndex(own))) === JSON.stringify(["scripts/x.py"]),
         `a ${shadow} the project holds at its root, which cmd runs in its name's place, takes the exemption away`);
     }
     const began = Date.now();
-    for (const command of ["a.sh ".repeat(1 << 16), "test -f a.sh; ".repeat(1 << 15), "'".repeat(1 << 19), "$'".repeat(1 << 18), "alias\talias ".repeat(1 << 15), "git show ".repeat(1 << 15), `git ${"-C x ".repeat(1 << 15)}show origin/main:a.sh`, `git -C "${"$(a)".repeat(1 << 15)}`, `git -C ${"$a".repeat(1 << 12)} show origin/main:x y`, `FOO=${"$a".repeat(1 << 12)} git show origin/main:x y`, `git -C "${"$a".repeat(1 << 12)}" show origin/main:x y`, `git ${"--a=$a ".repeat(1 << 11)}show origin/main:x y`, `"'\"${"(/".repeat(50000)}\"'"`, "a={ ".repeat(1 << 16), "-c ".repeat(1 << 17)]) fromTree(command, has, index);
+    for (const command of ["a.sh ".repeat(1 << 16), "test -f a.sh; ".repeat(1 << 15), "'".repeat(1 << 19), "$'".repeat(1 << 18), "alias\talias ".repeat(1 << 15), "git show ".repeat(1 << 15), `git ${"-C x ".repeat(1 << 15)}show origin/main:a.sh`, `git -C "${"$(a)".repeat(1 << 15)}`, `git -C ${"$a".repeat(1 << 12)} show origin/main:x y`, `FOO=${"$a".repeat(1 << 12)} git show origin/main:x y`, `git -C "${"$a".repeat(1 << 12)}" show origin/main:x y`, `git ${"--a=$a ".repeat(1 << 11)}show origin/main:x y`, `"'\"${"(/".repeat(50000)}\"'"`, "a={ ".repeat(1 << 16), "-c ".repeat(1 << 17), "a \"b c\" ".repeat(1 << 16)]) fromTree(command, has, index);
     ok(Date.now() - began < 15000, "and a command half a megabyte long is read in seconds, never minutes", `${Date.now() - began} ms`);
   }
   ok(JSON.stringify(kitHooks().map(id => JSON.parse(id)).flatMap(id => { const h = id[id.length - 1]; return [h.command, h.action?.command].filter(Boolean); }).flatMap(c => fromTree(c, p => /\.(?:sh|mjs|json|md)$/u.test(p)))) === "[]", "the starter kit's hooks take nothing from the working tree, whatever files the project holds");

@@ -239,6 +239,34 @@ function literals(written, take) {
   for (const level of [written, ...dequotings(written)]) for (const m of level.matchAll(LITERAL)) once(m[0].replace(/\\(.)/gsu, "$1"), windowAt(level, m.index), false);
 }
 
+// A script's words as the shell reads them, each whole: its quoted and unquoted parts joined (tools/"my hook.sh" is one
+// word), a backslash keeping the next character, a blank or an operator outside quotes ending it. Each is [its text, where
+// it starts, whether a quote stood in it].
+function shellWords(script) {
+  const words = [];
+  let word = null, from = 0, quoted = false;
+  const end = () => { if (word !== null) words.push([word, from, quoted]); word = null; quoted = false; };
+  for (let i = 0; i < script.length; i++) {
+    const c = script[i];
+    if (/[\s;&|()<>]/u.test(c)) { end(); continue; }
+    if (word === null) { word = ""; from = i; }
+    if (c === "\\") { word += script[i + 1] ?? ""; i++; continue; }
+    if (c !== "'" && c !== '"') { word += c; continue; }
+    const [text, next] = quotedAt(script, i + 1, c);
+    word += text; quoted = true; i = next - 1;
+  }
+  end();
+  return words;
+}
+// (each whole word that holds a blank, in the command and in each script quoted within it, read through take(), which
+// follows a link inside the checkout, as the list of the project's files alone would not find tools/"my hook.sh")
+function wholeWords(written, take) {
+  const seen = new Set();
+  for (const script of [written, ...quotedTexts(written).map(([body]) => body)]) {
+    for (const [word, at, quoted] of shellWords(script)) if (/\s/u.test(word) && !seen.has(word)) { seen.add(word); take(word, windowAt(script, at), quoted); }
+  }
+}
+
 // Of a command in one of the kit's forms, the words after its script that name a file of the working tree; else null.
 function kitWords(command, holds) {
   const kit = KIT_FORMS.map(f => f.exec(command)).find(Boolean);
@@ -274,6 +302,7 @@ export function fromTree(command, holds, index = null, operand = false) {
   for (const m of text.matchAll(ESCAPED)) if (m[0].includes("\\ ")) take(m[0].replace(/\\ /gu, " "), windowAt(text, m.index));
   for (const [body, before] of quotedTexts(raw)) take(body.replace(/\\(?=[\w.%-])/gu, "/"), before, true);
   literals(String(command), take);
+  wholeWords(String(command), take);
   if (index) scanAll(String(command), raw, text, index, holds, found, tests, fetches);
   for (const word of operands) for (const at of fromTree(word, holds, index, true)) found.add(at);
   return [...found];
