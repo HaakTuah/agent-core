@@ -66,7 +66,7 @@ let n = 0;
 // usual ones.
 // `under` is the folder the copy is written to, and `floor` one a copy of the core's floor/ is written to besides; `then`
 // changes the project before its commit.
-function check(files = {}, { branch = "main", at = B, without = null, under = "core", floor = null, then = null, base = env } = {}) {
+function check(files = {}, { branch = "main", at = B, without = null, under = "core", floor = null, then = null, base = env, held = { login: "someone", type: "Organization" } } = {}) {
   const dir = path.join(tmp, `project-${++n}`);
   fs.mkdirSync(path.join(dir, under), { recursive: true });
   git(dir, "init", "-q", "-b", "main");
@@ -78,7 +78,7 @@ function check(files = {}, { branch = "main", at = B, without = null, under = "c
   if (then) then(dir);
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "a project");
-  const github = { event_name: "pull_request", repository: "someone/project", event: { repository: { default_branch: branch, private: false }, pull_request: { base: { sha: "" } } } };
+  const github = { event_name: "pull_request", repository: `${held.login}/project`, repository_owner: held.login, event: { repository: { default_branch: branch, private: false, owner: held }, pull_request: { base: { sha: "" } } } };
   const [job] = runWorkflow(workflow, { github, base, temp: tmp, workspace: () => dir, uses: { "actions/checkout": checkoutStandIn(env, tmp) } });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
@@ -93,7 +93,16 @@ passes("a difference from a module", { "core-manifest.md": MANIFEST(B, "\n## Dif
 passes("a heading inside a fenced block, and the floor named outside the section", { "core-manifest.md": MANIFEST(B, "\n## Differences\n- `core/tasks/roles.md`, \"The builders\": none.\n\n## Notes\nThe floor holds whole.\n\n```\n# Differences\nthe floor\n```\n") });
 fails("a manifest without its pin line", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^Core: .*\n/m, "") });
 fails("a manifest with two", "no one \"Core:", { "core-manifest.md": MANIFEST().replace(/^(Core: .*\n)/m, "$1$1") });
-fails("a manifest without the owner's account", "owner's account", { "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") });
+fails("a manifest without the owner's account, an organisation's account holding the repository", "owner's account", { "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") });
+{ // (#481: read where the host says a person's account holds it; a row, there, still decides)
+  const r = check({ "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") }, { held: { login: "someone", type: "User" } });
+  ok(r.passed && r.out.includes("The owner's account is read: someone"), "a manifest without the owner's account, a person's account holding the repository: passes, saying what it read", r.out);
+}
+fails("a manifest without the owner's account, a login of no form holding the repository", "owner's account", { "core-manifest.md": MANIFEST().replace(/^\| \*owner's account\*.*\n/m, "") }, { held: { login: "a;b", type: "User" } });
+fails("an owner's account row whose lead is spelt otherwise, a person's account holding the repository: never read past", "owner's account", { "core-manifest.md": MANIFEST().replace("| *owner's account* |", "| *owner’s Account* |") }, { held: { login: "someone", type: "User" } });
+passes("the one owner's account row of its form beside a row spelt otherwise, as before", { "core-manifest.md": MANIFEST().replace(/^(\| \*owner's account\*.*\n)/m, "$1| *Owner's account* | `x` |\n") }, { held: { login: "someone", type: "User" } });
+fails("an owner's account row with more in its first cell, a person's account holding the repository: never read past", "owner's account", { "core-manifest.md": MANIFEST().replace("| *owner's account* |", "| *owner's account* (a team's) |") }, { held: { login: "someone", type: "User" } });
+fails("an owner's account that is no login, a person's account holding the repository", "owner's account", { "core-manifest.md": MANIFEST().replace(`\`${OWNER}\``, "`two words`") }, { held: { login: "someone", type: "User" } });
 fails("a manifest with the owner's account twice", "owner's account", { "core-manifest.md": MANIFEST().replace(/^(\| \*owner's account\*.*\n)/m, "$1$1") });
 fails("an owner's account that is no login", "owner's account", { "core-manifest.md": MANIFEST().replace(`\`${OWNER}\``, "`two words`") });
 fails("a pin off the core's main", `the pin ${SIDE} is not a commit of the core's main`, { "core-manifest.md": MANIFEST(SIDE) });

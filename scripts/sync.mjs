@@ -5,9 +5,10 @@
 // entries it gained between the two commits), then, from the copy it has just written, every step a release asks that
 // is not done, every difference from a fresh start, where the owner's inbox is and what its labels and openers lack
 // (steps.mjs, fresh.mjs, inbox.mjs and labels.mjs, beside this file), for the sync PR's description: they report and fail nothing (AGENTS.md of the core, "Nothing locks a project"). It commits and pushes nothing: the session that runs it reviews the diff and opens the PR,
-// which, a pure sync, its merger checks with `scripts/pure-sync.mjs` (floor rule 8). Git, tar and Node's own modules
-// only; the core's address: core-address.mjs, beside this file. Where the line says a library carries the core, it
-// syncs nothing: the library's own repository does (tasks/repositories.md).
+// which, a pure sync, its merger checks with `scripts/pure-sync.mjs` (floor rule 8). Git, tar, gh where it asks whose
+// account holds the repository (releases.mjs, hostAccount) and Node's own modules only; the core's address:
+// core-address.mjs, beside this file. Where the line says a library carries the core, it syncs nothing: the library's
+// own repository does (tasks/repositories.md).
 //
 //   node core/scripts/sync.mjs              to the newest of what the project follows: the core's main, or its newest
 //                                           release where it follows the releases (releases.mjs, beside this file),
@@ -24,7 +25,7 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
-import { NOTES, asksBetween, fetchCore, followsOf, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
+import { NOTES, asksBetween, fetchCore, followsOf, hostSaid, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
 // git's own variables that point elsewhere left out: releases.mjs)
@@ -63,7 +64,7 @@ function targetOf({ manifest, text, old, first, at }, tmp) {
   if (arg && !/^[0-9a-f]{40}$/.test(arg)) fail("give the core's commit as a full SHA");
   const pin = arg ?? (first ? old : null);
   if (pin) return { pin, release: "" };
-  const follows = followsOf(text) ?? fail(`${manifest} does not say what the project follows: its *follows* row is \`main\` or \`releases\`, once, or left out beside one *owner's account* row`);
+  const follows = followsOf(text, hostSaid()) ?? fail(`${manifest} does not say what the project follows: its *follows* row is \`main\` or \`releases\`, once, or left out where the owner's account is read: its one row, or the repository's own account where the host says a person holds it`);
   if (follows === "main") return { pin: git(["rev-parse", "refs/heads/main"], tmp), release: "" };
   return releaseToTake({ text, old, at }, tmp);
 }
