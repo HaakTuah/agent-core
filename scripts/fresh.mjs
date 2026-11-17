@@ -30,13 +30,15 @@ import { ownerOf } from "./releases.mjs";
 import { KIT as SHAPE, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
-import { KIT_CONFIGS, Unread, packagesFolder } from "./check-configs.mjs";
+import { KIT_CONFIGS, Unread, folded, packagesFolder } from "./check-configs.mjs";
 import { call as callOf, configs, plain, project } from "./steps.mjs";
 
 const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // (a call that cannot be read, a workflow in a form the core's reader does not know, counts as none here: steps.mjs
 // reports it)
 const call = (p, name) => { try { return callOf(p, name); } catch { return null; } };
+// Whether the project calls the NuGet check: the core's nuget.yml, or core.yml with its input nuget (#376).
+const nugetCalled = p => { try { return !!call(p, "nuget.yml") || folded(p, "nuget").length > 0; } catch { return false; } };
 const SKIPPED = new Set(["docs/PROGRESS.md"]); // (the progress file: the project's own from its first task)
 
 // The project's own files: neither the core's copy, at the path its manifest names (core-path.mjs), nor an install's.
@@ -65,7 +67,7 @@ export function kind(p) {
   // (Dependabot's directory for NuGet where it names one, "/" being the root itself; else the solution's or project
   // file's folder)
   const named = /package-ecosystem:\s*"?nuget"?\s*\n\s*directory:\s*"?\/?([^"\n]*)"?/.exec(p.read(".github/dependabot.yml") ?? "");
-  if (call(p, "nuget.yml") || built) o.nuget = named ? named[1].replace(/\/+$/, "") || "." : built ? folderOf(built) : ".";
+  if (nugetCalled(p) || built) o.nuget = named ? named[1].replace(/\/+$/, "") || "." : built ? folderOf(built) : ".";
   if (!p.workflows["codeql.yml"] && !p.workflows["licences.yml"]) o.private = true;
   if (/^Floor: whole\. Modules: all\.$/m.test(p.manifest)) o.game = true;
   return { o, pin };
