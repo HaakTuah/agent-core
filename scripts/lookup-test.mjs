@@ -264,6 +264,23 @@ try {
   ok(notDone(tmp, step).length === 1, "nor after a core script Node is told to load a file of the project's before");
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/lookup.mjs c.json --nuget\n        env:\n          NODE_OPTIONS: --import ./build.mjs\n      - run: node core/scripts/nuget.mjs c.json\n");
   ok(notDone(tmp, step).length === 1, "nor a lookup Node is told to load a file of the project's before");
+  // What has a step run more than its words show, before the NuGet lookup or in it.
+  const lic = (extra) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n${extra}      - run: node core/scripts/lookup.mjs c.json --nuget\n      - run: node core/scripts/nuget.mjs c.json\n`);
+  for (const [what, extra] of [
+    ["BASH_ENV", "      - run: node core/scripts/licences.mjs c.json\n        env:\n          BASH_ENV: ./build.sh\n"],
+    ["a PATH of the project's", "      - run: node core/scripts/licences.mjs c.json\n        env:\n          PATH: ./tools:/usr/bin:/bin\n"],
+    ["a node of the project's", "      - run: ./tools/node core/scripts/licences.mjs c.json\n"],
+    ["a shell of the step's own", "      - run: node core/scripts/licences.mjs c.json\n        shell: ./build.sh {0}\n"],
+    ["an expansion bash evaluates", "      - run: node core/scripts/licences.mjs ${X:Y}\n"],
+    ["a step that writes to $GITHUB_ENV", "      - run: echo NODE_OPTIONS=--import=./build.mjs >> \"$GITHUB_ENV\"\n"],
+  ]) {
+    lic(extra);
+    ok(notDone(tmp, step).length === 1, `a NuGet lookup after a step with ${what} does not count`);
+  }
+  lic("      - run: node core/scripts/licences.mjs c.json\n");
+  ok(notDone(tmp, step).length === 0, "and after the licence script alone, it does");
+  nugetJob("echo PATH=./tools >> \"$GITHUB_PATH\"", "node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json");
+  ok(notDone(tmp, step).length === 1, "nor does an npm lookup after a step that writes to $GITHUB_PATH");
   writeFileSync(join(tmp, "core-manifest.md"), `# Manifest\n\nCore: ${CORE} at ${"0".repeat(40)}, copied whole under shared/\n`);
   nugetJob("node shared/scripts/exact-versions.mjs c.json");
   missed = notDone(tmp, step);
@@ -348,6 +365,14 @@ try {
   ok(notDone(tmp, step).length === 0, "and given the same, it does");
   calls(null, null);
   ok(notDone(tmp, step).length === 1, "an input no caller gives matches nothing");
+  // The same, an input given through env.
+  for (const [name, line] of [["look", "node core/scripts/lookup.mjs \"$CFG\""], ["check", "node core/scripts/exact-versions.mjs \"$CFG\""]]) {
+    writeFileSync(join(tmp, `.github/actions/${name}/action.yml`), `name: ${name}\ninputs:\n  config:\n    required: false\nruns:\n  using: composite\n  steps:\n    - run: ${line}\n      shell: bash\n      env:\n        CFG: \${{ inputs.config }}\n`);
+  }
+  calls("checks/a.json", "checks/b.json");
+  ok(notDone(tmp, step).length === 1, "an input given through env is the caller's too: a lookup of one config does not stand for another's check");
+  calls("checks/b.json", "checks/b.json");
+  ok(notDone(tmp, step).length === 0, "and given the same through env, it does");
   rmSync(join(tmp, ".github/actions"), { recursive: true, force: true });
   // An action past a megabyte is named, not read, and each action is read once however often it is used.
   mkdirSync(join(tmp, ".github/actions/big"), { recursive: true });

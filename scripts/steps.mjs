@@ -408,7 +408,7 @@ function movedPaths(p) {
 // A job's steps with each local composite action (`uses: ./…`) read in its place, its own steps in order, so a check or
 // a lookup run from one is seen where it runs: an inner step takes its caller's `if:`, continue-on-error and env where
 // it gives none of its own, and runs from the folder it names, never its caller's default; each `${{ inputs.x }}` in its
-// run, folder and `with:` is the caller's `with:` (or the input's default) where it gives one, and is left, never to
+// run, folder, `with:` and env is the caller's `with:` (or the input's default) where it gives one, and is left, never to
 // match, where not. An action no deeper than 10, never within itself, and no more than INLINED_MOST steps read in a
 // workflow, however the actions call each other; one whose file cannot be read as YAML, is past ACTION_MOST bytes, or
 // lies past that bound is named in `unread`, and its step kept as it stands.
@@ -420,11 +420,11 @@ function inlined(list, read, unread, budget, chain = []) {
     if (!steps) return [st];
     if ((budget.left -= steps.length) < 0) { unread.push(uses); return [st]; }
     const given = inputsOf(st, steps.inputs);
-    const inner = steps.map(x => (x && typeof x === "object" ? { ...given(x), composite: true, if: x.if ?? st.if, "continue-on-error": x["continue-on-error"] || st["continue-on-error"], env: { ...(st.env ?? {}), ...(x.env ?? {}) } } : x));
+    const inner = steps.map(x => (x && typeof x === "object" ? (y => ({ ...y, composite: true, if: x.if ?? st.if, "continue-on-error": x["continue-on-error"] || st["continue-on-error"], env: { ...(st.env ?? {}), ...(y.env ?? {}) } }))(given(x)) : x));
     return inlined(inner, read, unread, budget, [...chain, uses]);
   });
 }
-// A step of an action with each `${{ inputs.x }}` of its run, folder and `with:` put as its caller gives it.
+// A step of an action with each `${{ inputs.x }}` of its run, folder, `with:` and env put as its caller gives it.
 const inputsOf = (caller, declared) => x => {
   const value = name => {
     const v = caller?.with?.[name] ?? declared?.[name]?.default;
@@ -432,7 +432,7 @@ const inputsOf = (caller, declared) => x => {
   };
   const put = t => (typeof t === "string" ? t.replace(/\$\{\{\s*inputs\.([\w-]+)\s*\}\}/gu, (whole, name) => value(name) ?? whole) : t);
   const out = { ...x, run: put(x.run), "working-directory": put(x["working-directory"]) };
-  if (x.with && typeof x.with === "object") out.with = Object.fromEntries(Object.entries(x.with).map(([k, v]) => [k, put(v)]));
+  for (const key of ["with", "env"]) if (x[key] && typeof x[key] === "object") out[key] = Object.fromEntries(Object.entries(x[key]).map(([k, v]) => [k, put(v)]));
   return out;
 };
 // The steps of the composite action at `at`, with its declared inputs as `inputs`, or null: none there, or not
@@ -469,9 +469,15 @@ function folderOf(st, job, w) {
   const dir = st?.["working-directory"] ?? (st?.composite ? undefined : job?.defaults?.run?.["working-directory"] ?? w.yaml?.defaults?.run?.["working-directory"]);
   return typeof dir === "string" ? dir : undefined;
 }
-// Whether a step may run more than its words show: a command run inside another's words, or Node told to load a file first.
-const hides = (st, env, job, w) => /\$\(|`|<\(|>\(/u.test(typeof st?.run === "string" ? st.run : "")
-  || [env, job?.env, w.yaml?.env].some(e => e && typeof e === "object" && "NODE_OPTIONS" in e);
+// Whether a step may run more than its words show: a command run inside another's words or an expansion bash may
+// evaluate (anything but a plain ${NAME}), a shell of the step's own, or an env that has bash or Node load a file first
+// or finds programs elsewhere (BASH_ENV, ENV, PATH, any NODE_*), the step's, its job's or its workflow's.
+const LOADS = /^(?:BASH_ENV|ENV|PATH|NODE_\w*)$/iu;
+const hides = (st, env, job, w) => /\$\(|`|<\(|>\(|\$\{(?![A-Za-z_]\w*\})/u.test(typeof st?.run === "string" ? st.run : "")
+  || !/^(?:bash|sh)?$/u.test(String(st?.shell ?? job?.defaults?.run?.shell ?? w.yaml?.defaults?.run?.shell ?? "").trim())
+  || [env, job?.env, w.yaml?.env].some(e => e && typeof e === "object" && Object.keys(e).some(k => LOADS.test(k)));
+// Whether a step's run writes what later steps run with ($GITHUB_ENV, $GITHUB_PATH).
+const exports = st => typeof st?.run === "string" && /GITHUB_(?:ENV|PATH)/u.test(st.run);
 // A step of a job as the step reads it: its commands, whether its one lookup counts, its action and its env.
 function stepOf(st, job, w, started) {
   const cmds = typeof st?.run === "string" ? commands(st.run) : [];
@@ -480,7 +486,7 @@ function stepOf(st, job, w, started) {
   const alone = typeof st?.run === "string" && !/(?:^|[^&|>])[&|](?![&|])/mu.test(st.run.split(/\r?\n/u).map(uncommented).join("\n"));
   const counts = started && cmds.length === 1 && alone && stops && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"];
   const env = st?.env && typeof st.env === "object" ? st.env : {};
-  return { cmds, counts, hidden: hides(st, env, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
+  return { cmds, counts, hidden: hides(st, env, job, w), exports: exports(st), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
 }
 
 // Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads
@@ -498,6 +504,8 @@ function jobsOf(w, read = () => null) {
   return jobs.map(job => {
     const unread = [];
     const steps = inlined(Array.isArray(job?.steps) ? job.steps : [], read, unread, budget).map(st => stepOf(st, job, w, started));
+    // (a step after one that writes to $GITHUB_ENV or $GITHUB_PATH runs with what that one chose)
+    steps.reduce((seen, st) => { st.tainted = seen; return seen || st.exports; }, false);
     return { runs: steps.flatMap(st => st.cmds), steps, unread,
       deep: (job?.steps ?? []).some(st => typeof st?.uses === "string" && /^actions\/checkout@/u.test(st.uses) && deep(st.with?.["fetch-depth"]) && st.with?.ref === undefined) };
   });
@@ -507,9 +515,9 @@ const placed = (cfg, dir) => (typeof cfg === "string" && dir && !path.posix.isAb
 // Whether a counted lookup step runs the lookup, given `flag`, with the config `at.cfg` the check's step gives; a config
 // named by a variable is matched only where both steps give that variable the same value (or neither sets it), one
 // an action's input names, where its caller gave none, is matched by none, and a lookup that may run more than its
-// words show (hides) counts for none.
+// words show (hides), or that runs after a step that writes what later steps run with, counts for none.
 const lookupOf = (st, flag, copy, at) => {
-  if (/\$\{\{\s*inputs\./u.test(at.cfg ?? "") || st.hidden) return false;
+  if (/\$\{\{\s*inputs\./u.test(at.cfg ?? "") || st.hidden || st.tainted) return false;
   if (!st.counts || !looksUp(st.cmds[0], flag, copy) || placed(configOf(st.cmds[0], "lookup.mjs", copy), st.dir) !== at.cfg) return false;
   const name = /\$\{?(\w+)|%(\w+)%/u.exec(at.cfg ?? "");
   return !name || st.env[name[1] ?? name[2]] === at.step.env[name[1] ?? name[2]];
@@ -522,7 +530,7 @@ const lookupOf = (st, flag, copy, at) => {
 const BEFORE_LOOKUP = ["lookup.mjs", "exact-versions.mjs", "licences.mjs"];
 const beforeLookup = (st, copy) => (st.uses ? /^actions\/(?:checkout|setup-[\w-]+)@/u.test(st.uses)
   : !st.hidden && st.cmds.length > 0 && st.cmds.every(c => /(?:^|[\\/])node(?:\.exe)?$/iu.test(c[0]?.text ?? "") && c.length > 1
-    && BEFORE_LOOKUP.some(n => c[1].text === `${copy}scripts/${n}` || c[1].text === `./${copy}scripts/${n}`)));
+    && /^node(?:\.exe)?$/iu.test(c[0].text) && BEFORE_LOOKUP.some(n => c[1].text === `${copy}scripts/${n}` || c[1].text === `./${copy}scripts/${n}`)));
 // Whether a job runs the NuGet lookup of the check at `at`, counted, with every step before it one that may stand there.
 const lookedUpFirst = (job, copy, at) => {
   const first = job.steps.findIndex(st => lookupOf(st, true, copy, at));
