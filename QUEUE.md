@@ -21,6 +21,7 @@ it merges last.
 | #534, point 8 | rule builder | #530 |
 | #488, points 1, 2 and 6 | rule builder; it changes the floor (rules 15 and 7) | |
 | #488, points 3 to 5, 7 and 8 | builder; #534's tools wait on points 3 to 5 | #488's points 1 and 2 |
+| #545 | rule builder; it changes `AGENTS.md`, which every session here reads at its start | |
 | #306 | rule builder | |
 | #307 | rule builder | |
 | #308 | rule builder | |
