@@ -15,7 +15,7 @@ it merges last.
 | #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue, as #534's line below does | |
 | #534, point 13 | rule builder | |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | #488's points 1 and 3 to 5 |
-| #579 | builder; a workflow, two security reviews | #567 |
+| #579 | builder | #567 |
 | #580 | builder | #567 |
 | #581 | rule builder; it changes `AGENTS.md`'s *mutation tool* | #567 |
 | #582 | builder | #567 |
@@ -29,7 +29,7 @@ it merges last.
 | #528, step 3 | rule builder | #527, and #488's points 1 and 3 to 5 |
 | #529, step 4 | builder | #528 |
 | #530, step 5 | builder | #529 |
-| #587 | rule builder | #530 |
+| #587 | rule builder; it may change the floor's topics and what every role reads at its start | #530 |
 | #488, points 3 to 5, 7 and 8 | builder; #534's tools wait on points 3 to 5 | #488's points 1 and 2 |
 | #306 | rule builder | |
 | #307 | rule builder | |
