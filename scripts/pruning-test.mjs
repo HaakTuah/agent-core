@@ -97,6 +97,10 @@ ok(led[at(early.key)] === `- ${early.key}: no holder, read at a role's start. It
 ok(/^- floor\/security\.md: 3\. Bare: no holder, read on need\. Its proposal: goes, it costs much\. It guards against rare and severe harm, so it is proposed a holder, a check or a staged case, and nothing else\.$/u.test(led[at(floorBare.key)])
   && /No proposal yet: the session that takes the pruning gives it one in `reports\/unheld\.json`/u.test(led[at(unproposed.key)]),
   "a floor rule proposed to go is said to need a holder instead, and a rule with no proposal is said to need one");
+const tool = R("tools/x.md", "Its own"), floorNone = R("floor/topics/y.md", "Unproposed");
+const tooled = list({ all: [bare, tool, floorNone], named, numbers, record: rec(), cases, steps, starts: new Set(), toolStarts: new Set([tool.key]), joined: () => 40, none: [bare.key, tool.key, floorNone.key], proposals });
+ok(tooled[1].startsWith(`- ${tool.key}: no holder, read at its tool's start.`) && /^- floor\/topics\/y\.md: Unproposed: no holder, read on need\. No proposal yet: .*a check or staged case that could hold it, since it guards against rare and severe harm\.$/u.test(tooled.find(l => l.startsWith(`- ${floorNone.key}:`)) ?? ""),
+  "a rule of a tool's part, read at its tool's start, comes first, and a floor rule with no proposal is offered only a holder", tooled.join("\n"));
 const lone = list({ all: [bare, floorBare], named, numbers, record: rec(), cases, steps, starts: new Set(), joined: () => 40, none: [bare.key, floorBare.key],
   proposals: { [bare.key]: { mark: "check", why: "a script could read it" }, [floorBare.key]: { mark: "move", why: "read rarely" } } });
 ok(lone.some(l => l === `- ${bare.key}: no holder, read on need. Its proposal: check, no issue filed yet: the session files one where its upkeep pays, which joins the queue as any check for a rule that stands does, a script could read it.`)
