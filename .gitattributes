@@ -4,7 +4,7 @@
 # What stays in this repository alone: `git archive`, which makes each project's copy (scripts/sync.mjs), leaves it
 # out, and core.yml and scripts/copy-tree.mjs compare a copy with the core without it. Both read these lines, each
 # spelled exactly so and named in both: another folder kept here needs both changed first, or every project's check of
-# its copy fails. Both already know `tests`, whose line comes with the core's tests a release later (#527). The dated
+# its copy fails. Both already know `tests`, whose line comes with the core's tests (#527). The dated
 # reports, and the owner's own words behind the archive (#252).
 /reports export-ignore
 /words export-ignore
