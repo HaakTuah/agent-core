@@ -20,6 +20,38 @@
       "rework": "93 (± 19) in 60 pull requests: a review finding 32, a failed check 15, neither (measuring again, or the builder's own) 46; and 20 bringing the branch up to date",
       "size": "412 KB in 40 files, 5 of them over 20 KB",
       "functions": "11 over 60 lines, 0 over 4 depth, 37 over 15 branches"
+    },
+    "HaakTuah/amarna-letters": {
+      "misread": "3 (± 3) of 870 merged, 0.03 for every ten",
+      "missing": "2 (± 3) of 870 merged, 0.02 for every ten",
+      "queued": "none",
+      "looks": "1 (± 2) of 870 merged, 0.01 for every ten",
+      "failed": "0 (± 0) of 870, 0%",
+      "live": "1.8 h (of 54)",
+      "broke": "3 (± 3) of 870 merged, 0.03 for every ten",
+      "mending": "48 (± 14) of 870, 6%",
+      "corrected": "9 (± 6) of 870 merged, 0.1 for every ten",
+      "cost": "68 answers, 53,049 output tokens (of 28 priced)",
+      "uncorrected": "68 answers, 53,049 output tokens (of 28 priced, 28 not corrected)",
+      "carried": "397,962 (of 28 priced)",
+      "idle": "24% of 65 open hours (of the 60 newest merged)",
+      "rework": "31 (± 11) in 60 pull requests: a review finding 5, a failed check 5, neither (measuring again, or the builder's own) 21; and 14 bringing the branch up to date"
+    },
+    "HaakTuah/barkstreet-snakes": {
+      "misread": "5 (± 4) of 690 merged, 0.07 for every ten",
+      "missing": "4 (± 4) of 690 merged, 0.06 for every ten",
+      "queued": "none",
+      "looks": "7 (± 5) of 690 merged, 0.1 for every ten",
+      "failed": "0 (± 0) of 690, 0%",
+      "live": "5.5 h (of 14)",
+      "broke": "0 (± 0) of 690 merged, 0 for every ten",
+      "mending": "20 (± 9) of 690, 3%",
+      "corrected": "16 (± 8) of 690 merged, 0.23 for every ten",
+      "cost": "104 answers, 83,494 output tokens (of 21 priced)",
+      "uncorrected": "104 answers, 83,494 output tokens (of 21 priced, 21 not corrected)",
+      "carried": "418,617 (of 21 priced)",
+      "idle": "71% of 133 open hours (of the 60 newest merged)",
+      "rework": "37 (± 12) in 60 pull requests: a review finding 10, a failed check 16, neither (measuring again, or the builder's own) 11; and 22 bringing the branch up to date"
     }
   },
   "projects": [
@@ -30,13 +62,13 @@
     },
     {
       "shown": "`HaakTuah/amarna-letters`",
-      "outcomes": null,
-      "why": "not read here (#451)"
+      "outcomes": "HaakTuah/amarna-letters",
+      "why": "read on 17 November 2026 by a session that reaches its issues and pull requests; its numbers stand under \"repos\" (#451)"
     },
     {
       "shown": "`HaakTuah/barkstreet-snakes`",
-      "outcomes": null,
-      "why": "not read here (#451)"
+      "outcomes": "HaakTuah/barkstreet-snakes",
+      "why": "read on 17 November 2026 by a session that reaches its issues and pull requests; its numbers stand under \"repos\" (#451)"
     }
   ]
 }

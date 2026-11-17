@@ -28,6 +28,7 @@
       "check: scripts/licences.mjs, in part",
       "check: scripts/agent-tools.mjs, in part"
     ],
+    "floor/topics/dependencies.md: A new one is looked up in its registry": "check: scripts/lookup.mjs",
     "floor/topics/dependencies.md: 17. Dependabot's own PRs": "check: scripts/security-review.mjs, in part",
     "tools/claude.md: Pass both model and effort": "check: scripts/helper-call.mjs, in part",
     "tasks/code-shape.md: How strong the tests are is measured on the lines a pull request changes": "check: scripts/strength.mjs, in part",
@@ -192,7 +193,9 @@
     "floor/security.md: The owner's word": [134, 246],
     "floor/security.md: The owner's yes in the PR": [232],
     "floor/topics/accounts.md: 19. Accounts, roles and a server": [227],
-    "floor/topics/dependencies.md: 15. Dependencies": [76],
+    "floor/topics/dependencies.md: 15. Dependencies": [76, 252],
+    "floor/topics/dependencies.md: A new one is looked up in its registry": [252],
+    "floor/topics/dependencies.md: A new one is taken in an order": [252],
     "floor/topics/dependencies.md: 17. Dependabot's own PRs": [34],
     "floor/topics/dependencies.md: An agent's own tools are code with its sign-ins": [225],
     "floor/topics/input.md: A failure refuses": [227],
@@ -203,6 +206,7 @@
     "floor/topics/weaknesses.md: In a PR's own change": [130],
     "floor/topics/weaknesses.md: Secret scanning with push protection is switched on": [227],
     "floor/topics/what-ships.md: 7. What runs on users' machines": [37, 65, 151],
+    "floor/topics/what-ships.md: A package found bad goes at once": [252],
     "floor/topics/what-ships.md: A program installed on a user's machine": [227],
     "roles/builder.md: Read by task, twice": [234],
     "roles/orchestrator.md: A finished session is archived": [185],
@@ -358,7 +362,7 @@
     "tasks/tools.md: One door in: `AGENTS.md`": [232],
     "tasks/tools.md: One script says what to read": [234],
     "tasks/tools.md: Proven by the staged cases, tool by tool": [232],
-    "tasks/updates.md: Node": [39, 252],
+    "tasks/updates.md: Node": [39, 253],
     "tasks/updates.md: The newest stable version, unless there is a reason": [37, 65],
     "tools/claude.md: Name models by family alone": [80, 81],
     "tools/claude.md: Pass both model and effort": [128],
@@ -386,6 +390,9 @@
     "tasks/choices.md: Every move passes the same gates": "correction: does not work; outcome: robust",
     "tasks/choices.md: A move has an end and states its cost": "correction: does not work; outcome: robust",
     "roles/shared/review-guidelines.md: A mechanical move is read by its rule and a sample": "findings; outcome: robust",
-    "tasks/cleaning.md: The state report leads with the outcomes": "correction: does not work; outcome: robust"
+    "tasks/cleaning.md: The state report leads with the outcomes": "correction: does not work; outcome: robust",
+    "floor/topics/dependencies.md: A new one is looked up in its registry": "check fires; outcome: robust; rare harm",
+    "floor/topics/dependencies.md: A new one is taken in an order": "findings; outcome: robust",
+    "floor/topics/what-ships.md: A package found bad goes at once": "correction: rule missing; outcome: robust; rare harm"
   }
 }
