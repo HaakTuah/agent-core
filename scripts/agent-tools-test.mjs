@@ -457,6 +457,21 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   git(emptyHead, "update-ref", "refs/heads/main", git(emptyHead, "commit-tree", headTree, "-p", "HEAD^1", "-p", "HEAD^2", "-m", "merge"));
   git(emptyHead, "reset", "-q", "--hard");
   fails(run(emptyHead), "and one whose merge holds an empty folder at the fetched path, main a file", 'fetches "format.sh" from main, which the project holds as no plain file');
+  // (#476's fallback security review of 32e028f: where a tree git would refuse names one entry to a path lookup and
+  // another to git show, as one out of order with a broken entry that empties the whole listing, the object git show
+  // resolves is what is asked)
+  const oddBase = project({ ...listing() }), inOdd = { cwd: oddBase, env };
+  const oid = text => execFileSync("git", ["hash-object", "-w", "--stdin"], { ...inOdd, encoding: "utf8", input: text }).trim();
+  const entries = git(oddBase, "ls-tree", "HEAD").split("\n").map(l => { const [meta, name] = l.split("\t"); const [mode, , id] = meta.split(" "); return [mode === "040000" ? "40000" : mode, name, id]; });
+  const raw = [["40000", "aaa", oid("y\n")], ...entries, ["100644", "zzzzzzzzzzzzzzzz", oid("x\n")], ["120000", "format.sh", oid("tree.sh")]].map(([m, n, o]) => Buffer.concat([Buffer.from(`${m} ${n}\0`), Buffer.from(o, "hex")]));
+  const oddTree = execFileSync("git", ["hash-object", "-t", "tree", "--literally", "-w", "--stdin"], { ...inOdd, encoding: "utf8", input: Buffer.concat(raw) }).trim();
+  const oddMain = git(oddBase, "commit-tree", oddTree, "-p", "HEAD", "-m", "a tree out of order");
+  // (the pull request's own tree written from the clean checkout, its commits made by hand over that main)
+  change(oddBase, { "format.sh": "echo a file\n", ".claude/settings.json": withHook(rootKit), ...listing(entry(rootKit)) });
+  git(oddBase, "add", "-A");
+  const prTree = git(oddBase, "write-tree"), prCommit = git(oddBase, "commit-tree", prTree, "-p", oddMain, "-m", "change");
+  git(oddBase, "update-ref", "refs/heads/main", git(oddBase, "commit-tree", prTree, "-p", oddMain, "-p", prCommit, "-m", "merge"));
+  fails(run(oddBase), "and one whose fetched path main holds as a link in a tree out of order", 'fetches "format.sh" from main, which the project holds as no plain file');
   // (#476's security review of a74309b: what the kit's form fetches from main must be a file, not a link, whose target's
   // name main would give in the script's place)
   if (LINKS) {
