@@ -319,9 +319,12 @@ jobs:
       - name: The manifest check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/manifest-reads-test.mjs ')) }}
         run: node scripts/manifest-reads-test.mjs
-      - name: The core's own AGENTS.md fills each slot its modules use
+      - name: Each slot of the core's README carries its mark, read by a reader that stands here or with a default
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/manifest-reads.mjs --core
+      - name: The tools reader
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/tools-read-test.mjs ')) }}
+        run: node scripts/tools-read-test.mjs
       - name: The entry-files check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' scripts/entry-files-test.mjs ')) }}
         run: node scripts/entry-files-test.mjs

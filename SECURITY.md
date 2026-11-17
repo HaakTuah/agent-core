@@ -12,7 +12,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      "Read for it:" by `scripts/reading.mjs`); hostile tests: `scripts/hostile-pr-text-test.mjs`.
    - the comments and reviews on a pull request, their bodies and authors: read by the security-review check and
      the code-review wait (`scripts/security-review.mjs`, `scripts/code-review-wait.mjs`) and the size check's reader
-     of a "Leanness check:" answer (`scripts/size.mjs`); hostile tests: `scripts/hostile-pr-comments-test.mjs`.
+     of a "Leanness check:" answer (`scripts/size.mjs`), and, with the descriptions of merged pull requests, by the
+     tools reader (`scripts/tools-read.mjs`); hostile tests: `scripts/hostile-pr-comments-test.mjs`.
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`) and the tree a copy must be (`scripts/copy-tree.mjs`); hostile
@@ -20,7 +21,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the
      reviews' records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look
      (`scripts/look.mjs`) and the inbox (`scripts/inbox.mjs`); hostile tests: `scripts/hostile-issues-test.mjs`.
-   - what GitHub's API answers, releases and tags, runs and checks, pull requests: read by `scripts/core-moved.mjs`,
+   - what GitHub's API answers, releases and tags, runs and checks, pull requests, and whose account holds a
+     repository (the workflow's event too): read by `scripts/core-moved.mjs`,
      `scripts/releases.mjs`, `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs` and
      `scripts/clean-merges.mjs`; hostile tests: `scripts/hostile-github-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
