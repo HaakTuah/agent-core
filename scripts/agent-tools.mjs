@@ -451,10 +451,23 @@ export function readProject(root, rev = null) {
       return [...(listing(root, rev).children.get(d.f) ?? [])];
     }
     if (outside(dir)) return [];
-    try { return fs.readdirSync(path.join(root, dir)); } catch { return []; }
+    try { return owned(root, dir, fs.readdirSync(path.join(root, dir))); } catch { return []; }
   };
   const skills = () => names(".claude/skills").filter(n => read(`.claude/skills/${n}/SKILL.md`) !== null);
   return { ...configured(read, skills, names, rev ? heldAt(root, rev, read) : f => read(f) !== null), links };
+}
+
+// The names in the working tree's folder `dir` that a commit could hold too: not .git, the checkout's own, nor any git
+// ignores (an install's or a build's), as one `git check-ignore` asks them, at the folder links lead to.
+function owned(root, dir, entries) {
+  const list = entries.filter(n => n !== ".git");
+  if (!list.length) return list;
+  const real = path.relative(fs.realpathSync(root), fs.realpathSync(path.join(root, dir))).split(path.sep).join("/");
+  const at = n => (real ? `${real}/${n}` : n);
+  let out = "";
+  try { out = execFileSync("git", ["check-ignore", "-z", "--stdin"], { cwd: root, input: list.map(at).join("\0"), encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] }); } catch (e) { out = e.stdout ?? ""; }
+  const ignored = new Set(out.split("\0"));
+  return list.filter(n => !ignored.has(at(n)));
 }
 
 // At the commit `rev`, git's own tree is walked as the working tree is, a name at a time as the file system walks it:

@@ -417,6 +417,14 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     for (const odd of ["bash Scripts/Format.SH", "bash scripts/format.sh.", "env -C SCRIPTS bash format.sh"])
       fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(odd), ...listing(entry(odd)) })), `a hook that names a file in another case or with a trailing dot (${odd}) takes it from the working tree`, 'takes "scripts');
   }
+  {
+    // (#476's code review of c5f3515: the checkout's own .git and what git ignores are no part of the project, at the head
+    // as at the base, so a listed hook that names them takes nothing)
+    const own = "git --git-dir=.git --work-tree=build status";
+    const local = project({ ".gitignore": "build/\n", ...listing() });
+    write(local, "build/out.js", "");
+    passes(run(pr(local, { ".claude/settings.json": withHook(own), ...listing(entry(own)) })), "a hook that names the checkout's .git and a folder git ignores takes nothing from the working tree");
+  }
   const step = STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed");
   ok(notDone(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK)) }), step)[0]?.mend.includes('takes "scripts/format.sh" from the working tree'), "the sync note's step reads not done while a hook takes a file from the working tree unmarked");
   ok(!notDone(project({ ...script, ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK, fromWorkingTree)) }), step).length, "and done once it is marked, listed in the baseline");
@@ -473,6 +481,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       // (#476's code review of 77481d7: a word of many `=`, and one long option, are read in one pass)
       `echo ${"=".repeat(1 << 20)}`, `echo -${"a".repeat(1 << 20)}`, `echo -${"a".repeat(1 << 19)}=x`, `echo ${"a=".repeat(1 << 19)}`]) fromTree(command, finds);
     ok(Date.now() - began < 5000, "and a command a megabyte long is read at once", `${Date.now() - began} ms`);
+    // (#476's code review of c5f3515: thousands of names asked of folders of thousands, each folder read once)
+    const many = Array.from({ length: 6000 }, (_, i) => `n${i}`), at = Date.now();
+    fromTree(`echo ${many.map(n => `${n}x n0/${n}x`).join(" ")}`, finder(() => false, d => (d === "." || d === "n0" ? many : [])));
+    ok(Date.now() - at < 5000, "and twelve thousand names asked of folders of six thousand are read at once", `${Date.now() - at} ms`);
     // (#476's code review of 378a61a: two quoted words of a thousand parts each, in a project where each names a folder)
     const wide = n => `'${Array.from({ length: n }, (_, i) => `${"ab"[n % 2]}${i}`).join(" ")}'`, also = Date.now();
     fromTree(`echo ${wide(1000)} ${wide(1001)}`, finder(() => false, () => ["x"]));

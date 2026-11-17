@@ -129,32 +129,46 @@ function named(list, finds) {
 // matched as a file system that ignores case and a name's trailing dots and blanks reads it, as macOS's and Windows' do.
 // `holds(file)` says whether the project holds a file there, `names(folder)` the names in a folder.
 export function finder(holds, names) {
-  const listed = new Map(), list = d => { if (!listed.has(d)) listed.set(d, names(d)); return listed.get(d); };
+  const indexed = new Map(), index = d => { if (!indexed.has(d)) indexed.set(d, indexOf(names(d))); return indexed.get(d); };
   const found = new Map();
   return f => {
-    if (!found.has(f)) found.set(f, under(f, holds, list));
+    if (!found.has(f)) found.set(f, under(f, holds, index));
     return found.get(f);
   };
 }
-function under(f, holds, names) {
+function under(f, holds, index) {
   if (f === ".") return ["."];
-  const out = new Set(), at = [f, ...folded(f, names)];
-  for (const p of at) if (holds(p) || names(p).length) out.add(p);
-  const dir = path.posix.dirname(f), stem = `${bare(path.posix.basename(f))}.`;
-  for (const d of dir === "." ? ["."] : [dir, ...folded(dir, names)]) {
-    for (const n of names(d)) if (n.toLowerCase().startsWith(stem)) out.add(d === "." ? n : `${d}/${n}`);
+  const out = new Set();
+  for (const p of reached(f, index)) if (holds(p) || index(p).size) out.add(p);
+  const dir = path.posix.dirname(f), stem = bare(path.posix.basename(f));
+  for (const d of dir === "." ? ["."] : reached(dir, index)) {
+    for (const n of index(d).byStem.get(stem) ?? []) out.add(d === "." ? n : `${d}/${n}`);
   }
   return [...out];
 }
-// (each path a path names where case and a name's trailing dots and blanks are not read)
+// (a folder's names, made once a folder, by their form where case and trailing dots and blanks are not read, and by
+// each beginning of one that a dot ends, of a name's first 255 characters, as long as a file system lets a name be)
 const bare = name => name.replace(/[. ]+$/u, "").toLowerCase();
-function folded(f, names) {
+function indexOf(list) {
+  const byBare = new Map(), byStem = new Map();
+  const put = (map, key, n) => { if (!map.has(key)) map.set(key, []); map.get(key).push(n); };
+  for (const n of list) {
+    put(byBare, bare(n), n);
+    const low = n.slice(0, 255).toLowerCase();
+    for (let i = low.indexOf("."); i >= 0; i = low.indexOf(".", i + 1)) put(byStem, low.slice(0, i), n);
+  }
+  return { size: list.length, byBare, byStem };
+}
+// (each path of the project a path names, as written or where case and a name's trailing dots and blanks are not
+// read: each name on its way in the listing of the folder before it, so what a listing leaves out, the checkout's .git
+// or what git ignores, is never reached)
+function reached(f, index) {
   let at = ["."];
   for (const name of f.split("/")) {
-    at = at.flatMap(d => names(d).filter(n => bare(n) === bare(name)).map(n => (d === "." ? n : `${d}/${n}`)));
+    at = at.flatMap(d => (index(d).byBare.get(bare(name)) ?? []).map(n => (d === "." ? n : `${d}/${n}`)));
     if (!at.length) break;
   }
-  return at.filter(p => p !== f);
+  return at;
 }
 
 // Whether a word makes the command no plain one: a piece of it between blanks that sets a variable, itself, after an
