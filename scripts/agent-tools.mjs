@@ -465,8 +465,8 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   for (const [at, want] of misnamed(rev ? [...listing(root, rev).blobs, ...listing(root, rev).links] : tracked(root))) {
     const problem = `${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`;
     project.problems.push(problem);
-    // (with its text, so one the base held is noted only while it stands letter for letter)
-    project.texts.set(problem, `${at}\0${read(at)}`);
+    // (with what the tool reads through it, so one the base held is noted only while that stands letter for letter)
+    project.texts.set(problem, through(at, want, read, names));
   }
   return { ...project, links };
 }
@@ -474,19 +474,30 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
 // The tools' files this check reads, and their folders, as each tool names them.
 const TOOL_FILES = [".claude/settings.json", ".claude/settings.local.json", ".mcp.json", ".kiro/settings/mcp.json", ".codex/hooks.json", ".codex/config.toml"];
 const TOOL_FOLDERS = [".claude/skills/", ".kiro/hooks/"];
-// Each path of `paths` that names a tool's file or folder in another case, or a hook file of Kiro's whose ".json" is,
-// as [the path, the name the check reads]: a file system that ignores case gives the tool the file this check passes by.
+// Each step on the way to a tool's file or folder (.codex, .kiro/settings, .claude/skills and the files themselves).
+const WAYS = new Set([...TOOL_FILES, ...TOOL_FOLDERS.map(d => d.slice(0, -1))].flatMap(f => f.split("/").map((_, i, parts) => parts.slice(0, i + 1).join("/"))));
+// Each path of `paths`, or step on its way, a folder or a link among them, that names one of those in another case, and
+// each hook file of Kiro's whose ".json" is, as [the path, the name the check reads]: a file system that ignores case
+// gives the tool what this check passes by.
 function misnamed(paths) {
-  const out = [];
+  const out = new Map();
   for (const at of paths) {
-    const low = at.toLowerCase();
-    const file = TOOL_FILES.find(f => f === low && f !== at);
-    const folder = TOOL_FOLDERS.find(d => low.startsWith(d) && !at.startsWith(d));
-    const want = file ?? (folder ? `${folder}${at.slice(folder.length)}` : at);
-    const fixed = path.posix.dirname(want) === ".kiro/hooks" ? want.replace(/\.json$/iu, ".json") : want;
-    if (fixed !== at) out.push([at, fixed]);
+    const parts = at.split("/");
+    for (let i = 1; i <= parts.length; i++) {
+      const step = parts.slice(0, i).join("/"), low = step.toLowerCase();
+      if (WAYS.has(low) && step !== low) { out.set(step, low); break; }
+    }
+    if (path.posix.dirname(at) === ".kiro/hooks" && /\.json$/iu.test(at) && !at.endsWith(".json")) out.set(at, at.replace(/\.json$/iu, ".json"));
   }
-  return out;
+  return [...out];
+}
+// What a tool reads through `at`, a path in another case that stands for `want`: each tool file under it, and each entry
+// of a tool folder under it with its text (and a skill's SKILL.md), so one the base held is noted only while that stands.
+function through(at, want, read, names) {
+  const via = f => `${at}${f.slice(want.length)}`, under = f => f === want || f.startsWith(`${want}/`);
+  const files = TOOL_FILES.filter(under).map(f => `${f}\0${read(via(f))}`);
+  const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => names(via(d.slice(0, -1))).sort().map(n => `${d}${n}\0${read(`${via(d)}${n}`)}\0${read(`${via(d)}${n}/SKILL.md`)}`));
+  return [at, read(at), ...files, ...folders].join("\0\0");
 }
 // The paths the working tree holds of the project's, tracked or not but never ignored, git asked once.
 function tracked(root) {
