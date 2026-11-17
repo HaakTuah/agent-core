@@ -98,6 +98,16 @@ ok(r.status === 1 && /FAIL copies\.yml\/copies\/copies: its step "The copies, po
   s = check(q.dir, "--base", "base");
   ok(s.status === 1 && /the copy of the core is not the core at its pin, so no other check runs/.test(s.out) && !/its step "The copies, pointer/.test(s.out) && mended(s.out),
     "where the copy is not the core, the steps the one job runs of the copy's scripts run no more, the new copy unread", s.out);
+  // (a pin that is no commit of the core, so the core's checkout at it fails, and the copy's own checks.mjs edited to
+  // leave a mark where it runs: it must not run, here or in the job, before the copy is proved the core)
+  git(q.dir, "reset", "-q", "--hard", "base");
+  const mark = path.join(tmp, "copy-scripts-ran");
+  fs.writeFileSync(path.join(q.dir, "core", "scripts", "checks.mjs"), `import fs from "node:fs";\nfs.writeFileSync(${JSON.stringify(mark)}, "ran");\n`);
+  const qManifest = path.join(q.dir, "core-manifest.md");
+  fs.writeFileSync(qManifest, fs.readFileSync(qManifest, "utf8").replace(/^(Core: \S+ at )[0-9a-f]{40}/m, `$1${"f".repeat(40)}`));
+  commit(q.dir, "a pin that is no commit of the core, and an edited script of the copy");
+  s = check(q.dir, "--base", "base");
+  ok(s.status === 1 && !fs.existsSync(mark) && mended(s.out), "where the core cannot be fetched at the pin, the copy's own scripts run not at all", s.out);
 }
 
 // a change that takes a check's call out still runs it: the calls are the base's

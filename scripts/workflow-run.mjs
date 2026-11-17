@@ -427,7 +427,7 @@ function runUses(jr, step, name, env) {
   } catch (e) {
     // (a stand-in that refuses what the step asks of it fails the step, as the action would)
     result.steps.push({ name, ran: true, passed: false, out: `${e.message}\n` });
-    state.failed = true; result.passed = false;
+    failed(state, result, rt.stop, name);
     return;
   }
   result.steps.push({ name, ran: did !== false, passed: true, out: did === false ? "GitHub's own, not run here" : "" });

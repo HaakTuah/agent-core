@@ -54,6 +54,9 @@ export const COPIES = [
 function fail(what, mend) { console.log(`FAIL ${what} ${MEND}${mend}`); process.exit(1); }
 
 function main() {
+  // (on Windows, no program is looked for in the folder a check runs in, which the change under check fills: neither by
+  // Node when it starts one nor by a shell it starts; every other system looks only on the PATH)
+  if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
   let root;
   try { root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); }
   catch { fail("this folder is in no git repository.", "run it from the project's root, in its clone."); }
@@ -166,11 +169,13 @@ const node = (coreAt, script, args, opts) => run(process.execPath, [`${coreAt}sc
 // The registry's packages installed from the lock file, running no package's install script, and their signatures
 // checked: each written out whole, on Windows through its shell, where the program is a script. Whether each passed.
 const shown = { stdio: ["ignore", "inherit", "inherit"] };
+// (Windows' shell, by the path the system names, never a cmd.exe the checked-out folder holds)
+const COMSPEC = process.env.ComSpec || "cmd.exe";
 const passed = r => { if (r.error) console.log(`The package manager could not be started (${r.error.message}).`); return r.status === 0; };
 const install = cwd => passed(process.platform === "win32"
-  ? spawnSync("cmd.exe", ["/d", "/s", "/c", "npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none"], { cwd, ...shown })
+  ? spawnSync(COMSPEC, ["/d", "/s", "/c", "npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none"], { cwd, ...shown })
   : spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none"], { cwd, ...shown }));
-const signed = cwd => passed(process.platform === "win32" ? spawnSync("cmd.exe", ["/d", "/s", "/c", "npm audit signatures"], { cwd, ...shown })
+const signed = cwd => passed(process.platform === "win32" ? spawnSync(COMSPEC, ["/d", "/s", "/c", "npm audit signatures"], { cwd, ...shown })
   : spawnSync("npm", ["audit", "signatures"], { cwd, ...shown }));
 
 const RUN = {
