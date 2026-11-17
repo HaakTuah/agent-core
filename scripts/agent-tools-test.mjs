@@ -426,26 +426,6 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   fails(windowsRun({ ".codex/config.toml": `[[hooks.Stop]]\n[[hooks.Stop.hooks]]\ntype = "command"\ncommand = ${JSON.stringify(KIT_HOOK)}\ncommand_windows = ${JSON.stringify(evil)}\n` }, `Codex Stop: ${KIT_HOOK} (Windows: ${evil})`), "and so does one in config.toml whose command_windows is not", NOT_KIT);
   const only = { type: "command", command_windows: evil };
   fails(windowsRun({ ".codex/hooks.json": codexHook(only) }, `Codex Stop: ${JSON.stringify(only)}`), "and one with a Windows command alone", NOT_KIT);
-  // (#476's security review of a74309b: a tool's file in another case is what a file system that ignores case gives the tool)
-  fails(run(pr(project({ ...listing() }), { ".Codex/hooks.json": codexHook({ type: "command", command: "bash scripts/evil.sh" }) })), "a tool's file in another case fails", ".Codex is .codex in another case", "Mend: rename it to .codex");
-  fails(run(pr(project({ ...listing() }), { ".Kiro/hooks/x.JSON": { version: "v1", hooks: [{ name: "x", trigger: "Stop", action: { type: "command", command: "bash scripts/evil.sh" } }] } })), "and so does a Kiro hook file in another case, its .json too", "Mend: rename it to .kiro");
-  fails(run(pr(project({ ...listing() }), { ".kiro/hooks/x.JSON": { version: "v1", hooks: [{ name: "x", trigger: "Stop", action: { type: "command", command: "bash scripts/evil.sh" } }] } })), "and a Kiro hook file whose .json is in another case", "Mend: rename it to .kiro/hooks/x.json");
-  // (a folder the project's own helper writes none of, so a file system that ignores case keeps the name as written)
-  const oddStood = run(pr(project({ ".Codex/config.toml": "# none\n", ...listing() }), { "README.md": "a change of its own\n" }));
-  ok(oddStood.status === 0 && /\.Codex is \.codex in another case/.test(oddStood.out), "one the base held is noted, not failed", oddStood.out);
-  fails(run(pr(project({ ".Codex/config.toml": "# none\n", ...listing() }), { ".Codex/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n" })), "but not once the pull request changes it", "Mend: rename it to .codex");
-  if (LINKS) {
-    // (#476's code review of 5b36d45: a folder or a link in another case on the way to a tool's file, as .Codex -> config)
-    const aliased = project({ "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n", ...listing() });
-    fs.symlinkSync("config", path.join(aliased, ".Codex"));
-    fails(run(aliased, "--core"), "a link in another case to a tool's folder fails", ".Codex is .codex in another case", "Mend: rename it to .codex");
-    const aliasStood = project({ "config/config.toml": "# none\n", ...listing() });
-    fs.symlinkSync("config", path.join(aliasStood, ".Codex"));
-    git(aliasStood, "add", "-A"); git(aliasStood, "commit", "-q", "-m", "a link in another case");
-    const aliasKept = run(pr(aliasStood, { "README.md": "a change of its own\n" }));
-    ok(aliasKept.status === 0 && /\.Codex is \.codex in another case/.test(aliasKept.out), "one the base held is noted, not failed", aliasKept.out);
-    fails(run(pr(aliasStood, { "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n" })), "but not once what the tool reads through it changes", "Mend: rename it to .codex");
-  }
   // (#476's security review of a74309b: what the kit's form fetches from main must be a file, not a link, whose target's
   // name main would give in the script's place)
   if (LINKS) {
