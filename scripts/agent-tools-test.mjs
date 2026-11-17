@@ -401,12 +401,14 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const files = ["scripts/a.sh", "scripts/a b.sh", "scripts/r:x.sh", "a.sh"], holds = f => files.includes(f);
   for (const [command, want] of [["bash scripts/a.sh", ["scripts/a.sh"]], ["node \"$CLAUDE_PROJECT_DIR/scripts/a.sh\"", ["scripts/a.sh"]], ["\"$CLAUDE_PROJECT_DIR\"/scripts/a.sh", ["scripts/a.sh"]],
     ["bash ${CLAUDE_PROJECT_DIR}/scripts/a.sh", ["scripts/a.sh"]], ["bash 'scripts/a b.sh'", ["scripts/a b.sh"]], ["bash scripts/'a b'.sh", ["scripts/a b.sh"]], ["node --require=scripts/a.sh x", ["scripts/a.sh"]],
-    ["java -cp lib:scripts/a.sh Main", ["scripts/a.sh"]], ["git show refs/remotes/origin/main:scripts/a.sh", ["scripts/a.sh"]], ["test -f scripts/a.sh", ["scripts/a.sh"]], ["cat ./scripts/../scripts/a.sh", ["scripts/a.sh"]],
-    ["bash scripts/r:x.sh", ["scripts/r:x.sh"]], ["FOO=1 bash a.sh", ["a.sh"]], ["sh -c 'python3 scripts/a.sh'", ["scripts/a.sh"]], ["bash /scripts/a.sh", []], ["echo ../scripts/a.sh", []], ["npx -y tool@1.0.0", []], ["", []],
+    ["java -cp lib:scripts/a.sh Main", ["scripts/a.sh"]], ["git show refs/remotes/origin/main:scripts/a.sh", ["scripts/a.sh"]], ["test -f scripts/a.sh", ["scripts/a.sh"]], ["cat ./scripts/a.sh", ["scripts/a.sh"]],
+    ["bash scripts/r:x.sh", ["scripts/r:x.sh"]], ["FOO=1 bash a.sh", ["a.sh"]], ["sh -c 'python3 scripts/a.sh'", ["scripts/a.sh"]], ["bash /scripts/a.sh", []], ["npx -y tool@1.0.0", []], ["", []],
     // (anything a shell reads otherwise than as written is not read at all: no exemption, nothing taken, only "not shown")
     ["bash scripts/a.sh | cat", null], ["bash scripts/a.sh; true", null], ["bash $X/scripts/a.sh", null], ["bash $CLAUDE_PROJECT_DIRX/scripts/a.sh", null], ["bash scripts/a\\ b.sh", null],
     ["bash \"scripts/a b.sh", null], ["bash ~/a.sh", null], ["bash scripts/*.sh", null], ["bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/a.sh\"", null], ["git show refs/remotes/origin/main:scripts/a.sh | bash", null],
-    ["powershell -File %CLAUDE_PROJECT_DIR%\\scripts\\a.sh", null], ["bash scripts/a.sh # note", null], ["bash scripts/a.sh\nbash a.sh", null]])
+    ["powershell -File %CLAUDE_PROJECT_DIR%\\scripts\\a.sh", null], ["bash scripts/a.sh # note", null], ["bash scripts/a.sh\nbash a.sh", null],
+    // (#476's code review of 0cf9828: the root's name in single quotes is written, not read; and ".." is read after the links before it)
+    ["bash 'scripts/$CLAUDE_PROJECT_DIR/a.sh'", null], ["bash tools/../a.sh", null], ["cat scripts/../scripts/a.sh", null], ["bash scripts/a.sh --x=..", null]])
     ok(JSON.stringify(fromTree(command, holds)) === JSON.stringify(want), `the command ${JSON.stringify(command)} ${want === null ? "is not read" : `takes ${want.length ? want.join(", ") : "nothing"} from the working tree`}`, JSON.stringify(fromTree(command, holds)));
   // (a file at the root that cmd runs in the place of the first word, past the variables it sets)
   for (const shadow of ["git.bat", "git.exe", "git.vbs", "git"])

@@ -6,7 +6,8 @@
 // Read only where it can be read exactly, two ways and no other. The starter kit's own two forms (KIT_FORMS), whole,
 // are the core's: of one, only the plain words after its script are read. A plain command (PLAIN) holds nothing a shell
 // reads otherwise than as written: letters, digits, blanks and `_ . / : = @ + , -`, quotes that only group (balanced,
-// and nothing in them a shell reads either), and $CLAUDE_PROJECT_DIR, the project's root, as an agent tool sets it.
+// and nothing in them a shell reads either), and $CLAUDE_PROJECT_DIR outside single quotes, the project's root, as an
+// agent tool sets it; a path with a ".." is no plain command, since the file system reads ".." after the links before it.
 // Of it, each word, and each part of a word between blanks (a quoted script given to sh -c) or `=`, `:`, `,` and `@`,
 // that names a file the project holds (through
 // a link inside the checkout too, as holds() reads it) is taken from the working tree, whatever program it is given to;
@@ -31,17 +32,28 @@ const KIT_FORMS = [
 ];
 
 // (the project's root, as an agent tool sets it, written so or in braces, and nothing after it that would join its name)
-const ROOT = /\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?!\w))/gu;
+const ROOT = /\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?!\w))/uy;
 const PLAIN = /^[\w \t./:=@+,'"-]*$/u;
+// (a ".." in a path is read by the file system after the links before it, which a plain reading cannot follow)
+const PARENT = /(?:^|[/=:,@\s])\.\.(?:$|[/=:,@\s])/u;
 // (a file at the project's root that a Windows shell runs in the place of a command's first word, since cmd looks in
 // the folder it stands in first)
 const RUNS = ["", ".exe", ".bat", ".cmd", ".com", ".ps1", ".js", ".jse", ".vbs", ".vbe", ".wsf", ".wsh", ".msc"];
 
-// A plain command's words, its quotes taken out, or null where a quote is never closed.
+// A plain command's words, its quotes taken out and $CLAUDE_PROJECT_DIR read as "." where the shell reads it (outside
+// single quotes), or null where a quote is never closed or the root's name stands in single quotes, as written.
 function words(command) {
   const out = [];
   let word = null, quote = null;
-  for (const c of command) {
+  for (let i = 0; i < command.length; i++) {
+    const c = command[i];
+    if (c === "$") {
+      ROOT.lastIndex = i;
+      if (quote === "'" || !ROOT.test(command)) return null;
+      word = (word ?? "") + ".";
+      i = ROOT.lastIndex - 1;
+      continue;
+    }
     if (quote) { if (c === quote) quote = null; else word += c; continue; }
     if (c === "'" || c === '"') { quote = c; word ??= ""; continue; }
     if (c === " " || c === "\t") { if (word !== null) out.push(word); word = null; continue; }
@@ -70,10 +82,9 @@ export function fromTree(command, holds) {
   const text = String(command);
   const kit = KIT_FORMS.map(f => f.exec(text)).find(Boolean);
   if (kit) return [...named((kit[1] ?? "").split(" ").filter(Boolean), holds)];
-  const plain = text.replace(ROOT, ".");
-  if (!PLAIN.test(plain)) return null;
-  const list = words(plain);
-  if (list === null) return null;
+  if (!PLAIN.test(text.replace(/\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?!\w))/gu, ""))) return null;
+  const list = words(text);
+  if (list === null || list.some(w => PARENT.test(w))) return null;
   const found = named(list, holds);
   // (its first word, past the variables it sets, as a Windows shell runs it from the project's root)
   const first = list.find(w => !/^\w+=/u.test(w));
