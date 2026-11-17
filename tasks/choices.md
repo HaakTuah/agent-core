@@ -42,9 +42,9 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
     does not mean every option named gets a trial. Reason: in the core's record on reading a language, no session
     searched past the three its issue named, and a tool that did the same job was never weighed;
   - **two providers where two are at hand** (#515): the blind pick and the case against are made by sessions of
-    different providers where the machine holds two, read from what is installed and never asked
-    (`tasks/tools.md`); otherwise by two fresh sessions of the one tool. Reason: two sessions of one model given one
-    job mostly repeat each other, and each provider's reviews find what the other's miss;
+    different providers where the machine holds two, read from what is installed and never asked (`tasks/roles.md`,
+    "Tools are preferences"); otherwise by two fresh sessions of the one tool. Reason: two sessions of one model given
+    one job mostly repeat each other, and each provider's reviews find what the other's miss;
   - **the judgment** (#515): a fresh session that wrote no part of the record reads it with the blind pick and the case
     against, and decides: the pick stands, another option is picked, or it names the trial that would settle an
     objection, run before it decides where it is cheap, since a trial and not the better argument settles one. Its
@@ -56,19 +56,19 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
 
   It does not mean that what is common is wrong: how well agents write a language is a criterion like any other, once
   named and weighed; nor that the lines above are asked of a record that stood before them, or of one that records a
-  choice already made, which `core/scripts/choices.mjs` lists and never fails. Nothing waits for the owner beyond what floor rule 14 names: the
-  record is how the reading is taken, not a question.
-  Reason: fresh sessions advise what is most common, and both of the owner's first projects paid for an early choice,
-  one with a rewrite into another language.
-- **The choices a project already made are recorded too.** At its first audit (in a project that stood before this
-  rule, as the step its sync asks: `setup/sync-notes.md`), a project's auditing session records each standing choice
-  that is hard to undo, a stated feature of its design that works as one included ("no build step"), each with what
-  it was chosen for, a line that opens `Stood before:` saying when, and its `Reopens it:` line; such a record is
-  argued only by "What the project would be built on today", below. Which platforms the code builds and tests on is such a choice: a
+  choice already made, which `core/scripts/choices.mjs` lists and never fails. Nothing waits for the owner beyond what
+  floor rule 14 names: the record is how the reading is taken, not a question. Reason: fresh sessions advise what is
+  most common, and both of the owner's first projects paid for an early choice, one with a rewrite into another
+  language.
+- **The choices a project already made are recorded too.** At its first audit (in a project that stood before this rule,
+  as the step its sync asks: `setup/sync-notes.md`), a project's auditing session records each standing choice that is
+  hard to undo, a stated feature of its design that works as one included ("no build step"), each with what it was
+  chosen for, a line that opens `Stood before:` saying when, and its `Reopens it:` line; such a record is argued only by
+  "What the project would be built on today", below. Which platforms the code builds and tests on is such a choice: a
   project is bound to one only with the reason in its first record, and "bound to one platform" is recorded with the
   sign that reopens it ("its tests cannot run where its sessions work"). It does not mean that a rewrite is asked or
-  that anything changes in the code: it is a record of what stands. Reason: a choice never written down cannot show
-  when it stops paying off.
+  that anything changes in the code: it is a record of what stands. Reason: a choice never written down cannot show when
+  it stops paying off.
 - **What reopens a choice.** A recorded choice stands until one of two triggers:
   - **its sign trips:** by default, the session that runs the trial, the audit or the measure in which it shows tripped
     files the suggestion below. Where the sign is a measure a check already keeps, the session that writes the record
@@ -137,8 +137,9 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
   another owner, nothing of the report reaches the core but counts. It does not mean the project moves on it: the next
   rule says when a move is built. Reason: the owner wants every project that takes the core to learn what it would be
   built on now, and its owner told.
-- **A move that pays is built in steps; one that must happen at once is capped** (#515). By default nothing moves.
-  Where the second judgment finds that a move pays:
+- **A move that pays is built in steps; one that must happen at once is capped** (#515). By default nothing moves. Where
+  the second judgment finds that a move pays, the session that wrote the record queues it, as the *progress file*'s
+  writer adds any line:
   - one that can ship in steps, each an ordinary pull request that leaves `main` working and the old code in use until
     its step replaces it, is queued and built like any improvement, whatever the project's size, the owner told and
     able to overturn it, nothing waiting;
@@ -147,17 +148,18 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
     owner's sign-off, and the report names the parts worth moving in steps before it;
   - one that has not passed its gates at the cap stops, and becomes that suggestion with what was learned.
 
-  The cap is read, never asked: what the pull requests the project merged in the 14 days up to its newest merge took
-  by their cost lines, as `core/scripts/core-cost.mjs --cap` sums it, two weeks being a first guess. The judge's
-  estimate is compared with it before a move, which decides whether the owner's sign-off is needed; during one, the
-  branch's pull requests are summed (`--pulls`), and the move stops where the sum reaches the cap; where its tool
-  prints no cost line, the cap is 14 days from the move's first commit. Where nothing pays, the report says plainly
-  that staying is the answer. It does not mean that size decides: size sets what a move costs, not whether it works;
-  nor the weighing the core applies to itself (#519), which holds for what many projects take in. Reason: a process
-  that runs by itself must not rewrite a large project for a small gain, a small project on a poor stack is cheapest to
-  move early, and the field gives no size at which a move stops being safe.
-- **Every move passes the same gates** (#515), in steps or all at once, each named in the description of the pull
-  request that makes it, by its builder:
+  The cap is read, never asked: what the pull requests the project merged in the 14 days up to its newest merge took by
+  their cost lines, as `core/scripts/core-cost.mjs --cap` sums it, two weeks being a first guess; the judge gives its
+  estimate in the same answers and output tokens. The estimate is compared with it before a move, which decides whether
+  the owner's sign-off is needed; during one, the branch's pull requests are summed (`--pulls`), and the move stops
+  where the sum reaches the cap; where its tool prints no cost line, the cap is 14 days from the move's first commit.
+  Where nothing pays, the report says plainly that staying is the answer. It does not mean that size decides: size sets
+  what a move costs, not whether it works; nor the weighing the core applies to itself (#519), which holds for what many
+  projects take in. Reason: a process that runs by itself must not rewrite a large project for a small gain, a small
+  project on a poor stack is cheapest to move early, and the field gives no size at which a move stops being safe.
+- **Every move passes the same gates** (#515). By default a change passes its tests and reviews alone; where it moves
+  code from one stack to another, in steps or all at once, its builder passes these too, each named in the description
+  of the pull request that makes it:
   - the old and the new run on the same inputs and their results compared, since tests that pass are not the proof;
     where the project holds its own proof that the same input gives the same result (a simulation's fingerprint, a
     replay, a recorded round trip), that proof is the comparison, and no second one is built;

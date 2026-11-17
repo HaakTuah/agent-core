@@ -605,7 +605,8 @@ export const STEPS = [
   { lead: "17 November 2026, what the project would be built on today", cost: COST.record,
     // (the record of core/tasks/choices.md, "What the project would be built on today", in the *choice records*: its
     // heading's end, and the issue its line "The suggestion:" names; or records all argued by that module's process, a
-    // new project's among them, whose starter kit's file is still to fill in)
+    // new project's among them, whose starter kit's file is still to fill in: a done that holds only until a first audit
+    // records the choices the project already made, on lines "Stood before:", and the step reads not done again)
     check: p => {
       const file = choicesAt(p.manifest);
       if (!file) throw new Unread("the *choice records* the manifest names is no plain path inside the project");
