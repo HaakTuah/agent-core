@@ -251,6 +251,11 @@ function fewer(now, was) {
   return now.every((d) => { const n = left.get(d) ?? 0; left.set(d, n - 1); return n > 0; });
 }
 
+// A download's pin, in every file read for its commands that an entry audits by hand.
+function pinnedIfRead(c, f, text) {
+  if (!c.binary.has(f) && byHand(c, f) && pinRead(f, text, c.auditPath)) pinned(c, f, codeOf(f, text));
+}
+
 /** A program the file `f` downloads by its address is pinned by version and checksum (floor rule 7, as the core pins
  *  Node): where it is not, a pull request that adds the download, or that makes the file lose its pin, fails; a file the
  *  base held unpinned with no download fewer is reported, as is every one with no base (AGENTS.md, "Nothing locks a
@@ -278,8 +283,7 @@ function scanned(c, f) {
   if (runs) scanRunning(c, f, text);
   else if (/\.json[c5]?$/u.test(f) && f !== c.auditPath && !LOCKFILE.test(f)) scanJson(c, f, text);
   else if (other) scanOther(c, f);
-  // (a download's pin, in every file read for its commands that an entry audits by hand)
-  if (!c.binary.has(f) && byHand(c, f) && pinRead(f, text, c.auditPath)) pinned(c, f, codeOf(f, text));
+  pinnedIfRead(c, f, text);
   // (a notice in any file but prose, the notices a project writes itself among them: code copied in, in any language)
   if (!c.binary.has(f) && !PROSE_FILE.test(f) && NOTICE.test(text)) needFile(c, f, "a file carrying a licence notice", { own: false });
   if (ASSET.test(f) || c.binary.has(f)) needFile(c, f, c.binary.has(f) && !ASSET.test(f) ? "a binary file" : "a font, image, sound, video, model or data file");
