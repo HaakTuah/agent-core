@@ -20,8 +20,10 @@
 // step a release asks reads done (steps.mjs), but one the commit under test adds that it asks of every project (a
 // check's own list to write), which is reported, alone, and done by its mend as written; each step the commit under
 // test adds over the release started from, taken out, is reported, and its mend as written makes it done; and steps
-// taken out at random are reported, exactly those; then that a release changing only the core's own files (a test, its queue, a workflow no project calls) asks no
-// sync, and the next one syncs all the same.
+// taken out at random are reported, exactly those. Of the private one, its NuGet call with the starter kit's paths
+// starts no job where nothing NuGet reads changed, and its pull-request checks with the kit's trigger and condition
+// start none on a push to a draft and each once it is marked ready (#375); then that a release changing only the
+// core's own files (a test, its queue, a workflow no project calls) asks no sync, and the next one syncs all the same.
 // Where its issues answer as switched off, the owner's inbox is the folder inbox.mjs names, and a task given,
 // queued, built and closed there passes every check on each pull request. And a copy older than the first release,
 // written by hand since no starter kit stood then, takes the release as the sync notes say (preRelease, below). It needs the core's history and release tags (a checkout with fetch-depth 0); on GitHub's runners the

@@ -275,9 +275,11 @@ function nugetPathsHold(p) {
 function readyOnlyHolds(p) {
   const checks = /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget)\.yml@/i;
   readable(p, text => checks.test(text));
-  const types = on => [].concat(on?.types ?? []).map(String);
-  const wrong = Object.entries(p.workflows).filter(([, w]) => w.yaml?.on && typeof w.yaml.on === "object" && "pull_request" in w.yaml.on
-    && !types(w.yaml.on.pull_request).includes("ready_for_review")
+  // (the types a workflow's pull_request trigger lists, GitHub's own where it lists none or names the event alone, as
+  // `on: pull_request` or `on: [push, pull_request]`; null where it has no such trigger)
+  const types = on => typeof on === "string" || Array.isArray(on) ? ([].concat(on).includes("pull_request") ? [] : null)
+    : on && typeof on === "object" && "pull_request" in on ? [].concat(on.pull_request?.types ?? []).map(String) : null;
+  const wrong = Object.entries(p.workflows).filter(([, w]) => types(w.yaml?.on) !== null && !types(w.yaml.on).includes("ready_for_review")
     && Object.values(w.yaml.jobs ?? {}).some(job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/`.toLowerCase()) && checks.test(job.uses)
       && /\bpull_request\.draft\b/.test(String(job.if ?? ""))));
   return wrong.length ? `A call to the core's checks whose job is skipped on a draft never runs once the pull request is marked ready, since its trigger leaves that out: add \`ready_for_review\` to the \`types:\` under \`pull_request:\` (where it lists none, \`types: [opened, reopened, synchronize, ready_for_review]\`) in ${wrong.map(([f]) => `\`.github/workflows/${shown(f)}\``).join(", ")}.` : null;
