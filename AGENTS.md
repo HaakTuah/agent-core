@@ -303,17 +303,17 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   each with its proposal in `reports/unheld.json` (#545): a check or staged case that could hold it, filed as a task; a
   move to a module read on need; that it goes; or, where it binds no one, that it describes. The session gives one to
   each that has none, a check only where it never guesses and its upkeep pays, a maintained tool where one reads the
-  breach (#534), takes out those whose rule gained a holder, and files each check as an issue, which joins the queue as
-  any check for a rule that stands does, worst first; a rule that guards against rare and severe harm is
-  proposed a holder, never to go.
-  Nothing changes it. The owner decides which move or go, a few at a time, the numbers read again before more go; the
-  list gives each rule its step: a rule read at a role's start is at step 1, to move to a module read on need, and one
-  read on need at step 2, to go where nothing changed after its move, kept in the archive with its reason and its last
-  number, and free to return. It does not mean that a session removes or moves a rule by its own choice, that a listed
-  rule goes, or that a new rule waits for a holder. Reason: the core tested that a rule holds and never whether it is
-  still needed, and an unneeded one costs every session that reads it; on 17 November 2026, 189 of its 310 rules were
-  held by being read alone. Held by `scripts/pruning.mjs`, which makes the list, its test reading that the rules with no
-  holder lead it, and by the state report, which says when a pruning is due.
+  breach (#534) and a maintained linter's rule that can be switched on before a check written by hand, takes out those
+  whose rule gained a holder, and files each check as an issue, which joins the queue as any check for a rule that
+  stands does, worst first; a rule that guards against rare and severe harm is proposed a holder, never to go. Nothing
+  changes it. The owner decides which move or go, a few at a time, the numbers read again before more go; the list gives
+  each rule its step: a rule read at a role's start is at step 1, to move to a module read on need, and one read on need
+  at step 2, to go where nothing changed after its move, kept in the archive with its reason and its last number, and
+  free to return. It does not mean that a session removes or moves a rule by its own choice, that a listed rule goes, or
+  that a new rule waits for a holder. Reason: the core tested that a rule holds and never whether it is still needed,
+  and an unneeded one costs every session that reads it; on 17 November 2026, 189 of its 310 rules were held by being
+  read alone. Held by `scripts/pruning.mjs`, which makes the list, its test reading that the rules with no holder lead
+  it, and by the state report, which says when a pruning is due.
 - **Proof is sized to what a thing costs others** (#303). By default the design check of a pull request that adds a
   thing asks for a number that shows it pays only where the thing is text a role reads at its start, a check that can
   fail a pull request, a test that adds a tenth of its suite's time mark or more (`tasks/tests.md`), or a choice one

@@ -94,8 +94,9 @@ The index, and how an item is written: `archive/instructions.md`.
 
 253. **17 November 2026**, #545. A pruning's list leads with the rules no holder has, worst first, each with one
      proposal: a check or staged case that could hold it, a move to a module read on need, or that it goes; the checks
-     are queued without a further word, a check only where it never guesses and its upkeep pays and a maintained tool
-     where one reads the breach, while the moves and removals are the owner's, a few at a time, and a floor rule is
-     proposed a holder, never to go; the first sorting was done at once: the owner, asking how far the core's rules are
-     enforced, learned that 189 of its 310 rules were held by being read alone, the kind a study found followed at more
-     cost with no gain. It stands behind the order of the pruning's list and `reports/unheld.json`.
+     are queued without a further word, a check only where it never guesses and its upkeep pays, a maintained tool where
+     one reads the breach and a linter's rule that can be switched on before a check written by hand, while the moves
+     and removals are the owner's, a few at a time, and a floor rule is proposed a holder, never to go; the first
+     sorting was done at once: the owner, asking how far the core's rules are enforced, learned that 189 of its 310
+     rules were held by being read alone, the kind a study found followed at more cost with no gain. It stands behind
+     the order of the pruning's list and `reports/unheld.json`.
