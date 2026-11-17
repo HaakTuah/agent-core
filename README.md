@@ -338,10 +338,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
 Where projects differ only in a name, a path or an example, the core leaves a **slot**, in italics (*progress file*),
 and a manifest's row says what fills it. A task is a project's unit of work; the main lane is its queue.
-Each slot carries one mark (`AGENTS.md`, "What can be read is never asked or declared"): `read:`, with the script that
-reads it, `choice:`, with its default, or `cannot be read:`, with the reason and a default; a row overrides what was
-read and the default alike, and a project leaves out every row it does not need (`scripts/manifest-reads.mjs` holds
-each mark to that).
+Each slot carries the mark the core's `AGENTS.md` asks ("What can be read is never asked or declared"), in the third
+column; a row overrides what was read and the default alike, and a project leaves out every row it does not need
+(`scripts/manifest-reads.mjs` holds each mark to its parts).
 
 | Slot | What the project fills in | Mark |
 | --- | --- | --- |
@@ -357,7 +356,7 @@ each mark to that).
 | *size marks* | the reading-size check's marks, its config for `scripts/reading-size.mjs` | choice: left out, `checks/sizes.json` |
 | *shape check* | the check of how the code is put together, and its config for `scripts/shape.mjs`, in backticks: the project's names for its systems, its marks and its suites' time marks (`tasks/code-shape.md`), and what the tests cost: the tests never selected out ("select.proof"), those that reach every file and the files no test reads, what a test imports that opens a screen, the time mark on a push's checks ("wait") and the seconds from which a measurement runs outside the session ("long", an hour where none is given) (`tasks/tests.md`) | choice: left out, `checks/shape.json`, which the starter kit writes |
 | *dose* | `in debt`, `paying down` or `in standard`, in backticks, where the project's owner names the state its codebase is cleaned and audited by (`tasks/cleaning.md`) | read: the state the shape check's baseline shows (`scripts/dose.mjs`) |
-| *mutation tool* | the command, in backticks, that runs the project's mutation tool, a tool of development only, on the lines given in `{lines}` (`<file>:<first>-<last>`, joined by commas) and writes its report in the mutation-testing-elements schema to `{report}` (`tasks/code-shape.md`; `scripts/strength.mjs` runs it, with no shell); or `none`, in backticks, with its reason, where no such tool exists for the project's language | cannot be read: a build file may name the tool, never the command that runs it on given lines into a given report, and the build files that name it are read once the parser #486's record picked arrives (#501); left out, no measure, and the sync's step asks the project's builder for the row |
+| *mutation tool* | the command, in backticks, that runs the project's mutation tool, a tool of development only, on the lines given in `{lines}` (`<file>:<first>-<last>`, joined by commas) and writes its report in the mutation-testing-elements schema to `{report}` (`tasks/code-shape.md`; `scripts/strength.mjs` runs it, with no shell); or `none`, in backticks, with its reason, where no such tool exists for the project's language | cannot be read: a build file names the tool at most, never the command that runs it on given lines into a given report, and even the tool waits on #501's reader; left out, no measure, and the sync's step asks the project's builder for the row |
 | *audits* | the folder that holds the reports of the audits of how its code is put together, each named by its day (`tasks/cleaning.md`) | choice: left out, `docs/audits/` |
 | *large file* | how large a file is before it is never read whole | choice: left out, past about 50 KB |
 | *one at a time* | what never runs as parallel lanes | choice: left out, the main lane's tasks |
@@ -369,7 +368,7 @@ each mark to that).
 | *choice records* | the file that holds its records of the choices that are hard to undo, in backticks (`tasks/choices.md`; `scripts/choices.mjs` reads it) | choice: left out, `docs/choices.md`, which the starter kit writes |
 | *owner's choices* | the kinds of choice the owner keeps, each asked of the owner (`tasks/choices.md`) | choice: left out, none |
 | *other builders' checks* | what a session of another tool than Claude Code runs before it finishes (`tools/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync | choice: left out, the project's own tests |
-| *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so (`tasks/roles.md`, "Tools are preferences") | read: with no "Builder" row, the tools that built the last merged pull requests, most first, then the core's default, and a tool shown reviewing them is at hand (`scripts/tools-read.mjs`) |
+| *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so (`tasks/roles.md`, "Tools are preferences") | read: from the last merged pull requests, as `tasks/roles.md` says ("Tools are preferences") (`scripts/tools-read.mjs`) |
 | *pace* | the manifest's lines under "Pace", each a pace the owner sets, of the kinds `roles/orchestrator.md`, "The pace is the owner's", names | choice: left out, no pace but the default |
 | *other builders*, *code reviewers*, *security reviewer* | rows of the *tools* table, "Builder", "Code reviewer" and "Security reviewer"; one still standing among the slots is read as that row | read: as the *tools* (`scripts/tools-read.mjs`) |
 | *direction* | the file that holds what the project's screens are held to: who uses it, its main size, what each screen is for, its mood, its references, what it uses and never uses, and where its system's values and its reference screen stand (`tasks/screens.md`, points 1 and 2) | choice: left out, `docs/direction.md`, written before its first screen |
