@@ -28,7 +28,8 @@ case "$want-$(uname -m)" in
   *) echo "NOT INSTALLED: Node ${want:-(no core/.node-version)} (no checksum here for it on $(uname -m))"; exit 0 ;;
 esac
 if have node && have npm; then get() { npm pack --silent --ignore-scripts "node-linux-$arch@$want"; }
-elif have curl; then get() { curl -fsS --proto =https -o "node-linux-$arch.tgz" "https://registry.npmjs.org/node-linux-$arch/-/node-linux-$arch-$want.tgz"; }
+elif have curl; then get() { curl -fsS --proto =https --connect-timeout 30 --max-time 600 -o "node-linux-$arch.tgz" \
+  "https://registry.npmjs.org/node-linux-$arch/-/node-linux-$arch-$want.tgz"; }
 else echo "NOT INSTALLED: Node $want (no npm, or no node to run it, and no curl to fetch it with)"; exit 0; fi
 if have node; then bin=$(readlink -f "$(command -v node)")
 else

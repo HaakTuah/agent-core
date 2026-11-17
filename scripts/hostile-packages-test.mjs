@@ -190,7 +190,7 @@ if (process.platform !== "win32") {
     }
   }
   const curled = run({ bin: { [CURL]: fetchers[CURL] } }).fetched?.trim(), arch = process.arch === "arm64" ? "arm64" : "x64";
-  ok(curled === `-fsS --proto =https -o node-linux-${arch}.tgz https://registry.npmjs.org/node-linux-${arch}/-/node-linux-${arch}-${want}.tgz`, `with no ${NPM}, node.sh fetches only the pin, only from the registry's own address, over HTTPS alone`);
+  ok(curled === `-fsS --proto =https --connect-timeout 30 --max-time 600 -o node-linux-${arch}.tgz https://registry.npmjs.org/node-linux-${arch}/-/node-linux-${arch}-${want}.tgz`, `with no ${NPM}, node.sh fetches only the pin, only from the registry's own address, over HTTPS alone`);
   for (const [what, opts] of Object.entries({ "at the least long-term line": { node: "v22.0.0" }, "above it": { node: "v24.1.0" } })) {
     const { r, fetched, node } = run({ ...opts, bin: { [NPM]: fetchers[NPM] } });
     ok(r.status === 0 && fetched === null && new RegExp(`present, at or above the least long-term line, 22 \\(the checks run the pin, ${want.replaceAll(".", "\\.")}\\)`, "u").test(r.stdout) && node().includes(opts.node), `node.sh keeps a machine's node ${what} and fetches nothing`);
