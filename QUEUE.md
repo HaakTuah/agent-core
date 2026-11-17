@@ -11,7 +11,7 @@ it merges last.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #519 | rule builder, hard work, by #515's process whether or not #515 has merged; #515's point 2 trial runs first or with it, as its evidence | |
+| #519 | rule builder, hard work, by #515's process, merged or not; #515's point 2 trial runs first or with it, as its evidence | |
 | #515, points 1 and 3 to 16 | rule builder; point 12 changes what a reviewer reads, with the owner's yes on the issue | |
 | #526, path step 1 | rule builder | |
 | #527, step 2 | rule builder | #526 |
@@ -29,36 +29,38 @@ it merges last.
 | #325 | rule builder | |
 | #314 | rule builder | |
 | #456 | rule builder; it changes the floor (rules 5 and 10) | |
-| #457 | rule builder; point 1's reading of test code for a clock or a process waits on #529 | |
+| #457 | rule builder; point 1's reading of tests for a clock or process waits on #529 | |
 | #458 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
-| #464 | rule builder | #459, whose list of rules (`scripts/holders.mjs`) it reads |
+| #464 | rule builder | #459, whose rule list it reads |
 | #361 | rule builder, points 1 and 2 only | |
 | #467 | rule builder | |
 | #469 | rule builder; it changes what every role reads at its start | |
 | #484, points 1 to 5 | rule builder | |
 | #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged, judged by #469's measure; where no kind of task reads less, the file stays whole | #469 |
-| #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, whose work-down takes in `scripts/look.mjs` |
+| #471 | rule builder; it changes what the orchestrator reads at its start | #355 and #391, which change `scripts/look.mjs` |
 | #355 | builder | |
 | #391 | builder; the look's task, which overlaps #355, the work-down of the core's listed functions | |
 | #337 | builder | |
 | #426 | builder; a .NET reader it files waits on #529 | |
 | #404 | builder | |
 | #407 | builder | |
-| #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467's table and #407's check, which it builds on |
+| #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467 and #407, which it builds on |
 | #492 | rule builder; it changes floor rule 4, with the owner's yes on the issue, who may start the orchestrator, and what every role reads at its start | #397 and #467 |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 1 | rule builder | |
-| #486, point 5 | builder | the types record reopening: #521's gives it no steps |
+| #486, point 5 | builder | the types record reopening |
 | #460, point 1 | builder | |
 | #460, point 2 (the author's address) | builder | |
 | #460, point 3 (a copy in a test) | builder | |
 | #460, point 4 (names in descriptions) | builder | |
 | #460, point 5 (a report's size) | builder | |
 | #460, point 6 (billed minutes) | builder | |
+| #502, case 1 | builder | |
+| #502, case 2 | rule builder; it changes what every role reads at its start | |
 | #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
-| #416 | builder | #441, which changes the same files |
+| #416 | builder | #441, on the same files |
 | #259 | a builder that built none of the batch, on Fable at high for this batch (its note of 15 November) | every line above it |
 
 ## Beside any line
