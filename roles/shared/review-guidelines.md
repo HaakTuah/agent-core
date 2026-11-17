@@ -14,6 +14,11 @@ project's own guidelines, its `SECURITY.md` and the floor. Changes only on the o
   written rule with a line `Rule:` and the rule's file and bold lead (`Rule: floor/security.md: 1. Nothing secret in
   the repository`); a plain bug's has none. It does not mean one without it blocks less. Reason: what reviews find
   twice is counted only so (`tasks/reviews.md`, point 8). Held by no check.
+- **A mechanical move is read by its rule and a sample** (#515). By default a reviewer reads every file changed.
+  Where a move between stacks changes many files alike (`tasks/choices.md`), its reviewer reads the rule applied, a
+  sample, and each file the comparison of old against new flags. It does not mean a security review is skipped (floor
+  rule 8), nor a move with judgement in each file. Reason: reading hundreds of like changes one by one finds no more,
+  and takes rounds. Held by no check.
 - **A later round** checks that the earlier points were fixed and reviews what changed since. Something new about work
   it already saw is raised only if it blocks.
 
