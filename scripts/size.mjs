@@ -41,10 +41,11 @@ export const CAPS = {
 };
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a
 // project's size marks give each such file (roles/shared/inbox.md, "The progress file holds order only"; core archive 216):
-// set at its first trim, as each project sets its own. A raise of it is read by the reviews, as any mark's is
-// (roles/shared/review-guidelines.md, "A mark on what every session reads"); this script checks only that the queue is
-// under it.
-export const QUEUE = { file: "QUEUE.md", mark: 4 * 1024 };
+// set at its first trim, as each project sets its own, and raised one step on 17 November 2026 for #534's lines (#537),
+// its leanness check having found at most 220 bytes of room for 273 over. A raise of it is read by the reviews, as any
+// mark's is (roles/shared/review-guidelines.md, "A mark on what every session reads"); this script checks only that
+// the queue is under it.
+export const QUEUE = { file: "QUEUE.md", mark: 5 * 1024 };
 const WRITERS = ["OWNER", "MEMBER", "COLLABORATOR"]; // GitHub's own word for who wrote a comment, not the comment's
 const ANSWER = /^(?:\*\*)?Leanness check:/u;
 
