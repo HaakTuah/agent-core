@@ -94,7 +94,8 @@ export function place(files, dir, sys = process.platform) {
 }
 
 /** Fetches the engine into `dir` at set-up; always resolves, to the line it prints. */
-export async function fetchEngine(dir, { sys = system(), get = fetch } = {}) {
+export async function fetchEngine(dir, { sys = system(), get = fetch, root = process.cwd() } = {}) {
+  if (hostScans(root)) return `semgrep ${VERSION}: not fetched: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project`;
   const wheel = WHEELS[sys];
   if (!wheel) return `NOT FETCHED: Semgrep ${VERSION}: no build of its engine for ${sys}; the code scan will say it did not run here`;
   if (ran(dir)) return `semgrep ${VERSION}: present in ${dir}`;
@@ -141,21 +142,23 @@ export function hostScans(root) {
   });
 }
 
-/** The files the scan reads: with a base, those the change adds or alters; else every tracked one; each of a kind it
+/** The files the scan reads: with a base, those the change adds or alters, a link made a file among them; else every
+ *  tracked one; each of a kind it
  *  reads, a plain file inside the project, and none of the core's copy, which the core's own scan reads. */
 export function targets(root, base) {
   const git = (...a) => execFileSync("git", a, { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0").filter(Boolean);
-  const listed = base ? git("diff", "--name-only", "-z", "--no-renames", "--diff-filter=AM", base, "HEAD") : git("ls-files", "-z");
+  const listed = base ? git("diff", "--name-only", "-z", "--no-renames", "--diff-filter=AMT", base, "HEAD") : git("ls-files", "-z");
   const copy = copyOf(root);
   return listed.filter(f => KINDS.test(f) && !f.startsWith(copy) && !leadsOut(root, path.join(root, f)) && fs.lstatSync(path.join(root, f), { throwIfNoEntry: false })?.isFile());
 }
 
-/** The lines the change adds to each file, from git's diff of that file alone with no context, so that no name git
- *  would quote in a diff's header is read: Map(file → Set(line)). */
+/** The lines the change adds to each file, from git's diff of that file alone with no context, its name taken
+ *  literally (no pattern), so that no name git would quote in a diff's header is read, and no other file's lines are
+ *  counted as its own: Map(file → Set(line)). */
 export function addedLines(root, base, files) {
   const out = new Map();
   for (const file of files) {
-    const diff = execFileSync("git", ["diff", "-U0", "--no-renames", "--no-color", "--no-ext-diff", base, "HEAD", "--", file], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
+    const diff = execFileSync("git", ["--literal-pathspecs", "diff", "-U0", "--no-renames", "--no-color", "--no-ext-diff", base, "HEAD", "--", file], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
     const lines = new Set();
     for (const hunk of diff.matchAll(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/gmu)) {
       for (let n = Number(hunk[1]), i = 0; i < Number(hunk[2] ?? 1); i++) lines.add(n + i);

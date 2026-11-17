@@ -44,13 +44,13 @@ ok(throws(() => engineFiles(zip([[`${BIN}README`, "x"]]), "linux")) && throws(()
 // the fetch: a wheel whose digest is not the pin's, a system with no build, an error from the host; nothing is placed
 {
   const dir = path.join(tmp, "fetched");
-  const wrong = await fetchEngine(dir, { sys: "linux-x64", get: answer(zip(engine)) });
+  const wrong = await fetchEngine(dir, { sys: "linux-x64", get: answer(zip(engine)), root: tmp });
   ok(/^NOT FETCHED: .*SHA-256 is [0-9a-f]{64}, not 0eb6/u.test(wrong) && !fs.existsSync(dir) && !fs.readdirSync(tmp).some(n => n.startsWith("fetched")), "a wheel whose SHA-256 is not the pin's is refused, and nothing of it is written", wrong);
-  const none = await fetchEngine(dir, { sys: "darwin-x64", get: () => { throw new Error("no fetch was due"); } });
+  const none = await fetchEngine(dir, { sys: "darwin-x64", get: () => { throw new Error("no fetch was due"); }, root: tmp });
   ok(/^NOT FETCHED: .*no build of its engine for darwin-x64/u.test(none) && !fs.existsSync(dir), "a system with no build fetches nothing and says so", none);
-  const gone = await fetchEngine(dir, { sys: "linux-x64", get: async () => ({ ok: false, status: 404 }) });
+  const gone = await fetchEngine(dir, { sys: "linux-x64", get: async () => ({ ok: false, status: 404 }), root: tmp });
   ok(/^NOT FETCHED: .*answered 404/u.test(gone) && !fs.existsSync(dir), "a host that answers an error leaves nothing and says so", gone);
-  const big = await fetchEngine(dir, { sys: "linux-x64", get: answer(Buffer.alloc((128 << 20) + 1)) });
+  const big = await fetchEngine(dir, { sys: "linux-x64", get: answer(Buffer.alloc((128 << 20) + 1)), root: tmp });
   ok(/^NOT FETCHED: .*weighs more than/u.test(big) && !fs.existsSync(dir), "a wheel past its bound is refused before its digest is read", big);
 }
 
@@ -74,10 +74,12 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
   const before = hostScans(p);
   fs.writeFileSync(path.join(p, ".github", "workflows", "scan.yaml"), "jobs:\n  analyze:\n    uses: owner/core/.github/workflows/codeql.yml@0123456789abcdef0123456789abcdef01234567\n");
   ok(!before && hostScans(p) && !hostScans(tmp), "the host scans a project where a workflow calls the core's codeql.yml, not where one only names it");
+  const skipped = await fetchEngine(path.join(tmp, "not-fetched"), { sys: "linux-x64", get: () => { throw new Error("no fetch was due"); }, root: p });
+  ok(/not fetched: a workflow calls the core's codeql\.yml/u.test(skipped) && !fs.existsSync(path.join(tmp, "not-fetched")), "where the host's CodeQL scans the project, nothing is fetched", skipped);
 }
 
 // the engine itself, where this system has a build and the host answers
-const fetched = await fetchEngine(engineAt(path.join(os.tmpdir(), `code-scan-test-engine-${VERSION}`)));
+const fetched = await fetchEngine(engineAt(path.join(os.tmpdir(), `code-scan-test-engine-${VERSION}`)), { root: tmp });
 const dir = engineAt(path.join(os.tmpdir(), `code-scan-test-engine-${VERSION}`));
 if (!/^semgrep /u.test(fetched)) {
   console.log(`skip the engine's own cases: ${fetched}`);
@@ -172,6 +174,14 @@ def ok5(cur):
   ok(alarms.length === 0, `no safe look-alike is flagged (${safe.size})`, `flagged: ${alarms.join(" ")}`);
   ok(!all.lines.some(l => l.includes("could not read")), "the engine reads every sample", all.lines.join("\n"));
 
+  // (before the pull request: a file whose name is a pattern to git, with a weakness that stands, and a link)
+  fs.writeFileSync(path.join(repo, "[id].ts"), "export function h(req, res, db) {\n  db.query(\"SELECT \" + req.query.id);\n  return res;\n  // a note\n}\n");
+  let linked = false;
+  try { fs.symlinkSync("tasks.py", path.join(repo, "handler.py")); linked = true; } catch { /* (no links made here, as on Windows without the right) */ }
+  git("add", "-A"); git("commit", "-q", "-m", "more");
+  fs.writeFileSync(path.join(repo, "[id].ts"), fs.readFileSync(path.join(repo, "[id].ts"), "utf8").replace("// a note", "// a note, changed"));
+  fs.writeFileSync(path.join(repo, "i.ts"), "export const a = 1;\nexport const b = 2;\n");
+  if (linked) { fs.rmSync(path.join(repo, "handler.py")); fs.writeFileSync(path.join(repo, "handler.py"), "import os\ndef run(user_input):\n    os.system(user_input)\n"); }
   // a pull request: one line it adds is a weakness, one hidden behind a comment, one listed as a false alarm
   fs.appendFileSync(path.join(repo, "tasks.py"), "def added(name):\n    os.system(\"rm \" + name)  # nosemgrep\ndef listed(n):\n    os.popen(\"ls \" + n)\n");
   // (files named so that git would quote them in a diff's header, or so that they read as an option)
@@ -185,6 +195,8 @@ def ok5(cur):
   ok(failing.status === 1 && /FAIL: tasks\.py:\d+: a parameter reaches a shell command \(py-command\), on a line this change adds/u.test(out) && mended(out), "a weakness on a line the change adds fails, saying its mend", out);
   ok((out.match(/^FAIL: tasks\.py:/gmu) ?? []).length === 2, "a comment in the code silences no finding", out);
   ok(ODD.every(f => out.includes(`FAIL: ${f}:3:`)), "a file whose name git quotes, or that reads as an option, is scanned, its finding failing", out);
+  ok(/reported, not failed: \[id\]\.ts:2:/u.test(out) && !out.includes("FAIL: [id].ts"), "a file whose name is a pattern to git is read by its name alone: a finding that stood in it is reported, not failed for another file's lines", out);
+  ok(!linked || out.includes("FAIL: handler.py:3:"), "a link the change makes a file is scanned, its finding failing", out);
   ok(/reported, not failed: tasks\.py:5: .* on a line that stood before this change/u.test(out) && !/^FAIL: (web|Handlers)/mu.test(out), "a weakness on a line that stood before is reported, and passes", out);
   ok(!/link\.py/u.test(out), "a file that is a link is not read", out);
   const listedAll = [...out.matchAll(/^FAIL: (.+?:\d+): /gmu)].map(m => `Scan false alarm: \`${m[1]}\`, invented for the test`).join("\n");
