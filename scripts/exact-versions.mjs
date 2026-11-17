@@ -33,25 +33,35 @@ export const exact = (text) => {
 const inside = (key) => !key.startsWith("/") && !`/${key}/`.includes("/../") && !/[\\:]/u.test(key); // (a folder of the project's, by its key)
 const show = (value) => JSON.stringify(value) ?? String(value); // (a name or version printed so that it stays on its line)
 
+// Whether a "$name" points to a dependency every list of the root's that holds the name holds at one exact version, and
+// one does.
+function pointsAtExact(value, list) {
+  if (typeof value !== "string" || !value.startsWith("$")) return false;
+  const lists = KINDS.map((kind) => list[kind]).filter((deps) => deps !== null && typeof deps === "object" && !Array.isArray(deps) && Object.hasOwn(deps, value.slice(1)));
+  return lists.length > 0 && lists.every((deps) => exact(deps[value.slice(1)]));
+}
+
+const notExactOverride = (file, at, value) => `${file}: overrides ${show(at)}: ${show(value)} is not one exact version. Mend: write one, such as 1.2.3, then write the lock file anew with npm: its install, given --package-lock-only`;
+
 // The root's "overrides": every value, however deep, one exact version, or a "$name" that points to a dependency the
 // root itself lists at one exact version. A key that picks among versions (it has an "@" after its first letter) must
 // say its value outright, as a text or as the "." of its list: left unsaid, npm takes the key's own pick as the value.
 function overrides(value, list, file, at, problems, picks = false) {
-  let points = false; // (a "$name": every list of the root's that holds the name holds it at one exact version, and one does)
-  if (typeof value === "string" && value.startsWith("$")) {
-    const lists = KINDS.map((kind) => list[kind]).filter((deps) => deps !== null && typeof deps === "object" && !Array.isArray(deps) && Object.hasOwn(deps, value.slice(1)));
-    points = lists.length > 0 && lists.every((deps) => exact(deps[value.slice(1)]));
-  }
   if (typeof value === "string") {
-    if (!exact(value) && !points) problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version. Mend: write one, such as 1.2.3, then write the lock file anew with npm: its install, given --package-lock-only`);
+    if (!exact(value) && !pointsAtExact(value, list)) problems.push(notExactOverride(file, at, value));
   } else if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    if (picks && !Object.hasOwn(value, ".")) problems.push(`${file}: overrides ${show(at)}: a key that picks among versions has no value of its own. Mend: give it one, one exact version as a text, or "." for the version the project names`);
-    for (const [name, inner] of Object.entries(value)) {
-      const here = at === "" ? name : `${at} > ${name}`;
-      if (name === "." && typeof inner !== "string") problems.push(`${file}: overrides ${show(here)}: ${show(inner)} is not one exact version. Mend: write one, such as 1.2.3`);
-      else overrides(inner, list, file, here, problems, name.indexOf("@", 1) !== -1);
-    }
-  } else problems.push(`${file}: overrides ${show(at)}: ${show(value)} is not one exact version. Mend: write one, such as 1.2.3, then write the lock file anew with npm: its install, given --package-lock-only`);
+    overridesOf(value, list, file, at, problems, picks);
+  } else problems.push(notExactOverride(file, at, value));
+}
+
+// The entries of one object of the overrides, each held to the same.
+function overridesOf(value, list, file, at, problems, picks) {
+  if (picks && !Object.hasOwn(value, ".")) problems.push(`${file}: overrides ${show(at)}: a key that picks among versions has no value of its own. Mend: give it one, one exact version as a text, or "." for the version the project names`);
+  for (const [name, inner] of Object.entries(value)) {
+    const here = at === "" ? name : `${at} > ${name}`;
+    if (name === "." && typeof inner !== "string") problems.push(`${file}: overrides ${show(here)}: ${show(inner)} is not one exact version. Mend: write one, such as 1.2.3`);
+    else overrides(inner, list, file, here, problems, name.indexOf("@", 1) !== -1);
+  }
 }
 
 // The entry npm installs for `name` as seen from the package at `from`: the nearest node_modules going up.
@@ -63,6 +73,48 @@ function installed(packages, from, name) {
   }
 }
 
+// Whether an entry is a link to another package of the project's own.
+function ownLink(entry, packages) {
+  const linked = entry !== null && typeof entry === "object" && entry.link === true && typeof entry.resolved === "string";
+  return linked && own(entry.resolved) && inside(entry.resolved) && Object.hasOwn(packages, entry.resolved);
+}
+
+// What a dependency's spec says of its entry in the lock file, as the problems it has: none, or one.
+function dependencyProblems({ file, kind, name, spec, entry, lockfile }) {
+  if (!exact(spec)) return [`${file}: ${kind} ${show(name)}: ${show(spec)} is not one exact version. Mend: write the one exact version the lock file installs${entry && typeof entry === "object" && typeof entry.version === "string" ? `, ${entry.version}` : ""}, then write the lock file anew with npm: its install, given --package-lock-only`];
+  if (entry === undefined) {
+    if (kind === "peerDependencies" || kind === "optionalDependencies") return []; // (a lock file may leave these out)
+    return [`${file}: ${kind} ${show(name)}: ${show(spec)} is not in ${lockfile}. Mend: write the lock file anew with npm: its install, given --package-lock-only`];
+  }
+  if (entry === null || typeof entry !== "object" || spec !== entry.version) return [`${file}: ${kind} ${show(name)}: ${show(spec)} is not the version the lock file installs (${show(entry?.version ?? null)}). Mend: write the lock file anew with npm: its install, given --package-lock-only, or write the version it installs`];
+  return [];
+}
+
+// The problems of one kind of dependencies of a package's list.
+function kindProblems(file, kind, deps, lockfile, packages, key) {
+  if (deps === undefined) return [];
+  if (deps === null || typeof deps !== "object" || Array.isArray(deps)) return [`${file}: "${kind}" is no list of names and versions. Mend: write it as an object of each name to its version`];
+  const problems = [];
+  for (const [name, spec] of Object.entries(deps)) {
+    const entry = installed(packages, key, name);
+    if (ownLink(entry, packages)) continue; // (one of the project's own)
+    problems.push(...dependencyProblems({ file, kind, name, spec, entry, lockfile }));
+  }
+  return problems;
+}
+
+// The problems of one package of the project's own that the lock file knows.
+function packageProblems(lockfile, root, packages, key, read) {
+  if (!inside(key)) return [`${lockfile}: the package ${show(key)} is no folder of the project's. Mend: make it a folder inside the project, or take it out of the project's workspaces, then write the lock file anew with npm: its install, given --package-lock-only`];
+  const file = posix.join(root, key, "package.json");
+  let list;
+  try { list = parseBounded(read(file)); } catch (e) { return [`${file}: cannot be read as JSON (${logged(e.message)}). Mend: correct it to JSON`]; }
+  const problems = [];
+  if (key === "" && list?.overrides !== undefined) overrides(list.overrides, list, file, "", problems);
+  for (const kind of KINDS) for (const problem of kindProblems(file, kind, list?.[kind], lockfile, packages, key)) problems.push(problem); // (one at a time: a spread of a long list overflows the stack)
+  return problems;
+}
+
 export function check(lockfile, read) {
   const problems = [];
   let lock;
@@ -71,31 +123,7 @@ export function check(lockfile, read) {
   if (packages === null || typeof packages !== "object" || Array.isArray(packages)) return [`${lockfile}: holds no "packages" (lockfileVersion 2 or later is needed)`];
   const root = posix.dirname(lockfile);
   if (!Object.hasOwn(packages, "")) problems.push(`${lockfile}: holds no entry for the project's own root (""), whose list would go unread. Mend: write the lock file anew with npm: its install, given --package-lock-only`);
-  for (const key of Object.keys(packages).filter(own)) {
-    if (!inside(key)) { problems.push(`${lockfile}: the package ${show(key)} is no folder of the project's. Mend: make it a folder inside the project, or take it out of the project's workspaces, then write the lock file anew with npm: its install, given --package-lock-only`); continue; }
-    const file = posix.join(root, key, "package.json");
-    let list;
-    try { list = parseBounded(read(file)); } catch (e) { problems.push(`${file}: cannot be read as JSON (${logged(e.message)}). Mend: correct it to JSON`); continue; }
-    if (key === "" && list?.overrides !== undefined) overrides(list.overrides, list, file, "", problems);
-    for (const kind of KINDS) {
-      const deps = list?.[kind];
-      if (deps === undefined) continue;
-      if (deps === null || typeof deps !== "object" || Array.isArray(deps)) { problems.push(`${file}: "${kind}" is no list of names and versions. Mend: write it as an object of each name to its version`); continue; }
-      for (const [name, spec] of Object.entries(deps)) {
-        const entry = installed(packages, key, name);
-        const linked = entry !== null && typeof entry === "object" && entry.link === true && typeof entry.resolved === "string";
-        if (linked && own(entry.resolved) && inside(entry.resolved) && Object.hasOwn(packages, entry.resolved)) continue; // (one of the project's own)
-        if (!exact(spec)) {
-          problems.push(`${file}: ${kind} ${show(name)}: ${show(spec)} is not one exact version. Mend: write the one exact version the lock file installs${entry && typeof entry === "object" && typeof entry.version === "string" ? `, ${entry.version}` : ""}, then write the lock file anew with npm: its install, given --package-lock-only`);
-        } else if (entry === undefined) {
-          if (kind === "peerDependencies" || kind === "optionalDependencies") continue; // (a lock file may leave these out)
-          problems.push(`${file}: ${kind} ${show(name)}: ${show(spec)} is not in ${lockfile}. Mend: write the lock file anew with npm: its install, given --package-lock-only`);
-        } else if (entry === null || typeof entry !== "object" || spec !== entry.version) {
-          problems.push(`${file}: ${kind} ${show(name)}: ${show(spec)} is not the version the lock file installs (${show(entry?.version ?? null)}). Mend: write the lock file anew with npm: its install, given --package-lock-only, or write the version it installs`);
-        }
-      }
-    }
-  }
+  for (const key of Object.keys(packages).filter(own)) for (const problem of packageProblems(lockfile, root, packages, key, read)) problems.push(problem);
   return problems;
 }
 
