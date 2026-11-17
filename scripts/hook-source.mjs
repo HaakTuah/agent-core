@@ -6,7 +6,7 @@
 // Read only where it can be read exactly, two ways and no other. The starter kit's own two forms (KIT_FORMS), whole,
 // are the core's: of one, only the plain words after its script are read. A plain command (PLAIN) holds nothing a shell
 // reads otherwise than as written: letters, digits, blanks and `_ . / : = @ + , -`, quotes that only group (balanced,
-// and nothing in them a shell reads either), and $CLAUDE_PROJECT_DIR outside single quotes, the project's root, as an
+// none within another, and nothing in them a shell reads either), and $CLAUDE_PROJECT_DIR outside single quotes, the project's root, as an
 // agent tool sets it; a path with a ".." is no plain command, since the file system reads ".." after the links before it.
 // Of it, each word, and each part of a word between blanks (a quoted script given to sh -c) or `=`, `:`, `,` and `@`,
 // that names a file the project holds (through
@@ -41,7 +41,7 @@ const PARENT = /(?:^|[/=:,@\s])\.\.(?:$|[/=:,@\s])/u;
 const RUNS = ["", ".exe", ".bat", ".cmd", ".com", ".ps1", ".js", ".jse", ".vbs", ".vbe", ".wsf", ".wsh", ".msc"];
 
 // A plain command's words, its quotes taken out and $CLAUDE_PROJECT_DIR read as "." where the shell reads it (outside
-// single quotes), or null where a quote is never closed or the root's name stands in single quotes, as written.
+// single quotes), or null where a quote is never closed or holds the root's name in single quotes, as written.
 function words(command) {
   const out = [];
   let word = null, quote = null;
@@ -62,6 +62,18 @@ function words(command) {
   if (quote) return null;
   if (word !== null) out.push(word);
   return out;
+}
+
+// Whether a quote holds a quote of the other kind: quoting for a shell that runs it in turn, as sh -c 'bash "a b"'.
+function nested(command) {
+  let quote = null;
+  for (const c of command) {
+    if (c !== "'" && c !== '"') continue;
+    if (quote === null) quote = c;
+    else if (c === quote) quote = null;
+    else return true;
+  }
+  return false;
 }
 
 // Where the root's name that starts at `i` ends, or -1 where none does or it stands in single quotes, written as is.
@@ -89,7 +101,7 @@ export function fromTree(command, holds) {
   const kit = KIT_FORMS.map(f => f.exec(text)).find(Boolean);
   if (kit) return [...named((kit[1] ?? "").split(" ").filter(Boolean), holds)];
   if (!PLAIN.test(text.replace(/\$(?:\{CLAUDE_PROJECT_DIR\}|CLAUDE_PROJECT_DIR(?!\w))/gu, ""))) return null;
-  const list = words(text);
+  const list = nested(text) ? null : words(text);
   if (list === null || list.some(w => PARENT.test(w))) return null;
   const found = named(list, holds);
   // (its first word, past the variables it sets, as a Windows shell runs it from the project's root)

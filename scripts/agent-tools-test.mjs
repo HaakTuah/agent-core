@@ -408,7 +408,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ["bash \"scripts/a b.sh", null], ["bash ~/a.sh", null], ["bash scripts/*.sh", null], ["bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/a.sh\"", null], ["git show refs/remotes/origin/main:scripts/a.sh | bash", null],
     ["powershell -File %CLAUDE_PROJECT_DIR%\\scripts\\a.sh", null], ["bash scripts/a.sh # note", null], ["bash scripts/a.sh\nbash a.sh", null],
     // (#476's code review of 0cf9828: the root's name in single quotes is written, not read; and ".." is read after the links before it)
-    ["bash 'scripts/$CLAUDE_PROJECT_DIR/a.sh'", null], ["bash tools/../a.sh", null], ["cat scripts/../scripts/a.sh", null], ["bash scripts/a.sh --x=..", null]])
+    ["bash 'scripts/$CLAUDE_PROJECT_DIR/a.sh'", null], ["bash tools/../a.sh", null], ["cat scripts/../scripts/a.sh", null], ["bash scripts/a.sh --x=..", null],
+    // (#476's code review of 6d32c8c: a quote within a quote is quoting for a shell run in turn)
+    ["sh -c 'bash \"scripts/a b.sh\"'", null], ["sh -c \"bash 'scripts/a b.sh'\"", null]])
     ok(JSON.stringify(fromTree(command, holds)) === JSON.stringify(want), `the command ${JSON.stringify(command)} ${want === null ? "is not read" : `takes ${want.length ? want.join(", ") : "nothing"} from the working tree`}`, JSON.stringify(fromTree(command, holds)));
   // (a file at the root that cmd runs in the place of the first word, past the variables it sets)
   for (const shadow of ["git.bat", "git.exe", "git.vbs", "git"])
