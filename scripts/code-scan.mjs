@@ -215,14 +215,24 @@ function keyOf(root, f, texts) {
   return `${f.file}\0${f.rule}\0${code}`;
 }
 
-/** What stood at the base: of the files given that the base held, the engine's findings there, a count for each key;
- *  null where the engine could not read them. Each is read from git's object, never from the work tree. */
+/** The files the change renames, from git's own reading of renames: Map(new path → its path at the base). */
+export function renamedFrom(root, base) {
+  const out = new Map();
+  const parts = execFileSync("git", ["diff", "-z", "--name-status", "-M", "--diff-filter=R", base, "HEAD"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 }).split("\0");
+  for (let i = 0; i + 2 < parts.length; i += 3) if (/^R\d*$/u.test(parts[i])) out.set(parts[i + 2], parts[i + 1]);
+  return out;
+}
+
+/** What stood at the base: of the files given that the base held, by their name there where the change renames them,
+ *  the engine's findings, each placed under its name at the head, a count for each key; null where the engine could
+ *  not read them. Each is read from git's object, never from the work tree. */
 function stoodAt(dir, root, base, files) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "code-scan-base-"));
+  const was = renamedFrom(root, base);
   try {
     const held = files.filter(f => {
       let bytes;
-      try { bytes = execFileSync("git", ["cat-file", "blob", `${base}:${f}`], { cwd: root, maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] }); } catch { return false; }
+      try { bytes = execFileSync("git", ["cat-file", "blob", `${base}:${was.get(f) ?? f}`], { cwd: root, maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] }); } catch { return false; }
       fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true });
       fs.writeFileSync(path.join(tmp, f), bytes);
       return true;
