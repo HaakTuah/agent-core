@@ -162,31 +162,41 @@ function closing({ all, numbers, now, early, unread }) {
   ];
 }
 
-// The proposals for the rules with no holder (UNHELD's "proposals"): { key: { mark, by, why } }, or none where it
-// cannot be read.
+// The proposals for the rules with no holder (UNHELD's "proposals"): { proposals: { key: { mark, by, why } }, wrong },
+// `wrong` the line of why a file that is there cannot be read, with its mend; none where there is no file.
 export function readUnheld(root = ROOT) {
-  try { const j = JSON.parse(fs.readFileSync(path.join(root, UNHELD), "utf8")); return j?.proposals && typeof j.proposals === "object" ? j.proposals : {}; } catch { return {}; }
+  const file = path.join(root, UNHELD);
+  if (!fs.existsSync(file)) return { proposals: {}, wrong: null };
+  try {
+    const p = JSON.parse(fs.readFileSync(file, "utf8"))?.proposals;
+    if (p && typeof p === "object" && !Array.isArray(p)) return { proposals: p, wrong: null };
+    return { proposals: {}, wrong: `\`${UNHELD}\` holds no object "proposals". Mend: write it as an object keyed by each rule's file and bold lead, each value { mark, by, why }` };
+  } catch (e) { return { proposals: {}, wrong: `\`${UNHELD}\` cannot be read (${String(e.message).split("\n")[0]}). Mend: write it as JSON, its "proposals" an object keyed by each rule` }; }
 }
+
+// A value of the file as one line of plain text, so that no value can stand as a line of the list of its own.
+const flat = v => String(v ?? "").replace(/\s+/gu, " ").trim();
 
 // The list's leading lines: each rule of `all` whose key `none` (holders.mjs's rules with no holder) names, those
 // `starts` or `toolStarts` (the rules of a tool's part, read at the start of that tool's sessions) names first, each with
 // its proposal of `proposals`; then the proposals whose rule now has a holder or no
 // longer stands.
-export function unheldLines({ all, none, starts, toolStarts = new Set(), proposals, numbers = {} }) {
+export function unheldLines({ all, none, starts, toolStarts = new Set(), proposals, numbers = {}, wrong = null }) {
   const first = r => starts.has(r.key) || toolStarts.has(r.key);
   const without = new Set(none), keys = all.filter(r => without.has(r.key)), rest = Object.keys(proposals).filter(k => !without.has(k));
-  if (!keys.length && !rest.length) return [];
+  if (!keys.length && !rest.length) return wrong ? [`- ${wrong}.`] : [];
   const say = r => {
     const x = proposals[r.key], where = starts.has(r.key) ? "read at a role's start" : toolStarts.has(r.key) ? "read at its tool's start" : "read on need";
     const harm = rare(r, numbers[r.key]);
     if (!x || !MARKS.includes(x.mark)) return `- ${r.key}: no holder, ${where}. No proposal yet: the session that takes the pruning gives it one in \`${UNHELD}\`, ${harm ? "a check or staged case that could hold it, since it guards against rare and severe harm" : "a check or staged case that could hold it, a move to a module read on need, or that it goes"}.`;
     const warn = !["check", "case"].includes(x.mark) && harm ? " It guards against rare and severe harm, so it is proposed a holder, a check or a staged case, and nothing else." : "";
-    return `- ${r.key}: no holder, ${where}. Its proposal: ${x.mark}${x.by ? ` (${x.by})` : x.mark === "check" || x.mark === "case" ? ", no issue filed yet: the session files one where its upkeep pays, which joins the queue as any check for a rule that stands does" : ""}, ${x.why ?? "with no reason given"}.${warn}`;
+    return `- ${r.key}: no holder, ${where}. Its proposal: ${x.mark}${x.by ? ` (${flat(x.by)})` : x.mark === "check" || x.mark === "case" ? ", no issue filed yet: the session files one where its upkeep pays, which joins the queue as any check for a rule that stands does" : ""}, ${flat(x.why) || "with no reason given"}.${warn}`;
   };
   return [
     `- No holder: ${keys.length} rule${keys.length === 1 ? "" : "s"} (\`scripts/holders.mjs\`), worst first, each with its proposal (\`${UNHELD}\`). Each check is filed as an issue, which joins the queue without a further word; the moves and removals are the owner's, a few at a time.`,
+    ...(wrong ? [`- ${wrong}; until it is, every rule below reads as having no proposal.`] : []),
     ...[...keys.filter(first), ...keys.filter(r => !first(r))].map(say),
-    ...(rest.length ? [`- Proposed for a rule that now has a holder or no longer stands, to take out of \`${UNHELD}\`: ${rest.join("; ")}.`] : []),
+    ...(rest.length ? [`- Proposed for a rule that now has a holder or no longer stands, to take out of \`${UNHELD}\`: ${rest.map(flat).join("; ")}.`] : []),
   ];
 }
 
@@ -195,8 +205,8 @@ export function unheldLines({ all, none, starts, toolStarts = new Set(), proposa
 // `starts`: the keys of the rules a role reads at its start; `joined(r)`: how many merged pull requests came under the rule since it joined, or null;
 // `none`: the keys of the rules with no holder (holders.mjs), and `proposals`, UNHELD's, which lead the list, those of
 // `toolStarts` sorted with a role's start.
-export function list({ all, named, numbers, record, cases, steps, starts, toolStarts = new Set(), joined, none = [], proposals = {} }) {
-  const p = ordered(record), now = p.at(-1), first = unheldLines({ all, none, starts, toolStarts, proposals, numbers });
+export function list({ all, named, numbers, record, cases, steps, starts, toolStarts = new Set(), joined, none = [], proposals = {}, wrong = null }) {
+  const p = ordered(record), now = p.at(-1), first = unheldLines({ all, none, starts, toolStarts, proposals, numbers, wrong });
   if (!now) return [...first, "- No pruning is recorded yet: no other sign to list (`node scripts/pruning.mjs --due`)."];
   const listed = [], early = [], unread = [];
   for (const r of all) {
@@ -402,7 +412,7 @@ async function main(argv) {
   // (the core's AGENTS.md, which every builder here reads at its start, with the floor and the modules)
   const all = rules(ROOT, { agents: true }), h = holdersAt(ROOT), starts = new Set([...all.filter(r => r.file === "AGENTS.md").map(r => r.key), ...[...startRules(all).values()].flatMap(x => [...x])]);
   const { counts: heldCounts, holders } = await import("./holders.mjs");
-  console.log(list({ all, named: h.holders ?? {}, numbers: h.numbers ?? {}, record: readRecord(), cases: CASES, steps: await stepsAt(ROOT), starts, toolStarts: new Set(all.filter(r => r.file.startsWith("tools/")).map(r => r.key)), joined: r => joinedIn(r), none: heldCounts(holders()).none, proposals: readUnheld() }).join("\n"));
+  console.log(list({ all, named: h.holders ?? {}, numbers: h.numbers ?? {}, record: readRecord(), cases: CASES, steps: await stepsAt(ROOT), starts, toolStarts: new Set(all.filter(r => r.file.startsWith("tools/")).map(r => r.key)), joined: r => joinedIn(r), none: heldCounts(holders()).none, ...readUnheld() }).join("\n"));
 }
 
 if (started(import.meta.url)) await main(process.argv.slice(2));

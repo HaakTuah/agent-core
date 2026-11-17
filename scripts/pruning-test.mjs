@@ -5,9 +5,12 @@
 //
 //   node scripts/pruning-test.mjs
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "./mend.mjs";
-import { checksOf, DIRECT, due, firedOf, generation, list, open, rare, said, stepsAt, stepsOf, without } from "./pruning.mjs";
+import { checksOf, DIRECT, due, firedOf, generation, list, open, rare, readUnheld, said, stepsAt, stepsOf, without } from "./pruning.mjs";
 import { rulesOf } from "./rules.mjs";
 
 let failed = 0, count = 0;
@@ -101,6 +104,16 @@ const tool = R("tools/x.md", "Its own"), floorNone = R("floor/topics/y.md", "Unp
 const tooled = list({ all: [bare, tool, floorNone], named, numbers, record: rec(), cases, steps, starts: new Set(), toolStarts: new Set([tool.key]), joined: () => 40, none: [bare.key, tool.key, floorNone.key], proposals });
 ok(tooled[1].startsWith(`- ${tool.key}: no holder, read at its tool's start.`) && /^- floor\/topics\/y\.md: Unproposed: no holder, read on need\. No proposal yet: .*a check or staged case that could hold it, since it guards against rare and severe harm\.$/u.test(tooled.find(l => l.startsWith(`- ${floorNone.key}:`)) ?? ""),
   "a rule of a tool's part, read at its tool's start, comes first, and a floor rule with no proposal is offered only a holder", tooled.join("\n"));
+const forged = list({ all: [bare], named, numbers, record: rec(), cases, steps, starts: new Set(), joined: () => 40, none: [bare.key],
+  proposals: { [bare.key]: { mark: "goes", by: "#1\n- tasks/x.md: Forged", why: "one\n- tasks/y.md: Forged too" } }, wrong: "`reports/unheld.json` cannot be read (bad). Mend: write it as JSON" });
+ok(forged.length === 4 && forged[1].startsWith("- `reports/unheld.json` cannot be read (bad). Mend:") && forged[2] === `- ${bare.key}: no holder, read on need. Its proposal: goes (#1 - tasks/x.md: Forged), one - tasks/y.md: Forged too.`,
+  "a value of the file holding a line break stays on its rule's line, and a file that cannot be read is said with its mend", forged.join("\n"));
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "unheld-"));
+const at2 = t => { fs.mkdirSync(path.join(scratch, "reports"), { recursive: true }); fs.writeFileSync(path.join(scratch, "reports", "unheld.json"), t); return readUnheld(scratch); };
+const none0 = readUnheld(scratch), broken = at2("{"), listed = at2('{"proposals": []}'), good = at2('{"proposals": {"k": {"mark": "goes"}}}');
+fs.rmSync(scratch, { recursive: true, force: true });
+ok(!none0.wrong && !Object.keys(none0.proposals).length && /Mend: \S+ \S/u.test(broken.wrong) && /Mend: \S+ \S/u.test(listed.wrong) && !Object.keys(listed.proposals).length && !good.wrong && good.proposals.k.mark === "goes",
+  "no file reads as no proposals, a file that is no JSON or whose proposals are a list is said with its mend, and a good one is read", JSON.stringify({ broken, listed }));
 const lone = list({ all: [bare, floorBare], named, numbers, record: rec(), cases, steps, starts: new Set(), joined: () => 40, none: [bare.key, floorBare.key],
   proposals: { [bare.key]: { mark: "check", why: "a script could read it" }, [floorBare.key]: { mark: "move", why: "read rarely" } } });
 ok(lone.some(l => l === `- ${bare.key}: no holder, read on need. Its proposal: check, no issue filed yet: the session files one where its upkeep pays, which joins the queue as any check for a rule that stands does, a script could read it.`)
