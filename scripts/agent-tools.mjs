@@ -424,23 +424,18 @@ export function readProject(root, rev = null) {
     return false;
   };
   // At a commit, git's own tree is walked as the working tree is: a link inside the repository is followed (eight hops at
-  // most), one that leads out of it is not, and names are read as git stores them (-z: no quoting).
-  const tree = at => {
-    let out = "";
-    try { out = execFileSync("git", ["ls-tree", "-z", rev, "--", at], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }); } catch { /* (none) */ }
-    return out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"), [mode, type] = l.slice(0, tab).split(" "); return { mode, type, f: l.slice(tab + 1) }; });
-  };
+  // most), one that leads out of it is not, and names are read as git stores them (-z: no quoting); each part of a path
+  // is looked up in the commit's one listing, so a file read costs git no process but its text's.
   const resolve = (f, hops = 0) => {
-    const parts = f.split("/");
+    const parts = f.split("/"), { blobs, links, dirs, others } = listing(root, rev);
     for (let i = 1; i <= parts.length; i++) {
-      const at = parts.slice(0, i).join("/"), entry = tree(at).find(e => e.f === at);
-      if (!entry) return null;
-      if (entry.mode !== "120000") continue;
+      const at = parts.slice(0, i).join("/");
+      if (!links.includes(at)) { if (blobs.has(at) || dirs.has(at) || others.has(at)) continue; return null; }
       const to = path.posix.normalize(path.posix.join(path.posix.dirname(at), textAt(root, rev, at) ?? "/"));
       if (hops >= 8 || to === ".." || to.startsWith("../") || path.posix.isAbsolute(to)) return null;
       return resolve([to, ...parts.slice(i)].join("/"), hops + 1);
     }
-    return { f, type: tree(f).find(e => e.f === f)?.type ?? "tree" };
+    return { f, type: blobs.has(f) ? "blob" : dirs.has(f) ? "tree" : "commit" };
   };
   // (in the working tree, a file git ignores is a person's or a machine's own, as a .claude/settings.local.json mostly
   // is, and no file of the project's: floor rule 18)
@@ -455,7 +450,12 @@ export function readProject(root, rev = null) {
     };
   // (the names in a folder of the project, at the commit or in the working tree, a link out of the checkout not followed)
   const names = dir => {
-    if (rev) { const d = resolve(dir); return d?.type === "tree" ? tree(`${d.f}/`).map(e => e.f.slice(d.f.length + 1)) : []; }
+    if (rev) {
+      const d = resolve(dir);
+      if (d?.type !== "tree") return [];
+      const { blobs, links, dirs, others } = listing(root, rev), under = `${d.f}/`;
+      return [...new Set([...blobs, ...links, ...dirs, ...others].filter(at => at.startsWith(under)).map(at => at.slice(under.length).split("/")[0]))];
+    }
     if (outside(dir)) return [];
     try { return fs.readdirSync(path.join(root, dir)); } catch { return []; }
   };
@@ -480,7 +480,7 @@ function filesOf(root, rev) {
   return out.split("\0").filter(Boolean);
 }
 
-// The files and links of the commit `rev`, git asked once for each commit: { blobs, links }.
+// The files and links of the commit `rev`, git asked once for each commit: { blobs, links, others, dirs }.
 const listings = new Map();
 function listing(root, rev) {
   const key = `${root}\0${rev}`;
@@ -490,6 +490,9 @@ function listing(root, rev) {
   const entries = out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"); return [l.slice(0, tab).split(" ")[0], l.slice(tab + 1)]; });
   // (a file is a plain or an executable blob; a submodule's entry, 160000, is no file the commit holds)
   const found = { blobs: new Set(entries.filter(([mode]) => mode === "100644" || mode === "100755").map(([, at]) => at)), links: entries.filter(([mode]) => mode === "120000").map(([, at]) => at) };
+  // (and any other entry, a submodule's among them, and the folders on every entry's way, each by its path)
+  found.others = new Set(entries.filter(([mode]) => mode !== "100644" && mode !== "100755" && mode !== "120000").map(([, at]) => at));
+  found.dirs = new Set(entries.flatMap(([, at]) => at.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/"))));
   listings.set(key, found);
   return found;
 }
