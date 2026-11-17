@@ -125,15 +125,15 @@ const gone = [...parts].filter(name => /^(?:scripts|\.github|setup)\//u.test(nam
 ok(gone.length === 0, `each file a line of INVENTORY.md names is there${gone.length
   ? `: not so for ${gone.join(", ")}. Mend: in INVENTORY.md, name the file where it went, or take out the line of a part that is gone`
   : ""}`);
-// a part's line that records a trial of a maintained tool (*Tried:*) says which of the part's bugs the tool read
+// a part's line that records a trial of a maintained tool (*Tried:*) says which of the part's bugs the tool reads
 // (*Replayed:*; tasks/choices.md, "A trial of a maintained tool replays the part's past bugs"; #593)
 const unreplayed = text => text.split(/\r?\n(?! )/u).filter(l => /^- /u.test(l)).map(l => l.replace(/\s*\r?\n\s*/gu, " "))
   .filter(l => /\*Tried:\*/u.test(l) && !/\*Replayed:\*/u.test(l)).map(l => l.split(": ")[0].replace(/^- /u, ""));
 ok(unreplayed("- `a.mjs`: reads.\n  *Tried:* a tool, 2 s.\n- `b.mjs`: reads. *Tried:* a tool. *Replayed:* #1 read.\n- `c.mjs`: reads.").join() === "`a.mjs`",
   "a part's line that records a trial and replays none of its bugs is found, one that replays them or records no trial is not");
 const notReplayed = unreplayed(inventory);
-ok(notReplayed.length === 0, `each part's line of INVENTORY.md that records a trial says which of the part's bugs the tool read${notReplayed.length
-  ? `: not so for ${notReplayed.join(", ")}. Mend: run the tool on the case of each bug filed against the part, and add to its line "*Replayed:*" with each bug's number and whether the tool read it ("none" where no bug was filed; a case no longer at hand named as not run, and why), as tasks/choices.md says ("A trial of a maintained tool replays the part's past bugs")`
+ok(notReplayed.length === 0, `each part's line of INVENTORY.md that records a trial says which of the part's bugs the tool reads and which it does not${notReplayed.length
+  ? `: not so for ${notReplayed.join(", ")}. Mend: run the tool on the case of each bug filed against the part, and add to its line "*Replayed:*" with each bug's number and whether the tool reads it or not ("none" where no bug was filed; a case rebuilt from the bug's issue or the test its fix added, and one that neither can rebuild named as not run, and why), as tasks/choices.md says ("A trial of a maintained tool replays the part's past bugs")`
   : ""}`);
 
 for (const [check, test] of Object.entries(CHECKS)) {
