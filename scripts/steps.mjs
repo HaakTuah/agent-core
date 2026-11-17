@@ -114,6 +114,15 @@ function testsStand(p) {
 // Whether a workflow that runs on pull requests has a step that runs the strength check, with STRENGTH_BASE set on the
 // step, its job or the workflow: a mention in a comment, or a step with no base, which measures nothing, is none.
 const STRENGTH_RUN = /(^|[\s;&|])node\s+core\/scripts\/strength\.mjs(?=\s*($|[;&|]))/mu;
+// Whether a workflow runs on every push to an open pull request: the event pull_request with no "types" that leaves out
+// its opening or a push, and no "paths" that could leave out the change a lookup reads (a lookup's own reading of it).
+const everyPush = on => {
+  if (!onPullRequests(on)) return false;
+  const pr = on && typeof on === "object" && !Array.isArray(on) ? on.pull_request : null;
+  if (!pr || typeof pr !== "object") return true;
+  const types = pr.types === undefined ? null : [pr.types].flat();
+  return (!types || ["opened", "synchronize"].every(t => types.includes(t))) && pr.paths === undefined && pr["paths-ignore"] === undefined;
+};
 const onPullRequests = on => (typeof on === "string" ? on === "pull_request" : Array.isArray(on) ? on.includes("pull_request") : !!on && "pull_request" in on);
 const based = (...envs) => envs.some(e => typeof e?.STRENGTH_BASE === "string" && e.STRENGTH_BASE.trim() !== "");
 function strengthRuns(p) {
@@ -504,7 +513,7 @@ function jobsOf(w, read = () => null) {
   const deep = (v) => /^(?:0|[2-9]|\d{2,})$/u.test(String(v ?? "").trim());
   const jobs = w.yaml?.jobs && typeof w.yaml.jobs === "object" ? Object.values(w.yaml.jobs) : null;
   if (!jobs) return [{ runs: commands(w.text ?? ""), steps: [], deep: false, unread: [] }];
-  const started = onPullRequests(w.yaml?.on), budget = { left: INLINED_MOST };
+  const started = everyPush(w.yaml?.on), budget = { left: INLINED_MOST };
   return jobs.map(job => {
     const unread = [];
     const steps = inlined(Array.isArray(job?.steps) ? job.steps : [], read, unread, budget).map(st => stepOf(st, job, w, started));

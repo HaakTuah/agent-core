@@ -97,6 +97,16 @@ ok(nread.length === 2 && nread.find((p) => p.name === "Invented.Moss.Core")?.bri
   ok(long[many - 2].brings === 1 && long[many - 2].by.length === 0 && long[0].brings === many - 1, "and what one brings is read where it is asked");
 }
 
+// The same for NuGet: a long chain of packages the project names, left alone, read in a bounded time.
+{
+  const many = 3000, deps = {};
+  for (let i = 0; i < many; i++) deps[`Invented.Chain.${i}`] = { type: "Direct", requested: "[1.0.0, )", resolved: "1.0.0", contentHash: "AAAA", ...(i + 1 < many ? { dependencies: { [`Invented.Chain.${i + 1}`]: "1.0.0" } } : {}) };
+  const began = Date.now(), long = nugetPackages(JSON.stringify({ version: 1, dependencies: { "net8.0": deps } }), "packages.lock.json");
+  const none = newPackages([["packages.lock.json", long]], [long.map((p) => ({ name: p.name }))], true);
+  ok(long.length === many && none.length === 0 && Date.now() - began < 5000, `NuGet: a lock file of ${many} packages in a chain, left alone, is read in a bounded time (${Date.now() - began} ms)`);
+  ok(long[0].brings === many - 1 && long[many - 1].by.length === many - 1, "and what one brings, and what brings it, are read where they are asked");
+}
+
 // ---- What is new
 const fresh = newPackages([["package-lock.json", read]], [[{ name: "tidy-moss-helper" }], [{ name: "@invented/scoped-moss" }]]);
 ok(fresh.map((p) => p.name).sort().join() === "brand-new-moss,dev-moss,from-git,tidy-moss-format" && fresh.every((p) => p.lockPath === "package-lock.json"), "a package any lock file of the base held, under any version, is not new");
@@ -323,6 +333,12 @@ try {
   }
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  push:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
   ok(notDone(tmp, step).length === 1, "nor one in a workflow no pull request starts");
+  for (const [what, on] of [["only once it closes", "  pull_request:\n    types: [closed]\n"], ["only where its paths change", "  pull_request:\n    paths: [docs/**]\n"]]) {
+    writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n${on}jobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n`);
+    ok(notDone(tmp, step).length === 1, `nor one in a workflow a pull request starts ${what}`);
+  }
+  writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\n    types: [opened, synchronize, reopened, ready_for_review]\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n");
+  ok(notDone(tmp, step).length === 0, "and one that runs on its opening and every push counts");
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n        continue-on-error: true\n");
   ok(notDone(tmp, step).length === 1, "nor one in a step allowed to fail");
   writeFileSync(join(tmp, ".github/workflows/own.yml"), "name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/exact-versions.mjs c.json\n      - run: node core/scripts/lookup.mjs c.json\n        if: false\n");

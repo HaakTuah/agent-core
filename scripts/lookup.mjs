@@ -118,13 +118,20 @@ export function nugetPackages(text, lockPath) {
   for (const entries of Object.values(lock.dependencies)) {
     const lower = new Map(Object.keys(entries).map((id) => [id.toLowerCase(), id]));
     const next = (id) => Object.keys(entries[id]?.dependencies ?? {}).map((d) => lower.get(d.toLowerCase())).filter(Boolean);
-    const reached = Object.entries(entries).filter(([, e]) => e?.type === "Direct" || e?.type === "CentralTransitive").map(([id]) => [id, reach(id, next)]);
+    const named = (id) => entries[id]?.type === "Direct" || entries[id]?.type === "CentralTransitive";
+    // (as for npm: what a package brings, and what brings it, read only where asked, each by one walk, in each framework)
+    let back = null;
+    const before = (id) => {
+      if (!back) { back = new Map(); for (const from of Object.keys(entries)) for (const to of next(from)) { if (!back.has(to)) back.set(to, []); back.get(to).push(from); } }
+      return back.get(id) ?? [];
+    };
     for (const { id, version } of packages) {
-      const entry = entries[lower.get(id.toLowerCase())];
+      const at = lower.get(id.toLowerCase()), entry = entries[at];
       if (!entry || entry.resolved !== version) continue;
-      const was = out.get(id.toLowerCase()), brings = reach(lower.get(id.toLowerCase()), next).size;
-      const by = reached.filter(([, set]) => set.has(lower.get(id.toLowerCase()))).map(([d]) => d);
-      out.set(id.toLowerCase(), { name: id, version, path: id, direct: (was?.direct ?? false) || entry.type !== "Transitive", brings: Math.max(was?.brings ?? 0, brings), by: [...new Set([...(was?.by ?? []), ...by])] });
+      const was = out.get(id.toLowerCase()), seen = [...(was?.seen ?? []), { brings: () => reach(at, next).size, by: () => [...reach(at, before)].filter(named) }];
+      out.set(id.toLowerCase(), { name: id, version, path: id, direct: (was?.direct ?? false) || entry.type !== "Transitive", seen,
+        get brings() { return Math.max(0, ...seen.map((f) => f.brings())); },
+        get by() { return [...new Set(seen.flatMap((f) => f.by()))]; } });
     }
   }
   return [...out.values()];
