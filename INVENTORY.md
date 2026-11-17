@@ -107,9 +107,11 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   issues only security fixes for it and builds Betterleaks, which reads the same rules (fact, as reported in March
   2026), so the lookup of #488 picks between them; TruffleHog (AGPL-3.0, allowed for a tool that only runs), dropped on
   an assumption that the challenge measured wrong, and so proposed for the replacement's comparison: its live check of
-  a secret turns off (`--no-verification`), and so run, offline, over the core's files with a fake key and a term
-  planted, 3.99.7 found what gitleaks 8.30.1 found (the key, and the term through a rule of its own) and two addresses
-  holding a password in two tests' data, which gitleaks did not; 184 MB against gitleaks's 24 MB, 1.3 s against 0.9 s.
+  a secret turns off (`--no-verification`), as does its look for a newer version of itself when it starts
+  (`--no-update`), and so run, offline, with both, over the core's files with a fake key and a term planted, 3.99.7
+  found what gitleaks 8.30.1 found (the key, and the term through a rule of its own) and two addresses holding a
+  password in two tests' data, which gitleaks did not; 184 MB against gitleaks's 24 MB, 1.3 s against 0.9 s. With its
+  defaults it would send each secret it finds to the service the secret belongs to, so it is never run without both.
   *Bugs:* 1.
   **Replace** the matching with gitleaks or its successor, which also brings the scan for secrets that floor rule 1 has
   no check for in a private project (the host's own is paid there); **keep** what is read (each commit's names and
@@ -411,7 +413,8 @@ the host's release downloads.
 Each is proposed, and none becomes a line, or widens one, before the owner's word; the twelve agreed verdicts do not
 wait on any of them.
 
-1. TruffleHog joins the comparison of the personal-terms check's replacement, beside gitleaks or Betterleaks.
+1. TruffleHog joins the comparison of the personal-terms check's replacement, beside gitleaks or Betterleaks, run only
+   with `--no-verification` and `--no-update`, offline, as the trial ran it.
 2. ghalint and poutine join the comparison of the workflow check's replacement, beside zizmor and actionlint.
 3. promptfoo joins the trial of a harness under the staged cases, beside Inspect AI and Harbor.
 4. The trial of the skill format (#534, point 8) weighs each tool's own rule files for paths too, and uses
