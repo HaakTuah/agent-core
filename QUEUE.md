@@ -13,7 +13,6 @@ it merges last.
 | #486, points 6 to 8 and 11 | rule builder | |
 | #527, step 2 | rule builder | #526 |
 | #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue, as #534's line below does | |
-| #534, point 13 | rule builder | |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | |
 | #579 | builder | |
 | #580 | builder | |
