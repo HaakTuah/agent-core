@@ -248,6 +248,8 @@ function shellWords(script) {
   const end = () => { if (word !== null) words.push([word, from, quoted]); word = null; quoted = false; };
   for (let i = 0; i < script.length; i++) {
     const c = script[i];
+    // (a backslash before a newline joins the lines, as the shell reads it, and stands for nothing)
+    if (c === "\\" && script[i + 1] === "\n") { i++; continue; }
     if (/[\s;&|()<>]/u.test(c)) { end(); continue; }
     if (word === null) { word = ""; from = i; }
     if (c === "\\") { word += script[i + 1] ?? ""; i++; continue; }
