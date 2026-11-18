@@ -1063,7 +1063,13 @@ function reaches(root, rev, at, follow = false) {
 // stands. "" where no node_modules folder is on its way.
 const INSTALL_READS = ["package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".yarnrc.yml", ".yarnrc", ".npmrc", ".pnpmfile.cjs", "bun.lock", "bun.lockb"];
 const FROM = /(?:link|file|portal|workspace):([^"'\n,}\]#]+)/gu, PATCHES = ["patches", ".yarn/patches"], PATCH_FILE = /[^\s"'#:,{}[\]]+\.patch\b/gu;
+const locks = new Map(), reads = new Map();
 function lockOf(root, rev, at) {
+  const key = `${root}\0${rev}\0${at}`;
+  if (!locks.has(key)) locks.set(key, lockRead(root, rev, at));
+  return locks.get(key);
+}
+function lockRead(root, rev, at) {
   const posix = at.split(path.sep).join("/"), via = [], out = new Set(), r = walk(root, rev, posix, via, true, [], true);
   // (each name the walk passed beyond the commit, where it ended, and the link's own target read as a path, which a walk
   // that meets a name the commit does not hold leaves unsaid)
@@ -1080,8 +1086,15 @@ function lockOf(root, rev, at) {
   return [...out].sort().join("\0\0");
 }
 // What an install reads in one folder, `dir`, for lockOf(): each file of INSTALL_READS whole, or all a path holds where
-// the commit holds it as no plain file, and all that each folder of the project its files take a package from holds.
+// the commit holds it as no plain file, there and in each folder of a package below it, as a workspace's members,
+// whose packages an install puts in that node_modules; and all that each folder of the project its files take a
+// package from holds. Read once a folder.
 function installRead(root, rev, dir) {
+  const key = `${root}\0${rev}\0${dir}`;
+  if (!reads.has(key)) reads.set(key, installReadOf(root, rev, dir));
+  return reads.get(key);
+}
+function installReadOf(root, rev, dir) {
   const l = listing(root, rev), there = f => (dir ? `${dir}/${f}` : f), out = [];
   const held = f => (notFile(l, f) ? `${f}\0${everything(root, rev, f)}` : `${f}\0${textAt(root, rev, f)}`);
   const from = new Set(PATCHES.map(there)), add = fromBases(l, dir, from);
@@ -1092,6 +1105,9 @@ function installRead(root, rev, dir) {
     // (and each patch file it names, wherever it stands, as a patch: or a list of patched dependencies names one)
     for (const m of text.matchAll(PATCH_FILE)) add(m[0]);
     if (/^(?:package-lock|npm-shrinkwrap)\.json$/u.test(f)) for (const resolved of npmLinks(text)) add(resolved);
+  }
+  for (const member of [...l.blobs].filter(f => f.endsWith("/package.json") && (!dir || f.startsWith(`${dir}/`))).map(f => path.posix.dirname(f)).sort()) {
+    for (const f of INSTALL_READS) out.push(`member ${held(`${member}/${f}`)}`);
   }
   for (const p of [...from].sort()) if (p !== "." && p !== ".." && !p.startsWith("../") && !path.posix.isAbsolute(p)) out.push(`from ${p}\0${everything(root, rev, p)}`);
   return out;

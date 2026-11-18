@@ -488,6 +488,20 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     fs.writeFileSync(path.join(nestedPkg, ".gitignore"), "node_modules/\n"); fs.writeFileSync(path.join(nestedPkg, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "1.0.0" } } }));
     fs.symlinkSync("../node_modules/pkg/agents", path.join(nestedPkg, "docs/pkg")); git(nestedPkg, "add", "-A"); git(nestedPkg, "commit", "-q", "-m", "a package's agents behind a link");
     fails(run(pr(nestedPkg, { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "6.6.6" } } }) })), "and so does one reached through another link the base held, once its lock changes", WAY);
+    // (its fallback security review of cd32eb7: and once a workspace member's package.json changes, as an install puts
+    // that member's packages in the node_modules the link leads into; while many such links, nothing changed, are read in
+    // seconds, each folder's install files once)
+    const memberPkg = viaDocs();
+    fs.writeFileSync(path.join(memberPkg, ".gitignore"), "node_modules/\n"); fs.writeFileSync(path.join(memberPkg, "package.json"), JSON.stringify({ workspaces: ["packages/*"] }));
+    fs.mkdirSync(path.join(memberPkg, "packages/w"), { recursive: true }); fs.writeFileSync(path.join(memberPkg, "packages/w/package.json"), JSON.stringify({ name: "w" }));
+    fs.symlinkSync("../node_modules/pkg/agents", path.join(memberPkg, "docs/pkg")); git(memberPkg, "add", "-A"); git(memberPkg, "commit", "-q", "-m", "a package's agents behind a link, in a workspace");
+    fails(run(pr(memberPkg, { "packages/w/package.json": JSON.stringify({ name: "w", dependencies: { pkg: "1.0.0" } }) })), "and so does one whose workspace member's package.json changes", WAY);
+    const manyPkg = viaDocs();
+    fs.writeFileSync(path.join(manyPkg, ".gitignore"), "node_modules/\n"); fs.writeFileSync(path.join(manyPkg, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: {} }));
+    for (let i = 0; i < 300; i++) fs.symlinkSync("../node_modules/pkg/agents", path.join(manyPkg, `docs/l${i}`));
+    git(manyPkg, "add", "-A"); git(manyPkg, "commit", "-q", "-m", "many links into a package");
+    const manyStarted = Date.now(), manyKept = run(pr(manyPkg, { "README.md": "x\n" }));
+    ok(manyKept.status === 0 && manyKept.out.includes(WAY) && Date.now() - manyStarted < 30000, "while 300 such links the base held, nothing changed, are noted in seconds", `${Date.now() - manyStarted} ms\n${manyKept.out.slice(0, 2000)}`);
     // (#647's fallback security review of 90bcf1a: a folder of agents or commands that is a link out of the checkout fails
     // as any such link does; a folder in another case a link reaches first is still read for its case; and a hook is named
     // by the path Claude Code reads it at)
