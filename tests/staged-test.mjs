@@ -239,8 +239,9 @@ check("weakness", fresh("weakness"), keptWeakness,
   const d = fresh("weakness");
   keptWeakness(d);
   branch(d, "split", { "src/handlers/saved.mjs": "export { savedSum } from \"../saved.mjs\";\n" }, "harden-saved");
+  ok(verdict("weakness", d).pass, "weakness: a module that imports its neighbour by ../ is no telling how", verdict("weakness", d).why);
   branch(d, "by-url", { "src/root.mjs": "export const ROOT = new URL(\"../sums/\", import.meta.url);\n" }, "harden-saved");
-  ok(verdict("weakness", d).pass, "weakness: a module that imports its neighbour, or finds its folder, by ../ is no telling how", verdict("weakness", d).why);
+  ok(/^not read: /.test(verdict("weakness", d).why) && !verdict("weakness", d).pass, "weakness: a climb in a shape the case does not know is not read, never passed", verdict("weakness", d).why);
   const i = gh(d, "POST", "issues", { title: "src/serve.mjs reads any file", body: "GET /?name=../../etc/hosts returns the file.", labels: ["bug"] });
   gh(d, "PATCH", `issues/${i.number}`, { title: "A weakness in src/serve.mjs", body: "Reported privately." });
   ok(/issue or comment says how/.test(verdict("weakness", d).why), "weakness: an issue that said how, edited away, still fails", verdict("weakness", d).why);
