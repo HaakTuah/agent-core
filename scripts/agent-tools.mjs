@@ -121,6 +121,7 @@ export function configured(read, skills, files = () => [], linked = () => false)
     readHooks(state, file, settings);
     readEnv(state, file, "env", settings?.env);
     readCommands(state, file, settings);
+    readMarkets(state, file, settings);
     for (const [name, on] of Object.entries(entries(file, "enabledPlugins", settings?.enabledPlugins, "each plug-in's \"name@marketplace\" to true"))) if (on) { tools.set(`plugin ${name}`, file); plugins.push(name); }
   }
   // (a plug-in is what its name and its marketplace's declared source make it, so one fetched from elsewhere is another;
@@ -147,6 +148,8 @@ function addServers(state, file, servers, tool) {
     // (a server is its whole entry: its command, arguments, address and all, so one the pull request changes is another)
     state.add(key, canonical(["server", file, name, server ?? null]));
     state.servers.push([key, file, name, server]);
+    // (a remote server's command that prints its headers, which Claude Code runs by itself as it connects: read as a hook)
+    if (server?.headersHelper !== undefined) readHelper(state, file, `mcpServers.${name}.headersHelper`, server.headersHelper);
   }
 }
 
@@ -197,15 +200,12 @@ function readCodex(state, json, read) {
     // (its words are a program and its arguments, each one whole, read as shellWords reads them)
     addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [shellWords(notify)] });
   }
-  // (a model provider's commands that print a token, which Codex runs by itself: each read as a hook is, its command and
-  // its arguments as notify's words are)
+  // (a model provider, which says where Codex sends a key and which commands it runs by itself to print one: read whole
+  // as a setting no starter kit writes, so one the pull request adds or changes is new, its commands named as notify's)
   for (const [id, provider] of Object.entries(state.entries(".codex/config.toml", "model_providers", config.model_providers, "each provider's id to its settings"))) {
-    for (const [key, part] of [["auth", provider?.auth], ["gateway_oauth.credential_export", provider?.gateway_oauth?.credential_export]]) {
-      if (part?.command === undefined) continue;
-      const words = [part.command, ...(Array.isArray(part.args) ? part.args : [])];
-      if (!words.every(w => typeof w === "string")) { state.flag(`.codex/config.toml: "model_providers.${id}.${key}" holds a command or arguments that are no text. Mend: write them as Codex takes them`, ".codex/config.toml"); continue; }
-      addHook(state, ".codex/config.toml", { tool: "Codex", event: `model_providers.${id}.${key}`, matcher: "", hook: part, runs: true, text: words.join(" "), commands: [shellWords(words)], setting: true });
-    }
+    const words = [provider?.auth, provider?.gateway_oauth?.credential_export].filter(part => part?.command !== undefined).map(part => [part.command, ...(Array.isArray(part.args) ? part.args : [])]);
+    if (!words.flat().every(w => typeof w === "string")) { state.flag(`.codex/config.toml: "model_providers.${id}" holds a command or arguments that are no text. Mend: write them as Codex takes them`, ".codex/config.toml"); continue; }
+    addHook(state, ".codex/config.toml", { tool: "Codex", event: `model_providers.${id}`, matcher: "", hook: provider ?? null, runs: true, text: words.length ? words.map(w => w.join(" ")).join("; ") : "its settings", commands: [NO_KIT, ...words.map(shellWords)], setting: true });
   }
   addServers(state, ".codex/config.toml", state.entries(".codex/config.toml", "mcp_servers", config.mcp_servers, SERVERS), "Codex ");
   const policy = state.entries(".codex/config.toml", "shell_environment_policy", config.shell_environment_policy, "its settings");
@@ -313,6 +313,31 @@ function addHook(state, file, { tool, event, matcher, given = matcher, hook, run
 // one not in the starter kit's form is held as a hook is (floor rule 3), and each is listed as one; a value of another
 // shape than Claude Code takes is refused.
 const COMMANDS = ["apiKeyHelper", "awsAuthRefresh", "awsCredentialExport", "gcpAuthRefresh", "otelHeadersHelper", "statusLine", "fileSuggestion"];
+// A command a tool runs by itself, written as one text, read as a hook is, as a setting; any other shape refused.
+function readHelper(state, file, key, value) {
+  if (typeof value !== "string") return void state.flag(`${file}: "${key}" is no command. Mend: write it as one text, as Claude Code takes it`, file);
+  addHook(state, file, { tool: "", event: key, matcher: "", hook: value, runs: true, text: value, commands: [value], setting: true });
+}
+// What no starter kit writes, given as a command so it is never read as the kit's form.
+const NO_KIT = "(no form of the starter kit's)";
+// A marketplace that runs a command by itself, to print the headers it is fetched with, or as a plug-in's source: read
+// whole, as a setting no starter kit writes, so one the pull request adds or changes is new.
+function readMarkets(state, file, settings) {
+  const declared = settings?.extraKnownMarketplaces;
+  if (!declared || typeof declared !== "object" || Array.isArray(declared)) return;
+  const runs = v => Array.isArray(v) ? v.some(runs) : v && typeof v === "object" && Object.entries(v).some(([k, w]) => fold(k) === "headershelper" || (k === "source" && w === "command") || runs(w));
+  for (const [name, m] of Object.entries(declared)) if (runs(m)) addHook(state, file, { tool: "", event: `extraKnownMarketplaces.${name}`, matcher: "", hook: m, runs: true, text: "a command it runs", commands: [NO_KIT], setting: true });
+}
+// The hooks a skill's or a subagent's frontmatter holds, which Claude Code runs while it runs: the whole frontmatter
+// read as a setting no starter kit writes, where any key in it is "hooks" in any case or written in a form this does not
+// read (a key quoted with an escape, a complex key), so one the pull request adds or changes is new.
+function readFrontmatter(state, file, text) {
+  const front = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/u.exec(text ?? "")?.[1];
+  if (front === undefined) return;
+  const keys = [...front.matchAll(/(?:^|[\n{,[])[ \t]*(?:-[ \t]+)*("(?:[^"\\\n]|\\.)*"|'[^'\n]*'|[^\s:#{}[\],"'?][^:#{}[\],\n]*?)[ \t]*:(?=\s|$)/gu)].map(m => m[1]);
+  const hooks = keys.some(k => fold(k.replace(/^["']|["']$/gu, "").trim()) === "hooks" || (k.startsWith('"') && k.includes("\\"))) || /^[ \t]*\?(?:\s|$)/mu.test(front);
+  if (hooks) addHook(state, file, { tool: "", event: `${file} frontmatter`, matcher: "", hook: front, runs: true, text: "its hooks", commands: [NO_KIT], setting: true });
+}
 function readCommands(state, file, settings) {
   for (const key of COMMANDS) {
     const value = settings?.[key];
@@ -589,26 +614,41 @@ function submodules(root, rev) {
   for (const [at, id] of l.gitlinks) if (WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d))) out.set(at, [`${at} is a submodule where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${id}`]);
   // (the submodule a walk reaches, or one it stops at with more of the path left, a link leading into its folder: from
   // each tool's path, and from each link anywhere under a tool's folder, a skill's own folders among them)
-  const under = l.links.filter(at => WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d)));
-  for (const at of new Set([...toolPaths(names, f => resolve(f)?.type), ...under])) {
+  for (const at of new Set([...toolPaths(names, f => resolve(f)?.type), ...toolLinks(l)])) {
     const via = [], r = walk(root, rev, at, via), sub = r?.type === "commit" ? r.f : via.find(v => l.gitlinks.has(v));
     if (sub && !out.has(at) && !out.has(sub)) out.set(at, [`${at} leads, through a link, to the submodule ${sub}, where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${sub}\0${l.ids.get(sub)}`]);
   }
   return [...out.values()];
 }
 
+// Everything a name holds at a commit, as a fingerprint: what it leads to, each entry the commit lists under that, by its
+// path and object, and, for each link among them, everything it holds in turn, each folder read once; so a name held
+// twice is held by all a tool may read under either, never by one path through it.
+function everything(root, rev, at, seen = new Set()) {
+  const l = listing(root, rev), via = [], r = walk(root, rev, at, via, true, [], true);
+  const top = [r?.type ?? "nothing", r?.f ?? "", l.ids.get(r?.f) ?? "", ...via.map(v => `${v}\0${l.ids.get(v)}`)].join("\0");
+  if (r?.type !== "tree" || seen.has(r.f)) return top;
+  seen.add(r.f);
+  const prefix = r.f === "." ? "" : `${r.f}/`, under = [...l.ids.keys()].filter(p => p.startsWith(prefix)).sort();
+  return [top, ...under.map(p => `${p}\0${l.ids.get(p)}`), ...under.filter(p => l.linked.has(p)).map(p => everything(root, rev, p, seen))].join("\0\0");
+}
+// The links a commit holds on a tool's way or under a tool's folder, in whatever case.
+const toolLinks = l => l.links.filter(at => WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d)));
+
 // Each tool's path a link leads to a name the commit holds in another case only, as [its problem, what it is held by]: a
 // file system that ignores case gives the tool what stands under that name, which this check never reads, so one the
 // base held is noted while the links on the way and all that stands under that name are as they were.
 function caseLinks(root, rev) {
   const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = [];
-  for (const at of toolPaths(names, f => resolve(f)?.type)) {
+  // (from each tool's path, and from each link on a tool's way or under its folder, so a link to a folder held twice is
+  // seen where no tool's file stands under the name git keeps)
+  for (const at of new Set([...toolPaths(names, f => resolve(f)?.type), ...toolLinks(l)])) {
     const via = [], misses = [], r = walk(root, rev, at, via, false, misses);
     if (!via.some(v => l.linked.has(v))) continue;
     // (held by what the tool reads there, found as a file system that ignores case finds it, and nothing else there)
     const miss = r === null ? misses.find(m => !m.several) : undefined, several = misses.find(m => m.several), links = via.map(v => `${v}\0${l.ids.get(v)}`);
     if (miss) out.push([`${at} leads, through a link, to ${miss.at} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${miss.at} stands, in this pull request`, [at, ...links, reaches(root, rev, at, true)].join("\0\0")]);
-    else if (several) out.push([`${at} leads, through a link, to ${several.at}, which the commit holds under more than one name a file system that ignores case reads as one (${several.several.join(", ")}), as macOS's and Windows' do, keeping one of them, so which an agent tool reads is not plain. Mend: keep one of those names, in this pull request`, [at, ...links, ...several.several.map(n => readAs(root, rev, n, several.rest))].join("\0\0")]);
+    else if (several) out.push([`${at} leads, through a link, to ${several.at}, which the commit holds under more than one name a file system that ignores case reads as one (${several.several.join(", ")}), as macOS's and Windows' do, keeping one of them, so which an agent tool reads is not plain. Mend: keep one of those names, in this pull request`, [at, ...links, ...several.several.map(n => everything(root, rev, n))].join("\0\0")]);
   }
   return out;
 }
@@ -930,10 +970,6 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 // link and submodule on the way held by its object, of what it reaches only what a tool reads there, and for a skill's
 // folder its SKILL.md; so a link held as the base held it is held by that too, and nothing else that stands there. With
 // `follow`, each name is found as a file system that ignores case finds it.
-// What a tool reads through the name `at`, `rest` the path after it: what the walk reaches there, read as reaches() reads.
-function readAs(root, rev, at, rest) {
-  return commitReader(root, rev, true, true).holds(rest ? `${at}/${rest}` : at);
-}
 function reaches(root, rev, at, follow = false) {
   const posix = at.split(path.sep).join("/"), want = fold(posix), { holds, names, resolve } = commitReader(root, rev, true, follow);
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
@@ -944,22 +980,31 @@ function reaches(root, rev, at, follow = false) {
 // it lies in, and a yarn or pnpm lock file there whole; so a link the base held, through a package the pull request
 // locks at another version or source, is held by that too.
 function lockOf(root, rev, at) {
-  const via = [], l = listing(root, rev), out = [];
+  const via = [], l = listing(root, rev), out = new Set();
   walk(root, rev, at.split(path.sep).join("/"), via, true, [], true);
   for (const v of via) {
-    const cut = `/${v}`.indexOf("/node_modules/");
-    if (l.ids.has(v) || l.dirs.has(v) || cut < 0) continue;
-    const dir = v.slice(0, cut) ? `${v.slice(0, cut)}/` : "", key = v.slice(dir.length);
-    for (const lock of ["package-lock.json", "npm-shrinkwrap.json"]) {
-      let entry;
-      // (an entry too deep to write back is read as one that cannot be read, as one too deep to parse is)
-      try { entry = JSON.stringify(JSON.parse(textAt(root, rev, `${dir}${lock}`) ?? "null")?.packages?.[key] ?? null); } catch { entry = "unreadable"; }
-      out.push(`${dir}${lock}\0${key}\0${entry}`);
+    const cut = `/${v}`.lastIndexOf("/node_modules/");
+    if (l.ids.has(v) || cut < 0) continue;
+    // (the installed package's folder, a scope's name and the package's, and the folder that holds its node_modules)
+    const parts = v.slice(cut + "node_modules/".length).split("/"), name = parts.slice(0, parts[0].startsWith("@") ? 2 : 1).join("/");
+    const pkg = `${v.slice(0, cut + "node_modules/".length)}${name}`, entries = [];
+    // (each lock file in that folder or one above it, as a workspace's root holds one for every package under it)
+    for (let dir = v.slice(0, cut); ; dir = dir.includes("/") ? dir.slice(0, dir.lastIndexOf("/")) : "") {
+      const at = f => (dir ? `${dir}/${f}` : f), key = dir ? pkg.slice(dir.length + 1) : pkg;
+      for (const lock of ["package-lock.json", "npm-shrinkwrap.json"]) {
+        let entry = null;
+        try { entry = JSON.parse(textAt(root, rev, at(lock)) ?? "null")?.packages?.[key] ?? null; if (entry !== null) entry = JSON.stringify(entry); } catch { entry = "unreadable"; }
+        if (entry !== null) entries.push(`${at(lock)}\0${key}\0${entry}`);
+      }
+      for (const lock of ["yarn.lock", "pnpm-lock.yaml"]) { const e = entriesOf(textAt(root, rev, at(lock)), name); if (e) entries.push(`${at(lock)}\0${name}\0${e}`); }
+      if (!dir) break;
     }
-    const name = key.slice(key.lastIndexOf("node_modules/") + "node_modules/".length);
-    for (const lock of ["yarn.lock", "pnpm-lock.yaml"]) out.push(`${dir}${lock}\0${name}\0${entriesOf(textAt(root, rev, `${dir}${lock}`), name)}`);
+    // (a package no lock file read here names, or one that names it in a form no check reads, as an npm lock file
+    // before its seventh version or bun's, is no package held: the link is read as new)
+    if (!entries.length || entries.some(e => e.endsWith("\0unreadable"))) return null;
+    entries.forEach(e => out.add(e));
   }
-  return out.join("\0\0");
+  return [...out].sort().join("\0\0");
 }
 // Of a yarn or pnpm lock's text, the entries that name the package `name`, each its line and the lines indented under
 // it, so a change to another package's entry leaves them as they were; a key names it where, unquoted and past a leading
@@ -985,7 +1030,9 @@ function sortLinks(root, base, links, fail, notes) {
     let to = null;
     try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
-    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at, true) === reaches(root, "HEAD", at, true) && lockOf(root, base, at) === lockOf(root, "HEAD", at)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
+    const lock = base && to !== null ? lockOf(root, "HEAD", at) : "";
+    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at, true) === reaches(root, "HEAD", at, true) && lock !== null && lockOf(root, base, at) === lock) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
+    else if (lock === null) fail.push(`${said}, through an installed package that no lock file this check reads holds (package-lock.json or npm-shrinkwrap.json of npm 7 or later, yarn.lock, pnpm-lock.yaml, beside its node_modules or in a folder above). Mend: replace it with the file or folder itself, committed in the project, in this pull request; or lock the package in one of those files`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
   }
 }
