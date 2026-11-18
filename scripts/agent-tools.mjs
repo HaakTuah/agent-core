@@ -574,8 +574,10 @@ function caseProblems(root, rev) {
 function submodules(root, rev) {
   const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = new Map();
   for (const [at, id] of l.gitlinks) if (WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d))) out.set(at, [`${at} is a submodule where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${id}`]);
-  // (the submodule a walk reaches, or one it stops at with more of the path left, a link leading into its folder)
-  for (const at of toolPaths(names, f => resolve(f)?.type)) {
+  // (the submodule a walk reaches, or one it stops at with more of the path left, a link leading into its folder: from
+  // each tool's path, and from each link anywhere under a tool's folder, a skill's own folders among them)
+  const under = l.links.filter(at => WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d)));
+  for (const at of new Set([...toolPaths(names, f => resolve(f)?.type), ...under])) {
     const via = [], r = walk(root, rev, at, via), sub = r?.type === "commit" ? r.f : via.find(v => l.gitlinks.has(v));
     if (sub && !out.has(at) && !out.has(sub)) out.set(at, [`${at} leads, through a link, to the submodule ${sub}, where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${sub}\0${l.ids.get(sub)}`]);
   }

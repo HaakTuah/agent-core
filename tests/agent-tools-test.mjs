@@ -784,6 +784,12 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const heldBehindRun = run(pr(heldBehind, { "README.md": "a change of its own\n" }));
     ok(heldBehindRun.status === 0 && heldBehindRun.out.includes("leads, through a link, to the submodule sub"), "one the base held is noted, not failed", heldBehindRun.out);
     fails(run(prLink(heldBehind, "sub", git(heldBehind, "rev-parse", "HEAD~1"))), "but not once the pull request moves the submodule", "leads, through a link, to the submodule sub");
+    // (#618's fallback security review of 4d141c6: and from a link anywhere under a tool's folder)
+    const skillLink = project({ ".claude/skills/x/SKILL.md": "# x\n", ...listing() });
+    gitlink(skillLink, "sub");
+    fs.symlinkSync("../../../sub", path.join(skillLink, ".claude/skills/x/scripts"));
+    git(skillLink, "add", "-A"); git(skillLink, "commit", "-q", "-m", "a skill's folder linked to a submodule");
+    fails(run(skillLink, "--core"), "a skill's own folder linked to a submodule fails", ".claude/skills/x/scripts leads, through a link, to the submodule sub");
     // (and a tool's path in another case the base held, through a chain of links: each link on the way is held too)
     const chain = project({ ...listing() });
     fs.mkdirSync(path.join(chain, ".claude/Skills"), { recursive: true });
