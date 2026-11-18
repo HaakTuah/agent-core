@@ -35,7 +35,7 @@ export const READERS = {
 const WORDS = ["Added", "Changed", "Fixed", "Updated", "Removed", "Modified", "Moved", "Renamed", "Rewritten", "Refactored", "Replaced"];
 const CAPITAL = `(?:${WORDS.flatMap(w => [w, w.toUpperCase()]).join("|")})`, CHANGED = `(?:${WORDS.map(w => w.toLowerCase()).join("|")}|${CAPITAL.slice(3, -1)})`;
 const DATE = "(?:19|20)\\d\\d-[01]\\d-[0-3]\\d";
-const OPENS = "^\\s*(?:[*-]\\s*)?";
+const OPENS = "^\\s*(?:/\\s*)?(?:[*-]\\s*)?"; // (a doc comment's third slash, a block's own * and a list's - aside)
 export const CHANGE_MARKS = {
   "a change's heading": new RegExp(`${OPENS}${CAPITAL}\\s*(?::|\\(?${DATE}\\b)`, "u"),
   "what the code was": new RegExp(`${OPENS}(?:Previously|Formerly|Was|Old|PREVIOUSLY|FORMERLY|WAS|OLD)\\s*:`, "u"),

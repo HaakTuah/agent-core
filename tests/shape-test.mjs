@@ -122,12 +122,12 @@ ok(same(ids(mono), ["inside: web -> engine: packages/web/src/page.ts -> packages
 const changeCfg = cfg({ changes: ["Ticket: ABC-"] });
 const marked = survey({
   "src/a.js": "// Changed: the loop runs once (old code below)\nconst a = 1; // Fixed in #12\n/* Previously: a map\n * Added 2024-05-01\n * then the rest of a comment that\n * changed: nothing, a line going on in small letters\n */\nconst s = \"// Changed: in a string\";\n// Ticket: ABC-12, the task's own mark\n// moved here 2025-01-02 from b.js\n// replaced by utf-8, a reason\n// padding is added per RFC-4648, lone surrogates replaced by UTF-8 bytes\n// Deprecated: use parseUrl() instead\n// Stripe changed the webhook format on 2023-08-16; older events lack it\n",
-  "src/b.cs": "// CHANGED: a heading in capitals\n/// was renamed from Foo for ABC-9 (a reason, no mark)\nclass B {}\n",
+  "src/b.cs": "// CHANGED: a heading in capitals\n/// Previously: scanned on every call\n/// was renamed from Foo for ABC-9 (a reason, no mark)\nclass B {}\n",
   "src/c.py": "# Updated for PR 42\nx = '# Changed: in a string'\n",
   "src/d.js": "// Why the loop runs twice: the reader needs both passes (#458 gives the reason)\nexport const d = 1;\n",
 }, changeCfg);
 const changes = ids(marked).filter(id => id.startsWith("change: "));
-ok(same(changes, ["change: src/a.js: \"Ticket:\\u0020ABC-\"", "change: src/a.js: a change's date", "change: src/a.js: a change's heading", "change: src/a.js: the task that changed it", "change: src/a.js: what the code was", "change: src/b.cs: a change's heading", "change: src/c.py: the task that changed it"])
+ok(same(changes, ["change: src/a.js: \"Ticket:\\u0020ABC-\"", "change: src/a.js: a change's date", "change: src/a.js: a change's heading", "change: src/a.js: the task that changed it", "change: src/a.js: what the code was", "change: src/b.cs: a change's heading", "change: src/b.cs: what the code was", "change: src/c.py: the task that changed it"])
   && marked.entries.get("change: src/a.js: a change's heading").n.count === 2 && marked.entries.get("change: src/a.js: the task that changed it").n.count === 1 && marked.entries.get("change: src/a.js: a change's date").n.count === 1 && readerOf("change: src/a.js: a change's date", marked.readers) === "changes" && fileOf("change: src/a.js: what the code was") === "src/a.js"
   && groupOf("change: src/a.js: \"Ticket:\\u0020ABC-\"").group === "\"Ticket:\\u0020ABC-\"",
   "a comment line that marks a change is an entry of the reader \"changes\", counted by file and mark, in JavaScript, C# and Python, a mark of the config's too; a string, a line going on in small letters, a reason and a pointer to an issue are none", changes.join("\n"));
