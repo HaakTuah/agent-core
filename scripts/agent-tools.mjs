@@ -371,15 +371,16 @@ function readCommands(state, file, settings) {
   }
 }
 
-// Each hook with a command that is not the starter kit's form, into `state.sources` with why: nothing shows it runs its
-// copy on main (hook-source.mjs); nor where the file the kit's form fetches the project holds as a link (`linked`), whose
-// target's name main gives in the script's place, a file the branch can change.
+// Each hook with a command that is not the starter kit's form, into `state.sources` as { why, how }, why nothing shows it
+// runs its copy on main (hook-source.mjs) and its mend; so too where the file the kit's form fetches the project holds as
+// a link (`linked`), whose target's name main gives in the script's place, a file the branch can change.
 function readSource(state, name, commands) {
   for (const command of commands) {
     const at = fetchedBy(command);
-    if (command === NO_KIT) return void state.sources.set(name, NO_KIT_WHY);
-    if (at === null) return void state.sources.set(name, "is not in the starter kit's form");
-    if (state.linked(at)) return void state.sources.set(name, `fetches ${show(at)} from main, which the project holds as no plain file (a link, a folder or a submodule), so main gives no script but what git prints of it`);
+    if (command === NO_KIT) return void state.sources.set(name, { why: NO_KIT_WHY, how: NO_KIT_HOW });
+    if (at === null) return void state.sources.set(name, { why: "is not in the starter kit's form", how: HOW });
+    // (the command in the kit's form already, its mend is the fetched file's)
+    if (state.linked(at)) return void state.sources.set(name, { why: `fetches ${show(at)} from main, which the project holds as no plain file (a link, a folder or a submodule), so main gives no script but what git prints of it`, how: `make ${show(at)} a plain file committed in the project, the script itself in place of the link, folder or submodule, so main gives it` });
   }
 }
 
@@ -540,10 +541,10 @@ export function check(head, list, kit, file) {
 // check()'s `sources` and `marked`, and into `problems` each mark on a hook in the starter kit's form.
 function sourcesOf(head, list, file, problems) {
   const sources = [], marked = [];
-  for (const [k, why] of head.sources ?? []) {
+  for (const [k, { why, how }] of head.sources ?? []) {
     const said = `${describe(k)}, configured in ${head.tools.get(k)}, ${why}, so nothing shows that it runs its copy on main, where floor rule 3 has what an agent tool starts by itself run from its copy on main, and not the working tree's, which the branch it runs on can change`;
-    if (list?.from?.has(k)) marked.push([k, said, why === NO_KIT_WHY ? NO_KIT_HOW : HOW]);
-    else sources.push([k, `${said}. Mend: ${why === NO_KIT_WHY ? NO_KIT_HOW : HOW}, in this pull request`]);
+    if (list?.from?.has(k)) marked.push([k, said, how]);
+    else sources.push([k, `${said}. Mend: ${how}, in this pull request`]);
   }
   for (const k of list?.from ?? []) if (head.tools.has(k) && !head.sources?.has(k)) problems.push(`${file}: "agentTools" says of ${describe(k)} "from": ${show(TREE)}, but its command is the starter kit's form, which runs its copy on main. Mend: take "from" out of its entry, in this pull request`);
   return { sources, marked };
@@ -720,14 +721,29 @@ function belowDir(root, rev, p) {
 function mdLinks(root, rev) {
   const l = listing(root, rev), read = p => !l.blobs.has(p) || /\.md$/iu.test(p);
   // (each read as a link's way is, where it leaves the checkout and comes back in, and as Windows reads a link: WAYS_READ;
-  // and by what the lock files say exactly of the package each link walked leads into: pkgLock())
-  const held = at => { const walked = [], all = WAYS_READ.map(how => everything(root, rev, at, read, how, walked)); return [at, ...all, ...[...new Set(walked)].map(w => pkgLock(root, rev, w).exact)].join("\0"); };
+  // and by what the lock files say exactly of the package each link walked leads into: pkgLock(). A link below the
+  // folder whose own name is no Markdown file's, where a way reaches a file, gives Claude Code nothing to read there, so
+  // that way is held by the links on it alone, never by the file or its lock: a change to that file is none of it)
+  const held = (at, below = false) => {
+    const walked = [], all = WAYS_READ.map(how => {
+      const via = below ? unreadFile(root, rev, at, how) : null;
+      return via ? ["a file Claude Code does not read", ...via.map(v => `${v}\0${l.ids.get(v)}`)].join("\0") : everything(root, rev, at, read, how, walked);
+    });
+    return [at, ...all, ...[...new Set(walked)].map(w => pkgLock(root, rev, w).exact)].join("\0");
+  };
   // (.claude as a link on the way, by what stands at its agents and commands alone, as Claude Code reads nothing else
   // there for them)
   const way = at => (fold(at) === ".claude" ? AGENT_DIRS.map(d => held(`${at}/${d.split("/")[1]}`)).join("\0\0") : held(at));
   const folders = agentFolders(root, rev);
   return [...[...new Set(folders.flatMap(f => f.ways))].map(at => [`${at} is a link on the way to a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads only those of plain folders the project commits. Mend: replace it with the folder itself, committed in the project, in this pull request`, way(at)]),
-    ...[...new Set(folders.flatMap(f => f.links))].map(at => [`${at} is a link below a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads none of them there. Mend: replace it with the files themselves, committed in the project, in this pull request`, held(at)])];
+    ...[...new Set(folders.flatMap(f => f.links))].map(at => [`${at} is a link below a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads none of them there. Mend: replace it with the files themselves, committed in the project, in this pull request`, held(at, true)])];
+}
+// The links on the way of `at`, a link below a folder of Claude Code's agents or commands, read as `how` says, where its
+// own name is no Markdown file's and that way reaches a file, which Claude Code reads nothing of; else null.
+function unreadFile(root, rev, at, how) {
+  if (/\.md$/iu.test(at)) return null;
+  const via = [], r = walk(root, rev, at, via, true, [], true, how);
+  return r?.type === "blob" ? via : null;
 }
 // Each folder of Claude Code's below the project's root, in whatever case, a folder, a link or a submodule, as [its
 // problem, all it holds]: Claude Code reads its settings, agents, skills and commands where it works in that folder, and
@@ -978,15 +994,36 @@ const checkouts = new Map();
 const topOf = root => { if (!checkouts.has(root)) checkouts.set(root, fs.realpathSync(root)); return checkouts.get(root); };
 // The link `here`, the walk's `hops`th, its text put before what is left of a walk's path, read as `how` says: false
 // where it leads nowhere this machine can follow (past the links followed, no text, or a whole path on a drive this
-// machine has none of), and a whole path walked from its start by backIn().
+// machine has none of, save one through the checkout's own folder: onDrive()), and a whole path walked from its start by
+// backIn().
 function onward(root, rev, here, how, left, at, via, hops) {
   const to = linkText(root, rev, here), names = t => t.split(how.win ? /[\\/]/u : "/");
   if (hops > most(how) || to === null) return false;
   if (!path.posix.isAbsolute(to) && !(how.win && path.win32.isAbsolute(to))) { left.unshift(...names(to)); return true; }
-  if (!path.isAbsolute(to)) return false;
+  if (!path.isAbsolute(to)) return onDrive(root, to, left, at, via);
   const start = path.parse(to).root || path.sep;
   left.unshift(...names(to.slice(start.length)));
   return backIn(root, start, left, at, via);
+}
+// A whole path on a Windows drive, which this machine has none of: where one of its names is the checkout's own folder's,
+// in whatever case, the rest after the last such is walked in the checkout from its root, said in `via`, and true; else
+// false. So a link the base held there is held by what it reaches in the checkout, as on the machine it was made on.
+function onDrive(root, to, left, at, via) {
+  const parts = to.slice(path.win32.parse(to).root.length).split(/[\\/]/u), own = fold(path.basename(topOf(root)));
+  const i = parts.findLastIndex(n => fold(n) === own);
+  if (i < 0) return false;
+  at.length = 0;
+  left.unshift(...parts.slice(i + 1));
+  via.push(`\0back in by its name\0${parts.slice(0, i + 1).join("/")}`);
+  return true;
+}
+// The link on the way of `at`, read as Windows reads it, whose text is a whole path on a Windows drive this machine
+// cannot follow (onDrive()), as [the link, its text]; null where there is none.
+function driveCut(root, rev, at) {
+  const via = [];
+  if (walk(root, rev, at, via, true, [], true, WAYS_READ[1]) !== null) return null;
+  const last = via.at(-1), to = last && !last.startsWith("\0") ? linkText(root, rev, last) : null;
+  return to !== null && path.win32.isAbsolute(to) && !path.isAbsolute(to) ? [last, to] : null;
 }
 // A way that left the checkout, walked from `start` on the file system around it, a name of `left` at a time, each link
 // there followed (63 at most): true where it comes back into the checkout, the walk then going on from the checkout's
@@ -1171,9 +1208,10 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 // link and submodule on the way held by its object, of what it reaches only what a tool reads there, and for a skill's
 // folder its SKILL.md; so a link held as the base held it is held by that too, and nothing else that stands there. With
 // `follow`, each name is found as a file system that ignores case finds it.
-// With `from`, what a tool reads through `at` read from that path instead, as under each of several names that fold alike.
-function reaches(root, rev, at, follow = false, from = at) {
-  const posix = from.split(path.sep).join("/"), want = fold(at.split(path.sep).join("/")), { holds, names, resolve } = commitReader(root, rev, true, follow);
+// With `from`, what a tool reads through `at` read from that path instead, as under each of several names that fold alike;
+// with `how`, each link read as walk() says.
+function reaches(root, rev, at, follow = false, from = at, how = null) {
+  const posix = from.split(path.sep).join("/"), want = fold(at.split(path.sep).join("/")), { holds, names, resolve } = commitReader(root, rev, true, follow, how);
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
   return [through(posix, want, holds, names, f => resolve(f)?.type, p => belowDir(root, rev, p)), ...skill].join("\0\0");
 }
@@ -1286,18 +1324,29 @@ const mayHaveChanged = (was, now) => was.loose !== now.loose || UNREAD.test(now.
 // A link the base held to what the commit does not hold, as it stood: failed where the pull request locks the package
 // it leads into anew by an entry read exactly (pkgLock()), reported as one whose package may have changed where only what
 // cannot be read exactly changed, and reported otherwise.
-function sortStood(root, base, at, said, there, fail, notes) {
+function sortStood(root, base, at, said, there, fail, notes, mend = "Replace it with the file or folder itself, committed in the project") {
   const was = pkgLock(root, base, at), now = pkgLock(root, "HEAD", at);
   if (was.exact !== now.exact) fail.push(`${said}, ${there}, and this pull request locks the package it leads into anew, which changes what an agent tool runs there unread. Mend: replace the link with the file or folder itself, committed in the project, or take it out, in this pull request`);
   else if (mayHaveChanged(was, now)) notes.push(`${said}, ${there}, as the base held it, and a lock file this check cannot read the package's entry of changes beside it, so the package it leads into may have changed what an agent tool runs there: reported, never failed. Replace the link with the file or folder itself, committed in the project, or take it out`);
-  else notes.push(`${said}, ${there}, as the base held it: reported, never failed while the package it leads into is locked as before. Replace it with the file or folder itself, committed in the project`);
+  else notes.push(`${said}, ${there}, as the base held it: reported, never failed while the package it leads into is locked as before. ${mend}`);
 }
 // Each link on the way to or below a folder of Claude Code's agents or commands whose package may have changed unread
-// (mayHaveChanged()), as a note: mdLinks() holds such a link by what is read exactly alone.
+// (mayHaveChanged()), as a note: mdLinks() holds such a link by what is read exactly alone. One below it that reaches, by
+// every way, a file Claude Code reads nothing of (unreadFile()) is held by no lock, and left out.
 function looseNotes(root, base, notes) {
-  for (const at of new Set(agentFolders(root, "HEAD").flatMap(f => [...f.ways, ...f.links]))) {
+  const folders = agentFolders(root, "HEAD"), below = folders.flatMap(f => f.links).filter(at => !WAYS_READ.every(how => unreadFile(root, "HEAD", at, how)));
+  for (const at of new Set([...folders.flatMap(f => f.ways), ...below])) {
     if (mayHaveChanged(pkgLock(root, base, at), pkgLock(root, "HEAD", at))) notes.push(`${show(at)}, a link to Claude Code's agents or commands, leads into a package that a lock file this check cannot read the entry of may have changed, so what Claude Code reads there may have changed unread: reported, never failed. Replace the link with the files themselves, committed in the project, or take it out`);
   }
+}
+// Whether the base held the link `at`, whose text is `to`, as it stands: held only where it takes the way the base's took,
+// by the same links, there and back again where it leaves the checkout, so one the pull request makes lead elsewhere, by a
+// link it adds or changes further along, is new; and where what an agent tool reads where it leads is as it was, by each
+// of the ways a link is read, so one only Windows follows into the checkout, past Linux's forty links or by a whole path on
+// a drive, is held by what stands there, never by its path.
+function heldAsBase(root, base, at, to) {
+  return !!base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && wayOf(root, base, at) === wayOf(root, "HEAD", at)
+    && [null, ...WAYS_READ].every(how => reaches(root, base, at, true, at, how) === reaches(root, "HEAD", at, true, at, how));
 }
 // In the core's own repository none may stand, one the base held among them (#259).
 function sortLinks(root, base, links, fail, notes, core = false) {
@@ -1305,13 +1354,13 @@ function sortLinks(root, base, links, fail, notes, core = false) {
     let to = null;
     try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
-    // (held only where it takes the way the base's took, by the same links, there and back again where it leaves the
-    // checkout: one the pull request makes lead elsewhere, by a link it adds or changes further along, is new)
-    const held = !core && base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && wayOf(root, base, at) === wayOf(root, "HEAD", at);
+    const held = !core && heldAsBase(root, base, at, to);
     const out = to !== null && away(root, "HEAD", at), stood = held && out && away(root, base, at);
     const there = "to what the commit does not hold (outside the checkout, or in a folder an install fills, as node_modules or a virtual environment), which this check cannot read";
-    if (stood) sortStood(root, base, at, said, there, fail, notes);
-    else if (held && reaches(root, base, at, true) === reaches(root, "HEAD", at, true)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
+    // (a whole path on one Windows machine, which no other follows, is reported with that path)
+    const cut = stood ? driveCut(root, "HEAD", at) : null;
+    if (stood) sortStood(root, base, at, said, there, fail, notes, cut ? `Its link ${show(cut[0])} names ${show(cut[1])}, a whole path on one Windows machine, which this check and every other machine cannot follow: replace it with a link relative to where it stands, or with the file or folder itself, committed in the project` : undefined);
+    else if (held) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
     else if (out) fail.push(`${said}, ${there}. Mend: replace the link with the file or folder itself, committed in the project, in this pull request`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
   }
