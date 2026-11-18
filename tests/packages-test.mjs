@@ -49,6 +49,7 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   // the registry carries: one that links a folder, or is bundled in another, or carries any other field, is refused)
   const whole = e => JSON.stringify(Object.keys(e ?? {}).sort().map(k => [k, e[k]]));
   const same = (a, b) => Boolean(a) && whole(a) === whole(b);
+  const SAID = ["dependencies", "optionalDependencies", "peerDependencies", "peerDependenciesMeta", "license"];
   const FIELDS = new Set(["version", "resolved", "integrity", "license", "dev", "optional", "devOptional", "peer", "engines", "bin", "funding",
     "dependencies", "optionalDependencies", "peerDependencies", "peerDependenciesMeta", "os", "cpu", "libc", "deprecated", "hasInstallScript"]);
   // (each entry that fails, with what is wrong; `ask(name)` gives the registry's document of a package, as fetched does)
@@ -57,7 +58,7 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
     for (const [k, e] of Object.entries(packages ?? {})) {
       if (!k || same(base[k], e)) continue;
       const odd = Object.keys(e).filter(f => !FIELDS.has(f));
-      if (!/^(?:node_modules\/(?:@[^/]+\/)?[^/@]+\/)*node_modules\/(?:@[^/]+\/)?[^/@]+$/u.test(k) || odd.length) { out.push(`${k}: ${odd.length ? `its field${odd.length === 1 ? "" : "s"} ${odd.join(", ")}, which no package fetched from the registry carries` : "a key that names no installed package's folder"}`); continue; }
+      if (!/^(?:node_modules\/(?:@[^/.][^/]*\/)?[^/@.][^/@]*\/)*node_modules\/(?:@[^/.][^/]*\/)?[^/@.][^/@]*$/u.test(k) || odd.length) { out.push(`${k}: ${odd.length ? `its field${odd.length === 1 ? "" : "s"} ${odd.join(", ")}, which no package fetched from the registry carries` : "a key that names no installed package's folder"}`); continue; }
       const name = registryName(e.resolved), version = registryVersion(e.resolved);
       // (an address in its one plain form alone, a name as npm spells one: never one a URL parser reads otherwise)
       const plainAddress = (() => { try { return new URL(e.resolved).href === e.resolved; } catch { return false; } })();
@@ -69,6 +70,11 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
       const doc = await ask(name).catch(err => ({ status: err.message }));
       const dist = doc.json?.name === name ? doc.json?.versions?.[version]?.dist : undefined;
       if (doc.status === 200 && (dist?.tarball !== e.resolved || dist?.integrity !== e.integrity)) { out.push(`${name}@${version}: the registry gives another address or integrity for it than the lock file`); continue; }
+      // (what the entry says it depends on, and its licence, are the registry's own for that version: a spec of its own
+      // could name a source npm would fetch in place of what the lock file names)
+      const meta = doc.json?.versions?.[version] ?? {};
+      const said = SAID.filter(f => (e[f] !== undefined || (f === "license" && meta[f] !== undefined)) && whole(e[f]) !== whole(meta[f]));
+      if (doc.status === 200 && said.length) { out.push(`${name}@${version}: its ${said.join(", ")} not the registry's for that version`); continue; }
       const at = Date.parse(doc.json?.time?.[version] ?? "");
       if (!(now - at >= WEEK)) out.push(`${name}@${version}: ${doc.status === 200 ? (Number.isNaN(at) ? "the registry gives no date" : `published ${new Date(at).toISOString()}`) : `the registry answered ${doc.status}`}`);
     }
@@ -98,6 +104,9 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
     [{ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-z" } }, /another address or integrity/u],
     [{ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a", link: true } }, /its field link/u],
     [{ ...held, "https:/registry.npmjs.org/yaml/-/yaml-2.9.1.tgz": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /names no installed package's folder/u],
+    [{ ...held, "node_modules/yaml/node_modules/..": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /names no installed package's folder/u],
+    [{ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a", dependencies: { ms: "https://example.invalid/ms.tgz" } } }, /its dependencies not the registry's/u],
+    [{ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a", license: "MIT" } }, /its license not the registry's/u],
   ];
   const results = await Promise.all(cases.map(([lock]) => tooYoung(lock, held, ask, now)));
   ok(cases.every(([, said], i) => results[i].length === 1 && said.test(results[i][0])) && (await tooYoung(held, held, ask, now)).length === 0
