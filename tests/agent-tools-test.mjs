@@ -733,7 +733,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   fails(run(core, "--core"), "in the core's own repository none may stand", `.codex ${SAYS}`);
   if (LINKS) {
     // (#600's fallback security review of 33315a2: a submodule a tool's path leads to through a link)
-    for (const [at, to] of [[".codex", "sub"], [".claude/skills/foo", "../../sub"]]) {
+    for (const [at, to] of [[".codex", "sub"], [".claude/skills/foo", "../../sub"], [".kiro/settings", "../sub/cfg"]]) {
       const behind = project({ ...listing() });
       gitlink(behind, "sub");
       fs.mkdirSync(path.dirname(path.join(behind, at)), { recursive: true });
