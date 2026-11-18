@@ -27,10 +27,10 @@
 # reported (core archive 207). What is read is gathered by git and this file, and the terms are matched in it by
 # Betterleaks, a maintained scanner of text (MIT), at one exact version built from its source and checked by its sums
 # (floor rule 7), each term a rule of its own written as the job runs and removed with it, letter case aside, nothing of
-# the scanner's own rules, ignore files, inline marks, decoding or archives used (#579; INVENTORY.md). Without the secret
-# (a fork, Dependabot, a project that has not set it), or on a machine where Betterleaks cannot be built (no Go, or no
-# sum below for its system; never GitHub's runners), it passes with a note that nothing was checked: the check is
-# optional. It checks this repository, and every project that takes the core calls it (workflow_call), pinned to a full
+# the scanner's own rules, ignore files, inline marks, decoding or archives used (#579; INVENTORY.md); on a machine where
+# it cannot be built (no Go, or no sum below for its system; never GitHub's runners) the check fails, saying how to
+# mend it. Without the secret (a fork, Dependabot, a project that has not set it) it passes with a note that nothing
+# was checked: the check is optional. It checks this repository, and every project that takes the core calls it (workflow_call), pinned to a full
 # commit SHA (README.md, point 5), passing only that secret: the caller's event, checkout and token are the caller's own.
 name: Personal terms
 
@@ -90,8 +90,8 @@ jobs:
           # proxy by the toolchain pinned here, the source checked against its sum here and both against Go's checksum
           # database, and the build against the SHA-256 written here for the machine's system, which the same source
           # and toolchain always give; kept between runs under the system's temporary folder, and checked each time it
-          # runs; where no Go is at hand, or no sum stands here for the machine's system, nothing is read, said so, as
-          # without the secret. A new pin moves the version, the toolchain, every sum and the cache's key above at once)
+          # runs; where no Go is at hand, or no sum stands here for the machine's system, the check fails, saying so,
+          # since it guards what may not leak (floor rule 14). A new pin moves the version, the toolchain, every sum and the cache's key above at once)
           version=1.10.1 module=github.com/betterleaks/betterleaks toolchain=go1.26.11
           source='h1:w7AL/I3ygUzxoPTvTniTtMMWDAnZRTrIiBebc/L+E2o='
           # (the machine's system, as Go names it, asked outside the checkout and of the machine's own Go alone, so that
@@ -112,13 +112,9 @@ jobs:
             darwin/arm64/) sum=eb8b28e0eaac1536bd1311c775dbc58d9d9bc2beb7a77fdeb5beefdeb89bf2ff ;;
             *) sum= ;;
           esac
-          if [ -z "$sum" ] && [ "$RUNNER_ENVIRONMENT" = github-hosted ]; then
-            echo "FAIL Betterleaks, which matches the terms, could not be built on this runner of GitHub's: ${system:+no sum stands in this check for ${system%/}}${system:-no Go is at hand}, so nothing was read. Mend: run the check again; where it fails again, report it to the core (core/README.md, \"Reporting to the core\"), since GitHub's runners have Go."
-            rm -rf "$work"; exit 1
-          fi
           if [ -z "$sum" ]; then
-            echo "::notice::Betterleaks, which matches the terms, is built here by Go, and ${system:+no sum stands in this check for a build on ${system%/}}${system:-no Go is at hand}, so nothing was checked. Mend: run the check where Go 1.21 or later is at hand on Linux, Windows or macOS on Apple silicon, as on GitHub's runners."
-            rm -rf "$work"; exit 0
+            echo "FAIL Betterleaks, which matches the terms, is built here by Go, and ${system:+no sum stands in this check for a build on ${system%/}}${system:-no Go is at hand}, so nothing was read. Mend: run the check where Go 1.21 or later is at hand (go.dev/dl) on Linux, Windows or macOS on Apple silicon, as on GitHub's runners; the check guards what may not leak, so it never passes unread."
+            rm -rf "$work"; exit 1
           fi
           exe=; case $system in windows/*) exe=.exe ;; esac
           store="${TMPDIR:-/tmp}/agent-core-tools/betterleaks-$version-$sum" bl="$work/betterleaks$exe"

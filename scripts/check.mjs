@@ -21,7 +21,7 @@
 // each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed.
 // Git, bash and Node's own modules, gh where the manifest has no owner's row and no workflow's event says whose
 // account holds the repository (releases.mjs, hostAccount), and Go 1.21 or later, which builds the personal-terms
-// check's matcher where the list is given (without it that check says it read nothing, and passes).
+// check's matcher where the list is given (without it that check fails, saying so).
 //
 //   node core/scripts/check.mjs [--base <commit>] [--title <the pull request's title>] [--description <a file>]
 //                               [--branch <the branch's name, where none is checked out>]
