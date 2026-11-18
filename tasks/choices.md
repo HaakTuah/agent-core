@@ -1,7 +1,8 @@
 # Choices that are hard to undo
 
 Read before a session makes a choice that is hard to undo or advises the owner on one, by the reader of a pass over
-the recorded choices, and by a builder of a move from one stack to another: the kinds `choice` and `port`.
+the recorded choices, by a builder of a move from one stack to another, and by whoever runs a trial of a tool that
+would take a part's job: the kinds `choice`, `port` and `trial`.
 
 A choice is hard to undo where one pull request cannot reverse it: a language, an engine or framework, where data is
 kept, how the code is put together, a large dependency, a tool the work will lean on, and the platforms the code builds
@@ -181,6 +182,18 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
   (`core/scripts/core-cost.mjs --pulls`). It does not mean a move is rolled back by a session's own choice. Reason: a
   move in steps is known to stall, a project left in two stacks pays for both, and a cap is only as good as the
   estimates it is compared with.
+- **A trial of a maintained tool replays the part's past bugs** (#593). By default a trial of a maintained tool in the
+  place of a part of the project's own shows the two, old against new, on the same inputs (#534). Where bugs were filed
+  against the part it would replace (its issues labelled `bug`, or their files where the project's issues run from
+  files), whoever runs the trial also runs the tool on the case of each one's merged fix, taken from the test cases that
+  fix added or changed on the default branch and never from an issue's text, and the trial's record says of each bug,
+  by its number, whether the tool reads its case or not, on a line that opens `Replayed:` ("none" where no bug was
+  filed): in the pull request that shows the trial, and on the part's line of the inventory where the project keeps
+  one, beside the line `Tried:` that records the trial. A bug whose fix added or changed no test case is named on the
+  line as not run. It does not mean a tool must read every one to be taken, nor that a case is ever written from what
+  an issue says, which may carry outside text (floor rules 4 and 5). Reason: 11 of the 30 bugs filed on the core by 17
+  November 2026 that were a case a check's writer had not thought of stood on the NuGet and copies checks, and whether a
+  tool tried in their place reads those cases is the best evidence that the move pays.
 
 Held by: the records' check (`core/scripts/choices.mjs`, a step of the copies check), which fails a record a pull
 request adds without its lines `Looked for:`, `The blind pick:` and `The judgment:`, and lists, never fails, one that
@@ -190,6 +203,8 @@ a new project's stack before its first code; the scheduled look, which keeps the
 in a measure while it holds (`core/scripts/choices.mjs`, its test running both on a project made for it, and on the
 core's own records); the staged case `stack-choice` (`core/scripts/staged/stack-choice.mjs`), in which the common answer
 is the wrong one for a new project's stated aims, read in part: the record's criteria with a number of the aims' before
-its third option, three options, a case against, the pick and its sign; and, for the rest, the reviews alone: that the
+its third option, three options, a case against, the pick and its sign; the inventory's check, in the core
+(`tests/mend-test.mjs`), which fails a part's line that records a trial and replays none of its bugs; and, for the rest,
+the reviews alone: that the
 blind session saw nothing of the record, its brief alone; the gates of a move, the description of the pull request that
 makes it.

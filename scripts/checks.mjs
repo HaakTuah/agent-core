@@ -33,6 +33,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
+import { THIRD_PARTY } from "./core-path.mjs";
 import { MEND } from "./mend.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./workflow-run.mjs";
@@ -219,12 +220,13 @@ const RUN = {
   },
 
   // npm's own install from the lock file and its own check of the registry's signatures (.github/workflows/signatures.yml
-  // says what it holds and why), where the change touches what it reads.
+  // says what it holds and why), where the change touches what it reads: never the folder of packages the core's copy
+  // carries (third-party.mjs), whose package.json is no list of the project's.
   signatures(o, { coreAt, check }) {
     const dir = o.signatures || ".";
     console.log("== Does the pull request change what this check reads?");
     const look = changes(process.env.BASE_SHA || baseCommit(o.base), [":(glob)**/package.json", ":(glob)**/package-lock.json", ":(glob)**/npm-shrinkwrap.json",
-      ":(glob)**/.npmrc", `${coreAt}.node-version`, ".github/workflows/signatures.yml", ...caller()],
+      ":(glob)**/.npmrc", `${coreAt}.node-version`, ".github/workflows/signatures.yml", ...caller(), `:(exclude)${coreAt}${THIRD_PARTY}`],
     "No package list, lock file, .npmrc, Node version or calling workflow changed: nothing to verify.");
     if (!look) return;
     if (!check("Install from the lock file, from the registry alone, running no package's install script",

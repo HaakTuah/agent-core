@@ -196,6 +196,7 @@ if (process.platform !== "win32") {
 const synced = project({ ...listing() });
 const HERE = fileURLToPath(new URL("..", import.meta.url));
 fs.cpSync(path.join(HERE, "scripts"), path.join(synced, "core/scripts"), { recursive: true });
+fs.cpSync(path.join(HERE, "third-party"), path.join(synced, "core/third-party"), { recursive: true });
 fs.cpSync(path.join(HERE, "setup/template"), path.join(synced, "core/setup/template"), { recursive: true });
 git(synced, "add", "-A"); git(synced, "commit", "-q", "-m", "the copy");
 const newKit = JSON.parse(KIT);
