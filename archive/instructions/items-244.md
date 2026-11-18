@@ -133,5 +133,4 @@ The index, and how an item is written: `archive/instructions.md`.
      any difference, since kinds listed by hand are as complete as their writer's memory. The owner agreed to both,
      with the issue's other points, after asking what the core lacked that let a check cover only the cases its writer
      thought of, which 30 of its 58 bugs by that day had been. It stands behind "A part whose gaps repeat is read for its
-     whole input" and "Where something outside defines the full set, the part is compared with it" in
-     `tasks/code-shape.md`.
+     whole input" in `tasks/code-shape.md`.
