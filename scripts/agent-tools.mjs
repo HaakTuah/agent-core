@@ -723,10 +723,12 @@ function mdLinks(root, rev) {
   // (each read as a link's way is, where it leaves the checkout and comes back in, and as Windows reads a link: WAYS_READ;
   // and by what the lock files say exactly of the package each link walked leads into: pkgLock(). A link below the
   // folder whose own name is no Markdown file's, where a way reaches a file, gives Claude Code nothing to read there, so
-  // that way is held by the links on it alone, never by the file or its lock: a change to that file is none of it)
+  // that way is held by the links on it and its lock alone, never by the file: a change to that file is none of it, while
+  // an install the pull request locks anew may put a folder in the file's place)
   const held = (at, below = false) => {
     const walked = [], all = WAYS_READ.map(how => {
       const via = below ? unreadFile(root, rev, at, how) : null;
+      if (via) walked.push(at);
       return via ? ["a file Claude Code does not read", ...via.map(v => `${v}\0${l.ids.get(v)}`)].join("\0") : everything(root, rev, at, read, how, walked);
     });
     return [at, ...all, ...[...new Set(walked)].map(w => pkgLock(root, rev, w).exact)].join("\0");
@@ -1007,7 +1009,7 @@ function onward(root, rev, here, how, left, at, via, hops) {
 }
 // A whole path on a Windows drive, which this machine has none of: where one of its names is the checkout's own folder's,
 // in whatever case, the rest after the last such is walked in the checkout from its root, said in `via`, and true; else
-// false. So a link the base held there is held by what it reaches in the checkout, as on the machine it was made on.
+// false. So a link the base held there is held by what it would reach in a checkout of that name, never by nothing.
 function onDrive(root, to, left, at, via) {
   const parts = to.slice(path.win32.parse(to).root.length).split(/[\\/]/u), own = fold(path.basename(topOf(root)));
   const i = parts.findLastIndex(n => fold(n) === own);
@@ -1331,11 +1333,9 @@ function sortStood(root, base, at, said, there, fail, notes, mend = "Replace it 
   else notes.push(`${said}, ${there}, as the base held it: reported, never failed while the package it leads into is locked as before. ${mend}`);
 }
 // Each link on the way to or below a folder of Claude Code's agents or commands whose package may have changed unread
-// (mayHaveChanged()), as a note: mdLinks() holds such a link by what is read exactly alone. One below it that reaches, by
-// every way, a file Claude Code reads nothing of (unreadFile()) is held by no lock, and left out.
+// (mayHaveChanged()), as a note: mdLinks() holds such a link by what is read exactly alone.
 function looseNotes(root, base, notes) {
-  const folders = agentFolders(root, "HEAD"), below = folders.flatMap(f => f.links).filter(at => !WAYS_READ.every(how => unreadFile(root, "HEAD", at, how)));
-  for (const at of new Set([...folders.flatMap(f => f.ways), ...below])) {
+  for (const at of new Set(agentFolders(root, "HEAD").flatMap(f => [...f.ways, ...f.links]))) {
     if (mayHaveChanged(pkgLock(root, base, at), pkgLock(root, "HEAD", at))) notes.push(`${show(at)}, a link to Claude Code's agents or commands, leads into a package that a lock file this check cannot read the entry of may have changed, so what Claude Code reads there may have changed unread: reported, never failed. Replace the link with the files themselves, committed in the project, or take it out`);
   }
 }
@@ -1359,7 +1359,7 @@ function sortLinks(root, base, links, fail, notes, core = false) {
     const there = "to what the commit does not hold (outside the checkout, or in a folder an install fills, as node_modules or a virtual environment), which this check cannot read";
     // (a whole path on one Windows machine, which no other follows, is reported with that path)
     const cut = stood ? driveCut(root, "HEAD", at) : null;
-    if (stood) sortStood(root, base, at, said, there, fail, notes, cut ? `Its link ${show(cut[0])} names ${show(cut[1])}, a whole path on one Windows machine, which this check and every other machine cannot follow: replace it with a link relative to where it stands, or with the file or folder itself, committed in the project` : undefined);
+    if (stood) sortStood(root, base, at, said, there, fail, notes, cut ? `Its link ${show(cut[0])} names a whole path on one Windows machine, which this check and every other machine cannot follow (its text left out here, as a machine's path may name a person): replace it with a link relative to where it stands, or with the file or folder itself, committed in the project` : undefined);
     else if (held) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
     else if (out) fail.push(`${said}, ${there}. Mend: replace the link with the file or folder itself, committed in the project, in this pull request`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);

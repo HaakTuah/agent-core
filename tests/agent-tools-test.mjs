@@ -360,7 +360,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ok(winKept.status === 0 && winKept.out.includes(OUT), `and is reported while nothing there changes (${what})`, winKept.out);
     }
     const elsewhere = run(pr(winWay(() => "D:\\elsewhere\\hooks"), { "README.md": "a change of its own\n" }));
-    ok(elsewhere.status === 0 && elsewhere.out.includes(OUT) && elsewhere.out.includes('"D:\\\\elsewhere\\\\hooks", a whole path on one Windows machine'), "one the base held to a Windows drive path naming no folder of the checkout's is reported with that path and its mend", elsewhere.out);
+    ok(elsewhere.status === 0 && elsewhere.out.includes(OUT) && elsewhere.out.includes('Its link ".kiro/hooks" names a whole path on one Windows machine') && !/elsewhere/u.test(elsewhere.out), "one the base held to a Windows drive path naming no folder of the checkout's is reported with its mend, the path itself left out", elsewhere.out);
   }
   const kiroServer = { ".kiro/settings/mcp.json": { mcpServers: { docs: { command: "npx", args: ["-y", "docs-server"] } } } };
   fails(run(pr(project({ ...listing() }), { ...kiroServer, ...listing({ kind: "server", name: "Kiro docs", publisher: "Example Tools", version: "2.0.0" }) })), "a Kiro tool server is held to the pin its configuration gives", 'the tool server "Kiro docs" is fetched at no fixed version: .kiro/settings/mcp.json, in the arguments of "docs", names no version');
@@ -521,14 +521,14 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     }
     // (#647's fallback security review: a link below agents whose own name is no Markdown file's, reaching a file, gives
     // Claude Code nothing to read, so it is held by the links on its way alone, not by that file or its lock; one named as a
-    // Markdown file, or reaching a folder, is held by both)
+    // Markdown file, or reaching a folder, is held by both; and each by its lock, as an install may put a folder in the
+    // file's place)
     const plainLink = (name, to) => { const dir = project({ ...script, "vendor/package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version: "1.0.0" } } }), "vendor/node_modules/pkg/a.md": "---\nname: a\n---\n", "lib/d/b.md": "# b\n", ...listing() }); fs.symlinkSync("../vendor/node_modules/pkg/a.md", path.join(dir, "lib/hop")); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync(to, path.join(dir, ".claude/agents", name)); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link below agents"); return dir; };
     const relock = { "vendor/package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version: "2.0.0" } } }) };
-    for (const [what, files] of [["the file it reaches changes", { "vendor/node_modules/pkg/a.md": "---\nname: a\npermissionMode: default\n---\n" }], ["its package is locked anew", relock]]) {
-      const plainKept = run(pr(plainLink("x", "../../lib/hop"), files));
-      ok(plainKept.status === 0 && plainKept.out.includes(LINKED), `a link the base held below agents, named as no Markdown file and reaching a file, is noted while ${what}`, plainKept.out);
-      fails(run(pr(plainLink("x.MD", "../../lib/hop"), files)), `but one named as a Markdown file fails once ${what}`, LINKED);
-    }
+    const plainKept = run(pr(plainLink("x", "../../lib/hop"), { "vendor/node_modules/pkg/a.md": "---\nname: a\npermissionMode: default\n---\n" }));
+    ok(plainKept.status === 0 && plainKept.out.includes(LINKED), "a link the base held below agents, named as no Markdown file and reaching a file, is noted while that file changes", plainKept.out);
+    fails(run(pr(plainLink("x.MD", "../../lib/hop"), { "vendor/node_modules/pkg/a.md": "# changed\n" })), "but one named as a Markdown file fails once that file changes", LINKED);
+    for (const name of ["x", "x.md"]) fails(run(pr(plainLink(name, "../../lib/hop"), relock)), `and either, ${name}, fails once its package is locked anew, as an install may put a folder in the file's place`, LINKED);
     fails(run(pr(plainLink("x", "../../lib/d"), { "lib/d/b.md": "# changed\n" })), "and so does one named as no Markdown file that reaches a folder, once a Markdown file there changes", LINKED);
     const hopMoved = plainLink("x", "../../lib/hop");
     git(hopMoved, "checkout", "-q", "-B", "change2"); fs.unlinkSync(path.join(hopMoved, "lib/hop")); fs.symlinkSync("d/b.md", path.join(hopMoved, "lib/hop"));
