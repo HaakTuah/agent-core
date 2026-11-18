@@ -29,6 +29,20 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   const entries = Object.entries(lock.packages ?? {}).filter(([k]) => k);
   ok(lock.lockfileVersion === 3 && wanted.every(([n, v]) => lock.packages?.[`node_modules/${n}`]?.version === v), "package-lock.json is npm's own, and holds each package at the version package.json names", JSON.stringify(Object.keys(lock.packages ?? {})));
   ok(entries.every(([, e]) => /^https:\/\/registry\.npmjs\.org\//u.test(e.resolved ?? "") && /^sha512-/u.test(e.integrity ?? "")), "each entry comes from npm's registry, held to its sha512", entries.filter(([, e]) => !/^sha512-/u.test(e.integrity ?? "")).map(([k]) => k).join(", "));
+  // (every dependency spec npm reads, the package list's and each lock entry's, is a version, range or tag of npm's
+  // registry: one naming git, a web address, a file or a folder would have npm fetch from there in the lock's place;
+  // and the package list holds no field but its own, an override among those it does not hold)
+  const SPEC = /^[\w.^~<>=|*+ -]*$/u, specs = o => Object.entries(o ?? {}).filter(([, v]) => typeof v !== "string" || !SPEC.test(v) || /^\./u.test(v));
+  const KEYS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
+  const odd = [...KEYS.flatMap(f => specs(list[f]).map(([n, v]) => `package.json ${f} ${n}: ${v}`)), ...Object.keys(list).filter(k => !["name", "private", "description", "license", "dependencies", "devDependencies"].includes(k)).map(k => `package.json: ${k}`),
+    ...entries.flatMap(([k, e]) => KEYS.flatMap(f => specs(e[f]).map(([n, v]) => `${k} ${f} ${n}: ${v}`)))];
+  ok(odd.length === 0, "every dependency spec in the package list and the lock file is a version, range or tag of npm's registry, and the package list holds its own fields alone", odd.slice(0, 5).join("; "));
+  // (what npm installed is what the lock file names: its own record of the install, read against the lock entry by
+  // entry, whatever field or npm brought another source in; the core's tests' job installs before this runs)
+  const record = (() => { try { return JSON.parse(fs.readFileSync(path.join(root, "node_modules/.package-lock.json"), "utf8")).packages ?? {}; } catch { return null; } })();
+  const differ = record === null ? ["no install"] : [...new Set([...Object.keys(record), ...entries.map(([k]) => k)])]
+    .filter(k => record[k]?.link || ["version", "resolved", "integrity"].some(f => record[k]?.[f] !== lock.packages[k]?.[f]));
+  ok(differ.length === 0, "what npm installed, by its own record, is each entry of the lock file as written, and nothing else", `${differ.slice(0, 5).join(", ")}\nMend: run node scripts/install.mjs; where it still differs, an entry of the lock file or a spec in it names another source than npm's registry, which goes`);
   const config = json(".github/licences.json");
   ok((config.lockfiles ?? []).includes("package-lock.json"), "the core's licence check reads the lock file, so the licence check and the lookup hold each package (floor rules 10 and 15)");
   // (an install script never runs, whatever npm command is run at the core's root or a copy's: the mechanism holds it)
@@ -58,13 +72,15 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
     for (const [k, e] of Object.entries(packages ?? {})) {
       if (!k || same(base[k], e)) continue;
       const odd = Object.keys(e).filter(f => !FIELDS.has(f));
-      if (!/^(?:node_modules\/(?:@[^/.][^/]*\/)?[^/@.][^/@]*\/)*node_modules\/(?:@[^/.][^/]*\/)?[^/@.][^/@]*$/u.test(k) || odd.length) { out.push(`${k}: ${odd.length ? `its field${odd.length === 1 ? "" : "s"} ${odd.join(", ")}, which no package fetched from the registry carries` : "a key that names no installed package's folder"}`); continue; }
+      if (!/^(?:node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*\/)*node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*$/u.test(k) || odd.length) { out.push(`${k}: ${odd.length ? `its field${odd.length === 1 ? "" : "s"} ${odd.join(", ")}, which no package fetched from the registry carries` : "a key that names no installed package's folder"}`); continue; }
       const name = registryName(e.resolved), version = registryVersion(e.resolved);
       // (an address in its one plain form alone, a name as npm spells one: never one a URL parser reads otherwise)
       const plainAddress = (() => { try { return new URL(e.resolved).href === e.resolved; } catch { return false; } })();
       if (!name || !version || version !== e.version || !plainAddress || !/^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/u.test(name)) {
         out.push(`${k}: its address names ${name ?? "no package of npm's registry"} at ${version ?? "no version"}${plainAddress ? "" : " in no plain form"}, and its version field ${e.version ?? "none"}`); continue;
       }
+      // (the folder npm installs it in is named for the package its address fetches, so the lock file reads as it installs)
+      if (k.slice(k.lastIndexOf("node_modules/") + "node_modules/".length) !== name) { out.push(`${k}: its folder names another package than its address fetches, ${name}`); continue; }
       // (the date read is the one of the very tarball npm ci installs: the registry's own document gives that address and
       // that integrity for that version)
       const doc = await ask(name).catch(err => ({ status: err.message }));
@@ -107,6 +123,8 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
     [{ ...held, "node_modules/yaml/node_modules/..": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /names no installed package's folder/u],
     [{ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a", dependencies: { ms: "https://example.invalid/ms.tgz" } } }, /its dependencies not the registry's/u],
     [{ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a", license: "MIT" } }, /its license not the registry's/u],
+    [{ ...held, "node_modules/spdx-exceptions": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /its folder names another package than its address fetches/u],
+    [{ ...held, "node_modules/yaml\\..\\x": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /names no installed package's folder/u],
   ];
   const results = await Promise.all(cases.map(([lock]) => tooYoung(lock, held, ask, now)));
   ok(cases.every(([, said], i) => results[i].length === 1 && said.test(results[i][0])) && (await tooYoung(held, held, ask, now)).length === 0

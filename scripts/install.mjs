@@ -25,7 +25,7 @@ const own = fs.existsSync(path.join(root, "tests"));
 // (each command written out, so the licence check reads what it runs; npm on Windows is a .cmd file, which Node starts
 // only through the shell, and each argument is the script's own)
 export const REGISTRIES = {
-  npm: { lock: "package-lock.json", into: "node_modules/", run: () => spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none", "--workspaces=false", ...(own ? [] : ["--omit=dev"])], { cwd: root, encoding: "utf8", shell: windows }) },
+  npm: { lock: "package-lock.json", into: "node_modules/", run: () => spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none", "--allow-directory=none", "--workspaces=false", ...(own ? [] : ["--omit=dev"])], { cwd: root, encoding: "utf8", shell: windows }) },
 };
 
 // What keeps an install from running where it could reach past the core's own files: for npm's registry, a shrinkwrap
