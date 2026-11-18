@@ -272,12 +272,13 @@ export function staleFinding(run = () => spawnSync(process.execPath, [fileURLToP
 // The late findings, through `add` (review-marks.mjs; #551): Codex's findings of the last LATE_DAYS days made after
 // their pull request merged with no reply, or why they could not be read; `gh` in ghApi's form. Only the pull requests
 // that hold a finding of Codex's are looked up, the newest first, and what is past LATE_PULLS or LATE_PAGES is said to be
-// unread, never dropped: with nothing found, the issue is left as it stands.
+// unread, never dropped: with nothing found, the issue is left as it stands. The comments are read newest first, so a
+// reply, always newer than its finding, is read before it past the cap.
 export function lateFinding(repo, add, at, gh = ghApi) {
   try {
     const since = new Date(Date.parse(at) - LATE_DAYS * 86400000).toISOString().replace(/\.\d{3}Z$/, "Z");
     let pages = 0;
-    const inline = pagesOf(`repos/${repo}/pulls/comments?since=${since}`, route => (++pages > LATE_PAGES ? "[]" : gh(route)));
+    const inline = pagesOf(`repos/${repo}/pulls/comments?sort=created&direction=desc&since=${since}`, route => (++pages > LATE_PAGES ? "[]" : gh(route)));
     const all = [...new Set(inline.filter(c => codexFind(c)).map(pullOf).filter(Number.isInteger))].sort((a, b) => b - a);
     const merged = new Map(all.slice(0, LATE_PULLS).map(n => [n, JSON.parse(gh(`repos/${repo}/pulls/${n}`)).merged_at ?? null]).filter(([, m]) => typeof m === "string"));
     const left = [pages > LATE_PAGES && `the review comments past the first ${LATE_PAGES * 100} of the week`, all.length > LATE_PULLS && `Codex's findings on ${all.length - LATE_PULLS} older pull requests`].filter(Boolean);

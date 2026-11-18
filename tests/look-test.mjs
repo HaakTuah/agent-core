@@ -189,7 +189,7 @@ ok(stale(0, "Packages the project holds that have gone stale\n\n- a\n").what ===
   const others = Array.from({ length: LATE_PULLS + 5 }, (_, i) => ({ id: 100 + i, pull_request_url: `https://api.github.com/repos/o/r/pulls/${200 + i}`, created_at: "2026-11-18T10:00:00Z", user: { login: "someone", type: "User" }, body: "a comment" }));
   const asked = [], seen = [];
   lateFinding("o/r", (title, w, unread = null) => seen.push({ what: w, unread }), "2026-11-18T12:00:00Z", route => { asked.push(route); return route.startsWith("repos/o/r/pulls/comments") ? JSON.stringify(/page=1$/.test(route) ? [...others, ...inline] : []) : gh(route); });
-  ok(seen[0].what?.includes("discussion_r1") && !asked.some(r => /pulls\/2\d\d$/.test(r)), "another account's comments on other pull requests push no finding of Codex's past the cap", asked.filter(r => /pulls\/\d+$/.test(r)).join(" "));
+  ok(seen[0].what?.includes("discussion_r1") && !asked.some(r => /pulls\/2\d\d$/.test(r)) && asked.some(r => r.includes("sort=created&direction=desc")), "another account's comments on other pull requests push no finding of Codex's past the cap, and the week's comments are read newest first, a reply before its finding", asked.filter(r => /pulls\/\d+$/.test(r)).join(" "));
   const many = Array.from({ length: LATE_PULLS + 2 }, (_, i) => codex(300 + i, 400 + i, "2026-11-18T10:00:00Z", `${badge("P1")} One of many`));
   const capped = [];
   lateFinding("o/r", (title, w, unread = null) => capped.push({ what: w, unread }), "2026-11-18T12:00:00Z", route => JSON.stringify(route.startsWith("repos/o/r/pulls/comments") ? (/page=1$/.test(route) ? many : []) : { merged_at: "2026-11-18T09:00:00Z" }));
