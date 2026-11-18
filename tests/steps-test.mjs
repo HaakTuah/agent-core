@@ -134,6 +134,15 @@ ok(JSON.stringify(notDone(lockProject).map(m => m.lead)) === JSON.stringify(some
 for (const lead of Object.keys(STAGES).filter(l => some.includes(l))) STAGES[lead].mend(lockProject);
 ok(!notDone(lockProject).length, "and their mends make every one done");
 for (const lead of some) STAGES[lead].after?.(lockProject);
+// (two whose stages both write a job that selects, taken out together: each still reported, as the upgrade test's
+// random draw takes them, #457)
+{
+  const pair = ["16 November 2026, the tests a change can reach", "18 November 2026, a tree that passed is not run again"];
+  for (const lead of pair) STAGES[lead].stage(lockProject);
+  ok(pair.every(lead => notDone(lockProject).some(m => m.lead === lead)), "the tests a change can reach and a tree that passed, taken out together, are each reported", report(notDone(lockProject)));
+  for (const lead of Object.keys(STAGES).filter(l => pair.includes(l))) STAGES[lead].mend(lockProject);
+  for (const lead of pair) STAGES[lead].after?.(lockProject);
+}
 
 // ---- a suite's path filter, read as GitHub reads one: `?` and `+` repeat the character before them (#379) ----
 const SUITE_LEAD = "12 November 2026, a sync and the project's own suites";

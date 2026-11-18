@@ -37,8 +37,10 @@ const copies = (dir, flag) => spawnSync(process.execPath, ["core/scripts/copies.
 // (a workflow of the project's own with a key twice in a step, which GitHub refuses)
 const TWICE = "name: twice-staged\n\non:\n  push:\n\npermissions:\n  contents: read\n\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo a\n        if: github.event_name == 'push'\n        if: always()\n";
 
-// A job of the tests on a pull request and on a push, which selects them; PASSED is where --passed stands (#457).
-const PUSHED = "name: tests-pushed\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      checks: read\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/select.mjs --env RUNPASSED\n        env:\n          SELECT_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}\n          SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}\n          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}\n      - run: if [ \"$RUN\" = all ]; then node --test; elif [ \"$RUN\" != none ]; then node --test $RUN; fi\n";
+// A job of the tests on a pull request and on a push, which selects them; PASSED is where --passed stands (#457). It
+// names no SELECT_BASE, which the step of the tests a change can reach reads, so that staging this one leaves that
+// one's reading as it was.
+const PUSHED = "name: tests-pushed\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      checks: read\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/select.mjs --env RUNPASSED\n        env:\n          SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}\n          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}\n      - run: if [ \"$RUN\" = all ]; then node --test; elif [ \"$RUN\" != none ]; then node --test $RUN; fi\n";
 
 export const STAGES = {
   "16 November 2026, hostile tests for every named input": {
