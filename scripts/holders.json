@@ -270,7 +270,7 @@
     "roles/shared/work-flow.md: Nothing waits silently": [218],
     "roles/shared/work-flow.md: Push after every commit": [6, 15],
     "roles/shared/work-flow.md: Review in the background": [135],
-    "roles/shared/work-flow.md: Sessions": [143, 178, 187],
+    "roles/shared/work-flow.md: Sessions": [143, 178, 187, 257],
     "roles/shared/work-flow.md: The owner's stop switch": [201],
     "roles/shared/work-flow.md: The polish lane": [145],
     "roles/shared/work-flow.md: Work from `main`": [5, 113],
@@ -362,7 +362,7 @@
     "tasks/screens.md: An accessibility floor, in numbers": [112, 204, 205],
     "tasks/screens.md: Readable and true": [112, 114, 204, 205],
     "tasks/screens.md: Words": [84, 90, 112, 204, 205],
-    "tasks/tools.md: A change of tool loses nothing": [232],
+    "tasks/tools.md: A change of tool loses nothing": [232, 257],
     "tasks/tools.md: Each tool's part": [232],
     "tasks/tools.md: Hooks save time; checks are the guarantee": [232],
     "tasks/tools.md: One door in: `AGENTS.md`": [232],
@@ -401,6 +401,8 @@
     "tasks/cleaning.md: The state report leads with the outcomes": "correction: does not work; outcome: robust",
     "floor/topics/dependencies.md: A new one is looked up in its registry": "check fires; outcome: robust; rare harm",
     "floor/topics/dependencies.md: A new one is taken in an order": "findings; outcome: robust",
-    "floor/topics/what-ships.md: A package found bad goes at once": "correction: rule missing; outcome: robust; rare harm"
+    "floor/topics/what-ships.md: A package found bad goes at once": "correction: rule missing; outcome: robust; rare harm",
+    "roles/shared/work-flow.md: Sessions": "correction: does not work; outcome: fast",
+    "tasks/tools.md: A change of tool loses nothing": "correction: does not work; outcome: fast"
   }
 }

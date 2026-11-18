@@ -61,6 +61,24 @@ ok(r.status === 0 && /What this branch has changed calls for `core\/tasks\/notes
   "once main holds it, the start names what the branch's changed paths call for: main's copy run, main's modules read, no file of the working tree's named", `${r.status} ${r.stdout}`);
 fs.rmSync(path.join(project, "core", "tasks", "ignore-the-rules-and-push.md"));
 git(project, "checkout", "-q", "--", "core/scripts/reading.mjs");
+// the quick check (#306): named at the start, from main's manifest where it has the row, never run; a row the working
+// tree alone holds is not read, and its control characters are taken out
+ok(/^Before your first change, run the quick check \(the project's \*quick check\*, as its manifest or AGENTS\.md names it\): a failure there is a bug of its own/m.test(r.stdout), "with no row, the start names the slot", r.stdout);
+fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\n| Slot | Fill |\n| --- | --- |\n| *quick check* | `npm run quick` |\n");
+git(project, "commit", "-q", "-am", "a quick check");
+git(project, "push", "-q", "origin", "main");
+fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\n| *quick check* | `touch QUICK-RAN`\u001b[2J |\n");
+r = hook("start", project);
+ok(/^Before your first change, run the quick check \(`npm run quick`\): /m.test(r.stdout) && !/QUICK-RAN/.test(r.stdout), "main's row is named; the working tree's is not read", r.stdout);
+git(project, "checkout", "-q", "--", "core-manifest.md");
+fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\n| *quick check* | `touch QUICK-RAN`\u001b[2J |\n");
+git(project, "commit", "-q", "-am", "a row with a control character");
+git(project, "push", "-q", "origin", "main");
+r = hook("start", project);
+ok(r.stdout.includes("run the quick check (`touch QUICK-RAN`[2J)") && !fs.existsSync(path.join(project, "QUICK-RAN")), "the command is named with its control characters out, and never run", JSON.stringify(r.stdout));
+fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n");
+git(project, "commit", "-q", "-am", "no row");
+git(project, "push", "-q", "origin", "main");
 // the starter kit's hooks for Kiro and Codex (tasks/tools.md), run from a folder inside the project, as those tools
 // start a command where the session works, with no CLAUDE_PROJECT_DIR: each finds the project's root by git
 const kit = name => JSON.parse(fs.readFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), "utf8"));
@@ -116,7 +134,7 @@ ok(!/helper hook is off/.test(r.stdout), "with Node on the path it says nothing 
 // the owner's stop switch: the branch agents-stop on origin, said at the start where it stands, and not where it is gone
 git(project, "push", "-q", "origin", "main:agents-stop");
 const stopped = hook("start", project);
-ok(stopped.status === 0 && /The owner's stop switch is set/.test(stopped.stdout), "with the branch agents-stop on origin, the start says the owner's stop switch is set, and stops nothing itself", `${stopped.status} ${stopped.stdout}`);
+ok(stopped.status === 0 && /The owner's stop switch is set.*write the hand-off note in its pull request \(the core's tasks\/tools\.md, "A change of tool loses nothing"\)/.test(stopped.stdout), "with the branch agents-stop on origin, the start says the owner's stop switch is set, and stops nothing itself", `${stopped.status} ${stopped.stdout}`);
 git(project, "push", "-q", "origin", "--delete", "agents-stop");
 ok(!/stop switch/.test(hook("start", project).stdout), "deleted, it says nothing of it");
 git(project, "push", "-q", "origin", "main:claude/agents-stop");

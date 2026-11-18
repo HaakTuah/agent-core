@@ -57,7 +57,7 @@ queue's order; the
 issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`tasks/roles.md`,
 `roles/orchestrator.md`); the *hard work*: a new or changed rule; the *size marks*: the caps of
 `scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*:
-the suites of `.github/workflows/tests.yml`; *planning design*: none; the *other builders' checks*: those suites, which any tool's
+the suites of `.github/workflows/tests.yml`; *planning design*: none; the *quick check*: `node scripts/holders.mjs && node scripts/size.mjs && node scripts/reading.mjs --check`; the *other builders' checks*: those suites, which any tool's
 session here runs before it finishes, every file here being protected (`SECURITY.md`).
 
 ## The queue

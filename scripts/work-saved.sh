@@ -50,6 +50,14 @@ if [ "$mode" = start ] && command -v node >/dev/null 2>&1; then
   fi
   [ -n "$r" ] && printf '%s' "$r" | node --input-type=module - --hook 2>/dev/null
 fi
+# The quick check (the core's roles/shared/work-flow.md, "Sessions"; #306): named, never run, since a hook that ran the
+# project's code would run it outside a box the owner set up for it (floor rule 18) and past the hook's time; the
+# command as main's manifest gives it in its row *quick check*, its control characters taken out, or the slot's name.
+if [ "$mode" = start ]; then
+  quick=$(printf '%s\n' "$manifest" | sed -n -E 's#^\|[[:space:]]*\*quick check\*[[:space:]]*\|[[:space:]]*(.*[^[:space:]|])[[:space:]]*\|[[:space:]]*$#\1#p' | head -n 1 | tr -d '\000-\037\177' | cut -c1-300)
+  [ -n "$quick" ] || quick="the project's *quick check*, as its manifest or AGENTS.md names it"
+  echo "Before your first change, run the quick check ($quick): a failure there is a bug of its own, filed, and the task goes on with what does not hang on it (the core's roles/shared/work-flow.md, \"Sessions\")."
+fi
 issues=()
 dirty=$(g status --porcelain 2>/dev/null)
 [ -n "$dirty" ] && issues+=("$(printf '%s\n' "$dirty" | wc -l | tr -d ' ') file(s) not committed, such as $(printf '%s\n' "$dirty" | head -1 | cut -c4-)")
@@ -97,7 +105,7 @@ asking=$! waited=0 rc=timeout
 while kill -0 "$asking" 2> /dev/null && [ $waited -lt 16 ]; do sleep 0.5; waited=$((waited + 1)); done
 if kill -0 "$asking" 2> /dev/null; then kill "$asking" 2> /dev/null; else wait "$asking"; rc=$?; fi
 if grep -q "$(printf '\t')refs/heads/agents-stop\$" "$asked" 2> /dev/null; then
-  echo "The owner's stop switch is set (the branch agents-stop on origin): start no task; commit and push what you have, and stop, saying so."
+  echo "The owner's stop switch is set (the branch agents-stop on origin): start no task; commit and push what you have, write the hand-off note in its pull request (the core's tasks/tools.md, \"A change of tool loses nothing\"), and stop, saying so."
 elif [ "$rc" != 0 ]; then
   echo "The owner's stop switch could not be read (origin did not answer in time): say so before starting a task, and read it again before each commit (the core's roles/shared/work-flow.md)."
 fi
