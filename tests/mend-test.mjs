@@ -101,20 +101,25 @@ for (const [name, why] of Object.entries(NOT_CHECKS)) ok(fs.existsSync(path.join
 
 // the inventory of the core's parts (INVENTORY.md; #534, point 4), a sweep whose source is the tracked files
 // (tasks/cleaning.md, "A sweep's scope is read, not listed"; #593, point 2): each tracked file is claimed by a part's
-// line, or lies under a path its section "What the inventory leaves out" names with the reason. A line is a bullet, its
-// lines joined; the paths it names are the backticked ones before its first ": ", a folder (ending in /) naming what
-// lies under it, and a script's line claims its test too, tests/<its name>-test.mjs.
+// line, or lies under a path its section "What the inventory leaves out" names with the reason. A part's line is a
+// bullet from the first "##" heading to that section, its lines joined (what stands above, the trials, and below, the
+// challenge and the verdicts, claims nothing); the paths it names are the backticked ones before its first ": ", a
+// folder (ending in /) naming what lies under it, and a script's line claims its test too, tests/<its name>-test.mjs.
+// The inventory says on a line that opens "Challenged" the day a fresh session challenged it (#593, point 3).
 const LEAVES = "What the inventory leaves out";
 function inventoryOf(text) {
   const parts = new Set(), leaves = new Map();
-  let section = "";
+  let phase = "above";
   for (const block of String(text).split(/\r?\n(?! )/u)) {
-    const heading = /^#{1,6}\s+(.*)$/u.exec(block);
-    if (heading) { section = heading[1].trim(); continue; }
-    if (!/^- /u.test(block)) continue;
+    const heading = /^(#{1,6})\s+(.*)$/u.exec(block);
+    if (heading) {
+      if (heading[1] === "##") phase = heading[2].trim() === LEAVES ? "leaves" : phase === "above" ? "parts" : phase === "parts" ? "parts" : "below";
+      continue;
+    }
+    if (!/^- /u.test(block) || phase === "above" || phase === "below") continue;
     const [names, ...rest] = block.replace(/\s*\r?\n\s*/gu, " ").split(": ");
     for (const m of names.matchAll(/`([^`]+)`/gu)) {
-      if (section === LEAVES) leaves.set(m[1], rest.join(": ").trim());
+      if (phase === "leaves") leaves.set(m[1], rest.join(": ").trim());
       else parts.add(m[1]);
     }
   }
@@ -128,10 +133,12 @@ function unclaimed(files, { parts, leaves }) {
   });
 }
 {
-  const one = inventoryOf("# I\n\n- `scripts/a.mjs`, `setup/t/`: does a.\n- `scripts/b.mjs`: does\n  b: more.\n\n## What the inventory leaves out\n\n- `words/`: the owner's words.\n- `x.md`:\n");
+  const one = inventoryOf("# I\n\n- *A trial:* `scripts/t.mjs`: ran.\n\n## Checks\n\n- `scripts/a.mjs`, `setup/t/`: does a.\n### More\n\n- `scripts/b.mjs`: does\n  b: more.\n\n## What the inventory leaves out\n\n- `words/`: the owner's words.\n- `x.md`:\n\n## The challenge\n\n- `scripts/c.mjs`: weighed.\n");
   ok(one.parts.has("scripts/a.mjs") && one.parts.has("setup/t/") && one.parts.has("scripts/b.mjs") && !one.parts.has("words/")
     && one.leaves.get("words/") === "the owner's words." && one.leaves.get("x.md") === "",
     "the inventory reads a part's paths before its first colon, its lines joined, and the paths left out with their reasons");
+  ok(!one.parts.has("scripts/t.mjs") && !one.parts.has("scripts/c.mjs") && !one.leaves.has("scripts/c.mjs"),
+    "a bullet above the first heading of parts, or below the section left out, claims nothing");
   const files = ["scripts/a.mjs", "tests/a-test.mjs", "setup/t/k.tmpl", "words/1.md", "scripts/c.mjs", "tests/c-test.mjs", "x.md"];
   ok(unclaimed(files, one).join() === "scripts/c.mjs,tests/c-test.mjs", "a file no line claims and no path leaves out is unclaimed, a test with its script");
 }
@@ -139,15 +146,17 @@ const tracked = (() => {
   try { return execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean); } catch { return null; }
 })();
 ok(tracked !== null && tracked.length > 0, `the tracked files are read${tracked ? "" : ". Mend: run the test in a clone of the repository, where git lists its files"}`);
-const inv = inventoryOf(fs.readFileSync(path.join(root, "INVENTORY.md"), "utf8"));
+const inventoryText = fs.readFileSync(path.join(root, "INVENTORY.md"), "utf8");
+const inv = inventoryOf(inventoryText);
 const left = unclaimed(tracked ?? [], inv);
 ok(left.length === 0, `each tracked file is claimed by a line of INVENTORY.md or left out there with its reason${left.length
   ? `: not so for ${left.length}, ${left.slice(0, 20).join(", ")}${left.length > 20 ? ", ..." : ""}. Mend: name each on the line of the part it belongs to, or add a line for it under the heading it belongs to, as "How a line reads" says (what it does, where it must run, what else does it, searched on the web too, and a verdict); or, where it is no part (a rule file's content, a record), name it or its folder under "${LEAVES}" with the reason`
   : ""}`);
 const bare = [...inv.leaves].filter(([, why]) => !why).map(([name]) => name);
 ok(bare.length === 0, `each path INVENTORY.md leaves out says why${bare.length ? `: not so for ${bare.join(", ")}. Mend: after its ": ", say why it is no part of the core` : ""}`);
-const gone = [...inv.parts, ...inv.leaves.keys()].filter(name => /^(?:scripts|tests|\.github|setup)\//u.test(name) || inv.leaves.has(name))
+const gone = [...inv.parts, ...inv.leaves.keys()].filter(name => !/\s/u.test(name) && (name.includes("/") || /^\.?[\w-]+\.[\w.]+$|^[A-Z]+$/u.test(name)))
   .filter(name => name.split("/").includes("..") || !fs.existsSync(path.join(root, name))).sort();
+ok(/^Challenged\b.*\b\d{4}-\d{2}-\d{2}\b/mu.test(inventoryText), `INVENTORY.md says on a line that opens "Challenged" the day a fresh session challenged it${/^Challenged\b.*\b\d{4}-\d{2}-\d{2}\b/mu.test(inventoryText) ? "" : ". Mend: have a fresh session that wrote no part of it read it whole for what it lacks, write its finds in, and add the line \"Challenged whole: <the day>\" (tasks/cleaning.md, \"An inventory or an audit is challenged once for what it missed\")"}`);
 ok(gone.length === 0, `each file a line of INVENTORY.md names is there${gone.length
   ? `: not so for ${gone.join(", ")}. Mend: in INVENTORY.md, name the file where it went, or take out the line of a part that is gone`
   : ""}`);

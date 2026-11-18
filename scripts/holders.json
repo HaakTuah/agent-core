@@ -71,6 +71,7 @@
     "roles/shared/work-flow.md: An exemption leaves a mark": "check: scripts/pr-description.mjs, in part",
     "tasks/cleaning.md: The state report leads with the outcomes": "check: scripts/outcomes.mjs, in part",
     "tasks/cleaning.md: A sweep's scope is read, not listed": "check: .github/workflows/tests.yml, in part",
+    "tasks/cleaning.md: An inventory or an audit is challenged once for what it missed": "check: .github/workflows/tests.yml, in part",
     "roles/shared/inbox.md: Bugs don't wait": "check: GitHub's closing of an issue whose \"Fixes #n\" reaches the default branch, in part",
     "roles/orchestrator.md: A stalled lane": "check: scripts/stalled.mjs, in part",
     "roles/shared/review-guidelines.md: A mark on what every session reads": [
