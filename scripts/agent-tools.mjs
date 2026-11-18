@@ -19,7 +19,10 @@
 // outside the repository is no file of the project's (floor rule 18); another tool's settings (Kiro's agents under
 // `.kiro/agents`, say, or the plug-ins and marketplaces a Codex config names), and where a plug-in's marketplace or a
 // tool server's command points, are the review's. A tool's file, or a folder on its way, in another letter case, as the
-// commit holds it, fails, as the tool may read it, save one the base held while what the tool reads through it stands.
+// commit holds it, fails, as the tool may read it, save one the base held while what the tool reads through it stands;
+// so does a submodule where a tool reads its files, save one the base held at that commit. So does a variable a tool's
+// settings set (Claude Code's "env", Codex's shell environment policy) but those KEPT lists, any other of which may
+// change how the programs a hook runs start, save one the base held while its entry stands.
 //
 // Where each hook's command comes from (#407; floor rule 3, what an agent tool starts by itself runs from its copy on
 // `main`): a hook of any tool read here runs its copy on main only where each command it may run, Codex's for Windows
@@ -88,10 +91,11 @@ export function configured(read, skills, files = () => [], linked = () => false)
   // (each tool's name, as the list writes it, and what it is: for a hook its tool, event, matcher and the whole hook,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
   // (`texts`: each problem met reading a file, with that file's text, so one the base held as it stands can be told)
-  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map();
+  // (`baselined`: those a project may hold, noted where there is no base to read against, as a pin is)
+  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map(), baselined = new Set();
   const flag = (problem, file, text = read(file)) => { problems.push(problem); texts.set(problem, `${file}\0${text}`); };
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
-  const state = { tools, problems, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, linked };
+  const state = { tools, problems, texts, baselined, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, linked };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -114,6 +118,7 @@ export function configured(read, skills, files = () => [], linked = () => false)
     const settings = json(file);
     declaredMarkets(settings, file, markets);
     readHooks(state, file, settings);
+    readEnv(state, file, "env", settings?.env);
     for (const [name, on] of Object.entries(entries(file, "enabledPlugins", settings?.enabledPlugins, "each plug-in's \"name@marketplace\" to true"))) if (on) { tools.set(`plugin ${name}`, file); plugins.push(name); }
   }
   // (a plug-in is what its name and its marketplace's declared source make it, so one fetched from elsewhere is another;
@@ -123,7 +128,7 @@ export function configured(read, skills, files = () => [], linked = () => false)
   for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
   readKiro(state, json, files);
   readCodex(state, json, read);
-  return { tools, ids, problems, texts, sources, pins: pinsOf(plugins, markets, servers) };
+  return { tools, ids, problems, texts, baselined, sources, pins: pinsOf(plugins, markets, servers) };
 }
 
 const SERVERS = "each tool server's name to its settings";
@@ -190,6 +195,41 @@ function readCodex(state, json, read) {
     addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [command] });
   }
   addServers(state, ".codex/config.toml", state.entries(".codex/config.toml", "mcp_servers", config.mcp_servers, SERVERS), "Codex ");
+  const policy = state.entries(".codex/config.toml", "shell_environment_policy", config.shell_environment_policy, "its settings");
+  readEnv(state, ".codex/config.toml", "shell_environment_policy.set", policy.set);
+  // (and each profile's, which replaces it where the profile is chosen)
+  for (const [name, profile] of Object.entries(state.entries(".codex/config.toml", "profiles", config.profiles, "each profile's name to its settings"))) {
+    const its = state.entries(".codex/config.toml", `profiles.${name}`, profile, "its settings");
+    readEnv(state, ".codex/config.toml", `profiles.${name}.shell_environment_policy.set`, state.entries(".codex/config.toml", `profiles.${name}.shell_environment_policy`, its.shell_environment_policy, "its settings").set);
+  }
+}
+
+// The variables a tool's settings may set for the programs it starts, each named whole and kept for its reason: any
+// other may change how a program a hook runs starts (a shell, git, ssh, Node, the system's loader) or where the tool
+// itself finds what it runs (its plug-ins, its shell), so that main's copy is not all it runs (floor rule 3), or where
+// it sends the owner's sign-in (floor rule 18), and no list of such names can be shown whole, so the variables kept are
+// listed instead, as plain names; a name of other letters is none of them.
+const KEPT = [
+  // (the models Claude Code asks for, by name: it alone reads them; not where it sends its requests or with what)
+  /^(?:ANTHROPIC_MODEL|ANTHROPIC_SMALL_FAST_MODEL|ANTHROPIC_DEFAULT_(?:OPUS|SONNET|HAIKU|FABLE)_MODEL)$/iu,
+  // (Claude Code's limits, timeouts and effort: how long or how much, never what runs)
+  /^(?:MAX_THINKING_TOKENS|MCP_TIMEOUT|MCP_TOOL_TIMEOUT|API_TIMEOUT_MS|BASH_DEFAULT_TIMEOUT_MS|BASH_MAX_TIMEOUT_MS|BASH_MAX_OUTPUT_LENGTH|CLAUDE_CODE_MAX_OUTPUT_TOKENS|CLAUDE_CODE_EFFORT_LEVEL)$/iu,
+  // (switches that turn a report or a call that is not needed off)
+  /^(?:DISABLE_TELEMETRY|DISABLE_ERROR_REPORTING|CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC|DO_NOT_TRACK)$/iu,
+  // (switches programs read for their output or time zone, never to find what to run)
+  /^(?:CI|TZ|NO_COLOR|FORCE_COLOR)$/iu,
+];
+const kept = name => /^[A-Za-z_][A-Za-z0-9_]*$/u.test(name) && KEPT.some(k => k.test(name));
+// Each such variable a tool's setting `key` in `file` sets, as a problem with the entry's own text, so one the base held
+// is noted while that entry stands, whatever else of the file changes.
+function readEnv(state, file, key, env) {
+  for (const [name, value] of Object.entries(state.entries(file, key, env, "each variable's name to its value"))) {
+    if (kept(name)) continue;
+    const problem = `${file}: "${key}" sets the variable "${name}", which is none of those a tool's settings may set (the agent-tools check's KEPT): another may change how the programs a hook runs start, so nothing shows a hook runs main's copy alone (floor rule 3). Mend: take it out of "${key}", in this pull request; where a tool needs it, the owner sets it on the machine, or, where it is a tool's own setting that no program a hook runs reads, its name joins KEPT with its reason`;
+    state.problems.push(problem);
+    state.texts.set(problem, `${file}\0${key}\0${name}\0${JSON.stringify(value)}`);
+    state.baselined.add(problem);
+  }
 }
 
 // What a plug-in's marketplace declares of it, for its id: the source, or of a "settings" source its own fields and the
@@ -478,15 +518,15 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   const project = configured(read, skills, names, linked);
   // (read at the commit, the working tree's at HEAD, the pull request's head: a file not committed, ignored or not, is
   // no file of the project's, and the base is read the same way)
-  for (const [problem, text] of caseProblems(root, rev ?? "HEAD")) { project.problems.push(problem); project.texts.set(problem, text); }
+  for (const [problem, text] of [...caseProblems(root, rev ?? "HEAD"), ...submodules(root, rev ?? "HEAD"), ...caseLinks(root, rev ?? "HEAD")]) { project.problems.push(problem); project.texts.set(problem, text); project.baselined.add(problem); }
   if (!rev && listing(root, "HEAD").failed) project.problems.push(`the commit HEAD cannot be listed by git (an error, or names past ${LISTING_MAX} bytes), so this check cannot read the tools' files there. Mend: run the check again; where it fails the same way, take out of this pull request what makes its tree too large to list`);
   return { ...project, links };
 }
 
 // A commit's files as an agent tool reads them: a path walked as the file system walks it, a link inside the checkout
 // followed (walk), a file's text, and the names in a folder.
-function commitReader(root, rev, lenient = false) {
-  const resolve = f => walk(root, rev, f, [], lenient);
+function commitReader(root, rev, lenient = false, follow = false) {
+  const resolve = f => walk(root, rev, f, [], lenient, [], follow);
   const read = f => { const r = resolve(f); return r?.type === "blob" ? textAt(root, rev, r.f) : null; };
   const names = dir => {
     const d = resolve(dir);
@@ -496,7 +536,7 @@ function commitReader(root, rev, lenient = false) {
   // submodule's commit, and each link it passes on the way, by its object, which is its target, so a link filled in,
   // moved or leading on to what changed is seen)
   const holds = f => {
-    const via = [], r = walk(root, rev, f, via, lenient), { ids } = listing(root, rev);
+    const via = [], r = walk(root, rev, f, via, lenient, [], follow), { ids } = listing(root, rev);
     return [r?.type ?? "nothing", ids.get(r?.f) ?? "", ...via.map(at => `${at}\0${ids.get(at)}`)].join("\0");
   };
   return { resolve, read, names, holds };
@@ -510,6 +550,36 @@ function caseProblems(root, rev) {
   const { resolve, names, holds } = commitReader(root, rev, true), typeOf = f => resolve(f)?.type;
   return misnamed(toolPaths(names, typeOf)).map(([at, want]) =>
     [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, holds, names, typeOf)]);
+}
+
+// Each submodule where an agent tool reads its files, in whatever case, as [its problem, the commit it names]: git gives
+// this check none of what it holds, and a clone that brings in its submodules gives the tool all of it, so one the base
+// held is noted while it names that commit. One is found where it stands, and where a tool's path leads to it through a
+// link, the walk reaching it as no folder.
+function submodules(root, rev) {
+  const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = new Map();
+  for (const [at, id] of l.gitlinks) if (WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d))) out.set(at, [`${at} is a submodule where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${id}`]);
+  // (the submodule a walk reaches, or one it stops at with more of the path left, a link leading into its folder)
+  for (const at of toolPaths(names, f => resolve(f)?.type)) {
+    const via = [], r = walk(root, rev, at, via), sub = r?.type === "commit" ? r.f : via.find(v => l.gitlinks.has(v));
+    if (sub && !out.has(at) && !out.has(sub)) out.set(at, [`${at} leads, through a link, to the submodule ${sub}, where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${sub}\0${l.ids.get(sub)}`]);
+  }
+  return [...out.values()];
+}
+
+// Each tool's path a link leads to a name the commit holds in another case only, as [its problem, what it is held by]: a
+// file system that ignores case gives the tool what stands under that name, which this check never reads, so one the
+// base held is noted while the links on the way and all that stands under that name are as they were.
+function caseLinks(root, rev) {
+  const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = [];
+  for (const at of toolPaths(names, f => resolve(f)?.type)) {
+    const via = [], misses = [];
+    if (walk(root, rev, at, via, false, misses) !== null || !misses.length || !via.some(v => l.linked.has(v))) continue;
+    // (held by what the tool reads there, found as a file system that ignores case finds it, and nothing else there)
+    const m = misses[0];
+    out.push([`${at} leads, through a link, to ${m} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${m} stands, in this pull request`, [at, ...via.map(v => `${v}\0${l.ids.get(v)}`), reaches(root, rev, at, true)].join("\0\0")]);
+  }
+  return out;
 }
 
 // Whether a commit's listing holds `at` as anything but a plain file: a link, a folder or a submodule's entry.
@@ -625,13 +695,14 @@ function target(root, rev, at) {
   }
   return targets.get(key);
 }
-function walk(root, rev, f, via = [], lenient = false) {
+function walk(root, rev, f, via = [], lenient = false, misses = [], follow = false) {
   const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
   let hops = 0;
   while (left.length) {
-    const name = left.shift();
+    let name = left.shift();
     if (name === "" || name === ".") continue;
     if (name === "..") { if (!at.length) return null; at.pop(); continue; }
+    if (follow) name = folded(listing(root, rev), at, name);
     const here = [...at, name].join("/");
     if (linked.has(here)) {
       via.push(here);
@@ -640,10 +711,26 @@ function walk(root, rev, f, via = [], lenient = false) {
       left.unshift(...to.split("/"));
       continue;
     }
+    noteMiss(listing(root, rev), at, name, misses);
     if (!goesOn(listing(root, rev), here, left.length > 0, via, lenient)) return null;
     at.push(name);
   }
   return reached(at.join("/") || ".", blobs, dirs, others);
+}
+// Where a walk meets `here`, a name the commit holds nothing at, while its folder holds that name in another case, which
+// a file system that ignores case finds in its place, that name, said in `misses`.
+// The name a file system that ignores case finds for `name` in the folder `at`: `name` where the commit holds it, else
+// one of the folder's names that folds to it.
+function folded({ blobs, dirs, others, linked, children }, at, name) {
+  const here = [...at, name].join("/");
+  if (dirs.has(here) || blobs.has(here) || others.has(here) || linked.has(here)) return name;
+  return [...(children.get(at.join("/") || ".") ?? [])].find(n => fold(n) === fold(name)) ?? name;
+}
+function noteMiss({ blobs, dirs, others, children }, at, name, misses) {
+  const here = [...at, name].join("/");
+  if (dirs.has(here) || blobs.has(here) || others.has(here)) return;
+  const dir = at.join("/") || ".", other = [...(children.get(dir) ?? [])].find(n => n !== name && fold(n) === fold(name));
+  if (other !== undefined) misses.push(dir === "." ? other : `${dir}/${other}`);
 }
 // Whether a walk goes on past `here`, `more` of the path after it: the last name may be anything the commit holds; one
 // with more after it, a folder the commit holds, or a folder every clone holds beside what the commit lists, a
@@ -686,6 +773,8 @@ function listing(root, rev) {
   found.ids = new Map(entries.map(([, at, id]) => [at, id]));
   // (and any other entry, a submodule's among them, and the folders on every entry's way, each by its path)
   found.others = new Set(entries.filter(([mode]) => mode !== "100644" && mode !== "100755" && mode !== "120000").map(([, at]) => at));
+  // (a submodule's entry by its path, with the commit it names)
+  found.gitlinks = new Map(entries.filter(([mode]) => mode === "160000").map(([, at, id]) => [at, id]));
   found.dirs = new Set(entries.flatMap(([, at]) => at.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/"))));
   // (the names in each folder, "." the root's, built once)
   found.children = new Map();
@@ -759,12 +848,22 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 
 // Each link out of the checkout into `fail`, save one the base held as it stands, into `notes`: what stood before turns
 // nothing red.
+// What the link `at` reaches in the commit `rev`, read as the case check reads what a folder in another case holds
+// (through()): through any folder a working copy may hold beside the commit (one CI's checkout lacks among them), each
+// link and submodule on the way held by its object, of what it reaches only what a tool reads there, and for a skill's
+// folder its SKILL.md; so a link held as the base held it is held by that too, and nothing else that stands there. With
+// `follow`, each name is found as a file system that ignores case finds it.
+function reaches(root, rev, at, follow = false) {
+  const posix = at.split(path.sep).join("/"), want = fold(posix), { holds, names, resolve } = commitReader(root, rev, true, follow);
+  const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
+  return [through(posix, want, holds, names, f => resolve(f)?.type), ...skill].join("\0\0");
+}
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {
     let to = null;
     try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
-    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
+    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at, true) === reaches(root, "HEAD", at, true)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
   }
 }
@@ -791,13 +890,20 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   const baseProject = base ? readProject(root, base) : null, baseList = base ? listed(baseConfig, file) : null;
   const before = new Set(baseProject ? [...baseProject.ids.values()].flatMap(set => [...set]) : []), held = k => [...head.ids.get(k)].every(id => before.has(id));
   const stood = heldBefore(checked, { head, baseProject, baseList, held, core });
-  const fail = [...head.problems, ...problems].filter(p => !stood.has(p));
-  const notes = [...stood].map(p => `as the base held it, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`);
+  const unread = unreadOf(head, baseProject, core);
+  const fail = [...head.problems, ...problems].filter(p => !stood.has(p) && !unread.has(p));
+  const notes = [...[...stood].map(p => `as the base held it, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`), ...[...unread].map(p => `with no base to read against, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`)];
   sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes);
   sortSources(checked, { head, baseProject, baseList, core, file }, fail, notes);
   sortLinks(root, base, head.links, fail, notes);
   sortUnlisted(unlisted, { head, base, held, file }, fail, notes);
   return { fail, notes };
+}
+
+// With no base to read against, as before a commit or on a push, each problem a project may hold, noted as sortSources
+// notes its own; in the core's own repository none may stand.
+function unreadOf(head, baseProject, core) {
+  return new Set(!core && !baseProject ? head.problems.filter(p => head.baselined.has(p)) : []);
 }
 
 // Each tool configured where no list is written yet, into `fail` or `notes`: the base counts as the list, so one it

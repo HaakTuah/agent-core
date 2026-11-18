@@ -23,7 +23,7 @@ const summary = (code, who = { login: "chatgpt-codex-connector[bot]", type: "Bot
   body: `<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 ${JSON.stringify({ code_review: code, security_review: secDone })} -->\n<!-- codex-security-review:v1 {} -->\n<details>the table</details>`,
 });
 const running = { commit_sha: HEAD, has_any_findings: null, has_unresolved_findings: null, status: "running" };
-const said = (body, assoc = "OWNER") => ({ user: { login: "someone", type: "User" }, author_association: assoc, created_at: "2026-11-14T11:50:00Z", body });
+const said = (body, assoc = "OWNER") => ({ user: { login: "someone", type: "User" }, author_association: assoc, created_at: "2026-11-14T11:50:00Z", updated_at: "2026-11-14T11:50:00Z", body });
 const is = (verdict, isDone, words) => verdict?.sha === HEAD && verdict.done === isDone && verdict.why.includes(words);
 
 ok(is(judge(pull, [summary(running)]), false, "still running"), "Codex's code review running on the head commit is waited for");
@@ -33,6 +33,8 @@ ok(is(judge(pull, [summary({ ...running, status: "failed" })]), true, "no code r
 ok(is(judge(pull, [summary({ commit_sha: null, status: null })]), true, "no code review is running") && is(judge(pull, []), true, "no code review is running") && is(judge(pull, null), true, "no code review is running"), "none asked, or no summary at all (a reviewer out of usage never starts), holds nothing");
 ok(is(judge(pull, [summary({ ...running, commit_sha: OLD })]), true, "no code review is running"), "one running on an earlier commit does not hold the newest");
 ok(is(judge(pull, [summary(running), said(`Code review: the fallback reviewer's, of ${HEAD}. Blocking: none.`)]), true, "is posted"), "a code review of the head commit, named whole, posted by the owner's account ends the wait");
+const retold = { ...said(`Code review: of ${HEAD}`), updated_at: "2026-11-14T12:30:00Z" };
+ok(is(judge(pull, [summary(running), retold]), false, "still running") && is(judge(pull, [summary(running), retold], undefined, undefined, [], false), true, "is posted"), "a code review edited since it was posted counts no longer; on a pull request from before the check it counts as it did");
 ok(is(judge(pull, [summary(running), said(`Code review: of ${HEAD.slice(0, 7)}`)]), false, "still running") && is(judge(pull, [summary(running), said(`Code review: of ${HEAD.slice(0, 39)}`)]), false, "still running"), "one naming only the commit's first characters does not, since a commit can be made to share them");
 const SAME = HEAD.slice(0, 7) + "e".repeat(33);
 const same = judge({ ...pull, head: { sha: SAME } }, [summary({ ...running, commit_sha: SAME }), said(`Code review: of ${HEAD}`)]);
@@ -134,7 +136,9 @@ try {
   const counts = { ...pull, commits: 2, changed_files: 1 };
   const none = run(counts, [], { ADVISORY: "false" }, [line], [code]);
   ok(none.status.state === "pending" && none.status.description.startsWith("Waiting: no code review yet") && mended(none.status.description) && run(counts, [[summary(done)]], { ADVISORY: "false" }, [line], [code]).status.state === "success"
-    && run(counts, [], { ADVISORY: "false", BOUND: "false" }, [line], [code]).status.state === "success", "given the commits and files too, it waits for a code review that has not run, and says how to mend it; told the pull request is from before the check, it waits not");
+    && run({ ...counts, created_at: "2026-11-14T09:00:00Z" }, [], { ADVISORY: "false", BOUND: "false", SINCE: "2026-11-14T10:00:00Z" }, [line], [code]).status.state === "success"
+    && run({ ...counts, created_at: "2026-11-14T11:00:00Z" }, [], { ADVISORY: "false", BOUND: "false", SINCE: "2026-11-14T10:00:00Z" }, [line], [code]).status.state === "pending",
+  "given the commits and files too, it waits for a code review that has not run, and says how to mend it; told the pull request is from before the check and opened before the default branch's copy came, it waits not; opened since, it waits");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   let usage = 0;
   try { execFileSync(process.execPath, [script], { stdio: "ignore" }); } catch (e) { usage = e.status; }
