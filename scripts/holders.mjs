@@ -24,6 +24,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { inStep, items } from "./archive.mjs";
+import { MANIFEST, copyOf } from "./core-path.mjs";
 import { NUMBER } from "./outcomes.mjs";
 import { FOLDERS, ROOT, rules, rulesOf } from "./rules.mjs";
 import { started } from "./started.mjs";
@@ -131,41 +132,52 @@ export function report(root = ROOT) {
 // ---- a project's own rules (--project) ----
 
 export const OWN = "checks/holders.json";
-const OWN_HELD = /^(?:(check|test): (\S.*)|(review)|(describes))$/u;
+const OWN_HELD = /^(?:(check|test): (\S.*?)(, in part)?|(review)|(describes))$/u;
 const ABOUT = /^(?:this project|its kind: \S.*|every project)$/u;
 
 // A project's own rules (`files`, its rule files, read by `read`) against its list (the text of checks/holders.json,
-// or null): { rules, counts: { all, check, test, review, describes }, none, wrong, toCore }.
-export function ownRules(files, read, listText) {
-  const all = files.filter(f => !f.startsWith("core/") && f !== "core-manifest.md").flatMap(f => { const t = read(f); return t === null ? [] : rulesOf(f, t); });
+// or null; `copy`, the path of the core's copy, whose files are the core's; `there`, whether a holder's path, a file or
+// a folder, stands in the project): { rules, counts: { all, check, test, part,
+// review, describes }, none, wrong, toCore, bare }, `part` the rules a check or test holds in part, `bare` the files
+// read that hold no rule the check reads (none opening with a bold lead).
+export function ownRules(files, read, listText, copy = copyOf(), there = f => read(f) !== null) {
+  const bare = [];
+  const all = files.filter(f => !f.startsWith(copy) && f !== MANIFEST).flatMap(f => {
+    const t = read(f), found = t === null ? [] : rulesOf(f, t);
+    if (t !== null && !found.length) bare.push(f);
+    return found;
+  });
   const keys = new Set(all.map(r => r.key)), wrong = [], toCore = [];
   let list = {};
   if (listText !== null) {
     try { list = JSON.parse(listText)?.rules ?? {}; } catch { wrong.push(`${OWN} cannot be read as JSON. Mend: write it as { "rules": { "<file>: <bold lead>": { "held": "check: <path>", "about": "this project" } } }`); }
     if (!list || typeof list !== "object" || Array.isArray(list)) { wrong.push(`${OWN} holds no "rules" object. Mend: write it as { "rules": { "<file>: <bold lead>": { "held": ..., "about": ... } } }`); list = {}; }
   }
-  const counts = { all: all.length, check: 0, test: 0, review: 0, describes: 0 }, none = [];
+  const counts = { all: all.length, check: 0, test: 0, part: 0, review: 0, describes: 0 }, none = [];
   for (const r of all) {
     const e = Object.hasOwn(list, r.key) ? list[r.key] : null, m = OWN_HELD.exec(String(e?.held ?? ""));
     if (!e || !m) { none.push(r.key); if (e) wrong.push(`${OWN}: "${r.key}" is held by "${e.held}", in no form it reads. Mend: write "check: <path>", "test: <path>", "review" or "describes"`); continue; }
-    const kind = m[1] ?? m[3] ?? m[4];
+    const kind = m[3] ? "part" : m[1] ?? m[4] ?? m[5];
     // (a check or test that is not there holds nothing: its entry is said, and the rule is counted as held by none)
-    if (m[2] && !/^[a-z]+:/iu.test(m[2]) && read(m[2]) === null) wrong.push(`${OWN}: "${r.key}" is held by ${m[2]}, which is not there. Mend: name the check or test that holds it, or what holds it now`);
+    if (m[2] && !/^[a-z]+:/iu.test(m[2]) && !there(m[2])) wrong.push(`${OWN}: "${r.key}" is held by ${m[2]}, which is not there. Mend: name the check or test that holds it, or what holds it now`);
     else counts[kind]++;
     if (!ABOUT.test(String(e.about ?? ""))) wrong.push(`${OWN}: "${r.key}" says no "about" the check reads. Mend: write "this project", "its kind: <kind>" or "every project"`);
     else if (e.about !== "this project") toCore.push(`${r.key} (${e.about})`);
   }
   for (const k of Object.keys(list)) if (!keys.has(k)) wrong.push(`${OWN}: "${k}" names no rule that stands. Mend: take it out, or name the rule by its file and bold lead as it stands now`);
-  return { rules: all, counts, none, wrong, toCore };
+  return { rules: all, counts, none, wrong, toCore, bare };
 }
 
-// Of the core's rules, those a check holds whole in a project, none whose every check read nothing there (`nothing`,
-// the scripts read-nothing.mjs names, as core/scripts/<name>): { held, all }.
-export function heldThere(root, nothing) {
-  const h = holders(root), gone = new Set(nothing.map(n => n.replace(/^core\//u, "")));
+// Of the core's rules a project takes, those a check holds whole there: the rules of the modules its manifest leaves
+// out (`out`, their names, as reading.mjs's leftOut gives them; the floor is never left out) are not counted, and a
+// rule whose every check read nothing there (`nothing`, the scripts read-nothing.mjs names, as <copy>/scripts/<name>)
+// is not held: { held, all }.
+export function heldThere(root, nothing, out = new Set()) {
+  const h = holders(root), gone = new Set(nothing.map(n => n.replace(/^.*?(?=scripts\/)/u, "")));
+  const rulesTaken = h.rules.filter(r => r.file.startsWith("floor/") || !out.has(path.posix.basename(r.file)));
   let held = 0;
-  for (const r of h.rules) if ((h.by.get(r.key) ?? []).some(x => x.kind === "check" && !x.part && !hook(x) && !gone.has(x.by))) held++;
-  return { held, all: h.rules.length };
+  for (const r of rulesTaken) if ((h.by.get(r.key) ?? []).some(x => x.kind === "check" && !x.part && !hook(x) && !gone.has(x.by))) held++;
+  return { held, all: rulesTaken.length };
 }
 
 // The line a project's state report carries (state-report.mjs; #459, point 3).
@@ -174,16 +186,17 @@ export const shareLine = (own, core) => `- rules held by a check: the project's 
 if (started(import.meta.url) && process.argv.includes("--project")) {
   // (each file read only where it lies inside the project and is a file: a path that leads out, a link to a device or a
   // folder, reads as not there)
-  const { readHere: read, ruleFiles } = await import("./rule-files.mjs");
+  const { isHere, readHere: read, ruleFiles } = await import("./rule-files.mjs");
   let files;
   try { files = ruleFiles(); } catch (e) {
     // (in the core's own repository, whose SECURITY.md names no rule files of a project's, the rules are its own list's)
     console.log(fs.existsSync(path.join(process.cwd(), FILE)) && !fs.existsSync(path.join(process.cwd(), "core")) ? "FAIL this is the core's own repository, whose rules holders.json lists. Mend: run node scripts/holders.mjs --list here" : `FAIL ${e.message}`);
     process.exit(1);
   }
-  const o = ownRules(files, read, read(OWN));
+  const o = ownRules(files, read, read(OWN), copyOf(), isHere);
   const c = o.counts;
-  console.log(`Of the project's own ${c.all} rules: ${c.check} held by a check, ${c.test} by a test, ${c.review} by the review, ${c.describes} describe; ${o.none.length} not in ${OWN}${o.none.length ? `: ${o.none.join("; ")}` : ""}.`);
+  console.log(`Of the project's own ${c.all} rules: ${c.check} held by a check, ${c.test} by a test, ${c.part} in part by one, ${c.review} by the review, ${c.describes} describe; ${o.none.length} not in ${OWN}${o.none.length ? `: ${o.none.join("; ")}` : ""}.`);
+  if (o.bare.length) console.log(`Rule files that hold no rule this reads, each rule opening with a bold lead: ${o.bare.join("; ")}.`);
   if (o.toCore.length) console.log(`About a kind or every project, each to file to the core as an idea where none is filed yet, written for the kind and holding nothing of this project, no file's name and no rule's own words ("Reporting to the core"): ${o.toCore.join("; ")}.`);
   for (const w of o.wrong) console.log(`note ${w}`);
 } else if (started(import.meta.url)) {

@@ -22,6 +22,8 @@ export const FOLDERS = Object.freeze([".kiro/steering", ".kiro/agents", ".agents
 const inside = f => !leadsOut(process.cwd(), f);
 const tracked = dir => { try { return execFileSync("git", ["ls-files", "-z", "--", dir], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(f => f && inside(f)); } catch { return []; } };
 export const readHere = f => { try { return inside(f) && fs.statSync(f).isFile() ? fs.readFileSync(f, "utf8") : null; } catch { return null; } };
+// Whether a file or a folder stands inside the project, read from its stat alone, nothing read from it.
+export const isHere = f => { try { if (!inside(f)) return false; const s = fs.statSync(f); return s.isFile() || s.isDirectory(); } catch { return false; } };
 export const FLOOR = Object.freeze(["AGENTS.md", "CLAUDE.md", "SECURITY.md", "core-manifest.md"]);
 export const TOOL_FILES = Object.freeze(["GEMINI.md", ...Object.values(ENTRY_FILES)]);
 // A reader of the files of a commit's tree, as the work tree's reader reads them, for a check that holds a pull request

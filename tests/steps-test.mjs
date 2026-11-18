@@ -16,6 +16,7 @@ import { NOTES } from "../scripts/releases.mjs";
 import { READERS } from "../scripts/shape-readers.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { parseYaml, pathsLetThrough } from "../scripts/workflow-run.mjs";
+import { holders } from "../scripts/holders.mjs";
 import { COST, MOVED_GLOB, NEW_GLOBS, READ_MOST, STEPS, Unread, configs, leads, moved, notDone, plain, project, report, runsOwn } from "../scripts/steps.mjs";
 
 let failed = 0, count = 0;
@@ -838,8 +839,9 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
     "one that leaves the copies checks out, runs the signature check twice, or passes copies without its marks is reported, each with its mend", [left, twice, bare].join("\n"));
 }
 
-// the checks that read nothing here (#459, point 2): the shape check and the selection where "code" names no file of
-// their languages, the strength where the manifest names no mutation tool; said in the report, failing nothing
+// the checks that read nothing here (#459, point 2): the shape check where "code" names no file of its languages, the
+// strength where the manifest names no mutation tool, each with the rules holders.json says it holds; said in the
+// report, failing nothing
 {
   const bare = path.join(tmp, "no-code");
   fs.cpSync(dirs["an-npm-project"], bare, { recursive: true });
@@ -849,9 +851,11 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
   fs.writeFileSync(path.join(bare, codeAt, "a.js"), "export const a = 1;\n");
   execFileSync("git", ["add", "-A"], { cwd: bare });
   const now = notDone(bare).nothing.map(n => n.check);
-  ok(was.includes("core/scripts/shape.mjs") && was.includes("core/scripts/select.mjs") && report(before).includes("Checks that read nothing here") && before.nothing.every(n => n.holds.length && n.why.length > 20)
-    && !now.includes("core/scripts/shape.mjs") && !now.includes("core/scripts/select.mjs"),
-    "a project whose code holds no file the shape check's readers know is said to have the shape check and the selection read nothing, with the rules they hold; a file of code there makes them read", report(before));
+  const listed = [...holders().by].filter(([, l]) => l.some(h => h.kind === "check" && h.by === "scripts/shape.mjs")).map(([k]) => k);
+  const shape = before.nothing.find(n => n.check === "core/scripts/shape.mjs");
+  ok(listed.length && JSON.stringify(shape?.holds) === JSON.stringify(listed) && !was.includes("core/scripts/select.mjs") && report(before).includes("Checks that read nothing here") && before.nothing.every(n => n.holds.length && n.why.length > 20)
+    && !now.includes("core/scripts/shape.mjs"),
+    "a project whose code holds no file the shape check's readers know is said to have the shape check read nothing, with the rules holders.json says it holds; a file of code there makes it read", report(before));
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);

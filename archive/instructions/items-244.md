@@ -134,11 +134,12 @@ The index, and how an item is written: `archive/instructions.md`.
      core's rules that applied there, and nothing told its owner which. The owner agreed to it with the other points
      read from an evaluation's counts, on the test of taking what is good for every development cycle and no brake
      that would slow the owner's own projects. It stands behind "A project's own rules name what holds them" in
-     `tasks/cleaning.md` and "A game's own rule says whom it is about" in `tasks/game-design.md`.
+     `tasks/cleaning.md` and "A rule of a game's kind moves to the core once a second game needs it" in
+     `tasks/game-design.md`.
 
 258. **16 November 2026**, #484, points 8 to 10. A game is sorted by what it is made of, taking each kind that is true
      of it, never by a genre; and a rule a game writes for itself that is true of its kind moves to the core once a
      second game needs it, written for the kind, the game pointing to it. Two games each held rules true of their kind,
      which a new game would have had to find again; the owner agreed to these points as they were added to #484. It
-     stands behind "A game takes each kind that is true of it" and "A game's own rule says whom it is about" in
-     `tasks/game-design.md`.
+     stands behind "A game takes each kind that is true of it" and "A rule of a game's kind moves to the core once a
+     second game needs it" in `tasks/game-design.md`.

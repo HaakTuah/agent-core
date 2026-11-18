@@ -22,16 +22,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { HEADING as CITED, citedFrom, mergedIn } from "./cited.mjs";
 import { CORE } from "./core-address.mjs";
+import { copyOf } from "./core-path.mjs";
 import { classify } from "./core-cost.mjs";
 import { HEADING as OUTCOMES, outcomesFrom } from "./outcomes.mjs";
 import { pinOf } from "./core-moved.mjs";
+import { leftOut } from "./reading.mjs";
 import { reading, rulesOf } from "./dose.mjs";
 import { baselineOf } from "./strength.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
 import { OWN, heldThere, ownRules, report as holdersReport, shareLine } from "./holders.mjs";
 import { readNothing } from "./read-nothing.mjs";
 import { said as pruningSaid } from "./pruning.mjs";
-import { readHere, ruleFiles } from "./rule-files.mjs";
+import { isHere, readHere, ruleFiles } from "./rule-files.mjs";
 import { ROOT, rules } from "./rules.mjs";
 import { started } from "./started.mjs";
 import { line as waitLine, measure as measureWait } from "./wait.mjs";
@@ -103,7 +105,7 @@ const pct = (a, b) => (b ? `${Math.round((100 * a) / b)}%` : "none merged");
 const heldNow = () => { try { return holdersReport(); } catch { return null; } };
 
 // The report's text. `core`: whether this is the core's own repository; `previous`: the last report's text, or null;
-// `overdue`: [{ number, title, since }]; `counts` (a project): { pin, behind, steps, merged } as readCounts gives them;
+// `overdue`: [{ number, title, since }]; `counts` (a project): { pin, behind, steps, merged, held } as readCounts gives them;
 // `holders` (the core): the lines holders.mjs gives, the rules of the floor and the modules by what holds them, read
 // here where left out, and null where they could not be read; `cited`: the lines cited.mjs gives for the month before,
 // null where they were not counted; `outcomes`: the lines outcomes-read.mjs gives for the month before, which the report
@@ -120,7 +122,7 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
     "",
     "**The rules, by what holds them**",
     ...(holders ?? [core ? "- Not read: `scripts/holders.mjs` could not read them, so the report leaves them out rather than guess."
-      : "- The core's rules, in the core's own report; this project's own rules are not counted."]),
+      : "- The core's rules, in the core's own report; how many of this project's own, and of the core's it takes, a check holds, under the counts below."]),
     ...(pruning ? ["", "**The pruning of the rules**", ...pruning] : []),
     "",
     `**${CITED}**`,
@@ -161,12 +163,13 @@ export function readCounts({ repo, manifest, month, steps, gh = ghApi }) {
 }
 
 // Of a project's rules, those a check holds (#459, point 3): its own, by its list (holders.mjs, --project), and the
-// core's, none whose every check read nothing here (read-nothing.mjs); null where they cannot be read.
+// core's it takes (the modules its manifest leaves out aside), none whose every check read nothing here
+// (read-nothing.mjs); null where they cannot be read.
 function heldHere(manifest) {
   try {
     const read = readHere; // (inside the project, a file: rule-files.mjs)
     const nothing = readNothing(process.cwd(), manifest ?? "", read).map(n => n.check);
-    return { own: ownRules(ruleFiles(), read, read(OWN)), there: heldThere(ROOT, nothing) };
+    return { own: ownRules(ruleFiles(), read, read(OWN), copyOf(), isHere), there: heldThere(ROOT, nothing, leftOut(manifest)) };
   } catch { return null; }
 }
 

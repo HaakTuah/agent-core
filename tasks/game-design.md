@@ -117,20 +117,20 @@ player can choose to use.
 - **A game takes each kind that is true of it** (#484). By default a game is sorted by what it is made of, never by a
   genre, and takes every kind that is true of it: a game the project designs, an emergent simulation, a traditional
   game, a game with model players, a game played in real time, a game played online, a show for a room; one game takes
-  several. The trigger is a game's first stage, or a change that makes another kind true of it: its builder reads which
-  kinds stand where they can be read (#481) and writes the rest on the *game page*. It does not mean a list of genres,
-  nor that a kind binds before it is true of the game. Reason: a game that is two kinds at once was held to the rules
-  of one. The design check reads the page; no check holds it yet.
-- **A game's own rule says whom it is about** (#484). By default each rule a game writes for itself is asked one
-  question, whether it is about this game, its kind, or every game, and the answer stands beside it in the project's
-  list of its own rules (`tasks/cleaning.md`, "A project's own rules name what holds them"). The trigger is the audit,
-  whose session answers it as it lists the rules and files a rule about a kind or about every game to the core as an
-  idea, the kind named and the idea written for it, holding nothing of the game itself; such a rule moves to the core once a second game needs it, one that stands or one the owner
-  has planned, written for the kind and not for the game it came from, that game pointing to it and dropping its own
-  copy in the same sync ("One fact, one place"). It does not mean a game's rule is taken from it before the owner's
-  word, nor that a kind with one game gets a part in the core. Reason: two games each held rules true of their kind (on
-  what a request to a model may imply, on how fast a computer player may react), and a new game of that kind would
-  have to find them again. Held by the audit, through that list; the copies check, once a rule stands in both places.
+  several. The trigger is a game's first stage, or a change that makes another kind true of it: its builder writes
+  each kind that is true of it on the *game page*, which holds them, since nothing reads a game's kinds yet (#484,
+  points 6 and 11). It does not mean a list of genres, nor that a kind binds before it is true of the game. Reason: a
+  game that is two kinds at once was held to the rules of one. The design check reads the page; no check holds it yet.
+- **A rule of a game's kind moves to the core once a second game needs it** (#484). By default a rule a game writes for
+  itself stays in the game, and whether it is about this game, its kind or every game is asked by the audit
+  (`tasks/cleaning.md`, "A project's own rules name what holds them"), which files one about a kind to the core as an
+  idea. The one condition that changes it: a second game needs the same rule, one that stands or one the owner has
+  planned. The trigger is that idea's line joining the core's queue: its builder writes the rule for the kind, never for
+  the game it came from, and the sync that brings it takes out each game's own copy, pointing to the core's ("One fact,
+  one place"). It does not mean a game's rule is taken from it before the owner's word, nor that a kind with one game
+  gets a part in the core. Reason: two games each held rules true of their kind (on what a request to a model may imply,
+  on how fast a computer player may react), and a new game of that kind would have to find them again. Held by the
+  audit, through the project's list; the copies check, once a rule stands in both places.
 - **Every stage is a game.** A game built in stages ends each stage in one someone can play from
   start to finish and enjoy; a feature that makes sense only once later ones exist waits for them.
 - **The first stage is the loop alone.** By default a game built in stages has as its first stage
