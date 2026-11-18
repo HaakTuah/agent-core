@@ -1190,7 +1190,16 @@ function away(root, rev, at) {
 // read exactly, which changes what a tool runs there; is reported as one whose package may have changed where only what
 // cannot be read exactly changed, as any dependency's update does there; and is a note otherwise.
 const NPM_LOCKS = ["package-lock.json", "npm-shrinkwrap.json"];
+// (read once for each link at each commit; a link met again while it is read, a loop, and one past eight links deep,
+// are read loosely, so a check that cannot finish reading them reports them and never stalls)
+const pkgLocks = new Map(), READING = { exact: "", loose: "\0a loop of links" }, TOO_DEEP = { exact: "", loose: "\0past eight links deep" };
 function pkgLock(root, rev, at, depth = 0) {
+  if (depth > 8) return TOO_DEEP;
+  const memo = `${root}\0${rev}\0${at}`;
+  if (!pkgLocks.has(memo)) { pkgLocks.set(memo, READING); pkgLocks.set(memo, pkgLockOf(root, rev, at, depth)); }
+  return pkgLocks.get(memo);
+}
+function pkgLockOf(root, rev, at, depth) {
   const posix = at.split(path.sep).join("/"), via = [], l = listing(root, rev), out = { exact: new Set(), loose: new Set() };
   walk(root, rev, posix, via, true, [], true);
   for (const v of new Set([posix, ...via])) {
@@ -1226,11 +1235,14 @@ function npmRead(root, rev, f, text, key, up, out, depth = 0) {
   const entry = key ? npmEntry(text, key) : undefined;
   if (entry === undefined) return void out.loose.add(`${f}\0${text}`);
   out.exact.add(`${f}\0${JSON.stringify(ENTRY_SAYS.map(k => entry?.[k] ?? null))}`);
+  // (a package bundled in its parent's, which comes in the parent's own tarball, by the parent's entry too)
+  const parent = key.lastIndexOf("/node_modules/");
+  if (entry?.inBundle && parent > 0) out.exact.add(`${f} bundled in\0${JSON.stringify(ENTRY_SAYS.map(k => npmEntry(text, key.slice(0, parent))?.[k] ?? null))}`);
   if (!entry?.link || typeof entry.resolved !== "string") return;
   const walked = [];
   out.exact.add(`${f} links to\0${everything(root, rev, path.posix.normalize(path.posix.join(up || ".", entry.resolved)), undefined, walked)}`);
   // (a link walked there that leads into node_modules in turn, read as pkgLock() reads it, a few links deep at most)
-  for (const w of depth < 8 ? walked : []) {
+  for (const w of walked) {
     const more = pkgLock(root, rev, w, depth + 1);
     out.exact.add(more.exact);
     out.loose.add(more.loose);
