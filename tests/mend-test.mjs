@@ -133,7 +133,7 @@ ok(unreplayed("- `a.mjs`: reads.\n  *Tried:* a tool, 2 s.\n- `b.mjs`: reads. *Tr
   "a part's line that records a trial and replays none of its bugs is found, one that replays them or records no trial is not");
 const notReplayed = unreplayed(inventory);
 ok(notReplayed.length === 0, `each part's line of INVENTORY.md that records a trial says which of the part's bugs the tool reads and which it does not${notReplayed.length
-  ? `: not so for ${notReplayed.join(", ")}. Mend: for each bug filed against the part, run the tool on the case of the test its merged fix added, taken from that test on the default branch and never from the issue's text, and add to its line "*Replayed:*" with each bug's number and whether the tool reads its case or not ("none" where no bug was filed; a bug whose fix added no test named as not run), as tasks/choices.md says ("A trial of a maintained tool replays the part's past bugs")`
+  ? `: not so for ${notReplayed.join(", ")}. Mend: for each bug filed against the part, run the tool on the test cases its merged fix added or changed, taken from those on the default branch and never from the issue's text, and add to its line "*Replayed:*" with each bug's number and whether the tool reads its case or not ("none" where no bug was filed; a bug whose fix added or changed no test case named as not run), as tasks/choices.md says ("A trial of a maintained tool replays the part's past bugs")`
   : ""}`);
 
 for (const [check, test] of Object.entries(CHECKS)) {
