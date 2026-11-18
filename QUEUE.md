@@ -24,7 +24,6 @@ it merges last.
 | #593, points 6, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #579 | builder | |
 | #580 | builder | |
-| #581 | rule builder; it changes `AGENTS.md`'s *mutation tool* | |
 | #582 | builder | |
 | #583 | builder | |
 | #584 | rule builder | |
