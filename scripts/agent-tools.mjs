@@ -657,24 +657,37 @@ function submodules(root, rev) {
 // path and object, and, for each link among them, everything it holds in turn, each folder read once; so a name held
 // twice is held by all a tool may read under either, never by one path through it.
 function everything(root, rev, at) {
-  const l = listing(root, rev), seen = new Set(), out = [], todo = [at];
-  // (walked a link at a time from a list, never by recursion, so no chain of links is too long for it)
+  const l = listing(root, rev), seen = new Set(), tops = [], entries = new Set(), todo = [at];
+  // (walked a link at a time from a list, never by recursion, so no chain of links is too long for it; each entry named
+  // once, however many links reach the folders it stands in)
   for (let i = 0; i < todo.length; i++) {
     const via = [], r = walk(root, rev, todo[i], via, true, [], true);
-    out.push([r?.type ?? "nothing", r?.f ?? "", l.ids.get(r?.f) ?? "", ...via.map(v => `${v}\0${l.ids.get(v)}`)].join("\0"));
+    tops.push([r?.type ?? "nothing", r?.f ?? "", l.ids.get(r?.f) ?? "", ...via.map(v => `${v}\0${l.ids.get(v)}`)].join("\0"));
     if (r?.type !== "tree" || seen.has(r.f)) continue;
     seen.add(r.f);
-    const prefix = r.f === "." ? "" : `${r.f}/`, under = [...l.ids.keys()].filter(p => p.startsWith(prefix)).sort();
-    out.push(...under.map(p => `${p}\0${l.ids.get(p)}`));
-    todo.push(...under.filter(p => l.linked.has(p)));
+    for (const p of entriesBelow(l, r.f === "." ? "" : r.f)) {
+      if (entries.has(p)) continue;
+      entries.add(p);
+      if (l.linked.has(p)) todo.push(p);
+    }
   }
-  return out.join("\0\0");
+  return [...tops, ...[...entries].sort().map(p => `${p}\0${l.ids.get(p)}`)].join("\0\0");
+}
+// Each entry a listing holds below the folder `dir` ("" the root), from the listing's names sorted once, by a binary
+// search for where they begin, so a folder's entries cost what they are, not the whole listing.
+function entriesBelow(l, dir) {
+  l.sorted ??= [...l.ids.keys()].sort();
+  const prefix = dir ? `${dir}/` : "", out = [];
+  let lo = 0, hi = l.sorted.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (l.sorted[mid] < prefix) lo = mid + 1; else hi = mid; }
+  for (let i = lo; i < l.sorted.length && l.sorted[i].startsWith(prefix); i++) out.push(l.sorted[i]);
+  return out;
 }
 // What the commit holds below the folder `p`, each entry but a folder, from its one listing, where `p` is a folder the
 // commit holds; else null.
 function belowDir(root, rev, p) {
   const l = listing(root, rev);
-  return l.dirs.has(p) ? [...l.ids.keys()].filter(q => q.startsWith(`${p}/`)).sort() : null;
+  return l.dirs.has(p) ? entriesBelow(l, p) : null;
 }
 // Each link below a folder of Claude Code's agents or commands, in whatever case, as [its problem, all it leads to]:
 // Claude Code reads the Markdown files wherever such a link leads, and this check reads none of them there, so one the
