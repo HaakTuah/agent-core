@@ -150,10 +150,11 @@ export const OWN_FILES = ["QUEUE.md", ".github/workflows/own-description.yml", "
 // What never matters to a project (#242; README.md, point 1): a list exact and short, never a guess. A module its
 // manifest's "Modules:" line does not name and its "Not taken:" line does (any other module matters: one the list
 // forgot, or every one where the line says "all" or cannot be read), a test of the core's own scripts (which nothing a
-// project runs names: releases-test.mjs), the core's own issue forms, and OWN_FILES. Every other file of the core is
-// something the project takes.
+// project runs names: releases-test.mjs), under tests/, which the copy leaves out, or under scripts/, where releases
+// before #527 held them, the core's own issue forms, and OWN_FILES. Every other file of the core is something the
+// project takes.
 export function matters(file, manifest) {
-  if (/^scripts\/[^/]+-test\.mjs$/.test(file) || file.startsWith(".github/ISSUE_TEMPLATE/") || OWN_FILES.includes(file)) return false;
+  if (/^scripts\/[^/]+-test\.mjs$/.test(file) || file.startsWith("tests/") || file.startsWith(".github/ISSUE_TEMPLATE/") || OWN_FILES.includes(file)) return false;
   const module = MODULES.includes(file.slice(0, Math.max(0, file.lastIndexOf("/")))) && file.endsWith(".md") ? file.slice(file.lastIndexOf("/") + 1) : undefined;
   const { taken, notTaken } = modulesOf(manifest);
   return !(module && taken instanceof Set && !taken.has(module) && notTaken.has(module));

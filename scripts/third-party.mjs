@@ -22,7 +22,7 @@
 // registry's key, the lookup of floor rule 15 (lookup.mjs), and the tarball itself, fetched by its address, held to the
 // integrity and unpacked by tar, each carried file the same as the tarball's. To add or update a package: `npm pack
 // --ignore-scripts <name>@<version>` (its sha512 is the integrity), unpack it, copy the paths, write the entry and its
-// notice, then run this, which names the digest to write, and --verify. Run by third-party-test.mjs. Node's own
+// notice, then run this, which names the digest to write, and --verify. Run by tests/third-party-test.mjs. Node's own
 // modules, and tar for --verify.
 //
 //   node scripts/third-party.mjs [--verify]

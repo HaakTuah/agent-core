@@ -40,11 +40,10 @@
 //   PR_BODY="$(...)" PR_CREATED="..." node core/scripts/pr-description.mjs ["Part one|Part two"]
 //   PR_BODY="$(...)" node core/scripts/pr-description.mjs "+Part three"     the two, and that one as well
 import { spawnSync } from "node:child_process";
-import fs from "node:fs";
 import { doneMends, ownerAt, queueAt, readItem, takesIt } from "./done-when.mjs";
 import { isPart, milestoneMends } from "./milestones.mjs";
 import { NUMBER } from "./outcomes.mjs";
-import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, taken, textOf } from "./reading.mjs";
+import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, pathIn, taken, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
 
 // The line a description ends with, saying what the pull request waits on: nothing (its builder goes on), a review, its
@@ -131,6 +130,15 @@ export function calledFor(dir) {
   return calledByPaths(lib, ownOf(diff.split("\0").filter(Boolean), prefix), own).map(c => ({ ...c, file: `${prefix}${c.file}` }));
 }
 
+// The path of the copy whose history says which lines a pull request is asked, in the checkout at `dir`, the merge commit
+// against its first parent, the base: where the base's manifest puts the core (its "Core:" line, read by pathIn), or the
+// core's own scripts/ where the base holds no manifest; never the head's, so that a pull request cannot move the path to
+// skip the lines (#455).
+export function copyAtBase(dir) {
+  const r = spawnSync("git", ["show", "HEAD^1:core-manifest.md"], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 24 });
+  return `${r.status === 0 ? pathIn(r.stdout) : ""}scripts/pr-description.mjs`;
+}
+
 export const PARTS = ["What the owner can try", "Readings taken"];
 
 // The parts an argument asks for: its own, separated by |, in place of the two; led by a +, added to the two (so a
@@ -158,7 +166,7 @@ if (started(import.meta.url)) {
   const created = String(process.env.PR_CREATED ?? ""), base = String(process.env.BASE_SHA ?? ""), repo = String(process.env.GITHUB_REPOSITORY ?? "");
   const mends = [];
   if (/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(created) && created >= WAITS_SINCE && /^[0-9a-f]{40}$/.test(base) && /^[\w-]+\/[\w.-]+$/.test(repo) && !/\/\.+$/.test(repo)) {
-    const file = fs.existsSync("core/scripts/pr-description.mjs") ? "core/scripts/pr-description.mjs" : "scripts/pr-description.mjs";
+    const file = copyAtBase(".");
     const gh = (...a) => { const r = spawnSync("gh", ["api", ...a], { encoding: "utf8", maxBuffer: 1 << 24 }); if (r.status !== 0) throw new Error("no answer"); return r.stdout; };
     // the copy as it stood when the pull request opened, read once
     let then = null;
