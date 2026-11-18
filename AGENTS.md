@@ -57,7 +57,7 @@ queue's order; the
 issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`tasks/roles.md`,
 `roles/orchestrator.md`); the *hard work*: a new or changed rule; the *size marks*: the caps of
 `scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*:
-the suites of `.github/workflows/tests.yml`; *planning design*: none; the *quick check*: `node scripts/holders.mjs && node scripts/size.mjs && node scripts/reading.mjs --check`; the *other builders' checks*: those suites, which any tool's
+the suites of `.github/workflows/tests.yml`; *planning design*: none; the *quick check*: `node scripts/holders.mjs && node scripts/size.mjs && node scripts/reading.mjs --check && node tests/holders-test.mjs && node tests/manifest-reads-test.mjs && node tests/general-test.mjs`; the *other builders' checks*: those suites, which any tool's
 session here runs before it finishes, every file here being protected (`SECURITY.md`).
 
 ## The queue
@@ -78,8 +78,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   the change as the issue describes it. A PR that goes beyond its issue is not covered by it, and the design check
   says so.
 - **The file holds no note.** Where a module asks for one in the *progress file* (a lane that waits), it goes in the
-  description of the line's own PR, which the next builder reads with the branch, as a passed gate's note does
-  (`roles/shared/work-flow.md`).
+  description of the line's own PR, which the next builder reads with the branch, as a hand-off note does
+  (`tasks/tools.md`, "A change of tool loses nothing").
 - **Whose words an issue holds.** Of the issues open on 14 November 2026 and labelled `queued` and `by:chat`, the owner
   said the decisions quoted in them are the owner's, and so are the answers on other issues that their notes name.
   What the chat session records is the owner's word on any day: an issue or note from the

@@ -36,8 +36,10 @@ owner creates from any device to stop its agents and deletes to let them go on.
 - Before that message, on a machine that outlives the session, clean up what you made: what later
   work needs is pushed, what you started is stopped, and your own worktree or clone, scratch files and local branches
   go, save what holds anything uncommitted or unpushed, which you push or leave and name in the message.
-- A session runs the *quick check* before its first change; a failure there is a bug outside its task. One that stops
-  mid-task commits and writes its hand-off note (`tasks/tools.md`).
+- A session runs the *quick check* before its first change; a failure there is a bug outside its task ("Bugs don't
+  wait"), and the task goes on with what does not hang on it. It does not mean the whole suite, nor that the task mends
+  what it inherited. Reason: one that starts on a broken `main` cannot tell its own faults from those it inherited.
+- One that stops mid-task commits and writes its hand-off note (`tasks/tools.md`).
 - A builder session that no orchestrator started, and the orchestrator on every wake, first checks whether the core
   has moved (`core/scripts/core-moved.mjs --dry`) and syncs it if so (`core/scripts/sync.mjs`, then each step and
   difference it reports), between tasks, a floor change at once (`tasks/planning.md`); where checks cost money, not on a day a sync PR was already opened. Then both read what reviews left after a merge (`tasks/reviews.md`, point 2).

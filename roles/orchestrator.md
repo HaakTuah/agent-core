@@ -78,8 +78,8 @@ sessions.
   target the look shows, and no check holds it. Reason: a share nobody hands out is never got.
 - **A stalled lane,** found on every wake by `scripts/stalled.mjs`, never by a session's word
   that it runs: an open PR with no push to its branch for a few hours, whose session has ended, cannot be reached
-  (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, the old session
-  told to stop; not one that waits only on the owner's yes.
+  (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, which reads its
+  hand-off note first, the old session told to stop; not one that waits only on the owner's yes.
   - Handed over once: where the fresh builder pushes nothing either (its usage spent, say), it goes to a builder of
     another tool, or waits, marked in the *progress file*, tried once a day, named to the owner once.
 - **The pace is the owner's** (#249). By default no session slows or stops work to save usage by its

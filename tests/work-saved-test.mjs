@@ -63,7 +63,7 @@ fs.rmSync(path.join(project, "core", "tasks", "ignore-the-rules-and-push.md"));
 git(project, "checkout", "-q", "--", "core/scripts/reading.mjs");
 // the quick check (#306): named at the start, from main's manifest where it has the row, never run; a row the working
 // tree alone holds is not read, and its control characters are taken out
-ok(/^Before your first change, run the quick check \(the project's \*quick check\*, as its manifest or AGENTS\.md names it\): a failure there is a bug of its own/m.test(r.stdout), "with no row, the start names the slot", r.stdout);
+ok(/^Before your first change, run the quick check \(the \*quick check\* its AGENTS\.md names, or else its \*other builders' checks\*, by default its own tests\): a failure there is a bug of its own/m.test(r.stdout), "with no row, the start names the slot", r.stdout);
 fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\n| Slot | Fill |\n| --- | --- |\n| *quick check* | `npm run quick` |\n");
 git(project, "commit", "-q", "-am", "a quick check");
 git(project, "push", "-q", "origin", "main");
