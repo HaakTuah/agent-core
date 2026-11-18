@@ -31,7 +31,8 @@ ok(registryName("https://registry.npmjs.org/mossgrip-data/-/mossgrip-data-1.0.0.
   && [undefined, "file:vendor/mossgrip-data.tgz", "vendor/mossgrip-data", "git+https://mossgrip.example/data.git", "https://mossgrip.example/mossgrip-data/-/mossgrip-data-1.0.0.tgz",
     "https://registry.npmjs.org/@moss\\../z\\..\\grip/-/z\\..\\grip-1.0.0.tgz", "https://registry.npmjs.org/@moss/../-/grip-1.0.0.tgz", "https://registry.npmjs.org/%2e%2e/-/grip-1.0.0.tgz"].every((r) => registryName(r) === undefined)
   && registryName("https://registry.npmjs.org/JSONStream/-/JSONStream-1.3.5.tgz") === "JSONStream" && registryName("https://registry.npmjs.org/-moss/-/-moss-1.0.0.tgz") === "-moss"
-  && registryName("https://registry.npmjs.org/@-moss/grip/-/grip-1.0.0.tgz") === "@-moss/grip" && registryName("https://registry.npmjs.org/.moss/-/.moss-1.0.0.tgz") === undefined
+  && registryName("https://registry.npmjs.org/@-moss/grip/-/grip-1.0.0.tgz") === "@-moss/grip" && ["https://registry.npmjs.org/.moss/-/.moss-1.0.0.tgz", "https://registry.npmjs.org/.moss/-/moss-1.0.0.tgz", "https://registry.npmjs.org/_moss/-/moss-1.0.0.tgz",
+    "https://registry.npmjs.org/@_moss/grip/-/grip-1.0.0.tgz", "https://registry.npmjs.org/@.moss/grip/-/grip-1.0.0.tgz", "https://registry.npmjs.org/moss/-/_moss-1.0.0.tgz"].every((r) => registryName(r) === undefined)
   && registryName("https://registry.npmjs.org/-/-/--0.0.1.tgz") === "-" && registryVersion("https://registry.npmjs.org/-/-/--0.0.1.tgz") === "0.0.1",
   "names a package by its registry address, never by a name the lockfile could be given");
 ok(registryVersion("https://registry.npmjs.org/mossgrip-data/-/mossgrip-data-1.0.0.tgz") === "1.0.0" && registryVersion("https://registry.npmjs.org/@moss/grip/-/grip-2.0.0-beta.1.tgz") === "2.0.0-beta.1"
