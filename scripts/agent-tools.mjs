@@ -583,18 +583,25 @@ function misnamed(paths) {
 // ignores case finds it, every one that matches.
 function through(at, want, holds, names, typeOf) {
   const under = f => f === want || f.startsWith(`${want}/`);
-  const found = (from, rest) => rest.split("/").filter(Boolean).reduce((dirs, step) => dirs.flatMap(d => names(d).filter(n => fold(n) === fold(step)).sort().map(n => `${d}/${n}`)), [from]);
+  // (an entry on the way that is no folder, a link out or a submodule's among them, stops the walk there and is held by
+  // what stands there, as a tool's file is)
+  const stops = new Set();
+  const found = (from, rest) => rest.split("/").filter(Boolean).reduce((dirs, step, i, steps) => dirs.flatMap(d => names(d).filter(n => fold(n) === fold(step)).sort().map(n => `${d}/${n}`)).filter(p => {
+    if (i === steps.length - 1 || typeOf(p) === "tree") return true;
+    stops.add(p);
+    return false;
+  }), [from]);
   // (each entry by what it holds, a file's text or what else stands there, so one added, taken out or changed is seen)
   const text = (name, a) => [`${name}\0${a}\0${holds(a)}`];
   const files = TOOL_FILES.filter(under).flatMap(f => found(at, f.slice(want.length)).flatMap(a => text(f, a)));
   // (of a tool folder's entries, only what the tool reads there: a hook file of Kiro's, a skill's SKILL.md, and the
   // skill's folder itself where it is neither a file nor a folder, by what stands there, a link's target or a
   // submodule's commit)
-  const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => found(at, d.slice(want.length, -1)).flatMap(dir => names(dir).sort().flatMap(n => {
+  const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => found(at, d.slice(want.length, -1)).flatMap(dir => typeOf(dir) !== "tree" ? text(d, dir) : names(dir).sort().flatMap(n => {
     const reads = d === ".kiro/hooks/" ? (/\.json$/iu.test(n) ? [`${dir}/${n}`] : []) : [...(["blob", "tree"].includes(typeOf(`${dir}/${n}`)) ? [] : [`${dir}/${n}`]), ...found(`${dir}/${n}`, "SKILL.md")];
     return reads.flatMap(a => text(`${d}${n}`, a));
   })));
-  return [at, holds(at), ...files, ...folders].join("\0\0");
+  return [at, holds(at), ...files, ...folders, ...[...stops].sort().flatMap(a => text("on the way", a))].join("\0\0");
 }
 // The entries on the way to a tool's file, in whatever case they stand: each one the walk reaches as no folder, whose
 // name folded is a step of WAYS or lies in a tool folder, a few deep, found through `names`, so a link inside the
