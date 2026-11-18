@@ -19,7 +19,8 @@
 // and temporary folder of its own, so no token reaches it, and with its metrics off; a comment in the code that would
 // silence a finding (`nosemgrep`) silences none, and the files are named to it, so no ignore file of the project's
 // leaves one out. Each file is handed to the engine past its own limits of size and place, and one it
-// did not read whole fails as a finding does, unless the description lists it on a line "Scan unread: `<path>`". It
+// did not read whole fails as a finding does, unless the description lists it on a line "Scan unread: `<path>`", which
+// excuses only a file the engine did not read, or one with which it gives no answer at all. It
 // reads JavaScript and TypeScript, C# and Python; a file that is a link, or leads out of the
 // project, is not read, nor the core's copy, whose code the host's CodeQL scans in the core's own public repository.
 // Node's own modules, git, and the engine.
@@ -344,12 +345,30 @@ function gate(root, base, dir) {
   return null;
 }
 
-/** The lines for what the engine did not read whole: with a base, each file it did not read fails; else each is said. */
-function unreadLines(files, got, base) {
-  const out = unreadOf(files, got).map(u => (base
-    ? `FAIL: ${logged(u.file)}: ${u.why}, so a weakness in it would pass unseen. ${UNREAD_MEND(logged(u.file))}`
-    : `- not read: ${logged(u.file)}: ${u.why}`));
+/** The lines for what the engine did not read whole: with a base, each file it did not read fails, unless the
+ *  description lists it as unread; a listed file it read whole is said, since the listing excuses nothing there; a
+ *  listed file held back (`held`), since the engine gave no answer with it, passes, said so; with no base, each is said. */
+export function unreadLines(files, got, { base, listed, held }) {
+  const out = unreadOf(files, got).map(u => {
+    if (!base) return `- not read: ${logged(u.file)}: ${u.why}`;
+    if (listed.has(u.file)) return `- passed: ${logged(u.file)}: ${u.why}, listed in the description as one the engine cannot read, for the security review to confirm`;
+    return `FAIL: ${logged(u.file)}: ${u.why}, so a weakness in it would pass unseen. ${UNREAD_MEND(logged(u.file))}`;
+  });
+  const unread = new Set(unreadOf(files, got).map(u => u.file));
+  for (const f of listed) {
+    if (held.includes(f)) out.push(`- passed: ${logged(f)}: the engine gave no answer with it, and the description lists it as one the engine cannot read, for the security review to confirm`);
+    else if (files.includes(f) && !unread.has(f)) out.push(`- listed as unread, but the engine read it whole: ${logged(f)}; the listing excuses nothing there`);
+  }
   return [...out, ...got.errors.filter(e => e.partial).map(e => `- read in part: ${logged(e.path ?? "")}: ${logged(e.what)}`)];
+}
+
+/** The engine's answer on the files: every one handed to it; where it gives none and the description lists files as
+ *  unread, again without those, which are then held back. { got, held, read }. */
+function answer(dir, root, files, listed) {
+  const got = runEngine(dir, root, files);
+  if (!got.failed || !listed.size) return { got, held: [], read: files };
+  const read = files.filter(f => !listed.has(f));
+  return { got: read.length ? runEngine(dir, root, read) : { findings: [], errors: [], scanned: new Set() }, held: files.filter(f => listed.has(f)), read };
 }
 
 /** The scan: { lines, failed }, each line to print. */
@@ -357,21 +376,21 @@ export function scan(root, { base = null, description = "", dir = engineAt() } =
   const stopped = gate(root, base, dir);
   if (stopped) return stopped;
   const listed = base ? unreadListed(description) : new Set();
-  const files = targets(root, base).filter(f => !listed.has(f));
-  const said = [...listed].map(f => `- passed: ${logged(f)}: listed in the description as one the engine cannot read, for the security review to confirm`);
-  if (!files.length) return { lines: [`code scan: no file of the kinds it reads ${base ? "changed" : "tracked"}`, ...said], failed: false };
-  const got = runEngine(dir, root, files);
+  const files = targets(root, base);
+  if (!files.length) return { lines: [`code scan: no file of the kinds it reads ${base ? "changed" : "tracked"}`], failed: false };
+  const { got, held, read } = answer(dir, root, files, listed);
   if (got.failed) return base
-    ? { lines: [...said, `FAIL: code scan: ${got.failed}, on the files this change adds or alters. ${UNREAD_MEND("<path>")}, naming the file it stops on (run the scan on each)`], failed: true }
+    ? { lines: [`FAIL: code scan: ${got.failed}, on the files this change adds or alters. ${UNREAD_MEND("<path>")}, naming the file it stops on (run the scan on each)`], failed: true }
     : { lines: [`code scan: did not run: ${got.failed}; it decides nothing`], failed: false };
-  const stood = base ? stoodAt(dir, root, base, files) : null;
-  if (base && !stood) return { lines: ["code scan: did not run: the engine could not read the base's files; it decides nothing"], failed: false };
-  const { lines, fails } = verdicts(got.findings, { root, base, stood, added: base ? addedLines(root, base, files) : new Map(), explained: falseAlarms(description) });
-  const unread = unreadLines(files, got, base);
+  const stoodRead = base ? stoodAt(dir, root, base, read) : null;
+  const stood = base ? stoodRead ?? new Map() : null;
+  const { lines, fails } = verdicts(got.findings, { root, base, stood, added: base ? addedLines(root, base, read) : new Map(), explained: falseAlarms(description) });
+  if (base && !stoodRead) lines.push("- the engine could not read the base's files, so every finding is counted as this change's own");
+  const unread = unreadLines(read, got, { base, listed, held });
   const failing = [...fails, ...unread.filter(l => l.startsWith("FAIL"))];
   lines.push(...unread.filter(l => !l.startsWith("FAIL")));
-  lines.unshift(`code scan: Semgrep ${VERSION}, the core's rules, ${files.length} file(s) ${base ? "the change adds or alters" : "tracked"}: ${got.findings.length} finding(s), ${failing.length} failing`);
-  return { lines: [...said, ...lines, ...failing], failed: failing.length > 0 };
+  lines.unshift(`code scan: Semgrep ${VERSION}, the core's rules, ${read.length} file(s) ${base ? "the change adds or alters" : "tracked"}: ${got.findings.length} finding(s), ${failing.length} failing`);
+  return { lines: [...lines, ...failing], failed: failing.length > 0 };
 }
 
 if (started(import.meta.url)) {
