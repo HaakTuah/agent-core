@@ -125,3 +125,14 @@ The index, and how an item is written: `archive/instructions.md`.
      and copies checks, the parts the first trials would replace. The owner agreed to it, with the issue's other points,
      after asking what the core lacked that let an inventory's check miss a part. It stands behind "A trial of a
      maintained tool replays the part's past bugs" in `tasks/choices.md`, and the inventory's line `Replayed:`.
+
+257. **16 November 2026**, #484, points 1 to 5. Four rules for games and screens are amended where a planned suite of
+     traditional games with model players, played as a party game, could not keep them: whether the computer players
+     know who is a person may be a game's setting, measured with it off; a game whose rules are given is built as
+     given, the design points binding only what the project adds; a mode for the show is told apart from play that is
+     measured; and a game's playing scene is no desktop window, a screen read across a room being one of the sizes.
+     The owner asked whether the plan could be built under the rules as they stood, and agreed to the four amendments
+     and to making them before the game rules are split. It stands behind "The computer players never know who is a
+     person", "A game whose rules are given is built as given", "Play that is measured and play that entertains are
+     told apart" and "Code decides facts; models phrase them" in `tasks/game-design.md`, and points 10 and 15 of
+     `tasks/screens.md`.

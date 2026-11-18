@@ -8,6 +8,10 @@ player can choose to use.
   - Nothing in the logic of the *computer players*, nor in *what they are shown*, says whether another player is a
     person; they judge every player by behaviour alone, so the game tests everyone alike.
   - The game makes no tells that give a person away, such as computer players that answer at once.
+  - The one condition that changes it (#484): a game may make knowing who is a person a setting, where knowing is part
+    of what the game is for and its *game page* says so; whatever is measured (the simulations, the standing measures,
+    an experiment) runs with the setting off. It does not mean a tell stays in where the setting is off. Reason: a
+    party game with model players may be played for knowing, and a rule that forbids it would stop that game.
 - **The computer players never cheat.** They hold nothing a player in their place could not
   see or know: no sight through what hides the game from a player, no knowledge it was not given.
 - **What must be remembered is decided once for each game.** By default the *game page* says, once
@@ -69,6 +73,15 @@ player can choose to use.
   instead): the rules are measured through their play, and weak play hides what is wrong with a rule.
   - Stronger never means samey: where there are several, each keeps its own style, checked before and after a change to
     their play.
+- **A game whose rules are given is built as given** (#484). By default, where a game is a traditional one, or its
+  rules come from a rule set the owner hands in, those rules as written down are its spec, and the points on design
+  below ("Don't prohibit", "No solutions", "Reality first", "Effects from causes", "Levers, not luck" and "Using a
+  feature must pay") bind only what the project adds or may choose: options, table sizes, variants, and how the
+  *computer players* play. Where the measures show a given rule never pays, or that chance alone decides it, the
+  builder who finds it reports it to the owner on the *game page*, and no session changes the rule. It does not mean
+  the measures are not taken. Reason: a traditional card game forbids a play outright, and a builder holding it to
+  these points would either stop or break them without saying so. Held by no check: whether a rule is given is read
+  from the game page by the design check.
 - **Don't prohibit; give it its real cost,** so the player keeps its agency. An action a player
   could realistically take is never forbidden because it seems unwise; the game's own rules make it as costly, risky and
   rare as it really was, so the rare exception stays possible, as Hannibal crossed the Alps.
@@ -139,6 +152,13 @@ player can choose to use.
     within its own seat.
   - A model is called only where its judgement can change what happens; the obvious, the routine and the mechanical are
     the code's.
+  - **Play that is measured and play that entertains are told apart** (#484). By default the computer players play as
+    strongly as they can ("Strong computer players") and a model is called as the point above says. The one condition
+    that changes it: a game may have a mode whose *game page* says its purpose is the show, in which who decides a move
+    may follow what makes the show, a model seat taking a move a script would find plain among them; nothing is
+    measured in that mode. It does not mean a script that errs on purpose, nor a seat kept from what a player in its
+    place would see: a model's mistakes are its own. Reason: in a party game a model's mistake at a high point is the
+    show. Held by no check: whether a mode is for the show is the game page's to say.
 - **In a game played online, everything new works online,** the same on every screen, with the
   protocol's version raised when its messages change.
 - **Players always play the newest version.**

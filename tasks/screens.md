@@ -67,8 +67,10 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
    Held by the rendered check; colour alone by the critique ("Is anything lost in grey?").
 10. **Each size it is used at,** the smallest first: the builder builds a screen at each of the *screen sizes*, and
     nothing runs off the screen at those sizes or at any width between them. It does not mean "mobile first" as a stance
-    for every product: the main size is the direction's, and a product made for a large screen keeps it. Reason: text
-    that runs off at a phone's width is the commonest mistake a builder could see for itself. Held by the rendered
+    for every product: the main size is the direction's, and a product made for a large screen keeps it. A screen read
+    from across a room is one of the *screen sizes*, its distance named in the *direction* and its text sized for that
+    distance, a first guess tuned on a real screen of that kind (#484). Reason: text that runs off at a phone's width is
+    the commonest mistake a builder could see for itself. Held by the rendered
     check's sweep of widths.
 11. **Familiar first.** A control works as its users know it from the platform and from other products. A departure is
     a choice, recorded with its reason (`tasks/choices.md`). It does not mean nothing new: a departure with its reason
@@ -91,8 +93,9 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
     and its finish matches the rest of the product. Reason: one screen finished apart from the rest reads as a part of
     another product. Held by the critique's last three questions.
 15. **On a desktop,** a program uses the platform's own controls and conventions, windows that resize, and right-click
-    menus where users expect them, on each of the *desktop platforms*. It does not mean a site opened on a desktop.
-    Reason: a desktop program that ignores its platform feels foreign there. Held by the critique and the pictures at
+    menus where users expect them, on each of the *desktop platforms*. It does not mean a site opened on a desktop, nor
+    a game's playing scene: it binds a game's menus and settings (#484). Reason: a desktop program that ignores its
+    platform feels foreign there, and a game's table on a television has no window to resize. Held by the critique and the pictures at
     each window size.
 
 ## What the builder does before review
