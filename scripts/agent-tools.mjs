@@ -655,8 +655,9 @@ function submodules(root, rev) {
 
 // Everything a name holds at a commit, as a fingerprint: what it leads to, each entry the commit lists under that, by its
 // path and object, and, for each link among them, everything it holds in turn, each folder read once; so a name held
-// twice is held by all a tool may read under either, never by one path through it.
-function everything(root, rev, at) {
+// twice is held by all a tool may read under either, never by one path through it. Each name walked, `at` and each link
+// reached under it, is said in `walked`.
+function everything(root, rev, at, walked = []) {
   const l = listing(root, rev), seen = new Set(), tops = [], entries = new Set(), todo = [at];
   // (walked a link at a time from a list, never by recursion, so no chain of links is too long for it; each entry named
   // once, however many links reach the folders it stands in)
@@ -671,6 +672,7 @@ function everything(root, rev, at) {
       if (l.linked.has(p)) todo.push(p);
     }
   }
+  walked.push(...todo);
   return [...tops, ...[...entries].sort().map(p => `${p}\0${l.ids.get(p)}`)].join("\0\0");
 }
 // Each entry a listing holds below the folder `dir` ("" the root), from the listing's names sorted once, by a binary
@@ -691,9 +693,10 @@ function belowDir(root, rev, p) {
 }
 // Each link below a folder of Claude Code's agents or commands, in whatever case, as [its problem, all it leads to]:
 // Claude Code reads the Markdown files wherever such a link leads, and this check reads none of them there, so one the
-// base held is noted while all it leads to stands.
+// base held is noted while all it leads to stands, and what an install reads for it and for each link reached through it.
 function mdLinks(root, rev) {
-  const held = at => `${at}\0${everything(root, rev, at)}\0${lockOf(root, rev, at)}`, folders = agentFolders(root, rev);
+  const held = at => { const walked = [], all = everything(root, rev, at, walked); return [at, all, ...walked.map(w => lockOf(root, rev, w))].join("\0"); };
+  const folders = agentFolders(root, rev);
   return [...[...new Set(folders.flatMap(f => f.ways))].map(at => [`${at} is a link on the way to a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads only those of plain folders the project commits. Mend: replace it with the folder itself, committed in the project, in this pull request`, held(at)]),
     ...[...new Set(folders.flatMap(f => f.links))].map(at => [`${at} is a link below a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads none of them there. Mend: replace it with the files themselves, committed in the project, in this pull request`, held(at)])];
 }

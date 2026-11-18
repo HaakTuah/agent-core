@@ -483,6 +483,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ok(loopsKept.status === 0 && loopsKept.out.includes(WAY) && Date.now() - loopsStarted < 30000, "loops of links behind a link are never walked, and the link the base held is noted", loopsKept.out);
     const agentPkg = () => { const dir = project({ ...script, ".gitignore": "node_modules/\n", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "1.0.0" } } }), ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../node_modules/pkg/agents", path.join(dir, ".claude/agents/pkg")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents from a package"); return dir; };
     fails(run(pr(agentPkg(), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "6.6.6" } } }) })), "a link the base held below agents into an installed package fails once its lock changes", LINKED);
+    // (Codex's code review of 872cc8d: and so does one reached through another link the base held)
+    const nestedPkg = viaDocs();
+    fs.writeFileSync(path.join(nestedPkg, ".gitignore"), "node_modules/\n"); fs.writeFileSync(path.join(nestedPkg, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "1.0.0" } } }));
+    fs.symlinkSync("../node_modules/pkg/agents", path.join(nestedPkg, "docs/pkg")); git(nestedPkg, "add", "-A"); git(nestedPkg, "commit", "-q", "-m", "a package's agents behind a link");
+    fails(run(pr(nestedPkg, { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "6.6.6" } } }) })), "and so does one reached through another link the base held, once its lock changes", WAY);
     // (#647's fallback security review of 90bcf1a: a folder of agents or commands that is a link out of the checkout fails
     // as any such link does; a folder in another case a link reaches first is still read for its case; and a hook is named
     // by the path Claude Code reads it at)
