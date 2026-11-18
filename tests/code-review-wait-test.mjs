@@ -67,6 +67,31 @@ const updated = [commit(OLD, "8".repeat(40)), commit(M, OLD, MAIN), commit(HEAD,
 ok(is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but updates from main") && is(had([said(`Code review: of ${OLD}`)], updated), true, "nothing but updates"), "one of an earlier commit followed only by merges from main stands");
 // Given the merges clean-merges.mjs proved (#323), only those carry a review past them; the status names the one that
 // stops it, with its mend
+// The marks reviews leave (review-marks.mjs; #551): a session's posted review declares its two lines, and, in the core,
+// a design-checked pull request has a design check of the head
+{
+  const at = "2026-11-18T09:00:00Z", now = (body, assoc = "OWNER", when = at) => ({ ...said(body, assoc), created_at: when, updated_at: when });
+  const lines = "Blocking findings: 0.\nNo other finding.";
+  const ran = [summary(done)];
+  ok(is(had([...ran, now(`Code review: of ${HEAD}`)]), false, "declares no line of its findings") && mended(`FAIL ${had([...ran, now(`Code review: of ${HEAD}`)]).why}`),
+    "if a session's posted code review has no declared lines, the status waits, saying its mend");
+  ok(is(had([...ran, now(`Code review: of ${HEAD}\n${lines}`)]), true, "a code review has run") && is(had([...ran, now(`Security review: none needed, ${HEAD}`)]), true, "a code review has run"),
+    "one with both lines, and a note that no security review is needed, which declares nothing, keep it");
+  ok(is(had([...ran, now(`Security review: ${HEAD}\nBlocking findings: 0.`)]), false, "a posted Security review declares no line") && is(had([...ran, now(`Code review: of ${HEAD}`), now(`Code review: of ${HEAD}\n${lines}`, "OWNER", "2026-11-18T10:00:00Z")]), true, "a code review has run"),
+    "a review with one line of the two waits; posted again with both, the newer one settles it");
+  ok(is(had([...ran, now(`Code review: of ${HEAD}`, "OWNER", "2026-11-17T23:59:59Z")]), true, "a code review has run") && is(had([...ran, now(`Code review: of ${HEAD}`, "NONE")]), true, "a code review has run"),
+    "a review posted before the rule's day, or by an account the host does not let write, is not read");
+  const tasks = [{ filename: "tasks/reviews.md", status: "modified", patch: "@@ -1 +1 @@\n-a\n+b" }], core = { ...pull, created_at: at, base: { repo: { full_name: CORE } } };
+  ok(is(had(ran, line, tasks, core), false, "no design check of the head") && mended(`FAIL ${had(ran, line, tasks, core).why}`), "if a pull request of the core that changes tasks/ has no design check of its head, the status waits, saying its mend");
+  ok(is(had([...ran, now(`Design check: ${HEAD}\n${lines}`)], line, tasks, core), true, "a code review has run") && is(had([...ran, now(`Design check: ${OLD}\n${lines}`)], updated, tasks, core), true, "a code review has run"),
+    "a design check naming the head, or a commit only updates from main follow, settles it");
+  ok(is(had([...ran, now(`Design check: ${OLD}\n${lines}`)], line, tasks, core), false, "no design check") && is(had([...ran, { ...now(`Design check: ${HEAD}\n${lines}`), updated_at: "2026-11-18T11:00:00Z" }], line, tasks, core), false, "no design check"),
+    "one of an earlier commit with the builder's after it, or one edited since it was posted, does not");
+  ok(is(had(ran, line, code, core), true, "a code review has run") && is(had(ran, line, tasks, { ...core, base: { repo: { full_name: "someone/project" } } }), true, "")
+    && is(had(ran, line, tasks, { ...core, created_at: "2026-11-17T12:00:00Z" }), true, "a code review has run"),
+    "a change outside the rule folders, a project's pull request, and one opened before the rule's day ask no design check");
+  ok(is(had(ran, line, tasks, core, [], false), true, "before this check came, so not waited for: no design check"), "a pull request from before the check is told, never held");
+}
 const proved = (comments, merges, commits = updated) => judge({ commits: commits.length, changed_files: 1, ...pull }, comments, commits, code, [], true, merges);
 const stopped = proved([summary({ ...done, commit_sha: OLD })], [HEAD]);
 ok(is(proved([summary({ ...done, commit_sha: OLD })], [HEAD, M]), true, "nothing but updates from main") && is(proved([said(`Code review: of ${M}`)], [HEAD]), true, "nothing but updates"), "a review stands across the merges proved the ones git makes, and a review of the merge where they stop stands too");

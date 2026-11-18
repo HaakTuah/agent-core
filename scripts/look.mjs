@@ -12,6 +12,8 @@
 //     with no push for longer than stalled.mjs's hours: draft or ready, its checks, what its description says it waits
 //     on (pr-description.mjs) and for how long, a draft with green checks first; and one whose line and label
 //     needs-owner disagree.
+//   - Late review findings to answer (review-marks.mjs; tasks/reviews.md, "A late review is still read"): Codex's
+//     findings of the last LATE_DAYS days made after their pull request merged, with no reply.
 //   - Steps of a release not done (steps.mjs), in a project.
 //   - Labels and openers to mend (labels.mjs).
 //   - The scheduled look missed a run: where its record shows no run for longer than MISSED hours. The look never
@@ -52,6 +54,7 @@ import { asked, FOLDER, repoOf } from "./inbox.mjs";
 import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
 import { WAITS, waitsOn } from "./pr-description.mjs";
 import { pathIn } from "./reading.mjs";
+import { lateBody, lateOf } from "./review-marks.mjs";
 import { ownerOf } from "./releases.mjs";
 import { HOURS, openPulls, stalled } from "./stalled.mjs";
 import { started } from "./started.mjs";
@@ -71,7 +74,11 @@ export const TITLES = {
   labels: "Labels and openers to mend",
   missed: "The scheduled look missed a run",
   stale: "Packages gone stale",
+  late: "Late review findings to answer",
 };
+// How far back a late finding is read (tasks/reviews.md, "A late review is still read": the last week), and the most
+// pull requests whose merge is read for it in one run.
+export const LATE_DAYS = 7, LATE_PULLS = 30;
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
 // issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over
 // the choices that are hard to undo and a sign of theirs that has tripped (choices.mjs); and the cleaning and the audit
@@ -260,13 +267,28 @@ export function staleFinding(run = () => spawnSync(process.execPath, [fileURLToP
   return { title: TITLES.stale, what: null, unread: "the packages the project holds could not be looked up in their registries this time" };
 }
 
+// The late findings, through `add` (review-marks.mjs; #551): Codex's findings of the last LATE_DAYS days made after
+// their pull request merged with no reply, or why they could not be read; `gh` in ghApi's form.
+export function lateFinding(repo, add, at, gh = ghApi) {
+  try {
+    const since = new Date(Date.parse(at) - LATE_DAYS * 86400000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const inline = pagesOf(`repos/${repo}/pulls/comments?since=${since}`, gh);
+    const numbers = [...new Set(inline.map(c => Number(/\/pulls\/(\d+)$/.exec(String(c?.pull_request_url ?? ""))?.[1])).filter(Number.isInteger))].slice(0, LATE_PULLS);
+    const merged = new Map(numbers.map(n => [n, JSON.parse(gh(`repos/${repo}/pulls/${n}`)).merged_at ?? null]).filter(([, m]) => typeof m === "string"));
+    add(TITLES.late, lateBody(lateOf(inline, merged)));
+  } catch {
+    add(TITLES.late, null, "the review comments could not be read: the token here may not read pull requests");
+  }
+}
+
 // What the look finds, kind by kind, each { title, what, unread }; and `stepsLeft`, the count of a release's steps not
 // done (null where they were not read), for the state report.
 function findingsOf({ repo, manifest, owner, at }, reach, last) {
   const findings = [];
   const add = (title, what, unread = null) => findings.push({ title, what, unread });
-  // pull requests that stand idle
+  // pull requests that stand idle, and late review findings
   idleFinding(repo, add);
+  lateFinding(repo, add, at);
   // steps of a release not done, in a project
   let stepsLeft = null;
   if (manifest !== null) {

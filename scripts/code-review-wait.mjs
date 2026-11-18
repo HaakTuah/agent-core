@@ -29,7 +29,9 @@
 // date with main, it is held. A summary whose state cannot be read counts as no review of Codex's, with a warning. It
 // does not hold what a review says, that docs another provider built got their code review, nor, given no list of the
 // merges proved (a workflow older than this script), that a merge from `main` brought no change of its own: those stay
-// with the builder and the reviews. It prints, as JSON, the commit to
+// with the builder and the reviews. Once a review has run, it waits too on the marks reviews leave (review-marks.mjs,
+// beside this file; #551): the newest posted review of each kind declaring its two lines, and, in the core's own
+// repository, a design-checked pull request's design check of its head. It prints, as JSON, the commit to
 // mark and the status to give it, named "code-review", or {} for a pull request that is closed or a draft. While
 // "advisory" (the workflow's input, on unless turned off) the status is always a pass that says what the check would
 // have done, as the security-review status's.
@@ -41,6 +43,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
 import { copyOf } from "./core-path.mjs";
+import { marksWait } from "./review-marks.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, form, pinsAlone, standsFrom, status, unproved, whole } from "./security-review.mjs";
@@ -56,9 +59,19 @@ export function judge(pull, comments, commits, files, rules = [], bound = true, 
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
   const read = codexState(flat(comments));
-  const verdict = judgeWith(sha, flat(comments), read.state?.code_review, pull, commits, files, rules, bound, merges, copy);
+  const verdict = withMarks(judgeWith(sha, flat(comments), read.state?.code_review, pull, commits, files, rules, bound, merges, copy), pull, flat(comments), commits, files, bound, merges);
   // (a summary whose state cannot be read is no review of Codex's, running or done: the check warns, and goes on)
   return read.unread ? { ...verdict, warning: UNREAD } : verdict;
+}
+// the marks reviews leave (review-marks.mjs; #551), once the review has run: a posted review's two lines, and, in the
+// core, a design-checked pull request's design check of the head
+function withMarks(verdict, pull, list, commits, files, bound, merges) {
+  if (!verdict.done) return verdict;
+  const chain = commits === undefined ? undefined : new Set(standsFrom(pull, flat(commits), verdict.sha, merges));
+  const core = String(pull.base?.repo?.full_name).toLowerCase() === CORE.toLowerCase();
+  const why = marksWait({ pull, comments: list, files: files === undefined ? undefined : flat(files), chain, writers: WRITERS, core });
+  if (why === null) return verdict;
+  return bound ? { sha: verdict.sha, done: false, why } : { sha: verdict.sha, done: true, why: `before this check came, so not waited for: ${why}` };
 }
 function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges, copy) {
   const short = sha.slice(0, 7);

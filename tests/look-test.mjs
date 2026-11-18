@@ -3,7 +3,7 @@
 // report's parts. Node's own modules only; the calls to gh and git are the program's own and are not made here.
 //
 //   node tests/look-test.mjs
-import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, staleFinding, text, TITLES, updating } from "../scripts/look.mjs";
+import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, staleFinding, lateFinding, text, TITLES, updating } from "../scripts/look.mjs";
 import { parse, signKey, tripped, trippedBody } from "../scripts/choices.mjs";
 import { before, body, copies, countsFrom, reportOf, share, SHARES, shownAs } from "../scripts/state-report.mjs";
 import fs from "node:fs";
@@ -160,6 +160,29 @@ const stale = (status, stdout = "") => staleFinding(() => ({ status, stdout }));
 ok(stale(0, "Packages the project holds that have gone stale\n\n- a\n").what === "Packages the project holds that have gone stale\n\n- a" && stale(0).what === null && stale(0).title === TITLES.stale
   && stale(3).unread && stale(null).unread && plan(stale(3).what, { state: "open" }, stale(3).unread) === "nothing",
   "the packages gone stale: listed where held.mjs finds some, closed where it finds none, left as they stand where it could not look");
+
+// late review findings (review-marks.mjs; #551): Codex's findings made after their pull request merged, with no reply
+{
+  const badge = p => `<sub><sub>![${p} Badge](https://img.shields.io/badge/${p}-orange?style=flat)</sub></sub>`;
+  const codex = (id, pull, at, body, extra = {}) => ({ id, pull_request_url: `https://api.github.com/repos/o/r/pulls/${pull}`, html_url: `https://github.com/o/r/pull/${pull}#discussion_r${id}`, created_at: at, user: { login: "chatgpt-codex-connector[bot]", type: "Bot" }, body, ...extra });
+  const inline = [codex(1, 7, "2026-11-18T10:00:00Z", `${badge("P1")} A late code finding`), codex(2, 7, "2026-11-18T08:00:00Z", `${badge("P2")} Made before the merge`),
+    codex(3, 8, "2026-11-18T10:00:00Z", `${badge("P1")} Answered`), { id: 4, in_reply_to_id: 3, pull_request_url: "https://api.github.com/repos/o/r/pulls/8", created_at: "2026-11-18T11:00:00Z", user: { login: "owner", type: "User" }, body: "Fixed in #9." },
+    codex(5, 9, "2026-11-18T10:00:00Z", `${badge("P1")} On an open pull request`), { ...codex(6, 7, "2026-11-18T10:00:00Z", `${badge("P1")} Not Codex's`), user: { login: "someone", type: "User" } },
+    codex(7, 7, "2026-11-18T10:00:00Z", `<!-- codex-security-review-finding:v1 -->\n${badge("P0")} A late security finding`)];
+  const merged = { 7: "2026-11-18T09:00:00Z", 8: "2026-11-18T09:00:00Z", 9: null };
+  const gh = route => { if (route.startsWith("repos/o/r/pulls/comments")) return JSON.stringify(route.includes("page=1") ? inline : []); const n = /pulls\/(\d+)$/.exec(route)?.[1]; return JSON.stringify({ merged_at: merged[n] ?? null }); };
+  const found = [];
+  lateFinding("o/r", (title, what, unread = null) => found.push({ title, what, unread }), "2026-11-18T12:00:00Z", gh);
+  const what = found[0]?.what ?? "";
+  ok(found.length === 1 && found[0].title === TITLES.late && what.includes("discussion_r1") && !/discussion_r[23456]/.test(what),
+    "when a finding stands unanswered on a merged pull request, the look lists it; one made before the merge, one answered, one on an open pull request and another account's are not", what);
+  ok(/#7, a finding of Codex's security review/.test(what) && !what.includes("discussion_r7") && !what.includes("A late security finding"), "a security finding is listed by its pull request alone, nothing of it written (floor rule 9)", what);
+  const none = [];
+  lateFinding("o/r", (title, what2, unread = null) => none.push({ what: what2, unread }), "2026-11-18T12:00:00Z", route => JSON.stringify(route.startsWith("repos/o/r/pulls/comments") ? [] : {}));
+  const lost = [];
+  lateFinding("o/r", (title, what2, unread = null) => lost.push({ what: what2, unread }), "2026-11-18T12:00:00Z", () => { throw new Error("HTTP 403"); });
+  ok(none[0].what === null && none[0].unread === null && lost[0].what === null && /could not be read/.test(lost[0].unread), "with none, its issue closes; where the comments cannot be read, it is left as it stands");
+}
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);

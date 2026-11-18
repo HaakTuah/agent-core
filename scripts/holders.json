@@ -153,7 +153,11 @@
     "roles/reviewer.md: Reads at its start": "check: scripts/reading.mjs, in part",
     "roles/reviewer.md: Hands over, gets back": "describes",
     "roles/stand-in.md: Reads at its start": "check: scripts/reading.mjs, in part",
-    "roles/stand-in.md: Hands over, gets back": "describes"
+    "roles/stand-in.md: Hands over, gets back": "describes",
+    "roles/shared/review-guidelines.md: Every reviewer": "check: scripts/code-review-wait.mjs, in part",
+    "tasks/reviews.md: What a posted review declares": "check: scripts/code-review-wait.mjs, in part",
+    "tasks/reviews.md: The design check": "check: scripts/code-review-wait.mjs, in part",
+    "tasks/reviews.md: A late review is still read": "check: scripts/look.mjs, in part"
   },
   "behind": {
     "AGENTS.md": [208, 209, 213],

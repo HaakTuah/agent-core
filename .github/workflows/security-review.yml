@@ -6,7 +6,10 @@
 # "Which" and point 2: a review already running is waited for, and one that hangs is taken over, its review posted in a
 # comment that opens "Code review:" naming the commit by its whole SHA, which ends the wait; such a comment starts the
 # job only where the check is not advisory, since an advisory status passes anyway and the next push or Codex's own
-# summary rewrites it, so that no project starts a job for it it did not start before).
+# summary rewrites it, so that no project starts a job for it it did not start before). The same status waits, too,
+# while the newest posted review of a kind from such an account declares no line of its findings, and, in the core's
+# own repository, while a design-checked pull request has no "Design check:" of its head, which starts the job as
+# "Code review:" does (scripts/review-marks.mjs; tasks/reviews.md, points 3 and 4; #551).
 # Proof is the summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment
 # that opens "Security review:" from the repository's owner, a person the host lets write (in a team's project, each
 # owner: roles/shared/teams.md; the job reads each such commenter's rights from GitHub, #412), or an account the caller
@@ -48,9 +51,9 @@
 # What keeps it safe, since a comment starts it and it may write a status (floor rule 2): it checks out the default
 # branch, never the pull request, and runs only that branch's copies of the scripts; a comment's text is read only in
 # the job's condition and as data from GitHub's API, never written into a run line; it runs for a comment only where
-# that is the summary of Codex's app or opens "Security review:" or "Code review:" from the owner, a member or a
-# collaborator; on pull_request it runs only for a branch of the repository itself and not for Dependabot, whose token
-# could not write the status (theirs is written when the first comment that counts arrives: on Dependabot's own, Codex's
+# that is the summary of Codex's app or opens "Security review:", "Code review:" or "Design check:" from the owner, a
+# member or a collaborator; on pull_request it runs only for a branch of the repository itself and not for Dependabot,
+# whose token could not write the status (theirs is written when the first comment that counts arrives: on Dependabot's own, Codex's
 # summary, once the code review that floor rule 17 asks for is asked); and the token can read, and write a commit
 # status, nothing more. The proofs of a pure sync and of the merges from main fetch the head's commits into a clone of
 # their own and check out nothing, so no file of the pull request's is written to disk or run (git's merge of two
@@ -101,7 +104,9 @@ jobs:
       && (startsWith(github.event.comment.body, 'Security review:')
       || startsWith(github.event.comment.body, '**Security review:')
       || (!inputs.advisory && (startsWith(github.event.comment.body, 'Code review:')
-      || startsWith(github.event.comment.body, '**Code review:')))))))) }}
+      || startsWith(github.event.comment.body, '**Code review:')
+      || startsWith(github.event.comment.body, 'Design check:')
+      || startsWith(github.event.comment.body, '**Design check:')))))))) }}
     # one at a time for a pull request, in the order they came: the last to run has read the newest comments
     concurrency:
       group: security-review-${{ github.event.issue.number || github.event.pull_request.number }}

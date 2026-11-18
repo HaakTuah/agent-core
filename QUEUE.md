@@ -89,7 +89,6 @@ They read and change no rule.
 | #548 | builder | |
 | #549 | builder; a workflow, two security reviews | #548 |
 | #550 | builder; a case a PR | |
-| #551 | builder | #549 |
 | #552 | builder | #551 |
 | #553 | builder | #552 |
 | #554 | builder | #553 |
