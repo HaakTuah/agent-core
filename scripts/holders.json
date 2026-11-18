@@ -106,6 +106,8 @@
     "tasks/tests.md: The tests have a time mark, which never gets worse": "check: scripts/shape.mjs",
     "tasks/tests.md: A test that fails for no reason is mended or removed, never retried in silence": "audit",
     "tasks/tests.md: A test opens a screen only where the screen is what it guards": "check: scripts/shape.mjs",
+    "tasks/tests.md: A test asserts no time measured on a real clock": "audit",
+    "tasks/tests.md: A tree that passed is not run again": "check: scripts/steps.mjs, in part",
     "tasks/tests.md: What a push waits on has a time mark": [
       "check: scripts/shape.mjs, in part",
       "check: scripts/look.mjs, in part"
@@ -321,6 +323,7 @@
     "roles/shared/review-guidelines.md: A mechanical move is read by its rule and a sample": [251],
     "tasks/cleaning.md": [226],
     "tasks/cleaning.md: No process number is a builder's goal": [244],
+    "tasks/cleaning.md: The audit's reader has a fixed brief and fixed questions": [257],
     "tasks/cleaning.md: The state report leads with the outcomes": [244, 251],
     "tasks/code-shape.md": [226],
     "tasks/code-shape.md: A job a maintained package does is done by it": [255],
@@ -402,7 +405,9 @@
     "tools/claude.md: Name models by family alone": [80, 81],
     "tools/claude.md: Pass both model and effort": [128],
     "tools/claude.md: Who to call": [70, 71, 73],
-    "tools/codex.md: On GitHub": [169]
+    "tools/codex.md: On GitHub": [169],
+    "tasks/tests.md: A test asserts no time measured on a real clock": [257],
+    "tasks/tests.md: A tree that passed is not run again": [257]
   },
   "numbers": {
     "tasks/code-shape.md: A job a maintained package does is done by it": "findings; outcome: robust",
@@ -430,6 +435,8 @@
     "tasks/cleaning.md: The state report leads with the outcomes": "correction: does not work; outcome: robust",
     "floor/topics/dependencies.md: A new one is looked up in its registry": "check fires; outcome: robust; rare harm",
     "floor/topics/dependencies.md: A new one is taken in an order": "findings; outcome: robust",
-    "floor/topics/what-ships.md: A package found bad goes at once": "correction: rule missing; outcome: robust; rare harm"
+    "floor/topics/what-ships.md: A package found bad goes at once": "correction: rule missing; outcome: robust; rare harm",
+    "tasks/tests.md: A test asserts no time measured on a real clock": "findings; outcome: robust",
+    "tasks/tests.md: A tree that passed is not run again": "check fires; outcome: fast"
   }
 }
