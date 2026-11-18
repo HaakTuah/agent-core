@@ -125,6 +125,23 @@ one declared entrance.
   "One fact, one place" forbids a second copy of a fact, and code joined too early is harder to change than two plain
   pieces. Reason: exact copies were held, and copies that differ only in their names were up to 2.5% of a codebase
   that nothing saw. Held by the copies check's report.
+- **A part whose gaps repeat is read for its whole input** (#593). By default a bug is mended at its cause, its fix
+  adding the test of its case. The trigger is the third bug filed against one part that was a kind of input, of project
+  or of platform the part did not read (the count as the inventory keeps it, where the project keeps one): the builder
+  that mends it lists every kind the part's job covers, from the source that defines them (the project's kinds and its
+  manifest's slots, the platforms it builds and tests on, a format a standard or the host defines), and gives each a
+  test, in that pull request or, where that is large, as a task it files; the pull request holds the list, one line for
+  each kind and the test that holds it. Three is a first guess. It does not mean a bug waits for the list, nor that a
+  part with three bugs is replaced, nor that a kind no source names is guessed. Reason: mended one case at a time, four
+  of the core's parts took 22 bugs of the same kind by 17 November 2026.
+- **Where something outside defines the full set, the part is compared with it** (#593). By default a part reads its
+  input itself, and its tests hold the kinds its writer listed. Where an authority can say the whole of what the part
+  should have read (a build tool for what a build brings in, git for a rename, the host for a pull request's reviews),
+  whoever makes the list above, or writes such a part anew, has the part's test run the part and the authority on the
+  same projects (in the core, those its upgrade test builds) and fail on any difference; where the authority can do the
+  reading itself, the part gives way to it as to any maintained tool (#534). It does not mean a comparison where nothing
+  defines the full set, which no check can read, nor one run on a project of another owner. Reason: kinds listed by
+  hand are as complete as their writer's memory.
 
 **What has no mark here.** A hub, a file most others import: one that holds one small fact is as it should be, and
 the audit's reader judges the others. The time a user waits on gets its own measure as its rule comes (#318).
