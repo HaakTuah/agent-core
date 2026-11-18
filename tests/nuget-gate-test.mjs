@@ -62,7 +62,7 @@ function gate(files, { start = {}, base = true, caller = "nuget.yml", link = nul
   git(dir, "init", "-q", "-b", "main");
   const put = set => { for (const [f, text] of Object.entries(set)) { const at = path.join(dir, f); if (text === null) fs.rmSync(at); else { fs.mkdirSync(path.dirname(at), { recursive: true }); fs.writeFileSync(at, text); } } };
   put({ ...START, ...start });
-  for (const d of ["scripts", "third-party"]) fs.cpSync(path.join(root, d), path.join(dir, "core", d), { recursive: true });
+  fs.cpSync(path.join(root, "scripts"), path.join(dir, "core/scripts"), { recursive: true });
   if (link) fs.symlinkSync(link[1], path.join(dir, link[0]));
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "base");
