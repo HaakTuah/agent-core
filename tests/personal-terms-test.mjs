@@ -20,7 +20,9 @@
 // names an older base; a term only in the copyright lines of LICENSE and NOTICE of their shape, at the root and in the
 // core's copy (#257); and a repository without the secret. What Betterleaks, which matches the terms (#579), would read
 // otherwise fails all the same: a file of text that begins as an archive or a PDF does, a line marked for it to pass
-// over, a term beside its ignore and config files, a term holding a pattern's characters, matched as listed; a term in
+// over, a term beside its ignore and config files, a term holding a pattern's characters, matched as listed, a file
+// whose name puts a binary type's mark where it reads one, a term on any line of a long run or across a long line's
+// pieces, since it reads in chunks; a term in
 // base64 passes, as before; and where Betterleaks cannot be built (no Go, no sum for the machine's system) it passes
 // with a note that nothing was checked, while a build that fails, or a kept copy that differs from its sum, fails, that
 // copy never run. The terms are invented, built from pieces as the test runs, so no file holds them. On Linux and on
@@ -94,13 +96,13 @@ function pull(commits, onMain = []) {
 }
 // The check's verdict, with the pull request checked out as GitHub merges it into the base's tip; the event names
 // `eventBase`, the tip itself unless an older base is given.
-function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", branch = "change", stale = false, key = keyFile, isPrivate = false, opener = null, locale = null, go = null, store = null, noGo = false } = {}) {
+function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", branch = "change", stale = false, key = keyFile, isPrivate = false, opener = null, locale = null, go = null, store = null, noGo = false, hosted = false } = {}) {
   const tip = git(dir, ["rev-parse", "main"]);
   git(dir, ["checkout", "-q", "--detach", "main"]);
   git(dir, ["merge", "-q", "--no-ff", "--no-edit", "change"], { ...GITHUB, ...(opener ? { GIT_AUTHOR_NAME: opener } : {}) });
   const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, head: { ref: branch }, base: { sha: stale ? first : tip } }, repository: { private: isPrivate } } };
   const PATH = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(d => !noGo || !goDirs.includes(d)).join(path.delimiter);
-  const base = { ...env, ...ME, ...(locale ? { LC_ALL: locale } : {}), ...(store ? { TMPDIR: store } : {}), STAND_IN_KEY: key, PATH: `${go ? `${go}${path.delimiter}` : ""}${stubs}${path.delimiter}${PATH}` };
+  const base = { ...env, ...ME, ...(locale ? { LC_ALL: locale } : {}), ...(store ? { TMPDIR: store } : {}), ...(hosted ? { RUNNER_ENVIRONMENT: "github-hosted" } : {}), STAND_IN_KEY: key, PATH: `${go ? `${go}${path.delimiter}` : ""}${stubs}${path.delimiter}${PATH}` };
   const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {}, "actions/cache": () => {} }, temp: tmp });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
@@ -298,6 +300,24 @@ passes("a term only in base64, which the check does not decode", pull([[{ "b.md"
 const oddTerm = ["a.", "\\E", '"c'].join("");
 fails("a term holding a dot, a backslash and E and a quote, written as listed", pull([[{ "b.md": `x ${oddTerm.toUpperCase()} y\n` }]]), { terms: `${oddTerm}\n` });
 passes("a term holding a dot, where only a pattern's dot would match it", pull([[{ "b.md": `x ${oddTerm.replace(".", "z")} y\n` }]]), { terms: `${oddTerm}\n` });
+// what Betterleaks reads in chunks never hides a term (the fallback security review of #656): a file's name that puts a
+// type's mark where it reads one (DICOM's at byte 128, tar's at byte 257), a term on any line of a long run with no
+// blank line, and one across any cut of a line longer than its chunks
+// (each name the first the check reads, so that its mark stands where Betterleaks reads one, had the input no lines
+// before it: DICOM's at byte 128, tar's at byte 257)
+fails("a term beside a file whose name puts DICOM's mark where Betterleaks reads one", pull([[{ [`${"!".repeat(127)}DICM`]: "x\n", "b.md": `x ${term}\n` }]]));
+fails("a term beside a file whose name puts tar's mark where Betterleaks reads one", pull([[{ [`${"!".repeat(200)}/${"!".repeat(55)}ustar`]: "x\n", "b.md": `x ${term}\n` }]]));
+// (every line the term alone, so that a chunk cut anywhere inside a line would lose that line)
+const lines40k = 40000, dense = check(pull([[{ "long.txt": `${term}\n`.repeat(lines40k) }]]));
+const namedLines = new Set([...dense.out.matchAll(/^long\.txt:(\d+)$/gmu)].map(m => Number(m[1])));
+ok(!dense.passed && namedLines.size === lines40k, "a term on every line of a run of 40,000 with no blank line is named on every line", `${namedLines.size} of ${lines40k} named`);
+// (the longest term's bytes, by which the pieces of a long line overlap: a term starting on each side of the end of
+// the first and the second piece of 20,000 bytes)
+const step = 20000 - Math.max(...[term, other, wide].map(t => Buffer.byteLength(t)));
+const starts = [20000 - term.length + 1, 20000 - 2, 20000, step + 20000 - term.length + 1, step + 20000 - 2, step + 20000];
+const longLines = starts.map(st => `${"z".repeat(st - 1)}${term}${"z".repeat(60000 - st - term.length + 1)}`);
+const widest = check(pull([[{ "wide.txt": `${longLines.join("\n")}\n` }]]));
+ok(!widest.passed && starts.every((_, i) => new RegExp(`^wide\\.txt:${i + 1}$`, "mu").test(widest.out)), "a term across each edge of the pieces a line of 60,000 characters is cut in is named on its line", widest.out.split("\n").filter(l => l.startsWith("wide.")).join(" "));
 // Betterleaks at its pin: where it cannot be built (no Go, no sum for the machine's system), the check passes with a
 // note, as without the secret; a build that fails, and a kept copy that differs from its sum, fail, and that copy never
 // runs (a go of the test's own stands in for Go)
@@ -312,6 +332,8 @@ ok(!mute.passed && mended(mute.out) && mute.out.includes("could not say the mach
 // a go.mod of the pull request's own that asks for a toolchain no one has changes nothing (Codex's finding on #656)
 fails("a term beside a go.mod that asks for a toolchain that does not exist", pull([[{ "go.mod": "module example.invalid/x\n\ngo 1.999.0\n", "b.md": `x ${term}\n` }]]));
 unbuilt("where no sum stands for the machine's system", goStub("plan9", 'case "$1" in env) printf "plan9\\n386\\n" ;; *) exit 1 ;; esac'), "no sum stands in this check for a build on plan9/386");
+const onGitHub = check(pull([[{ "b.md": `${term}\n` }]]), { go: path.join(tmp, "go-plan9"), hosted: true });
+ok(!onGitHub.passed && mended(onGitHub.out) && onGitHub.out.includes("on this runner of GitHub's"), "on a runner of GitHub's, where Go always is, no sum for its system fails the check, never passing", onGitHub.out);
 const failing = goStub("failing", 'case "$1" in env) printf "linux\\namd64\\n" ;; *) echo "go: no network here" >&2; exit 1 ;; esac');
 const sum = /linux\/amd64\/\) sum=([0-9a-f]{64})/.exec(workflow)?.[1], version = /version=(\S+)/.exec(workflow)?.[1];
 const keptTool = path.join(tmp, "kept"), keptDir = path.join(keptTool, "agent-core-tools", `betterleaks-${version}-${sum}`), ran = path.join(tmp, "kept-ran");

@@ -112,6 +112,10 @@ jobs:
             darwin/arm64/) sum=eb8b28e0eaac1536bd1311c775dbc58d9d9bc2beb7a77fdeb5beefdeb89bf2ff ;;
             *) sum= ;;
           esac
+          if [ -z "$sum" ] && [ "$RUNNER_ENVIRONMENT" = github-hosted ]; then
+            echo "FAIL Betterleaks, which matches the terms, could not be built on this runner of GitHub's: ${system:+no sum stands in this check for ${system%/}}${system:-no Go is at hand}, so nothing was read. Mend: run the check again; where it fails again, report it to the core (core/README.md, \"Reporting to the core\"), since GitHub's runners have Go."
+            rm -rf "$work"; exit 1
+          fi
           if [ -z "$sum" ]; then
             echo "::notice::Betterleaks, which matches the terms, is built here by Go, and ${system:+no sum stands in this check for a build on ${system%/}}${system:-no Go is at hand}, so nothing was checked. Mend: run the check where Go 1.21 or later is at hand on Linux, Windows or macOS on Apple silicon, as on GitHub's runners."
             rm -rf "$work"; exit 0
@@ -153,14 +157,28 @@ jobs:
             printf '[[rules]]\nid = "term-%s"\nregex = "%s"\n' "$n" "$e"
           done < "$list" > "$rules"
           printf '{{ range . }}{{ .StartLine }}\n{{ end }}' > "$work/lines.tmpl"
-          # (what Betterleaks finds in its input: the numbers of its lines that hold a term, in order, or a failure; its
-          # input begins with an empty line, since it takes an input that begins as an archive or a PDF does for one and
-          # reads none of it, and the run stands in a folder of its own, so that no ignore file there is read)
+          # (what Betterleaks finds in its input: the numbers of its lines that hold a term, in order, or a failure. It
+          # reads its input in chunks, taking the first chunk's bytes for a file's type, and, where it reads one it holds
+          # for binary (an archive, a PDF, a picture), none of the input; so the input given it opens with 33,000 empty
+          # lines, past every mark of a type it reads (the last at byte 32,773). It ends a chunk where a blank line
+          # follows within 25,000 bytes, and cuts a line otherwise; so each line is given it with an empty line after it,
+          # a line longer than 20,000 bytes in pieces that overlap by the longest term, and each line it finds is taken
+          # back to the line it came from, by bytes (LC_ALL=C). The run stands in a folder of its own, so that no ignore
+          # file there is read, and what it says on its errors, which may quote a rule, is never printed)
+          longest=$(LC_ALL=C awk '{ if (length($0) > m) m = length($0) } END { print m + 0 }' "$list")
+          pieces() { LC_ALL=C awk -v w=20000 -v o="$longest" 'function out(s) { print s; print "" }
+            { n = length($0); if (n <= w) { out($0); next } for (i = 1; ; i += w - o) { out(substr($0, i, w)); if (i + w > n) break } }'; }
+          back() { LC_ALL=C awk -v w=20000 -v o="$longest" -v h=33000 'NR == FNR { if ($1 != "") hit[$1] = 1; next }
+            { n = length($0); k = 1; if (n > w) for (i = 1; i + w <= n; i += w - o) k++
+              for (j = 0; j < k; j++) if (hit[h + at + 2 * j + 1]) { print FNR; break }; at += 2 * k }' "$1" -; }
           scan() {
-            { printf '\n'; cat; } | (cd "$work/none" && "$bl" stdin --config "$rules" --no-banner --no-color --log-level error \
+            cat > "$work/given"
+            { head -c 33000 /dev/zero | tr '\0' '\n'; pieces < "$work/given"; } \
+              | (cd "$work/none" && "$bl" stdin --config "$rules" --no-banner --no-color --log-level error \
               --redact --ignore-gitleaks-allow --max-decode-depth 0 --max-archive-depth 0 --gitleaks-ignore-path "$work/none" \
-              --exit-code 0 --report-format template --report-template "$work/lines.tmpl" --report-path - > "$work/found") \
-              && sort -n -u "$work/found"
+              --exit-code 0 --report-format template --report-template "$work/lines.tmpl" --report-path - > "$work/found" 2> "$work/said") \
+              || { echo "Betterleaks stopped with an error, not printed here, since it may quote a term." >&2; return 1; }
+            back "$work/found" < "$work/given" | sort -n -u
           }
           # (whether the text on its input holds a term: so too where Betterleaks fails, so that nothing goes unread)
           holds() { local out; ! out=$(scan) || [ -n "$out" ]; }
@@ -217,9 +235,8 @@ jobs:
           unread() { local p; own=(); for p in $exempt; do if shaped "$1" "$p"; then own+=(":(top,exclude,literal)$p"); fi; done; }
           unread HEAD; skip=("${own[@]}")
           # (what is read, gathered into one input for Betterleaks, a part at a time, each part's first line and what it
-          # is kept beside it: its kind, and the file's number or the commit; the input's own first line is empty, so a
-          # part's lines are counted from the second)
-          read="$work/read" parts="$work/parts" lines=1
+          # is kept beside it: its kind, and the file's number or the commit)
+          read="$work/read" parts="$work/parts" lines=0
           : > "$read"; : > "$parts"
           add() { # (a kind and what it names; the part's text on the input, a line at least, by the shell's own commands)
             local -a part; mapfile -t part; [ "${#part[@]}" -gt 0 ] || part=("")
