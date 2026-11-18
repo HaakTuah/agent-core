@@ -906,16 +906,16 @@ function linkTexts(root, rev) {
 // With `how` (a link's way, as sortLinks() reads it): a way out of the repository, by ".." or a link to a whole path, is
 // followed on the file system around the checkout, and the walk goes on in the commit where it comes back in (backIn());
 // with `how.win`, a link's text is read as Windows reads it, either slash a separator, and 63 links followed, as Windows
-// follows them; each way out counted as a link, so one that leaves and comes back in again and again ends.
+// follows them; and 64 ways out by ".." at most, so one that leaves and comes back in again and again ends.
 function walk(root, rev, f, via = [], lenient = false, misses = [], follow = false, how = null) {
   const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
-  let hops = 0;
+  let hops = 0, backs = 0;
   while (left.length) {
     let name = left.shift();
     if (name === "" || name === ".") continue;
     if (name === "..") {
-      hops = up(root, how, left, at, via, hops);
-      if (hops < 0) return null;
+      backs = up(root, how, left, at, via, backs);
+      if (backs < 0) return null;
       continue;
     }
     if (follow) name = folded(listing(root, rev), at, name);
@@ -934,12 +934,12 @@ function walk(root, rev, f, via = [], lenient = false, misses = [], follow = fal
   }
   return reached(at.join("/") || ".", blobs, dirs, others);
 }
-// A walk's step back by "..", its `hops` links followed so far: out of the folder it stands in, or, at the checkout's
-// root with `how`, out of the checkout, counted as a link (backIn()); the links followed after it, or -1 where the walk
-// ends there.
-function up(root, how, left, at, via, hops) {
-  if (at.length) { at.pop(); return hops; }
-  return how && hops < most(how) && backIn(root, path.dirname(topOf(root)), left, at, via) ? hops + 1 : -1;
+// A walk's step back by "..", `backs` ways out of the checkout taken so far: out of the folder it stands in, or, at the
+// checkout's root with `how`, out of the checkout (backIn()), 64 at most; the ways out taken after it, or -1 where the
+// walk ends there.
+function up(root, how, left, at, via, backs) {
+  if (at.length) { at.pop(); return backs; }
+  return how && backs < 64 && backIn(root, path.dirname(topOf(root)), left, at, via) ? backs + 1 : -1;
 }
 // How many links a walk read as `how` says follows.
 const most = how => (how?.win ? 63 : 40);

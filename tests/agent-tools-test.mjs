@@ -1079,6 +1079,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       dir => { fs.unlinkSync(path.join(dir, "l45")); fs.symlinkSync("node_modules/evil", path.join(dir, "l45")); })), "and so is one past forty links, as Windows follows them", UNHELD);
     const roundKept = run(swap(dir => { fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync(`../${self(dir)}/node_modules/pkg/.claude`, path.join(dir, ".claude")); }, dir => fs.writeFileSync(path.join(dir, "README.md"), "x\n")));
     ok(roundKept.status === 0 && roundKept.out.includes("reported, never failed"), "while one the base held that leaves and comes back in, as it stood, is still reported, never failed", roundKept.out);
+    // (and one whose way comes back in after as many links as Windows follows, a way back in no link of them)
+    fails(run(swap(dir => { fs.mkdirSync(path.join(dir, "cfg"), { recursive: true }); fs.writeFileSync(path.join(dir, "cfg/settings.json"), KIT); fs.rmSync(path.join(dir, ".claude/settings.json"), { force: true }); fs.symlinkSync("../l1", path.join(dir, ".claude/settings.json")); for (let i = 1; i <= 62; i++) fs.symlinkSync(i < 62 ? `l${i + 1}` : `../${self(dir)}/cfg/settings.json`, path.join(dir, `l${i}`)); },
+      dir => fs.writeFileSync(path.join(dir, "cfg/settings.json"), JSON.stringify({ ...JSON.parse(KIT), model: "opus" })))), "and so is one whose way comes back in after as many links as Windows follows, what it leads to changed", UNHELD);
     // (and a way that leaves and comes back in by ".." again and again, by a link beside the checkout, ends)
     const loopsAt = path.join(os.tmpdir(), `agent-tools-loop-${process.pid}`);
     try {
