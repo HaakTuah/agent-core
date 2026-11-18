@@ -474,6 +474,20 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const nestedKept = run(pr(nested(), { "README.md": "x\n" }));
   ok(nestedKept.status === 0 && nestedKept.out.includes(NESTED), "one the base held, in whatever case, is noted", nestedKept.out);
   fails(run(pr(nested(), { "app/.Claude/agents/rev.md": `---\nname: rev\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n` })), "but not once what it holds changes", NESTED);
+  // (#647's fallback security review of e5a319d: a link reached through another link is read and failed as well, a loop
+  // reached so is walked once, and a link below agents into an installed package is held by what an install reads)
+  const viaDocs = () => { const dir = project({ ...script, "docs/a.md": "---\nname: a\n---\n", "evil/x.md": `---\nname: x\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`, ...listing() }); fs.symlinkSync("../docs", path.join(dir, ".claude/agents")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents through a link"); return dir; };
+  const subAdded = viaDocs();
+  git(subAdded, "checkout", "-q", "-B", "change"); fs.symlinkSync("../evil", path.join(subAdded, "docs/sub"));
+  git(subAdded, "add", "-A"); git(subAdded, "commit", "-q", "-m", "a link"); git(subAdded, "checkout", "-q", "main"); git(subAdded, "merge", "-q", "--no-ff", "-m", "merge", "change");
+  fails(run(subAdded), "a link added in the folder agents lead to fails", LINKED);
+  const loops = viaDocs();
+  for (let i = 0; i < 6; i++) fs.symlinkSync(".", path.join(loops, `docs/l${i}`));
+  git(loops, "add", "-A"); git(loops, "commit", "-q", "-m", "loops behind a link");
+  const loopsStarted = Date.now(), loopsKept = run(pr(loops, { "README.md": "x\n" }));
+  ok(loopsKept.status === 0 && loopsKept.out.includes(LINKED) && Date.now() - loopsStarted < 30000, "loops of links behind a link are read once, and noted as the base held them", loopsKept.out);
+  const agentPkg = () => { const dir = project({ ...script, ".gitignore": "node_modules/\n", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "1.0.0" } } }), ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../node_modules/pkg/agents", path.join(dir, ".claude/agents/pkg")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents from a package"); return dir; };
+  fails(run(pr(agentPkg(), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "6.6.6" } } }) })), "a link the base held below agents into an installed package fails once its lock changes", LINKED);
   for (const at of [".claude/Agents/rev.md", ".claude/agents/rev.MD", ".claude/Commands/rev.md"]) fails(run(pr(project({ ...script, ...listing() }), { [at]: "---\nname: rev\n---\n" })), `a subagent's file in another letter case, ${at}, fails`, "in another case");
   passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": "---\nname: rev\ndescription: reviews hooks\n---\n# rev\n" })), "a subagent with no hooks in its frontmatter passes");
   const frontStood = project({ ...script, ".claude/agents/rev.md": front("hooks") });
