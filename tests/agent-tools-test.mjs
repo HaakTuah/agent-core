@@ -482,7 +482,8 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const loopsStarted = Date.now(), loopsKept = run(pr(loops, { "README.md": "x\n" }));
     ok(loopsKept.status === 0 && loopsKept.out.includes(WAY) && Date.now() - loopsStarted < 30000, "loops of links behind a link are never walked, and the link the base held is noted", loopsKept.out);
     const agentPkg = () => { const dir = project({ ...script, ".gitignore": "node_modules/\n", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "1.0.0" } } }), ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../node_modules/pkg/agents", path.join(dir, ".claude/agents/pkg")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents from a package"); return dir; };
-    fails(run(pr(agentPkg(), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "6.6.6" } } }) })), "a link the base held below agents into an installed package fails once its lock changes", LINKED);
+    const agentPkgKept = run(pr(agentPkg(), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "6.6.6" } } }) }));
+    ok(agentPkgKept.status === 0 && agentPkgKept.out.includes(LINKED), "a link the base held below agents into an installed package is reported, never failed, when its lock changes", agentPkgKept.out);
     // (#647's fallback security review of 90bcf1a: a folder of agents or commands that is a link out of the checkout fails
     // as any such link does; a folder in another case a link reaches first is still read for its case; and a hook is named
     // by the path Claude Code reads it at)
@@ -526,6 +527,8 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   ok(shellKept.status === 0 && shellKept.out.includes("as the base held it"), "one the base held is noted while its text stands", shellKept.out);
   for (const mode of ["bypassPermissions", "'acceptEdits' # quoted"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": `---\nname: rev\npermissionMode: ${mode}\n---\n` })), `a subagent's permission mode ${mode} fails`, NOKIT, "permissionMode");
   passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": "---\nname: rev\npermissionMode: default\n---\n" })), "and its default passes");
+  fails(run(pr(project({ ...script, ...listing() }), withSetting("permissions", { defaultMode: "bypassPermissions" }))), "settings whose permission mode runs all without asking fail", NOKIT, "permissions.defaultMode");
+  passes(run(pr(project({ ...script, ...listing() }), withSetting("permissions", { defaultMode: "acceptEdits" }))), "and settings of another mode pass");
   // (#693's fallback security review of fdd2d96: every key that folds to the permission mode, whichever a reader keeps;
   // a block that runs a command wherever it stands; and the tools a skill lets run without asking)
   for (const front of ["PermissionMode: default\npermissionMode: bypassPermissions", "permissionMode: default\npermissionMode: bypassPermissions"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": `---\nname: rev\n${front}\n---\n` })), `a permission mode written twice, ${front.split("\n")[0]} first, fails`, NOKIT, "permissionMode");
@@ -1036,95 +1039,23 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     // finds it)
     underLink(dir => { fs.mkdirSync(path.join(dir, "cl"), { recursive: true }); fs.writeFileSync(path.join(dir, "cl/settings.json"), KIT); fs.symlinkSync("node_modules/../CL", path.join(dir, ".claude")); },
       dir => fs.writeFileSync(path.join(dir, "cl/settings.json"), JSON.stringify({ ...JSON.parse(KIT), model: "opus" })), "and so does what it leads to in another case, changed");
-    // (and through an installed package, by what the lock file says of it: a version or source locked anew fails)
-    const lockAt = version => JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version, resolved: `https://registry.npmjs.org/pkg/-/pkg-${version}.tgz` }, "node_modules/other": { version: "1.0.0" } } });
-    const viaPackage = () => { const dir = project({ ".gitignore": "node_modules/\n", "package-lock.json": lockAt("1.0.0"), ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync("node_modules/pkg/.claude", path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link into an installed package"); return dir; };
-    const UNREAD = "through a folder the commit does not hold, which an install fills";
-    const lockKept = run(pr(viaPackage(), { "package-lock.json": JSON.stringify({ ...JSON.parse(lockAt("1.0.0")), packages: { ...JSON.parse(lockAt("1.0.0")).packages, "node_modules/other": { version: "2.0.0" } } }) }));
-    ok(lockKept.status === 1 && lockKept.out.includes(UNREAD), "a link the base held into an installed package fails once the lock file changes, read whole, another package's update among it", lockKept.out);
-    fails(run(pr(viaPackage(), { "package-lock.json": lockAt("2.0.0") })), "but not once the pull request locks the package anew", '".claude" is a link that leads out of the checkout');
-    // (#633's fallback security reviews of b0f654f and acf5691: an entry too deep to write back fails with the mend, not a
-    // crash, and is held by the lock file's text; and a yarn or pnpm lock is read whole, as no reading of its entries here
-    // is the package manager's: an alias's package, or a key written in another form, is locked elsewhere in it)
-    // (#633's fallback security review of acf5691: where a link's target stands in no case but folds alike to a folder
-    // and a link beside it, the one the listing gives first is read, as before the names were folded once a folder)
-    const order = () => { const dir = project({ "CONF/settings.json": KIT, "other/settings.json": KIT, ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync("conf", path.join(dir, ".claude")); fs.symlinkSync("other", path.join(dir, "Conf")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link to a name in no case"); return dir; };
-    fails(run(pr(order(), { "other/settings.json": JSON.stringify({ ...JSON.parse(KIT), hooks: { ...JSON.parse(KIT).hooks, SessionStart: [{ hooks: [{ type: "command", command: "bash scripts/x.sh" }] }] } }) })), "a hook added where a link to a name in no case leads, through a link beside a folder of that name, fails", ".claude");
-    // (#633's code review of b1866cb: and one in a folder's own node_modules, by the lock file beside it)
-    const nested = version => ({ "app/package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version } } }) });
-    const nestedHeld = () => { const dir = project({ ".gitignore": "node_modules/\n", ...nested("1.0.0"), ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync("app/node_modules/pkg/.claude", path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link into a folder's installed package"); return dir; };
-    fails(run(pr(nestedHeld(), nested("2.0.0"))), "a link the base held into a folder's own installed package, locked anew there, fails", '".claude" is a link that leads out of the checkout');
-    const deep = version => `{"lockfileVersion":3,"packages":{"node_modules/pkg":{"version":"${version}","x":${"[".repeat(200000)}${"]".repeat(200000)}}}}`;
-    fails(run(pr(viaPackage(), { "package-lock.json": deep("1.0.0") })), "and an entry too deep to read back fails with its mend", '".claude" is a link that leads out of the checkout', "Mend:");
-    const deepHeld = () => { const dir = viaPackage(); fs.writeFileSync(path.join(dir, "package-lock.json"), deep("1.0.0")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a deep entry"); return dir; };
-    fails(run(pr(deepHeld(), { "package-lock.json": deep("2.0.0") })), "and so does one held too deep by the base, locked anew", '".claude" is a link that leads out of the checkout');
-    // (and fail closed: a package no lock file read here holds, one a lock takes from the project's own files, bun's lock
-    // beside, a file of the package's folder committed, or a workspace's lock at a folder above, are each held or new)
-    const viaWith = (files, target = "node_modules/pkg/.claude") => { const dir = project({ ".gitignore": "node_modules/\n", ...files, ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync(target, path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link into an installed package"); return dir; };
-    // (a new one fails; one the base held is held by every file an install reads in those folders, and by all the
-    // folder holds whose lock takes the package from the project's own files)
-    const unread = (what, files, change, target) => {
-      const added = project({ ".gitignore": "node_modules/\n", ...files, ...listing() });
-      fs.rmSync(path.join(added, ".claude"), { recursive: true, force: true });
-      git(added, "add", "-A"); git(added, "commit", "-q", "-m", "no link yet");
-      git(added, "checkout", "-q", "-B", "change"); fs.symlinkSync(target ?? "node_modules/pkg/.claude", path.join(added, ".claude"));
-      git(added, "add", "-A"); git(added, "commit", "-q", "-m", "a link added"); git(added, "checkout", "-q", "main"); git(added, "merge", "-q", "--no-ff", "-m", "merge", "change");
-      fails(run(added), `a link added through a package ${what} fails`, UNREAD, "Mend:");
-      const kept = run(pr(viaWith(files, target), { "README.md": "x\n" }));
-      ok(kept.status === 0 && kept.out.includes("as the base held it"), `one the base held, ${what}, is noted while all an install reads there stands`, kept.out);
-      fails(run(pr(viaWith(files, target), change)), `but not once that changes, ${what}`, UNREAD);
-    };
-    unread("no lock file holds", { "package.json": "{}\n" }, { "package.json": "{\"dependencies\":{\"pkg\":\"2.0.0\"}}\n" });
-    unread("an npm lock file before npm 7 holds", { "package-lock.json": JSON.stringify({ lockfileVersion: 1, dependencies: { pkg: { version: "1.0.0" } } }) }, { "package-lock.json": JSON.stringify({ lockfileVersion: 1, dependencies: { pkg: { version: "2.0.0" } } }) });
-    unread("the lock takes from the project's own files", { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { resolved: "packages/pkg", link: true } } }), "packages/pkg/.claude/settings.json": KIT }, { "packages/pkg/.claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), model: "x" }) });
-    // (#633's code review of de3cb32: an npm entry that links to a folder of the project is held by what that folder holds)
-    unread("npm links to a folder of the project", { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { resolved: "vendor/pkg", link: true }, "vendor/pkg": { version: "1.0.0" } } }), "vendor/pkg/.claude/settings.json": KIT }, { "vendor/pkg/.claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), apiKeyHelper: "bash x.sh" }) });
-    unread("beside bun's lock", { "package-lock.json": lockAt("1.0.0"), "bun.lock": "{}\n" }, { "bun.lock": "{ \"x\": 1 }\n" });
-    unread("pnpm links from the project", { "pnpm-lock.yaml": "lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies:\n      pkg:\n        specifier: link:pkg\n        version: link:pkg\n", "pkg/.claude/settings.json": KIT }, { "pkg/.claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), model: "x" }) });
-    unread("through node_modules in another case", { "package-lock.json": lockAt("1.0.0") }, { "package-lock.json": lockAt("2.0.0") }, "Node_Modules/pkg/.claude");
-    const committed = { "package-lock.json": lockAt("1.0.0"), ".gitignore": "node_modules/*\n!node_modules/pkg/\nnode_modules/pkg/*\n!node_modules/pkg/package.json\n", "node_modules/pkg/package.json": "{}\n" };
-    fails(run(pr(viaWith(committed), { "package-lock.json": lockAt("2.0.0") })), "a package with a file of its folder committed, locked anew, fails", '".claude" is a link that leads out of the checkout');
-    const workspace = { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "packages/a/node_modules/pkg": { version: "1.0.0" } } }), "packages/a/package.json": "{}\n" };
-    const wsKept = run(pr(viaWith(workspace, "packages/a/node_modules/pkg/.claude"), { "README.md": "x\n" }));
-    ok(wsKept.status === 0 && wsKept.out.includes("as the base held it"), "a package a workspace's lock at a folder above holds is noted as it stands", wsKept.out);
-    fails(run(pr(viaWith(workspace, "packages/a/node_modules/pkg/.claude"), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "packages/a/node_modules/pkg": { version: "2.0.0" } } }) })), "but not once it locks the package anew", '".claude" is a link that leads out of the checkout');
-    const atRoot = { "package-lock.json": lockAt("1.0.0") };
-    const pkgKept = run(pr(viaWith(atRoot, "node_modules/pkg"), { "README.md": "x\n" }));
-    ok(pkgKept.status === 0 && pkgKept.out.includes("as the base held it"), "a link the base held to a package's own folder is noted as its lock stands", pkgKept.out);
-    fails(run(pr(viaWith(atRoot, "node_modules/pkg"), { "package-lock.json": lockAt("2.0.0") })), "but not once it locks that package anew", '".claude" is a link that leads out of the checkout');
-    const lockLinked = () => { const dir = viaWith({ "locks/package-lock.json": lockAt("1.0.0") }); fs.symlinkSync("locks/package-lock.json", path.join(dir, "package-lock.json")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a lock file held as a link"); return dir; };
-    const linkedKept = run(pr(lockLinked(), { "README.md": "x\n" }));
-    ok(linkedKept.status === 0 && linkedKept.out.includes("as the base held it"), "one the base held whose lock file is a link is noted while what it leads to stands", linkedKept.out);
-    fails(run(pr(lockLinked(), { "locks/package-lock.json": lockAt("2.0.0") })), "but not once what that link leads to changes", UNREAD);
-    // (#647's fallback security review of 341004e: a Yarn project's own root, which its lock file names, is never held,
-    // so a file of the project an install does not read changes nothing; a link to node_modules itself is held as any;
-    // and a folder an npm lock file links to is read exactly, whatever its name)
-    const berry = { "yarn.lock": "__metadata:\n  version: 8\n\n\"app@workspace:.\":\n  version: 0.0.0-use.local\n\n\"pkg@npm:^1.0.0\":\n  version: 1.0.0\n  bin:\n    pkg: bin/pkg.js\n  linkType: hard\n", "bin/tool.sh": "echo\n" };
-    const berryKept = run(pr(viaWith(berry), { "bin/tool.sh": "echo 2\n" }));
-    ok(berryKept.status === 0 && berryKept.out.includes("as the base held it"), "a Yarn project's own files an install does not read, changed, leave the link noted", berryKept.out);
-    fails(run(pr(viaWith({ "package-lock.json": lockAt("1.0.0") }, "node_modules"), { "package-lock.json": lockAt("2.0.0") })), "a link the base held to node_modules itself fails once its lock changes", UNREAD);
-    unread("npm links to a folder with a space in its name", { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { resolved: "my pkgs/pkg", link: true } } }), "my pkgs/pkg/.claude/settings.json": KIT }, { "my pkgs/pkg/.claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), apiKeyHelper: "bash x.sh" }) });
-    // (#647's fallback security review of 304f1e9: a patch file at any path a lock or package.json names, and a path a
-    // workspace member's lock entry names from that member's folder)
-    unread("pnpm patches from a file of its own", { "package.json": JSON.stringify({ pnpm: { patchedDependencies: { "pkg@1.0.0": "custom/pkg.patch" } } }), "pnpm-lock.yaml": "lockfileVersion: '9.0'\npatchedDependencies:\n  pkg@1.0.0:\n    hash: abc\n    path: custom/pkg.patch\n", "custom/pkg.patch": "a\n" }, { "custom/pkg.patch": "b\n" });
-    unread("Yarn patches from a file of its own", { "yarn.lock": "\"pkg@patch:pkg@npm%3A1.0.0#./custom/pkg.patch::locator=app%40workspace%3A.\":\n  version: 1.0.0\n", "custom/pkg.patch": "a\n" }, { "custom/pkg.patch": "b\n" });
-    unread("a workspace member links from its own folder", { "pnpm-lock.yaml": "lockfileVersion: '9.0'\nimporters:\n  packages/a:\n    dependencies:\n      pkg:\n        specifier: link:../pkg\n        version: link:../pkg\n", "packages/a/package.json": "{}\n", "packages/pkg/.claude/settings.json": KIT }, { "packages/pkg/.claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), apiKeyHelper: "bash x.sh" }) }, "packages/a/node_modules/pkg/.claude");
-    // (any folder an install fills, not node_modules alone, and what an install runs from the project: its scripts, an
-    // installer's own folder, a file a hook of the installer requires, a folder of patches named, a dependency by path)
-    unread("in a virtual environment", { ".gitignore": ".venv/\n", "requirements.txt": "pkg==1.0.0\n" }, { "requirements.txt": "pkg==2.0.0\n" }, ".venv/lib/pkg/.claude");
-    unread("whose install runs a script of the project", { "package.json": JSON.stringify({ scripts: { postinstall: "node scripts/setup" } }), "package-lock.json": lockAt("1.0.0"), "scripts/setup.js": "1\n" }, { "scripts/setup.js": "2\n" });
-    unread("whose installer runs from a folder of its own", { ".yarnrc.yml": "yarnPath: .yarn/releases/yarn.cjs\n", "yarn.lock": "# x\n", ".yarn/releases/yarn.cjs": "1\n" }, { ".yarn/releases/yarn.cjs": "2\n" });
-    unread("whose installer's hook requires a file", { ".pnpmfile.cjs": "module.exports = require('./lib/hook')\n", "pnpm-lock.yaml": "lockfileVersion: '9.0'\n", "lib/hook.js": "1\n" }, { "lib/hook.js": "2\n" });
-    unread("whose patches stand in a folder named", { "package.json": JSON.stringify({ scripts: { postinstall: "patch-package --patch-dir fixes" } }), "package-lock.json": lockAt("1.0.0"), "fixes/pkg+1.0.0.diff": "a\n" }, { "fixes/pkg+1.0.0.diff": "b\n" });
-    unread("taken by its path with no lock", { "package.json": JSON.stringify({ dependencies: { pkg: "./vendor/pkg" } }), "vendor/pkg/.claude/settings.json": KIT }, { "vendor/pkg/.claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), apiKeyHelper: "bash x.sh" }) });
-    const yarnAt = pkg => `# yarn lockfile v1\n\n\npkg@^1.0.0:\n  version "1.0.0"\n  resolved "https://registry.yarnpkg.com/pkg/-/pkg-1.0.0.tgz"\n${pkg}`;
-    const pnpmAt = pkg => `lockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    dependencies:\n      pkg:\n        specifier: npm:real-pkg@^1.0.0\n        version: real-pkg@1.0.0\n\npackages:\n\n  real-pkg@1.0.0:\n    resolution: {integrity: ${pkg}}\n`;
-    for (const [lock, at, moved] of [["yarn.lock", yarnAt, '\n"pkg@^1.0.0":\n  version "1.0.0"\n  resolved "https://example.invalid/pkg-1.0.0.tgz"\n'], ["pnpm-lock.yaml", pnpmAt, "sha512-q"]]) {
-      const viaLock = () => { const dir = project({ ".gitignore": "node_modules/\n", [lock]: at(lock === "yarn.lock" ? "" : "sha512-p"), ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync("node_modules/pkg/.claude", path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link into an installed package"); return dir; };
-      const kept = run(pr(viaLock(), { "README.md": "a change of its own\n" }));
-      ok(kept.status === 0 && kept.out.includes("as the base held it"), `with ${lock} as it stood, it is noted`, kept.out);
-      fails(run(pr(viaLock(), { [lock]: at(moved) })), `but ${lock} changed fails, read whole`, '".claude" is a link that leads out of the checkout');
+    // (a link to what the commit does not hold, a folder an install fills or a place outside the checkout: this check
+    // cannot read it, so a new one fails, and one the base held is reported, never failed, whatever else changes, as
+    // what a project held before a check read more is (core archive 207))
+    const UNHELD = "to what the commit does not hold";
+    const lockAt = version => JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version } } });
+    const linkTo = (target, files = {}) => { const dir = project({ ".gitignore": "node_modules/\n.venv/\n", "package-lock.json": lockAt("1.0.0"), ...files, ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync(target, path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link"); return dir; };
+    const added = target => { const dir = project({ ".gitignore": "node_modules/\n.venv/\n", ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "no link yet"); git(dir, "checkout", "-q", "-B", "change"); fs.symlinkSync(target, path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link"); git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change"); return dir; };
+    for (const target of ["node_modules/pkg/.claude", "Node_Modules/pkg/.claude", ".venv/lib/pkg/.claude", "node_modules", "../outside/.claude", "app/node_modules/pkg/.claude"]) {
+      fails(run(added(target)), `a link added to ${target} fails`, UNHELD, "Mend: replace the link with the file or folder itself");
+      const kept = run(pr(linkTo(target), { "package-lock.json": lockAt("2.0.0"), "README.md": "x\n" }));
+      ok(kept.status === 0 && kept.out.includes(UNHELD) && kept.out.includes("reported, never failed"), `one the base held, to ${target}, is reported, never failed, whatever else changes`, kept.out);
     }
+    const moved = linkTo("node_modules/pkg/.claude");
+    git(moved, "checkout", "-q", "-B", "change"); fs.unlinkSync(path.join(moved, ".claude")); fs.symlinkSync("node_modules/other/.claude", path.join(moved, ".claude"));
+    git(moved, "add", "-A"); git(moved, "commit", "-q", "-m", "moved"); git(moved, "checkout", "-q", "main"); git(moved, "merge", "-q", "--no-ff", "-m", "merge", "change");
+    fails(run(moved), "but a link the base held, moved, is new", UNHELD);
+
   }
 }
 

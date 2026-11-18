@@ -122,6 +122,8 @@ export function configured(read, skills, files = () => [], linked = () => false,
     readEnv(state, file, "env", settings?.env);
     readCommands(state, file, settings);
     readMarkets(state, file, settings);
+    // (and a permission mode that lets Claude Code run all without asking, as a setting no starter kit writes)
+    if (settings?.permissions?.defaultMode === "bypassPermissions") addHook(state, file, { tool: "", event: "permissions.defaultMode", matcher: "", hook: settings.permissions.defaultMode, runs: true, text: "bypassPermissions", commands: [NO_KIT], setting: true });
     for (const [name, on] of Object.entries(entries(file, "enabledPlugins", settings?.enabledPlugins, "each plug-in's \"name@marketplace\" to true"))) if (on) { tools.set(`plugin ${name}`, file); plugins.push(name); }
   }
   // (a plug-in is what its name and its marketplace's declared source make it, so one fetched from elsewhere is another;
@@ -694,7 +696,7 @@ function belowDir(root, rev, p) {
 // Claude Code reads the Markdown files wherever such a link leads, and this check reads none of them there, so one the
 // base held is noted while all it leads to stands.
 function mdLinks(root, rev) {
-  const held = at => `${at}\0${everything(root, rev, at)}\0${lockOf(root, rev, at)}`, folders = agentFolders(root, rev);
+  const held = at => `${at}\0${everything(root, rev, at)}`, folders = agentFolders(root, rev);
   return [...[...new Set(folders.flatMap(f => f.ways))].map(at => [`${at} is a link on the way to a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads only those of plain folders the project commits. Mend: replace it with the folder itself, committed in the project, in this pull request`, held(at)]),
     ...[...new Set(folders.flatMap(f => f.links))].map(at => [`${at} is a link below a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads none of them there. Mend: replace it with the files themselves, committed in the project, in this pull request`, held(at)])];
 }
@@ -1065,80 +1067,24 @@ function reaches(root, rev, at, follow = false) {
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
   return [through(posix, want, holds, names, f => resolve(f)?.type, p => belowDir(root, rev, p)), ...skill].join("\0\0");
 }
-// What an install reads for each path a link passes through beyond what the commit holds, a folder an install fills
-// whatever the commit holds there (node_modules, a virtual environment and the like): the whole text of each file an
-// installer reads (INSTALL_FILE) in the folder that holds that first folder the commit does not, and in each folder above
-// it, as a workspace's root holds them, a folder of the installer's own (INSTALL_DIRS) whole, and all that each path of
-// the project those files take a package from or run holds (FROM, PATCH_FILE, an npm lock file's "link" entries, and
-// each path an installer's file that runs code names; the root itself never, nor a path outside it); so a link the base
-// held is noted only while all of that stands. "" where no such folder is on its way.
-const INSTALL_FILE = /^(?:package\.json|npm-shrinkwrap\.json|[^/]*\.lockb?|[^/]*-lock\.(?:json|ya?ml)|pnpm-workspace\.yaml|\.yarnrc(?:\.yml)?|\.npmrc|\.pnpmfile\.c?js|requirements[^/]*\.(?:txt|in)|constraints[^/]*\.txt|pyproject\.toml|setup\.(?:py|cfg)|Pipfile(?:\.lock)?|\.python-version|Gemfile(?:\.lock)?|[^/]*\.gemspec|go\.(?:mod|sum|work)|Cargo\.(?:toml|lock)|composer\.(?:json|lock)|[^/]*\.(?:cs|fs|vb)proj|Directory\.(?:Packages|Build)\.props|packages\.lock\.json|nuget\.config|global\.json|pom\.xml|(?:build|settings)\.gradle(?:\.kts)?|gradle\.properties|deno\.jsonc?|\.tool-versions|mise\.toml)$/iu;
-const INSTALL_DIRS = [".yarn", "patches"];
-// (of these, the files whose text runs code or names a file of the project it runs: each path they name is held too)
-const RUNS = /^(?:package\.json|\.yarnrc(?:\.yml)?|\.npmrc|\.pnpmfile\.c?js|setup\.(?:py|cfg)|pyproject\.toml|Gemfile|[^/]*\.gemspec|(?:build|settings)\.gradle(?:\.kts)?)$/iu;
-const FROM = /(?:link|file|portal|workspace):([^"'\n,}\]#]+)/gu, PATCH_FILE = /[^\s"'#:,{}[\]]+\.patch\b/gu, WORD = /[\p{L}\p{N}_.@~+-][\p{L}\p{N}_./@~+-]*/gu;
-function lockOf(root, rev, at) {
-  const posix = at.split(path.sep).join("/"), via = [], out = new Set(), l = listing(root, rev), r = walk(root, rev, posix, via, true, [], true);
-  // (each name the walk passed beyond the commit, where it ended, and the link's own target read as a path, which a walk
-  // that meets a name the commit does not hold leaves unsaid)
-  const to = textAt(root, rev, posix), target = to === null ? [] : [path.posix.normalize(path.posix.join(path.posix.dirname(posix), to))];
-  for (const v of new Set([...via, ...(r ? [r.f] : []), ...target])) {
-    if (v === ".." || v.startsWith("../") || path.posix.isAbsolute(v)) continue;
-    // (the first folder on the path the commit holds nothing at, which an install may fill)
-    const parts = v.split("/"), i = parts.findIndex((_, k) => { const p = parts.slice(0, k + 1).join("/"); return !l.dirs.has(p) && !l.blobs.has(p) && !l.ids.has(p); });
-    if (i < 0) continue;
-    for (let dir = parts.slice(0, i).join("/"); ; dir = dir.slice(0, Math.max(dir.lastIndexOf("/"), 0))) {
-      installRead(root, rev, dir).forEach(e => out.add(e));
-      if (!dir) break;
-    }
-  }
-  return [...out].sort().join("\0\0");
-}
-// What an install reads in one folder, `dir`, for lockOf(): each file there an installer reads, whole, or all a path
-// holds where the commit holds it as no plain file, an installer's own folders, and all that each path of the project
-// its files take a package from, or run, holds.
-function installRead(root, rev, dir) {
-  const l = listing(root, rev), there = f => (dir ? `${dir}/${f}` : f), out = [];
-  const held = f => (notFile(l, f) ? `${f}\0${everything(root, rev, f)}` : `${f}\0${textAt(root, rev, f)}`);
-  const files = [...(l.children.get(dir || ".") ?? [])].filter(n => INSTALL_FILE.test(n)).sort();
-  const from = new Set(INSTALL_DIRS.map(there)), add = fromBases(l, dir, from);
-  for (const f of files) {
-    out.push(held(there(f)));
-    namedIn(f, textAt(root, rev, there(f)) ?? "", add);
-  }
-  const inside = p => p !== "." && p !== ".." && !p.startsWith("../") && !path.posix.isAbsolute(p);
-  for (const p of [...from].sort()) if (inside(p) && (l.dirs.has(p) || l.ids.has(p) || INSTALL_DIRS.includes(p.split("/").at(-1)))) out.push(`from ${p}\0${everything(root, rev, p)}`);
-  return out;
-}
-// Each path of the project an installer's file `f`, its text `text`, takes a package from or runs, given to `add`: a
-// link:, file:, portal: or workspace: path, each patch file, an npm lock file's links, and, of a file that runs code,
-// each word in it, with or without a script's ending, of which those the commit holds are kept.
-function namedIn(f, text, add) {
-  for (const m of text.matchAll(FROM)) add(m[1].trim());
-  for (const m of text.matchAll(PATCH_FILE)) add(m[0]);
-  if (/^(?:package-lock|npm-shrinkwrap)\.json$/iu.test(f)) for (const resolved of npmLinks(text)) add(resolved);
-  if (RUNS.test(f)) for (const [w] of text.matchAll(WORD)) ["", ".js", ".cjs", ".mjs", ".json", ".py", ".rb", ".sh"].forEach(e => add(`${w}${e}`));
-}
-// What adds a path an install's file names to `from`: read from the folder of that file and from each folder of a
-// package below it, as pnpm reads a workspace member's from that member's folder; "." never, which names the project
-// or the package itself.
-function fromBases(l, dir, from) {
-  const bases = [dir || ".", ...[...l.blobs].filter(f => f.endsWith("/package.json") && (!dir || f.startsWith(`${dir}/`))).map(f => path.posix.dirname(f))];
-  return rel => { if (rel !== "." && rel !== "./") bases.forEach(b => from.add(path.posix.normalize(path.posix.join(b, rel)))); };
-}
-// The "resolved" of each entry an npm lock file's text marks as a link to a folder of the project; none where it
-// cannot be read, its whole text being held all the same.
-function npmLinks(text) {
-  try { return Object.values(JSON.parse(text)?.packages ?? {}).filter(e => e?.link && typeof e.resolved === "string").map(e => e.resolved); } catch { return []; }
+// Whether a link leads to what the commit does not hold: a target outside the checkout, or one beyond a name the
+// commit holds nothing at, as a folder an install fills (node_modules, a virtual environment and the like). This check
+// cannot read what stands there, so such a link is new where the pull request adds or changes it, and one the base held
+// is reported, never failed, whatever else changes (core archive 207).
+function away(root, rev, at) {
+  const l = listing(root, rev), r = walk(root, rev, at.split(path.sep).join("/"), [], true, [], true);
+  return !r || !(r.f === "." || l.dirs.has(r.f) || l.ids.has(r.f));
 }
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {
     let to = null;
     try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
-    const lock = to !== null ? lockOf(root, "HEAD", at) : "";
-    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at, true) === reaches(root, "HEAD", at, true) && lockOf(root, base, at) === lock) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
-    else if (lock) fail.push(`${said}, through a folder the commit does not hold, which an install fills (node_modules, a virtual environment and the like), whose files this check does not read; one the base held is noted only while every file an install reads there stands as it was, so each change to one of them, a lock file's update among them, fails it again. Mend: replace the link with the file or folder itself, committed in the project outside such a folder, in this pull request, which ends it for good`);
+    const held = base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to, out = to !== null && away(root, "HEAD", at);
+    const there = "to what the commit does not hold (outside the checkout, or in a folder an install fills, as node_modules or a virtual environment), which this check cannot read";
+    if (held && out) notes.push(`${said}, ${there}, as the base held it: reported, never failed. Replace it with the file or folder itself, committed in the project`);
+    else if (held && reaches(root, base, at, true) === reaches(root, "HEAD", at, true)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
+    else if (out) fail.push(`${said}, ${there}. Mend: replace the link with the file or folder itself, committed in the project, in this pull request`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
   }
 }
