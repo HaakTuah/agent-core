@@ -26,6 +26,7 @@
 // baseline's path; "code" and "prose", lists of git pathspecs (":!" leaves a path out); and "proseFromSecurity": true
 // to add the project's rule files: those floor rule 3 names, those its SECURITY.md adds, and an agent tool's
 // (rule-files.mjs, beside it).
+import "./whole-output.mjs";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -35,7 +36,7 @@ import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, unrooted } from "./guards.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { readBlobs } from "./blobs.mjs";
-import { projectAt } from "./core-path.mjs";
+import { THIRD_PARTY, projectAt } from "./core-path.mjs";
 import { uncommented } from "./yaml-keys.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
 // core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
@@ -106,64 +107,87 @@ function proseUnits(text) {
   });
   return out;
 }
-// Every run of `size` units found in two places that do not overlap; overlapping finds of one copy merge into one,
-// keyed by a hash of its first run, so its key stays the same while the copy stands.
-function find(files, units, size, joiner, minChars, read = f => fs.readFileSync(f, "utf8")) {
+// The `size` units from `i` on, joined.
+const windowAt = (u, i, size, joiner) => u.slice(i, i + size).map(x => x.t).join(joiner);
+// Every window of every file, read in order: the units per file, and the places each window's hash stands in.
+function indexWindows(files, units, size, joiner, minChars, read) {
   const perFile = new Map(), seen = new Map();
-  const at = (u, i) => u.slice(i, i + size).map(x => x.t).join(joiner);
   for (const f of files) {
     const u = units(read(f));
     perFile.set(f, u);
     for (let i = 0; i + size <= u.length; i++) {
-      const s = at(u, i);
+      const s = windowAt(u, i, size, joiner);
       if (s.length < minChars) continue;
       const h = hash(s);
       if (!seen.has(h)) seen.set(h, []);
       seen.get(h).push({ file: f, at: i });
     }
   }
+  return { perFile, seen };
+}
+// The windows that stand in at least two places that do not overlap, each with those places.
+function apartPlaces(seen, size) {
   const dup = new Map();
   for (const [h, list] of seen) {
     const apart = list.filter((p, k) => list.some((q, m) => m !== k && (q.file !== p.file || Math.abs(q.at - p.at) >= size)));
     if (apart.length >= 2) dup.set(h, apart);
   }
+  return dup;
+}
+// How many units a copy runs: it grows while its next window stands in exactly the same places, one further on; where
+// the places change (a part copied once more, or once less), a new copy starts, so no part of a block hides another
+// copy of it.
+function copyLength(places, size, joiner, perFile, dup) {
+  let len = size;
+  for (;;) {
+    const step = len - size + 1;
+    const next = places.map(p => windowAt(perFile.get(p.file), p.at + step, size, joiner));
+    const there = next[0] && dup.get(hash(next[0]));
+    if (next.some(t => t !== next[0]) || !there || there.length !== places.length
+      || !places.every(p => there.some(q => q.file === p.file && q.at === p.at + step))) break;
+    len++;
+  }
+  return len;
+}
+// One copy: the hashes of its windows, its files, its places as file:first-last line, and how it starts.
+function describeCopy(places, len, size, joiner, perFile, u, i) {
+  const windows = [];
+  for (let k = 0; k <= len - size; k++) windows.push(hash(windowAt(u, i + k, size, joiner)));
+  return {
+    windows,
+    files: places.map(p => p.file),
+    places: places.map(p => { const pu = perFile.get(p.file); return `${p.file}:${pu[p.at].line}-${pu[Math.min(p.at + len - 1, pu.length - 1)].line}`; }),
+    starts: windowAt(u, i, size, joiner).replace(/\n/g, ' / ').slice(0, 80),
+  };
+}
+// Every run of `size` units found in two places that do not overlap; overlapping finds of one copy merge into one,
+// keyed by a hash of its first run, so its key stays the same while the copy stands.
+function find(files, units, size, joiner, minChars, read = f => fs.readFileSync(f, "utf8")) {
+  const { perFile, seen } = indexWindows(files, units, size, joiner, minChars, read);
+  const dup = apartPlaces(seen, size);
   const copies = [], used = new Set();
   for (const [f, u] of perFile) {
     for (let i = 0; i + size <= u.length; i++) {
       if (used.has(f + ':' + i)) continue;
-      const s = at(u, i);
+      const s = windowAt(u, i, size, joiner);
       if (s.length < minChars) continue;
       const h = hash(s), places = dup.get(h);
       if (!places || places[0].file !== f || places[0].at !== i) continue;
-      let len = size;
-      // a copy grows while its next window stands in exactly the same places, one further on; where the places change
-      // (a part copied once more, or once less), a new copy starts, so no part of a block hides another copy of it
-      for (;;) {
-        const step = len - size + 1;
-        const next = places.map(p => at(perFile.get(p.file), p.at + step));
-        const there = next[0] && dup.get(hash(next[0]));
-        if (next.some(t => t !== next[0]) || !there || there.length !== places.length
-          || !places.every(p => there.some(q => q.file === p.file && q.at === p.at + step))) break;
-        len++;
-      }
+      const len = copyLength(places, size, joiner, perFile, dup);
       for (const p of places) for (let k = 0; k <= len - size; k++) used.add(p.file + ':' + (p.at + k));
-      const windows = [];
-      for (let k = 0; k <= len - size; k++) windows.push(hash(at(u, i + k)));
-      copies.push({
-        windows,
-        files: places.map(p => p.file),
-        places: places.map(p => { const pu = perFile.get(p.file); return `${p.file}:${pu[p.at].line}-${pu[Math.min(p.at + len - 1, pu.length - 1)].line}`; }),
-        starts: at(u, i).replace(/\n/g, ' / ').slice(0, 80),
-      });
+      copies.push(describeCopy(places, len, size, joiner, perFile, u, i));
     }
   }
   return { copies, dup };
 }
 
-// An empty list checks nothing: git ls-files would list every file. `env` names another index (lsAt, below).
+// An empty list checks nothing: git ls-files would list every file. `env` names another index (lsAt, below). The
+// packages the core's copy carries from other publishers are left out, wherever a pattern reaches: they are no code or
+// prose of the project's, nor the core's own (third-party.mjs, beside this file).
+const OTHERS = `:!${CORE}${THIRD_PARTY}`;
 const ls = (specs, env = process.env) => {
   if (!specs.length) return [];
-  try { return execFileSync("git", ["ls-files", "-z", "--", ...specs], { env, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] }).split("\0").filter(Boolean); }
+  try { return execFileSync("git", ["ls-files", "-z", "--", ...specs, OTHERS], { env, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] }).split("\0").filter(Boolean); }
   catch (e) { return fail(`git cannot read the pathspecs ${specs.join(" ")}: ${unrooted(String(e.stderr || e.message).trim().split(/\r?\n/u)[0], ROOT)}. Mend: write each as a plain git pathspec, a path or a glob, with ":!" before one to leave it out, where it stands: in the config's "code" or "prose", or, for a rule file, on SECURITY.md's "the rule files:" line`); }
 };
 // The files pathspecs read in a commit's tree, as git lists them there: from an index of that tree, written to a

@@ -128,7 +128,7 @@ export function check(dir, system = thisSystem()) {
   // (every entry is written as npm writes one, or the lock file fails before anything is left out or read: lockPathOk,
   // in licences.mjs)
   const odd = Object.entries(lock.packages).filter(([path, entry]) => !lockPathOk(path) || !entry || typeof entry !== "object" || Array.isArray(entry));
-  if (odd.length) return { failures: odd.map(([path]) => `${name}: an entry at ${shown(path)} that is not written as npm writes one`), summary: `${name} not read; ${odd.length} failing (floor rule 10)` };
+  if (odd.length) return { failures: odd.map(([path]) => `${name}: an entry at ${shown(path)} that is not written as npm writes one. Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`), summary: `${name} not read; ${odd.length} failing (floor rule 10)` };
   let pkg = {};
   try { pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")); } catch { /* (none: the install read none, and no workspace stands) */ }
   const context = { dir, name, lock, failures };

@@ -16,6 +16,7 @@
 // It prints the head it checked, for the merge call's `sha` (`tasks/github-calls.md`), so nothing pushed after the
 // check can merge. Git and Node's own modules only, and gh where no workflow's event says whose account holds the
 // repository (releases.mjs, hostAccount); it changes nothing.
+import "./whole-output.mjs";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
