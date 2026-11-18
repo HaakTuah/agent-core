@@ -37,6 +37,11 @@ const copies = (dir, flag) => spawnSync(process.execPath, ["core/scripts/copies.
 // (a workflow of the project's own with a key twice in a step, which GitHub refuses)
 const TWICE = "name: twice-staged\n\non:\n  push:\n\npermissions:\n  contents: read\n\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo a\n        if: github.event_name == 'push'\n        if: always()\n";
 
+// A job of the tests on a pull request and on a push, which selects them; PASSED is where --passed stands (#457). It
+// names no SELECT_BASE, which the step of the tests a change can reach reads, so that staging this one leaves that
+// one's reading as it was.
+const PUSHED = "name: tests-pushed\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      checks: read\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/select.mjs --env RUNPASSED\n        env:\n          SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}\n          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}\n      - run: if [ \"$RUN\" = all ]; then node --test; elif [ \"$RUN\" != none ]; then node --test $RUN; fi\n";
+
 export const STAGES = {
   "16 November 2026, hostile tests for every named input": {
     // (rule 5 of SECURITY.md lists an input whose hostile tests are nowhere; the mend writes them where it names them)
@@ -165,6 +170,12 @@ export const STAGES = {
     },
     // (as the step words it: a step that selects, with its base, before the tests, which run what it names)
     mend: dir => write(dir, ".github/workflows/tests-selected.yml", "name: tests-selected\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/select.mjs --env RUN\n        env:\n          SELECT_BASE: HEAD^1\n      - run: if [ \"$RUN\" = all ]; then node --test; else node --test $RUN; fi\n"),
+  },
+  "18 November 2026, a tree that passed is not run again": {
+    // (a job of the tests that selects on a pull request and on a push alike, with nothing for the push)
+    stage: dir => write(dir, ".github/workflows/tests-pushed.yml", PUSHED.replace("PASSED", "")),
+    // (as the step words it: --passed on a push's first run, with the token, which reads checks)
+    mend: dir => write(dir, ".github/workflows/tests-pushed.yml", PUSHED.replace("PASSED", ' ${SELECT_PASSED:+--passed "$SELECT_PASSED"}')),
   },
   "16 November 2026, the NuGet check where it can matter": {
     // (a project file that imports a build file of another name than those the call's paths name)
