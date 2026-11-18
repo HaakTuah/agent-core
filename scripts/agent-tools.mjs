@@ -722,13 +722,15 @@ function caseLinks(root, rev) {
 }
 
 // Each path `rest` names below `n`, every step in each case its folder holds it in, as a file system that ignores case
-// may give any of them; a step no folder holds, as it stands.
+// may give any of them; a step no folder holds, as it stands. Paths that lead to the same place are kept once, so the
+// list grows only with the places there are.
 function spellings(root, rev, n, rest) {
-  const { names } = commitReader(root, rev, true, true);
-  return rest.split("/").filter(Boolean).reduce((dirs, step) => dirs.flatMap(d => {
+  const { names, resolve } = commitReader(root, rev, true, true);
+  const once = list => [...new Map(list.map(p => { const r = resolve(p); return [r ? `${r.type}\0${r.f}` : `\0${p}`, p]; })).values()];
+  return rest.split("/").filter(Boolean).reduce((dirs, step) => once(dirs.flatMap(d => {
     const found = names(d).filter(m => fold(m) === fold(step)).sort().map(m => `${d}/${m}`);
     return found.length ? found : [`${d}/${step}`];
-  }), [n]);
+  })), [n]);
 }
 // Whether a commit's listing holds `at` as anything but a plain file: a link, a folder or a submodule's entry.
 const notFile = (l, at) => l.linked.has(at) || l.dirs.has(at) || l.others.has(at);

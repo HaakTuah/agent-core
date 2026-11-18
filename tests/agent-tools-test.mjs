@@ -967,6 +967,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const twiceDeep = () => { const dir = project({ "A/b/settings/mcp.json": "{}\n", "a/b/settings/mcp.json": "{}\n", "A/B/hooks/n.txt": "x\n", "A/B/settings/mcp.json": "{}\n", ...listing() }); fs.symlinkSync("A/b", path.join(dir, ".kiro")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through names held twice"); return dir; };
     fails(run(pr(twiceDeep(), { "A/B/hooks/new.json": JSON.stringify({ version: "v1", hooks: [] }) })), "a hook file added under another spelling of a name past the first held twice fails", SEVERAL);
     fails(run(pr(twiceDeep(), { "A/B/settings/mcp.json": "{ \"mcpServers\": {} }\n" })), "and so does a tool's file changed there", SEVERAL);
+    const manyWays = project({ "A/xy/k": "x\n", "A/xY/k": "x\n", "A/Xy/k": "x\n", "A/XY/k": "x\n", "a/k": "x\n", ...listing() });
+    fs.symlinkSync(`A/${"xy/../".repeat(10)}xy`, path.join(manyWays, ".kiro")); git(manyWays, "add", "-A"); git(manyWays, "commit", "-q", "-m", "a link through many spellings");
+    const waysStarted = Date.now(), waysKept = run(pr(manyWays, { "README.md": "x\n" }));
+    ok(waysKept.status === 0 && waysKept.out.includes(SEVERAL) && Date.now() - waysStarted < 30000, "a link the base held through many spellings of each step is read in seconds, each place once", `${Date.now() - waysStarted} ms\n${waysKept.out.slice(0, 1500)}`);
     const kiroHook = command => ({ version: "v1", hooks: [{ name: "lint", trigger: "Stop", action: { type: "command", command } }] });
     // (a hook file added under the other name, where no tool's path the walk takes passes, is held all the same; and a
     // link to a folder held twice is seen where no tool's file stands under the name git keeps, or where the name it
