@@ -1,15 +1,16 @@
 // Tests what a pull request waits on (scripts/wait.mjs): the time the checks of one push took, from the
 // first one's start to the last one's end, a check skipped or not ended counting nothing; the median; the last merged
 // pull requests read through a stand-in for gh, a head that is no commit's whole name left out; the line the state
-// report gives, against the mark or with none; and a run told no repository, or one named by dots, refused with its
+// report gives, against the mark or with none; the minutes GitHub bills a push, each job of its runners rounded up, their
+// median beside the wait, and both carried into a project's row of the core's report (#460, point 6); and a run told no repository, or one named by dots, refused with its
 // mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/wait-test.mjs
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { body, pushWait } from "../scripts/state-report.mjs";
-import { line, measure, median, waited } from "../scripts/wait.mjs";
+import { body, countsFrom, pushWait } from "../scripts/state-report.mjs";
+import { billed, billedLine, line, measure, median, waited } from "../scripts/wait.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -47,6 +48,22 @@ ok(named.read === 3 && routes.every(r => r.includes("/pulls?") || /\/commits\/[0
 let thrown = "";
 try { measure({ repo: "../..", gh }); } catch (e) { thrown = e.message; }
 ok(mended(`FAIL: ${thrown}`), "a repository named by dots alone is refused, with its mend", thrown);
+
+// the billed minutes: each job of GitHub's runners rounded up to a whole minute, one at least; another app's check, one
+// skipped and one not ended count nothing
+const job = (from, to, conclusion = "success", slug = "github-actions") => ({ ...check(from, to, conclusion), app: { slug } });
+const secs = (s, e) => ({ started_at: new Date(Date.UTC(2026, 10, 16, 12, 0, s)).toISOString(), completed_at: new Date(Date.UTC(2026, 10, 16, 12, 0, e)).toISOString(), conclusion: "success", app: { slug: "github-actions" } });
+ok(billed([job(0, 2), secs(0, 61), secs(0, 0), job(0, 9, "success", "github-advanced-security"), job(0, 9, "skipped"), job(0, null)]) === 5 && billed([job(0, 9, "success", "other")]) === null,
+  "a push's billed minutes: each job rounded up, one at least, other apps', skipped and unfinished ones left out");
+const jobs = { a: [job(0, 10)], b: [job(0, 4), secs(0, 30)], c: [job(0, 6)] };
+const billedGh = route => (route.includes("/pulls?") ? JSON.stringify(pulls) : JSON.stringify({ check_runs: jobs[/commits\/(\w+)\//.exec(route)[1][0]] }));
+const mb = measure({ repo: "o/n", count: 3, gh: billedGh });
+ok(mb.billed === 6 && mb.billedRead === 3 && /^- billed minutes a pull request: 6, the median of the last 3 merged pull requests' last push, each job rounded up/.test(billedLine(mb)), "the median billed minutes of the last merged pull requests, and the report's line", billedLine(mb));
+ok(/not read/.test(billedLine({ billed: null })) && measure({ repo: "o/n", count: 2, gh }).billed === null, "a push no job of GitHub's runners ran is not billed, and the line says so");
+const both = pushWait("o/n", ".", null, billedGh);
+ok(/^- what a push waits on: .*\n- billed minutes a pull request: 6,/.test(both) && /\n- billed minutes a pull request: not read \(GitHub did not answer/.test(pushWait("o/n", ".", null, () => { throw new Error("403"); })), "the state report gives the billed minutes beside the wait, or says they were not read", both);
+const theirs = `**The measures against their baselines**\n${both}\n\n**Counts for the core**\n- steps not done: 2.\n`;
+ok(countsFrom(theirs, false) === "steps not done: 2; a push waits 6.0 min (median of 3); billed minutes a pull request: 6 (median of 3)", "a project's row carries its wait and billed minutes, their numbers alone", countsFrom(theirs, false));
 
 const report = body({ core: false, month: "2026-11", measures: null, wait: line(m), previous: null, overdue: [], scripts: "core/scripts" });
 ok(report.includes(`**The measures against their baselines**\n${line(m)}`), "the monthly state report gives the line among its measures", report);

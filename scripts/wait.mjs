@@ -1,12 +1,15 @@
 // What a pull request waits on (tasks/tests.md, "What a push waits on has a time mark"; #321), for every project
 // that takes the core: of the pull requests merged last, the time the checks of each one's last push took, from the
 // first check's start to the last one's end, and their median, held to the mark the shape check's config gives under
-// "wait" (shape.mjs, beside this file, which lets the mark rise only as a suite's does). It reports and fails nothing:
-// the monthly state report says the median beside its mark (state-report.mjs), and the session that reads a median
-// past it files the task that brings it down.
+// "wait" (shape.mjs, beside this file, which lets the mark rise only as a suite's does); and, from the same checks, the
+// minutes GitHub bills for each one's last push, each job rounded up to a whole minute, and their median (AGENTS.md of
+// the core, "The core is measured as a feature is"; #460, point 6). It reports and fails nothing: the monthly state
+// report says both medians, the wait beside its mark (state-report.mjs), and the session that reads a median past it
+// files the task that brings it down.
 //
 //   node core/scripts/wait.mjs [<config>] --repo <owner>/<name> [--count <n>]
-//       the last n merged pull requests (30 where none is given), through gh. Reads only; gh and Node's own modules.
+//       the last n merged pull requests (30 where none is given), through gh: the wait, then the billed minutes.
+//       Reads only; gh and Node's own modules.
 import fs from "node:fs";
 import { aCommit, aRepository } from "./guards.mjs";
 import { timeOf } from "./moment.mjs";
@@ -27,10 +30,20 @@ export function waited(checks) {
   return Math.max(0, Math.round((to - from) / 1000));
 }
 
+// The minutes GitHub bills for the checks of one push: each job its runners ran (a check run of the app
+// github-actions that started and ended, not skipped; another app's check runs on no runner) rounded up to a whole
+// minute, as GitHub bills a job, one at least; null where none ran. Not weighted by the runner's system, which a check
+// run does not say: where a project runs jobs on Windows or macOS, which use its free minutes faster, it is a floor.
+export function billed(checks) {
+  const ran = checks.filter(c => c?.app?.slug === "github-actions" && timeOf(c.started_at) !== null && timeOf(c.completed_at) !== null && c.conclusion !== "skipped");
+  if (!ran.length) return null;
+  return ran.reduce((n, c) => n + Math.max(1, Math.ceil((timeOf(c.completed_at) - timeOf(c.started_at)) / 60000)), 0);
+}
+
 export const median = xs => { const s = [...xs].sort((a, b) => a - b), k = s.length >> 1; return s.length ? (s.length % 2 ? s[k] : Math.round((s[k - 1] + s[k]) / 2)) : null; };
 
-// The median wait of the last `count` merged pull requests of `repo`, read through `gh`: { median, read, mark }, mark
-// the config's, or undefined where it gives none.
+// The median wait of the last `count` merged pull requests of `repo`, read through `gh`, and their median billed
+// minutes: { median, read, mark, billed, billedRead }, mark the config's, or undefined where it gives none.
 export function measure({ repo, count = COUNT, mark, gh = ghApi }) {
   if (!aRepository(repo)) throw new Refused(`${JSON.stringify(String(repo)).slice(0, 80)} names no repository. Mend: name it as <owner>/<name>`);
   // (newest updated first: a pull request is updated when it merges, so once a page's last update is older than the
@@ -42,9 +55,10 @@ export function measure({ repo, count = COUNT, mark, gh = ghApi }) {
     if (rows.length < 100 || (merged.length >= count && String(rows.at(-1).updated_at) < kth())) break;
   }
   // (a head that is no commit's whole name, as GitHub gives one, is not read: it would name another route than the commit's)
-  const times = merged.sort((a, b) => b.merged_at.localeCompare(a.merged_at)).slice(0, count).filter(p => aCommit(p.head?.sha))
-    .map(p => waited(JSON.parse(gh(`repos/${repo}/commits/${p.head.sha}/check-runs?per_page=100`) || "{}").check_runs ?? [])).filter(t => t !== null);
-  return { median: median(times), read: times.length, mark };
+  const runs = merged.sort((a, b) => b.merged_at.localeCompare(a.merged_at)).slice(0, count).filter(p => aCommit(p.head?.sha))
+    .map(p => JSON.parse(gh(`repos/${repo}/commits/${p.head.sha}/check-runs?per_page=100`) || "{}").check_runs ?? []);
+  const times = runs.map(waited).filter(t => t !== null), bills = runs.map(billed).filter(b => b !== null);
+  return { median: median(times), read: times.length, mark, billed: median(bills), billedRead: bills.length };
 }
 
 // The line the state report gives: the median against its mark.
@@ -55,6 +69,12 @@ export function line(m) {
   return `- what a push waits on: ${minutes(m.median)}, the median of the last ${m.read} merged pull requests' checks${against}.`;
 }
 
+// The line the state report gives beside it: the median billed minutes.
+export function billedLine(m) {
+  if (m.billed === null || m.billed === undefined) return "- billed minutes a pull request: not read (no merged pull request's checks ran on GitHub's runners).";
+  return `- billed minutes a pull request: ${m.billed}, the median of the last ${m.billedRead} merged pull requests' last push, each job rounded up to a whole minute as GitHub bills it, not weighted by the runner's system.`;
+}
+
 function main(argv) {
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, rest = named ? argv.slice(1) : argv;
   const opt = k => { const i = rest.indexOf(k); return i >= 0 ? rest[i + 1] : undefined; };
@@ -63,7 +83,8 @@ function main(argv) {
   const rules = ["core-manifest.md", "AGENTS.md"].find(f => fs.existsSync(f)), at = named ?? where(rules ? fs.readFileSync(rules, "utf8") : "");
   let mark;
   try { mark = fs.existsSync(notLinked(at)) ? parseConfig(fs.readFileSync(at, "utf8"), at).wait : undefined; } catch { mark = undefined; }
-  console.log(line(measure({ repo, count, mark })));
+  const m = measure({ repo, count, mark });
+  console.log(`${line(m)}\n${billedLine(m)}`);
   return 0;
 }
 
