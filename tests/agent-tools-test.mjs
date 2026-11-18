@@ -539,6 +539,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   write(unread, ".Kiro/hooks/lint.json", "{}\n");
   write(unread, ".Kiro/hooks/README.md", "notes\n");
   passes(run(unread), "a file there the tool does not read, beside its ignored hooks, is no tool's file");
+  // (#600's fallback security review of 8dfe536: a commit git cannot list is no commit with nothing in it)
+  process.env.AGENT_TOOLS_LISTING_MAX = "16";
+  const unlisted = run(pr(project({ ...listing() }), { "README.md": "a change of its own\n" }));
+  delete process.env.AGENT_TOOLS_LISTING_MAX;
+  fails(unlisted, "a head git cannot list fails", "cannot be listed", "Mend: ");
   // (#600's fallback security review of 72e6450: names are compared as a file system that folds case does)
   fails(run(pr(project({ ...listing() }), { ".claude/\u017fkills/notes/SKILL.md": "# notes\n" })), "a name that differs only by a letter a full case fold matches fails too", "in another case");
   if (LINKS) {
@@ -564,6 +569,21 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(viaLink, "add", "-A"); git(viaLink, "commit", "-q", "-m", "settings through a link");
     write(viaLink, ".codex/Config.toml", "notify = [\"bash\", \"x.sh\"]\n");
     passes(run(pr(viaLink, { "README.md": "a change of its own\n" })), "an ignored file in another case is still read as ignored where a tool's folder is a link");
+    // (#600's fallback security review of 8dfe536: behind a link of the tool's own name, an entry in another case that is no
+    // folder the walk reaches is named too, whatever it is)
+    for (const [link, to, inside, says] of [[".kiro", "k", "hooks/x.JSON", "Mend: rename it to .kiro/hooks/x.json"], [".codex", "c", "Config.toml", "Mend: rename it to .codex/config.toml"], [".claude/skills", "../s", "n/Skill.md", "Mend: rename it to .claude/skills/n/SKILL.md"]]) {
+      const out = project({ ...listing() }), real = path.join(out, path.dirname(link), to);
+      fs.mkdirSync(path.dirname(path.join(real, inside)), { recursive: true });
+      fs.symlinkSync(os.tmpdir(), path.join(real, inside));
+      fs.symlinkSync(to, path.join(out, link));
+      git(out, "add", "-A"); git(out, "commit", "-q", "-m", "a link out behind a link of the tool's own name");
+      fails(run(out, "--core"), `a link out of the checkout in another case behind ${link} fails`, says);
+    }
+    const subBehind = project({ "c/keep.md": "", ...listing() });
+    fs.symlinkSync("c", path.join(subBehind, ".codex"));
+    git(subBehind, "add", "-A"); git(subBehind, "update-index", "--add", "--cacheinfo", `160000,${git(subBehind, "rev-parse", "HEAD")},c/Config.toml`);
+    git(subBehind, "commit", "-q", "-m", "a submodule in another case behind a link");
+    fails(run(subBehind, "--core"), "and so does a submodule's entry there", "Mend: rename it to .codex/config.toml");
     // (a folder or a link in another case on the way to a tool's file)
     const aliased = project({ "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n", ...listing() });
     fs.symlinkSync("config", path.join(aliased, ".Codex"));

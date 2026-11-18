@@ -479,6 +479,7 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   // (read at the commit, the working tree's at HEAD, the pull request's head: a file not committed, ignored or not, is
   // no file of the project's, and the base is read the same way)
   for (const [problem, text] of caseProblems(root, rev ?? "HEAD")) { project.problems.push(problem); project.texts.set(problem, text); }
+  if (!rev && listing(root, "HEAD").failed) project.problems.push(`the commit HEAD cannot be listed by git (an error, or names past ${LISTING_MAX} bytes), so this check cannot read the tools' files there. Mend: run the check again; where it fails the same way, take out of this pull request what makes its tree too large to list`);
   return { ...project, links };
 }
 
@@ -489,9 +490,7 @@ function commitReader(root, rev) {
   const read = f => { const r = resolve(f); return r?.type === "blob" ? textAt(root, rev, r.f) : null; };
   const names = dir => {
     const d = resolve(dir);
-    if (d?.type !== "tree") return [];
-    const { blobs, links, dirs, others } = listing(root, rev), under = d.f === "." ? "" : `${d.f}/`;
-    return [...new Set([...blobs, ...links, ...dirs, ...others].filter(at => at.startsWith(under)).map(at => at.slice(under.length).split("/")[0]))];
+    return d?.type === "tree" ? [...(listing(root, rev).children.get(d.f) ?? [])] : [];
   };
   return { resolve, read, names };
 }
@@ -500,7 +499,7 @@ function commitReader(root, rev) {
 // reads through it], so one the base held is noted only while that stands letter for letter.
 function caseProblems(root, rev) {
   const { resolve, read, names } = commitReader(root, rev);
-  return misnamed(toolPaths(names, at => resolve(at)?.type === "blob", at => listing(root, rev).linked.has(at))).map(([at, want]) =>
+  return misnamed(toolPaths(names, at => resolve(at)?.type)).map(([at, want]) =>
     [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, read, names)]);
 }
 
@@ -567,21 +566,22 @@ function through(at, want, read, names) {
   })));
   return [at, read(at), ...files, ...folders].join("\0\0");
 }
-// The files and links on the way to a tool's file, in whatever case they stand: each entry, not a folder, whose name
-// folded is a step of WAYS or lies in a tool folder, a few deep, found through `names`, so a link inside the checkout is
-// followed as the rest of the check follows it, and named itself where it is one.
+// The entries on the way to a tool's file, in whatever case they stand: each one the walk reaches as no folder, whose
+// name folded is a step of WAYS or lies in a tool folder, a few deep, found through `names`, so a link inside the
+// checkout is followed as the rest of the check follows it.
 const READS = /^(?:\.kiro\/hooks\/[^/]+\.json|\.claude\/skills\/[^/]+\/skill\.md)$/u, SKILL_DIR = /^\.claude\/skills\/[^/]+$/u;
-function toolPaths(names, isFile, isLink) {
+function toolPaths(names, typeOf) {
   const out = [], folders = TOOL_FOLDERS.map(d => d.slice(0, -1));
   const visit = (at, depth) => {
     for (const n of names(at || ".")) {
       const p = at ? `${at}/${n}` : n, low = fold(p), inFolder = folders.some(d => low.startsWith(`${d}/`));
       // (nor, in a tool folder, a path that is neither what the tool reads nor a skill's folder on its way: never looked at)
       if ((!WAYS.has(low) && !inFolder) || (inFolder && !READS.test(low) && !SKILL_DIR.test(low))) continue;
-      const file = isFile(p);
-      // (in a tool folder, only what the tool reads there names the folders on its way: a hook file, a skill's SKILL.md)
-      if ((file || isLink(p)) && (!inFolder || READS.test(low))) out.push(p);
-      if (!file && depth < 4) visit(p, depth + 1);
+      // (whatever the walk reaches that is no folder is named, a file, a link that leads nowhere or out, a submodule's
+      // entry; in a tool folder, only what the tool reads there: a hook file, a skill's SKILL.md)
+      const folder = typeOf(p) === "tree";
+      if (!folder && (!inFolder || READS.test(low))) out.push(p);
+      if (folder && depth < 4) visit(p, depth + 1);
     }
   };
   visit("", 0);
@@ -632,13 +632,17 @@ function reached(f, blobs, dirs) {
   return { f, type: blobs.has(f) ? "blob" : "commit" };
 }
 
-// The files and links of the commit `rev`, git asked once for each commit: { blobs, links, linked, others, dirs }.
-const listings = new Map();
+// The files and links of the commit `rev`, git asked once for each commit: { blobs, links, linked, others, dirs,
+// children, failed }; its bound (bytes of names) may be lowered for a test.
+const listings = new Map(), LISTING_MAX = Number(process.env.AGENT_TOOLS_LISTING_MAX) > 0 ? Number(process.env.AGENT_TOOLS_LISTING_MAX) : 1 << 28;
 function listing(root, rev) {
   const key = `${root}\0${rev}`;
   if (listings.has(key)) return listings.get(key);
-  let out = "";
-  try { out = execFileSync("git", ["--no-replace-objects", "ls-tree", "-r", "-z", rev], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }); } catch { /* (none) */ }
+  let out = "", failed = false;
+  // (a commit git cannot list, an error or names past the bound, is said, never read as one with nothing in it; where
+  // there is no such commit, as before a project's first, there is nothing to list)
+  const git = (args, opts = {}) => execFileSync("git", ["--no-replace-objects", ...args], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], ...opts });
+  try { out = git(["ls-tree", "-r", "-z", rev], { maxBuffer: LISTING_MAX }); } catch { try { git(["rev-parse", "-q", "--verify", `${rev}^{commit}`]); failed = true; } catch { /* (no commit) */ } }
   const entries = out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"); return [l.slice(0, tab).split(" ")[0], l.slice(tab + 1)]; });
   // (a file is a plain or an executable blob; a submodule's entry, 160000, is no file the commit holds)
   const found = { blobs: new Set(entries.filter(([mode]) => mode === "100644" || mode === "100755").map(([, at]) => at)), links: entries.filter(([mode]) => mode === "120000").map(([, at]) => at) };
@@ -646,6 +650,14 @@ function listing(root, rev) {
   // (and any other entry, a submodule's among them, and the folders on every entry's way, each by its path)
   found.others = new Set(entries.filter(([mode]) => mode !== "100644" && mode !== "100755" && mode !== "120000").map(([, at]) => at));
   found.dirs = new Set(entries.flatMap(([, at]) => at.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/"))));
+  // (the names in each folder, "." the root's, built once)
+  found.children = new Map();
+  for (const at of [...entries.map(([, a]) => a), ...found.dirs]) {
+    const cut = at.lastIndexOf("/"), dir = cut < 0 ? "." : at.slice(0, cut);
+    if (!found.children.has(dir)) found.children.set(dir, new Set());
+    found.children.get(dir).add(at.slice(cut + 1));
+  }
+  found.failed = failed;
   listings.set(key, found);
   return found;
 }
