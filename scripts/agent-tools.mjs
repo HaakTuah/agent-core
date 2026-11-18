@@ -641,23 +641,27 @@ function walk(root, rev, f, via = []) {
     if (!goesOn(listing(root, rev), here, left.length > 0, via)) return null;
     at.push(name);
   }
-  return reached(at.join("/") || ".", blobs, dirs);
+  return reached(at.join("/") || ".", blobs, dirs, others);
 }
-// Whether a walk goes on past `here`, `more` of the path after it: a name with more after it must be a folder, as the
-// file system goes neither into a file nor back out of one by ".."; the last may be anything the commit holds. A
-// submodule's entry is a folder on disk, whose names the commit does not hold, so the walk goes into it, and back out
-// by "..", the entry said in `via`, its commit being what a clone fills it with.
+// Whether a walk goes on past `here`, `more` of the path after it: the last name may be anything the commit holds; one
+// with more after it, anything but a file, as the file system goes neither into a file nor back out of one by "..". A
+// name that is no folder the commit holds, a submodule's entry or what a clone holds beside the commit (.git among it),
+// the walk goes into and back out of by "..", as the file system may, said in `via`, so what it reaches past it is
+// still held, and a name inside it, which the commit does not hold, ends the walk.
 function goesOn({ blobs, dirs, others }, here, more, via) {
   if (dirs.has(here)) return true;
-  if (more && others.has(here)) { via.push(here); return true; }
-  return !more && (blobs.has(here) || others.has(here));
+  if (!more) return blobs.has(here) || others.has(here);
+  if (blobs.has(here)) return false;
+  via.push(here);
+  return true;
 }
 
 // The path a walk at a commit reached, and what it is there: the checkout's root, which no listing names (as a link to
 // ".." from a folder at the root leads to), and any folder a "tree", a file a "blob", anything else a submodule's.
-function reached(f, blobs, dirs) {
+function reached(f, blobs, dirs, others) {
   if (f === "." || dirs.has(f)) return { f, type: "tree" };
-  return { f, type: blobs.has(f) ? "blob" : "commit" };
+  if (blobs.has(f)) return { f, type: "blob" };
+  return others.has(f) ? { f, type: "commit" } : null;
 }
 
 // The files and links of the commit `rev`, git asked once for each commit: { blobs, links, linked, ids, others, dirs,
