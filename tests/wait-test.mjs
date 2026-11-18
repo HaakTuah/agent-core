@@ -1,16 +1,19 @@
 // Tests what a pull request waits on (scripts/wait.mjs): the time the checks of one push took, from the
 // first one's start to the last one's end, a check skipped or not ended counting nothing; the median; the last merged
 // pull requests read through a stand-in for gh, a head that is no commit's whole name left out; the line the state
-// report gives, against the mark or with none; the minutes GitHub bills a push, each job of its runners rounded up, their
-// median beside the wait, and both carried into a project's row of the core's report (#460, point 6); and a run told no repository, or one named by dots, refused with its
+// report gives, against the mark or with none; the minutes GitHub bills a push, each job and attempt of its runners
+// rounded up, a ceiling where a workflow names a self-hosted runner, their median beside the wait, and both carried into a project's row of the core's report (#460, point 6); and a run told no repository, or one named by dots, refused with its
 // mend (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/wait-test.mjs
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { body, countsFrom, pushWait } from "../scripts/state-report.mjs";
-import { billed, billedLine, line, measure, median, waited } from "../scripts/wait.mjs";
+import { billed, billedLine, latest, line, measure, median, selfHosted, waited } from "../scripts/wait.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -55,10 +58,21 @@ const job = (from, to, conclusion = "success", slug = "github-actions") => ({ ..
 const secs = (s, e) => ({ started_at: new Date(Date.UTC(2026, 10, 16, 12, 0, s)).toISOString(), completed_at: new Date(Date.UTC(2026, 10, 16, 12, 0, e)).toISOString(), conclusion: "success", app: { slug: "github-actions" } });
 ok(billed([job(0, 2), secs(0, 61), secs(0, 0), job(0, 9, "success", "github-advanced-security"), job(0, 9, "skipped"), job(0, null)]) === 5 && billed([job(0, 9, "success", "other")]) === null,
   "a push's billed minutes: each job rounded up, one at least, other apps', skipped and unfinished ones left out");
+// (every attempt counts toward the bill, while the wait reads each check's latest)
+const again = [{ ...job(0, 4), name: "suite" }, { ...job(5, 7), name: "suite" }];
+ok(billed(again) === 6 && latest(again).length === 1 && latest(again)[0].started_at === again[1].started_at && waited(latest(again)) === 120, "a check run again is billed for both attempts, and the wait reads its latest", JSON.stringify(latest(again)));
+const tmpHost = fs.mkdtempSync(path.join(os.tmpdir(), "wait-test-"));
+fs.mkdirSync(path.join(tmpHost, ".github", "workflows"), { recursive: true });
+fs.writeFileSync(path.join(tmpHost, ".github", "workflows", "a.yml"), "jobs:\n  a:\n    runs-on: ubuntu-latest\n");
+const plain = selfHosted(tmpHost);
+fs.writeFileSync(path.join(tmpHost, ".github", "workflows", "b.yml"), "jobs:\n  b:\n    runs-on: [self-hosted, linux]\n");
+ok(!plain && selfHosted(tmpHost) && /self-hosted runner, whose jobs GitHub does not bill, so it is a ceiling\.$/.test(billedLine({ billed: 3, billedRead: 1 }, true)) && !selfHosted(path.join(tmpHost, "none")),
+  "a workflow that names a self-hosted runner makes the billed minutes a ceiling, and the line says so");
+fs.rmSync(tmpHost, { recursive: true, force: true });
 const jobs = { a: [job(0, 10)], b: [job(0, 4), secs(0, 30)], c: [job(0, 6)] };
 const billedGh = route => (route.includes("/pulls?") ? JSON.stringify(pulls) : JSON.stringify({ check_runs: jobs[/commits\/(\w+)\//.exec(route)[1][0]] }));
 const mb = measure({ repo: "o/n", count: 3, gh: billedGh });
-ok(mb.billed === 6 && mb.billedRead === 3 && /^- billed minutes a pull request: 6, the median of the last 3 merged pull requests' last push, each job rounded up/.test(billedLine(mb)), "the median billed minutes of the last merged pull requests, and the report's line", billedLine(mb));
+ok(mb.billed === 6 && mb.billedRead === 3 && /^- billed minutes a pull request: 6, the median of the last 3 merged pull requests' last push, each job and each attempt rounded up/.test(billedLine(mb)), "the median billed minutes of the last merged pull requests, and the report's line", billedLine(mb));
 ok(/not read/.test(billedLine({ billed: null })) && measure({ repo: "o/n", count: 2, gh }).billed === null, "a push no job of GitHub's runners ran is not billed, and the line says so");
 const both = pushWait("o/n", ".", null, billedGh);
 ok(/^- what a push waits on: .*\n- billed minutes a pull request: 6,/.test(both) && /\n- billed minutes a pull request: not read \(GitHub did not answer/.test(pushWait("o/n", ".", null, () => { throw new Error("403"); })), "the state report gives the billed minutes beside the wait, or says they were not read", both);

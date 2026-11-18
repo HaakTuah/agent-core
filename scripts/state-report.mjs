@@ -33,7 +33,7 @@ import { said as pruningSaid } from "./pruning.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { rules } from "./rules.mjs";
 import { started } from "./started.mjs";
-import { billedLine, line as waitLine, measure as measureWait } from "./wait.mjs";
+import { billedLine, line as waitLine, measure as measureWait, selfHosted } from "./wait.mjs";
 
 export const TITLE = "State report";
 export const COUNTS = "Counts for the core";
@@ -73,7 +73,7 @@ function strength(root, config) {
 export function pushWait(repo, root, manifest, gh) {
   let mark;
   try { mark = reading(rulesOf(manifest, root).rules, root)?.config.wait; } catch { mark = undefined; }
-  try { const m = measureWait({ repo, mark, ...(gh ? { gh } : {}) }); return `${waitLine(m)}\n${billedLine(m)}`; }
+  try { const m = measureWait({ repo, mark, ...(gh ? { gh } : {}) }); return `${waitLine(m)}\n${billedLine(m, selfHosted(root))}`; }
   catch {
     const why = "GitHub did not answer for the pull requests' checks: the look's job needs `pull-requests: read` and `checks: read`";
     return `- what a push waits on: not read (${why}).\n- billed minutes a pull request: not read (${why}).`;
