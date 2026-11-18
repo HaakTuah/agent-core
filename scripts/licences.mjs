@@ -250,8 +250,11 @@ export function shippedPaths(packages, workspaces, manifest) {
   return seen;
 }
 
-// The lines of an `.npmrc` as npm reads them: split at each line feed and each carriage return, alone or together.
-const npmrcLines = (npmrc) => npmrc.split(/[\r\n]+/u);
+// The lines of an `.npmrc` as npm reads them: split at each line feed and each carriage return, alone or together,
+// after a leading byte-order mark. A line that holds any character but a tab and printable ASCII may read otherwise to
+// npm than to the patterns below, so it is never one of the settings they vouch for: listed, and never counted as set.
+const npmrcLines = (npmrc) => npmrc.replace(/^\uFEFF/u, "").split(/[\r\n]+/u);
+const plain = (line) => !/[^\t\x20-\x7e]/u.test(line);
 
 /**
  * The lines of an `.npmrc` that are not one of a few settings known to leave where npm fetches from alone: npm reads
@@ -260,18 +263,18 @@ const npmrcLines = (npmrc) => npmrc.split(/[\r\n]+/u);
  */
 export function registryOverrides(npmrc) {
   const harmless = /^((fund|audit|update-notifier|engine-strict|save-exact|progress|loglevel)\s*=\s*[\w.-]*|ignore-scripts\s*=\s*true|min-release-age\s*=\s*\d{1,5})$/u;
-  return npmrcLines(npmrc).map((l) => l.trim()).filter((l) => l && !/^[#;]/u.test(l) && !harmless.test(l));
+  return npmrcLines(npmrc).filter((l) => l.trim() && !/^[#;]/u.test(l.trim()) && !(plain(l) && harmless.test(l.trim()))).map((l) => l.trim());
 }
 
 /** Whether an `.npmrc` keeps packages' own install scripts off (floor rule 15): `ignore-scripts=true`, never undone. */
 export function scriptsOff(npmrc) {
-  return npmrcLines(npmrc).some((l) => /^ignore-scripts\s*=\s*true$/u.test(l.trim()));
+  return npmrcLines(npmrc).some((l) => plain(l) && /^ignore-scripts\s*=\s*true$/u.test(l.trim()));
 }
 
 /** The week's wait an `.npmrc` sets (floor rule 7: a new release is taken once it is WAIT days old): the days its last
  *  `min-release-age` line gives, which npm reads from version 11.10 on, or null where it gives none. */
 export function releaseAge(npmrc) {
-  const days = npmrcLines(npmrc).map((l) => /^min-release-age\s*=\s*(\d{1,5})$/u.exec(l.trim())?.[1]).filter(Boolean).at(-1);
+  const days = npmrcLines(npmrc).map((l) => (plain(l) ? /^min-release-age\s*=\s*(\d{1,5})$/u.exec(l.trim())?.[1] : undefined)).filter(Boolean).at(-1);
   return days === undefined ? null : Number(days);
 }
 export const WAIT = 7;

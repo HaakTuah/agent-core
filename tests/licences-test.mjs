@@ -51,7 +51,9 @@ ok(JSON.stringify(registryOverrides(npmrc.join("\n"))) === JSON.stringify(npmrc)
   "refuses every npm setting but a few harmless ones, however its key is spelt");
 ok(scriptsOff("# no install scripts\nignore-scripts=true\n") && !scriptsOff("ignore-scripts=false\n"), "knows when install scripts are off");
 // (an .npmrc is read line by line as npm reads it, a lone carriage return ending a line too)
-ok(!scriptsOff("ignore-scripts=\rtrue\n") && releaseAge("min-release-age=\r7\n") === null && registryOverrides("ignore-scripts=true\rregistry=x\n").length === 1 && releaseAge("ignore-scripts=true\r\nmin-release-age=7\r\n") === 7,
+ok(!scriptsOff("ignore-scripts=\rtrue\n") && releaseAge("min-release-age=\r7\n") === null && JSON.stringify(registryOverrides("fund=\rregistry=x\n")) === JSON.stringify(["registry=x"])
+  && releaseAge("ignore-scripts=true\r\nmin-release-age=7\r\n") === 7 && scriptsOff("\uFEFFignore-scripts=true\n")
+  && !scriptsOff("ignore-scripts=true\u2028\n") && releaseAge("min-release-age=7\u2029\n") === null && registryOverrides("ignore-scripts=true\u2028\n").length === 1,
   "reads an .npmrc's lines as npm does, at each carriage return too");
 
 // a licence the floor moved off the list for what ships (MS-PL, 13 November 2026): held at the base, reported and passing;
