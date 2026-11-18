@@ -499,7 +499,7 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   const project = configured(read, skills, names, linked);
   // (read at the commit, the working tree's at HEAD, the pull request's head: a file not committed, ignored or not, is
   // no file of the project's, and the base is read the same way)
-  for (const [problem, text] of [...caseProblems(root, rev ?? "HEAD"), ...submodules(listing(root, rev ?? "HEAD"))]) { project.problems.push(problem); project.texts.set(problem, text); }
+  for (const [problem, text] of [...caseProblems(root, rev ?? "HEAD"), ...submodules(root, rev ?? "HEAD")]) { project.problems.push(problem); project.texts.set(problem, text); }
   if (!rev && listing(root, "HEAD").failed) project.problems.push(`the commit HEAD cannot be listed by git (an error, or names past ${LISTING_MAX} bytes), so this check cannot read the tools' files there. Mend: run the check again; where it fails the same way, take out of this pull request what makes its tree too large to list`);
   return { ...project, links };
 }
@@ -513,13 +513,11 @@ function commitReader(root, rev) {
     const d = resolve(dir);
     return d?.type === "tree" ? [...(listing(root, rev).children.get(d.f) ?? [])] : [];
   };
-  // (what a name holds, as a fingerprint reads it: a file's object, or what else stands there, a link's target and a
-  // submodule's commit among it, each said with its kind, so no file reads as a link or another file)
+  // (what a name holds, as a fingerprint reads it: what the walk reaches, by its kind and git's object, a file's or a
+  // submodule's commit, and each link it passes on the way, by its object, which is its target)
   const holds = f => {
-    const r = resolve(f), { ids, linked } = listing(root, rev);
-    if (r?.type === "blob") return `\0a file\0${ids.get(r.f)}`;
-    const parent = resolve(path.posix.dirname(f)), real = parent ? `${parent.f === "." ? "" : `${parent.f}/`}${path.posix.basename(f)}` : null;
-    return real !== null && linked.has(real) ? `\0a link to\0${textAt(root, rev, real)}` : `\0${r?.type ?? "nothing"}\0${ids.get(r?.f) ?? ""}`;
+    const via = [], r = walk(root, rev, f, via), { ids } = listing(root, rev);
+    return [r?.type ?? "nothing", ids.get(r?.f) ?? "", ...via.map(at => `${at}\0${ids.get(at)}`)].join("\0");
   };
   return { resolve, read, names, holds };
 }
@@ -534,10 +532,16 @@ function caseProblems(root, rev) {
 
 // Each submodule where an agent tool reads its files, in whatever case, as [its problem, the commit it names]: git gives
 // this check none of what it holds, and a clone that brings in its submodules gives the tool all of it, so one the base
-// held is noted while it names that commit.
-function submodules(l) {
-  return [...l.gitlinks].filter(([at]) => WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d))).map(([at, id]) =>
-    [`${at} is a submodule where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${id}`]);
+// held is noted while it names that commit. One is found where it stands, and where a tool's path leads to it through a
+// link, the walk reaching it as no folder.
+function submodules(root, rev) {
+  const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = new Map();
+  for (const [at, id] of l.gitlinks) if (WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d))) out.set(at, [`${at} is a submodule where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${id}`]);
+  for (const at of toolPaths(names, f => resolve(f)?.type)) {
+    const r = resolve(at);
+    if (r?.type === "commit" && !out.has(at) && !out.has(r.f)) out.set(at, [`${at} leads, through a link, to the submodule ${r.f}, where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${r.f}\0${l.ids.get(r.f)}`]);
+  }
+  return [...out.values()];
 }
 
 // Whether a commit's listing holds `at` as anything but a plain file: a link, a folder or a submodule's entry.
@@ -642,7 +646,7 @@ function target(root, rev, at) {
   }
   return targets.get(key);
 }
-function walk(root, rev, f) {
+function walk(root, rev, f, via = []) {
   const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
   let hops = 0;
   while (left.length) {
@@ -651,6 +655,7 @@ function walk(root, rev, f) {
     if (name === "..") { if (!at.length) return null; at.pop(); continue; }
     const here = [...at, name].join("/");
     if (linked.has(here)) {
+      via.push(here);
       const to = target(root, rev, here);
       if (++hops > 40 || to === null) return null;
       left.unshift(...to.split("/"));

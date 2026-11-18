@@ -694,6 +694,35 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const core = project({ ...listing() });
   gitlink(core, ".codex");
   fails(run(core, "--core"), "in the core's own repository none may stand", `.codex ${SAYS}`);
+  if (LINKS) {
+    // (#600's fallback security review of 33315a2: a submodule a tool's path leads to through a link)
+    for (const [at, to] of [[".codex", "sub"], [".claude/skills/foo", "../../sub"]]) {
+      const behind = project({ ...listing() });
+      gitlink(behind, "sub");
+      fs.mkdirSync(path.dirname(path.join(behind, at)), { recursive: true });
+      fs.symlinkSync(to, path.join(behind, at));
+      git(behind, "add", "-A"); git(behind, "commit", "-q", "-m", "a link to a submodule");
+      fails(run(behind, "--core"), `one ${at} leads to through a link fails`, `${at} leads, through a link, to the submodule sub`, "Mend: ");
+    }
+    const heldBehind = project({ ...listing() });
+    gitlink(heldBehind, "sub");
+    fs.symlinkSync("sub", path.join(heldBehind, ".codex"));
+    git(heldBehind, "add", "-A"); git(heldBehind, "commit", "-q", "-m", "a link to a submodule");
+    const heldBehindRun = run(pr(heldBehind, { "README.md": "a change of its own\n" }));
+    ok(heldBehindRun.status === 0 && heldBehindRun.out.includes("leads, through a link, to the submodule sub"), "one the base held is noted, not failed", heldBehindRun.out);
+    fails(run(prLink(heldBehind, "sub", git(heldBehind, "rev-parse", "HEAD~1"))), "but not once the pull request moves the submodule", "leads, through a link, to the submodule sub");
+    // (and a tool's path in another case the base held, through a chain of links: each link on the way is held too)
+    const chain = project({ ...listing() });
+    fs.mkdirSync(path.join(chain, ".claude/Skills"), { recursive: true });
+    fs.symlinkSync(os.tmpdir(), path.join(chain, "l1"));
+    fs.symlinkSync("../../l1", path.join(chain, ".claude/Skills/foo"));
+    git(chain, "add", "-A"); git(chain, "commit", "-q", "-m", "a chain of links out");
+    git(chain, "checkout", "-q", "-B", "change2"); fs.unlinkSync(path.join(chain, "l1"));
+    fs.symlinkSync(path.dirname(os.tmpdir()), path.join(chain, "l1"));
+    git(chain, "add", "-A"); git(chain, "commit", "-q", "-m", "the chain moved");
+    git(chain, "checkout", "-q", "main"); git(chain, "merge", "-q", "--no-ff", "-m", "merge", "change2");
+    fails(run(chain), "a link on the way the pull request moves fails a path in another case the base held", "Mend: rename it to .claude/skills");
+  }
 }
 
 // ---- what the tools' settings set in the environment of the programs they start ----
