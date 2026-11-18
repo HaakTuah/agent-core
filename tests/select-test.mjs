@@ -6,13 +6,14 @@
 // (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/select-test.mjs
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import http from "node:http";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { links, matcher, reached, selection } from "../scripts/select.mjs";
+import { links, matcher, passedWhole, reached, selection } from "../scripts/select.mjs";
 import { parseConfig, survey } from "../scripts/shape.mjs";
 
 let failed = 0, count = 0;
@@ -161,7 +162,65 @@ for (const [args, env, what] of [
   [["--env", "run me"], {}, "a variable's name that is none"],
   [["--env", "RUN"], { GITHUB_ENV: "" }, "--env outside a workflow"],
   [["--all"], {}, "a word it does not know"],
+  [["--passed", "tests"], { SELECT_BASE: "HEAD^1" }, "--passed on a pull request's run, which is never skipped"],
+  [["--passed", "tests;rm"], {}, "a check's name that is none"],
 ]) { r = run(args, env); ok(r.status === 1 && mended(r.out), `refused, with its mend: ${what}`, r.out); }
+
+// ---- a tree that passed is not run again (#457): a push that merges a pull request's head ----
+// (a branch off main that changes a file no reader reads, so its run selected the whole suite, merged with a merge
+// commit; `merged` makes it, `moved` moves main first, so the head is not up to date)
+const merged = ({ moved = false, file = "README.md" } = {}) => {
+  git("checkout", "-q", "-b", `pr${++n}`, "main");
+  put(file, `# changed ${n}\n`); git("add", "-A"); git("commit", "-q", "-m", `change ${n}`);
+  git("checkout", "-q", "main");
+  if (moved) { put(`docs/other${n}.md`, "moved\n"); git("add", "-A"); git("commit", "-q", "-m", `main moved ${n}`); }
+  git("merge", "-q", "--no-ff", "-m", `merge ${n}`, `pr${n}`);
+  return git("rev-parse", "HEAD^2").trim();
+};
+let n = 0;
+const passedHere = async (asked, selects = () => ({ all: true })) => { const was = process.cwd(); process.chdir(dir); try { return await passedWhole({ check: "tests", selects, asked }); } finally { process.chdir(was); } };
+const yes = async () => true;
+let head = merged();
+let p = await passedHere(async (sha, check) => sha === head && check === "tests");
+ok(p.none === true && p.why.includes(head.slice(0, 12)), "a merge whose tree is its head's, whose change selects the whole suite and whose check passed on that head selects nothing", JSON.stringify(p));
+p = await passedHere(async () => "a run of it did not pass");
+ok(p.all === true && /did not pass on the merged head .*a run of it did not pass/.test(p.why), "a check that did not pass on the head runs the whole suite, saying why", p.why);
+p = await passedHere(yes, () => ({ all: false, tests: ["test/run.test.js"] }));
+ok(p.all === true && /selected 1 tests, not the whole suite/.test(p.why), "a pull request whose run selected some tests only runs the whole suite here", p.why);
+merged({ moved: true });
+p = await passedHere(yes);
+ok(p.all === true && /held another tree: it was not up to date/.test(p.why), "a head that was not up to date with main runs the whole suite", p.why);
+put("CHANGES.md", "a commit straight on main\n"); git("add", "-A"); git("commit", "-q", "-m", "no merge");
+p = await passedHere(yes);
+ok(p.all === true && /merges no two commits/.test(p.why), "a commit that merges nothing, as a squash or a rebase makes, runs the whole suite", p.why);
+
+// (from the command line: the host asked with the token, a test server standing in for it)
+head = merged();
+const asks = [];
+const server = http.createServer((req, res) => {
+  asks.push({ url: req.url, auth: req.headers.authorization });
+  const ok2 = req.url.startsWith(`/repos/moss/bark/commits/${head}/check-runs?check_name=tests&`);
+  res.setHeader("content-type", "application/json");
+  res.end(JSON.stringify({ check_runs: ok2 ? [{ name: "tests", status: "completed", conclusion: state }] : [] }));
+});
+let state = "success";
+await new Promise(done => server.listen(0, "127.0.0.1", done));
+const host = { GITHUB_API_URL: `http://127.0.0.1:${server.address().port}`, GITHUB_REPOSITORY: "moss/bark", GH_TOKEN: "pretend" };
+const runLive = (args, env) => new Promise(done => {
+  const c = spawn(process.execPath, [script, ...args], { cwd: dir, env: { ...process.env, SELECT_BASE: "", GITHUB_ENV: "", GITHUB_STEP_SUMMARY: "", ...env } });
+  let out = ""; c.stdout.on("data", d => { out += d; }); c.stderr.on("data", d => { out += d; }); c.on("close", status => done({ status, out }));
+});
+fs.writeFileSync(envFile, "");
+r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
+ok(r.status === 0 && /The selection: none of \d+ tests: the merged head/.test(r.out) && fs.readFileSync(envFile, "utf8") === "RUN=  \n" && asks.at(-1)?.auth === "Bearer pretend",
+  "on a push, given --passed, it asks the host with the token, and where the check passed on the merged head it writes no test for the steps after it", `${r.out}\n${fs.readFileSync(envFile, "utf8")}`);
+state = "failure"; fs.writeFileSync(envFile, "");
+r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
+ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /did not pass on the merged head/.test(r.out), "where the check failed there, the whole suite runs", r.out);
+fs.writeFileSync(envFile, "");
+r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GH_TOKEN: "", GITHUB_ENV: envFile });
+ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /no repository or token/.test(r.out), "with no token, the host is not asked and the whole suite runs", r.out);
+server.close();
 
 console.log(`${count - failed} of ${count} passed`);
 process.exitCode = failed ? 1 : 0;

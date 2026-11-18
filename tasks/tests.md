@@ -72,6 +72,23 @@ reads is the *shape check*'s config.
   thing beneath the screen, or lists the test with its reason under "grown". It does not mean that a project has no
   tests of its screens: they guard what only a screen shows. Reason: a desktop program's suite opened its window
   for test after test, each paying for a screen it did not test. Held by the shape check.
+- **A test asserts no time measured on a real clock.** By default a test that needs time has it handed in, as the
+  rules of a program do (`tasks/code-shape.md`), and asserts on that. The one exception is a measure of speed, which
+  keeps room above its floor so that a slow machine fails nothing (#318). The trigger is a test that reads the time,
+  sleeps or waits on a timer and then asserts a duration: its builder hands the time in instead. It does not mean a
+  test never waits for a program it starts. Reason: in the counts of #426, the one failure at random in 26,518 runs of a
+  suite came from a test that asserted a duration on a real clock. Held by the record's list of tests that failed for no
+  reason, at the audit.
+- **A tree that passed is not run again.** By default, where a pull request's head was up to date with the default
+  branch and its whole suite passed on that tree, the run on the default branch for the same tree runs no test again:
+  the job that runs the tests on a push gives the selection `--passed` with the check that gates them
+  (`core/scripts/select.mjs`), which finds the merged head's tree, its whole selection and that check's pass, and
+  otherwise runs the whole suite. The trigger is a push that merges a pull request with a merge commit. It does not
+  mean a run is skipped where the pull request ran a selection only, where it was merged by a squash or a rebase, on a
+  re-run, on a schedule or before a release, nor that a job a pull request does not run is skipped. Reason: in #426's
+  counts every push to the default branch ran the whole suite again after its pull request had run it on the same tree.
+  Held by the selection's own test, and by `core/scripts/steps.mjs`, which reports a job that selects on a push without
+  it.
 - **What a push waits on has a time mark.** By default the checks of one push, from the first job's start to the
   last job's end, take no longer than the mark the config gives under "wait", in seconds, which rises only as a
   suite's does. The trigger is the monthly state report, which gives the median of the last 30 merged pull requests
