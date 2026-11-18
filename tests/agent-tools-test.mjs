@@ -1086,6 +1086,14 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     fails(run(pr(fileAndFolder(), { "lib/D/deep/c.MD": "# c\n" })), "and once one is added there, at any depth", SEVERAL);
     const bothKept = run(pr(fileAndFolder(), { "lib/D/notes.txt": "x\n" }));
     ok(bothKept.status === 0 && bothKept.out.includes(SEVERAL), "and is noted while only what Claude Code does not read there changes", bothKept.out);
+    // (#706's fallback security review of 622669e: held by all a link in that folder leads to as well, and found as
+    // Windows reads a link's text too)
+    const deeper = fileAndFolder(); write(deeper, "other/a.md", "# a\n"); fs.symlinkSync("../../other", path.join(deeper, "lib/D/y")); git(deeper, "add", "-A"); git(deeper, "commit", "-q", "-m", "a link in the folder");
+    fails(run(pr(deeper, { "other/new.md": "---\nname: new\npermissionMode: default\n---\n" })), "and once Markdown is added where a link in that folder leads", SEVERAL);
+    const winTwin = () => { const dir = project({ "lib/d": "a file\n", "lib/D/b.md": "# b\n", ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("..\\..\\lib\\d", path.join(dir, ".claude/agents/x")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a Windows link to a file and a folder that fold alike"); return dir; };
+    fails(run(pr(winTwin(), { "lib/D/b.md": "---\nname: b\npermissionMode: default\n---\n" })), "and so does one whose text only Windows reads, once a Markdown file in the folder changes", SEVERAL);
+    const winTwinKept = run(pr(winTwin(), { "README.md": "x\n" }));
+    ok(winTwinKept.status === 0 && winTwinKept.out.includes(SEVERAL), "and is noted while nothing there changes", winTwinKept.out);
     fails(run(pr(twice(), { "Cfg/hooks/lint.json": JSON.stringify({ version: "v1", hooks: [] }) })), "nor once a hook file is added under the name git keeps", SEVERAL);
     // (its fallback security review of f8559d9: and under each spelling of each name past the first held twice)
     const twiceDeep = () => { const dir = project({ "A/b/settings/mcp.json": "{}\n", "a/b/settings/mcp.json": "{}\n", "A/B/hooks/n.txt": "x\n", "A/B/settings/mcp.json": "{}\n", ...listing() }); fs.symlinkSync("A/b", path.join(dir, ".kiro")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through names held twice"); return dir; };
