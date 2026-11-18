@@ -24,10 +24,14 @@
 # tool writes at the end of every builder's commit message and description: such a run of characters holds a short term
 # by chance and is no one's personal information, while the rest of the link and of its line is read (#261). Each failure says how the session takes the term out, one the project held before the
 # check read it too: of what a project held before a check read more, a listed term alone fails rather than being
-# reported (core archive 207). Without the secret (a fork, Dependabot, a project that has not set it) it passes with a
-# note: the check is optional. It checks this repository, and every project that takes the core calls it
-# (workflow_call), pinned to a full commit SHA (README.md, point 5), passing only that secret: the caller's event,
-# checkout and token are the caller's own.
+# reported (core archive 207). What is read is gathered by git and this file, and the terms are matched in it by
+# Betterleaks, a maintained scanner of text (MIT), at one exact version built from its source and checked by its sums
+# (floor rule 7), each term a rule of its own written as the job runs and removed with it, letter case aside, nothing of
+# the scanner's own rules, ignore files, inline marks, decoding or archives used (#579; INVENTORY.md). Without the secret
+# (a fork, Dependabot, a project that has not set it), or on a machine where Betterleaks cannot be built (no Go, or no
+# sum below for its system; never GitHub's runners), it passes with a note that nothing was checked: the check is
+# optional. It checks this repository, and every project that takes the core calls it (workflow_call), pinned to a full
+# commit SHA (README.md, point 5), passing only that secret: the caller's event, checkout and token are the caller's own.
 name: Personal terms
 
 on:
@@ -58,6 +62,13 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # (Betterleaks as the step below builds it, kept between runs so that a run need not build it again: what is
+      # restored runs only once the step has checked it against its SHA-256, as it checks a build of its own; the key
+      # names the version and the toolchain the step pins, and moves with them)
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: /tmp/agent-core-tools
+          key: betterleaks-1.10.1-go1.26.11-${{ runner.os }}-${{ runner.arch }}
       - name: Look for personal terms
         env:
           TERMS: ${{ secrets.PERSONAL_TERMS }}
@@ -67,11 +78,82 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -z "$TERMS" ]; then echo "::notice::PERSONAL_TERMS is not set here, so nothing was checked."; exit 0; fi
-          umask 077
-          list="$RUNNER_TEMP/terms"
+          # (a pipeline's last command in this shell, so that what it sets stays set)
+          umask 077; shopt -s lastpipe
+          work="$RUNNER_TEMP/personal-terms"; rm -rf "$work"; mkdir -p "$work/none" || exit 1
+          list="$work/terms"
           # (each term without the blanks around it, a carriage return among them, and no empty one)
           printf '%s\n' "$TERMS" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' > "$list"
+          if [ ! -s "$list" ]; then echo "::notice::PERSONAL_TERMS holds no term, so nothing was checked."; rm -rf "$work"; exit 0; fi
           found=0
+          # (Betterleaks, which matches the terms: one exact version, built by Go from its source on Go's own module
+          # proxy by the toolchain pinned here, the source checked against its sum here and both against Go's checksum
+          # database, and the build against the SHA-256 written here for the machine's system, which the same source
+          # and toolchain always give; kept between runs under the system's temporary folder, and checked each time it
+          # runs; where no Go is at hand, or no sum stands here for the machine's system, nothing is read, said so, as
+          # without the secret. A new pin moves the version, the toolchain, every sum and the cache's key above at once)
+          version=1.10.1 module=github.com/betterleaks/betterleaks toolchain=go1.26.11
+          source='h1:w7AL/I3ygUzxoPTvTniTtMMWDAnZRTrIiBebc/L+E2o='
+          system=$(go env GOHOSTOS GOHOSTARCH 2> /dev/null | tr -d '\r' | tr '\n' /)
+          case $system in
+            linux/amd64/) sum=5fbada3035618b380df0d07e1b766f31b2692df2fb1fb9eabbbf1bed6e3ef0e9 ;;
+            linux/arm64/) sum=ea4f1d6bf2b89858dc8d6f0d8cfba172f7031559a67c0205258ea6fef4bcb485 ;;
+            windows/amd64/) sum=1572b357cb6b8d56f26f0fac81ba8b5d3eafec064f4fed6033d63c596867a6c6 ;;
+            darwin/arm64/) sum=eb8b28e0eaac1536bd1311c775dbc58d9d9bc2beb7a77fdeb5beefdeb89bf2ff ;;
+            *) sum= ;;
+          esac
+          if [ -z "$sum" ]; then
+            echo "::notice::Betterleaks, which matches the terms, is built here by Go, and ${system:+no sum stands in this check for a build on ${system%/}}${system:-no Go is at hand}, so nothing was checked. Mend: run the check where Go 1.21 or later is at hand on Linux, Windows or macOS on Apple silicon, as on GitHub's runners."
+            rm -rf "$work"; exit 0
+          fi
+          exe=; case $system in windows/*) exe=.exe ;; esac
+          store="${TMPDIR:-/tmp}/agent-core-tools/betterleaks-$version-$sum" bl="$work/betterleaks$exe"
+          digest() { { sha256sum -- "$1" 2> /dev/null || shasum -a 256 -- "$1" 2> /dev/null; } | cut -c1-64; }
+          # (the build, in a folder of this run's own, Go's settings all given here so that none of the machine's own
+          # changes what is fetched or built, put in the store only where its sum holds)
+          built() {
+            local go="$work/go" info
+            mkdir -p "$go" "$store" || return 1
+            local with=(GOPATH="$go/path" GOMODCACHE="$go/path/pkg/mod" GOCACHE="$go/cache" GOBIN="$go/bin" GOENV=off
+              GOTOOLCHAIN="$toolchain" GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org GONOSUMDB= GONOPROXY=
+              GOPRIVATE= GOINSECURE= GOFLAGS= GOWORK=off CGO_ENABLED=0 GOAMD64=v1 GOARM64=v8.0 GOEXPERIMENT=)
+            info=$(cd "$go" && env "${with[@]}" go mod download -json "$module@v$version" 2>> "$go/log") \
+              && printf '%s\n' "$info" | grep -q -F -e "\"Sum\": \"$source\"," \
+              && (cd "$go" && env "${with[@]}" go install -trimpath -ldflags='-s -w' "$module@v$version" 2>> "$go/log") \
+              && [ "$(digest "$go/bin/betterleaks$exe")" = "$sum" ] \
+              && cp "$go/bin/betterleaks$exe" "$store/new.$$" && mv -f "$store/new.$$" "$store/betterleaks$exe"
+            local ok=$?
+            [ "$ok" = 0 ] || { echo "Of the build:"; tail -n 5 "$go/log" 2> /dev/null; echo "the source's sum, as Go read it: $(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*"Sum": "\(.*\)",$/\1/p')"; echo "the build's SHA-256: $(digest "$go/bin/betterleaks$exe")"; }
+            chmod -R u+w "$go" 2> /dev/null; rm -rf "$go"
+            return "$ok"
+          }
+          if { [ "$(digest "$store/betterleaks$exe")" = "$sum" ] || built; } && cp "$store/betterleaks$exe" "$bl" && [ "$(digest "$bl")" = "$sum" ]; then :; else
+            echo "FAIL Betterleaks $version, which matches the terms, could not be built here at its pin, so nothing was read. Mend: run the check again; where it fails again, with Go's module proxy (proxy.golang.org) reached and a sum that differs from this check's, report it to the core (core/README.md, \"Reporting to the core\")."
+            rm -rf "$work"; exit 1
+          fi
+          # (its rules: each term a rule of its own, matched as it is written, letter case aside (\Q to \E, a \E in a
+          # term kept as one), written as a TOML string, a backslash, a quote and each control character escaped)
+          rules="$work/rules.toml" n=0
+          while IFS= read -r t; do
+            n=$((n + 1)) b='\' e=; t=${t//"${b}E"/"${b}E${b}${b}E${b}Q"}; t="(?i)${b}Q$t${b}E"
+            for ((i = 0; i < ${#t}; i++)); do
+              c=${t:i:1}; printf -v code '%d' "'$c"
+              case $c in '\' | '"') e+="\\$c" ;; *) if [ "$code" -ge 0 ] && { [ "$code" -lt 32 ] && [ "$c" != $'\t' ] || [ "$code" = 127 ]; }; then printf -v c '\\u%04x' "$code"; fi; e+=$c ;; esac
+            done
+            printf '[[rules]]\nid = "term-%s"\nregex = "%s"\n' "$n" "$e"
+          done < "$list" > "$rules"
+          printf '{{ range . }}{{ .StartLine }}\n{{ end }}' > "$work/lines.tmpl"
+          # (what Betterleaks finds in its input: the numbers of its lines that hold a term, in order, or a failure; its
+          # input begins with an empty line, since it takes an input that begins as an archive or a PDF does for one and
+          # reads none of it, and the run stands in a folder of its own, so that no ignore file there is read)
+          scan() {
+            { printf '\n'; cat; } | (cd "$work/none" && "$bl" stdin --config "$rules" --no-banner --no-color --log-level error \
+              --redact --ignore-gitleaks-allow --max-decode-depth 0 --max-archive-depth 0 --gitleaks-ignore-path "$work/none" \
+              --exit-code 0 --report-format template --report-template "$work/lines.tmpl" --report-path - > "$work/found") \
+              && sort -n -u "$work/found"
+          }
+          # (whether the text on its input holds a term: so too where Betterleaks fails, so that nothing goes unread)
+          holds() { local out; ! out=$(scan) || [ -n "$out" ]; }
           # (a Claude Code session's id, of its one shape alone, taken out of what is read: a whole link, starting a
           # line or after a blank or an opening mark, so none inside another address; one of any other length,
           # characters or host stays; twice over, since a link whose mark before it the first pass took as the one after
@@ -91,9 +173,18 @@ jobs:
           held="^Copyright( \\([cC]\\)| ©)? ([0-9]{4}([-,] ?[0-9]{4})*|\\[yyyy\\]|\\[year\\]|<year>|YEAR),? $free\$"
           known=" 3b95290255fb1e607a13999c5f76a81c6877ef3d092c01eb18ef72ee2ddc2dc4 "
           exempt="LICENSE NOTICE core/LICENSE core/NOTICE"
-          shaped() { # (a revision and a path: whether that file is of its shape there)
+          # (a revision and a path: whether that file is of its shape there, read once for each of its contents, which
+          # the file's name, its mode and its blob say)
+          declare -A shapes
+          shaped() {
+            local key; key=$(git ls-tree --format='%(objectmode) %(objectname)' "$1" -- "$2" 2> /dev/null)
+            case $key in 100644\ * | 100755\ *) ;; *) return 1 ;; esac
+            key="${2##*/} $key"
+            if [ -z "${shapes[$key]+x}" ]; then if shape "$1" "$2"; then shapes[$key]=0; else shapes[$key]=1; fi; fi
+            return "${shapes[$key]}"
+          }
+          shape() {
             local text flat
-            case $(git ls-tree --format='%(objectmode)' "$1" -- "$2" 2> /dev/null) in 100644 | 100755) ;; *) return 1 ;; esac
             # (text alone, UTF-8 with no control character but a tab or a line's end, counted by bytes, so that no grep
             # below drops a line it would take for binary, a NUL however late included)
             git cat-file blob "$1:$2" | iconv -f UTF-8 -t UTF-8 > /dev/null 2>&1 || return 1
@@ -104,39 +195,44 @@ jobs:
             if [ "${2##*/}" = NOTICE ]; then
               [ "$(printf '%s\n' "$text" | grep -c -v '^Copyright[[:space:]]')" = 1 ] \
                 && printf '%s\n' "$text" | head -n 1 | grep -v '^Copyright[[:space:]]' | LC_ALL=C.UTF-8 grep -q -x -E "$free" \
-                && ! printf '%s\n' "$text" | head -n 1 | grep -q -i -F -f "$list"
+                && ! printf '%s\n' "$text" | head -n 1 | holds
               return
             fi
             flat=$(printf '%s\n' "$text" | sed -E 's/^Copyright[[:space:]].*/Copyright/' | tr -s '[:space:]' ' ' | sed -E 's/^ //; s/ $//')
             printf '%s\n' "$flat" | grep -q -x -E 'Copyright( Copyright)*' \
               || case $known in *" $(printf '%s' "$flat" | sha256sum | cut -c1-64) "*) ;; *) return 1 ;; esac
           }
-          # (those of them of their shape as the pull request would merge, by pathspecs that leave each out)
-          unread() { for p in $exempt; do if shaped "$1" "$p"; then printf ':(top,exclude,literal)%s\n' "$p"; fi; done; }
-          mapfile -t skip < <(unread HEAD)
+          # (those of them of their shape at a revision, by pathspecs that leave each out, in "own", in this shell, so
+          # that each shape is read once; first as the pull request would merge)
+          unread() { local p; own=(); for p in $exempt; do if shaped "$1" "$p"; then own+=(":(top,exclude,literal)$p"); fi; done; }
+          unread HEAD; skip=("${own[@]}")
+          # (what is read, gathered into one input for Betterleaks, a part at a time, each part's first line and what it
+          # is kept beside it: its kind, and the file's number or the commit; the input's own first line is empty, so a
+          # part's lines are counted from the second)
+          read="$work/read" parts="$work/parts" lines=1
+          : > "$read"; : > "$parts"
+          add() { # (a kind and what it names; the part's text on the input, a line at least, by the shell's own commands)
+            local -a part; mapfile -t part; [ "${#part[@]}" -gt 0 ] || part=("")
+            printf '%s\n' "${part[@]}" >> "$read"
+            printf '%s\t%s\t%s\n' "$((lines + 1))" "$1" "$2" >> "$parts"; lines=$((lines + ${#part[@]}))
+          }
           # (git with no attributes at all, read from the empty tree, so a .gitattributes of the pull request's own
           # cannot have a file of text taken for binary and left unread; git older than 2.40 fails the check)
           empty=$(git hash-object -t tree /dev/null); g() { git --attr-source="$empty" "$@"; }
-          rc=0; g -c core.quotePath=false grep -I -z -n -i -F -f "$list" -- . "${skip[@]}" > "$RUNNER_TEMP/hits" || rc=$?
+          # (the files as they would merge, what main already held included: each file of text, as git's grep reads one,
+          # its lines as that grep gives them, a session's ids taken out; and the name of each, a line of its own in a
+          # part of their names, so that a file whose name holds a term is named by its line alone)
+          names=() counts=() rc=0
+          g -c core.quotePath=false grep --cached -I -c -z -e '' -- . "${skip[@]}" > "$work/counts" || rc=$?
+          g -c core.quotePath=false grep --cached -I -h -e '' -- . "${skip[@]}" > "$work/text" || rc=$((rc > $? ? rc : $?))
           if [ "$rc" -gt 1 ]; then echo "FAIL git could not read the files. Mend: run the check where git is 2.40 or later."; found=1; fi
-          # (each hit as git gives it: the file's name and the line's number each ended by a NUL, the line by a newline;
-          # one is dropped only where grep finds a term in the line and none once a session's id is out, so a hit grep
-          # would not make alone, as in a case it folds otherwise than git, still fails; what is printed is held to the
-          # list first: a file whose name holds a term is named by its line alone, a line number of digits or none, and a
-          # name's control characters shown as "?")
-          hits=$(while IFS= read -r -d '' name && IFS= read -r -d '' line && IFS= read -r text; do
-            if printf '%s\n' "$text" | grep -q -i -F -f "$list" && ! printf '%s\n' "$text" | unlinked | grep -q -i -F -f "$list"; then continue; fi
-            if printf '%s\n' "$name" | grep -q -i -F -f "$list"; then name='(a file whose name holds a term)'; fi
-            name=${name//[[:cntrl:]]/?}
-            case $line in '' | *[!0-9]*) line='?' ;; esac; printf '%s:%s\n' "$name" "$line"
-          done < "$RUNNER_TEMP/hits")
-          if [ -n "$hits" ]; then
-            echo "FAIL A personal term is in these files (file:line, below), held before this pull request or added by it. Mend: in this pull request, edit each of those lines, and rename or delete a file whose name holds the term; the check reads the files as they would merge, what main already held included. LICENSE and NOTICE, at the root or in core/, go unread only while they hold a known licence's standard text, or a work's name, and copyright lines alone (floor rule 11): bring one named here back to that."
-            # (the names between GitHub's own marks that stop its runner reading workflow commands, under a token of
-            # this run's alone, so that no name is read as one)
-            token=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n'); echo "::stop-commands::$token"
-            printf '%s\n' "$hits"; echo "::$token::"
-            found=1
+          while IFS= read -r -d '' name && IFS= read -r count; do names+=("$name"); counts+=("$count"); done < "$work/counts"
+          if [ "${#names[@]}" -gt 0 ]; then
+            for name in "${names[@]}"; do printf '%s\n' "${name//$'\n'/ }"; done | add names -
+            at=$((lines + 1))
+            unlinked < "$work/text" >> "$read"
+            for i in "${!counts[@]}"; do printf '%s\tfile\t%s\n' "$at" "$i" >> "$parts"; at=$((at + counts[i])); done
+            lines=$((at - 1))
           fi
           if [ -n "$BASE" ]; then
             # One commit at a time, so every new commit is checked, not only the newest; a failing rev-list fails the
@@ -147,13 +243,12 @@ jobs:
             # adds nothing of its own, never reaches main, and no mend could change it.
             side=$BASE head=HEAD; if git rev-parse -q --verify 'HEAD^2' > /dev/null; then side=HEAD^1 head=HEAD^2; fi
             commits=$(git rev-list "$BASE..$head" "^$side")
-            bad="" people="" added="" names=""
             rewrite="Mend: rewrite those commits without it, though a later one took it away, since merging keeps every commit (git rebase -i origin/main, a message reworded, a commit edited), and push the branch again (git push --force-with-lease); main is never rewritten."
             # (GitHub's own signing key, from GitHub itself, in a keyring of this run's alone: a merge counts as GitHub's
             # only where its committer is GitHub and an OpenPGP signature on it is good by a key of that keyring, named
             # by its fingerprint; git's other signature formats, which may carry their own certificate, are read by no
             # program, so one written by hand to look so does not)
-            keys="$RUNNER_TEMP/github-keys"; mkdir -p -m 700 "$keys"
+            keys="$work/github-keys"; mkdir -p -m 700 "$keys"
             if ! curl -fsS --max-time 30 --retry 3 https://github.com/web-flow.gpg | GNUPGHOME="$keys" gpg -q --batch --import 2> /dev/null; then
               echo "::notice::GitHub's signing key could not be fetched, so no commit is taken for one GitHub made: re-run the check"
             fi
@@ -173,16 +268,13 @@ jobs:
             # only under one of them, since one made through GitHub's API takes whatever author its caller names)
             profiles=$(for m in $(git rev-list --max-count=100 --committer='noreply@github.com' "$side"); do
               made "$m" && git log -1 --format='%an <%ae>' "$m"; done | sort -u)
-            # (no step here names a shell, so GitHub runs it without pipefail: a grep -q that stops early never makes a
-            # hit read as a miss)
             for c in $commits; do
               short=$(git rev-parse --short "$c")
-              if git log -1 --format=%B "$c" | unlinked | tr '\n' ' ' | grep -q -i -F -f "$list"; then bad="$bad $short"; fi
+              git log -1 --format=%B "$c" | unlinked | tr '\n' ' ' | add message "$short"
               # (save a commit GitHub itself made under a profile above, the acting account's, as floor rule 11 excepts:
               # a merge, "update branch" too, or an edit on github.com)
-              if git log -1 --format='%an%n%ae%n%cn%n%ce' "$c" | grep -q -i -F -f "$list" \
-                && ! { made "$c" && printf '%s\n' "$profiles" | grep -q -x -F -e "$(git log -1 --format='%an <%ae>' "$c")"; }; then
-                people="$people $short"
+              if ! { made "$c" && printf '%s\n' "$profiles" | grep -q -x -F -e "$(git log -1 --format='%an <%ae>' "$c")"; }; then
+                git log -1 --format='%an%n%ae%n%cn%n%ce' "$c" | add people "$short"
               fi
               # (the lines it adds, a merge's those its own resolution adds; an octopus merge, which git's remerge-diff
               # skips, those in none of its parents, as its combined diff marks them; git that cannot show them, older
@@ -190,27 +282,53 @@ jobs:
               parents=$(($(git rev-list --parents -n 1 "$c" | wc -w) - 1))
               if [ "$parents" -gt 2 ]; then how=--cc plus="^[+]{$parents}"; else how=--remerge-diff plus='^[+]'; fi
               # (save in LICENSE or NOTICE where the commit leaves it of its shape)
-              mapfile -t own < <(unread "$c")
+              unread "$c"
               if ! patch=$(g show --format= --patch "$how" --no-ext-diff --no-textconv --no-color "$c" -- . "${own[@]}"); then
                 echo "FAIL git could not show what $short adds. Mend: run the check where git is 2.40 or later."; found=1
               # (each line read without its own marks of an added line, and no more of it, so a link can start it; a line
               # that is not UTF-8 read too, never taken for binary and left out)
-              elif printf '%s\n' "$patch" | grep -a -E "$plus" | sed -E "s/$plus//" | unlinked | grep -q -i -F -f "$list"; then added="$added $short"; fi
+              else printf '%s\n' "$patch" | grep -a -E "$plus" | sed -E "s/$plus//" | unlinked | add added "$short"; fi
               # (the names of every file it writes, not of one it deletes, so that an older name is taken out freely, as
               # git holds them: empty, renamed or binary ones too, none quoted; a merge's,
               # those its own resolution writes)
-              if git diff-tree --root --no-commit-id -r --cc --name-only --no-renames --diff-filter=d -z "$c" | tr '\0' '\n' | grep -q -i -F -f "$list"; then names="$names $short"; fi
+              git diff-tree --root --no-commit-id -r --cc --name-only --no-renames --diff-filter=d -z "$c" | tr '\0' '\n' | add written "$short"
             done
-            if [ -n "$bad" ]; then echo "FAIL A personal term is in these commits' messages (below). $rewrite"; echo "$bad"; found=1; fi
-            if [ -n "$people" ]; then
-              echo "FAIL A personal term is in these commits' author or committer (name or address), below. Mend: on the machine that made them, set git's name and address in this repository to the account's login and its no-reply address (git config user.name <login>; git config user.email <the no-reply address under Settings, Emails>), rewrite this pull request's commits with them (git rebase --exec 'git commit --amend --no-edit --reset-author' origin/main) and push the branch again (git push --force-with-lease). main is never rewritten."
-              echo "$people"; found=1
-            fi
-            if [ -n "$added" ]; then echo "FAIL A personal term is in a line that these commits add (below). $rewrite"; echo "$added"; found=1; fi
-            if [ -n "$names" ]; then echo "FAIL A personal term is in the name of a file that these commits write (below). $rewrite"; echo "$names"; found=1; fi
           fi
-          if printf '%s\n' "$TITLE" "$BODY" "$BRANCH" | unlinked | grep -q -i -F -f "$list"; then
+          printf '%s\n' "$TITLE" "$BODY" "$BRANCH" | unlinked | add text -
+          # (the terms matched, each line found taken back to its part: the file and its line, the commit, or the text)
+          if ! found_at=$(scan < "$read"); then
+            echo "FAIL Betterleaks could not read what the check gathered, so nothing was read. Mend: run the check again; where it fails again, report it to the core (core/README.md, \"Reporting to the core\")."
+            rm -rf "$work"; exit 1
+          fi
+          hits=$(printf '%s\n' "$found_at" | awk -F'\t' 'NR == FNR { if ($1 != "") { s[++n] = $1; k[n] = $2; r[n] = $3 } next }
+            $1 != "" { while (i < n && s[i + 1] <= $1) i++; if (i) print k[i] "\t" r[i] "\t" ($1 - s[i] + 1) }' "$parts" -)
+          of() { printf '%s\n' "$hits" | awk -F'\t' -v k="$1" '$1 == k && !seen[$2]++ { printf " %s", $2 }'; }
+          # (a file whose name holds a term is named by its line alone, a line number of digits or none, and a name's
+          # control characters shown as "?")
+          hidden=" $(printf '%s\n' "$hits" | awk -F'\t' '$1 == "names" { print $3 - 1 }' | tr '\n' ' ')"
+          files=$(printf '%s\n' "$hits" | awk -F'\t' '$1 == "file"' | while IFS=$'\t' read -r kind i line; do
+            name=${names[i]}; case $hidden in *" $i "*) name='(a file whose name holds a term)' ;; esac
+            name=${name//[[:cntrl:]]/?}
+            case $line in '' | *[!0-9]*) line='?' ;; esac; printf '%s:%s\n' "$name" "$line"
+          done)
+          if [ -n "$files" ]; then
+            echo "FAIL A personal term is in these files (file:line, below), held before this pull request or added by it. Mend: in this pull request, edit each of those lines, and rename or delete a file whose name holds the term; the check reads the files as they would merge, what main already held included. LICENSE and NOTICE, at the root or in core/, go unread only while they hold a known licence's standard text, or a work's name, and copyright lines alone (floor rule 11): bring one named here back to that."
+            # (the names between GitHub's own marks that stop its runner reading workflow commands, under a token of
+            # this run's alone, so that no name is read as one)
+            token=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n'); echo "::stop-commands::$token"
+            printf '%s\n' "$files"; echo "::$token::"
+            found=1
+          fi
+          bad=$(of message) people=$(of people) added=$(of added) written=$(of written)
+          if [ -n "$bad" ]; then echo "FAIL A personal term is in these commits' messages (below). $rewrite"; echo "$bad"; found=1; fi
+          if [ -n "$people" ]; then
+            echo "FAIL A personal term is in these commits' author or committer (name or address), below. Mend: on the machine that made them, set git's name and address in this repository to the account's login and its no-reply address (git config user.name <login>; git config user.email <the no-reply address under Settings, Emails>), rewrite this pull request's commits with them (git rebase --exec 'git commit --amend --no-edit --reset-author' origin/main) and push the branch again (git push --force-with-lease). main is never rewritten."
+            echo "$people"; found=1
+          fi
+          if [ -n "$added" ]; then echo "FAIL A personal term is in a line that these commits add (below). $rewrite"; echo "$added"; found=1; fi
+          if [ -n "$written" ]; then echo "FAIL A personal term is in the name of a file that these commits write (below). $rewrite"; echo "$written"; found=1; fi
+          if [ -n "$(of text)" ]; then
             echo "FAIL A personal term is in the PR's title, description or branch name. Mend: edit the title or the description; a branch's name is taken out by pushing its work to a branch of another name and opening the pull request from it."; found=1
           fi
-          rm -rf "$list" "$RUNNER_TEMP/hits" "$RUNNER_TEMP/github-keys"
+          rm -rf "$work"
           exit "$found"

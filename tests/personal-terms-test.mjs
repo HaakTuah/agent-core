@@ -89,13 +89,13 @@ function pull(commits, onMain = []) {
 }
 // The check's verdict, with the pull request checked out as GitHub merges it into the base's tip; the event names
 // `eventBase`, the tip itself unless an older base is given.
-function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", branch = "change", stale = false, key = keyFile, isPrivate = false, opener = null, locale = null } = {}) {
+function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", branch = "change", stale = false, key = keyFile, isPrivate = false, opener = null, locale = null, go = null, store = null } = {}) {
   const tip = git(dir, ["rev-parse", "main"]);
   git(dir, ["checkout", "-q", "--detach", "main"]);
   git(dir, ["merge", "-q", "--no-ff", "--no-edit", "change"], { ...GITHUB, ...(opener ? { GIT_AUTHOR_NAME: opener } : {}) });
   const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, head: { ref: branch }, base: { sha: stale ? first : tip } }, repository: { private: isPrivate } } };
-  const base = { ...env, ...ME, ...(locale ? { LC_ALL: locale } : {}), STAND_IN_KEY: key, PATH: `${stubs}${path.delimiter}${env.PATH ?? env.Path ?? ""}` };
-  const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {} }, temp: tmp });
+  const base = { ...env, ...ME, ...(locale ? { LC_ALL: locale } : {}), ...(store ? { TMPDIR: store } : {}), STAND_IN_KEY: key, PATH: `${go ? `${go}${path.delimiter}` : ""}${stubs}${path.delimiter}${env.PATH ?? env.Path ?? ""}` };
+  const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {}, "actions/cache": () => {} }, temp: tmp });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
 // (never printed in any case: GitHub's masking of the secret matches its case exactly)
@@ -275,6 +275,36 @@ fails("a term in the message of a commit that edits NOTICE alone", pull([[{ NOTI
 fails("a term in a NOTICE out of its shape in one commit, brought to it in the next", pull([[{ NOTICE: `${notice(term)}more words\n` }], [{ NOTICE: notice(term) }]]));
 fails("a term in a commit dated before the rule, added and taken out again, its author too (a date is its maker's to write)", pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_NAME: term, GIT_AUTHOR_DATE: "2026-10-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-10-01T00:00:00Z" }], [{ "b.md": "gone\n" }]]));
 passes("a term only in a commit of the base's, though the event names an older base", pull([[{ "b.md": "x\n" }]], [[{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }, "squashed on main"]]), { stale: true });
+// what Betterleaks, which matches the terms, would read otherwise than the check means (#579): a file of text that
+// begins as an archive or a PDF does, a line marked for it to pass over, its ignore and config files in the pull
+// request, a term in base64 (not decoded, as before), and a term holding what a pattern would read otherwise
+fails("a term in a file of text that begins as a zip archive or a PDF does", pull([[{ "a.txt": `PK\u0003\u0004 ${term}\n`, "b.txt": `%PDF-1.4 ${other}\n` }]]));
+fails("a term on a line marked for a scanner to pass over (gitleaks:allow, betterleaks:allow)", pull([[{ "b.md": `${term} # gitleaks:allow\n${other} # betterleaks:allow\n` }]]));
+const ignored = Array.from({ length: 400 }, (_, i) => `:term-1:${i + 1}\n:term-2:${i + 1}`).join("\n");
+const allowAll = "[allowlist]\nregexes = ['''.*''']\n";
+// (the term in a file whose name comes before theirs, so that its line is among the first the scanner is given, and
+// that file named, whatever the commit's own lines say)
+const beside = check(pull([[{ ".betterleaksignore": `${ignored}\n`, ".gitleaksignore": `${ignored}\n`, ".gitleaks.toml": allowAll, ".betterleaks.toml": allowAll, "+notes.md": `x ${term}\n` }]]));
+ok(!beside.passed && /^\+notes\.md:1$/m.test(beside.out) && !beside.out.includes(term), "a term in a file beside the pull request's own ignore and config files for the scanner fails, the file named", beside.out);
+passes("a term only in base64, which the check does not decode", pull([[{ "b.md": `${Buffer.from(`a line with ${term} in it`).toString("base64")}\n` }]]));
+const oddTerm = ["a.", "\\E", '"c'].join("");
+fails("a term holding a dot, a backslash and E and a quote, written as listed", pull([[{ "b.md": `x ${oddTerm.toUpperCase()} y\n` }]]), { terms: `${oddTerm}\n` });
+passes("a term holding a dot, where only a pattern's dot would match it", pull([[{ "b.md": `x ${oddTerm.replace(".", "z")} y\n` }]]), { terms: `${oddTerm}\n` });
+// Betterleaks at its pin: where it cannot be built (no Go, no sum for the machine's system), the check passes with a
+// note, as without the secret; a build that fails, and a kept copy that differs from its sum, fail, and that copy never
+// runs (a go of the test's own stands in for Go)
+const goStub = (name, script) => { const d = path.join(tmp, `go-${name}`); fs.mkdirSync(d); fs.writeFileSync(path.join(d, "go"), `#!/bin/sh\n${script}\n`, { mode: 0o755 }); return d; };
+const unbuilt = (what, go, words) => { const r = check(pull([[{ "b.md": `${term}\n` }]]), { go }); ok(r.passed && r.out.includes(words) && r.out.includes("so nothing was checked"), `${what}: it passes with a note that nothing was checked`, r.out); };
+unbuilt("where no Go answers", goStub("none", "exit 127"), "no Go is at hand");
+unbuilt("where no sum stands for the machine's system", goStub("plan9", 'case "$1" in env) printf "plan9\\n386\\n" ;; *) exit 1 ;; esac'), "no sum stands in this check for a build on plan9/386");
+const failing = goStub("failing", 'case "$1" in env) printf "linux\\namd64\\n" ;; *) echo "go: no network here" >&2; exit 1 ;; esac');
+const sum = /linux\/amd64\/\) sum=([0-9a-f]{64})/.exec(workflow)?.[1], version = /version=(\S+)/.exec(workflow)?.[1];
+const keptTool = path.join(tmp, "kept"), keptDir = path.join(keptTool, "agent-core-tools", `betterleaks-${version}-${sum}`), ran = path.join(tmp, "kept-ran");
+fs.mkdirSync(keptDir, { recursive: true });
+fs.writeFileSync(path.join(keptDir, "betterleaks"), `#!/bin/sh\ntouch '${ran}'\n`, { mode: 0o755 });
+const notBuilt = check(pull([[{ "b.md": "x\n" }]]), { go: failing, store: keptTool });
+ok(sum && !notBuilt.passed && mended(notBuilt.out) && notBuilt.out.includes("could not be built here at its pin") && !fs.existsSync(ran),
+  "where Betterleaks cannot be built at its pin, the check fails saying the mend, and a kept copy that differs from its sum never runs", notBuilt.out);
 const none = check(pull([[{ "b.md": `${term}\n` }]]), { terms: "" });
 ok(none.passed && none.out.includes("PERSONAL_TERMS is not set"), "without the secret it passes with a note: the check stays optional", none.out);
 
