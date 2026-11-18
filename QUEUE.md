@@ -32,9 +32,6 @@ it merges last.
 | #589 | builder | |
 | #590 | builder | #580 |
 | #591 | builder | #589 |
-| #585 | builder | |
-| #586 | builder | |
-| #546 | rule builder; two security reviews | |
 | #587 | rule builder; it may change the floor's topics and what every role reads at its start | #530 |
 | #306 | rule builder | |
 | #307 | rule builder | |
@@ -56,7 +53,6 @@ it merges last.
 | #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged; the file stays whole where #469's measure finds no kind of task reads less | #469 |
 | #471 | rule builder; it changes what the orchestrator reads at its start | |
 | #355 | builder | #530: the readers left go on the parser #529 brings |
-| #391 | builder; it overlaps #355 | #530, as #355 |
 | #542 | rule builder; it changes what the orchestrator reads at its start | #457 |
 | #337 | builder | |
 | #426 | builder; a .NET reader it files waits on #529 | |
@@ -83,6 +79,8 @@ it merges last.
 | #650 | rule builder | #654 |
 | #661 | builder | |
 | #662 | rule builder | |
+| #679 to #682 | rule builder; one PR each | #467 |
+| #702 | rule builder; it changes what every role reads at its start | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
