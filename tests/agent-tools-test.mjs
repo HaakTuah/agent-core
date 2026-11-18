@@ -957,6 +957,12 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const twiceKept = run(pr(twice(), { "README.md": "x\n" }));
     ok(twiceKept.status === 0 && twiceKept.out.includes(SEVERAL), "one the base held is noted, not failed", twiceKept.out);
     fails(run(pr(twice(), { "cfg/settings/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what the tool may read under the other name changes", SEVERAL);
+    // (Codex's code review of a2ed364: held by what a tool may read under each name alone, so what else stands there
+    // changes freely, while a tool's file changed or added under either name fails)
+    const twiceDoc = run(pr(twice(), { "Cfg/README.md": "x\n", "cfg/notes.txt": "y\n" }));
+    ok(twiceDoc.status === 0 && twiceDoc.out.includes(SEVERAL), "one the base held is noted while what no tool reads under either name changes", twiceDoc.out);
+    fails(run(pr(twice(), { "Cfg/settings/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what the tool may read under the name git keeps changes", SEVERAL);
+    fails(run(pr(twice(), { "Cfg/hooks/lint.json": JSON.stringify({ version: "v1", hooks: [] }) })), "nor once a hook file is added under the name git keeps", SEVERAL);
     const kiroHook = command => ({ version: "v1", hooks: [{ name: "lint", trigger: "Stop", action: { type: "command", command } }] });
     // (a hook file added under the other name, where no tool's path the walk takes passes, is held all the same; and a
     // link to a folder held twice is seen where no tool's file stands under the name git keeps, or where the name it
