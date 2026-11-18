@@ -37,7 +37,7 @@ const unstaged = STEPS.filter(s => s.check && !STAGES[s.lead]).map(s => s.lead);
 ok(!unstaged.length && Object.keys(STAGES).every(l => STEPS.some(s => s.lead === l && s.check)), "each step with a check has a stage and a mend in steps-stage.mjs, so the tests can take it out and put it back", unstaged.join("\n"));
 
 // ---- a project the starter kit writes: every step done, no difference from a fresh start ----
-function kit(name, o) {
+function kit(name, o, { held = true } = {}) {
   const dir = path.join(tmp, name);
   fs.mkdirSync(dir);
   execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
@@ -54,11 +54,12 @@ function kit(name, o) {
   // (the copies check's first baseline as the starter kit writes it, its two entry files' shared sentence listed)
   execFileSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: dir, stdio: "ignore" });
   fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), `${JSON.stringify({ reads: Object.keys(READERS), listed: {} }, null, 2)}\n`);
-  roundTrip(name, o, dir);
+  if (held) roundTrip(name, o, dir);
   return dir;
 }
 // (every kit, as it is written and before any case changes it: every step done, its kind read back, no difference from a
-// fresh start; so each value of each option the kit takes is held wherever a kit is made with it)
+// fresh start; so each value of each option the kit takes is held wherever a kit is made with it, and a kit made with
+// options another already holds is made with held: false, which spares the suite's time its round trip)
 function roundTrip(name, given, dir) {
   const missed = notDone(dir);
   ok(!missed.length && report(missed).startsWith("Every step a check reads is done"), `${name}, as the starter kit writes it: no step is reported not done`, report(missed));
@@ -75,9 +76,9 @@ function roundTrip(name, given, dir) {
 }
 const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget: "src", private: true }, "a-game": { packages: "web", game: true } };
 const dirs = Object.fromEntries(Object.entries(kinds).map(([name, o]) => [name, kit(name, o)]));
-// (the pairs of options no other kit of this file is made with: npm in a private repository, a private game, a game
-// built with NuGet)
-const pairs = Object.fromEntries(Object.entries({ "a-private-npm-project": { packages: ".", private: true }, "a-private-game": { private: true, game: true }, "a-dotnet-game": { nuget: "src", game: true } }).map(([name, o]) => [name, kit(name, o)]));
+// (the pairs of options no other kit of this file is made with: npm in a private repository, a private game and an npm
+// game, all three in one kit, and a game built with NuGet)
+const pairs = Object.fromEntries(Object.entries({ "a-private-npm-game": { packages: ".", private: true, game: true }, "a-dotnet-game": { nuget: "src", game: true } }).map(([name, o]) => [name, kit(name, o)]));
 // (a manifest with no `Core:` line, or one in neither form: the copy is read at core/, the default, and nothing throws;
 // beside a fresh start the line alone is listed, as the kit writes it)
 {
@@ -313,7 +314,7 @@ found = differences(project(game), fresh(project(game)));
 ok(found.length === 3 && !found.some(d => d.startsWith("AGENTS.md:")), "a file the manifest's \"Differences\" quotes is not compared", found.join("\n"));
 
 // ---- a project that lost its hooks' settings or its signature check: listed, however little of it is left ----
-const bare = kit("a-bare-npm-project", { packages: "." });
+const bare = kit("a-bare-npm-project", { packages: "." }, { held: false });
 fs.writeFileSync(path.join(bare, "package-lock.json"), "{}\n");
 fs.writeFileSync(path.join(bare, ".claude/settings.json"), '{"permissions": {}, "hooks": {}}\n');
 fs.rmSync(path.join(bare, ".github/workflows/signatures.yml"));
@@ -406,7 +407,7 @@ fs.cpSync(path.join(root, TEMPLATES), older, { recursive: true });
 const LEFT = "Every builder reads the old way of starting a task, which the core has since left.";
 fs.writeFileSync(path.join(older, "AGENTS.md.tmpl"), fs.readFileSync(path.join(older, "AGENTS.md.tmpl"), "utf8").replace("## Commands", `${LEFT}\n\n## Commands`));
 fs.writeFileSync(path.join(older, "core-manifest.md.tmpl"), fs.readFileSync(path.join(older, "core-manifest.md.tmpl"), "utf8").replace("| *large file* |", "| *old slot* | gone |\n| *large file* |"));
-const another = kit("another-npm-project", { packages: "." });
+const another = kit("another-npm-project", { packages: "." }, { held: false });
 const npmAgents = path.join(another, "AGENTS.md");
 const p0 = project(another), olderKit = fresh(p0, older);
 ok(olderKit.length > 0 && !differences(p0, fresh(p0), [olderKit]).length, "an earlier kit whose wording the project does not hold adds no difference");
@@ -424,7 +425,7 @@ ok(lacks.length === olderKit.length - 1 && !lacks.some(([to]) => to === "docs/ch
 
 // ---- a project that runs the copies and licence checks from a workflow of its own, its configs at paths of its own ----
 // (#366: each step and each difference names the files it holds; #364: a comment that names a script is no run of it)
-const ownDir = kit("own-configs", { nuget: "src", private: true });
+const ownDir = kit("own-configs", { nuget: "src", private: true }, { held: false });
 const move = (from, to) => { fs.mkdirSync(path.dirname(path.join(ownDir, to)), { recursive: true }); fs.renameSync(path.join(ownDir, from), path.join(ownDir, to)); };
 for (const [from, to] of [["checks/licences.json", "config/licences.json"], ["checks/licences-audit.json", "config/audit.json"], ["checks/copies.json", "config/copies.json"], ["checks/copies-baseline.json", "config/copies-base.json"]]) move(from, to);
 const rewrite = (file, edit) => fs.writeFileSync(path.join(ownDir, file), edit(fs.readFileSync(path.join(ownDir, file), "utf8")));
