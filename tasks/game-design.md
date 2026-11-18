@@ -125,7 +125,7 @@ player can choose to use.
   question, whether it is about this game, its kind, or every game, and the answer stands beside it in the project's
   list of its own rules (`tasks/cleaning.md`, "A project's own rules name what holds them"). The trigger is the audit,
   whose session answers it as it lists the rules and files a rule about a kind or about every game to the core as an
-  idea, the kind named; such a rule moves to the core once a second game needs it, one that stands or one the owner
+  idea, the kind named and the idea written for it, holding nothing of the game itself; such a rule moves to the core once a second game needs it, one that stands or one the owner
   has planned, written for the kind and not for the game it came from, that game pointing to it and dropping its own
   copy in the same sync ("One fact, one place"). It does not mean a game's rule is taken from it before the owner's
   word, nor that a kind with one game gets a part in the core. Reason: two games each held rules true of their kind (on

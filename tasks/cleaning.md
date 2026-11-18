@@ -85,16 +85,16 @@ code is held to: `tasks/code-shape.md`.
   holder named in the project's list, `checks/holders.json` (a check, a test, the review, or that it only describes),
   and what it is about: this project, its kind, or every project (#484). The trigger is the audit: the session that
   takes its task runs `node core/scripts/holders.mjs --project`, writes the list where the project has none and brings
-  it up to date, and files each rule about a kind or about every project to the core as an idea (`core/README.md`,
-  "Reporting to the core") where none is filed yet; the audit's reader answers its eighth question from it. Beside it,
-  each check of the core's that reads a project's code and found nothing there it could read is named in the sync's
-  report (`core/scripts/read-nothing.mjs`), and the state report gives how many of the project's own rules and of the
-  core's a check holds there, counting none whose every check read nothing. It does not mean that a rule with no check
-  fails anything, that every rule gets one (the reader proposes a check only as its limit says), nor that a project's
-  rules are rewritten to the core's pattern. Reason: a check that passes on nothing makes its rule look held, and in a
-  project of another owner a check held 10 of the 75 of the core's rules that applied there while nothing told its
-  owner which. Held by the audit, for the list; by the sync's report and the state report, for the rest, which fail
-  nothing.
+  it up to date, and files each rule about a kind or about every project to the core as an idea where none is filed yet,
+  written for the kind and holding nothing of the project, no file's name and no rule's own words (`core/README.md`,
+  "Reporting to the core"); the audit's reader answers its eighth question from it. Beside it, each check of the core's
+  that reads a project's code and found nothing there it could read is named in the sync's report
+  (`core/scripts/read-nothing.mjs`), and the state report gives how many of the project's own rules and of the core's a
+  check holds there, counting none whose every check read nothing. It does not mean that a rule with no check fails
+  anything, that every rule gets one (the reader proposes a check only as its limit says), nor that a project's rules
+  are rewritten to the core's pattern. Reason: a check that passes on nothing makes its rule look held, and in a project
+  of another owner a check held 10 of the 75 of the core's rules that applied there while nothing told its owner which.
+  Held by the audit, for the list; by the sync's report and the state report, for the rest, which fail nothing.
 - **The state report leads with the outcomes** (#302). By default the monthly state report names the five outcomes the
   owner named, the product does what was asked, is fast, can be read and changed by a newcomer, can be used by a new
   user, does not break, each with its direct measure first or the words that it has none yet, every other number under

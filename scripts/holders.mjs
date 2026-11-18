@@ -171,12 +171,13 @@ export function heldThere(root, nothing) {
 export const shareLine = (own, core) => `- rules held by a check: the project's own ${own.counts.check + own.counts.test} of ${own.counts.all}, the core's ${core.held} of ${core.all}.`;
 
 if (started(import.meta.url) && process.argv.includes("--project")) {
-  const { ruleFiles } = await import("./rule-files.mjs");
-  const read = f => { try { return fs.readFileSync(f, "utf8"); } catch { return null; } };
+  // (each file read only where it lies inside the project and is a file: a path that leads out, a link to a device or a
+  // folder, reads as not there)
+  const { readHere: read, ruleFiles } = await import("./rule-files.mjs");
   const o = ownRules(ruleFiles(), read, read(OWN));
   const c = o.counts;
   console.log(`Of the project's own ${c.all} rules: ${c.check} held by a check, ${c.test} by a test, ${c.review} by the review, ${c.describes} describe; ${o.none.length} not in ${OWN}${o.none.length ? `: ${o.none.join("; ")}` : ""}.`);
-  if (o.toCore.length) console.log(`About a kind or every project, each to file to the core as an idea ("Reporting to the core"), where none is filed yet: ${o.toCore.join("; ")}.`);
+  if (o.toCore.length) console.log(`About a kind or every project, each to file to the core as an idea where none is filed yet, written for the kind and holding nothing of this project, no file's name and no rule's own words ("Reporting to the core"): ${o.toCore.join("; ")}.`);
   for (const w of o.wrong) console.log(`note ${w}`);
 } else if (started(import.meta.url)) {
   const h = holders();

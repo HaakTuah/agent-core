@@ -31,7 +31,7 @@ import { ghApi, pagesOf } from "./labels.mjs";
 import { OWN, heldThere, ownRules, report as holdersReport, shareLine } from "./holders.mjs";
 import { readNothing } from "./read-nothing.mjs";
 import { said as pruningSaid } from "./pruning.mjs";
-import { ruleFiles } from "./rule-files.mjs";
+import { readHere, ruleFiles } from "./rule-files.mjs";
 import { ROOT, rules } from "./rules.mjs";
 import { started } from "./started.mjs";
 import { line as waitLine, measure as measureWait } from "./wait.mjs";
@@ -164,7 +164,7 @@ export function readCounts({ repo, manifest, month, steps, gh = ghApi }) {
 // core's, none whose every check read nothing here (read-nothing.mjs); null where they cannot be read.
 function heldHere(manifest) {
   try {
-    const read = f => { try { return fs.readFileSync(f, "utf8"); } catch { return null; } };
+    const read = readHere; // (inside the project, a file: rule-files.mjs)
     const nothing = readNothing(process.cwd(), manifest ?? "", read).map(n => n.check);
     return { own: ownRules(ruleFiles(), read, read(OWN)), there: heldThere(ROOT, nothing) };
   } catch { return null; }

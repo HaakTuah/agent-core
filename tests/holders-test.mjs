@@ -133,6 +133,15 @@ ok(o.counts.all === 4 && o.counts.test === 1 && o.counts.review === 1 && o.count
   "a project's own rules are listed by what holds them and what they are about: the copy of the core aside, one the list leaves out, a check not there and a rule gone said, a rule of a kind or every project marked for the core", JSON.stringify(o));
 const unlisted = ownRules(["AGENTS.md"], f => ownFiles[f] ?? null, null), unread = ownRules(["AGENTS.md"], f => ownFiles[f] ?? null, "{");
 ok(unlisted.none.length === 4 && unlisted.wrong.length === 0 && unread.wrong.some(w => /cannot be read as JSON/.test(w)), "with no list every rule is said as not listed, and a list that cannot be read is said, nothing failing");
+// (read as a project's own are read: inside the project, a file; a device or a path that leads out is not there, and
+// read nothing, so that no list makes the look hang)
+const { readHere } = await import("../scripts/rule-files.mjs");
+const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "own-rules-")), here = process.cwd();
+fs.writeFileSync(path.join(outsideDir, "AGENTS.md"), ownFiles["AGENTS.md"]);
+process.chdir(outsideDir);
+const devices = ownRules(["AGENTS.md"], readHere, JSON.stringify({ rules: { "AGENTS.md: Saves are atomic": { held: "check: /dev/zero", about: "this project" }, "AGENTS.md: Untold": { held: "test: ../outside.js", about: "this project" } } }));
+process.chdir(here);
+ok(devices.wrong.filter(w => /which is not there/.test(w)).length === 2, "a holder that is a device or leads out of the project is read as not there, and nothing is read from it", devices.wrong.join("\n"));
 const allHeld = heldThere(root, []), less = heldThere(root, ["core/scripts/shape.mjs"]);
 ok(allHeld.all > 0 && allHeld.held > 0 && less.held < allHeld.held, "of the core's rules, one held only by a check that read nothing is not held there", JSON.stringify({ allHeld, less }));
 
