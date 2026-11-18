@@ -588,11 +588,12 @@ function submodules(root, rev) {
 function caseLinks(root, rev) {
   const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = [];
   for (const at of toolPaths(names, f => resolve(f)?.type)) {
-    const via = [], misses = [];
-    if (walk(root, rev, at, via, false, misses) !== null || !misses.length || !via.some(v => l.linked.has(v))) continue;
+    const via = [], misses = [], r = walk(root, rev, at, via, false, misses);
+    if (!via.some(v => l.linked.has(v))) continue;
     // (held by what the tool reads there, found as a file system that ignores case finds it, and nothing else there)
-    const m = misses[0];
-    out.push([`${at} leads, through a link, to ${m} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${m} stands, in this pull request`, [at, ...via.map(v => `${v}\0${l.ids.get(v)}`), reaches(root, rev, at, true)].join("\0\0")]);
+    const miss = r === null ? misses.find(m => !m.several) : undefined, several = misses.find(m => m.several), links = via.map(v => `${v}\0${l.ids.get(v)}`);
+    if (miss) out.push([`${at} leads, through a link, to ${miss.at} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${miss.at} stands, in this pull request`, [at, ...links, reaches(root, rev, at, true)].join("\0\0")]);
+    else if (several) out.push([`${at} leads, through a link, to ${several.at}, which the commit holds under more than one name a file system that ignores case reads as one (${several.several.join(", ")}), as macOS's and Windows' do, keeping one of them, so which an agent tool reads is not plain. Mend: keep one of those names, in this pull request`, [at, ...links, ...several.several.map(n => readAs(root, rev, n, several.rest))].join("\0\0")]);
   }
   return out;
 }
@@ -620,8 +621,9 @@ function shownNotBlob(root, rev, at) {
   return shown.get(key);
 }
 // A name as a file system that folds case compares it: wholly, so a letter whose upper case is another's ("\u017f" and
-// "s") is the same, which lower case alone does not make it.
-const fold = name => name.toUpperCase().toLowerCase();
+// "s") is the same, which lower case alone does not make it; and in one of Unicode's normal forms, NFC, as macOS's
+// compares a letter written whole and one written with a joining mark.
+const fold = name => name.normalize("NFC").toUpperCase().toLowerCase().normalize("NFC");
 // The tools' files this check reads, and their folders, as each tool names them.
 const TOOL_FILES = [".claude/settings.json", ".claude/settings.local.json", ".mcp.json", ".kiro/settings/mcp.json", ".codex/hooks.json", ".codex/config.toml"];
 const TOOL_FOLDERS = [".claude/skills/", ".kiro/hooks/"];
@@ -726,14 +728,12 @@ function walk(root, rev, f, via = [], lenient = false, misses = [], follow = fal
       left.unshift(...to.split("/"));
       continue;
     }
-    noteMiss(listing(root, rev), at, name, misses);
+    noteMiss(listing(root, rev), at, name, misses, hops > 0 && left.join("/"));
     if (!goesOn(listing(root, rev), here, left.length > 0, via, lenient)) return null;
     at.push(name);
   }
   return reached(at.join("/") || ".", blobs, dirs, others);
 }
-// Where a walk meets `here`, a name the commit holds nothing at, while its folder holds that name in another case, which
-// a file system that ignores case finds in its place, that name, said in `misses`.
 // The name a file system that ignores case finds for `name` in the folder `at`: `name` where the commit holds it, else
 // one of the folder's names that folds to it.
 function folded({ blobs, dirs, others, linked, children }, at, name) {
@@ -741,11 +741,19 @@ function folded({ blobs, dirs, others, linked, children }, at, name) {
   if (dirs.has(here) || blobs.has(here) || others.has(here) || linked.has(here)) return name;
   return [...(children.get(at.join("/") || ".") ?? [])].find(n => fold(n) === fold(name)) ?? name;
 }
-function noteMiss({ blobs, dirs, others, children }, at, name, misses) {
-  const here = [...at, name].join("/");
-  if (dirs.has(here) || blobs.has(here) || others.has(here)) return;
-  const dir = at.join("/") || ".", other = [...(children.get(dir) ?? [])].find(n => n !== name && fold(n) === fold(name));
-  if (other !== undefined) misses.push(dir === "." ? other : `${dir}/${other}`);
+// Where a walk meets a name the commit holds nothing at, while its folder holds that name in another case, which a
+// file system that ignores case finds in its place, that name, said in `misses` as { at }; and, past a link, where it
+// meets a name its folder holds beside another that folds alike, which such a file system keeps one of, so which the
+// tool reads is not plain, those names, as { at, several, rest }, `rest` the path the walk had left there.
+function noteMiss({ blobs, dirs, others, linked, children }, at, name, misses, rest) {
+  const here = [...at, name].join("/"), dir = at.join("/") || ".", path = n => (dir === "." ? n : `${dir}/${n}`);
+  const same = [...(children.get(dir) ?? [])].filter(n => fold(n) === fold(name)).sort();
+  if (dirs.has(here) || blobs.has(here) || others.has(here) || linked.has(here)) {
+    if (rest !== false && same.length > 1) misses.push({ at: here, several: same.map(path), rest });
+    return;
+  }
+  const other = same.find(n => n !== name);
+  if (other !== undefined) misses.push({ at: path(other) });
 }
 // Whether a walk goes on past `here`, `more` of the path after it: the last name may be anything the commit holds; one
 // with more after it, a folder the commit holds, or a folder every clone holds beside what the commit lists, a
@@ -868,6 +876,10 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 // link and submodule on the way held by its object, of what it reaches only what a tool reads there, and for a skill's
 // folder its SKILL.md; so a link held as the base held it is held by that too, and nothing else that stands there. With
 // `follow`, each name is found as a file system that ignores case finds it.
+// What a tool reads through the name `at`, `rest` the path after it: what the walk reaches there, read as reaches() reads.
+function readAs(root, rev, at, rest) {
+  return commitReader(root, rev, true, true).holds(rest ? `${at}/${rest}` : at);
+}
 function reaches(root, rev, at, follow = false) {
   const posix = at.split(path.sep).join("/"), want = fold(posix), { holds, names, resolve } = commitReader(root, rev, true, follow);
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];

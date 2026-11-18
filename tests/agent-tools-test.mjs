@@ -822,6 +822,18 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ok(caseKept.status === 0 && caseKept.out.includes(LINK_SAYS), "one the base held is noted, not failed", caseKept.out);
     fails(run(pr(caseHeld, { "inner/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what stands under its target changes", LINK_SAYS);
     passes(run(pr(project({ "Inner/mcp.json": "{}\n", ...listing() }), { "README.md": "x\n" })), "a folder in another case that no link leads to is none of this");
+    // (a target the commit holds under two names that fold alike, which a file system that ignores case keeps one of)
+    const SEVERAL = "under more than one name a file system that ignores case reads as one";
+    const twice = () => { const dir = project({ "Cfg/settings/mcp.json": "{}\n", "cfg/settings/mcp.json": "{}\n", ...listing() }); fs.symlinkSync("Cfg", path.join(dir, ".kiro")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link to a name held twice"); return dir; };
+    fails(run(twice(), "--core"), "a link to a name the commit holds twice, folded alike, fails", `leads, through a link, to Cfg, which the commit holds ${SEVERAL} (Cfg, cfg)`, "Mend: keep one of those names");
+    const twiceKept = run(pr(twice(), { "README.md": "x\n" }));
+    ok(twiceKept.status === 0 && twiceKept.out.includes(SEVERAL), "one the base held is noted, not failed", twiceKept.out);
+    fails(run(pr(twice(), { "cfg/settings/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what the tool may read under the other name changes", SEVERAL);
+    // (and a target in another of Unicode's normal forms, which macOS's file system reads as the same)
+    const nfd = project({ ["cf\u0065\u0301/settings/mcp.json"]: "{}\n", ...listing() });
+    fs.symlinkSync("cf\u00e9", path.join(nfd, ".kiro"));
+    git(nfd, "add", "-A"); git(nfd, "commit", "-q", "-m", "a link to a name in another normal form");
+    fails(run(nfd, "--core"), "a link to a name the commit holds in another normal form fails", ".kiro leads, through a link, to", LINK_SAYS);
     // (#600's code review of 09ed8b5: a tool's folder in another case, itself a link whose target stands only in another
     // case, the base holding both, and what stands under that target changed)
     const both = project({ "cfg/config.toml": "# none\n", ...listing() });
