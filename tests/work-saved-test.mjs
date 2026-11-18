@@ -218,6 +218,7 @@ ok(!/STOP|floor's own copy/.test(hook("start", project).stdout), "a project whos
   const pkg = path.join(tmp, "packages"), origin = path.join(tmp, "packages.git");
   fs.mkdirSync(path.join(pkg, "core", "scripts"), { recursive: true });
   fs.copyFileSync(fileURLToPath(new URL("../scripts/work-saved.sh", import.meta.url)), path.join(pkg, "core", "scripts", "work-saved.sh"));
+  fs.copyFileSync(fileURLToPath(new URL("../scripts/packages.mjs", import.meta.url)), path.join(pkg, "core", "scripts", "packages.mjs"));
   for (const f of ["package.json", "package-lock.json", ".npmrc"]) fs.copyFileSync(fileURLToPath(new URL(`../${f}`, import.meta.url)), path.join(pkg, "core", f));
   fs.writeFileSync(path.join(pkg, "core-manifest.md"), "# Core manifest\n");
   git(tmp, "init", "-q", "--bare", "-b", "main", origin);
@@ -244,6 +245,16 @@ ok(!/STOP|floor's own copy/.test(hook("start", project).stdout), "a project whos
   fs.symlinkSync(kept, path.join(pkg, "core", "node_modules"), "junction");
   said = hook("start", pkg).stdout;
   ok(fs.existsSync(path.join(kept, "unpushed.txt")) && /packages are not installed: core\/node_modules is a link.*Mend: /.test(said), "a copy's node_modules that is a link is never replaced, and what it points at is kept", said);
+  // (main's own lock file naming another source than npm's registry: npm never runs, and the start says so)
+  fs.unlinkSync(path.join(pkg, "core", "node_modules"));
+  git(pkg, "checkout", "-q", "--", "core");
+  const mainLock = JSON.parse(fs.readFileSync(path.join(pkg, "core", "package-lock.json"), "utf8"));
+  mainLock.packages["node_modules/yaml"].dependencies = { x: "git+https://example.invalid/x.git" };
+  fs.writeFileSync(path.join(pkg, "core", "package-lock.json"), JSON.stringify(mainLock, null, 2));
+  git(pkg, "commit", "-q", "-am", "a lock file that names git");
+  git(pkg, "push", "-q", "origin", "main");
+  said = hook("start", pkg).stdout;
+  ok(!installed() && /packages are not installed: main's core\/package\.json, core\/package-lock\.json or core\/\.npmrc names a source.*Mend: /.test(said), "where main's lock file names another source than npm's registry, the start runs no npm, and says the mend", said);
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the work-saved hook`);

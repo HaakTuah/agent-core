@@ -30,7 +30,8 @@ if [ "$mode" = start ]; then
   fi
 fi
 # The core's packages (#654): at the start, where main's copy holds a lock file and what is installed beside the copy
-# is not what it names, npm installs them from main's package list, lock file and .npmrc alone, written into a folder of
+# is not what it names, and main's scripts/packages.mjs finds them all from npm's registry, npm installs them from main's
+# package list, lock file and .npmrc alone, written into a folder of
 # its own outside the checkout, so that nothing of the branch's is read or run (a shrinkwrap, a config, a link); then the
 # folder it installed takes the place of the copy's node_modules/, only where that is a folder of the checkout's own,
 # no link and nothing git tracks. No install script runs, and it gives up after 20 seconds, inside the hook's 30. A
@@ -38,7 +39,7 @@ fi
 if [ "$mode" = start ] && command -v npm >/dev/null 2>&1 && command -v node >/dev/null 2>&1 \
   && g cat-file -e "refs/remotes/origin/main:${at}package-lock.json" 2>/dev/null; then
   w=$(mktemp -d 2>/dev/null) || w=""
-  if [ -n "$w" ] && (for f in package.json package-lock.json .npmrc; do g --no-replace-objects show "refs/remotes/origin/main:${at}$f" >"$w/$f" 2>/dev/null || exit 1; done); then
+  if [ -n "$w" ] && (for f in package.json package-lock.json .npmrc scripts/packages.mjs; do mkdir -p "$w/$(dirname "$f")" && g --no-replace-objects show "refs/remotes/origin/main:${at}$f" >"$w/$f" 2>/dev/null || exit 1; done); then
     # (whether the folder holds what main's lock file names, by each entry's version, address and integrity: node reads
     # the two files as data, and runs nothing of either)
     if ! node -e 'const fs=require("fs");const read=f=>{try{return JSON.parse(fs.readFileSync(f,"utf8")).packages||{}}catch{return null}};const [w,h]=process.argv.slice(1).map(read);process.exit(w&&h&&Object.keys(w).filter(k=>k&&!w[k].dev).every(k=>h[k]&&["version","resolved","integrity"].every(f=>w[k][f]===h[k][f]))?0:1)' "$w/package-lock.json" "${at}node_modules/.package-lock.json" 2>/dev/null; then
@@ -50,9 +51,13 @@ if [ "$mode" = start ] && command -v npm >/dev/null 2>&1 && command -v node >/de
       elif [ -L "$dest" ] || node -e 'process.exit(require("fs").lstatSync(process.argv[1],{throwIfNoEntry:false})?.isSymbolicLink()?0:1)' "$dest" 2>/dev/null \
         || [ -n "$(g ls-files -- "$dest" 2>/dev/null | head -n 1)" ]; then
         echo "The core's packages are not installed: ${dest} is a link or holds files git tracks, which the install would replace. Mend: take it out of git and remove the link, then run node ${at}scripts/install.mjs."
+      # (main's own reading of its package list, lock file and .npmrc, as install.mjs reads them before npm runs: only
+      # npm's registry, and its own two settings; the npm that comes with the least Node reads no setting that says so)
+      elif ! node --input-type=module -e 'const fs=await import("node:fs"),{pathToFileURL}=await import("node:url");const w=process.argv[1],p=await import(pathToFileURL(w+"/scripts/packages.mjs").href),r=f=>fs.readFileSync(w+"/"+f,"utf8");process.exit(p.lockFaults(JSON.parse(r("package.json")),JSON.parse(r("package-lock.json"))).length||p.npmrcOthers(r(".npmrc")).length?1:0)' "$w" >/dev/null 2>&1; then
+        echo "The core's packages are not installed: main's ${at}package.json, ${at}package-lock.json or ${at}.npmrc names a source or a setting the core's install does not take. Mend: run node ${at}scripts/install.mjs, which says what it refuses."
       else
         omit=--omit=dev; [ -z "$at" ] && [ -d tests ] && omit= # (a copy installs no package only the core's own tests run)
-        if (cd "$w" && timeout 20 npm ci --ignore-scripts --no-audit --no-fund --workspaces=false $omit >/dev/null 2>&1) && rm -rf "$dest" && mv "$w/node_modules" "$dest"; then :; else
+        if (cd "$w" && timeout 20 npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none --allow-directory=none --workspaces=false $omit >/dev/null 2>&1) && rm -rf "$dest" && mv "$w/node_modules" "$dest"; then :; else
           echo "The core's packages are not installed: npm could not install them from main's ${at}package-lock.json. Mend: run node ${at}scripts/install.mjs before running a check."
         fi
       fi

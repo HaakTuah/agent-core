@@ -34,11 +34,12 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   const { lockFaults, ENTRY_FIELDS } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href);
   const faults = lockFaults(list, lock);
   ok(faults.length === 0, "the package list and the lock file hold what install.mjs takes: their own fields, registry entries alone, and every spec a version, range or tag of npm's registry", faults.slice(0, 5).join("; "));
-  const bad = [{ ...list, overrides: {} }, { ...list, devDependencies: { x: "git+https://example.invalid/x.git" } }, { ...list, devDependencies: { x: "ids.tgz" } }, { ...list, devDependencies: { x: "1.0.0 || a.tar.gz" } }, { ...list, devDependencies: { x: "file:x" } }];
+  const bad = [{ ...list, overrides: {} }, { ...list, devDependencies: { x: "git+https://example.invalid/x.git" } }, { ...list, devDependencies: { x: "ids.tgz" } }, { ...list, devDependencies: { x: "1.0.0 || a.tar.gz" } }, { ...list, devDependencies: { x: "file:x" } }, { ...list, devDependencies: { x: "x.tar_gz" } }, { ...list, devDependencies: { x: "^1.0.0" } }];
   const badLocks = [{ ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], dependencies: { b: "git+https://example.invalid/b.git" } } } },
     { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], link: true } } },
-    { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], resolved: "https://example.invalid/yaml.tgz" } } }];
-  ok(bad.every(l => lockFaults(l, lock).length > 0) && badLocks.every(l => lockFaults(list, l).length > 0) && lockFaults({ ...list, devDependencies: { x: "^1.2.3 || ~2", y: "latest" } }, lock).length === 0,
+    { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], resolved: "https://example.invalid/yaml.tgz" } } },
+    { lockfileVersion: 3, requires: true, dependencies: { yaml: { version: "git+https://example.invalid/yaml.git" } } }, { ...lock, packages: null }, { ...lock, dependencies: {} }];
+  ok(bad.every(l => lockFaults(l, lock).length > 0) && badLocks.every(l => lockFaults(list, l).length > 0) && lockFaults(list, { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], dependencies: { z: "^1.2.3 || ~2", y: "latest" } } } }).length === 0,
     "and a field of its own, a spec naming git, a file or a tarball, a linked entry or one from another address, each is one it refuses; a range or a tag is none");
   // (what npm installed is what the lock file names: its own record of the install, read against the lock entry by
   // entry, whatever field or npm brought another source in; the core's tests' job installs before this runs)

@@ -77,15 +77,28 @@ export const ENTRY_FIELDS = new Set(["version", "resolved", "integrity", "licens
   "dependencies", "optionalDependencies", "peerDependencies", "peerDependenciesMeta", "os", "cpu", "libc", "deprecated", "hasInstallScript"]);
 const LIST_FIELDS = ["name", "private", "description", "license", "dependencies", "devDependencies"];
 const SPEC_FIELDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
-const registrySpec = v => typeof v === "string" && /^[\w.^~<>=|*+ -]*$/u.test(v) && !/^\./u.test(v) && !/\.t(?:gz|ar)\b/iu.test(v);
+// (a range or tag of the registry: no ".tgz" or ".tar" anywhere, which some npm reads as a file however it ends)
+const registrySpec = v => typeof v === "string" && /^[\w.^~<>=|*+ -]*$/u.test(v) && !/^\./u.test(v) && !/\.t(?:gz|ar)/iu.test(v);
 const KEY = /^(?:node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*\/)*node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*$/u;
 const plainAddress = r => { try { return /^https:\/\/registry\.npmjs\.org\//u.test(r) && new URL(r).href === r; } catch { return false; } };
 export function lockFaults(list, lock) {
   const out = [], specs = (where, o) => { for (const [n, v] of Object.entries(o ?? {})) if (!registrySpec(v)) out.push(`${where}: the spec ${JSON.stringify(n)}: ${JSON.stringify(v)} names no version, range or tag of npm's registry`); };
   for (const k of Object.keys(list ?? {})) if (!LIST_FIELDS.includes(k)) out.push(`package.json: the field ${JSON.stringify(k)}, which the core's package list does not hold`);
   for (const f of SPEC_FIELDS) specs(`package.json ${f}`, list?.[f]);
-  if (lock?.lockfileVersion !== 3) out.push("package-lock.json: not npm's own form, version 3");
+  // (the package list's own packages at one exact version each: floor rule 7)
+  for (const f of ["dependencies", "devDependencies"]) for (const [n, v] of Object.entries(list?.[f] ?? {})) if (!/^\d+\.\d+\.\d+$/u.test(String(v))) out.push(`package.json ${f}: ${JSON.stringify(n)} at ${JSON.stringify(v)}, not one exact version`);
+  out.push(...formFaults(lock));
   for (const [k, e] of Object.entries(lock?.packages ?? {})) if (k) out.push(...entryFaults(k, e ?? {}, specs));
+  return out;
+}
+
+// The lock file's own form: npm's version 3, its entries under "packages" alone, since an older form's "dependencies"
+// npm would read in their place.
+function formFaults(lock) {
+  const out = [], top = Object.keys(lock ?? {}).filter(k => !["name", "version", "lockfileVersion", "requires", "packages"].includes(k));
+  if (lock?.lockfileVersion !== 3) out.push("package-lock.json: not npm's own form, version 3");
+  if (top.length) out.push(`package-lock.json: the field${top.length === 1 ? "" : "s"} ${top.join(", ")}, which npm's own form, version 3, does not hold`);
+  if (!lock?.packages || typeof lock.packages !== "object" || Array.isArray(lock.packages)) out.push("package-lock.json: no \"packages\" of npm's own form");
   return out;
 }
 
