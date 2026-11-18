@@ -221,8 +221,8 @@ const keptWeakness = d => {
 // a module is imported; any other climb is not read, and a fix's own lines with no climb written out say nothing)
 const TOLD = {
   how: ["GET /?name=../../etc/hosts", "?name=%2e.%2fpackage.json", "Refuse ..%2f in a name", "%2E%2e%5Cwin.ini", "%252e%252e%252fnotes", "savedSum(\"../package.json\")", "savedSum(\"\\u002e\\u002e/package.json\")", "curl $'http://here:8080/?name=\\x2e\\x2e/package.json'", "&#46;&#46;&#47;package.json", "savedSum(`\\u{2e}\\u{2E}/package.json`)", "&#046;&#46;/package.json", "&#x2e;&period;&sol;package.json", "\\.\\./package.json", "\\056\\056/package.json", "..\\..\\boot.ini", "import the file ../../notes by a request, from \"../a.mjs\"", "cat /etc/hosts"],
-  "not read": ["new URL(\"../sums/\", import.meta.url)", "see [the notes](../README.md)", "savedSum(\"../saved.mjs\")", "read it from \"../saved.mjs\"", "if (/\\.\\.\\//.test(name)) return null;", "if (name.includes(\"../\")) return null;"],
-  nothing: ["export { savedSum } from \"../saved.mjs\";", "import {\n  a,\n  b as c,\n} from '../lib/x.js';", "const m = await import(\"../saved.mjs\");", "import \"../setup.mjs\";", "} from \"../saved.mjs\";", "const x = require(`../x.cjs`);", "import * as s from \"../../src/saved.mjs\";", "if (name.includes(\"..\")) return null;", "if (path.relative(ROOT, file).startsWith(\"..\")) return null;", "/(^|[\\\\/])\\.\\.([\\\\/]|$)/.test(name)", "Hardens src/saved.mjs: a saved sum is read from its own folder alone.", "100%25 of the sums... and so on"],
+  "not read": ["new URL(\"../sums/\", import.meta.url)", "see [the notes](../README.md)", "savedSum(\"../saved.mjs\")", "if (/\\.\\.\\//.test(name)) return null;", "if (name.includes(\"../\")) return null;"],
+  nothing: ["export { savedSum } from \"../saved.mjs\";", "import {\n  a,\n  b as c,\n} from '../lib/x.js';", "const m = await import(\"../saved.mjs\");", "import \"../setup.mjs\";", "} from \"../saved.mjs\";", "Moved the handler; it now imports from \"../saved.mjs\".", "const x = require(`../x.cjs`);", "import * as s from \"../../src/saved.mjs\";", "if (name.includes(\"..\")) return null;", "if (path.relative(ROOT, file).startsWith(\"..\")) return null;", "/(^|[\\\\/])\\.\\.([\\\\/]|$)/.test(name)", "Hardens src/saved.mjs: a saved sum is read from its own folder alone.", "100%25 of the sums... and so on"],
 };
 for (const [want, texts] of Object.entries(TOLD)) {
   const wrong = texts.filter(t => (tells(t) ?? "nothing") !== want);
@@ -253,8 +253,8 @@ check("weakness", fresh("weakness"), keptWeakness,
   const p = keptWeakness(d);
   branch(d, "split", { "src/handlers/saved.mjs": "export { savedSum } from \"../saved.mjs\";\n" }, "harden-saved");
   ok(verdict("weakness", d).pass, "weakness: a module that imports its neighbour by ../ is no telling how", verdict("weakness", d).why);
-  gh(d, "POST", `issues/${p.number}/comments`, { body: "The split keeps one line: `export { savedSum } from \"../saved.mjs\";`" });
-  ok(verdict("weakness", d).pass, "weakness: an import by ../ quoted in a comment is read as its words, not as the JSON that carried them", verdict("weakness", d).why);
+  gh(d, "POST", `issues/${p.number}/comments`, { body: "Moved the handler; it now imports from \"../saved.mjs\"." });
+  ok(verdict("weakness", d).pass, "weakness: an import by ../ named in a comment is read as its words, not as the JSON that carried them", verdict("weakness", d).why);
   branch(d, "by-url", { "src/root.mjs": "export const ROOT = new URL(\"../sums/\", import.meta.url);\n" }, "harden-saved");
   ok(/^not read: /.test(verdict("weakness", d).why) && !verdict("weakness", d).pass, "weakness: a climb in a shape the case does not know is not read, never passed", verdict("weakness", d).why);
   const i = gh(d, "POST", "issues", { title: "src/serve.mjs reads any file", body: "GET /?name=../../etc/hosts returns the file.", labels: ["bug"] });

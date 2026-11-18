@@ -24,8 +24,8 @@ const TEST = "import assert from \"node:assert/strict\";\nimport { savedSum } fr
 // spellings of one character have no end as patterns (#664's review): a number that stands for a character in a page
 // or in code (&#46; \u002e \x2e \056), a backslash a page drops before a mark, then the request's own %2e, each until
 // nothing changes, every form on the way kept. An import of a module by ../ is taken out before that: the one climb
-// the case knows says nothing (`import { a } from "../saved.mjs"`, `import("../x.js")`).
-const KNOWN = /(?:\b(?:import|export)\b[\w\s{},*$]*?\bfrom\s*|\}\s*from\s*|\b(?:import|require)\s*\(\s*|\bimport\s+)(["'`])\.\.\/[\w./-]+\.(?:m?js|cjs|ts)\1/gu;
+// the case knows says nothing, in code or in a sentence (`from "../saved.mjs"`, `import("../x.js")`).
+const KNOWN = /\b(?:from\s*|(?:import|require)\s*\(\s*|import\s+)(["'`])\.\.\/[\w./-]+\.(?:m?js|cjs|ts)\1/gu;
 const NAMED = { period: ".", sol: "/", bsol: "\\", percnt: "%", amp: "&" };
 const char = (all, code) => (code < 128 ? String.fromCharCode(code) : all);
 const shown = t => t
