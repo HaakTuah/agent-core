@@ -825,6 +825,16 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const outKept = run(pr(throughIgnored, { "README.md": "x\n" }));
     ok(outKept.status === 0 && outKept.out.includes("as the base held it"), "a link out the base held is noted while what its path reaches stands", outKept.out);
     fails(run(pr(throughIgnored, { "kreal/settings/mcp.json": JSON.stringify({ mcpServers: { files: { command: "npx", args: ["-y", "files@1.0.0"] } } }) })), "but not once what it reaches changes", '".kiro" is a link that leads out of the checkout');
+    // (#618's code review of 4d141c6: only what a tool reads there, so a file beside it, or a link that reaches the
+    // checkout's root, changes nothing the base held)
+    const besideRead = run(pr(throughIgnored, { "kreal/notes.md": "x\n" }));
+    ok(besideRead.status === 0 && besideRead.out.includes("as the base held it"), "a file there no tool reads, changed, changes nothing the base held", besideRead.out);
+    const toRoot = project({ ".gitignore": "node_modules/\n", ...listing() });
+    fs.rmSync(path.join(toRoot, ".codex"), { recursive: true, force: true });
+    fs.symlinkSync("node_modules/..", path.join(toRoot, ".codex"));
+    git(toRoot, "add", "-A"); git(toRoot, "commit", "-q", "-m", "a link through an ignored folder to the root");
+    const rootKept = run(pr(toRoot, { "README.md": "an unrelated change\n" }));
+    ok(rootKept.status === 0 && rootKept.out.includes("as the base held it"), "and so does an unrelated change where a held link reaches the checkout's root", rootKept.out);
   }
 }
 

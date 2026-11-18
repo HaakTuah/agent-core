@@ -840,11 +840,13 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 // Each link out of the checkout into `fail`, save one the base held as it stands, into `notes`: what stood before turns
 // nothing red.
 // What the link `at` reaches in the commit `rev`, its path read through any folder a working copy may hold beside the
-// commit (one CI's checkout lacks among them): each link on the way, by its object, and what it reaches with all that
-// stands under it, so a link held as the base held it is held by that too.
+// commit (one CI's checkout lacks among them): each link on the way, by its object, and what it reaches, of it only what
+// a tool reads there (its file, or under it the tool's files and those of its folders the tool reads), so a link held as
+// the base held it is held by that too, and nothing else that stands there.
 function reaches(root, rev, at) {
-  const via = [], l = listing(root, rev), r = walk(root, rev, at.split(path.sep).join("/"), via, true);
-  const under = r ? [...l.ids].filter(([a]) => r.f === "." || a === r.f || a.startsWith(`${r.f}/`)).sort() : [];
+  const posix = at.split(path.sep).join("/"), via = [], l = listing(root, rev), r = walk(root, rev, posix, via, true);
+  const read = rel => { const low = fold(rel ? `${posix}/${rel}` : posix); return TOOL_FILES.includes(low) || READS.test(low); };
+  const under = r ? [...l.ids].filter(([a]) => a === r.f ? read("") : (r.f === "." || a.startsWith(`${r.f}/`)) && read(r.f === "." ? a : a.slice(r.f.length + 1))).sort() : [];
   return JSON.stringify([r?.type ?? null, ...via.map(v => [v, l.ids.get(v) ?? null]), ...under]);
 }
 function sortLinks(root, base, links, fail, notes) {
