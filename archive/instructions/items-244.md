@@ -125,3 +125,13 @@ The index, and how an item is written: `archive/instructions.md`.
      and copies checks, the parts the first trials would replace. The owner agreed to it, with the issue's other points,
      after asking what the core lacked that let an inventory's check miss a part. It stands behind "A trial of a
      maintained tool replays the part's past bugs" in `tasks/choices.md`, and the inventory's line `Replayed:`.
+
+257. **18 November 2026**, #457, points 2, 4 and 5. A test that needs time has it handed in and asserts no duration on
+     a real clock, a measure of speed excepted with room above its floor; a push that merges an up-to-date pull request
+     whose whole suite passed on the same tree runs no test again; and the audit's seventh question asks where the tests
+     of portable code run and what that costs, since in another owner's suite counted for #426 the one failure at random
+     in 26,518 runs came from a duration asserted on a real clock, and every push to its default branch ran the whole
+     suite again after its pull request had. The owner agreed to the issue's points, and to point 4's skip being built in
+     the core's own job of tests and listed for projects as a step with its cost, the starter kit holding none. It stands
+     behind "A test asserts no time measured on a real clock" and "A tree that passed is not run again" in
+     `tasks/tests.md`, and the seventh question in `tasks/cleaning.md`.
