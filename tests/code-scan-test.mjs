@@ -92,7 +92,9 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
   ok(throws(() => place(files, kept, "linux")) && fs.readFileSync(path.join(kept, "keep.txt"), "utf8") === "kept", "a folder that stands and holds no engine is refused, and left as it was");
   const forged = path.join(tmp, "forged");
   fs.mkdirSync(forged); fs.writeFileSync(path.join(forged, `osemgrep${process.platform === "win32" ? ".exe" : ""}`), "a stand-in that finds nothing");
-  const refused = scan(tmp, { dir: forged });
+  const holder = path.join(tmp, "holder"), hg = (...a) => execFileSync("git", a, { cwd: holder, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
+  fs.mkdirSync(holder); hg("init", "-q"); fs.writeFileSync(path.join(holder, "a.py"), "x = 1\n"); hg("add", "-A"); hg("commit", "-q", "-m", "code");
+  const refused = scan(holder, { dir: forged });
   ok(refused.failed && /the engine in .* is not the one pinned/u.test(refused.lines.join("\n")) && mended(refused.lines.join("\n")), "an engine whose files are not the pinned ones is never run: the scan fails, saying its mend", refused.lines.join("\n"));
 }
 // (hostile descriptions: nothing, the wrong type, markup, a path, a number out of range, too long; none lists a finding
@@ -116,6 +118,11 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
   const another = hostScans(p);
   fs.writeFileSync(path.join(p, ".github", "workflows", "scan.yaml"), `jobs:\n  analyze:\n    uses: ${CORE}/.github/workflows/codeql.yml@0123456789abcdef0123456789abcdef01234567\n`);
   ok(!before && !inText && !another && hostScans(p) && !hostScans(tmp), "the host scans a project where a job calls the core's own codeql.yml at a full commit, not where a comment or a step's text names it, nor another's or one at a branch");
+  const nothing = path.join(tmp, "no-code"), g = (...a) => execFileSync("git", a, { cwd: nothing, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
+  fs.mkdirSync(nothing); g("init", "-q"); g("commit", "-q", "--allow-empty", "-m", "base"); fs.writeFileSync(path.join(nothing, "README.md"), "words\n"); g("add", "-A"); g("commit", "-q", "-m", "docs");
+  const idle = await fetchEngine(path.join(tmp, "not-fetched"), { sys: "linux-x64", get: () => { throw new Error("no fetch was due"); }, root: nothing, base: "HEAD~1" });
+  ok(/not fetched: the change adds or alters no file of the kinds the scan reads/u.test(idle) && !fs.existsSync(path.join(tmp, "not-fetched")), "a change of no file the scan reads fetches nothing", idle);
+  ok(scan(nothing, { base: "HEAD~1", dir: path.join(tmp, "no-engine-here") }).lines.join("").includes("no file of the kinds it reads changed"), "and its scan says so, with no engine to ask");
   const skipped = await fetchEngine(path.join(tmp, "not-fetched"), { sys: "linux-x64", get: () => { throw new Error("no fetch was due"); }, root: p });
   ok(/not fetched: a workflow calls the core's codeql\.yml/u.test(skipped) && !fs.existsSync(path.join(tmp, "not-fetched")), "where the host's CodeQL scans the project, nothing is fetched", skipped);
 }

@@ -141,6 +141,7 @@ export function place(files, dir, sys = process.platform) {
 /** Fetches the engine into `dir` at set-up; always resolves, to the line it prints. */
 export async function fetchEngine(dir, { sys = system(), get = fetch, root = process.cwd(), base = null } = {}) {
   if (hostScans(root, base)) return `semgrep ${VERSION}: not fetched: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project`;
+  if (base && !targets(root, base).length) return `semgrep ${VERSION}: not fetched: the change adds or alters no file of the kinds the scan reads`;
   const wheel = WHEELS[sys];
   if (!wheel) return `NOT FETCHED: Semgrep ${VERSION}: no build of its engine for ${sys}; the code scan will say it did not run here`;
   if (fs.existsSync(dir) && digestAt(dir) === ENGINES[sys]) return `semgrep ${VERSION}: present in ${dir}`;
@@ -334,10 +335,8 @@ export function verdicts(findings, { root, base, stood, added, explained }) {
 
 const UNREAD_MEND = at => `${MEND}mend the file so the engine reads it (one past the engine's 30 seconds for a rule, split; one it cannot parse, made valid), or, where it must stay so, add to the pull request's description a line "Scan unread: \`${at}\`, <why>" for its security review to confirm (floor rule 9)`;
 
-/** What stops the scan before any file is read: the host's CodeQL, no engine, or an engine not the pinned one; null
- *  where none does. */
-function gate(root, base, dir) {
-  if (hostScans(root, base)) return { lines: ["code scan: not run: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project"], failed: false };
+/** What stops the scan before the engine runs: no engine, or an engine not the pinned one; null where neither does. */
+function gate(dir) {
   if (!fs.existsSync(path.join(dir, `osemgrep${exe()}`))) {
     return { lines: [`code scan: did not run: Semgrep's engine is not in ${dir} (fetched at set-up by \`node <the core's copy>/scripts/code-scan.mjs --fetch\`, or no build of it for ${system()}); it decides nothing`], failed: false };
   }
@@ -375,11 +374,12 @@ export function answer(dir, root, files, listed, run = runEngine) {
 
 /** The scan: { lines, failed }, each line to print. */
 export function scan(root, { base = null, description = "", dir = engineAt() } = {}) {
-  const stopped = gate(root, base, dir);
-  if (stopped) return stopped;
-  const listed = base ? unreadListed(description) : new Set();
+  if (hostScans(root, base)) return { lines: ["code scan: not run: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project"], failed: false };
   const files = targets(root, base);
   if (!files.length) return { lines: [`code scan: no file of the kinds it reads ${base ? "changed" : "tracked"}`], failed: false };
+  const stopped = gate(dir);
+  if (stopped) return stopped;
+  const listed = base ? unreadListed(description) : new Set();
   const { got, held, read } = answer(dir, root, files, listed);
   if (got.failed) return base
     ? { lines: [`FAIL: code scan: ${got.failed}, on the files this change adds or alters. ${UNREAD_MEND("<path>")}, naming the file it stops on (run the scan on each)`], failed: true }
