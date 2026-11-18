@@ -1,8 +1,8 @@
 # Choices that are hard to undo
 
 Read before a session makes a choice that is hard to undo or advises the owner on one, by the reader of a pass over
-the recorded choices, by a builder of a move from one stack to another, and by whoever tries a maintained tool in the
-place of a part of the project's own: the kinds `choice`, `port` and `trial`.
+the recorded choices, by a builder of a move from one stack to another, and by whoever runs a trial of a tool that
+would take a part's job: the kinds `choice`, `port` and `trial`.
 
 A choice is hard to undo where one pull request cannot reverse it: a language, an engine or framework, where data is
 kept, how the code is put together, a large dependency, a tool the work will lean on, and the platforms the code builds
