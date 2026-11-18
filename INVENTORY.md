@@ -7,10 +7,9 @@ its list "What is written by hand today"), which weighed the readers inside the 
 line here points to it where a part holds such a reader, and weighs the whole part. It lists too, under a heading of its
 own, what the core lacks that a maintained tool gives at once, first a general linter for its own scripts.
 
-It decides nothing by itself. A **replace** or a **try** becomes a line of `QUEUE.md` only on the owner's word, each a
-pull request of its own that shows the comparison, old against new (#534, point 2); no tool or package arrives before
-#488's points 1, 3, 4 and 5 have merged; and the order is #534's, point 7: the tools that only run first, then the
-packages carried in the copy, then the form the rules are delivered in.
+It decides nothing by itself. A **replace** or a **try** becomes a line of `QUEUE.md` only on the owner's word, and is
+built as `AGENTS.md`, "A part of the core gives way to what is maintained", says: its comparison, old against new, in a
+pull request of its own, in that rule's order.
 
 Weighed whole: 2026-11-17
 
