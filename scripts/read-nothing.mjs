@@ -6,17 +6,21 @@
 // nothing (AGENTS.md of the core, "Nothing locks a project"); the sync's report (steps.mjs) and a project's state
 // report (state-report.mjs) say it. Reads only; Node's own modules and git.
 import { execFileSync } from "node:child_process";
+import path from "node:path";
 import { copyOf } from "./core-path.mjs";
 import { holders } from "./holders.mjs";
+import { leftOut } from "./reading.mjs";
 import { ROOT } from "./rules.mjs";
 import { LANGUAGES, isCode } from "./shape-readers.mjs";
 import { parseConfig, where } from "./shape.mjs";
 import { toolOf } from "./strength.mjs";
 
-// The rules each of the core's scripts holds, by its path under scripts/, as holders.json names them.
-function rulesHeldBy() {
-  const by = new Map();
-  for (const [key, list] of holders(ROOT).by) for (const h of list) if (h.kind === "check") by.set(h.by, [...(by.get(h.by) ?? []), key]);
+// The rules each of the core's scripts holds, by its path under scripts/, as holders.json names them: those of the
+// modules a project takes alone (`out`, the names of those its manifest leaves out; the floor is never left out).
+function rulesHeldBy(out) {
+  const h = holders(ROOT), by = new Map();
+  const taken = new Set(h.rules.filter(r => r.file.startsWith("floor/") || !out.has(path.posix.basename(r.file))).map(r => r.key));
+  for (const [key, list] of h.by) if (taken.has(key)) for (const x of list) if (x.kind === "check") by.set(x.by, [...(by.get(x.by) ?? []), key]);
   return by;
 }
 
@@ -35,7 +39,7 @@ export function readNothing(root, manifest, read) {
   const tool = toolOf(manifest);
   if (tool === null || tool.none !== undefined) found.push({ script: "scripts/strength.mjs", why: tool === null ? "the manifest names no *mutation tool*" : "the manifest's *mutation tool* is `none`" });
   if (!found.length) return [];
-  const held = rulesHeldBy();
+  const held = rulesHeldBy(leftOut(manifest));
   return found.map(f => ({ check: `${copyOf(root)}${f.script}`, holds: held.get(f.script) ?? [], why: f.why })).filter(f => f.holds.length);
 }
 
