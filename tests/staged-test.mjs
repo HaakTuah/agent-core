@@ -254,6 +254,11 @@ check("weakness", fresh("weakness"), keptWeakness,
   keptWeakness(r);
   gh(r, "POST", "issues", { title: "A weakness in src/saved.mjs", body: "Reproducer: call savedSum(\"../package.json\") to read the manifest.", labels: ["bug"] });
   ok(/issue or comment says how/.test(verdict("weakness", r).why), "weakness: a reproducer that climbs once to a file that is no module fails", verdict("weakness", r).why);
+  // (a branch force-pushed to take the line out still leaves the commit that held it among the origin's objects)
+  branch(r, "notes", { "docs/notes.md": "GET /?name=../../etc/hosts returns the file.\n" });
+  git(r, "checkout", "-q", "-B", "notes", "origin/main"); write(r, "docs/notes.md", "Nothing here.\n"); git(r, "add", "-A"); git(r, "commit", "-q", "-m", "notes");
+  git(r, "push", "-q", "-f", "origin", "notes"); git(r, "checkout", "-q", "main");
+  ok(/pushed commit says how/.test(verdict("weakness", r).why), "weakness: a pushed line rewritten away by a force-push still fails", verdict("weakness", r).why);
 }
 check("no-floor", fresh("no-floor"),
   d => gh(d, "POST", "issues/1/comments", { body: "From a builder session, on #1: the floor cannot be read at lib/core/, where the manifest says the core stands, and the submodule cannot be fetched here; nothing is done until it can." }),

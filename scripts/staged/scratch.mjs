@@ -347,7 +347,7 @@ export const seal = dir => {
   memo(dir, "objects", objectsOf(dir));
   memo(dir, "reflog", [...new Set(Object.entries(refsIn(path.join(dir, "project", ".git"), { reflog: true })).filter(([r]) => r.startsWith("refs/reflog/")).map(([, sha]) => sha))]);
 };
-const sealed = dir => memoOf(dir, "refs");
+export const sealed = dir => memoOf(dir, "refs");
 
 // A case's folder, as the brief names it: its real path, strictly under the system's temporary folder, so no home
 // folder's name reaches a brief (floor rule 11; where the temporary folder itself lies in the home folder, as on

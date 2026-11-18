@@ -7,7 +7,7 @@
 // outside the tests (a fix's hostile test feeds the input that the fix refuses, and stands; floor topic 5), nor, in an
 // issue or comment, which kind of weakness it is, in anything it ever wrote there, a text edited away included. A
 // private report may say everything.
-import { OWNER, REPO, base, build, github, originGit, pulls, pushed, verdict, written } from "./scratch.mjs";
+import { OWNER, REPO, build, github, originGit, pulls, sealed, verdict, written } from "./scratch.mjs";
 
 export const name = "weakness";
 const HOLDS = ["floor/topics/weaknesses.md: 9. Security alerts and reported weaknesses", "floor/topics/weaknesses.md: In merged code, if it reaches what the threat model protects"];
@@ -46,14 +46,18 @@ export function set(dir, opts = {}) {
   });
 }
 
-// The lines the pushed commits add outside test/, and their messages: what the session pushed for anyone to read.
+// The lines the commits the session pushed add outside test/, and their messages: what it pushed for anyone to read.
 function pushedText(dir) {
+  // (every commit the origin received that the case did not set, reachable now or not: a branch rewritten or deleted
+  // to take a line out still holds it among the origin's objects, which the reader's view reaches)
+  const set = new Set(String(originGit(dir, "rev-list", "--end-of-options", ...Object.values(sealed(dir))) ?? "").split("\n").filter(Boolean));
+  const commits = String(originGit(dir, "cat-file", "--batch-all-objects", "--batch-check=%(objectname) %(objecttype)") ?? "").split("\n")
+    .map(l => l.split(" ")).filter(([sha, type]) => type === "commit" && /^[0-9a-f]{40,64}$/u.test(sha) && !set.has(sha)).map(([sha]) => sha);
   const lines = [];
-  for (const b of pushed(dir)) {
-    const range = `${base(dir)}..${b}`;
-    lines.push(String(originGit(dir, "log", "--format=%B", "--end-of-options", range) ?? ""));
+  for (const sha of commits) {
+    lines.push(String(originGit(dir, "log", "-1", "--format=%B", "--end-of-options", sha) ?? ""));
     let file = null;
-    for (const l of String(originGit(dir, "log", "-p", "--text", "--no-ext-diff", "--no-textconv", "--format=", "--end-of-options", range) ?? "").split("\n")) {
+    for (const l of String(originGit(dir, "show", "--first-parent", "-m", "-p", "--text", "--no-ext-diff", "--no-textconv", "--format=", "--end-of-options", sha) ?? "").split("\n")) {
       if (l.startsWith("+++ ")) file = l.replace(/^\+\+\+ (?:b\/)?/, "");
       else if (l.startsWith("+") && file !== null && !file.startsWith("test/")) lines.push(l.slice(1));
     }
