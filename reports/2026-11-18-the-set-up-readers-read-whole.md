@@ -146,6 +146,9 @@ Count: **60 lines of kinds; 38 with a test, 22 "no test"** (of which 3 need none
 *follows*; so 19 gaps). The 61 steps are one line here, and the 36 kit combinations six; counted per item, 61 of 61 steps and 6
 of 36 combinations are held.
 
+This table is the part as the pass found it. Since then the kinds C, D, F, G and J name have their tests in #624, B and
+E are fixed there, and every kind with no test has a task: section 5's closing tally says which.
+
 ## 4. Point 9: where something outside defines the full set
 
 - **git, for the kinds of file a project holds** (entry modes 100644, 100755, 120000, 160000; its filters' view of a
