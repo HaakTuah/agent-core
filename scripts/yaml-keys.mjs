@@ -8,9 +8,7 @@
 // and each line break, \r\n, \r or \n, is one, as GitHub reads it. What it does not read: mappings nested about a
 // thousand deep, far past what GitHub reads, where the package stops; and text that is no YAML past where the package
 // can read it, which GitHub refuses all the same.
-import { load } from "./packages.mjs";
-
-const { LineCounter, isScalar, parseAllDocuments, visit } = await load("yaml");
+import { loadSync } from "./packages.mjs";
 
 // A line without its comment (" #" outside quotes, or "#" at its start).
 export function uncommented(line) {
@@ -27,6 +25,8 @@ export function uncommented(line) {
 // The keys given twice in one mapping of a YAML text, each as { line, key, first }: the line of the second, the key as
 // YAML reads it and the line of the first, numbered from 1, in the order of the seconds in the text.
 export function twice(text) {
+  // (the package, loaded here alone: a script that imports this file for `uncommented` needs nothing installed)
+  const { LineCounter, isScalar, parseAllDocuments, visit } = loadSync("yaml");
   const found = [], lines = new LineCounter();
   try {
     const docs = parseAllDocuments(String(text).replace(/^\ufeff/u, "").replace(/\r\n?/gu, "\n"), { lineCounter: lines, schema: "failsafe", uniqueKeys: false, prettyErrors: false });

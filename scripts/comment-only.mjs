@@ -29,10 +29,9 @@
 // block scalar's text ends, this proof deciding what it reads (#530); it changes nothing.
 import "./whole-output.mjs";
 import { execFileSync } from "node:child_process";
-import { load } from "./packages.mjs";
+import { loadSync } from "./packages.mjs";
 import { started } from "./started.mjs";
 
-const { Lexer } = await load("yaml");
 
 export const RUNS = /(?:^|\/)(?:\.(?:github|claude)(?:\/|$)|action\.ya?ml$)/iu; // what runs by itself, as far as this proof reads it
 const YAML = /\.ya?ml$/iu;
@@ -60,6 +59,7 @@ const NOT_TEXT = /^(?:~|null|true|false|yes|no|on|off|y|n)$/iu;
 function tokensOf(text) {
   const out = [];
   let at = 0, marked = false, header = false;
+  const { Lexer } = loadSync("yaml"); // (loaded where it is used: no import of this file needs it)
   for (const src of new Lexer().lex(text)) {
     if (src === "\x02" || src === "\x18") continue; // (a document's start; a [ ] or { } left open, read below)
     if (src === "\x1f") { marked = true; continue; }

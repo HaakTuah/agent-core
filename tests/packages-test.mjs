@@ -47,13 +47,18 @@ try {
   fs.writeFileSync(path.join(project, "node_modules/yaml/index.js"), "module.exports = { Lexer: class {}, project: true };\n");
   fs.cpSync(path.join(root, "scripts"), path.join(copy, "scripts"), { recursive: true });
   for (const f of ["package.json", "package-lock.json", ".gitignore"]) fs.copyFileSync(path.join(root, f), path.join(copy, f));
-  const loads = fs.readdirSync(path.join(root, "scripts")).filter(f => f.endsWith(".mjs") && f !== "packages.mjs" && /await load\("/u.test(fs.readFileSync(path.join(root, "scripts", f), "utf8")));
-  ok(loads.length > 0, "the scripts that load a package are found", loads.join(", "));
+  // (each script that loads a package, by the call that loads it; a script that loads one and has no case here fails)
+  const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")` };
+  const loads = fs.readdirSync(path.join(root, "scripts")).filter(f => f.endsWith(".mjs") && f !== "packages.mjs" && /\bload(?:Sync)?\("/u.test(fs.readFileSync(path.join(root, "scripts", f), "utf8")));
+  ok(loads.length > 0 && loads.every(f => CALLS[f]), "each script that loads a package has its call here", loads.filter(f => !CALLS[f]).join(", "));
+  const call = (f, expr) => spawnSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts", f)).href)}); console.log(JSON.stringify(m.${expr}));`], { cwd: project, encoding: "utf8", timeout: 60000 });
   for (const f of loads) {
-    const r = spawnSync(process.execPath, [path.join(copy, "scripts", f)], { cwd: project, encoding: "utf8", timeout: 60000 });
-    const out = `${r.stdout}${r.stderr}`;
+    const r = call(f, CALLS[f]), out = `${r.stdout}${r.stderr}`;
     ok(r.status === 1 && /did not run: the package \S+ is not installed/u.test(out) && /install\.mjs/u.test(out) && mended(out), `${f}, with nothing installed beside the copy, says it did not run and how to install, and does not take the project's own package of the name`, out);
   }
+  // (a script that imports one of them for what needs no package runs with nothing installed: the copies check)
+  const plain = call("yaml-keys.mjs", `uncommented("a: 1 # b")`);
+  ok(plain.status === 0 && plain.stdout.trim() === JSON.stringify("a: 1"), "what needs no package runs with nothing installed, so a project's own workflow that runs the copies check is not stopped", `${plain.stdout}${plain.stderr}`);
   // (and the install puts each package where the scripts load it from, untracked)
   const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000 });
   const lock = JSON.parse(fs.readFileSync(path.join(copy, "package-lock.json"), "utf8"));
