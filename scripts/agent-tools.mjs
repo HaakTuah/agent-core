@@ -525,8 +525,8 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
 
 // A commit's files as an agent tool reads them: a path walked as the file system walks it, a link inside the checkout
 // followed (walk), a file's text, and the names in a folder.
-function commitReader(root, rev, lenient = false) {
-  const resolve = f => walk(root, rev, f, [], lenient);
+function commitReader(root, rev, lenient = false, follow = false) {
+  const resolve = f => walk(root, rev, f, [], lenient, [], follow);
   const read = f => { const r = resolve(f); return r?.type === "blob" ? textAt(root, rev, r.f) : null; };
   const names = dir => {
     const d = resolve(dir);
@@ -536,7 +536,7 @@ function commitReader(root, rev, lenient = false) {
   // submodule's commit, and each link it passes on the way, by its object, which is its target, so a link filled in,
   // moved or leading on to what changed is seen)
   const holds = f => {
-    const via = [], r = walk(root, rev, f, via, lenient), { ids } = listing(root, rev);
+    const via = [], r = walk(root, rev, f, via, lenient, [], follow), { ids } = listing(root, rev);
     return [r?.type ?? "nothing", ids.get(r?.f) ?? "", ...via.map(at => `${at}\0${ids.get(at)}`)].join("\0");
   };
   return { resolve, read, names, holds };
@@ -575,8 +575,9 @@ function caseLinks(root, rev) {
   for (const at of toolPaths(names, f => resolve(f)?.type)) {
     const via = [], misses = [];
     if (walk(root, rev, at, via, false, misses) !== null || !misses.length || !via.some(v => l.linked.has(v))) continue;
-    const m = misses[0], under = [...l.ids].filter(([a]) => a === m || a.startsWith(`${m}/`)).sort().map(([a, id]) => `${a}\0${id}`);
-    out.push([`${at} leads, through a link, to ${m} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${m} stands, in this pull request`, [at, ...via.map(v => `${v}\0${l.ids.get(v)}`), ...under].join("\0\0")]);
+    // (held by what the tool reads there, found as a file system that ignores case finds it, and nothing else there)
+    const m = misses[0];
+    out.push([`${at} leads, through a link, to ${m} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${m} stands, in this pull request`, [at, ...via.map(v => `${v}\0${l.ids.get(v)}`), reaches(root, rev, at, true)].join("\0\0")]);
   }
   return out;
 }
@@ -694,13 +695,14 @@ function target(root, rev, at) {
   }
   return targets.get(key);
 }
-function walk(root, rev, f, via = [], lenient = false, misses = []) {
+function walk(root, rev, f, via = [], lenient = false, misses = [], follow = false) {
   const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
   let hops = 0;
   while (left.length) {
-    const name = left.shift();
+    let name = left.shift();
     if (name === "" || name === ".") continue;
     if (name === "..") { if (!at.length) return null; at.pop(); continue; }
+    if (follow) name = folded(listing(root, rev), at, name);
     const here = [...at, name].join("/");
     if (linked.has(here)) {
       via.push(here);
@@ -717,6 +719,13 @@ function walk(root, rev, f, via = [], lenient = false, misses = []) {
 }
 // Where a walk meets `here`, a name the commit holds nothing at, while its folder holds that name in another case, which
 // a file system that ignores case finds in its place, that name, said in `misses`.
+// The name a file system that ignores case finds for `name` in the folder `at`: `name` where the commit holds it, else
+// one of the folder's names that folds to it.
+function folded({ blobs, dirs, others, linked, children }, at, name) {
+  const here = [...at, name].join("/");
+  if (dirs.has(here) || blobs.has(here) || others.has(here) || linked.has(here)) return name;
+  return [...(children.get(at.join("/") || ".") ?? [])].find(n => fold(n) === fold(name)) ?? name;
+}
 function noteMiss({ blobs, dirs, others, children }, at, name, misses) {
   const here = [...at, name].join("/");
   if (dirs.has(here) || blobs.has(here) || others.has(here)) return;
@@ -839,15 +848,15 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 
 // Each link out of the checkout into `fail`, save one the base held as it stands, into `notes`: what stood before turns
 // nothing red.
-// What the link `at` reaches in the commit `rev`, its path read through any folder a working copy may hold beside the
-// commit (one CI's checkout lacks among them): each link on the way, by its object, and what it reaches, of it only what
-// a tool reads there (its file, or under it the tool's files and those of its folders the tool reads), so a link held as
-// the base held it is held by that too, and nothing else that stands there.
-function reaches(root, rev, at) {
-  const posix = at.split(path.sep).join("/"), via = [], l = listing(root, rev), r = walk(root, rev, posix, via, true);
-  const read = rel => { const low = fold(rel ? `${posix}/${rel}` : posix); return TOOL_FILES.includes(low) || READS.test(low); };
-  const under = r ? [...l.ids].filter(([a]) => a === r.f ? read("") : (r.f === "." || a.startsWith(`${r.f}/`)) && read(r.f === "." ? a : a.slice(r.f.length + 1))).sort() : [];
-  return JSON.stringify([r?.type ?? null, ...via.map(v => [v, l.ids.get(v) ?? null]), ...under]);
+// What the link `at` reaches in the commit `rev`, read as the case check reads what a folder in another case holds
+// (through()): through any folder a working copy may hold beside the commit (one CI's checkout lacks among them), each
+// link and submodule on the way held by its object, of what it reaches only what a tool reads there, and for a skill's
+// folder its SKILL.md; so a link held as the base held it is held by that too, and nothing else that stands there. With
+// `follow`, each name is found as a file system that ignores case finds it.
+function reaches(root, rev, at, follow = false) {
+  const posix = at.split(path.sep).join("/"), want = fold(posix), { holds, names, resolve } = commitReader(root, rev, true, follow);
+  const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
+  return [through(posix, want, holds, names, f => resolve(f)?.type), ...skill].join("\0\0");
 }
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {

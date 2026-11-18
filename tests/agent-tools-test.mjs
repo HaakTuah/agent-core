@@ -817,6 +817,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     fs.symlinkSync("CFG", path.join(both, ".Codex"));
     git(both, "add", "-A"); git(both, "commit", "-q", "-m", "a link in another case to a target in another case");
     fails(run(pr(both, { "cfg/config.toml": "notify = [\"bash\", \"new.sh\"]\n" })), "and so does one the base held whose tool's folder is in another case too", LINK_SAYS);
+    // (#618's code review of 1e710c8: held by what the tool reads there alone, so a file beside it changes nothing)
+    const besideCase = run(pr(both, { "cfg/notes.md": "x\n" }));
+    ok(besideCase.status === 0 && besideCase.out.includes(LINK_SAYS), "a file there no tool reads, added, changes nothing the base held", besideCase.out);
     // (a link the base held that leads out of the checkout, as one through a folder CI's checkout lacks does, is held by
     // what its path reaches in the commit too)
     const throughIgnored = project({ ".gitignore": "node_modules/\n", "kreal/settings/mcp.json": "{}\n", ...listing() });
@@ -835,6 +838,23 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(toRoot, "add", "-A"); git(toRoot, "commit", "-q", "-m", "a link through an ignored folder to the root");
     const rootKept = run(pr(toRoot, { "README.md": "an unrelated change\n" }));
     ok(rootKept.status === 0 && rootKept.out.includes("as the base held it"), "and so does an unrelated change where a held link reaches the checkout's root", rootKept.out);
+    // (#618's fallback security review of 1e710c8: a link or submodule on the way to what a tool reads there, and what a
+    // link under it leads to, are held too)
+    const underLink = (setup, change, says) => {
+      const dir = project({ ".gitignore": "node_modules/\n", ...listing() });
+      fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true });
+      setup(dir);
+      git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link out through an ignored folder");
+      git(dir, "checkout", "-q", "-B", "change2"); change(dir);
+      git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "changed");
+      git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change2");
+      fails(run(dir), says, '".claude" is a link that leads out of the checkout');
+    };
+    const skillAt = (dir, folder) => { fs.mkdirSync(path.join(dir, folder, "x"), { recursive: true }); fs.writeFileSync(path.join(dir, folder, "x/SKILL.md"), `# ${folder}\n`); };
+    underLink(dir => { fs.mkdirSync(path.join(dir, "cl"), { recursive: true }); fs.writeFileSync(path.join(dir, "cl/settings.json"), KIT); skillAt(dir, "s1"); skillAt(dir, "s2"); fs.symlinkSync("../s1", path.join(dir, "cl/skills")); fs.symlinkSync("node_modules/../cl", path.join(dir, ".claude")); },
+      dir => { fs.unlinkSync(path.join(dir, "cl/skills")); fs.symlinkSync("../s2", path.join(dir, "cl/skills")); }, "a link under a held link out, moved, fails");
+    underLink(dir => { fs.mkdirSync(path.join(dir, "cl"), { recursive: true }); fs.writeFileSync(path.join(dir, "cl/settings.json"), KIT); skillAt(dir, "s1"); fs.symlinkSync("../s1", path.join(dir, "cl/skills")); fs.symlinkSync("node_modules/../cl", path.join(dir, ".claude")); },
+      dir => fs.writeFileSync(path.join(dir, "s1/x/SKILL.md"), "# changed\n"), "and so does what a link under it leads to, changed");
   }
 }
 
