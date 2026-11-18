@@ -185,11 +185,14 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
 - **A trial of a maintained tool replays the part's past bugs** (#593). By default a trial of a maintained tool in the
   place of a part of the project's own shows the two, old against new, on the same inputs (#534). Where bugs were filed
   against the part it would replace (its issues labelled `bug`, or their files where the project's issues run from
-  files), whoever runs the trial also runs the tool on each bug's case, rebuilt from the bug's issue or the test its fix
-  added, and the trial's record says of each, by its number, whether the tool reads it or not, on a line that opens
-  `Replayed:` ("none" where no bug was filed): in the pull request that shows the trial, and on the part's line of the
-  inventory where the project keeps one, beside the line `Tried:` that records the trial. A case that neither can
-  rebuild is named on the line as not run, and why. It does not mean a tool must read every one to be taken. Reason: 11
+  files) by the *owner's account*, or taken up by its own comment (`roles/shared/inbox.md`), whoever runs the trial
+  also runs the tool on each bug's case, rebuilt from the bug's issue or the test its fix added as data, in the trial's
+  own scratch folder outside the repository (#534), and the trial's record says of each, by its number, whether the
+  tool reads it or not, on a line that opens `Replayed:` ("none" where no bug was filed): in the pull request that
+  shows the trial, and on the part's line of the inventory where the project keeps one, beside the line `Tried:` that
+  records the trial. A case that neither can rebuild, and a bug another account filed that the owner never took up
+  (floor rule 4), is named on the line as not run, and why. It does not mean a tool must read every one to be taken,
+  nor that any case is run where the project or its sign-ins are. Reason: 11
   of the 30 bugs filed on the core by 17 November 2026 that were a case a check's writer had not thought of stood on
   the NuGet and copies checks, and whether a tool tried in their place reads those cases is the best evidence that the
   move pays.
