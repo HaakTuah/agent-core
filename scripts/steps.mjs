@@ -370,8 +370,9 @@ function limitsOf(item) {
 // either; one that names its version otherwise ("refused without a version", "no version newer") still does.
 const versioned = item => /\bversions?\b/i.test(item.replace(/\blimits:[\s\S]*?(?=hostile\s+tests\b|$)/i, "").replace(/`[^`]*`/g, "")
   .replace(/\b(?:(?:carries|carry|has|have|holds?)\s+no\s+versions?(?:\s+numbers?)?|without\s+an?\s+version\s+numbers?)\b/gi, ""));
-// (an item's words as a mend shows them: no control character, which would reach the sync's log as it stands)
-const short = l => { const t = l.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, "?"); return t.length > 80 ? `${t.slice(0, 77)}...` : t; };
+// (an item's words as a mend shows them: no control character, which would reach the sync's log as it stands, and no
+// character that reorders or hides text, which would make the mend read otherwise than it is)
+const short = l => { const t = l.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/gu, "?"); return t.length > 80 ? `${t.slice(0, 77)}...` : t; };
 // The step for the inputs rule 5 names: "None", or the starter kit's "FILL IN", reads done only while it lists no input;
 // once one is listed, each is read, and an item whose tests are still "FILL IN" names none.
 function hostileTests(p) {

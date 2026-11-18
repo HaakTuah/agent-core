@@ -217,8 +217,8 @@ ok(!rule5("   - a saved game, its version read first; limits: 1 MB, 5 s, version
   "an item whose limits name the newest version its reader knows reads done");
 ok(!rule5("   - a peer's message, which carries no version number; limits: 64 KB; hostile tests: `tests/hostile/link.test.mjs`.\n").length,
   "an item that says its input carries no version is not asked to name one");
-missedInputs = rule5("   - a saved game, refused without a version; limits: 1 MB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a save, \u001b[31mred\u0007; limits: 1 MB; hostile tests: none\n");
-ok(missedInputs.length === 1 && /newest version/u.test(missedInputs[0].mend) && missedInputs[0].mend.includes("a saved game") && !/[\u0000-\u001f]/u.test(missedInputs[0].mend),
+missedInputs = rule5("   - a saved game, refused without a version; limits: 1 MB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a save, \u001b[31mred\u0007\u009b\u2028\u202e\u2066\ufeff; limits: 1 MB; hostile tests: none\n");
+ok(missedInputs.length === 1 && /newest version/u.test(missedInputs[0].mend) && missedInputs[0].mend.includes("a saved game") && !/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/u.test(missedInputs[0].mend),
   "an item that names its version otherwise is still asked to name the newest, and an item's control characters never reach the mend", report(missedInputs));
 missedInputs = rule5("   Each message a peer sends, its size checked.\n");
 ok(missedInputs.length === 1 && missedInputs[0].mend.includes("as an item of its own"), "inputs written as a paragraph, no item in it, are reported, the mend saying to list them", report(missedInputs));
