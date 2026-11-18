@@ -389,7 +389,7 @@ jobs:
       - name: The registry's signature on each of the core's own installed packages (floor rule 7; once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }}
         working-directory: .packages
-        run: npm audit signatures
+        run: npm audit signatures --prefix=. # (the folder's own settings and every package of its lock, never a workspace root above it)
       - name: Every tool the core's own agents load is listed (floor topic 15)
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
         run: node scripts/agent-tools.mjs .github/licences.json --core

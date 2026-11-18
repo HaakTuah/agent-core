@@ -72,8 +72,8 @@ export function npmrcOthers(text) {
 // What the core's package list and lock file may hold, read before npm runs (install.mjs) and by the core's own test:
 // the package list its own fields alone; each lock entry a folder of node_modules/ named in npm's name characters,
 // fetched from npm's registry at an address in its one plain form and held to its sha512, with no field but those a
-// package fetched from the registry carries, and none of those npm would act on that the core's lock never writes
-// (ACTED); and every dependency spec a version, range or tag of npm's registry,
+// package fetched from the registry carries, and none of those that make npm skip an entry or install it only on
+// some platforms, which the core's lock never writes (ACTED); and every dependency spec a version, range or tag of npm's registry,
 // never one that names git, a web address, a file, a folder or a tarball, which the npm that comes with the least Node
 // would fetch, and run its prepare script, whatever setting says otherwise (#654). Each fault as a line; none, [].
 export const ENTRY_FIELDS = new Set(["version", "resolved", "integrity", "license", "dev", "peer", "engines", "bin", "funding",

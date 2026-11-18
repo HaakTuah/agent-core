@@ -3,7 +3,8 @@
 # a link in their place; nor the folder an install before they moved into .packages/ left at the root, which a clone
 # made then still holds. The copy's package list, lock file and .npmrc, in the dot folder .packages/ so that no
 # workspace pattern of a project's own package list takes them in, are tracked there even where the project's own
-# .gitignore leaves such files out.
+# .gitignore leaves such files, or dot folders, out.
+!/.packages/
 /.packages/node_modules
 /node_modules
 !/.packages/.npmrc
