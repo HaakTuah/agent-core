@@ -18,7 +18,8 @@
 // reaches through one differs by the system that resolves it: a link (git's mode 120000) where a tool reads its files,
 // at a tool's file or folder, on the way to one or below a tool's folder, in whatever case, fails where the pull request
 // adds or changes it, whatever it leads to; one the base held, the same link to the same target, is noted, and fails only
-// where the pull request changes what stands at the path its text names, read as a string (sortBehind()); one replaced
+// where the pull request changes what stands at the path its text names, read as a string, or, where an install fills
+// that path, what says what the install puts there (sortBehind()); one replaced
 // with the very files it named is its mend, what they configure standing as the base's. What a person or a machine configures
 // outside the repository is no file of the project's (floor rule 18); another tool's settings (Kiro's agents under
 // `.kiro/agents`, say, or the plug-ins and marketplaces a Codex config names), and where a plug-in's marketplace or a
@@ -560,8 +561,10 @@ function sourcesOf(head, list, file, problems) {
 // is a problem of its own (linkProblems()), so what it leads to is never read, and the head and the base read alike.
 export function readProject(root, rev = null, linkedOnMain = () => false, alias = f => f) {
   const commit = rev ? commitReader(root, rev, alias) : null;
-  // (in the working tree, a path with a link anywhere on its way is read as holding nothing)
-  const viaLink = f => f.split("/").some((_, i, parts) => { try { return fs.lstatSync(path.join(root, ...parts.slice(0, i + 1))).isSymbolicLink(); } catch { return false; } });
+  // (in the working tree, a path with a link anywhere on its way is read as holding nothing: a link of the file system's,
+  // or one git's HEAD holds, which a checkout with core.symlinks off writes as a plain file of the link's text)
+  const linkedAtHead = rev ? null : listing(root, "HEAD").linked;
+  const viaLink = f => f.split("/").some((_, i, parts) => { const p = parts.slice(0, i + 1); if (linkedAtHead.has(p.join("/"))) return true; try { return fs.lstatSync(path.join(root, ...p)).isSymbolicLink(); } catch { return false; } });
   // (in the working tree, a file git ignores is a person's or a machine's own, as a .claude/settings.local.json mostly
   // is, and no file of the project's: floor rule 18)
   const ignored = f => { try { execFileSync("git", ["check-ignore", "-q", "--", f], { cwd: root, stdio: "ignore" }); return true; } catch { return false; } };
@@ -870,9 +873,10 @@ function sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes
 // marked "from": "the working tree" in its entry, which lists it in the baseline. A new one fails, marked or not, and
 // so does one whose mark the pull request took out while it stands: the baseline only shrinks. In the core's own
 // repository none may stand.
-function sortSources({ sources, marked }, { head, baseProject, baseList, core, file }, fail, notes) {
-  const before = new Set(baseProject ? [...baseProject.ids.values()].flatMap(set => [...set]) : []);
-  const stood = k => !!baseProject && [...head.ids.get(k)].every(id => before.has(id)) && baseProject.sources.has(k);
+function sortSources({ sources, marked }, { head, baseProject, baseList, core, file, mended = null }, fail, notes) {
+  // (as the base held it, or as it held it with a link's files read in the link's place, where the pull request replaced
+  // it with them: mendedBase())
+  const held = heldBy(head, baseProject, mended), stood = k => !!baseProject && held(k) && (baseProject.sources.has(k) || !!mended?.sources.has(k));
   for (const [k, problem] of sources) {
     if (!core && !baseProject) notes.push(`with no base to read against, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}`);
     else if (!core && stood(k) && !baseList?.from.has(k)) notes.push(`as the base held it, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}; or, to list it in the baseline, give its entry in ${file} "from": ${show(TREE)}`);
@@ -909,27 +913,31 @@ function objectAt(root, rev, at) {
 }
 // Each link the base held where a tool reads its files that the pull request replaced with the very file or folder it
 // named, as [the link's path, the path its text names]: what HEAD holds at its path is git's same object as what the
-// base held at that path.
+// base held at that path, each step on its way a plain folder of the base's.
 function replaced(root, base) {
   const was = listing(root, base), now = listing(root, "HEAD"), out = [];
   for (const at of was.links.filter(p => whereToolsRead(p) && !now.linked.has(p))) {
     const text = textAt(root, base, at) ?? null, here = objectAt(root, "HEAD", at);
-    const to = here && [false, true].map(win => namedWay(at, text, win)?.to).find(p => p && p !== "." && objectAt(root, base, p) === here);
+    // (each step a ".." steps back out of a plain folder of the base's, so the text's words name what Linux reads too)
+    const way = here && [false, true].map(win => namedWay(at, text, win)).find(w => w && w.to !== "." && w.via.every(v => was.dirs.has(v)) && objectAt(root, base, w.to) === here), to = way?.to;
     if (to) out.push([at, to]);
   }
   return out;
 }
-// What the base configures with each such link's files read in its place (replaced()), each tool by its id: a tool the
-// pull request configures there is the base's only where it is the same tool, read with all the base's other files, so
-// a file of the pull request's that makes it another (a plug-in's marketplace, say) is new.
-function mendedIds(root, base) {
-  const mended = replaced(root, base);
-  if (!mended.length) return new Set();
+// The base as it configures its tools with each such link's files read in its place (replaced()), or null where the pull
+// request replaced none, or there is no base: a tool the pull request configures there, and a hook that takes a file from the working tree, is
+// the base's only where it is the same, read with all the base's other files, so a file of the pull request's that makes
+// it another (a plug-in's marketplace, say) is new.
+function mendedBase(root, base) {
+  const mended = base ? replaced(root, base) : [];
+  if (!mended.length) return null;
   const alias = f => { const m = mended.find(([at]) => f === at || f.startsWith(`${at}/`)); return m ? `${m[1]}${f.slice(m[0].length)}` : f; };
   const { blobs } = listing(root, base);
   alias.markdown = mended.flatMap(([at, to]) => [...blobs].filter(b => b === to || b.startsWith(`${to}/`)).map(b => `${at}${b.slice(to.length)}`)).filter(agentFile);
-  return new Set([...readProject(root, base, () => false, alias).ids.values()].flatMap(set => [...set]));
+  return readProject(root, base, () => false, alias);
 }
+// Each tool's id a project as read() gives it configures.
+const idsOf = project => new Set(project ? [...project.ids.values()].flatMap(set => [...set]) : []);
 // Each link the base held where a tool reads its files, standing as it stood (noted, never failed), into `fail` where the
 // pull request changes what stands where its text leads, read as a string as Linux reads it and again as Windows does,
 // nothing followed (namedWay()): an entry on that way, a link or submodule below where it ends, or a file there whose path
@@ -945,13 +953,20 @@ function sortBehind(root, base, fail, notes) {
   try { raw = execFileSync("git", ["--no-replace-objects", "diff", "--raw", "--no-renames", "--ignore-submodules=none", "-z", base, "HEAD"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: LISTING_MAX }); } catch { raw = null; }
   const parts = raw?.split("\0") ?? [], changed = [];
   for (let i = 0; i + 1 < parts.length; i += 2) changed.push({ modes: parts[i].slice(1).split(" ").slice(0, 2), at: parts[i + 1] });
+  // (each path either commit holds, a folder or an entry, folded, so a way that ends where neither holds anything is
+  // known: where an install puts what a tool reads, as node_modules or a virtual environment)
+  const holds = new Set([was, now].flatMap(l => [...l.dirs, ...l.ids.keys()]).map(fold));
   for (const at of standing) {
     const text = textAt(root, "HEAD", at) ?? null, ways = [false, true].map(win => namedWay(at, text, win));
-    for (const key of new Set(ways.map(w => JSON.stringify(w)))) behindOne(at, JSON.parse(key), { was, now, raw, changed }, fail, notes);
+    for (const key of new Set(ways.map(w => JSON.stringify(w)))) behindOne(at, JSON.parse(key), { was, now, raw, changed, holds }, fail, notes);
   }
 }
+// The files an install reads to know what to put in the folders it fills (npm's, Yarn's, pnpm's, Bun's and Python's
+// manifests, locks, settings and patches), by name, folded.
+const INSTALL_INPUTS = new Set(["package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "pnpm-workspace.yaml", "bun.lock", "bun.lockb", ".npmrc", ".yarnrc", ".yarnrc.yml", ".pnpmfile.cjs", "poetry.lock", "pipfile", "pipfile.lock", "uv.lock", "pyproject.toml", "setup.py", "setup.cfg"]);
+const installInput = low => INSTALL_INPUTS.has(low.split("/").at(-1)) || /(?:^|\/)requirements[^/]*\.txt$/u.test(low) || /(?:^|\/)patches\//u.test(low);
 // One such link `at`, by the way `way` its text names, as sortBehind() reads it.
-function behindOne(at, way, { was, now, raw, changed }, fail, notes) {
+function behindOne(at, way, { was, now, raw, changed, holds }, fail, notes) {
   const odd = m => m === "120000" || m === "160000", reads = low => TOOL_FILES.includes(low) || READS.test(low);
   const said = `${show(at)} is a link where an agent tool reads its files, which the base held`;
   if (!way) { notes.push(`${said}, and its text leaves the checkout or names a whole path, so what this pull request changes where it leads is not read: reported, never failed. Replace the link with the file or folder it leads to, committed in the project`); return; }
@@ -965,16 +980,20 @@ function behindOne(at, way, { was, now, raw, changed }, fail, notes) {
     if (steps.map(fold).some(s => low === s || s.startsWith(`${low}/`))) return true;
     return low.startsWith(below) && (c.modes.some(odd) || reads(`${fold(at)}/${low.slice(below.length)}`));
   });
+  // (and where the way ends where neither commit holds anything, an install fills it: each file an install reads to know
+  // what to put there, changed, may change what a tool reads through the link, which no lock is read here to tell)
+  const input = t && !holds.has(t) ? changed.find(c => installInput(fold(c.at))) : undefined;
   if (hit) fail.push(`${said}, and this pull request changes ${show(hit.at)}, which an agent tool reads through it while this check follows no link. Mend: replace the link with the file or folder it leads to, committed in the project, in this pull request`);
+  else if (input) fail.push(`${said}, to a path the commit holds nothing at, which an install fills, and this pull request changes ${show(input.at)}, which says what an install puts there, so what an agent tool reads through the link may change unread. Mend: replace the link with the file or folder it leads to, committed in the project, in this pull request`);
   else if (unread) notes.push(`${said}, and the way to what its text names passes a link, which this check does not follow, so what this pull request changes past it is not read: reported, never failed. Replace the link with the file or folder it leads to, committed in the project`);
 }
 
 // Whether the base held the tool `k` the head configures: as it stands, or as the base configures it with a link's files
-// read in its place, where the pull request put in that link's place the very files it named (mendedIds()), since
+// read in its place, where the pull request put in that link's place the very files it named (mendedBase()), since
 // replacing such a link is its mend, and what was behind it stood before.
-function heldBy(root, base, head, baseProject) {
-  const before = new Set(baseProject ? [...baseProject.ids.values()].flatMap(set => [...set]) : []), mended = base ? mendedIds(root, base) : new Set();
-  return k => [...head.ids.get(k)].every(id => before.has(id) || mended.has(id));
+function heldBy(head, baseProject, mended) {
+  const before = idsOf(baseProject), after = idsOf(mended);
+  return k => [...head.ids.get(k)].every(id => before.has(id) || after.has(id));
 }
 
 // The whole check, from the project's root: { fail, notes }.
@@ -997,13 +1016,13 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   if (!list && core) list = { keys: new Set(), versions: new Map(), from: new Set(), problems: [] };
   const checked = check(head, list, kit, file), { problems, unlisted, pins } = checked;
   const baseProject = base ? readProject(root, base) : null, baseList = base ? listed(baseConfig, file) : null;
-  const held = heldBy(root, base, head, baseProject);
+  const mended = mendedBase(root, base), held = heldBy(head, baseProject, mended);
   const stood = heldBefore(checked, { head, baseProject, baseList, held, core });
   const unread = unreadOf(head, baseProject, core);
   const fail = [...head.problems, ...problems].filter(p => !stood.has(p) && !unread.has(p));
   const notes = [...[...stood].map(p => `as the base held it, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`), ...[...unread].map(p => `with no base to read against, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`)];
   sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes);
-  sortSources(checked, { head, baseProject, baseList, core, file }, fail, notes);
+  sortSources(checked, { head, baseProject, baseList, core, file, mended }, fail, notes);
   if (base && !core) sortBehind(root, base, fail, notes);
   sortUnlisted(unlisted, { head, base, held, file }, fail, notes);
   return { fail, notes };

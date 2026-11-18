@@ -154,7 +154,11 @@ if (LINKS) {
   const heldLinks = project({ ...shared, ".claude/skills/notes": link("../../shared/notes"), ".mcp.json": link(path.join(away, "settings.json")), ".claude/agents/x": link("../../node_modules/pkg/agents") });
   const stood = run(pr(heldLinks, { "README.md": "a change of its own\n" }));
   ok(stood.status === 0 && stood.out.includes(`as the base held it, nothing fails here: ".mcp.json" ${LINKED}`) && stood.out.includes(`".claude/skills/notes" ${LINKED}`) && stood.out.includes(`".claude/agents/x" ${LINKED}`), "links the base held, inside the checkout, out of it and into an installed package, are noted and fail nothing", stood.out);
-  passes(run(pr(heldLinks, { "shared/notes/README.md": "beside the skill\n", "package-lock.json": "{}\n" })), "nor once a file beside what one leads to, which no tool reads, or a lock file, changes");
+  passes(run(pr(heldLinks, { "shared/notes/README.md": "beside the skill\n" })), "nor once a file beside what one leads to, which no tool reads, changes");
+  // (#709's security review of c5deb9a: one into what an install fills fails where the pull request changes what says
+  // what the install puts there, a manifest, a lock or a patch, in any folder)
+  for (const input of ["package-lock.json", "app/package.json", "yarn.lock", "requirements-dev.txt", "patches/pkg+1.0.0.patch"])
+    fails(run(pr(project({ ...shared, ".claude/agents/x": link("../../node_modules/pkg/agents") }), { [input]: "{}\n" })), `one the base held into an installed package fails once ${input} changes`, "which an install fills", `"${input}"`);
   passes(run(pr(heldLinks, { "shared/settings.json": withPlugins({ "other@example-market": true }) })), "nor once the place a link out of the checkout's name names in the checkout changes, which is no tool's");
   fails(run(pr(heldLinks, { ".claude/skills/notes": link("../../shared/other") })), "but one the base held, moved, is new", `".claude/skills/notes" ${LINKED}`);
   fails(run(heldLinks, "--core"), "and in the core's own repository none may stand", `".mcp.json" ${LINKED}`);
@@ -205,10 +209,27 @@ if (LINKS) {
   const market = () => project({ ".claude/settings.json": link("../conf/settings.json"), "conf/settings.json": withPlugins({ "foo@m": true }) });
   fails(run(pr(market(), { ".claude/settings.json": withPlugins({ "foo@m": true }), ".claude/settings.local.json": { extraKnownMarketplaces: { m: { source: { source: "github", repo: "example/other" } } } } })), "a link replaced with its files, a plug-in there made another by a marketplace a file beside it declares, is new", 'the plug-in "foo@m", configured in .claude/settings.json, is new');
   passes(run(pr(market(), { ".claude/settings.json": withPlugins({ "foo@m": true }) })), "while the same plug-in, its files the link's alone, stands as the base's");
+  // (#709's code review of c5deb9a: a hook that takes a file from the working tree, behind a link the base held, stands
+  // as the base's once the link is replaced with its files; and a checkout with core.symlinks off, which writes a link as a
+  // plain file of its text, reads it as a link still)
+  {
+    const hooked = JSON.parse(KIT);
+    hooked.hooks.Stop = [{ hooks: [{ type: "command", command: "bash scripts/format.sh" }] }];
+    const text = JSON.stringify(hooked, null, 2), hookBase = project({ ".claude/settings.json": link("../conf/settings.json"), "conf/settings.json": text, "scripts/format.sh": "echo\n" });
+    const hookMend = run(pr(hookBase, { ".claude/settings.json": text }));
+    ok(hookMend.status === 0 && hookMend.out.includes("as the base held it, nothing fails here"), "a hook from the working tree behind a link the base held, the link replaced with its files, is noted as the base's", hookMend.out);
+    const plain = project({ ...shared, ".claude/skills/notes/SKILL.md": link("../../../shared/notes/SKILL.md") });
+    git(plain, "config", "core.symlinks", "false");
+    fs.rmSync(path.join(plain, ".claude/skills/notes/SKILL.md")); fs.writeFileSync(path.join(plain, ".claude/skills/notes/SKILL.md"), "../../../shared/notes/SKILL.md");
+    const plainRun = run(pr(plain, { "README.md": "a change of its own\n" }));
+    ok(plainRun.status === 0 && plainRun.out.includes(`".claude/skills/notes/SKILL.md" ${LINKED}`), "a link a checkout with core.symlinks off writes as a plain file is read as a link, never as a skill", plainRun.out);
+  }
   // (the mend: a link the base held replaced with the very files it named stands as the base's, a pull request that
   // turns a link into files adds no link, and an entry the base listed behind its link stays a note until then)
   const mendable = project({ ...shared, ".claude/skills/notes": link("../../shared/notes") });
   passes(run(pr(mendable, { ".claude/skills/notes": null, ".claude/skills/notes/SKILL.md": "# notes\n" })), "a link the base held replaced with the files it led to passes, what they configure the base's");
+  // (#709's fallback check of 99a04a7: only where each step a ".." steps out of is a plain folder of the base's)
+  fails(run(pr(project({ ".claude/skills": link("nope/../stash"), ".claude/stash/evil/SKILL.md": "# evil\n" }), { ".claude/skills": null, ".claude/skills/evil/SKILL.md": "# evil\n" })), "one replaced with the files its words name, where a \"..\" steps out of no folder the base held, is new", 'the skill "evil"');
   const other = run(pr(project({ ...shared, ".claude/skills/notes": link("../../shared/notes") }), { ".claude/skills/notes": null, ".claude/skills/notes/SKILL.md": "# other\n" }));
   ok(other.status === 1 && !other.out.includes(LINKED) && other.out.includes('the skill "notes", configured in .claude/skills/notes/SKILL.md, is new in this pull request') && mended(other.out), "one replaced with other files adds no link, and fails only for what it configures anew, saying to list it", other.out);
   const listedBehind = project({ ...shared, ".claude/skills/notes": link("../../shared/notes"), ...listing({ kind: "skill", name: "notes", publisher: "this project" }) });
