@@ -1079,6 +1079,14 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       dir => { fs.unlinkSync(path.join(dir, "l45")); fs.symlinkSync("node_modules/evil", path.join(dir, "l45")); })), "and so is one past forty links, as Windows follows them", UNHELD);
     const roundKept = run(swap(dir => { fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync(`../${self(dir)}/node_modules/pkg/.claude`, path.join(dir, ".claude")); }, dir => fs.writeFileSync(path.join(dir, "README.md"), "x\n")));
     ok(roundKept.status === 0 && roundKept.out.includes("reported, never failed"), "while one the base held that leaves and comes back in, as it stood, is still reported, never failed", roundKept.out);
+    // (and a way that leaves and comes back in by ".." again and again, by a link beside the checkout, ends)
+    const loopsAt = path.join(os.tmpdir(), `agent-tools-loop-${process.pid}`);
+    try {
+      fs.rmSync(loopsAt, { force: true });
+      const looped = swap(dir => { fs.symlinkSync(`${fs.realpathSync(dir)}${path.sep}..${path.sep}${path.basename(loopsAt)}`, loopsAt); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync(`../${path.basename(loopsAt)}`, path.join(dir, ".claude")); }, dir => fs.writeFileSync(path.join(dir, "README.md"), "x\n"));
+      const ended = spawnSync(process.execPath, [SCRIPT, "checks/licences.json"], { cwd: looped, encoding: "utf8", timeout: 60_000 });
+      ok(ended.status === 0 && `${ended.stdout}`.includes("reported, never failed"), "and a way that leaves and comes back in again and again ends, as the base held it", `${ended.stdout}${ended.stderr}${ended.error ?? ""}`);
+    } finally { fs.rmSync(loopsAt, { force: true }); }
 
   }
 }

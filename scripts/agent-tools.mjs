@@ -906,7 +906,7 @@ function linkTexts(root, rev) {
 // With `how` (a link's way, as sortLinks() reads it): a way out of the repository, by ".." or a link to a whole path, is
 // followed on the file system around the checkout, and the walk goes on in the commit where it comes back in (backIn());
 // with `how.win`, a link's text is read as Windows reads it, either slash a separator, and 63 links followed, as Windows
-// follows them.
+// follows them; each way out counted as a link, so one that leaves and comes back in again and again ends.
 function walk(root, rev, f, via = [], lenient = false, misses = [], follow = false, how = null) {
   const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
   let hops = 0;
@@ -914,7 +914,7 @@ function walk(root, rev, f, via = [], lenient = false, misses = [], follow = fal
     let name = left.shift();
     if (name === "" || name === ".") continue;
     if (name === "..") {
-      if (!at.length && !(how && backIn(root, path.dirname(topOf(root)), left, at, via))) return null;
+      if (!at.length && !(how && ++hops <= most(how) && backIn(root, path.dirname(topOf(root)), left, at, via))) return null;
       at.pop();
       continue;
     }
@@ -934,6 +934,8 @@ function walk(root, rev, f, via = [], lenient = false, misses = [], follow = fal
   }
   return reached(at.join("/") || ".", blobs, dirs, others);
 }
+// How many links a walk read as `how` says follows.
+const most = how => (how?.win ? 63 : 40);
 // The checkout's own path on the file system, every link in it resolved, read once a root.
 const checkouts = new Map();
 const topOf = root => { if (!checkouts.has(root)) checkouts.set(root, fs.realpathSync(root)); return checkouts.get(root); };
@@ -942,7 +944,7 @@ const topOf = root => { if (!checkouts.has(root)) checkouts.set(root, fs.realpat
 // machine has none of), and a whole path walked from its start by backIn().
 function onward(root, rev, here, how, left, at, via, hops) {
   const to = linkText(root, rev, here), names = t => t.split(how.win ? /[\\/]/u : "/");
-  if (hops > (how.win ? 63 : 40) || to === null) return false;
+  if (hops > most(how) || to === null) return false;
   if (!path.posix.isAbsolute(to) && !(how.win && path.win32.isAbsolute(to))) { left.unshift(...names(to)); return true; }
   if (!path.isAbsolute(to)) return false;
   const start = path.parse(to).root || path.sep;
