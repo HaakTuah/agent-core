@@ -38,7 +38,7 @@ import { started } from "./started.mjs";
 import { twice } from "./yaml-keys.mjs";
 import { projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
-import { parseYaml } from "./workflow-run.mjs";
+import { parseDocument } from "../third-party/yaml/dist/index.js";
 
 const WORD = "pull_request_target";
 const BREAK = "\\r\\n|[\\r\\n\\u0085\\u2028\\u2029]"; // every line break YAML 1.1 or 1.2 knows
@@ -105,11 +105,20 @@ const CHECKS = /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nu
 // pull_request`, `on: [push, pull_request]`), as []; null where it has no such trigger.
 const typesOf = on => typeof on === "string" || Array.isArray(on) ? ([].concat(on).includes("pull_request") ? [] : null)
   : on && typeof on === "object" && "pull_request" in on ? [].concat(on.pull_request?.types ?? []).map(String) : null;
+// A workflow's text read as YAML by the package the core carries (as yaml-keys.mjs reads it; flow mappings and every
+// form GitHub reads), every scalar as text; null where it is no YAML, which GitHub's own reader refuses all the same.
+function yamlOf(text) {
+  try {
+    const doc = parseDocument(String(text).replace(/^\ufeff/u, ""), { schema: "failsafe", uniqueKeys: false, prettyErrors: false });
+    return doc.errors.length ? null : doc.toJS({ maxAliasCount: 100 });
+  } catch { return null; }
+}
+
 // The jobs of a workflow (its YAML read, `yaml`, or its text) that call one of the core's pull-request checks skipped on a
 // draft while the trigger never starts it once the pull request is marked ready: [] where none, or where the text is
-// not YAML this reader knows (GitHub's own reader then refuses it, and the key check says why).
+// no YAML (GitHub's own reader then refuses it).
 export function draftHoles(yaml) {
-  if (typeof yaml === "string") { try { yaml = parseYaml(yaml); } catch { return []; } }
+  if (typeof yaml === "string") yaml = yamlOf(yaml);
   const types = typesOf(yaml?.on);
   if (types === null || types.includes("ready_for_review")) return [];
   const prefix = `${CORE}/`.toLowerCase();

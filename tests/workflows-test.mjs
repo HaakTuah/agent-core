@@ -75,8 +75,9 @@ ok(draftHoles(call(TYPES, "copies.yml", NOT_DRAFT)).join() === "check" && draftH
   && draftHoles(call(TYPES, "pr-description.yml")).length === 1 && draftHoles(call(TYPES, "core.yml", "    with:\n      description: true\n")).length === 1,
   "a call skipped on a draft, by its if: or by a check that skips one itself, whose trigger leaves out ready_for_review is found");
 ok(!draftHoles(call(FULL, "copies.yml", NOT_DRAFT)).length && !draftHoles(call(TYPES, "copies.yml")).length && !draftHoles(call(TYPES, "core.yml", "    with:\n      copies: c.json\n")).length
-  && !draftHoles(call(TYPES, "copies.yml", NOT_DRAFT).replace(CORE, "someone/else")).length && !draftHoles("on: push\njobs: {}\n").length && !draftHoles("on: [unclosed\n  - :").length,
-  "the full trigger, a call that never skips a draft, another's workflow, no pull_request trigger and text not read as YAML pass");
+  && !draftHoles(call(TYPES, "copies.yml", NOT_DRAFT).replace(CORE, "someone/else")).length && !draftHoles("on: push\njobs: {}\n").length && !draftHoles("on: [unclosed\n  - :").length
+  && draftHoles(`on: {pull_request: {types: [opened, synchronize]}}\njobs: {check: {uses: "${CORE}/.github/workflows/pr-description.yml@${"a".repeat(40)}"}}\n`).length === 1,
+  "the full trigger, a call that never skips a draft, another's workflow, no pull_request trigger and text not read as YAML pass; a workflow in YAML's flow form is read");
 const holes = unreadied([{ file: "a.yml", text: call(TYPES, "copies.yml", NOT_DRAFT) }, { file: "b.yml", text: call(TYPES, "pr-description.yml") }], f => (f === "a.yml" ? call(TYPES, "copies.yml", NOT_DRAFT) : call(FULL, "pr-description.yml")));
 ok(holes.notes.length === 1 && /^note a\.yml: .*as on the base\. Mend: add ready_for_review/.test(holes.notes[0]) && holes.fails.length === 1 && /^FAIL b\.yml: its job "check"/.test(holes.fails[0]) && mended(holes.fails[0])
   && unreadied([{ file: "b.yml", text: call(TYPES, "pr-description.yml") }], null).fails.length === 0,
@@ -90,7 +91,7 @@ ok(own.length > 0 && own.every(f => !fails(fs.readFileSync(`${core}.github/workf
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-test-"));
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "core-path.mjs", "core-address.mjs", "workflow-run.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
+  for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
   fs.cpSync(fileURLToPath(new URL("../third-party", import.meta.url)), path.join(tmp, "core/third-party"), { recursive: true });
   fs.mkdirSync(path.join(tmp, ".github/workflows"), { recursive: true });
   fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), `on:\n${"  pull_request_target:\n".repeat(7)}`);
