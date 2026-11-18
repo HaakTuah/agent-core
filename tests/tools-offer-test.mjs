@@ -28,10 +28,13 @@ const says = (r, what) => r.wrong.length === 1 && r.wrong[0].includes(what) && m
 const own = check(text);
 ok(own.wrong.length === 0 && table(text).tools.map(x => x.name).join() === tools.join(), "the core's own table passes, a column for each tool of the list", own.wrong.join("\n"));
 ok(says(check(cell("The orchestrator", "Kiro", "")), "is empty"), "an empty cell fails, saying its mend");
+ok(table(text).tools.find(t => t.name === "Kiro").issue === "#680" && !table(text).rows.some(r => /^Its issue/u.test(r.what)), "the last row names each column's issue, and is no row of what is offered");
 ok(says(check(cell("The orchestrator", "Kiro", "maybe later")), "in none of the three forms"), "a cell in no form fails");
 ok(says(check(cell("The orchestrator", "Kiro", "cannot: kiro.dev, its page on agents")), "in none of the three forms"), "a cannot with no day it was read fails");
 ok(check(cell("The orchestrator", "Kiro", "cannot: kiro.dev, its page on agents, read 18 November 2026")).wrong.length === 0, "a cannot with its page and day passes");
-ok(says(check(cell("The orchestrator", "Kiro", "not yet")), "in none of the three forms"), "a not yet with no issue fails");
+const noIssue = check(cell("Its issue for what is not yet carried", "Kiro", ""));
+ok(noIssue.wrong.length === 3 && noIssue.wrong.every(w => w.includes("names no issue") && mended(`FAIL ${w}`)), "a not yet whose column names no issue fails, each such cell; one that names its own (#400) passes", noIssue.wrong.join("\n"));
+ok(says(check(cell("The orchestrator", "Kiro", "not yet: soon")), "in none of the three forms"), "a not yet naming no issue number fails");
 const closed = check(text, { isOpen: n => n !== 680 });
 ok(closed.wrong.length > 0 && closed.wrong.every(w => w.includes("#680, which is not open") && mended(`FAIL ${w}`)), "a not yet whose issue is closed fails, each cell that names it, where it can be read", closed.wrong.join("\n"));
 ok(check(text, { isOpen: () => null }).unread.includes("680"), "and where it cannot be read, nothing fails for it and it is named as not read");

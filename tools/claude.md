@@ -2,8 +2,8 @@
 
 Read by the tool `claude` at the start of every task.
 
-Its map of the tiers (`tasks/roles.md`, "The rules name tiers, never a model"; Anthropic's models, read on 18
-November 2026): strongest, Opus; middle, Sonnet; light, Haiku; scarce top, Fable, which takes escalation's last step at
+Its map (`tasks/roles.md`, "The rules name tiers, never a model"; Anthropic's models, read on 18 November 2026):
+strongest, Opus; middle, Sonnet; light, Haiku; scarce top, Fable, which takes escalation's last step at
 high, or xhigh if you run at high.
 
 - **Pass both model and effort** whenever you start a session or helper, save a helper whose

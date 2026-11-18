@@ -33,11 +33,14 @@ import { started } from "./started.mjs";
 // guidelines' "A finding names its rule" (#254), its leanness check having found 124 bytes of room for 204 over, in
 // trims of the guidelines that its issue did not ask for and so are not made; and again on 17 November 2026 for #486's
 // package rule, its pointers in the review guidelines and how-to-work, its leanness check having found 135 bytes of
-// room, made, for 262 over, and 65 more in trims of the guidelines that its issue did not ask for.
+// room, made, for 262 over, and 65 more in trims of the guidelines that its issue did not ask for. The orchestrator's,
+// raised one step on 18 November 2026 for #467's tiers in tasks/roles.md, its leanness check having found 179 bytes of
+// room for 717 over: 85 made in roles/orchestrator.md, and 94 in roles/shared/inbox.md, a rule its issue did not ask for,
+// not made.
 export const CAPS = {
   builder: 29 * 1024,
   design: 30 * 1024,
-  orchestrator: 43 * 1024,
+  orchestrator: 44 * 1024,
   reviewer: 24 * 1024,
   "stand-in": 20 * 1024,
 };

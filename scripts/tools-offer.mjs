@@ -1,7 +1,8 @@
 // What the core offers one agent tool, it offers each (tasks/tools.md, "What the core offers one tool, it offers each";
 // #467): the table there has a row for each thing the core offers and a column for each tool of the list
 // (staged-tools.json, beside this file), and each cell says one of three: "carried: " and the file that carries it,
-// "cannot: <the page of the tool's documentation>, read <day month year>", or "not yet: #<its issue>". It fails an empty
+// "cannot: <the page of the tool's documentation>, read <day month year>", or "not yet", its issue the column's cell in the
+// table's last row ("Its issue for what is not yet carried"), or "not yet: #<its issue>" where it names its own. It fails an empty
 // cell or one in no such form, a file a cell names that is not there, a tool of the list with no column, a map of the
 // tiers whose part says no day it was read, and a file of a tool's own that no cell names: each part under tools/, each
 // template of the starter kit (init.mjs, beside this file) written into a tool's folder or as a tool's entry file, each
@@ -27,10 +28,13 @@ export const TOOL_DIRS = [".claude", ".codex", ".kiro", ".agents", ".agent"];
 const TOOL_ROOT = ["GEMINI.md", ...Object.values(ENTRY_FILES)];
 const ofTool = f => TOOL_DIRS.some(d => f.startsWith(`${d}/`)) || TOOL_ROOT.includes(f);
 const DAY = String.raw`\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}`;
-const FORMS = [/^carried: \S.*$/u, new RegExp(String.raw`^cannot: \S.*, read ${DAY}$`, "u"), /^not yet: #\d+$/u];
+const FORMS = [/^carried: \S.*$/u, new RegExp(String.raw`^cannot: \S.*, read ${DAY}$`, "u"), /^not yet(?:: #\d+)?$/u];
+const ISSUES = /^Its issue for what is not yet carried$/u;
 const MAP = /^The map of the tiers/u;
 
-// The table: { tools: [{ name, part }], rows: [{ what, cells: [text] }] }, or null where TABLE holds none.
+// The table: { tools: [{ name, part, issue }], rows: [{ what, cells: [text] }] }, `issue` the column's cell of the row
+// ISSUES ("#<n>", "none", or "" where there is no such row), which is no row of what is offered; or null where TABLE
+// holds none.
 export function table(text) {
   const lines = String(text).split(/\r?\n/u), at = lines.findIndex(l => /^\|\s*What the core offers\s*\|/u.test(l));
   if (at < 0) return null;
@@ -40,8 +44,10 @@ export function table(text) {
   for (const l of lines.slice(at + 2)) {
     if (!l.trim().startsWith("|")) break;
     const c = cells(l);
-    rows.push({ what: c[0], cells: tools.map((_, i) => c[i + 1] ?? "") });
+    if (ISSUES.test(c[0])) tools.forEach((t, i) => { t.issue = c[i + 1] ?? ""; });
+    else rows.push({ what: c[0], cells: tools.map((_, i) => c[i + 1] ?? "") });
   }
+  for (const t of tools) t.issue ??= "";
   return { tools, rows };
 }
 
@@ -72,7 +78,11 @@ export function wrong({ root = ROOT, text = fs.readFileSync(path.join(root, TABL
       if (!fs.existsSync(path.join(root, m[1]))) out.push(`${where} names ${m[1]}, which is not there. Mend: name the file that carries it as it now stands`);
       else if (MAP.test(r.what) && m[1].startsWith("tools/") && !new RegExp(`read on ${DAY}`, "u").test(fs.readFileSync(path.join(root, m[1]), "utf8"))) out.push(`${where}: its map, ${m[1]}, says no day its documentation was read. Mend: write in it "read on <the day>", the day the models were read from the tool's documentation`);
     }
-    const n = /^not yet: #(\d+)$/u.exec(cell)?.[1];
+    let n = /^not yet: #(\d+)$/u.exec(cell)?.[1];
+    if (cell === "not yet") {
+      n = /^#(\d+)$/u.exec(t.tools[i].issue)?.[1];
+      if (!n) { out.push(`${where} says "not yet", and the column's cell in the row "Its issue for what is not yet carried" names no issue. Mend: write there "#<the open issue that carries what this column has not yet>", filing one where none does, or name one in the cell as "not yet: #<n>"`); return; }
+    }
     if (n) { const open = isOpen(Number(n)); if (open === false) out.push(`${where} names #${n}, which is not open. Mend: carry it or write the tool cannot, or name the open issue that takes it, filing one where none does`); else if (open === null) unread.push(n); }
   });
   for (const f of toolFiles(root, tracked).filter(f => !f.by.some(b => named.has(b)))) out.push(`${f.file} is a file of a tool's own that no cell of the table in ${TABLE} names. Mend: name it in the cell of the row it carries, or add the row for what it offers and fill that row for each tool`);

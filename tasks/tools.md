@@ -62,28 +62,29 @@ comment that opens "Code review:" or "Security review:". The parts: `tools/claud
 manifest's "Tools" table how it is reached, and files the part with the core (`README.md`, "Reporting to the core").
 Reason: a project with only that tool otherwise had no word on how to reach it. Held by nothing yet.
 
-**What the core offers one tool, it offers each** (#467). By default nothing the core gives a session of one agent
-tool is given to that tool alone: each thing it offers is a row of the table below, and each tool of the list a column,
+**What the core offers one tool, it offers each** (#467). By default nothing the core gives a session of one agent tool
+is given to that tool alone: each thing it offers is a row of the table below, and each tool of the list a column,
 Claude Code, Codex, Kiro, Antigravity and GitHub Copilot, the last as a builder too; the owner adds to the list
 (`scripts/staged-tools.json`). The one condition that changes it: the tool cannot, as its own documentation says. Each
 cell says one of three: `carried`, with the file that carries it; `cannot`, with the tool's documentation, by its page,
-and the day it was read; or `not yet`, with its open issue. Whoever adds or changes something for one tool fills the
-cell for each other tool in the same pull request. A cell that says `carried` claims no more than the tool's
-documentation until the tool has passed the staged cases (above). It does not mean the tools or their models are
-equal, that a project must use more than one tool (which tool takes which role stays its preference: `tasks/roles.md`),
-or that a `not yet` goes ahead of a project's own work: each is an ordinary task. Reason: the core grew up with one
-tool, and a project whose owner has another got less of it for no reason a rule gives. Held by
-`scripts/tools-offer.mjs`, which fails an empty cell, a `cannot` with no page and day, a `not yet` with no issue (where gh answers, one that is
-not open), a map with no day, a tool of the list with no column and a file of a tool's own that no row names.
+and the day it was read; or `not yet`, its open issue the column's last cell, or one it names itself. Whoever adds or
+changes something for one tool fills the cell for each other tool in the same pull request. A cell that says `carried`
+claims no more than the tool's documentation until the tool has passed the staged cases (above). It does not mean the
+tools or their models are equal, that a project must use more than one tool (which tool takes which role stays its
+preference: `tasks/roles.md`), or that a `not yet` goes ahead of a project's own work: each is an ordinary task. Reason:
+the core grew up with one tool, and a project whose owner has another got less of it for no reason a rule gives. Held by
+`scripts/tools-offer.mjs`, which fails an empty cell, a `cannot` with no page and day, a `not yet` with no issue (where
+gh answers, one that is not open), a map with no day, a tool of the list with no column and a file of a tool's own that
+no row names.
 
 | What the core offers | Claude Code (`tools/claude.md`) | Codex (`tools/codex.md`) | Kiro (`tools/kiro.md`) | Antigravity (`tools/antigravity.md`) | GitHub Copilot (`tools/copilot.md`) |
 | --- | --- | --- | --- | --- | --- |
 | The entry file | carried: `setup/template/CLAUDE.md.tmpl` | carried: it reads `AGENTS.md` itself | carried: `setup/template/kiro-steering.md.tmpl` | carried: `setup/template/antigravity-rule.md.tmpl` | carried: it reads `AGENTS.md` itself |
 | What to read at a task's start | carried: `tools/claude.md`, which the entry file pulls in | carried: `tools/other-builders.md` | carried: `tools/other-builders.md` | carried: `tools/other-builders.md` | carried: `tools/other-builders.md` |
-| The work-saved hook at a session's start and stop | carried: `setup/template/claude-settings.json.tmpl`, running `scripts/work-saved.sh` | carried: `setup/template/codex-hooks.json.tmpl` | carried: `setup/template/kiro-hook.json.tmpl` | cannot: antigravity.google, its page on rules, read 15 November 2026 | not yet: #682 |
-| Helpers, and the hook that holds their model and effort | carried: `tasks/helpers.md`, `scripts/helper-call.mjs` | not yet: #679 | not yet: #680 | not yet: #681 | not yet: #682 |
-| The map of the tiers to its models | carried: `tools/claude.md` | not yet: #679 | not yet: #680 | not yet: #681 | not yet: #682 |
-| How a task is handed over | carried: `roles/orchestrator.md` | carried: `tools/codex.md` | carried: `tools/kiro.md` | carried: `tools/antigravity.md` | carried: `tools/copilot.md` |
-| How a review is asked | carried: `tasks/reviews.md` | carried: `tools/codex.md` | carried: `tools/kiro.md` | carried: `tools/antigravity.md` | carried: `tools/copilot.md` |
-| The orchestrator | carried: `roles/orchestrator.md` | not yet: #679 | not yet: #680 | not yet: #681 | not yet: #682 |
-| The staged run | carried: `reports/staged-cases.json` | not yet: #679 | not yet: #400 | not yet: #681 | not yet: #682 |
+| The work-saved hook at a session's start and stop | carried: `setup/template/claude-settings.json.tmpl`, running `scripts/work-saved.sh` | carried: `setup/template/codex-hooks.json.tmpl` | carried: `setup/template/kiro-hook.json.tmpl` | cannot: antigravity.google, its page on rules, read 15 November 2026 | not yet |
+| Helpers, and the hook that holds their model and effort | carried: `tasks/helpers.md`, `scripts/helper-call.mjs` | not yet | not yet | not yet | not yet |
+| The map of the tiers to its models | carried: `tools/claude.md` | not yet | not yet | not yet | not yet |
+| How a task is handed over and a review asked | carried: `roles/orchestrator.md`, `tasks/reviews.md` | carried: `tools/codex.md` | carried: `tools/kiro.md` | carried: `tools/antigravity.md` | carried: `tools/copilot.md` |
+| The orchestrator | carried: `roles/orchestrator.md` | not yet | not yet | not yet | not yet |
+| The staged run | carried: `reports/staged-cases.json` | not yet | not yet: #400 | not yet | not yet |
+| Its issue for what is not yet carried | none | #679 | #680 | #681 | #682 |

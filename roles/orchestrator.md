@@ -27,19 +27,18 @@ sessions.
   names its builder; what no brief carries (a design reading, the owner's past words) goes to a builder that reads them
   itself. A task one failed at twice (its closed PRs and the *progress file* say) goes to the next, from `main`.
 - It does not mean the order holds back a line the owner gave a tool by name, nor that a project's own pace is passed
-  over (`roles/orchestrator.md`, "The pace is the owner's").
+  over ("The pace is the owner's", below).
 - Reason: the orchestrator is what keeps the work going, so its provider is saved the longest, and the strongest model
   is kept for the work that takes judgement.
 - Held by nothing yet: a builder's tool and the usage left are no mark a check reads.
 
 - **It builds nothing itself:** every lane goes to a builder session of its own, with its own brief
-  (`tasks/helpers.md`, "A brief is written as a rule is"), its tool picked as "The builders", above, says, at the
-  builder's model and effort.
+  (`tasks/helpers.md`, "A brief is written as a rule is"), its tool picked as "The builders", above, says.
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn, on the owner's computer
   only one the owner set up (floor rule 8):
-  - read the stop switch first (`roles/shared/work-flow.md`), and where it stands, tell the running builders to stop and do
+  - read the stop switch first, and where it stands, tell the running builders to stop and do
     nothing more that wake;
   - pull `main`, its clone on `main`; if a rule file changed, re-read it and pass what touches them to the running
     builders in one message;
