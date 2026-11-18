@@ -125,3 +125,10 @@ The index, and how an item is written: `archive/instructions.md`.
      and copies checks, the parts the first trials would replace. The owner agreed to it, with the issue's other points,
      after asking what the core lacked that let an inventory's check miss a part. It stands behind "A trial of a
      maintained tool replays the part's past bugs" in `tasks/choices.md`, and the inventory's line `Replayed:`.
+
+257. **16 November 2026**, #486, point 1. A choice of stack closes with which of the core's checks cannot yet read the
+     stack picked, each gap filed to the core as a task, since a project in a stack the core could not read found it
+     out months later, from an evaluation; what the core can read never weighs in the choice, which is made for the
+     product. The owner, offered that cost as a weight, answered that the core would be extended to the language picked
+     and that the owner wants what is optimal, and agreed to the closing line in its place. It stands behind "A choice
+     of stack ends with what the core cannot read in it" in `tasks/choices.md`.

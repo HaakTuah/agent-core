@@ -63,7 +63,6 @@ it merges last.
 | #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467 and #407 |
 | #492 | rule builder; it changes floor rule 4, with the owner's yes on the issue, who may start the orchestrator, and what every role reads at its start | #397 and #467 |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
-| #486, point 1 | rule builder | |
 | #486, point 5 | builder | the types record reopening |
 | #460, point 1 | builder | |
 | #460, point 2 (the author's address) | builder | |

@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ARGUED, DAYS, KIT, LISTED, MEASURES, MOST, TITLE, TRIPPED, argued, atCommit, baseRecords, checkOf, due, look, parse, records, report, signs, tripped, trippedBody, where } from "../scripts/choices.mjs";
+import { ARGUED, UNREAD, DAYS, KIT, LISTED, MEASURES, MOST, TITLE, TRIPPED, argued, atCommit, baseRecords, checkOf, due, look, parse, records, report, signs, tripped, trippedBody, where } from "../scripts/choices.mjs";
 import { DUE } from "../scripts/look.mjs";
 import { mended } from "../scripts/mend.mjs";
 
@@ -218,5 +218,28 @@ ok(checkOf({ file: "records.md", unread: "a link" }, linkedAt, hist)[1] === fals
 fs.rmSync(hist, { recursive: true, force: true });
 
 fs.rmSync(tmp, { recursive: true, force: true });
+{
+  // (in a history of its own, so the cases above keep theirs)
+  const hist2 = fs.mkdtempSync(path.join(os.tmpdir(), "choices-stack-"));
+  const h2 = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: hist2, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const put2 = text => { fs.mkdirSync(path.join(hist2, "docs"), { recursive: true }); fs.writeFileSync(path.join(hist2, "docs/choices.md"), text); h2("add", "-A"); h2("commit", "-q", "-m", "records"); return h2("rev-parse", "HEAD").trim(); };
+  h2("init", "-q", "-b", "main");
+  const base2 = put2(old);
+  const check2 = b => check(b, hist2);
+  let c;
+  // (a stack's record the change adds closes with what the core cannot read in it; one that stood is no task; #486)
+  const stack = full.replace(/^## Choice: [^\n]*/mu, "## Choice: the project's stack, Rust and Bevy");
+  put2(`${old}\n${stack}`);
+  c = check2(base2);
+  ok(c.status === 1 && new RegExp(`a choice of stack this change adds, does not close with a line that opens "${UNREAD}"`).test(c.out) && mended(c.out), "a stack's record a change adds without what the core cannot read in it fails, saying its mend", c.out);
+  put2(`${old}\n${stack}\n- ${UNREAD} the shape check and the copies check read no Rust yet: #900, #901.\n`);
+  c = check2(base2);
+  ok(c.status === 0, "with its line, it passes", c.out);
+  const stood = `${old}\n${stack}`, stoodAt = put2(stood);
+  put2(`${stood}\n`);
+  ok(check2(stoodAt).status === 0 && argued(stood, stood).gapless.length === 0, "a stack's record that stood before is never failed for the line");
+  ok(argued(`${old}\n${full}`, old).gapless.length === 0, "a record of another choice is asked nothing of the line");
+  fs.rmSync(hist2, { recursive: true, force: true });
+}
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;
