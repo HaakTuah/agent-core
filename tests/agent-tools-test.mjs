@@ -482,6 +482,12 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ok(notesKept.status === 0 && notesKept.out.includes(WAY), "a link the base held to agents is noted while only a file Claude Code does not read there changes", notesKept.out);
     fails(run(pr(viaDocs(), { "docs/a.md": "---\nname: a\ndescription: changed\n---\n" })), "but not once a Markdown file there changes", WAY);
     fails(run(pr(viaDocs(), { "docs/deep/b.MD": "---\nname: b\n---\n" })), "nor once one is added, at any depth, in whatever case", WAY);
+    // (Codex's code review of be69079: .claude a link on the way, held by what stands at its agents and commands alone)
+    const viaCfg = () => { const dir = project({ ...script, ...listing() }); fs.renameSync(path.join(dir, ".claude"), path.join(dir, "cfg")); fs.mkdirSync(path.join(dir, "cfg/agents"), { recursive: true }); fs.writeFileSync(path.join(dir, "cfg/agents/a.md"), "---\nname: a\n---\n"); fs.writeFileSync(path.join(dir, "cfg/README.md"), "# cfg\n"); fs.symlinkSync("cfg", path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents through .claude as a link"); return dir; };
+    const readmeKept = run(pr(viaCfg(), { "cfg/README.md": "# changed\n" }));
+    ok(readmeKept.status === 0 && readmeKept.out.includes(WAY), "a .claude link the base held is noted while only Markdown outside its agents and commands changes", readmeKept.out);
+    fails(run(pr(viaCfg(), { "cfg/agents/a.md": "---\nname: a\ndescription: changed\n---\n" })), "but not once an agent there changes", WAY);
+    fails(run(pr(viaCfg(), { "cfg/commands/c.md": "# c\n" })), "nor once a command is added there", WAY);
     const loops = viaDocs();
     for (let i = 0; i < 6; i++) fs.symlinkSync(".", path.join(loops, `docs/l${i}`));
     git(loops, "add", "-A"); git(loops, "commit", "-q", "-m", "loops behind a link");

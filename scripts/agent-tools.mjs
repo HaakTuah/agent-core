@@ -698,8 +698,11 @@ function belowDir(root, rev, p) {
 function mdLinks(root, rev) {
   const l = listing(root, rev), read = p => !l.blobs.has(p) || /\.md$/iu.test(p);
   const held = at => { const walked = [], all = everything(root, rev, at, walked, read); return [at, all, ...walked.map(w => lockOf(root, rev, w))].join("\0"); };
+  // (.claude as a link on the way, by what stands at its agents and commands alone, as Claude Code reads nothing else
+  // there for them)
+  const way = at => (fold(at) === ".claude" ? AGENT_DIRS.map(d => held(`${at}/${d.split("/")[1]}`)).join("\0\0") : held(at));
   const folders = agentFolders(root, rev);
-  return [...[...new Set(folders.flatMap(f => f.ways))].map(at => [`${at} is a link on the way to a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads only those of plain folders the project commits. Mend: replace it with the folder itself, committed in the project, in this pull request`, held(at)]),
+  return [...[...new Set(folders.flatMap(f => f.ways))].map(at => [`${at} is a link on the way to a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads only those of plain folders the project commits. Mend: replace it with the folder itself, committed in the project, in this pull request`, way(at)]),
     ...[...new Set(folders.flatMap(f => f.links))].map(at => [`${at} is a link below a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads none of them there. Mend: replace it with the files themselves, committed in the project, in this pull request`, held(at)])];
 }
 // The links a commit holds on a tool's way or under a tool's folder, in whatever case.
