@@ -30,8 +30,8 @@
 //       with SELECT_BASE the pull request's base (origin/main, fetched; or HEAD^1 of the merge a pull request's run
 //       checks out): prints what it selected and why; --failed names a file of the tests that failed last time, one
 //       path a line; --env appends NAME=" <test> <test> " (or NAME=all) to the file GITHUB_ENV names, for the steps
-//       that follow; --passed, on a push alone (no SELECT_BASE), names the check whose pass on the merged head lets the
-//       run select nothing. Reads only, but for those two files and that one question to the host; git and Node's own
+//       that follow, or NAME=none where nothing is selected; --passed, on a push alone (no SELECT_BASE), names the check
+//       whose pass on the merged head lets the run select nothing. Reads only, but for those two files and that one question to the host; git and Node's own
 //       modules.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -293,7 +293,8 @@ async function main(argv) {
   const lines = said(s, now ? now.tests.size : "all its");
   console.log(lines.join("\n"));
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
-  if (opts["--env"]) fs.appendFileSync(process.env.GITHUB_ENV, `${opts["--env"]}=${s.all ? "all" : ` ${s.tests.join(" ")} `}\n`);
+  // (nothing selected is "none", as everything is "all": a runner given an empty list would run every test)
+  if (opts["--env"]) fs.appendFileSync(process.env.GITHUB_ENV, `${opts["--env"]}=${s.all ? "all" : s.none ? "none" : ` ${s.tests.join(" ")} `}\n`);
   return 0;
 }
 

@@ -161,6 +161,11 @@ ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.y
   const asked = on => { fs.writeFileSync(pushed, `name: p\non:\n${on}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/select.mjs --env RUN\n`); return notDone(lockProject).some(m => m.lead === PASSED_LEAD); };
   ok(!asked("  push:\n    branches: [main]") && asked("  push:\n  pull_request:") && asked("  pull_request:\n  push:\n    branches: [main]"),
     "a job that selects on a push alone is not asked --passed, since its suite ran nowhere else; one a pull request runs too is");
+  const job = (select, runner) => { fs.writeFileSync(pushed, `name: p\non:\n  pull_request:\n  push:\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ${select}\n      - ${runner}\n`); return notDone(lockProject).some(m => m.lead === PASSED_LEAD); };
+  const sel = 'node core/scripts/select.mjs --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}';
+  ok(job(sel, 'run: if [ "$RUN" = all ]; then node --test; else node --test $RUN; fi') && !job(sel, 'run: if [ "$RUN" = all ]; then node --test; elif [ "$RUN" != none ]; then node --test $RUN; fi')
+    && !job(sel, "if: env.RUN == 'all'\n        run: node --test") && job("node core/scripts/select.mjs --env RUN", 'run: if [ "$RUN" = all ]; then node --test; elif [ "$RUN" != none ]; then node --test $RUN; fi'),
+    "it reads done only where the selection gives --passed and a step after it honours \"none\", by its if: on env.RUN or its run comparing $RUN with none, since a runner given no file runs every test");
   fs.rmSync(pushed);
 }
 

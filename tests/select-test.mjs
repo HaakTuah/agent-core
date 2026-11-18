@@ -212,8 +212,8 @@ const runLive = (args, env) => new Promise(done => {
 });
 fs.writeFileSync(envFile, "");
 r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
-ok(r.status === 0 && /The selection: none of \d+ tests: the merged head/.test(r.out) && fs.readFileSync(envFile, "utf8") === "RUN=  \n" && asks.at(-1)?.auth === "Bearer pretend",
-  "on a push, given --passed, it asks the host with the token, and where the check passed on the merged head it writes no test for the steps after it", `${r.out}\n${fs.readFileSync(envFile, "utf8")}`);
+ok(r.status === 0 && /The selection: none of \d+ tests: the merged head/.test(r.out) && fs.readFileSync(envFile, "utf8") === "RUN=none\n" && asks.at(-1)?.auth === "Bearer pretend",
+  "on a push, given --passed, it asks the host with the token, and where the check passed on the merged head it writes \"none\" for the steps after it, never an empty list a runner would read as every test", `${r.out}\n${fs.readFileSync(envFile, "utf8")}`);
 app = "another-app"; fs.writeFileSync(envFile, "");
 r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
 ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /no run of it by GitHub Actions/.test(r.out), "a check of that name another app posted, passed or not, says nothing of the suite: the whole suite runs", r.out);
