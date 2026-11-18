@@ -21,10 +21,11 @@ const ok = (cond, what, more = "") => { console.log(`${cond ? "ok  " : "FAIL"} $
   const core = f => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
   const pin = core(".node-version").trim();
   const entry = JSON.parse(core(".github/licences-audit.json")).entries.filter(e => e.name === "Node.js");
-  const summed = [...core("scripts/node.sh").matchAll(/^\s*([0-9][0-9.]*)-(?:x86_64|aarch64)\)/gmu)].map(m => m[1]);
-  ok(entry.length === 1 && entry[0].version === pin && summed.length === 2 && summed.every(v => v === pin),
-    `the audit's entry for Node, and node.sh's sums, name the pin in .node-version, ${pin}`,
-    `the entry names ${entry.map(e => e.version).join(", ") || "nothing"}, node.sh sums ${summed.join(", ") || "nothing"}. Mend: set "version" of the entry "Node.js" in .github/licences-audit.json to the version .node-version names, and give node.sh that version's two sums, in the pull request that moves the pin (tasks/updates.md, "Node")`);
+  const summed = [...core("scripts/node.sh").matchAll(/^\s*([0-9][0-9.]*)-(x86_64|aarch64)\)/gmu)].map(m => `${m[1]}-${m[2]}`);
+  const want = ["aarch64", "x86_64"].map(arch => `${pin}-${arch}`);
+  ok(entry.length === 1 && entry[0].version === pin && JSON.stringify([...summed].sort()) === JSON.stringify(want),
+    `the audit's entry for Node, and node.sh's sums, one for each architecture, name the pin in .node-version, ${pin}`,
+    `the entry names ${entry.map(e => e.version).join(", ") || "nothing"}, node.sh sums ${summed.join(", ") || "nothing"}, where ${want.join(" and ")} are wanted. Mend: set "version" of the entry "Node.js" in .github/licences-audit.json to the version .node-version names, and give node.sh that version's two sums, in the pull request that moves the pin (tasks/updates.md, "Node")`);
 }
 
 const lists = policy({ data: ["mossgrip-data"], fonts: ["mossgrip-face"] });
