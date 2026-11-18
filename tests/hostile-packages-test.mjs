@@ -16,7 +16,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { crc32, deflateRawSync } from "node:zlib";
-import { check } from "../scripts/licence-installed.mjs";
+import { check as installed } from "../scripts/licence-installed.mjs";
 import { scan } from "../scripts/licence-scan.mjs";
 import { licenceOk } from "../scripts/licences.mjs";
 import { quick, said, scratch } from "../scripts/hostile.mjs";
@@ -33,9 +33,6 @@ const word = (...parts) => parts.join("");
 const NPM = word("np", "m");
 const throws = (fn) => { try { fn(); return false; } catch { return true; } };
 const ALLOW = new Set(["MIT"]);
-// (a project with no node_modules folder is read as npm reads one, its root alone, which licence-installed-test.mjs
-// holds with npm itself: each npm query costs a second on Windows)
-const installed = (dir, system) => check(dir, system, fs.existsSync(path.join(dir, "node_modules")) ? undefined : () => new Map([["", { location: "" }]]));
 // an installed package: the lock file names moss-a at 1.0.0 under MIT, and node_modules holds `own` as its package.json
 const LINUX = { os: "linux", cpu: "x64", libc: "glibc" };
 const lockOf = (packages) => JSON.stringify({ lockfileVersion: 3, packages: { "": {}, ...packages } });
