@@ -119,8 +119,9 @@ ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon"
     "repos/o/r/collaborators/boss/permission": { role_name: "admin", user: { type: "User" } }, "repos/o/r/collaborators/writer/permission": { role_name: "write", user: { type: "User" } },
     "repos/o/r/collaborators/keeper/permission": { role_name: "maintain", user: { type: "User" } }, "repos/o/r/collaborators/app/permission": { role_name: "admin", user: { type: "Bot" } } };
   // (GraphQL's answer on who edited each text: none edited, unless `edits` names its editors)
+  // (the host refuses a lookup of more than 100 nodes, as GitHub's GraphQL does)
   const edited = (edits = {}) => (route, query) => route === "graphql"
-    ? { data: { nodes: [...query.matchAll(/"([^"]+)"/gu)].map(([, id]) => ({ id, lastEditedAt: edits[id] ? "2026-11-18T10:00:00Z" : null, userContentEdits: { totalCount: edits[id]?.total ?? edits[id]?.length ?? 0, nodes: (edits[id] ?? []).map(login => ({ editor: login === null ? null : { login } })) } })) } }
+    ? [...query.matchAll(/"([^"]+)"/gu)].length > 100 ? null : { data: { nodes: [...query.matchAll(/"([^"]+)"/gu)].map(([, id]) => ({ id, lastEditedAt: edits[id] ? "2026-11-18T10:00:00Z" : null, userContentEdits: { totalCount: edits[id]?.total ?? edits[id]?.length ?? 0, nodes: (edits[id] ?? []).map(login => ({ editor: login === null ? null : { login } })) } })) } }
     : host[route] ?? null;
   const asked = [], got = textsOf("o/r", [9], (route, query) => (asked.push(route), edited()(route, query)));
   ok(got.read && got.texts.length === 2 && got.texts.some(x => x.includes("my yes, as a maintainer")) && !got.texts.some(x => /as an? (writer|bot|app)/.test(x)) && !asked.some(r => r.includes("helper")),
@@ -132,10 +133,12 @@ ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon"
   ok(byWriter.read && byWriter.texts.length === 0 && byAdmin.read && byAdmin.texts.length === 2,
     "a text a writer, or an account gone, edited counts no longer; one edited by accounts of the higher right alone still counts", JSON.stringify(byWriter));
   const many = textsOf("o/r", [9], edited({ I_9: Object.assign(["boss"], { total: 101 }) })), dark = textsOf("o/r", [9], route => (route === "graphql" ? null : host[route] ?? null));
-  ok(!many.read && many.texts.length === 1 && !dark.read && dark.texts.length === 0, "a text whose editors run past the host's first hundred, or are not given, is unread, never counted", JSON.stringify(many));
+  const blank = textsOf("o/r", [9], edited({ I_9: [] }));
+  ok(!many.read && many.texts.length === 1 && !dark.read && dark.texts.length === 0 && !blank.read && blank.texts.length === 1,
+    "a text whose editors run past the host's first hundred, are not given, or are none though it was edited, is unread, never counted", JSON.stringify([many, blank]));
   const full = Array.from({ length: 100 }, (_, i) => ({ user: { login: "keeper" }, body: `> note ${i}`, node_id: `N_${i}` }));
   const long = textsOf("o/r", [9], (route, query) => (/comments\?per_page=100&page=\d$/.test(route) ? full : edited()(route, query)));
   ok(!long.read && long.texts.length === 301 && yesOf({ paths: floor, body: pr("> note 7"), texts: long.texts, read: long.read }).note?.startsWith("the owner's yes is quoted") && yesOf({ paths: floor, body: pr("> not read"), texts: long.texts, read: long.read }).note,
-    "comments past the pages read leave it unread: a quote found in them still passes, one not found is said, never failed", `${long.read} ${long.texts.length}`);
+    "comments past the pages read leave it unread, their texts asked of the host a hundred at a time: a quote found in them still passes, one not found is said, never failed", `${long.read} ${long.texts.length}`);
 }
 process.exit(failed ? 1 : 0);

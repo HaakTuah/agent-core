@@ -65,17 +65,59 @@ export function yesOf({ paths, body, texts, read = true }) {
   return { mend: `this pull request changes ${named}, which asks the owner's yes (floor rule 3), and no line it quotes under "${WORD}" stands word for word in the text of ${issues.map(n => `#${n}`).join(", ")} from an account with the higher right. Mend: ${how}; where the issue holds no yes for this change, file one asking the owner and leave this pull request unmerged meanwhile` };
 }
 
-// The query of GraphQL that gives, for each of `ids` (the host's node ids of issues and comments), whether it was
-// edited and by whom: the host gives every editor, the first 100 of them.
+// The query of GraphQL that gives, for each of `ids` (the host's node ids of issues and comments, at most BATCH, which
+// the host refuses past), whether it was edited and by whom: the host gives every editor, the first 100 of them.
 export const editsQuery = ids => `query { nodes(ids: [${ids.map(id => JSON.stringify(id)).join(", ")}]) { id ... on UserContentEditable { lastEditedAt userContentEdits(first: 100) { totalCount nodes { editor { login } } } } } }`;
-const NODE = /^[A-Za-z0-9_=-]{1,100}$/u;
+const NODE = /^[A-Za-z0-9_=-]{1,100}$/u, BATCH = 100;
+const ghCall = (route, query) => { const r = spawnSync("gh", query === undefined ? ["api", route] : ["api", "graphql", "-f", `query=${query}`], { encoding: "utf8", maxBuffer: 1 << 24 }); return r.status === 0 ? JSON.parse(r.stdout) : null; };
+
+// The texts of the issues `issues` of `repo`, through gh: { notes: [{ login, body, id }], read }, read false where an
+// issue or a page of its comments was not given, or the comments ran past MOST_PAGES.
+function notesOf(repo, issues, gh) {
+  const notes = [];
+  let read = true;
+  for (const n of issues) {
+    const issue = gh(`repos/${repo}/issues/${n}`);
+    if (!issue) { read = false; continue; }
+    notes.push({ login: String(issue.user?.login ?? ""), body: issue.body, id: issue.node_id });
+    for (let page = 1; page <= MOST_PAGES; page++) {
+      const one = gh(`repos/${repo}/issues/${n}/comments?per_page=100&page=${page}`);
+      if (!Array.isArray(one)) { read = false; break; }
+      notes.push(...one.map(c => ({ login: String(c.user?.login ?? ""), body: c.body, id: c.node_id })));
+      // (a last page still full: comments past it were not read)
+      if (one.length === 100 && page === MOST_PAGES) read = false;
+      if (one.length < 100) break;
+    }
+  }
+  return { notes, read };
+}
+
+// The host's answer on the edits of each of `ids`, in batches of BATCH: a Map of id to its node, those it gives.
+function editsOf(ids, gh) {
+  const by = new Map();
+  for (let at = 0; at < ids.length; at += BATCH) {
+    const nodes = gh("graphql", editsQuery(ids.slice(at, at + BATCH)))?.data?.nodes;
+    for (const node of Array.isArray(nodes) ? nodes : []) if (typeof node?.id === "string") by.set(node.id, node);
+  }
+  return by;
+}
+
+// Whether a text by an account of the higher right counts, from its node (editsOf): "yes" where it was never edited or
+// every editor has the higher right too (`higher`), "no" where one has not, "unread" where the host does not say.
+function counts(node, higher) {
+  if (node === undefined) return "unread";
+  if (node.lastEditedAt === null) return "yes";
+  const edits = node.userContentEdits;
+  if (!Array.isArray(edits?.nodes) || edits.nodes.length === 0 || edits.totalCount !== edits.nodes.length) return "unread";
+  return edits.nodes.every(edit => higher(String(edit?.editor?.login ?? ""))) ? "yes" : "no";
+}
 
 // Of the issues `issues` of `repo`, the texts written by an account the host gives the higher right, and edited, where
 // at all, by such accounts alone, each readable(), through gh (a REST route, or "graphql" with its query): { texts, read },
 // read false where an issue, a page of its comments, an account's right or a text's editors could not be read, or the
 // comments ran past MOST_PAGES (the texts read so far are kept, so a quote found among them still passes).
-export function textsOf(repo, issues, gh = (route, query) => { const r = spawnSync("gh", query === undefined ? ["api", route] : ["api", "graphql", "-f", `query=${query}`], { encoding: "utf8", maxBuffer: 1 << 24 }); return r.status === 0 ? JSON.parse(r.stdout) : null; }) {
-  const rights = new Map(), texts = [], kept = [];
+export function textsOf(repo, issues, gh = ghCall) {
+  const rights = new Map();
   let read = true;
   // (a login of no account's form, a bot's among them, is no owner; one the host does not answer on is unread)
   const higher = login => {
@@ -86,33 +128,12 @@ export function textsOf(repo, issues, gh = (route, query) => { const r = spawnSy
     return HIGHER.has(String(right?.role_name)) && right?.user?.type === "User";
   };
   try {
-    for (const n of issues) {
-      const issue = gh(`repos/${repo}/issues/${n}`);
-      if (!issue) { read = false; continue; }
-      const notes = [{ login: String(issue.user?.login ?? ""), body: issue.body, id: issue.node_id }];
-      for (let page = 1; page <= MOST_PAGES; page++) {
-        const one = gh(`repos/${repo}/issues/${n}/comments?per_page=100&page=${page}`);
-        if (!Array.isArray(one)) { read = false; break; }
-        notes.push(...one.map(c => ({ login: String(c.user?.login ?? ""), body: c.body, id: c.node_id })));
-        if (one.length < 100) break;
-        // (a last page still full: comments past it were not read)
-        if (page === MOST_PAGES) read = false;
-      }
-      kept.push(...notes.filter(note => higher(note.login)));
-    }
-    // (each text kept, where its editors are all of the higher right; one whose id or editors the host does not give,
-    // or gives past its first 100, is unread)
-    const ids = kept.map(note => note.id).filter(id => typeof id === "string" && NODE.test(id));
-    if (ids.length < kept.length) read = false;
-    const nodes = ids.length ? gh("graphql", editsQuery(ids))?.data?.nodes : [];
-    const by = new Map((Array.isArray(nodes) ? nodes : []).filter(node => typeof node?.id === "string").map(node => [node.id, node]));
-    for (const note of kept) {
-      const node = by.get(note.id), edits = node?.userContentEdits;
-      if (node === undefined) { read = false; continue; }
-      if (node.lastEditedAt === null) { texts.push(readable(note.body)); continue; }
-      if (!Array.isArray(edits?.nodes) || edits.totalCount !== edits.nodes.length) { read = false; continue; }
-      if (edits.nodes.every(edit => higher(String(edit?.editor?.login ?? "")))) texts.push(readable(note.body));
-    }
-  } catch { return { texts, read: false }; }
-  return { texts, read };
+    const got = notesOf(repo, issues, gh), kept = got.notes.filter(note => higher(note.login));
+    if (!got.read) read = false;
+    // (a kept text whose id is of no node's form, or whose editors the host does not give, is unread)
+    const by = editsOf(kept.map(note => note.id).filter(id => typeof id === "string" && NODE.test(id)), gh);
+    const verdicts = kept.map(note => [note, counts(by.get(note.id), higher)]);
+    if (verdicts.some(([, v]) => v === "unread")) read = false;
+    return { texts: verdicts.filter(([, v]) => v === "yes").map(([note]) => readable(note.body)), read };
+  } catch { return { texts: [], read: false }; }
 }
