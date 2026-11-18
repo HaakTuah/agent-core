@@ -29,8 +29,9 @@ export const READERS = {
 // none); what the code was, "Previously:", "Was:" and the like; a change's date, a word of change and a date written as
 // ISO writes one, near each other, opening the line (a change of another's, dated, mid-line, is a reason); and the task
 // that changed it, a word of change and "in", "for", "by" or "per" a pull request's or an issue's number (a tracker's
-// keys, ABC-12, read as a standard's or an advisory's name, RFC-4648, so a project adds its own pattern for them). None guesses: a pattern found
-// to does goes off this list in the pull request that finds it, and a project adds its own in the config ("changes").
+// keys, ABC-12, read as a standard's or an advisory's name, RFC-4648, so a project adds its own mark for them). None guesses: a pattern found
+// to does goes off this list in the pull request that finds it, and a project adds its own, plain text, in the config
+// ("changes").
 const WORDS = ["Added", "Changed", "Fixed", "Updated", "Removed", "Modified", "Moved", "Renamed", "Rewritten", "Refactored", "Replaced"];
 const CAPITAL = `(?:${WORDS.flatMap(w => [w, w.toUpperCase()]).join("|")})`, CHANGED = `(?:${WORDS.map(w => w.toLowerCase()).join("|")}|${CAPITAL.slice(3, -1)})`;
 const DATE = "(?:19|20)\\d\\d-[01]\\d-[0-3]\\d";

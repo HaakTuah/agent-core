@@ -34,8 +34,8 @@
 // The config's other keys: "code" and "tests", git pathspecs of what is read (tests for their imports alone);
 // "aliases", each prefix an import may start with to the path it stands for; "suites", each suite's time mark in
 // seconds, a number or one for each of Node's names for a platform ({ "linux": 60, "win32": 240 }); and those of what
-// the tests cost (tasks/tests.md; #275, #321): "changes", the patterns of a change's mark the project adds, each a
-// regular expression with the u flag (the reader "changes"); "screens", what a test imports that opens a screen, a window or a
+// the tests cost (tasks/tests.md; #275, #321): "changes", the marks of a change the project adds, each plain text
+// found anywhere in a comment line (the reader "changes"); "screens", what a test imports that opens a screen, a window or a
 // device (a package or module by the name it is imported under, or the start of one), so that each test file that
 // imports one is an entry ("screen: <test> -> <what>", found by the reader
 // "screens"), new ones failing as any breach does; "select", for select.mjs beside this file: "proof", pathspecs of the
@@ -97,24 +97,21 @@ const optional = (v, test) => v === undefined || test(v);
 const isName = v => typeof v === "string" && /^[a-z][a-z0-9-]*$/u.test(v);
 const plainPath = s => typeof s === "string" && /^[\w@.-][\w@. -]*(\/[\w@.-][\w@. -]*)*\/?$/u.test(s) && !s.split("/").includes("..");
 const wholeNumbers = o => Object.values(o).every(n => Number.isInteger(n) && n > 0);
-// A pattern of a change's mark the project adds ("changes"), held to a form no line can make slow: at most 120
-// characters, three quantifiers, no quantified group and no backreference, so that its work on a comment's first 400
-// characters stays bounded; at most 20 of them.
+
+// A mark of a change the project adds ("changes"): plain text, found anywhere in a comment line's first 400 characters,
+// so that no mark a config holds can make the check slow (a pattern of its own could backtrack past any bound a count
+// of its quantifiers sets); at most 120 characters, no control character, at most CHANGES_MOST of them.
 export const CHANGES_MOST = 20;
-const pattern = s => {
-  if (s.length > 120 || /\)[*+?{]|\\[1-9]|\\k</u.test(s) || (s.replace(/\\./gu, "").replace(/\(\?/gu, "(").match(/[*+?]|\{\d/gu) ?? []).length > 3) return false;
-  try { new RegExp(s, "u"); return true; } catch { return false; }
-};
+const plainMark = s => s.length <= 120 && !/[\p{Cc}]/u.test(s);
+function readChanges(changes, at) {
+  if (!optional(changes, v => strings(v) && v.length <= CHANGES_MOST && v.every(plainMark))) refuse(`"changes" in ${at} is not a list of at most ${CHANGES_MOST} marks of a change`, "list there each mark of a change in a comment the project adds, as plain text the check finds anywhere in a comment line (\"Ticket: ABC-\", \"fixed in JIRA-\"), of at most 120 characters with no control character, or take it out");
+}
+
 const aSecond = n => Number.isFinite(n) && n > 0;
 const seconds = v => aSecond(v) || (isObject(v) && Object.keys(v).length > 0 && Object.values(v).every(aSecond));
 const KIT_FORM = "write it as the starter kit does (core/setup/template/shape.json.tmpl): a JSON object with \"baseline\", the baseline's path, and \"code\", git pathspecs of the code to read";
 
 // ---- the config ----
-
-// The patterns of a change's mark the config adds ("changes"), each of the form `pattern` reads, at most CHANGES_MOST.
-function readChanges(changes, at) {
-  if (!optional(changes, v => strings(v) && v.length <= CHANGES_MOST && v.every(pattern))) refuse(`"changes" in ${at} is not a list of at most ${CHANGES_MOST} patterns of the form the check reads`, "list there each pattern of a change's mark in a comment the project adds, as a regular expression JavaScript reads (with its u flag), of at most 120 characters and three quantifiers (*, +, ? or {n}), with no quantifier after a group and no backreference, or take it out");
-}
 
 function readLists(c, at) {
   const unknown = Object.keys(c).filter(k => !KEYS.includes(k));
@@ -178,7 +175,7 @@ export function parseConfig(text, at = KIT) {
   if (!isObject(systems)) refuse(`"systems" in ${at} is not an object`, "give each system's name its \"paths\", and what else it declares: \"uses\", \"entrance\", \"domain\", \"wraps\"");
   for (const [name, s] of Object.entries(systems)) readSystem(name, s, systems, at);
   const select = Object.fromEntries(SELECT_KEYS.map(k => [k, c.select?.[k] ?? []]));
-  return { baseline: c.baseline, code: c.code, tests: c.tests ?? [], systems, platform: c.platform ?? [], screens: c.screens ?? [], changes: [...Object.entries(CHANGE_MARKS), ...(c.changes ?? []).map(p => [`/${p.replaceAll(": ", ":\\x20")}/`, new RegExp(p, "u")])], select, wait: c.wait, long: c.long ?? LONG, ...readMarks(c, at), wrapped: readTogether(systems, at) };
+  return { baseline: c.baseline, code: c.code, tests: c.tests ?? [], systems, platform: c.platform ?? [], screens: c.screens ?? [], changes: [...Object.entries(CHANGE_MARKS), ...(c.changes ?? []).map(p => [JSON.stringify(p).replaceAll(": ", ":\\u0020"), { test: t => t.includes(p) }])], select, wait: c.wait, long: c.long ?? LONG, ...readMarks(c, at), wrapped: readTogether(systems, at) };
 }
 
 // ---- what stands ----
@@ -536,7 +533,7 @@ const SAID = {
   screen: n => [`${plural(n, "test imports", "tests import")} what opens a screen, a window or a device, where no test of ${n === 1 ? "its" : "their"} file did before`,
     "test what it guards beneath the screen, through the system it uses, and take the import out; only where the screen, the window or the device itself is what the test guards, list the entry in the baseline with that reason under \"grown\", by its id, and in the pull request"],
   change: n => [`${plural(n, "comment line marks", "comment lines mark")} what changed, when or for which task, more than the file's comments did before (a change's heading such as "Changed:", what the code was, a change's date, the task that changed it)`,
-    "move what changed, when and for which task to the commit's message or the pull request's description, and keep in the comment only why the code is so, or a pointer to the issue that gives the reason; where a mark of the config's (\"changes\") takes a comment that says why for a change's mark, take that pattern out of the config in this pull request; where one of the core's marks takes such a comment, or a notice a licence asks for (Apache-2.0's, that a file was modified), list the entry under \"grown\" in the baseline with that reason, and report the pattern to the core (core/README.md, \"Reporting to the core\")"],
+    "move what changed, when and for which task to the commit's message or the pull request's description, and keep in the comment only why the code is so, or a pointer to the issue that gives the reason; where a mark of the config's (\"changes\") takes a comment that says why for a change's mark, take that mark out of the config in this pull request; where one of the core's marks takes such a comment, or a notice a licence asks for (Apache-2.0's, that a file was modified), list the entry under \"grown\" in the baseline with that reason, and report the pattern to the core (core/README.md, \"Reporting to the core\")"],
   clock: n => [`${plural(n, "file", "files")} of the rules ${n === 1 ? "reads" : "read"} the clock or ${n === 1 ? "makes" : "make"} randomness of ${n === 1 ? "its" : "their"} own`, "pass the time and the source of randomness in as arguments, so that the same input gives the same result"],
 };
 

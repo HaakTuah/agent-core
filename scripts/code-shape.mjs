@@ -72,10 +72,11 @@ export function tokens(src, jsx = false) {
 // alone, all a mark is read in.
 export const COMMENT_READ = 400;
 export function commentLines(to, src, a, b, line) {
+  const text = src.slice(a, b);
   let k = 0;
-  for (let at = a; at <= b; k++) {
-    const end = src.indexOf("\n", at), stop = end < 0 || end > b ? b : end;
-    to.push({ line: line + k, text: src.slice(at, Math.min(stop, at + COMMENT_READ)) });
+  for (let at = 0; at <= text.length; k++) {
+    const end = text.indexOf("\n", at), stop = end < 0 ? text.length : end;
+    to.push({ line: line + k, text: text.slice(at, Math.min(stop, at + COMMENT_READ)) });
     at = stop + 1;
   }
 }

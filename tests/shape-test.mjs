@@ -52,7 +52,7 @@ const BAD = {
   "a circle of uses": config(two({ uses: ["view"] }, { uses: ["rules"] })),
   "screens that are no list": config({ screens: "playwright" }),
   "changes that are no list": config({ changes: "Changed:" }),
-  "a change's mark JavaScript cannot read as a pattern": config({ changes: ["(unclosed"] }),
+  "a change's mark with a control character": config({ changes: ["Ticket:\u0007"] }),
   "a selection that is no object": config({ select: ["test/a.test.js"] }),
   "a selection's unknown key": config({ select: { always: ["test/a.test.js"] } }),
   "a selection's list that is no list": config({ select: { proof: "test/a.test.js" } }),
@@ -119,7 +119,7 @@ const mono = survey({ "packages/engine/package.json": JSON.stringify({ name: "@g
 ok(same(ids(mono), ["inside: web -> engine: packages/web/src/page.ts -> packages/engine/src/inner.ts"]), "a package the repository holds itself is read as its files: its entrance holds, by its name too", ids(mono));
 
 // ---- the comments that mark a change (#458) ----
-const changeCfg = cfg({ changes: ["^\\s*Ticket: [A-Z]+-\\d+"] });
+const changeCfg = cfg({ changes: ["Ticket: ABC-"] });
 const marked = survey({
   "src/a.js": "// Changed: the loop runs once (old code below)\nconst a = 1; // Fixed in #12\n/* Previously: a map\n * Added 2024-05-01\n * then the rest of a comment that\n * changed: nothing, a line going on in small letters\n */\nconst s = \"// Changed: in a string\";\n// Ticket: ABC-12, the task's own mark\n// moved here 2025-01-02 from b.js\n// replaced by utf-8, a reason\n// padding is added per RFC-4648, lone surrogates replaced by UTF-8 bytes\n// Deprecated: use parseUrl() instead\n// Stripe changed the webhook format on 2023-08-16; older events lack it\n",
   "src/b.cs": "// CHANGED: a heading in capitals\n/// was renamed from Foo for ABC-9 (a reason, no mark)\nclass B {}\n",
@@ -127,9 +127,9 @@ const marked = survey({
   "src/d.js": "// Why the loop runs twice: the reader needs both passes (#458 gives the reason)\nexport const d = 1;\n",
 }, changeCfg);
 const changes = ids(marked).filter(id => id.startsWith("change: "));
-ok(same(changes, ["change: src/a.js: /^\\s*Ticket:\\x20[A-Z]+-\\d+/", "change: src/a.js: a change's date", "change: src/a.js: a change's heading", "change: src/a.js: the task that changed it", "change: src/a.js: what the code was", "change: src/b.cs: a change's heading", "change: src/c.py: the task that changed it"])
+ok(same(changes, ["change: src/a.js: \"Ticket:\\u0020ABC-\"", "change: src/a.js: a change's date", "change: src/a.js: a change's heading", "change: src/a.js: the task that changed it", "change: src/a.js: what the code was", "change: src/b.cs: a change's heading", "change: src/c.py: the task that changed it"])
   && marked.entries.get("change: src/a.js: a change's heading").n.count === 2 && marked.entries.get("change: src/a.js: the task that changed it").n.count === 1 && marked.entries.get("change: src/a.js: a change's date").n.count === 1 && readerOf("change: src/a.js: a change's date", marked.readers) === "changes" && fileOf("change: src/a.js: what the code was") === "src/a.js"
-  && groupOf("change: src/a.js: /^\\s*Ticket:\\x20[A-Z]+-\\d+/").group === "/^\\s*Ticket:\\x20[A-Z]+-\\d+/",
+  && groupOf("change: src/a.js: \"Ticket:\\u0020ABC-\"").group === "\"Ticket:\\u0020ABC-\"",
   "a comment line that marks a change is an entry of the reader \"changes\", counted by file and mark, in JavaScript, C# and Python, a mark of the config's too; a string, a line going on in small letters, a reason and a pointer to an issue are none", changes.join("\n"));
 // (a block comment of 300,000 lines, in JavaScript and C#, read whole and overflowing nothing; a file whose JSX the
 // reader cannot follow gives no marks, since what it would take for a comment may be the element's text)
@@ -137,6 +137,9 @@ const tall = `/*\n * Changed: x\n${" * a line\n".repeat(300000)} */\nconst t = 1
 const longMarked = survey({ "src/t.js": tall, "src/t.cs": `${tall.replace("const t = 1;", "class T {}")}`, "src/l.jsx": "const cast = <T>(x: T) => x;\nconst p = <p>// Changed: the text</p>;\n" }, cfg({}));
 ok(longMarked.entries.get("change: src/t.js: a change's heading")?.n.count === 1 && longMarked.entries.get("change: src/t.cs: a change's heading")?.n.count === 1 && !ids(longMarked).some(id => id.startsWith("change: src/l.jsx")),
   "a block comment of 300,000 lines is read whole in JavaScript and C#, and a file whose JSX the reader cannot follow gives no marks", ids(longMarked).join("\n"));
+// (a minified file of 100,000 inline comments on one line, read in time: each comment's lines found within it alone)
+const minStart = Date.now(), minified = survey({ "src/min.js": `var a=${"/*#__PURE__*/f()+".repeat(100000)}1;\n` }, cfg({}));
+ok(Date.now() - minStart < 5000 && !ids(minified).some(id => id.startsWith("change: ")), "a minified file of 100,000 inline comments on one line is read in time", `${Date.now() - minStart} ms`);
 const changeSaid = verdict({ config: changeCfg, at: "c.json", self: "s", found: marked, baselineText: JSON.stringify({ reads: ["javascript", "jsx", "csharp", "python", "scripts", "screens", "changes"], listed: {} }) }).fail.flat().join("\n");
 ok(mended(changeSaid) && /comment lines? marks? what changed/.test(changeSaid) && /commit's message/.test(changeSaid), "a new comment that marks a change fails, its mend saying where the words go", changeSaid);
 const unread = verdict({ config: changeCfg, at: "c.json", self: "s", found: marked, baselineText: JSON.stringify({ reads: ["javascript", "jsx", "csharp", "python", "scripts", "screens"], listed: {} }) });
