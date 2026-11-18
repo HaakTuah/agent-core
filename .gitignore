@@ -1,8 +1,11 @@
-# The packages of other publishers the core's scripts run, installed from package-lock.json by scripts/install.mjs:
-# never tracked, here or in a project's copy, where this file stands at the copy's root (#654), nor a link in their
-# place. The copy's package list, lock file and .npmrc are tracked there even where the project's own .gitignore leaves
-# such files out.
+# The packages of other publishers the core's scripts run, installed from .packages/package-lock.json by
+# scripts/install.mjs: never tracked, here or in a project's copy, where this file stands at the copy's root (#654), nor
+# a link in their place; nor the folder an install before they moved into .packages/ left at the root, which a clone
+# made then still holds. The copy's package list, lock file and .npmrc, in the dot folder .packages/ so that no
+# workspace pattern of a project's own package list takes them in, are tracked there even where the project's own
+# .gitignore leaves such files out.
+/.packages/node_modules
 /node_modules
-!/.npmrc
-!/package.json
-!/package-lock.json
+!/.packages/.npmrc
+!/.packages/package.json
+!/.packages/package-lock.json

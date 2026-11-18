@@ -59,7 +59,7 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), "manifest-reads-"));
 const core = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 try {
   fs.mkdirSync(path.join(root, "core"));
-  for (const d of ["scripts", "node_modules", "roles", "tasks", "tools", "floor"]) fs.cpSync(path.join(core, d), path.join(root, "core", d), { recursive: true });
+  for (const d of ["scripts", ".packages", "roles", "tasks", "tools", "floor"]) fs.cpSync(path.join(core, d), path.join(root, "core", d), { recursive: true });
   fs.copyFileSync(path.join(core, "README.md"), path.join(root, "core/README.md"));
   const git = (...a) => execFileSync("git", a, { cwd: root, stdio: "ignore" });
   git("init", "-q");
@@ -86,7 +86,7 @@ ok(self.status === 0, "each slot of the core's own README carries its mark", sel
 { // the core's own, with a slot's mark taken out: fails, saying its mend
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "manifest-reads-core-"));
   try {
-    for (const d of ["scripts", "node_modules"]) fs.cpSync(path.join(core, d), path.join(dir, d), { recursive: true });
+    for (const d of ["scripts", ".packages"]) fs.cpSync(path.join(core, d), path.join(dir, d), { recursive: true });
     fs.writeFileSync(path.join(dir, "README.md"), fs.readFileSync(path.join(core, "README.md"), "utf8").replace(/^(\| \*large file\* \|[^|\n]*\|)[^|\n]*\|$/m, "$1 |"));
     execFileSync("git", ["init", "-q"], { cwd: dir, stdio: "ignore" });
     const r = spawnSync(process.execPath, [path.join(dir, "scripts/manifest-reads.mjs"), "--core"], { encoding: "utf8" });

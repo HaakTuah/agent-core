@@ -1,8 +1,8 @@
-// A package of another publisher, as the core installs it (#654): from node_modules/ at the core's root alone, never a
-// project's own install of the same name at another version, and only where what is installed there is what the lock
-// file names, each entry by its version, address and integrity (npm's own record of the install, node_modules/
-// .package-lock.json, read against package-lock.json), so a folder an earlier install of another lock file left is
-// never run. Where it is not so, the check that needs it did not run, and says so with the command that installs it
+// A package of another publisher, as the core installs it (#654): from .packages/node_modules/ in the core alone, never
+// a project's own install of the same name at another version, and only where what is installed there is what the lock
+// file names, each entry by its version, address and integrity (npm's own record of the install,
+// .packages/node_modules/.package-lock.json, read against .packages/package-lock.json), so a folder an earlier install
+// of another lock file left is never run. Where it is not so, the check that needs it did not run, and says so with the command that installs it
 // (#254, #457); it never passes. In a project's pull request whose install could not reach the registry, a script asks
 // unreached() first, and says that part did not run as a warning (#654, point 4).
 //
@@ -15,10 +15,12 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
+// (the core's dot folder of its package list, lock file and install, which no workspace pattern of a project takes in)
+const packages = path.join(root, ".packages");
 
-const need = createRequire(path.join(root, "package.json"));
+const need = createRequire(path.join(packages, "package.json"));
 
-// The package's module, imported from the core's own node_modules/; where it is not there, a failure that says the mend.
+// The package's module, imported from the core's own .packages/node_modules/; where it is not there, a failure that says the mend.
 export async function load(name) {
   return import(pathToFileURL(found(name)).href);
 }
@@ -28,30 +30,30 @@ export function loadSync(name) {
   return need(found(name));
 }
 
-// Whether the package is installed in the core's own node_modules/, for what reads it and must not stop where it is
+// Whether the package is installed in the core's own .packages/node_modules/, for what reads it and must not stop where it is
 // not (steps.mjs, which never fails over one step).
 export function installed(name) {
   return entry(name) !== null;
 }
 
-// Whether node_modules/ holds what package-lock.json names: each entry of the lock file in npm's record of the install,
+// Whether .packages/node_modules/ holds what .packages/package-lock.json names: each entry of the lock file in npm's record of the install,
 // at the same version, from the same address, with the same integrity; all but those only the core's tests run, which
 // no script loads and a copy does not install.
 let current;
 function matches() {
   if (current === undefined) {
-    const read = f => { try { return JSON.parse(fs.readFileSync(path.join(root, f), "utf8")).packages ?? {}; } catch { return null; } };
+    const read = f => { try { return JSON.parse(fs.readFileSync(path.join(packages, f), "utf8")).packages ?? {}; } catch { return null; } };
     const wanted = read("package-lock.json"), had = read("node_modules/.package-lock.json");
     current = Boolean(wanted && had) && Object.keys(wanted).filter(k => k && !wanted[k].dev).every(k => had[k] && ["version", "resolved", "integrity"].every(f => wanted[k][f] === had[k][f]));
   }
   return current;
 }
 
-// The package's entry file, in the core's own node_modules/ alone, as the lock file names it, or null.
+// The package's entry file, in the core's own .packages/node_modules/ alone, as the lock file names it, or null.
 function entry(name) {
   if (!matches()) return null;
   try {
-    const own = fs.realpathSync(path.join(root, "node_modules")) + path.sep;
+    const own = fs.realpathSync(path.join(packages, "node_modules")) + path.sep;
     const at = need.resolve(name);
     return fs.realpathSync(at).startsWith(own) ? at : null;
   } catch { return null; }
@@ -70,11 +72,13 @@ export function npmrcOthers(text) {
 // What the core's package list and lock file may hold, read before npm runs (install.mjs) and by the core's own test:
 // the package list its own fields alone; each lock entry a folder of node_modules/ named in npm's name characters,
 // fetched from npm's registry at an address in its one plain form and held to its sha512, with no field but those a
-// package fetched from the registry carries; and every dependency spec a version, range or tag of npm's registry,
+// package fetched from the registry carries, and none of those npm would act on that the core's lock never writes
+// (ACTED); and every dependency spec a version, range or tag of npm's registry,
 // never one that names git, a web address, a file, a folder or a tarball, which the npm that comes with the least Node
 // would fetch, and run its prepare script, whatever setting says otherwise (#654). Each fault as a line; none, [].
-export const ENTRY_FIELDS = new Set(["version", "resolved", "integrity", "license", "dev", "optional", "devOptional", "peer", "engines", "bin", "funding",
-  "dependencies", "optionalDependencies", "peerDependencies", "peerDependenciesMeta", "os", "cpu", "libc", "deprecated", "hasInstallScript"]);
+export const ENTRY_FIELDS = new Set(["version", "resolved", "integrity", "license", "dev", "peer", "engines", "bin", "funding",
+  "dependencies", "optionalDependencies", "peerDependencies", "peerDependenciesMeta", "deprecated", "hasInstallScript"]);
+const ACTED = new Set(["optional", "devOptional", "os", "cpu", "libc"]);
 const LIST_FIELDS = ["name", "private", "description", "license", "dependencies", "devDependencies"];
 const SPEC_FIELDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
 // (a range or tag of the registry: no ".tgz" or ".tar" anywhere, which some npm reads as a file however it ends)
@@ -101,7 +105,9 @@ const plainObject = v => v !== null && typeof v === "object" && !Array.isArray(v
 function rootFaults(e, list) {
   if (!plainObject(e)) return ["package-lock.json \"\": not an object of fields"];
   const odd = Object.keys(e).filter(f => !["name", "version", "license", "dependencies", "devDependencies"].includes(f));
-  const differ = ["dependencies", "devDependencies"].filter(f => JSON.stringify(e[f] ?? {}) !== JSON.stringify(list[f] ?? {}));
+  // (as sorted pairs of name and version, since npm writes the root entry's packages sorted, whatever order the list holds)
+  const pairs = o => JSON.stringify(Object.entries(o ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+  const differ = ["dependencies", "devDependencies"].filter(f => pairs(e[f]) !== pairs(list[f]));
   return [...(odd.length ? [`package-lock.json "": the field${odd.length === 1 ? "" : "s"} ${odd.join(", ")}, which the package list does not hold`] : []),
     ...differ.map(f => `package-lock.json "": its ${f} not the package list's`)];
 }
@@ -116,11 +122,18 @@ function formFaults(lock) {
   return out;
 }
 
+// One lock entry's fields that no package fetched from the registry carries, and those npm would act on that the core's
+// lock never writes, each as a fault.
+function fieldFaults(k, e) {
+  const odd = Object.keys(e).filter(f => !ENTRY_FIELDS.has(f) && !ACTED.has(f)), acted = Object.keys(e).filter(f => ACTED.has(f));
+  const said = (fields, why) => (fields.length ? [`package-lock.json ${k}: the field${fields.length === 1 ? "" : "s"} ${fields.join(", ")}, ${why}`] : []);
+  return [...said(odd, "which no package fetched from the registry carries"), ...said(acted, "which npm would act on and the core's lock never writes")];
+}
+
 // One lock entry's faults, its specs' through `specs(where, fields)`.
 function entryFaults(k, e, specs) {
-  const out = [], odd = Object.keys(e).filter(f => !ENTRY_FIELDS.has(f));
+  const out = fieldFaults(k, e);
   if (!KEY.test(k)) out.push(`package-lock.json ${JSON.stringify(k)}: a key that names no folder of node_modules/`);
-  if (odd.length) out.push(`package-lock.json ${k}: the field${odd.length === 1 ? "" : "s"} ${odd.join(", ")}, which no package fetched from the registry carries`);
   // (the folder, the version and the address bound together: the address is exactly the registry's tarball of the
   // package the folder names, at the entry's version, so no part of an entry is free for npm to read otherwise)
   const name = k.slice(k.lastIndexOf("node_modules/") + "node_modules/".length), base = name.slice(name.indexOf("/") + 1);
@@ -146,11 +159,11 @@ function found(name) {
   const file = entry(name);
   if (!file) {
     const install = path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"));
-    const at = `${path.relative(process.cwd(), root) || "."}${path.sep}node_modules`;
+    const at = path.relative(process.cwd(), path.join(packages, "node_modules"));
     const mend = process.env.GITHUB_ACTIONS === "true"
       ? `in a pull request of its own, never a sync pull request, add the step if [ -f ${install} ]; then node ${install}; fi to this job before the step that runs this check, then run the job again; where the job has such a step, run the job again`
       : `run node ${install}, which installs the core's packages from its lock file, then run the check again`;
-    console.error(`FAIL: the check did not run: the package ${name} is not installed in ${at} as package-lock.json names it. Mend: ${mend}`);
+    console.error(`FAIL: the check did not run: the package ${name} is not installed in ${at} as .packages/package-lock.json names it. Mend: ${mend}`);
     process.exit(1);
   }
   return file;

@@ -73,9 +73,9 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-test-"));
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
   for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
-  fs.cpSync(fileURLToPath(new URL("../node_modules", import.meta.url)), path.join(tmp, "core/node_modules"), { recursive: true });
-  fs.copyFileSync(fileURLToPath(new URL("../package-lock.json", import.meta.url)), path.join(tmp, "core/package-lock.json")); // (what the install is read against)
-  fs.writeFileSync(path.join(tmp, "core/.gitignore"), "/node_modules/\n"); // (as the copy holds it)
+  // (the install with the lock file it is read against)
+  fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(tmp, "core/.packages"), { recursive: true });
+  fs.writeFileSync(path.join(tmp, "core/.gitignore"), "/.packages/node_modules/\n"); // (as the copy holds it)
   fs.mkdirSync(path.join(tmp, ".github/workflows"), { recursive: true });
   fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), `on:\n${"  pull_request_target:\n".repeat(7)}`);
   fs.writeFileSync(path.join(tmp, ".github/workflows/b.yml"), Buffer.from("on: push\n", "utf16le"));
@@ -99,7 +99,7 @@ try {
   // still fails, so no pull request turns the check green by making the install fail: #654, point 4)
   fs.writeFileSync(path.join(tmp, ".github/workflows/d.yml"), "on:\n  pull_request_target:\n");
   execFileSync("git", ["add", ".github/workflows/d.yml"], { cwd: tmp, stdio: "ignore" });
-  fs.rmSync(path.join(tmp, "core/node_modules"), { recursive: true, force: true });
+  fs.rmSync(path.join(tmp, "core/.packages/node_modules"), { recursive: true, force: true });
   const u = keyRun([], { CORE_PACKAGES_UNREACHED: "1" }), uOut = u.stdout + u.stderr;
   ok(u.status === 1 && /^::warning::The check for a key given twice did not run/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && mended(uOut), `where the install could not reach the registry, the keys given twice did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }

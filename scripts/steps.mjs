@@ -288,22 +288,7 @@ function installsFirst(p) {
     const at = job.steps.findIndex(st => runs(st, t => t.startsWith(script) && t.endsWith(".mjs") && t !== install));
     return at >= 0 && !job.steps.slice(0, at).some(installs);
   })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
-  const asks = [...(wrong.length ? [`In one small pull request, add a step \`node ${install}\` before the first step that runs a .mjs script under \`${script}\` in each such job of ${wrong.join(", ")}: the core's scripts load the packages it installs from its lock file, and without them a check says it did not run.`] : []),
-    ...(takesCopyIn(p.root, copy) ? [`In one small pull request, add \`"!${copy.replace(/\/$/u, "")}"\` after the patterns of \`workspaces\` in the project's own package.json: they take in the copy's folder, whose package.json npm would then read as one of the project's own, and the project's own npm ci fails.`] : [])];
-  return asks.length ? asks.join(" ") : null;
-}
-
-// Whether the project's own package.json names workspaces whose patterns take in the copy's folder, no later "!"
-// pattern leaving it out: npm reads each pattern as a glob from the project's root (* within a segment, ** across).
-function takesCopyIn(root, copy) {
-  let ws;
-  try { ws = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).workspaces; } catch { return false; }
-  const patterns = (Array.isArray(ws) ? ws : Array.isArray(ws?.packages) ? ws.packages : []).filter(x => typeof x === "string");
-  const folder = copy.replace(/\/$/u, "");
-  const glob = g => new RegExp(`^${g.replace(/^\.\//u, "").replace(/\/$/u, "").split("**").map(part => part.split("*").map(s => s.replace(/[.+?^${}()|[\]\\]/gu, "\\$&")).join("[^/]*")).join(".*")}$`, "u");
-  let taken = false;
-  for (const g of patterns) if (g.startsWith("!") ? glob(g.slice(1)).test(folder) : glob(g).test(folder)) taken = !g.startsWith("!");
-  return taken;
+  return wrong.length ? `In one small pull request, add a step \`node ${install}\` before the first step that runs a .mjs script under \`${script}\` in each such job of ${wrong.join(", ")}: the core's scripts load the packages it installs from its lock file, and without them a check says it did not run.` : null;
 }
 
 // Where the project's call to the NuGet check starts only on the paths it names, each build file a build reads by
@@ -903,7 +888,7 @@ export const STEPS = [
   { lead: "17 November 2026, packages from the registry, the week's wait and pinned downloads", cost: COST.check, check: packagesHeld },
   { lead: "17 November 2026, held packages looked up again", cost: COST.read, unread: "whether a package has gone stale is its registry's answer on the day, and GitHub's, not a file's: the session that syncs runs `node core/scripts/held.mjs` once and puts what it prints in the sync pull request's description, each package gone stale a task; the scheduled look runs it again each month" },
   { lead: "18 November 2026, the core's packages installed from its lock file", cost: COST.workflow, check: installsFirst,
-    partly: "that a job reaching a script of the copy through the project's own npm or shell script installs first, and a workspace of pnpm's or yarn's own file, are read by the review" },
+    partly: "that a job reaching a script of the copy through the project's own npm or shell script installs first is read by the review" },
   { lead: "18 November 2026, another publisher's code named in a lock file", cost: COST.line, unread: "how a project loads another publisher's code (a content network's script, a file copied in) is no file's to say exactly: the session that syncs reads the project's pages and folders for it" },
 ];
 

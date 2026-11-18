@@ -1,5 +1,6 @@
-// Installs the code of other publishers the core's scripts run (#654): each registry's from its own lock file at the
-// core's root, beside this file's folder, into a folder there that git does not track, taking each package at the one
+// Installs the code of other publishers the core's scripts run (#654): each registry's from its own lock file in the
+// core's dot folder .packages/, beside this file's folder, into a folder there that git does not track (a dot folder,
+// so that no workspace pattern of a project's own package list takes in the copy's), taking each package at the one
 // version and integrity the lock file names from its registry alone (no git, web or file address, whatever an .npmrc
 // says) and running no install script (floor rule 15). The
 // sync runs it after it writes the copy (sync.mjs), a session at its start, and each job before a check (README, "How
@@ -17,6 +18,8 @@ import { fileURLToPath } from "node:url";
 import { lockFaults, npmrcOthers } from "./packages.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
+// (the folder of the core's own package list, lock file and .npmrc, where npm runs and so reads that .npmrc alone)
+const packages = path.join(root, ".packages");
 const windows = process.platform === "win32";
 // (the core's own repository, which holds its tests: a copy holds none, .gitattributes keeping them out, and installs no
 // package that only the core's tests run)
@@ -25,29 +28,29 @@ const own = fs.existsSync(path.join(root, "tests"));
 // (each command written out, so the licence check reads what it runs; npm on Windows is a .cmd file, which Node starts
 // only through the shell, and each argument is the script's own)
 export const REGISTRIES = {
-  npm: { lock: "package-lock.json", into: "node_modules/", run: () => spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none", "--allow-directory=none", "--workspaces=false", ...(own ? [] : ["--omit=dev"])], { cwd: root, encoding: "utf8", shell: windows }) },
+  npm: { lock: ".packages/package-lock.json", into: ".packages/node_modules/", run: () => spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none", "--allow-directory=none", "--workspaces=false", ...(own ? [] : ["--omit=dev"])], { cwd: packages, encoding: "utf8", shell: windows }) },
 };
 
 // What keeps an install from running where it could reach past the core's own files: for npm's registry, a shrinkwrap
-// beside the lock file, which its program reads first; an .npmrc with any line but the core's own two settings; and an install folder
-// that is a link, or holds what git tracks, which the install would empty. Each as the failure's words with its mend; null
-// where none stands.
+// beside the lock file, which its program reads first; an .npmrc with any line but the core's own two settings; and an
+// install folder that is a link, or stands in one (.packages/), or holds what git tracks, which the install would empty.
+// Each as the failure's words with its mend; null where none stands.
 function refusal(lock, into) {
-  if (lock !== "package-lock.json") return null;
-  const at = f => path.join(root, f);
+  if (lock !== REGISTRIES.npm.lock) return null;
+  const at = f => path.join(packages, f);
   // (what the package list and lock file hold, read before npm runs: the npm that comes with the least Node fetches
   // whatever source a spec names, and runs its prepare script, whatever setting says otherwise)
   let faults;
-  try { faults = lockFaults(JSON.parse(fs.readFileSync(at("package.json"), "utf8")), JSON.parse(fs.readFileSync(at(lock), "utf8"))); }
-  catch (e) { faults = [`${lock} or package.json cannot be read (${e.message})`]; }
+  try { faults = lockFaults(JSON.parse(fs.readFileSync(at("package.json"), "utf8")), JSON.parse(fs.readFileSync(at("package-lock.json"), "utf8"))); }
+  catch (e) { faults = [`${lock} or .packages/package.json cannot be read (${e.message})`]; }
   if (faults.length) return `${faults[0]}${faults.length > 1 ? `, and ${faults.length - 1} more` : ""}. Mend: write the package list and lock file as npm's own install from its registry writes them, with no other source`;
-  if (fs.existsSync(at("npm-shrinkwrap.json"))) return `${at("npm-shrinkwrap.json")} stands beside the lock file, and would be installed from in its place. Mend: take it out; the core's packages are named in package-lock.json alone`;
+  if (fs.existsSync(at("npm-shrinkwrap.json"))) return `${at("npm-shrinkwrap.json")} stands beside the lock file, and would be installed from in its place. Mend: take it out; the core's packages are named in .packages/package-lock.json alone`;
   let npmrc = "";
   try { npmrc = fs.readFileSync(at(".npmrc"), "utf8"); } catch { /* (none: npm's own registry) */ }
   const others = npmrcOthers(npmrc);
   if (others.length) return `${at(".npmrc")} holds ${others.length === 1 ? "a line" : `${others.length} lines`} beside the core's own two settings (the first: ${JSON.stringify(others[0].slice(0, 80))}), which npm would read: a registry, a host's token, a proxy or a certificate would send the install elsewhere. Mend: take ${others.length === 1 ? "that line" : "those lines"} out; the core's .npmrc holds ignore-scripts=true and min-release-age alone`;
-  const folder = at(into.replace(/\/$/u, "")); // (no "/" after it, which would read the link's target)
-  if (fs.lstatSync(folder, { throwIfNoEntry: false })?.isSymbolicLink()) return `${folder} is a link, which the install would empty. Mend: remove the link, then run this again`;
+  const folder = path.join(root, into.replace(/\/$/u, "")); // (no "/" after it, which would read the link's target)
+  for (const f of [packages, folder]) if (fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()) return `${f} is a link, which the install would write through, or empty. Mend: remove the link, then run this again`;
   let tracked = "";
   try { tracked = spawnSync("git", ["ls-files", "--", into], { cwd: root, encoding: "utf8" }).stdout ?? ""; } catch { /* (no git: nothing tracked) */ }
   if (tracked.trim()) return `${folder} holds files git tracks, which the install would replace. Mend: take them out of git (git rm -r --cached ${into}), then run this again`;

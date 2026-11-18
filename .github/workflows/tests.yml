@@ -14,8 +14,8 @@
 # Windows half after each part (#508).
 # A third runs the reference parsers the hand-written readers are held to, tools that only run, the devDependencies of
 # the core's lock file, which its own jobs install and a copy does not (tests/readers-test.mjs, on Linux).
-# Each job first installs the core's own packages from its lock file, from npm's registry, running no install script
-# (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
+# Each job first installs the core's own packages from its lock file in .packages/, from npm's registry, running no
+# install script (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
 # tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
 # Once, on Linux, the core's own lock file is held as a project's is: each package it brings looked up in npm's
 # registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures).
@@ -388,6 +388,7 @@ jobs:
         run: node scripts/lookup.mjs .github/licences.json
       - name: The registry's signature on each of the core's own installed packages (floor rule 7; once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }}
+        working-directory: .packages
         run: npm audit signatures
       - name: Every tool the core's own agents load is listed (floor topic 15)
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}

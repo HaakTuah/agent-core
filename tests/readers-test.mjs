@@ -21,8 +21,8 @@ const ok = (cond, what, detail = "") => { if (cond) passed++; else failed++; con
 
 {
   // the references, from the core's own lock file, as its tests' job installs them (scripts/install.mjs; #654)
-  const require = createRequire(fileURLToPath(new URL("../package.json", import.meta.url)));
-  const dev = Object.keys(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).devDependencies);
+  const require = createRequire(fileURLToPath(new URL("../.packages/package.json", import.meta.url)));
+  const dev = Object.keys(JSON.parse(readFileSync(new URL("../.packages/package.json", import.meta.url), "utf8")).devDependencies);
   let parse, DOMParser;
   try { parse = require("spdx-expression-parse"); ({ DOMParser } = require("@xmldom/xmldom")); }
   catch (e) { console.error(`FAIL: the references are not installed (${e.code ?? e.message}). Mend: run node scripts/install.mjs in the core's own repository, which installs them from package-lock.json, then run this again`); process.exit(1); }

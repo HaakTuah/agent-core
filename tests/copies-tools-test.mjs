@@ -24,8 +24,8 @@ try {
   const commit = what => { g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", what); return g("rev-parse", "HEAD").trim(); };
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
   for (const f of ["copies.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
-  fs.cpSync(path.join(here, "..", "node_modules"), path.join(dir, "core/node_modules"), { recursive: true });
-  put("core/.gitignore", "/node_modules/\n"); // (as the copy holds it: the installed packages are no file of the project's)
+  fs.cpSync(path.join(here, "..", ".packages"), path.join(dir, "core/.packages"), { recursive: true });
+  put("core/.gitignore", "/.packages/node_modules/\n"); // (as the copy holds it: the installed packages are no file of the project's)
   put("AGENTS.md", `# A project\n\n${SAID}.\n`);
   put("SECURITY.md", "# Security\n\n**3. The protected files,** here, **the rule files:** `docs/a.md`;\n");
   put("docs/a.md", `# Developing\n\n${OTHER}.\n`);
@@ -90,7 +90,7 @@ try {
   // (the packages the core installs beside its copy are no code of the project's, and git does not track them: a
   // pattern that reaches them reads none)
   const block = `${Array.from({ length: 10 }, (_, i) => `const value${i} = compute(${i}, "a string long enough to make the run count");`).join("\n")}\n`;
-  put("core/node_modules/a/dist/one.js", block); put("core/node_modules/a/dist/two.js", block);
+  put("core/.packages/node_modules/a/dist/one.js", block); put("core/.packages/node_modules/a/dist/two.js", block);
   put("checks/code.json", `${JSON.stringify({ baseline: "checks/code-baseline.json", code: ["*.js"], prose: [], proseFromSecurity: false })}\n`);
   g("add", "-A");
   const code = (...flags) => { const c = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/code.json", ...flags], { cwd: dir, encoding: "utf8", env: { ...process.env, COPIES_BASE: "" } }); return { status: c.status, out: `${c.stdout}${c.stderr}` }; };
@@ -103,7 +103,7 @@ try {
   r = code();
   ok(r.status === 1 && /^FAIL: a new copy: src\/(one|two)\.js/m.test(r.out) && !/node_modules/.test(r.out), "while the same copy in the project's own files fails", r.out);
   g("rm", "-q", "-f", "-r", "src", "checks/code.json");
-  fs.rmSync(path.join(dir, "core/node_modules/a"), { recursive: true, force: true });
+  fs.rmSync(path.join(dir, "core/.packages/node_modules/a"), { recursive: true, force: true });
   fs.rmSync(path.join(dir, "checks/code-baseline.json"));
 
   // (against the base, the config is held to every file the base's read, an agent tool's among them)

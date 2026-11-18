@@ -62,13 +62,14 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    project's: point 8), pinned to one commit of this repository and never edited by hand: everything but
    `reports/`, the dated reports of this repository's own changes, `words/`, the owner's own words behind the
    archive, and `tests/`, the tests of the core's own scripts, which stay here alone (`.gitattributes`; core archive
-   165; #252; #527). The packages of other publishers its scripts run are never in the copy: its `package-lock.json`
-   names each, at one exact version, and `core/scripts/install.mjs` installs them from npm's registry into
-   `core/node_modules/`, which the copy's `.gitignore` keeps out of git: the sync runs it after it writes the copy, a
-   session's start runs npm's own install where what is installed is not what the lock file names and the copy's npm
-   files are `main`'s own (the work-saved hook), and each of the core's workflows a project calls runs it before its
-   checks; a check that finds a package missing says it did not run, with that command (#654). Its devDependencies,
-   which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
+   165; #252; #527). The packages of other publishers its scripts run are never in the copy: its
+   `.packages/package-lock.json` names each, at one exact version, and `core/scripts/install.mjs` installs them from
+   npm's registry into `core/.packages/node_modules/`, which the copy's `.gitignore` keeps out of git (a dot folder, so
+   that no workspace pattern of the project's own package list takes the copy's package list in): the sync runs it after
+   it writes the copy, a session's start runs npm's own install where what is installed is not what the lock file names
+   and the copy's npm files are `main`'s own (the work-saved hook), and each of the core's workflows a project calls
+   runs it before its checks; a check that finds a package missing says it did not run, with that command (#654). Its
+   devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
    copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
@@ -237,11 +238,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      project of each of the last two releases synced to the change (`AGENTS.md`, "Nothing locks a
      project"): so the project's own suites run on one only for what they take from the copy (all of them where they run
      on its Node version and `core/.node-version` changed; those that read its scripts for a change under
-     `core/scripts/` or `core/package-lock.json`, whose packages those scripts run), never for the rest of the copy, which
-     `core.yml` checks, nor for a workflow in which only such a pin moved (`tasks/tests.md`, "A pull request runs the
-     tests its change can reach"; core archive 167). A path filter sees which files changed, not what changed in them,
-     so a suite filtered by `paths-ignore` names there each file that holds only calls to the core's workflows by its
-     exact path (`core/scripts/steps.mjs` reports one that does not).
+     `core/scripts/` or `core/.packages/package-lock.json`, whose packages those scripts run), never for the rest of the
+     copy, which `core.yml` checks, nor for a workflow in which only such a pin moved (`tasks/tests.md`, "A pull request
+     runs the tests its change can reach"; core archive 167). A path filter sees which files changed, not what changed
+     in them, so a suite filtered by `paths-ignore` names there each file that holds only calls to the core's workflows
+     by its exact path (`core/scripts/steps.mjs` reports one that does not).
    - **Dependabot:** its `.github/dependabot.yml` ignores `HaakTuah/agent-core*`.
    - **Every action a workflow uses,** GitHub's own included, is pinned to a full commit SHA with its version in a
      comment after it, which Dependabot keeps current: a security fix in an action reaches a workflow by that weekly
@@ -562,11 +563,11 @@ changed or not, passes on with it, marking the files they changed (#257; core ar
 repository, the floor, the modules, the scripts and workflows, the starter kit and the rule files, but `archive/`,
 `words/` and `reports/`: the owner's decisions, own words and records, all rights reserved. Both files travel in each
 project's copy under `core/`, and they license the core alone: a project keeps the terms its own owner gives its own work, and nothing here
-adds or changes them (floor rule 10). Nor do they cover the packages of other publishers the scripts run, each under
-its own licence: none is carried, each an entry of `package-lock.json`, installed from npm's registry into
-`node_modules/`, which git does not track (`scripts/install.mjs`; #654), and held to floor rule 10's list by the core's
-own licence check, which reads that lock file. Nothing of the core ships, so no project's audit or notices file asks
-for it.
+adds or changes them (floor rule 10). Nor do they cover the packages of other publishers the scripts run, each under its
+own licence: none is carried, each an entry of `.packages/package-lock.json`, installed from npm's registry into
+`.packages/node_modules/`, which git does not track (`scripts/install.mjs`; #654), and held to floor rule 10's list by
+the core's own licence check, which reads that lock file. Nothing of the core ships, so no project's audit or notices
+file asks for it.
 `NOTICE` names the work, with its other name, which renames nothing, and as the holder the account in the core's
 address, until the core's owner types another name there by hand (floor rule 11).
 
