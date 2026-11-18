@@ -71,11 +71,11 @@ fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\n| *
 r = hook("start", project);
 ok(/^Before your first change, run the quick check \(`npm run quick`\): /m.test(r.stdout) && !/QUICK-RAN/.test(r.stdout), "main's row is named; the working tree's is not read", r.stdout);
 git(project, "checkout", "-q", "--", "core-manifest.md");
-fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\n| *quick check* | `touch QUICK-RAN`\u001b[2J |\n");
-git(project, "commit", "-q", "-am", "a row with a control character");
+fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\n| *quick check* | `touch QUICK-RAN`\u001b[2J\u009b\u202e\u2028 | a note of a third column |\n");
+git(project, "commit", "-q", "-am", "a row with control characters and a third column");
 git(project, "push", "-q", "origin", "main");
 r = hook("start", project);
-ok(r.stdout.includes("run the quick check (`touch QUICK-RAN`[2J)") && !fs.existsSync(path.join(project, "QUICK-RAN")), "the command is named with its control characters out, and never run", JSON.stringify(r.stdout));
+ok(r.stdout.includes("run the quick check (`touch QUICK-RAN`[2J)") && !fs.existsSync(path.join(project, "QUICK-RAN")), "the command is named, its second cell alone, with no control, bidirectional or separating character of any encoding, and never run", JSON.stringify(r.stdout));
 fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n");
 git(project, "commit", "-q", "-am", "no row");
 git(project, "push", "-q", "origin", "main");

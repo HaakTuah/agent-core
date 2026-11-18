@@ -52,9 +52,10 @@ if [ "$mode" = start ] && command -v node >/dev/null 2>&1; then
 fi
 # The quick check (the core's roles/shared/work-flow.md, "Sessions"; #306): named, never run, since a hook that ran the
 # project's code would run it outside a box the owner set up for it (floor rule 18) and past the hook's time; the
-# command as main's manifest gives it in its row *quick check*, its control characters taken out, or the slot's name.
+# command as main's manifest gives it in its row *quick check*, the row's second cell, kept to printable ASCII (no
+# control, bidirectional or line-separating character of any encoding), or the slot's name.
 if [ "$mode" = start ]; then
-  quick=$(printf '%s\n' "$manifest" | sed -n -E 's#^\|[[:space:]]*\*quick check\*[[:space:]]*\|[[:space:]]*(.*[^[:space:]|])[[:space:]]*\|[[:space:]]*$#\1#p' | head -n 1 | tr -d '\000-\037\177' | cut -c1-300)
+  quick=$(printf '%s\n' "$manifest" | sed -n -E 's#^\|[[:space:]]*\*quick check\*[[:space:]]*\|[[:space:]]*([^|]*[^|[:space:]])[[:space:]]*\|.*$#\1#p' | head -n 1 | LC_ALL=C tr -cd '\040-\176' | cut -c1-300)
   [ -n "$quick" ] || quick="the project's *quick check*, as its manifest or AGENTS.md names it"
   echo "Before your first change, run the quick check ($quick): a failure there is a bug of its own, filed, and the task goes on with what does not hang on it (the core's roles/shared/work-flow.md, \"Sessions\")."
 fi
