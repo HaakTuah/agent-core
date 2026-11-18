@@ -10,6 +10,7 @@ it merges last.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
+| #654 | rule builder; two security reviews | |
 | #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue | |
 | #529, step 4 | builder | #528 |
 | #530, step 5 | builder; licence readers after #585 and #586 | #529 |
@@ -78,6 +79,8 @@ it merges last.
 | #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
+| #652 | rule builder; it changes `tasks/choices.md` | |
+| #650 | rule builder | #654 |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
