@@ -366,10 +366,12 @@ function limitsOf(item) {
 }
 // Whether an item says its input carries a version, in its own words outside its limits and anything in backticks (a
 // path such as `scripts/exact-versions.mjs` says nothing of the input).
-// An item that says its input carries none ("no version", "without a version") says nothing of one either.
+// An item that says its input carries none ("carries no version", "without a version number") says nothing of one
+// either; one that names its version otherwise ("refused without a version", "no version newer") still does.
 const versioned = item => /\bversions?\b/i.test(item.replace(/\blimits:[\s\S]*?(?=hostile\s+tests\b|$)/i, "").replace(/`[^`]*`/g, "")
-  .replace(/\b(?:no|without(?:\s+an?)?)\s+versions?(?:\s+numbers?)?\b/gi, ""));
-const short = l => (l.length > 80 ? `${l.slice(0, 77)}...` : l);
+  .replace(/\b(?:(?:carries|carry|has|have|holds?)\s+no\s+versions?(?:\s+numbers?)?|without\s+an?\s+version\s+numbers?)\b/gi, ""));
+// (an item's words as a mend shows them: no control character, which would reach the sync's log as it stands)
+const short = l => { const t = l.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, "?"); return t.length > 80 ? `${t.slice(0, 77)}...` : t; };
 // The step for the inputs rule 5 names: "None", or the starter kit's "FILL IN", reads done only while it lists no input;
 // once one is listed, each is read, and an item whose tests are still "FILL IN" names none.
 function hostileTests(p) {
