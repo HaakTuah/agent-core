@@ -25,12 +25,13 @@
 // change how the programs a hook runs start, save one the base held while its entry stands.
 //
 // Where each hook's command comes from (#407; floor rule 3, what an agent tool starts by itself runs from its copy on
-// `main`): a hook of any tool read here runs its copy on main only where each command it may run, Codex's for Windows
-// among them, is the starter kit's form (hook-source.mjs), which fetches its script from main, and the file it fetches
-// is no link; any other fails, since nothing shows it does not run the working tree's copy, which the branch it runs on
-// can change. One that stood before is listed in the baseline, its
-// entry saying "from": "the working tree", and noted; the baseline only shrinks: a new hook marked so fails, and so does
-// a mark taken out while its hook stands, or a mark on a hook in the kit's form.
+// `main`): a hook of any tool read here, and each setting by which a tool runs a command of its own (Claude Code's
+// apiKeyHelper, statusLine and the like; Codex's notify and its model providers' token commands), read as a hook, runs
+// its copy on main only where each command it may run, Codex's for Windows among them, is the starter kit's form
+// (hook-source.mjs), which fetches its script from main, and the file it fetches is no link; any other fails, since
+// nothing shows it does not run the working tree's copy, which the branch it runs on can change. One that stood before
+// is listed in the baseline, its entry saying "from": "the working tree", and noted; the baseline only shrinks: a new
+// hook marked so fails, and so does a mark taken out while its hook stands, or a mark on a hook in the kit's form.
 //
 // A listed plug-in or tool server is held to the pin its own configuration gives, where it gives one in a form read here
 // (#352; Claude Code's plug-in and tool-server documentation): a plug-in by its marketplace in "extraKnownMarketplaces",
