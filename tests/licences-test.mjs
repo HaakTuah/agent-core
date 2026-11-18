@@ -1,18 +1,31 @@
 // Checks the licence check's lists and readers (scripts/licences.mjs), alone, on invented names: how a licence
-// expression is read, which list allows what, a package known by its registry address, npm's settings. The check on a
-// whole project, and its scan, are checked by licence-scan-test.mjs. Run by the core's tests workflow
+// expression is read, which list allows what, a package known by its registry address, npm's settings; and, of the
+// core's own files, that its audit's entry for Node names the version the core pins (#592). The check on a whole
+// project, and its scan, are checked by licence-scan-test.mjs. Run by the core's tests workflow
 // (.github/workflows/tests.yml).
 //
 //   node tests/licences-test.mjs
 import { readable } from "../scripts/licence-yes.mjs";
 import { actionLists, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 let failed = 0;
 const ok = (cond, what, more = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) { failed++; if (more) console.log(more); } };
+
+// the pin, .node-version, is one fact that the audit's entry for Node and node.sh's sums each name: the scan reads the
+// download as pinned by the entry's version, so an entry left behind when the pin moves would pass unseen (#592)
+{
+  const core = f => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
+  const pin = core(".node-version").trim();
+  const entry = JSON.parse(core(".github/licences-audit.json")).entries.filter(e => e.name === "Node.js");
+  const summed = [...core("scripts/node.sh").matchAll(/^\s*([0-9][0-9.]*)-(?:x86_64|aarch64)\)/gmu)].map(m => m[1]);
+  ok(entry.length === 1 && entry[0].version === pin && summed.length === 2 && summed.every(v => v === pin),
+    `the audit's entry for Node, and node.sh's sums, name the pin in .node-version, ${pin}`,
+    `the entry names ${entry.map(e => e.version).join(", ") || "nothing"}, node.sh sums ${summed.join(", ") || "nothing"}. Mend: set "version" of the entry "Node.js" in .github/licences-audit.json to the version .node-version names, and give node.sh that version's two sums, in the pull request that moves the pin (tasks/updates.md, "Node")`);
+}
 
 const lists = policy({ data: ["mossgrip-data"], fonts: ["mossgrip-face"] });
 const code = lists.allowedFor("mossgrip-lib"), data = lists.allowedFor("mossgrip-data"), font = lists.allowedFor("mossgrip-face");
