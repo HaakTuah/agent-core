@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
-import { carriedAt, corePath, floorCopyIn, hookCommands, projectAt, readCore } from "../scripts/core-path.mjs";
+import { carriedAt, corePath, floorCopy, floorCopyIn, hookCommands, manifestText, projectAt, readCore } from "../scripts/core-path.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { pathIn } from "../scripts/reading.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
@@ -103,6 +103,22 @@ if (process.platform !== "win32") {
   const r = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/sync.mjs", import.meta.url))], { cwd: linked, encoding: "utf8" });
   ok(r.status === 1 && /vendor, on the way to the copy's path vendor\/the-core\/, is a link/.test(r.stderr) && mended(r.stderr) && fs.readdirSync(outside).length === 0, "the sync refuses a path through a link, saying the mend, and writes nothing", r.stderr);
 } else console.log("note a link cannot be made here (Windows), so the sync's refusal of one is not tried");
+// a manifest that is no regular file, or past a mebibyte, reads as empty: the usual path, no floor copy, and nothing
+// that stops the script reading it (a link to a device once took every reader down: #593, point 8)
+const odd = path.join(tmp, "odd");
+fs.mkdirSync(path.join(odd, "core-manifest.md"), { recursive: true });
+const big = path.join(tmp, "big");
+fs.mkdirSync(big);
+fs.writeFileSync(path.join(big, "core-manifest.md"), `${copied("vendor/core/")}${"x".repeat(1 << 20)}`);
+ok(manifestText(path.join(odd, "core-manifest.md")) === "" && corePath(odd) === "core/" && floorCopy(odd) === null && corePath(big) === "core/" && manifestText(path.join(tmp, "nowhere", "core-manifest.md")) === null,
+  "a manifest that is a folder, or past a mebibyte, reads as empty and so as the usual path; none, as null");
+if (process.platform !== "win32" && fs.existsSync("/dev/zero")) {
+  const device = path.join(tmp, "device");
+  fs.mkdirSync(device);
+  fs.symlinkSync("/dev/zero", path.join(device, "core-manifest.md"));
+  const started = Date.now(), r = spawnSync(process.execPath, [script], { cwd: device, encoding: "utf8", timeout: 20000 });
+  ok(corePath(device) === "core/" && floorCopy(device) === null && r.status === 1 && mended(r.stderr) && Date.now() - started < 10000, "a manifest that is a link to a device reads as empty, and the script says the mend in moments", `${r.status} ${r.signal} ${r.stderr}`);
+}
 
 // Claude Code's hooks for a core at another path: for core/ the helper's and the stop's are the starter kit's own, and
 // where a submodule carries the core, the start reads the work-saved hook from the library's commit main pins, never
