@@ -149,9 +149,11 @@ const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "
 const astray = tracked.filter((file) => /-test\.mjs$/.test(file) && !file.startsWith("tests/"));
 ok(lines.includes("/tests export-ignore") && astray.length === 0, "every test of the core's own scripts is under tests/, which the copy leaves out (#527)", astray.join(" "));
 // (and the other way round: a file of another name under tests/, which a script a project runs might import, would be
-// missing from every copy, #614)
-const strays = tracked.filter((file) => file.startsWith("tests/") && !/^tests\/[^/]+-test\.mjs$/.test(file));
-ok(strays.length === 0, "tests/ holds the core's tests alone, so nothing a project runs can lean on a file the copy leaves out (#614)", strays.join(" "));
+// missing from every copy, #614; but tests/mutation/, which pins the core's own mutation tool for its own workflow
+// (#581), holds its package files and no code a script could import)
+const tool = (file) => /^tests\/mutation\/(?:package\.json|package-lock\.json|\.npmrc|\.gitignore)$/.test(file);
+const strays = tracked.filter((file) => file.startsWith("tests/") && !/^tests\/[^/]+-test\.mjs$/.test(file) && !tool(file));
+ok(strays.length === 0, "tests/ holds the core's tests alone, and the package files of the core's own mutation tool, so nothing a project runs can lean on a file the copy leaves out (#614)", strays.join(" "));
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);
