@@ -9,3 +9,9 @@ whose text travels in its folder, and not under the core's: the core's `LICENSE`
 ISC, its text in `yaml/LICENSE`.
 
 Copyright Eemeli Aro <eemeli@gmail.com>
+
+## smol-toml 1.9.1
+
+BSD-3-Clause, its text in `smol-toml/LICENSE`.
+
+Copyright (c) Squirrel Chat et al., All rights reserved.

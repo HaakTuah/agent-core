@@ -11,6 +11,17 @@
       "files": ["LICENSE", "dist/"],
       "digest": "sha256-f4484cdfb7dc703f008a9c8de6b73c5c12af3ba4e7731a82cc15fd3e69ce970f",
       "used": ["scripts/yaml-keys.mjs"]
+    },
+    {
+      "name": "smol-toml",
+      "version": "1.9.1",
+      "integrity": "sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==",
+      "published": "2026-10-09T10:21:39.612Z",
+      "taken": "2026-11-18",
+      "licence": "BSD-3-Clause",
+      "files": ["LICENSE", "dist/index.cjs"],
+      "digest": "sha256-b02dddbb1a7e9203f5e3fdde77a1c91443e0612b93329fcca2432756ac255d1b",
+      "used": ["scripts/toml.mjs"]
     }
   ]
 }
