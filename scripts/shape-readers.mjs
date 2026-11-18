@@ -25,19 +25,21 @@ export const READERS = {
 // The marks of a change in a comment (tasks/code-shape.md, "A comment says why the code is so, never what changed";
 // #458), each by its name, read of each line of a comment, a block's own * and a list's - before it aside: a change's
 // heading, a word of change in capitals that opens the line before a colon or a date (a line of a comment that goes on
-// from the one above opens in small letters, and is none); what the code was, "Previously:", "Was:" and the like; a
-// change's date, a word of change and a date written as ISO writes one, near each other; and the task that changed it,
-// a word of change and "in", "for", "by" or "per" a pull request's or an issue's number. None guesses: a pattern found
+// from the one above opens in small letters, and is none; a notice of what is deprecated says what to use now, and is
+// none); what the code was, "Previously:", "Was:" and the like; a change's date, a word of change and a date written as
+// ISO writes one, near each other, opening the line (a change of another's, dated, mid-line, is a reason); and the task
+// that changed it, a word of change and "in", "for", "by" or "per" a pull request's or an issue's number (a tracker's
+// keys, ABC-12, read as a standard's or an advisory's name, RFC-4648, so a project adds its own pattern for them). None guesses: a pattern found
 // to does goes off this list in the pull request that finds it, and a project adds its own in the config ("changes").
-const WORDS = ["Added", "Changed", "Fixed", "Updated", "Removed", "Modified", "Moved", "Renamed", "Rewritten", "Refactored", "Deprecated", "Replaced"];
+const WORDS = ["Added", "Changed", "Fixed", "Updated", "Removed", "Modified", "Moved", "Renamed", "Rewritten", "Refactored", "Replaced"];
 const CAPITAL = `(?:${WORDS.flatMap(w => [w, w.toUpperCase()]).join("|")})`, CHANGED = `(?:${WORDS.map(w => w.toLowerCase()).join("|")}|${CAPITAL.slice(3, -1)})`;
 const DATE = "(?:19|20)\\d\\d-[01]\\d-[0-3]\\d";
 const OPENS = "^\\s*(?:[*-]\\s*)?";
 export const CHANGE_MARKS = {
   "a change's heading": new RegExp(`${OPENS}${CAPITAL}\\s*(?::|\\(?${DATE}\\b)`, "u"),
   "what the code was": new RegExp(`${OPENS}(?:Previously|Formerly|Was|Old|PREVIOUSLY|FORMERLY|WAS|OLD)\\s*:`, "u"),
-  "a change's date": new RegExp(`\\b${CHANGED}\\b.{0,40}\\b${DATE}\\b|\\b${DATE}\\b\\W{0,3}${CHANGED}\\b`, "u"),
-  "the task that changed it": new RegExp(`\\b${CHANGED}\\s+(?:in|for|by|per)\\s+(?:#\\d+|PR\\s*#?\\d+|pull request\\s*#?\\d+|[A-Z][A-Z0-9]+-\\d+)\\b`, "u"),
+  "a change's date": new RegExp(`${OPENS}(?:${CHANGED}\\b.{0,40}\\b${DATE}\\b|${DATE}\\b\\W{0,3}${CHANGED}\\b)`, "u"),
+  "the task that changed it": new RegExp(`\\b${CHANGED}\\s+(?:in|for|by|per)\\s+(?:#\\d+|PR\\s*#?\\d+|pull request\\s*#?\\d+)\\b`, "u"),
 };
 
 // What a baseline that names no reader was written with: the check as #246 built it.
