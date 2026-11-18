@@ -783,7 +783,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     try { parseToml(lost); } catch (e) { message = e.message; }
     ok(message.startsWith("line 1: a string's line-ending backslash runs into its closing quotes"), `a string whose quotes the package would drop is refused: ${JSON.stringify(lost)}`, message);
   }
-  ok(parseToml("a = \"\"\"x\\\\\n\"\"\"\"\"\nb = \"\"\"x\\\n\"\"\"\n").a === "x\\\n\"\"", "a backslash escaped by another ends no line, and one with no quote of the string's own before the close is read", JSON.stringify(parseToml("a = \"\"\"x\\\\\n\"\"\"\"\"\n")));
+  // (#634's code review: only a multi-line basic string; a literal string, a comment and a one-line string are read)
+  const literal = parseToml("notify = ['''a\\\n'''', \"b\\\\\", '''c\\\n''''']\n# d\\\n");
+  ok(JSON.stringify(literal.notify) === JSON.stringify(["a\\\n'", "b\\", "c\\\n''"]), "a backslash before the closing quotes of a literal string, or in a comment, is read as written", JSON.stringify(literal));
+  ok(parseToml("a = \"\"\"x\\\\\n\"\"\"\"\"\nb = \"\"\"x\\\n\"\"\"\n").a === "x\\\n\"\"","a backslash escaped by another ends no line, and one with no quote of the string's own before the close is read", JSON.stringify(parseToml("a = \"\"\"x\\\\\n\"\"\"\"\"\n")));
   ok(parseToml("a = '''x\r\ny'''\r\nb = \"\"\"p\r\nq\"\"\"\r\n").a === "x\ny" && parseToml("b = \"\"\"p\r\nq\"\"\"\r\n").b === "p\nq", "a CRLF inside a string of several lines is read as LF");
   for (const bare of ["a = 1\r\r\nb = 2\r\n", "a = '''x\ry'''\n"]) {
     let refused = false;

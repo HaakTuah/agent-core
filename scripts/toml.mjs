@@ -13,17 +13,11 @@ import { DEEPEST, tooDeep } from "./guards.mjs";
 // (a key set as a plain property, never through a setter: "__proto__" is a key like any other)
 const put = (table, key, value) => Object.defineProperty(table, key, { value, enumerable: true, writable: true, configurable: true });
 
-// A line-ending backslash in a multi-line basic string whose closing """ holds one or two quotes of the string's own
-// ("""x\ then """""), which the package reads without those quotes (smol-toml 1.9.1; #634's search for differences):
-// refused, so no command is listed other than the one Codex runs. A backslash escaped by another ends no line, so the
-// run of backslashes is odd.
-const QUOTES_LOST = /(?<!\\)(?:\\\\)*\\[ \t]*\n[ \t\n]*"{4}/u;
-
 export function parseToml(text) {
   // (a CRLF line end is read as LF, inside a string of several lines too, as the reader before the package read it;
   // where a CR stands alone anywhere, the text is left as it is, for the package to refuse: "\r\r\n" never becomes CRLF)
-  const raw = String(text), s = /\r(?!\n)/u.test(raw) ? raw : raw.replace(/\r\n/gu, "\n"), lost = QUOTES_LOST.exec(s);
-  if (lost) throw new SyntaxError(`line ${s.slice(0, lost.index).split("\n").length}: a string's line-ending backslash runs into its closing quotes, which the TOML package reads wrong`);
+  const raw = String(text), s = /\r(?!\n)/u.test(raw) ? raw : raw.replace(/\r\n/gu, "\n"), lost = quotesLost(s);
+  if (lost >= 0) throw new SyntaxError(`line ${s.slice(0, lost).split("\n").length}: a string's line-ending backslash runs into its closing quotes, which the TOML package reads wrong`);
   let read;
   try { read = parse(s, { integersAsBigInt: true, maxDepth: DEEPEST }); } catch (e) {
     if (!(e instanceof TomlError)) throw new SyntaxError(`the file cannot be read as TOML (${String(e?.message ?? e).split("\n")[0]})`);
@@ -34,6 +28,41 @@ export function parseToml(text) {
   // (the package counts its depth its own way: the whole is counted once more, as guards.mjs counts JSON)
   if (tooDeep(root)) throw new SyntaxError(`the file nests deeper than ${DEEPEST} tables and arrays`);
   return root;
+}
+
+// Where a multi-line basic string's line-ending backslash runs into a closing """ that holds one or two quotes of the
+// string's own ("""x\ then """""), which the package reads without those quotes (smol-toml 1.9.1; #634's search for
+// differences): the backslash's place, so the text is refused and no command is listed other than the one Codex runs;
+// else -1. Only that kind of string: a literal string, a comment or a one-line string reads a backslash as itself or
+// ends at its line, and the package reads them right. Each string and comment is passed in one walk.
+function quotesLost(s) {
+  const end = (from, close, oneLine, escapes) => {
+    let j = from;
+    while (j < s.length && !(oneLine && s[j] === "\n")) {
+      if (escapes && s[j] === "\\") j += 2;
+      else if (s.startsWith(close, j)) return j;
+      else j++;
+    }
+    return j;
+  };
+  for (let i = 0; i < s.length;) {
+    if (s[i] === "#") { i = end(i, "\n", true, false); continue; }
+    if (s[i] !== '"' && s[i] !== "'") { i++; continue; }
+    const many = s.startsWith(s[i].repeat(3), i), from = i + (many ? 3 : 1), basic = s[i] === '"';
+    const at = end(from, many ? s[i].repeat(3) : s[i], !many, basic);
+    let close = at + (many ? 3 : 1);
+    while (many && s[close] === s[i] && close - at < 5) close++;
+    if (many && basic && close - at > 3) {
+      // (back over the blanks before the close, a line break among them, to a backslash whose run is odd)
+      let k = at, broke = false;
+      while (k > from && /[ \t\n]/u.test(s[k - 1])) broke = s[--k] === "\n" || broke;
+      let run = 0;
+      while (k - run > from && s[k - run - 1] === "\\") run++;
+      if (broke && run % 2 === 1) return k - 1;
+    }
+    i = close;
+  }
+  return -1;
 }
 
 // A value the package read, as JSON would hold it (above), walked with a stack of its own, never by recursion.
