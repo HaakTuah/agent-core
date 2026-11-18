@@ -14,7 +14,7 @@ import { mended } from "../scripts/mend.mjs";
 import { FIRST, HEADING, KINDS, LABEL, LEAST, MEASURES, MONTHS, OUTCOMES, corrections, counted, kindOf, lines, measure, outcomesFrom, windowOf } from "../scripts/outcomes.mjs";
 import { CALLS, firstOf, gather, read, report as monthly, spending } from "../scripts/outcomes-read.mjs";
 import { body, countsFrom } from "../scripts/state-report.mjs";
-import { COUNT, LINES, TITLE as BLIND_TITLE, answersOf, bodyOf, draw, drawOf, laidOut, line as blindLine, reader as blindReader, shareOf } from "../scripts/blind-sample.mjs";
+import { COUNT, LINES, TITLE as BLIND_TITLE, answersOf, bodyOf, draw, drawOf, earlierOf, laidOut, line as blindLine, reader as blindReader, shareOf } from "../scripts/blind-sample.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
@@ -189,6 +189,12 @@ ok(long.includes("- `a?b.md` (modified, +99 -1)") && !long.split("```diff")[1].s
 const sample = bodyOf("2026-10", "2026-11-01T05:00:00Z", [7, 9, 12], n => [{ filename: `f${n}.mjs`, status: "added", additions: 1, deletions: 0, patch: "+x" }]);
 ok(/^### 3$/m.test(sample) && !/#7\b|Fixes|merged by|author/i.test(sample.split("<!--")[0]) && JSON.stringify(drawOf(sample)) === JSON.stringify({ month: "2026-10", drawn: "2026-11-01T05:00:00Z", pulls: [7, 9, 12] }) && drawOf("no draw") === null,
   "the issue's text shows each change by its place alone; the draw it holds is read back from it", sample.slice(0, 400));
+// (a diff that holds a draw's own mark is not taken for it; the draws before are kept; the whole stays under the limit)
+const copied = bodyOf("2026-10", "2026-11-01T05:00:00Z", [7], () => [{ filename: "x.md", status: "modified", patch: "+<!-- blind-sample 2020-01 drawn 2020-02-01T00:00:00Z pulls 999 -->" }], [{ month: "2026-09", drawn: "2026-10-01T05:00:00Z", pulls: [3, 4] }]);
+ok(drawOf(copied)?.month === "2026-10" && JSON.stringify(drawOf(copied).pulls) === "[7]" && earlierOf(copied).length === 1 && earlierOf(copied)[0].pulls.join() === "3,4",
+  "a mark inside a diff is no draw's, and the draws before stay noted", JSON.stringify(drawOf(copied)));
+const wide = bodyOf("2026-10", "2026-11-01T05:00:00Z", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], () => Array.from({ length: 40 }, (_, i) => ({ filename: `f${i}.md`, status: "modified", patch: Array.from({ length: 60 }, () => `+${"x".repeat(300)}`).join("\n") })));
+ok(wide.length < 65536 && drawOf(wide)?.pulls.length === 10 && /and 20 more files/.test(wide), "ten wide changes stay under GitHub's limit for an issue's text", wide.length);
 const at = t => `2026-11-0${t}T00:00:00Z`, me = { login: "owner" };
 const said = [
   { user: me, created_at: "2026-10-30T00:00:00Z", body: "1: no, misread" },
@@ -213,6 +219,8 @@ const ghOf = issues => route => (route.includes("/issues?") ? (route.includes("p
 const fresh = blindReader({ repo: "o/n", at: "2026-11-01T05:12:34.567Z", gh: ghOf([]) });
 ok(fresh.title === BLIND_TITLE && fresh.owner === true && drawOf(fresh.body)?.month === "2026-10" && drawOf(fresh.body).drawn === "2026-11-01T05:12:34Z" && drawOf(fresh.body).pulls.length === 2,
   "the look's reader lays out the month before's draw on the month's first run, needs-owner, drawn at that run", fresh.body?.slice(-120));
+const rolled = blindReader({ repo: "o/n", at: "2026-12-01T05:00:00Z", gh: ghOf([{ number: 3, title: BLIND_TITLE, body: fresh.body }]) });
+ok(drawOf(rolled.body)?.month === "2026-11" && earlierOf(rolled.body).map(d => d.month).join() === "2026-10", "the next month's draw keeps the one it replaces noted", rolled.body?.slice(-200));
 const stands = blindReader({ repo: "o/n", at: "2026-11-09T05:00:00Z", gh: ghOf([{ number: 3, title: BLIND_TITLE, body: fresh.body }]) });
 ok(stands.unread && !stands.body && blindReader({ repo: "o/n", at: "2026-11-09T05:00:00Z", gh: () => { throw new Error("403"); } }).unread && blindReader({ at: "2026-11-09T05:00:00Z" }) === null,
   "on later runs of the month the issue stands as it is; where GitHub does not answer, nothing is changed", JSON.stringify(stands));

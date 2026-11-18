@@ -18,7 +18,7 @@ import { BLIND as LABEL, KINDS, counted } from "./outcomes.mjs";
 import { byAgent } from "./stand-in-record.mjs";
 
 export const TITLE = "The blind sample";
-export const COUNT = 10, LINES = 60;
+export const COUNT = 10, LINES = 60, FILES = 20, WIDE = 200, BODY = 60000;
 const MARK = /<!-- blind-sample (\d{4}-\d\d) drawn (\d{4}-\d\d-\d\dT[\d:]+Z) pulls ([\d ]*) -->/u;
 const ANSWER = new RegExp(`^\\s*(?:(\\d{4}-\\d\\d)\\s+)?(\\d{1,2})\\s*[:.)]\\s*(yes|no)\\b(?:\\s*[,;:-]\\s*(${KINDS.join("|")}))?`, "iu");
 
@@ -33,32 +33,42 @@ export function draw(pulls, repo, month, count = COUNT) {
     .map(p => ({ p, k: key(p) })).sort((a, b) => a.k.localeCompare(b.k)).slice(0, count).map(({ p }) => p.number).sort((a, b) => a - b);
 }
 
-// One change laid out: each file it changed, with GitHub's patch, LINES lines at most, the rest counted.
-export function laidOut(files, lines = LINES) {
-  const out = [], patch = [];
-  for (const f of files) {
-    out.push(`- \`${String(f.filename).replace(/[`\r\n]/gu, "?")}\` (${f.status}, +${f.additions ?? 0} -${f.deletions ?? 0})`);
-    if (f.patch) patch.push(`--- ${f.filename}`, ...String(f.patch).split("\n"));
-  }
-  const shown = patch.slice(0, lines).map(l => l.replace(/```/gu, "'''"));
-  return [...out, "", "```diff", ...shown, "```", ...(patch.length > lines ? [`(${patch.length - lines} more lines of the diff not shown)`] : [])].join("\n");
+// One change laid out: FILES of the files it changed at most, then GitHub's patch, LINES lines of WIDE characters at
+// most and `budget` characters in all, the rest counted; a fence or a comment mark in the text is broken, so no diff
+// closes the block or reads as the draw's own mark.
+const tame = l => String(l).replace(/```/gu, "'''").replace(/<!--/gu, "<!- -").slice(0, WIDE);
+export function laidOut(files, lines = LINES, budget = Infinity) {
+  const out = files.slice(0, FILES).map(f => `- \`${String(f.filename).replace(/[`\r\n]/gu, "?").slice(0, WIDE)}\` (${f.status}, +${f.additions ?? 0} -${f.deletions ?? 0})`);
+  if (files.length > FILES) out.push(`- and ${files.length - FILES} more files`);
+  const patch = files.flatMap(f => (f.patch ? [`--- ${f.filename}`, ...String(f.patch).split("\n")] : [])).map(tame);
+  const shown = [];
+  let size = out.join("\n").length + 40;
+  for (const l of patch.slice(0, lines)) { if (size + l.length + 1 > budget) break; shown.push(l); size += l.length + 1; }
+  return [...out, "", "```diff", ...shown, "```", ...(patch.length > shown.length ? [`(${patch.length - shown.length} more lines of the diff not shown)`] : [])].join("\n");
 }
 
-// The issue's text for the draw of `month`, made at `drawn` (the first of the month after): each change by its place in
-// the draw, laid out by `filesOf(number)`.
-export function bodyOf(month, drawn, numbers, filesOf) {
+// The issue's text for the draw of `month`, made at `drawn`: each change by its place in the draw, laid out by
+// `filesOf(number)` within an equal share of BODY, under GitHub's limit for an issue's text; the draws before it kept
+// as `earlier` marks, so the pull request behind an answer to one is still known when a "no" is filed.
+export function bodyOf(month, drawn, numbers, filesOf, earlier = []) {
   const parts = [`The blind sample of the work merged in ${month}: ${numbers.length} changes drawn at random, each shown by what it changed alone, with no word of who built it, why, or what its reviews found (README.md, "What the core is for"; \`scripts/blind-sample.mjs\`). Would you approve each, shown it so?`,
     "",
-    `Answer in a comment, a line each: \`3: yes\`, or \`3: no, <kind>\`, the kind one of ${KINDS.map(k => `\`${k}\``).join(", ")}; \`${month} 3: yes\` names this draw, so an answer given once the next is drawn still counts for it alone. Nothing waits on it: next month's state report gives the share approved, or says the month was not answered, and a session files each "no" as a correction.`];
+    `Answer in a comment, a line each: \`3: yes\`, or \`3: no, <kind>\`, the kind one of ${KINDS.map(k => `\`${k}\``).join(", ")}; \`${month} 3: yes\` names this draw, so an answer given once the next is drawn is never taken for the next one's. The share counts the answers given before the next draw; the earlier draws' changes stay noted here, so a "no" given later is still filed as a correction. Nothing waits on it: next month's state report gives the share approved, or says the month was not answered, and a session files each "no" as a correction.`];
   if (!numbers.length) parts.push("", `Nothing was merged in ${month}, so nothing is drawn.`);
-  numbers.forEach((n, i) => parts.push("", `### ${i + 1}`, "", laidOut(filesOf(n))));
-  parts.push("", `<!-- blind-sample ${month} drawn ${drawn} pulls ${numbers.join(" ")} -->`);
+  const share = Math.floor((BODY - parts.join("\n").length - 2000) / Math.max(1, numbers.length));
+  numbers.forEach((n, i) => parts.push("", `### ${i + 1}`, "", laidOut(filesOf(n), LINES, share)));
+  parts.push("", ...earlier.slice(-11).map(d => `<!-- blind-sample-before ${d.month} drawn ${d.drawn} pulls ${d.pulls.join(" ")} -->`), `<!-- blind-sample ${month} drawn ${drawn} pulls ${numbers.join(" ")} -->`);
   return parts.join("\n");
 }
 
+// The draws before it an issue's text keeps: [{ month, drawn, pulls }], oldest first.
+export const earlierOf = body => [...String(body ?? "").matchAll(/<!-- blind-sample-before (\d{4}-\d\d) drawn (\d{4}-\d\d-\d\dT[\d:]+Z) pulls ([\d ]*) -->/gu)]
+  .map(m => ({ month: m[1], drawn: m[2], pulls: m[3].trim() ? m[3].trim().split(" ").map(Number) : [] }));
+
 // The draw an issue's text holds: { month, drawn, pulls } or null.
 export function drawOf(body) {
-  const m = MARK.exec(String(body ?? ""));
+  // (the last mark: the draw's own stands at the text's end, after every diff)
+  const m = [...String(body ?? "").matchAll(new RegExp(MARK.source, "gu"))].at(-1);
   return m ? { month: m[1], drawn: m[2], pulls: m[3].trim() ? m[3].trim().split(" ").map(Number) : [] } : null;
 }
 
@@ -111,9 +121,10 @@ export function reader({ repo, at, gh = ghApi }) {
   if (!repo) return null;
   const month = before(String(at).slice(0, 7)), drawn = String(at).replace(/\.\d+Z$/u, "Z");
   try {
-    if (drawOf(keptIssue(repo, gh)?.body)?.month === month) return { title: TITLE, unread: `the draw of ${month} stands`, owner: true };
+    const kept = keptIssue(repo, gh)?.body, was = drawOf(kept);
+    if (was?.month === month) return { title: TITLE, unread: `the draw of ${month} stands`, owner: true };
     const numbers = draw(mergedIn(repo, `${month}-01T00:00:00Z`, `${after(month)}-01T00:00:00Z`, gh), repo, month);
     const files = n => pagesOf(`repos/${repo}/pulls/${n}/files`, gh);
-    return { title: TITLE, body: bodyOf(month, drawn, numbers, files), owner: true };
+    return { title: TITLE, body: bodyOf(month, drawn, numbers, files, [...earlierOf(kept), ...(was ? [was] : [])]), owner: true };
   } catch { return { title: TITLE, unread: "GitHub did not answer for the month's merged pull requests and their files", owner: true }; }
 }
