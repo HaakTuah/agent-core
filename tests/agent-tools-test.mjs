@@ -805,6 +805,12 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ok(caseKept.status === 0 && caseKept.out.includes(LINK_SAYS), "one the base held is noted, not failed", caseKept.out);
     fails(run(pr(caseHeld, { "inner/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what stands under its target changes", LINK_SAYS);
     passes(run(pr(project({ "Inner/mcp.json": "{}\n", ...listing() }), { "README.md": "x\n" })), "a folder in another case that no link leads to is none of this");
+    // (#600's code review of 09ed8b5: a tool's folder in another case, itself a link whose target stands only in another
+    // case, the base holding both, and what stands under that target changed)
+    const both = project({ "cfg/config.toml": "# none\n", ...listing() });
+    fs.symlinkSync("CFG", path.join(both, ".Codex"));
+    git(both, "add", "-A"); git(both, "commit", "-q", "-m", "a link in another case to a target in another case");
+    fails(run(pr(both, { "cfg/config.toml": "notify = [\"bash\", \"new.sh\"]\n" })), "and so does one the base held whose tool's folder is in another case too", LINK_SAYS);
   }
 }
 
