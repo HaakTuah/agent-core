@@ -42,7 +42,7 @@ const one = (lock, own) => said(project({ [A]: { version: "1.0.0", ...lock } }, 
 
 {
   const bare = project({ [A]: { version: "1.0.0", license: "MIT" } }, {}), read = installedTree(bare);
-  ok(read.size === 1 && read.has("") && check(bare, LINUX).failures.join() === check(bare, LINUX, ROOT_ALONE).failures.join(), "npm reads a project with nothing installed as its root alone, as the cases below that install nothing read it", JSON.stringify([...read.keys()]));
+  ok(read.size === 1 && read.has("") && check(bare, LINUX).failures.join() === check(bare, LINUX, ROOT_ALONE).failures.join(), "the package manager reads a project with nothing installed as its root alone, as the cases below that install nothing read it", JSON.stringify([...read.keys()]));
 }
 ok(lockForm("MIT") === "MIT" && lockForm({ type: "MIT", url: "x" }) === "MIT" && lockForm(undefined) === null && lockForm("") === null && lockForm({}) === null && lockForm([]) === null
   && JSON.stringify(lockForm(["MIT", "ISC"])) === '["MIT","ISC"]' && JSON.stringify(lockForm({ url: "x" })) === '{"url":"x"}', "a licence is read as npm writes one into a lock file: the type of one written as an object, nothing for an empty one, else as it stands");
@@ -137,7 +137,7 @@ ok(run(fine).status === 0 && /^1 packages of package-lock\.json read back/.test(
   ok(lockForm(typed) === "MIT", "a type within a type is followed however deep it nests");
   const deep = `{"version":"1.0.0","license":${"[".repeat(20000)}"MIT"${"]".repeat(20000)}}`;
   const nested = said(project({ [A]: { version: "1.0.0", license: "MIT" } }, { [A]: deep }));
-  ok(/^threw: npm could not read what is installed \(.*\)\. Mend: /u.test(nested) && !/complete log/u.test(nested), "a package.json nested past what npm reads stops the reading, and the failure says what npm said and its mend", nested.slice(0, 400));
+  ok(/^threw: the package manager could not read what is installed \(.*\)\. Mend: /u.test(nested) && !/complete log/u.test(nested), "a package.json nested past what npm reads stops the reading, and the failure says what npm said and its mend", nested.slice(0, 400));
   const lockDeep = project({}, {});
   fs.writeFileSync(path.join(lockDeep, "package-lock.json"), `{"lockfileVersion":3,"packages":{"":{"x":${"[".repeat(20000)}1${"]".repeat(20000)}}}}`);
   ok(/^threw: cannot read package-lock\.json as JSON, nested no deeper than 200 .*Mend: /u.test(said(lockDeep)), "a lock file nested past the bound is refused, saying its mend", said(lockDeep).slice(0, 300));

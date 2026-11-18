@@ -127,10 +127,10 @@ export function installedTree(dir) {
     : spawnSync("npm", ["query", "*", "--prefix", "."], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 28 });
   // (npm's first line of its own, not the one that names its log, which holds nothing of the project's)
   const said = (r.stderr || "").split(/\r?\n/u).map((line) => line.replace(/^npm (error|ERR!) /u, "").trim()).find((line) => line && !/complete log of this run|^Log files were not written/u.test(line))?.slice(0, 200);
-  if (r.error || r.status !== 0) throw new Error(`npm could not read what is installed (${r.error?.message ?? said ?? `it ended with ${r.status}`}). ${AGAIN}`);
+  if (r.error || r.status !== 0) throw new Error(`the package manager could not read what is installed (${r.error?.message ?? said ?? `it ended with ${r.status}`}). ${AGAIN}`);
   let nodes;
   try { nodes = parseBounded(r.stdout); } catch { nodes = null; }
-  if (!Array.isArray(nodes)) throw new Error(`npm's reading of what is installed is no list. ${AGAIN}`);
+  if (!Array.isArray(nodes)) throw new Error(`the package manager's reading of what is installed is no list. ${AGAIN}`);
   return new Map(nodes.filter((n) => n && typeof n === "object" && typeof n.location === "string").map((n) => [n.location, n]));
 }
 
