@@ -227,16 +227,17 @@ function selectionRuns(p) {
   return selects ? null : "No workflow on pull requests runs the selection of the tests a change can reach: in the job that runs the project's tests, add a step before them `node core/scripts/select.mjs --env RUN`, with `SELECT_BASE` set to the pull request's base (`origin/<its base branch>`, fetched first, or `HEAD^1` with `fetch-depth: 2`), and have the job run only the test files `RUN` names, each between spaces, or its whole suite where it says `all` (`if [ \"$RUN\" = all ]; then <the whole suite>; else <the runner> $RUN; fi`); name the project's proof, never selected out, under \"select\" and \"proof\" in the shape check's config. Where the record's numbers (`node core/scripts/test-record.mjs`) show the suite needed whole, name every test under \"select\" and \"whole\" instead, citing them in that pull request.";
 }
 
-// Whether each job that runs the selection on a push gives it --passed, the name of the check that gates the tests
-// (core/tasks/tests.md, "A tree that passed is not run again"); null where it does, or where no job selects on a push
-// (the step of the tests a change can reach asks that first); else the mend.
+// Whether each job that runs the selection on a push, in a workflow a pull request runs too, gives it --passed, the name
+// of the check that gates the tests (core/tasks/tests.md, "A tree that passed is not run again"); null where it does,
+// or where no such job selects (the step of the tests a change can reach asks that first); else the mend.
 const onPush = on => (typeof on === "string" ? on === "push" : Array.isArray(on) ? on.includes("push") : !!on && "push" in on);
 function passedRuns(p) {
   readable(p, text => text.includes("select.mjs"));
-  const missing = Object.entries(p.workflows).filter(([, { yaml }]) => onPush(yaml?.on)).flatMap(([file, { yaml }]) => Object.entries(yaml.jobs ?? {})
+  // (only a workflow a pull request runs too: a job that runs on a push alone ran nowhere else, and is never skipped)
+  const missing = Object.entries(p.workflows).filter(([, { yaml }]) => onPush(yaml?.on) && onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => Object.entries(yaml.jobs ?? {})
     .filter(([, job]) => (job?.steps ?? []).some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run) && !/(?<![\w-])--passed(?![\w-])/u.test(step.run)))
     .map(([name]) => `\`.github/workflows/${file}\`, its job \`${name}\``));
-  return missing.length ? `The selection runs on a push with nothing to say whether the merged tree passed already (${missing.join("; ")}): give its step \`--passed <the check that gates the tests>\` on a push's first run alone (the job's own check, such as \`tests\`, as a ruleset requires it; in bash, \`\${SELECT_PASSED:+--passed "$SELECT_PASSED"}\` with \`SELECT_PASSED\` set so on a push and empty otherwise), \`GH_TOKEN: \${{ github.token }}\` on that step on a push alone, and \`checks: read\` beside \`contents: read\` in the job's permissions; then a push that merges a pull request's head whose tree it holds, whose run selected the whole suite and passed that check, runs no test again. Nothing fails meanwhile: the whole suite runs on a push as before.` : null;
+  return missing.length ? `The selection runs on a push with nothing to say whether the merged tree passed already (${missing.join("; ")}): give its step \`--passed <the check that gates the tests>\` on a push's first run alone (the job's own check, such as \`tests\`, as a ruleset requires it; in bash, \`\${SELECT_PASSED:+--passed "$SELECT_PASSED"}\` with \`SELECT_PASSED\` set so on a push and empty otherwise), \`GH_TOKEN: \${{ github.token }}\` on that step on a push alone, and \`checks: read\` beside \`contents: read\` in the job's permissions; then a push that merges a pull request's head whose tree it holds, whose run selected the whole suite and passed that check, runs no test again. Leave it off any job, or entry of a job's matrix, that a pull request does not run, whose suite ran nowhere else. Nothing fails meanwhile: the whole suite runs on a push as before.` : null;
 }
 
 // Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
@@ -888,7 +889,7 @@ export const STEPS = [
   { lead: "17 November 2026, the packages the copy carries", cost: COST.workflow, check: scriptsWithPackages,
     partly: "which suites read the core's scripts is the project's own logic, read by the review" },
   { lead: "18 November 2026, a tree that passed is not run again", cost: COST.workflow, check: passedRuns,
-    partly: "which check gates a project's tests is the project's own, as its ruleset names it" },
+    partly: "which check gates a project's tests is the project's own, as its ruleset names it, and which entries of a job's matrix a pull request leaves out is a reading of its expressions" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

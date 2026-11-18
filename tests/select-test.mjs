@@ -201,9 +201,9 @@ const server = http.createServer((req, res) => {
   asks.push({ url: req.url, auth: req.headers.authorization });
   const ok2 = req.url.startsWith(`/repos/moss/bark/commits/${head}/check-runs?check_name=tests&`);
   res.setHeader("content-type", "application/json");
-  res.end(JSON.stringify({ check_runs: ok2 ? [{ name: "tests", status: "completed", conclusion: state }] : [] }));
+  res.end(JSON.stringify({ check_runs: ok2 ? [{ name: "tests", status: "completed", conclusion: state, app: { slug: app } }] : [] }));
 });
-let state = "success";
+let state = "success", app = "github-actions";
 await new Promise(done => server.listen(0, "127.0.0.1", done));
 const host = { GITHUB_API_URL: `http://127.0.0.1:${server.address().port}`, GITHUB_REPOSITORY: "moss/bark", GH_TOKEN: "pretend" };
 const runLive = (args, env) => new Promise(done => {
@@ -214,7 +214,10 @@ fs.writeFileSync(envFile, "");
 r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
 ok(r.status === 0 && /The selection: none of \d+ tests: the merged head/.test(r.out) && fs.readFileSync(envFile, "utf8") === "RUN=  \n" && asks.at(-1)?.auth === "Bearer pretend",
   "on a push, given --passed, it asks the host with the token, and where the check passed on the merged head it writes no test for the steps after it", `${r.out}\n${fs.readFileSync(envFile, "utf8")}`);
-state = "failure"; fs.writeFileSync(envFile, "");
+app = "another-app"; fs.writeFileSync(envFile, "");
+r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
+ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /no run of it by GitHub Actions/.test(r.out), "a check of that name another app posted, passed or not, says nothing of the suite: the whole suite runs", r.out);
+app = "github-actions"; state = "failure"; fs.writeFileSync(envFile, "");
 r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
 ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /did not pass on the merged head/.test(r.out), "where the check failed there, the whole suite runs", r.out);
 fs.writeFileSync(envFile, "");

@@ -22,7 +22,9 @@
 // brings selects the whole suite, as that pull request's run selected it, and the check passed on that head, nothing is
 // selected. Where any of that cannot be told (no merge of two, a tree that differs, a selection, no answer from the
 // host, a check not passed), the whole suite runs. The check's runs are asked of GitHub (GITHUB_API_URL, the
-// repository GITHUB_REPOSITORY names), with the token GH_TOKEN holds, which needs to read checks and nothing more.
+// repository GITHUB_REPOSITORY names), with the token GH_TOKEN holds, which needs to read checks and nothing more, and
+// only those GitHub Actions posted count. That the head held the default branch rests on floor rule 12: a pull request
+// merges brought up to date, its checks passed on that head.
 //
 //   node core/scripts/select.mjs [<config>] [--failed <file>] [--env <NAME>] [--passed <check>]
 //       with SELECT_BASE the pull request's base (origin/main, fetched; or HEAD^1 of the merge a pull request's run
@@ -260,7 +262,10 @@ async function askHost(sha, check) {
     if (!r.ok) return `the host answered ${r.status}`;
     const runs = (await r.json())?.check_runs;
     if (!Array.isArray(runs) || !runs.length) return "the host knows no such run";
-    return runs.every(run => run?.name === check && run?.status === "completed" && run?.conclusion === "success") || "a run of it did not pass";
+    // (only GitHub Actions' own runs: an app of another's, or a check of that name it posts, says nothing of the suite)
+    const ours = runs.filter(run => run?.app?.slug === "github-actions");
+    if (!ours.length) return "no run of it by GitHub Actions";
+    return ours.every(run => run?.name === check && run?.status === "completed" && run?.conclusion === "success") || "a run of it did not pass";
   } catch (e) { return `the host could not be asked: ${String(e?.message ?? e).slice(0, 80)}`; }
 }
 

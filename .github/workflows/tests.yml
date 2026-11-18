@@ -25,7 +25,8 @@
 # tree it holds, whose change selected every suite and whose check "tests" passed there runs none of the suites that
 # pull request ran, the least Node's on Windows kept (select.mjs --passed, which asks GitHub of that check with the
 # run's token, given to it on a push alone, that token reading checks besides the contents; tasks/tests.md, "A tree
-# that passed is not run again"; #457); the checks of the core itself, each a step of its own after the suites, run
+# that passed is not run again"; #457); the upgrade test and the staged cases, which read the release tags and the day,
+# never in the tree, run on every push; and the checks of the core itself, each a step of its own after the suites, run
 # every time.
 # After them, on Linux, the core's own mutation tool puts faults into the lines a pull request changes and runs the
 # tests that name each file against them (scripts/strength.mjs with scripts/mutate.mjs; tasks/code-shape.md, "How
@@ -434,10 +435,6 @@ jobs:
           - { os: ubuntu-latest, part: newer }
           - { os: windows-latest, part: older }
           - { os: windows-latest, part: newer }
-    # (the run's token reads the checks too: the selection asks whether "tests" passed on the merged head, on a push)
-    permissions:
-      contents: read
-      checks: read
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     defaults:
@@ -451,12 +448,10 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
-      - name: The tests this change can reach (on main, and in a re-run, every one, but none where the merged head passed this tree whole)
+      - name: The tests this change can reach (on main, and in a re-run, every one)
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
-          SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}
-          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}
-        run: node scripts/select.mjs .github/shape.json --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}
+        run: node scripts/select.mjs .github/shape.json --env RUN
       - name: A project of each of the last two releases, or of the one this job's part names, synced to this commit, passes every check unchanged
         if: ${{ env.RUN == 'all' || contains(env.RUN, ' tests/upgrade-test.mjs ') }}
         env:

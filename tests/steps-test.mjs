@@ -155,6 +155,15 @@ ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.y
   fs.rmSync(suiteFile);
 }
 
+// ---- a tree that passed (#457): a job that selects on a push alone ran nowhere else, and is not asked --passed ----
+{
+  const PASSED_LEAD = "18 November 2026, a tree that passed is not run again", pushed = path.join(lockProject, ".github/workflows/pushed.yml");
+  const asked = on => { fs.writeFileSync(pushed, `name: p\non:\n${on}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/select.mjs --env RUN\n`); return notDone(lockProject).some(m => m.lead === PASSED_LEAD); };
+  ok(!asked("  push:\n    branches: [main]") && asked("  push:\n  pull_request:") && asked("  pull_request:\n  push:\n    branches: [main]"),
+    "a job that selects on a push alone is not asked --passed, since its suite ran nowhere else; one a pull request runs too is");
+  fs.rmSync(pushed);
+}
+
 // ---- a shape baseline written before the check read C#, Python, JSX and shared scripts (#354): its mend names them ----
 const shapeBaseline = path.join(lockProject, "checks/shape-baseline.json"), shapeAsKit = fs.readFileSync(shapeBaseline, "utf8");
 fs.writeFileSync(shapeBaseline, "{\n  \"listed\": {}\n}\n");

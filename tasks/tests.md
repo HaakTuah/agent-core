@@ -22,7 +22,8 @@ reads is the *shape check*'s config.
   (a simulation's fingerprint, a replay, a save's round trip), which are never selected out. The one condition that
   changes it: where a changed file's reach cannot be told (a file of no code the readers follow, data, a file gone),
   where no base is told and where the config cannot be read, the whole suite runs. The whole suite runs where it ran
-  before: on the default branch, on a schedule, before a release, so no job is added. A test that reaches an import the
+  before: on the default branch, save where the tree passed whole ("A tree that passed is not run again", below), on a
+  schedule, before a release, so no job is added. A test that reaches an import the
   readers cannot follow (a path built at run time, a file they do not read) runs on any change; one that reaches files
   by a path it builds, by listing a folder or through a running program, its builder names under "select.whole". The
   trigger is a fault the whole suite finds that the selection left out: its finder mends the map at once, as a bug (a
@@ -81,9 +82,11 @@ reads is the *shape check*'s config.
   reason, at the audit.
 - **A tree that passed is not run again.** By default, where a pull request's head was up to date with the default
   branch and its whole suite passed on that tree, the run on the default branch for the same tree runs no test again:
-  the job that runs the tests on a push gives the selection `--passed` with the check that gates them
-  (`core/scripts/select.mjs`), which finds the merged head's tree, its whole selection and that check's pass, and
-  otherwise runs the whole suite. The trigger is a push that merges a pull request with a merge commit. It does not
+  whoever writes a job of tests that a pull request and a push both run gives its selection, on a push, `--passed` with
+  the check that gates the tests (`core/scripts/select.mjs`), which finds the merged head's tree, its whole selection
+  and that check's pass, as GitHub Actions posted it, and otherwise runs the whole suite; that the head held the default
+  branch rests on floor rule 12, which merges a pull request brought up to date. A test that reads what no tree holds
+  (a release's tag, the day) stays out of the skip. The trigger is a push that merges a pull request with a merge commit. It does not
   mean a run is skipped where the pull request ran a selection only, where it was merged by a squash or a rebase, on a
   re-run, on a schedule or before a release, nor that a job a pull request does not run is skipped. Reason: in #426's
   counts every push to the default branch ran the whole suite again after its pull request had run it on the same tree.
