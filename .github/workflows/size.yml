@@ -6,7 +6,9 @@
 # line it adds to the dated records, or a phrase a rule may not use in a line it adds to a rule file or to a Markdown
 # template of the starter kit, read against the base, and reports the phrases that stood before it (AGENTS.md, "A rule
 # is written to one pattern"; tasks/helpers.md, "A brief is written as a rule is"); and the shape check on the core's
-# own scripts (scripts/shape.mjs, with .github/shape.json), which a project runs from the copies workflow. This
+# own scripts (scripts/shape.mjs, with .github/shape.json), which a project runs from the copies workflow; and the total
+# read (scripts/read-total.mjs), which fails a pull request that cuts or joins the rule files where the total does not
+# go down, a reader reads more or loses a file it read, reading the description's line "Never needed:" alone. This
 # repository only; no project calls it. Reads only, with no secret: the raise is read from git alone, the merge commit against its
 # first parent, the base, and of the pull request's comments only who wrote each and how it opens is used, in a file
 # the script reads; no text of a comment reaches a command.
@@ -14,6 +16,7 @@ name: size
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited] # (edited: a line "Never needed:" added to the description)
   push:
     branches: [main]
 
@@ -36,7 +39,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false # gh below takes its token from GH_TOKEN, nothing from the checkout
-          fetch-depth: 2 # the merge commit and its parents: a raise of a cap is read against the base
+          fetch-depth: 0 # the base, for a raise of a cap, and its history, the merged pull requests the total read reads
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
@@ -58,6 +61,11 @@ jobs:
         run: node scripts/size.mjs --raise "$RUNNER_TEMP/raise/base.mjs" "$RUNNER_TEMP/raise/comments.json"
       - name: The floor and the modules fit any project, and a rule written uses no phrase a rule may not use
         run: node scripts/general.mjs scripts/general.json --base HEAD^1
+      - name: A cut or a join of the rule files lowers the total read
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }} # (read as data: only its line "Never needed:", for file names)
+        run: node scripts/read-total.mjs --compare HEAD^1
       - name: Nothing new in how the core's own code is put together
         env:
           SHAPE_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}

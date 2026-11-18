@@ -875,6 +875,7 @@ export const STEPS = [
   { lead: "17 November 2026, held packages looked up again", cost: COST.read, unread: "whether a package has gone stale is its registry's answer on the day, and GitHub's, not a file's: the session that syncs runs `node core/scripts/held.mjs` once and puts what it prints in the sync pull request's description, each package gone stale a task; the scheduled look runs it again each month" },
   { lead: "17 November 2026, the packages the copy carries", cost: COST.workflow, check: scriptsWithPackages,
     partly: "which suites read the core's scripts is the project's own logic, read by the review" },
+  { lead: "18 November 2026, why a file past its split mark stays whole", cost: COST.check, held: "the reading-size check" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

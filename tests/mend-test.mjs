@@ -32,6 +32,7 @@ const CHECKS = {
   "scripts/copies.mjs": "tests/init-test.mjs",
   "scripts/pointers.mjs": "tests/pointers-test.mjs",
   "scripts/reading-size.mjs": "tests/init-test.mjs",
+  "scripts/read-total.mjs": "tests/read-total-test.mjs",
   "scripts/workflows.mjs": "tests/workflows-test.mjs",
   "scripts/licences.mjs": "tests/licence-scan-test.mjs",
   "scripts/exact-versions.mjs": "tests/exact-versions-test.mjs",

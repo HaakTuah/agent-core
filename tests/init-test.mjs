@@ -145,6 +145,23 @@ if (p.status === 0) {
   const ownGrew = sizeCheck();
   undo();
   ok(coreGrew.status === 0 && ownGrew.status === 1 && /project's own files every session reads total .*\. Mend: make them smaller/.test(ownGrew.stderr) && mended(ownGrew.stderr), "the core's copy grown by a sync fails no project's total; the project's own files grown past it do", `${coreGrew.stderr}${ownGrew.stdout}`);
+  // (a file past the split mark that a pull request changes asks the question: no line in "past", or one with no why
+  // or grown a quarter past its mark, fails with its mend; one whose line says why it stays whole passes; #469)
+  const marksAt = path.join(p.dir, "checks/sizes.json"), marksWas = fs.readFileSync(marksAt, "utf8");
+  const pastAs = past => { fs.writeFileSync(marksAt, JSON.stringify({ ...JSON.parse(marksWas), past })); return sizeCheck(); };
+  fs.writeFileSync(path.join(p.dir, "big.md"), `${"a line of a long record\n".repeat(2600)}`);
+  git(p.dir, "add", "big.md");
+  const big = fs.statSync(path.join(p.dir, "big.md")).size, why = "every reader of it reads it whole";
+  const [unlisted, bare, grown, kept, within] = [pastAs({}), pastAs({ "big.md": big }), pastAs({ "big.md": { mark: Math.floor(big / 1.3), why } }),
+    pastAs({ "big.md": { mark: big, why } }), pastAs({ "big.md": { mark: Math.ceil(big / 1.2), why } })];
+  git(p.dir, "rm", "-q", "--cached", "big.md");
+  fs.rmSync(path.join(p.dir, "big.md"));
+  fs.writeFileSync(marksAt, marksWas);
+  ok(unlisted.status === 1 && /big\.md is \d+ bytes, past the 51200-byte mark.*Mend: ask in what ways it could be split so that someone reads less/.test(unlisted.stderr) && mended(unlisted.stderr)
+    && bare.status === 1 && /big\.md is listed under "past" .* with no reason it stays whole/.test(bare.stderr) && mended(bare.stderr)
+    && grown.status === 1 && /grown more than a quarter past its mark/.test(grown.stderr) && mended(grown.stderr),
+    "a changed file past the split mark with no line, a line with no why, or one grown a quarter past its mark fails, saying its mend", `${unlisted.stderr}${bare.stderr}${grown.stderr}`);
+  ok(kept.status === 0 && within.status === 0, "a line that says why the file stays whole passes, its file grown less than a quarter past its mark too", `${kept.stderr}${within.stderr}`);
   // (a copy the project adds fails the copies check, and each failure says its mend)
   undo = grow("AGENTS.md", 0);
   fs.appendFileSync(path.join(p.dir, "AGENTS.md"), `\n${fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/u).find(l => /^- It is never pushed to/u.test(l))}\n`);

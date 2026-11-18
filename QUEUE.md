@@ -50,7 +50,6 @@ it merges last.
 | #464 | rule builder | #459, whose rule list it reads |
 | #361 | rule builder, points 1 and 2 only | |
 | #467 | rule builder | |
-| #469 | rule builder; it changes what every role reads at its start | |
 | #484, points 1 to 5 | rule builder | |
 | #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged; the file stays whole where #469's measure finds no kind of task reads less | #469 |
 | #471 | rule builder; it changes what the orchestrator reads at its start | |

@@ -105,7 +105,7 @@ the code is held to: `tasks/code-shape.md`.
   reading more: where whoever reads one part needs the other every time, it is no split. A dated record (the archive's
   item files, the reports) is cut by month where it is cut at all, those that stand kept as they are. It does not mean
   a file is cut to meet a number, nor that the caps on what a role reads at its start go, where size is the cost itself
-  (the core's `AGENTS.md`, "The size caps keep the rules lean and decide nothing else"). Reason: a mark on size is a
+  (the core's `AGENTS.md`, on its size caps). Reason: a mark on size is a
   weak sign that a file holds two things, and files were cut where nothing was gained. Held by the reading-size check
   (`core/scripts/reading-size.mjs`), which fails a file past its mark that a pull request changes with no line in
   `"past"`, one whose line names neither a split's issue nor why it stays whole, and one grown a quarter past it.
