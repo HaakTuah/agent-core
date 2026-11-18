@@ -24,6 +24,7 @@ import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tool
 import { parse as parseChoices, where as choicesAt } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
+import { installed } from "./packages.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
 import { progressOf } from "./done-when.mjs";
 import { leadsOut } from "./guards.mjs";
@@ -153,6 +154,9 @@ function strengthNamed(p) {
 // them (workflows.mjs and yaml-keys.mjs, beside this file), which GitHub refuses, running none of the file's jobs: the
 // old ones, which the check notes and passes, listed here at every sync until they are gone (#393). Null where none is.
 function keysOnce(p) {
+  // (with the core's packages not installed, as after a sync made by a copy from before #654, this step cannot be read:
+  // it says so, with the install, and every other step is still told)
+  if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`node ${corePath(p.root) || "core/"}scripts/install.mjs\`, then \`node ${corePath(p.root) || "core/"}scripts/steps.mjs\` again.`;
   const found = reads(p.files).flatMap(f => twice(p.read(f) ?? "").map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
   return found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : null;
 }
