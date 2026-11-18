@@ -81,6 +81,7 @@ it merges last.
 | #416 | builder | #441, on the same files |
 | #652 | rule builder; it changes `tasks/choices.md` | |
 | #650 | rule builder | #654 |
+| #661 | builder | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
