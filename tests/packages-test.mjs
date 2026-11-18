@@ -37,23 +37,50 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
 }
 
 // ---- the week's wait on each package the change brings or updates (floor rule 7) ----
-// npm ci installs a lock file as it is written, so the .npmrc's wait holds only what npm resolves itself: each entry
-// new or at another version than at the base (the merge's first parent, or PACKAGES_BASE) is asked of npm's registry
-// for its date.
+// npm ci installs a lock file as it is written, the tarball its entry's address names, so the .npmrc's wait holds only
+// what npm resolves itself. Each entry new, or other in its version, address or integrity than at the base (the merge's
+// first parent, or PACKAGES_BASE), is asked of npm's registry for the date of the version its address names, which must
+// be its version field too.
 {
   const WEEK = 7 * 86400000;
+  const { registryName, registryVersion } = await import(pathToFileURL(path.join(root, "scripts/licences.mjs")).href);
+  const { fetched } = await import(pathToFileURL(path.join(root, "scripts/lookup.mjs")).href);
+  const same = (a, b) => Boolean(a) && ["version", "resolved", "integrity"].every(f => a[f] === b[f]);
+  // (each entry that fails, with what is wrong; `ask(name)` gives the registry's document of a package, as fetched does)
+  const tooYoung = async (packages, base, ask, now = Date.now()) => {
+    const out = [];
+    for (const [k, e] of Object.entries(packages ?? {})) {
+      if (!k || same(base[k], e)) continue;
+      const name = registryName(e.resolved), version = registryVersion(e.resolved);
+      if (!name || !version || version !== e.version) { out.push(`${k}: its address names ${name ?? "no package of npm's registry"} at ${version ?? "no version"}, and its version field ${e.version ?? "none"}`); continue; }
+      const doc = await ask(name).catch(err => ({ status: err.message }));
+      const at = Date.parse(doc.json?.time?.[version] ?? "");
+      if (!(now - at >= WEEK)) out.push(`${name}@${version}: ${doc.status === 200 ? (Number.isNaN(at) ? "the registry gives no date" : `published ${new Date(at).toISOString()}`) : `the registry answered ${doc.status}`}`);
+    }
+    return out;
+  };
   let base = {};
   try { base = JSON.parse(execFileSync("git", ["show", `${process.env.PACKAGES_BASE || "HEAD^1"}:package-lock.json`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })).packages ?? {}; } catch { /* (no lock file at the base: every entry is new) */ }
-  const changed = Object.entries(json("package-lock.json").packages ?? {}).filter(([k, e]) => k && base[k]?.version !== e.version);
-  const { fetched } = await import(pathToFileURL(path.join(root, "scripts/lookup.mjs")).href);
-  const young = [];
-  for (const [k, e] of changed) {
-    const name = k.slice(k.lastIndexOf("node_modules/") + "node_modules/".length);
-    const doc = await fetched(`https://registry.npmjs.org/${name.replace("/", "%2f")}`).catch(err => ({ status: err.message }));
-    const at = Date.parse(doc.json?.time?.[e.version] ?? "");
-    if (!(Date.now() - at >= WEEK)) young.push(`${name}@${e.version} (${doc.status === 200 ? (Number.isNaN(at) ? "no date" : new Date(at).toISOString()) : `the registry answered ${doc.status}`})`);
-  }
-  ok(young.length === 0, `each of the ${changed.length} package${changed.length === 1 ? "" : "s"} the change brings or updates in the lock file is a week old or more by the registry's date (floor rule 7)`, young.join(", "));
+  const young = await tooYoung(json("package-lock.json").packages, base, name => fetched(`https://registry.npmjs.org/${name.replace("/", "%2f")}`));
+  ok(young.length === 0, "each package the change brings or updates in the lock file is a week old or more by the registry's date (floor rule 7)",
+    `${young.join("; ")}\nMend: wait until the version is a week old and run the job again, or take the version before it, its lock entry written by npm's own install`);
+  // (held on a lock written by hand: a version field kept while the address names another tarball, an entry with no
+  // version, an address off the registry, and a young version, against answers made here)
+  const day = 86400000, now = Date.parse("2026-11-18T00:00:00Z");
+  const docs = { yaml: { "2.9.1": "2026-09-01T00:00:00Z", "2.9.2": "2026-11-17T00:00:00Z" } };
+  const ask = async name => ({ status: 200, json: { time: docs[name] ?? {} } });
+  const tgz = v => `https://registry.npmjs.org/yaml/-/yaml-${v}.tgz`;
+  const held = { "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } };
+  const cases = [
+    [{ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.2"), integrity: "sha512-b" } }, /names yaml at 2\.9\.2, and its version field 2\.9\.1/u],
+    [{ ...held, "node_modules/yaml/node_modules/yaml": { resolved: tgz("2.9.2"), integrity: "sha512-c" } }, /version field none/u],
+    [{ "node_modules/yaml": { version: "2.9.1", resolved: "https://example.invalid/yaml-2.9.1.tgz", integrity: "sha512-d" } }, /no package of npm's registry/u],
+    [{ "node_modules/yaml": { version: "2.9.2", resolved: tgz("2.9.2"), integrity: "sha512-e" } }, /yaml@2\.9\.2: published 2026-11-17/u],
+  ];
+  const results = await Promise.all(cases.map(([lock]) => tooYoung(lock, held, ask, now)));
+  ok(cases.every(([, said], i) => results[i].length === 1 && said.test(results[i][0])) && (await tooYoung(held, held, ask, now)).length === 0
+    && (await tooYoung({ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, {}, ask, now + day)).length === 0,
+    "and the week's wait reads the tarball the address names, never the version field alone, and fails an entry whose address names no version of npm's registry", results.map(r => r.join(" | ")).join(" || "));
 }
 
 // ---- nothing of another publisher's tracked: no node_modules/, no carried folder ----
