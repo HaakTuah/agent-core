@@ -586,6 +586,15 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(moved, "add", "-A"); git(moved, "commit", "-q", "-m", "the link moved");
     git(moved, "checkout", "-q", "main"); git(moved, "merge", "-q", "--no-ff", "-m", "merge", "change2");
     fails(run(moved), "and so does one whose target the pull request moves", "Mend: rename it to .codex");
+    // (#600's fallback security review of 27d9d98: a file is held by its kind too, so none reads as a link it names)
+    const asLink = project({ ".Codex/hooks.json": "{}\n", ...listing() });
+    fs.symlinkSync(os.tmpdir(), path.join(asLink, ".Codex/config.toml"));
+    git(asLink, "add", "-A"); git(asLink, "commit", "-q", "-m", "a link out");
+    git(asLink, "checkout", "-q", "-B", "change2"); fs.unlinkSync(path.join(asLink, ".Codex/config.toml"));
+    fs.writeFileSync(path.join(asLink, ".Codex/config.toml"), `\0a link to ${os.tmpdir()}`);
+    git(asLink, "add", "-A"); git(asLink, "commit", "-q", "-m", "the link a file");
+    git(asLink, "checkout", "-q", "main"); git(asLink, "merge", "-q", "--no-ff", "-m", "merge", "change2");
+    fails(run(asLink), "and so does a file put in a link's place that names what the link led to", "Mend: rename it to .codex");
     // (#600's fallback security review of 8dfe536: behind a link of the tool's own name, an entry in another case that is no
     // folder the walk reaches is named too, whatever it is)
     for (const [link, to, inside, says] of [[".kiro", "k", "hooks/x.JSON", "Mend: rename it to .kiro/hooks/x.json"], [".codex", "c", "Config.toml", "Mend: rename it to .codex/config.toml"], [".claude/skills", "../s", "n/Skill.md", "Mend: rename it to .claude/skills/n/SKILL.md"]]) {
@@ -601,6 +610,30 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(subBehind, "add", "-A"); git(subBehind, "update-index", "--add", "--cacheinfo", `160000,${git(subBehind, "rev-parse", "HEAD")},c/Config.toml`);
     git(subBehind, "commit", "-q", "-m", "a submodule in another case behind a link");
     fails(run(subBehind, "--core"), "and so does a submodule's entry there", "Mend: rename it to .codex/config.toml");
+    // (#600's fallback security review of 27d9d98: a skill's folder in a folder in another case that is no folder, a link
+    // out of the checkout or a submodule's entry, through which the tool reads a SKILL.md this check cannot, is named too)
+    for (const [skills, says] of [[".claude/Skills", "Mend: rename it to .claude/skills"], [".Claude/skills", "Mend: rename it to .claude"]]) {
+      const outSkill = project({ ...listing() });
+      fs.mkdirSync(path.join(outSkill, skills), { recursive: true });
+      fs.symlinkSync(os.tmpdir(), path.join(outSkill, skills, "foo"));
+      git(outSkill, "add", "-A"); git(outSkill, "commit", "-q", "-m", "a skill's folder linked out");
+      fails(run(outSkill, "--core"), `a skill's folder under ${skills} that links out of the checkout fails`, says);
+    }
+    const subSkill = project({ "README.md": "x\n", ...listing() });
+    git(subSkill, "update-index", "--add", "--cacheinfo", `160000,${git(subSkill, "rev-parse", "HEAD")},.claude/Skills/foo`);
+    git(subSkill, "commit", "-q", "-m", "a skill's folder as a submodule");
+    fails(run(subSkill, "--core"), "and so does one that is a submodule's entry", "Mend: rename it to .claude/skills");
+    const plainSkill = project({ ".claude/Skills/notes.md": "# notes\n", ...listing() });
+    passes(run(plainSkill, "--core"), "while a plain file there, which the tool does not read, is not looked at");
+    const skillHeld = project({ ".claude/Skills/bar/SKILL.md": "# bar\n", ...listing() });
+    const skillAdded = pr(skillHeld, { "README.md": "a change of its own\n" });
+    git(skillAdded, "checkout", "-q", "-B", "change2");
+    fs.symlinkSync(os.tmpdir(), path.join(skillAdded, ".claude/Skills/foo"));
+    git(skillAdded, "add", "-A"); git(skillAdded, "commit", "-q", "-m", "a skill's folder linked out");
+    git(skillAdded, "checkout", "-q", "main"); git(skillAdded, "merge", "-q", "--no-ff", "-m", "merge", "change2");
+    fails(run(skillAdded), "one a pull request adds under a folder the base held in another case fails", "Mend: rename it to .claude/skills");
+    const noteAdded = run(pr(project({ ".claude/Skills/bar/SKILL.md": "# bar\n", ...listing() }), { ".claude/Skills/notes.md": "# notes\n" }));
+    ok(noteAdded.status === 0, "while a file there the tool does not read changes nothing the base held", noteAdded.out);
     // (a folder or a link in another case on the way to a tool's file)
     const aliased = project({ "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n", ...listing() });
     fs.symlinkSync("config", path.join(aliased, ".Codex"));
