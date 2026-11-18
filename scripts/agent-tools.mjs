@@ -1190,14 +1190,14 @@ function away(root, rev, at) {
 // read exactly, which changes what a tool runs there; is reported as one whose package may have changed where only what
 // cannot be read exactly changed, as any dependency's update does there; and is a note otherwise.
 const NPM_LOCKS = ["package-lock.json", "npm-shrinkwrap.json"];
-function pkgLock(root, rev, at) {
+function pkgLock(root, rev, at, depth = 0) {
   const posix = at.split(path.sep).join("/"), via = [], l = listing(root, rev), out = { exact: new Set(), loose: new Set() };
   walk(root, rev, posix, via, true, [], true);
   for (const v of new Set([posix, ...via])) {
     const to = l.linked.has(v) ? linkText(root, rev, v) : null;
     const p = to === null ? "" : path.posix.normalize(path.posix.join(path.posix.dirname(v), to.split("\\").join("/")));
     const m = [...`/${p}`.matchAll(/\/node_modules(?:\/|$)/giu)].at(-1);
-    if (m) lockEntries(root, rev, p.slice(0, Math.max(m.index - 1, 0)), `/${p}`.slice(m.index + "/node_modules/".length).split("/"), out);
+    if (m) lockEntries(root, rev, p.slice(0, Math.max(m.index - 1, 0)), `/${p}`.slice(m.index + "/node_modules/".length).split("/"), out, depth);
   }
   return { exact: [...out.exact].sort().join("\0\0"), loose: [...out.loose].sort().join("\0\0") };
 }
@@ -1207,24 +1207,34 @@ function pkgLock(root, rev, at) {
 // project (a workspace's, or a file: dependency), all that folder holds. Loosely: an npm lock with no such entry, or none
 // read, whole; a yarn, pnpm or bun lock, the package.json and .npmrc, whole; and each folder of patches.
 const LOOSE_READS = ["yarn.lock", "pnpm-lock.yaml", "bun.lock", "bun.lockb", "package.json", ".npmrc"], PATCHES = ["patches", ".yarn/patches"];
-function lockEntries(root, rev, dir, rest, out) {
+function lockEntries(root, rev, dir, rest, out, depth = 0) {
   const scoped = rest[0]?.startsWith("@"), name = (scoped ? (rest[1] ? rest.slice(0, 2) : []) : rest.slice(0, 1)).filter(Boolean).join("/");
   const { read } = commitReader(root, rev, true, true);
   for (let up = dir; ; up = up.includes("/") ? up.slice(0, up.lastIndexOf("/")) : "") {
     const there = f => (up ? `${up}/${f}` : f), key = path.posix.relative(up || ".", `${dir ? `${dir}/` : ""}node_modules/${name}`);
-    for (const f of NPM_LOCKS) npmRead(root, rev, there(f), read(there(f)), name && key, up, out);
+    for (const f of NPM_LOCKS) npmRead(root, rev, there(f), read(there(f)), name && key, up, out, depth);
     for (const f of LOOSE_READS) out.loose.add(`${there(f)}\0${read(there(f))}`);
     for (const d of PATCHES) out.loose.add(`${there(d)}\0${everything(root, rev, there(d))}`);
     if (!up) break;
   }
 }
-// What one npm lock file, `f` with its `text`, says of the package at `key` (none: read loosely), into `out`'s two sets,
-// with all the folder of the project it links the package to holds, `up` the lock's folder.
-function npmRead(root, rev, f, text, key, up, out) {
+// What one npm lock file, `f` with its `text`, says of the package at `key` (none: read loosely), into `out`'s two sets:
+// the entry's fields that say what is installed (ENTRY_SAYS), and, where it links the package to a folder of the project,
+// `up` the lock's folder, all that folder holds, with what the lock files say of each link walked there in turn.
+const ENTRY_SAYS = ["version", "resolved", "integrity", "link"];
+function npmRead(root, rev, f, text, key, up, out, depth = 0) {
   const entry = key ? npmEntry(text, key) : undefined;
   if (entry === undefined) return void out.loose.add(`${f}\0${text}`);
-  out.exact.add(`${f}\0${JSON.stringify(entry)}`);
-  if (entry?.link && typeof entry.resolved === "string") out.exact.add(`${f} links to\0${everything(root, rev, path.posix.normalize(path.posix.join(up || ".", entry.resolved)))}`);
+  out.exact.add(`${f}\0${JSON.stringify(ENTRY_SAYS.map(k => entry?.[k] ?? null))}`);
+  if (!entry?.link || typeof entry.resolved !== "string") return;
+  const walked = [];
+  out.exact.add(`${f} links to\0${everything(root, rev, path.posix.normalize(path.posix.join(up || ".", entry.resolved)), undefined, walked)}`);
+  // (a link walked there that leads into node_modules in turn, read as pkgLock() reads it, a few links deep at most)
+  for (const w of depth < 8 ? walked : []) {
+    const more = pkgLock(root, rev, w, depth + 1);
+    out.exact.add(more.exact);
+    out.loose.add(more.loose);
+  }
 }
 // An npm lock's entry for the package at `key`, found as written or in another case, as a file system that ignores case
 // finds the folder; undefined where the lock does not parse or holds no such entry.
