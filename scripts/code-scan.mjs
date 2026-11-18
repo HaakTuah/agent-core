@@ -319,7 +319,7 @@ function stoodAt(dir, root, base, files) {
 /** Each finding's verdict: a line to print, or a failure. With a base, a finding stood where the base held one of the
  *  same key, those on lines the change does not add taking them first; any other is the change's own, and fails unless
  *  the description lists it as a false alarm. */
-function verdicts(findings, { root, base, stood, added, explained }) {
+export function verdicts(findings, { root, base, stood, added, explained }) {
   const lines = [], fails = [], texts = new Map(), left = new Map(stood ?? []);
   const isAdded = f => (added.get(f.file)?.has(f.line) ? 1 : 0);
   for (const f of [...findings].sort((a, b) => isAdded(a) - isAdded(b))) {
@@ -363,12 +363,14 @@ export function unreadLines(files, got, { base, listed, held }) {
 }
 
 /** The engine's answer on the files: every one handed to it; where it gives none and the description lists files as
- *  unread, again without those, which are then held back. { got, held, read }. */
-function answer(dir, root, files, listed) {
-  const got = runEngine(dir, root, files);
+ *  unread, each listed file is tried alone, and only one with which it still gives no answer is held back, the rest run
+ *  again together, a listed one it reads judged as any other. { got, held, read }. `run` is the engine's run. */
+export function answer(dir, root, files, listed, run = runEngine) {
+  const got = run(dir, root, files);
   if (!got.failed || !listed.size) return { got, held: [], read: files };
-  const read = files.filter(f => !listed.has(f));
-  return { got: read.length ? runEngine(dir, root, read) : { findings: [], errors: [], scanned: new Set() }, held: files.filter(f => listed.has(f)), read };
+  const held = files.filter(f => listed.has(f) && run(dir, root, [f]).failed);
+  const read = files.filter(f => !held.includes(f));
+  return { got: read.length ? run(dir, root, read) : { findings: [], errors: [], scanned: new Set() }, held, read };
 }
 
 /** The scan: { lines, failed }, each line to print. */

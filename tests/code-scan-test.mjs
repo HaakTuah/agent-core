@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir, tally, zip } from "../scripts/scratch-core.mjs";
 import { CORE } from "../scripts/core-address.mjs";
-import { ENGINES, VERSION, WHEELS, digestAt, engineAt, engineDigest, engineFiles, falseAlarms, fetchEngine, hostScans, place, scan, system, unreadLines, unreadListed, unreadOf, wheelAddress } from "../scripts/code-scan.mjs";
+import { ENGINES, VERSION, WHEELS, digestAt, engineAt, engineDigest, engineFiles, falseAlarms, fetchEngine, hostScans, place, scan, system, answer as engineAnswer, verdicts, unreadLines, unreadListed, unreadOf, wheelAddress } from "../scripts/code-scan.mjs";
 
 const { ok, done } = tally();
 const tmp = scratchDir("code-scan-test-");
@@ -67,6 +67,15 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
   ok(lines.some(l => /^- passed: b\.py: the engine did not scan it, listed in the description/u.test(l)) && lines.some(l => /^FAIL: d\.py: the engine did not scan it/u.test(l)) && mended(lines.join("\n"))
     && lines.some(l => /^- listed as unread, but the engine read it whole: c\.py/u.test(l)) && lines.some(l => /^- passed: e\.py: the engine gave no answer with it/u.test(l)),
     "a listed file the engine did not read passes, an unlisted one fails with its mend, a listed one it read excuses nothing, and one held back is said", lines.join("\n"));
+  // (the retry, with a stand-in for the engine that gives no answer where bomb.py is among its files)
+  const ran = [], stand = (dir, root, files) => { ran.push(files.join(" ")); return files.includes("bomb.py") ? { failed: "no answer" } : { findings: files.map(f => ({ file: f })), errors: [], scanned: new Set(files) }; };
+  const tried = engineAnswer("engine", ".", ["bomb.py", "evil.py", "a.py"], new Set(["bomb.py", "evil.py"]), stand);
+  ok(tried.held.join(" ") === "bomb.py" && tried.read.join(" ") === "evil.py a.py" && tried.got.findings.map(f => f.file).join(" ") === "evil.py a.py" && ran.includes("bomb.py") && ran.includes("evil.py"),
+    "where the engine gives no answer, each listed file is tried alone: only the one it still cannot answer on is held back, and a listed file it reads is judged with the rest", ran.join(" | "));
+  ok(engineAnswer("engine", ".", ["bomb.py", "a.py"], new Set(), stand).got.failed === "no answer", "with no file listed, an engine that gives no answer is no answer: the scan fails on it");
+  // (a base the engine could not read: every finding is the change's own)
+  const own = verdicts([{ file: "x.py", line: 3, from: 0, to: 0, rule: "py-command", message: "m" }], { root: tmp, base: "HEAD~1", stood: new Map(), added: new Map(), explained: new Set() });
+  ok(own.fails.length === 1 && mended(own.fails.join("\n")), "with nothing known to stand at the base, a finding fails as the change's own, saying its mend", own.fails.join("\n"));
   ok([...unreadListed("Scan unread: `big/data.py`, a generated table\n- Scan unread: `x.cs`\nscan unread: `y.py`\n<b>Scan unread: `z.py`</b>")].join(" ") === "big/data.py x.cs" && unreadListed(undefined).size === 0, "a file is listed unread on a line of its own, opening \"Scan unread:\" with its path in backticks");
 }
 // the engine's folder: an engine held to its pin, and a folder that holds none never replaced
