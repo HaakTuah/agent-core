@@ -22,15 +22,15 @@ Read before a task adds or updates a dependency or a tool of an agent's own, and
     asked again. Reason: a model sometimes names a package that does not exist, the same names recur, and someone
     registers them; such a name is new and has no history.
 - **Code of another publisher is named in a lock file** (#654). By default what a project ships or runs of another
-  publisher's code stands in a lock file in its registry's own form, at one exact version with the registry's
-  integrity. Where the project loads such code another way (a script from a content network pinned by its hash, a file
-  copied into the repository), the session that adds it, or finds it, names it in such a lock file too, so the host's
-  alerts, the audit and the update proposals read it; a list of the project's own that stood in for one gives way to
-  it. Nothing changes it.
+  publisher's code stands in a lock file in its registry's own form, at its exact version. Where the project loads
+  such code another way (a script from a content network pinned by its hash, a file copied into the repository), the
+  session that adds it, or finds it, names it in such a lock file too, so the host's alerts, the audit and the update
+  proposals read it; a list of the project's own that stood in for one gives way to it. Nothing changes it.
   - It does not mean the project changes how it loads the code or gains a build step, nor an asset that is no code (a
-    font, a picture, a sound), which the licence check holds. Reason: a library loaded from a content network by its
-    hash stood in no lock file, a list written by hand stood in for its updates, and nothing watched it for a
-    vulnerability.
+    font, a picture, a sound), which the licence check holds, nor what no registry publishes: the platform's own
+    runtime, an action, pinned as `floor/topics/workflows.md` says, or a download no registry offers. Reason: a
+    library loaded from a content network by its hash stood in no lock file, a list written by hand stood in for its
+    updates, and nothing watched it for a vulnerability.
 - Findings from CI's audit fixed, not silenced.
 - **An agent's own tools are code with its sign-ins:** every plug-in, tool server, skill and hook the
   project configures for its agents is listed under "agentTools" in its licence check's config, from a known

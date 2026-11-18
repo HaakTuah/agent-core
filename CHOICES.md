@@ -298,7 +298,8 @@ adds this record.
   `package-lock.json`, installed by the sync, at a session's start and in each job before a check
   (`scripts/install.mjs`), and held by the core's own licence check and lookup, which read that lock file. The signs
   above that read the carried files read the install instead: a package that turns a project's check red or raises its
-  alerts, or an install that adds more than 30 s to a job.
+  alerts, or an install that adds more than 30 s to a job; "a hook's start passes 100 ms" reads the hook's own work,
+  not the install it makes once a checkout.
 - Reopens it: the suites' verdicts differ between the least Node and the pin, on Linux or Windows (the least
   goes); a hook's start passes 100 ms on Windows; a carried file turns a project's check red or raises its code
   scanning's alerts; a port's comparison differs beyond its definition's mend (that reader stays); the replay of fixed
@@ -432,7 +433,8 @@ counter and its commands are in the pull request that adds this record (#487).
   the parser, its runtime and each grammar at one exact version, and no fetch while a check runs. What gives way:
   "carried in the copy": the runtime and each grammar are entries of the core's `package-lock.json`, installed as
   every package is (`scripts/install.mjs`), their integrity the registry's, their licences read by the core's licence
-  check from the lock file; the list of SHA-256 and the carried notices go with the folder.
+  check from the lock file; the list of SHA-256 and the carried notices go with the folder. The sign "the files carried
+  pass 20 MB" reads the installed packages instead.
 - **What is written by hand today** (#486, point 10). Counted on 16 November 2026: each stand-in's lines, and the
   issues labelled `bug` that name its script (of the 50 so labelled). In the order of what each is worth, each
   replaced by itself, with a trial of its own, at the dose, as cleaning is (`tasks/cleaning.md`), and each that brings

@@ -10,7 +10,7 @@ own, what the core lacks that a maintained tool gives at once, first a general l
 It decides nothing by itself. A **replace** or a **try** becomes a line of `QUEUE.md` only on the owner's word, each a
 pull request of its own that shows the comparison, old against new (#534, point 2); no tool or package arrives before
 #488's points 1, 3, 4 and 5 have merged; and the order is #534's, point 7: the tools that only run first, then the
-packages carried in the copy, then the form the rules are delivered in.
+packages installed from the core's lock file (#654), then the form the rules are delivered in.
 
 Weighed whole: 2026-11-17
 
@@ -377,7 +377,8 @@ as the trials above were, over the scripts on `main` that day (36,896 lines of J
   the sessions already keep.
 - **A scan of the packages for known faults.** *Else:* the host's Dependabot alerts, free on a private repository too,
   whose alerts the owner reads and passes on (floor rule 9); OSV-Scanner (Apache-2.0, one program). **Keep** without
-  one: the core carries no package yet, and the first comes only after #488's points 1, 3, 4 and 5; weighed again then.
+  one: the core's packages stand in its lock file since #654, which the host's Dependabot alerts read; #650 brings the
+  scan against a vulnerability database.
 - **A type checker.** **Keep** without it: #519's record weighed it on 33 fixed bugs and a writing trial, and found no
   fault it would have caught.
 - **A linter for Markdown.** *Else:* markdownlint-cli2 (MIT, 89 packages). **Keep** without it, on a measure the
@@ -446,5 +447,5 @@ points 1, 3, 4 and 5 have merged. What the challenge proposes is not among them 
    staged cases; and of what the core lacks, **try** a general linter for its scripts (oxlint, then Biome), ShellCheck
    with actionlint, and knip after the linter.
 2. The reading under the package checks: **replace** with `npm sbom`; **try** nuget-license and the SDK's own list.
-3. The packages carried in the copy: as #486's inventory and #519's path have them.
+3. The packages, installed from the core's lock file (#654): as #486's inventory and #519's path have them.
 4. The form the rules are delivered in: **try** the skill format (#534, point 8).

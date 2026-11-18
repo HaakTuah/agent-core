@@ -878,7 +878,8 @@ export const STEPS = [
     } },
   { lead: "17 November 2026, packages from the registry, the week's wait and pinned downloads", cost: COST.check, check: packagesHeld },
   { lead: "17 November 2026, held packages looked up again", cost: COST.read, unread: "whether a package has gone stale is its registry's answer on the day, and GitHub's, not a file's: the session that syncs runs `node core/scripts/held.mjs` once and puts what it prints in the sync pull request's description, each package gone stale a task; the scheduled look runs it again each month" },
-  { lead: "18 November 2026, the core's packages installed from its lock file", cost: COST.workflow, check: installsFirst },
+  { lead: "18 November 2026, the core's packages installed from its lock file", cost: COST.workflow, check: installsFirst,
+    partly: "that a job reaching a script of the copy through the project's own npm or shell script installs first is read by the review" },
   { lead: "18 November 2026, another publisher's code named in a lock file", cost: COST.line, unread: "how a project loads another publisher's code (a content network's script, a file copied in) is no file's to say exactly: the session that syncs reads the project's pages and folders for it" },
 ];
 
