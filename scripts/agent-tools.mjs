@@ -173,6 +173,10 @@ function readKiro(state, json, files) {
 // 2026): the hooks of .codex/hooks.json, and those written inline in .codex/config.toml under "hooks", both as Claude
 // Code's are, each named "Codex <event> <matcher>: <command>"; config.toml's "notify", the program Codex starts at
 // each turn's end, as the hook "Codex notify: <its words>"; and config.toml's "mcp_servers", as "Codex <name>".
+// A program's words as the one command a shell would run them as: a word that needs no quote as written and any other
+// single-quoted, so a fetch keeps its context, the kit's form given as bash, -c and its script reads as the kit's, and
+// "scripts/my hook.py" stays one path.
+const shellWords = words => words.map(w => (/^[\w./:@%+,=-]+$/u.test(w) ? w : `'${w.replace(/'/gu, "'\\''")}'`)).join(" ");
 function readCodex(state, json, read) {
   const hooksFile = json(".codex/hooks.json");
   state.entries(".codex/hooks.json", "hooks", hooksFile?.hooks, "each event to its hooks");
@@ -189,11 +193,18 @@ function readCodex(state, json, read) {
   readHooks(state, ".codex/config.toml", config, "Codex");
   const notify = config.notify;
   if (Array.isArray(notify) && notify.length && notify.every(w => typeof w === "string")) {
-    // (its words are a program and its arguments, each one whole: they are read as the one command a shell would run them
-    // as, a word that needs no quote as written and any other single-quoted, so a fetch keeps its context, the kit's form
-    // given as bash, -c and its script reads as the kit's, and "scripts/my hook.py" stays one path)
-    const command = notify.map(w => (/^[\w./:@%+,=-]+$/u.test(w) ? w : `'${w.replace(/'/gu, "'\\''")}'`)).join(" ");
-    addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [command] });
+    // (its words are a program and its arguments, each one whole, read as shellWords reads them)
+    addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [shellWords(notify)] });
+  }
+  // (a model provider's commands that print a token, which Codex runs by itself: each read as a hook is, its command and
+  // its arguments as notify's words are)
+  for (const [id, provider] of Object.entries(state.entries(".codex/config.toml", "model_providers", config.model_providers, "each provider's id to its settings"))) {
+    for (const [key, part] of [["auth", provider?.auth], ["gateway_oauth.credential_export", provider?.gateway_oauth?.credential_export]]) {
+      if (part?.command === undefined) continue;
+      const words = [part.command, ...(Array.isArray(part.args) ? part.args : [])];
+      if (!words.every(w => typeof w === "string")) { state.flag(`.codex/config.toml: "model_providers.${id}.${key}" holds a command or arguments that are no text. Mend: write them as Codex takes them`, ".codex/config.toml"); continue; }
+      addHook(state, ".codex/config.toml", { tool: "Codex", event: `model_providers.${id}.${key}`, matcher: "", hook: part, runs: true, text: words.join(" "), commands: [shellWords(words)] });
+    }
   }
   addServers(state, ".codex/config.toml", state.entries(".codex/config.toml", "mcp_servers", config.mcp_servers, SERVERS), "Codex ");
   const policy = state.entries(".codex/config.toml", "shell_environment_policy", config.shell_environment_policy, "its settings");
