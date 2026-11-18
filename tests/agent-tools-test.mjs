@@ -624,8 +624,19 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     fails(run(pr(project({ ".Kiro/hooks/x.json": "{}\n", ".Kiro/settings": "a\n", ...listing() }), { ".Kiro/settings": null })), "and one taken out fails", "Mend: rename it to .kiro");
     // (and a link through a submodule's folder and back out of it by "..", to a file the pull request changes)
     held(dir => { fs.mkdirSync(path.join(dir, "real"), { recursive: true }); fs.writeFileSync(path.join(dir, "real/mcp.json"), "{}\n"); fs.symlinkSync("../sub/../real", path.join(dir, ".Kiro/settings")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through a submodule"); sub(dir, "sub", git(dir, "rev-parse", "HEAD")); }, dir => { fs.writeFileSync(path.join(dir, "real/mcp.json"), "{ \"mcpServers\": {} }\n"); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "changed"); }, "a file reached through a submodule's folder and out of it, changed, fails");
-    // (#600's fallback security review of 243d29e: and through any name a clone holds beside the commit, .git among it)
-    for (const via of [".git", "nothere"]) held(dir => { fs.mkdirSync(path.join(dir, "real"), { recursive: true }); fs.writeFileSync(path.join(dir, "real/mcp.json"), "{}\n"); fs.symlinkSync(`../${via}/../real`, path.join(dir, ".Kiro/settings")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through a name the commit lacks"); }, dir => { fs.writeFileSync(path.join(dir, "real/mcp.json"), "{ \"mcpServers\": {} }\n"); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "changed"); }, `a file reached through ${via} and out of it, changed, fails`);
+    // (#600's fallback security review of 243d29e: and through the root's .git, which every clone holds beside the commit)
+    for (const via of [".git"]) held(dir => { fs.mkdirSync(path.join(dir, "real"), { recursive: true }); fs.writeFileSync(path.join(dir, "real/mcp.json"), "{}\n"); fs.symlinkSync(`../${via}/../real`, path.join(dir, ".Kiro/settings")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through a name the commit lacks"); }, dir => { fs.writeFileSync(path.join(dir, "real/mcp.json"), "{ \"mcpServers\": {} }\n"); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "changed"); }, `a file reached through ${via} and out of it, changed, fails`);
+    // (#600's fallback security review of 4c63650: a name no clone holds ends the walk, as it ends the file system's, so
+    // the base never holds what its tools could not read)
+    const absentServer = project({ ".mcp.json": null, "real.json": JSON.stringify({ mcpServers: { files: { command: "npx", args: ["-y", "files@1.0.0"] } } }), ...listing() });
+    fs.symlinkSync("nothere/../real.json", path.join(absentServer, ".mcp.json"));
+    git(absentServer, "add", "-A"); git(absentServer, "commit", "-q", "-m", "a link through a name no clone holds");
+    fails(run(pr(absentServer, { "nothere/.keep": "" })), "a server the base's tools could not read, made readable, is new", 'the tool server "files"');
+    const absentKept = project({ "real/mcp.json": "{}\n", ".Kiro/hooks/x.json": "{}\n", ...listing() });
+    fs.symlinkSync("../nothere/../real", path.join(absentKept, ".Kiro/settings"));
+    git(absentKept, "add", "-A"); git(absentKept, "commit", "-q", "-m", "a link through a name no clone holds");
+    const absentRun = run(pr(absentKept, { "real/mcp.json": "{ \"mcpServers\": {} }\n" }));
+    ok(absentRun.status === 0, "what no tool can read there, changed, changes nothing the base held", absentRun.out);
     // (#600's fallback security review of 27d9d98: a file is held by its kind too, so none reads as a link it names)
     const asLink = project({ ".Codex/hooks.json": "{}\n", ...listing() });
     fs.symlinkSync(os.tmpdir(), path.join(asLink, ".Codex/config.toml"));
