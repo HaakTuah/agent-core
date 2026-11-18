@@ -506,8 +506,8 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
 
 // A commit's files as an agent tool reads them: a path walked as the file system walks it, a link inside the checkout
 // followed (walk), a file's text, and the names in a folder.
-function commitReader(root, rev) {
-  const resolve = f => walk(root, rev, f);
+function commitReader(root, rev, lenient = false) {
+  const resolve = f => walk(root, rev, f, [], lenient);
   const read = f => { const r = resolve(f); return r?.type === "blob" ? textAt(root, rev, r.f) : null; };
   const names = dir => {
     const d = resolve(dir);
@@ -517,7 +517,7 @@ function commitReader(root, rev) {
   // submodule's commit, and each link it passes on the way, by its object, which is its target, so a link filled in,
   // moved or leading on to what changed is seen)
   const holds = f => {
-    const via = [], r = walk(root, rev, f, via), { ids } = listing(root, rev);
+    const via = [], r = walk(root, rev, f, via, lenient), { ids } = listing(root, rev);
     return [r?.type ?? "nothing", ids.get(r?.f) ?? "", ...via.map(at => `${at}\0${ids.get(at)}`)].join("\0");
   };
   return { resolve, read, names, holds };
@@ -525,10 +525,12 @@ function commitReader(root, rev) {
 
 // Each path on the way to a tool's file that stands in another case at the commit `rev`, as [its problem, what the tool
 // reads through it], so one the base held is noted only while that stands letter for letter.
+// (the paths found as the commit holds them; what they are held by read leniently, through any name a working copy may
+// hold beside the commit, so a change that may reach the tool there is seen, which only ever makes the check stricter)
 function caseProblems(root, rev) {
-  const { resolve, names, holds } = commitReader(root, rev);
+  const { resolve, names } = commitReader(root, rev), wide = commitReader(root, rev, true);
   return misnamed(toolPaths(names, at => resolve(at)?.type)).map(([at, want]) =>
-    [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, holds, names, f => resolve(f)?.type)]);
+    [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, wide.holds, wide.names, f => wide.resolve(f)?.type)]);
 }
 
 // Each submodule where an agent tool reads its files, in whatever case, as [its problem, the commit it names]: git gives
@@ -553,7 +555,7 @@ function caseLinks(root, rev) {
   const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = [];
   for (const at of toolPaths(names, f => resolve(f)?.type)) {
     const via = [], misses = [];
-    if (walk(root, rev, at, via, misses) !== null || !misses.length || !via.some(v => l.linked.has(v))) continue;
+    if (walk(root, rev, at, via, false, misses) !== null || !misses.length || !via.some(v => l.linked.has(v))) continue;
     const m = misses[0], under = [...l.ids].filter(([a]) => a === m || a.startsWith(`${m}/`)).sort().map(([a, id]) => `${a}\0${id}`);
     out.push([`${at} leads, through a link, to ${m} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${m} stands, in this pull request`, [at, ...via.map(v => `${v}\0${l.ids.get(v)}`), ...under].join("\0\0")]);
   }
@@ -673,7 +675,7 @@ function target(root, rev, at) {
   }
   return targets.get(key);
 }
-function walk(root, rev, f, via = [], misses = []) {
+function walk(root, rev, f, via = [], lenient = false, misses = []) {
   const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
   let hops = 0;
   while (left.length) {
@@ -689,7 +691,7 @@ function walk(root, rev, f, via = [], misses = []) {
       continue;
     }
     noteMiss(listing(root, rev), at, name, misses);
-    if (!goesOn(listing(root, rev), here, left.length > 0, via)) return null;
+    if (!goesOn(listing(root, rev), here, left.length > 0, via, lenient)) return null;
     at.push(name);
   }
   return reached(at.join("/") || ".", blobs, dirs, others);
@@ -706,11 +708,12 @@ function noteMiss({ blobs, dirs, others, children }, at, name, misses) {
 // with more after it, a folder the commit holds, or a folder every clone holds beside what the commit lists, a
 // submodule's entry or the root's .git, which the walk goes into and back out of by "..", as the file system does, said
 // in `via` so what it reaches past it is still held; a name inside it, which the commit does not hold, and a name no
-// clone holds end the walk, as they end the file system's.
-function goesOn({ dirs, blobs, others }, here, more, via) {
+// clone holds end the walk, as they end the file system's. A `lenient` walk goes so through any name but a file, as a
+// working copy may hold any folder beside the commit (.git's own, an ignored one).
+function goesOn({ dirs, blobs, others }, here, more, via, lenient) {
   if (dirs.has(here)) return true;
   if (!more) return blobs.has(here) || others.has(here);
-  if (!others.has(here) && here !== ".git") return false;
+  if (blobs.has(here) || (!lenient && !others.has(here) && here !== ".git")) return false;
   via.push(here);
   return true;
 }

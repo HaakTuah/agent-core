@@ -635,8 +635,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const absentKept = project({ "real/mcp.json": "{}\n", ".Kiro/hooks/x.json": "{}\n", ...listing() });
     fs.symlinkSync("../nothere/../real", path.join(absentKept, ".Kiro/settings"));
     git(absentKept, "add", "-A"); git(absentKept, "commit", "-q", "-m", "a link through a name no clone holds");
-    const absentRun = run(pr(absentKept, { "real/mcp.json": "{ \"mcpServers\": {} }\n" }));
-    ok(absentRun.status === 0, "what no tool can read there, changed, changes nothing the base held", absentRun.out);
+    // (while what is held there is read through any name a working copy may hold, .git's own folders and ignored ones
+    // among them: #600's fallback security review of 09ed8b5)
+    fails(run(pr(absentKept, { "real/mcp.json": "{ \"mcpServers\": {} }\n" })), "what a working copy may give a tool there, changed, fails", "Mend: rename it to .kiro");
+    for (const via of [".git/refs/..", "node_modules"]) held(dir => { fs.mkdirSync(path.join(dir, "real"), { recursive: true }); fs.writeFileSync(path.join(dir, "real/mcp.json"), "{}\n"); fs.symlinkSync(`../${via}/../real`, path.join(dir, ".Kiro/settings")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through a folder beside the commit"); }, dir => { fs.writeFileSync(path.join(dir, "real/mcp.json"), "{ \"mcpServers\": {} }\n"); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "changed"); }, `a file reached through ${via} and out of it, changed, fails`);
     // (#600's fallback security review of 27d9d98: a file is held by its kind too, so none reads as a link it names)
     const asLink = project({ ".Codex/hooks.json": "{}\n", ...listing() });
     fs.symlinkSync(os.tmpdir(), path.join(asLink, ".Codex/config.toml"));
