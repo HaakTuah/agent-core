@@ -179,7 +179,7 @@ function contentOf(rows, i, lines, unread) {
   if (first && block.slice(0, block.indexOf(first)).some(r => r.line.length > first.indent)) unread.push(`line ${first.n}: a block scalar's first line less indented than a blank line before it`);
   let end = block.length;
   if (!lines.at(-1)?.value?.includes("+")) while (end > 0 && blank(block[end - 1]) && !(first && block[end - 1].line.length > first.indent)) end--;
-  lines.push(...block.slice(0, end).map(r => ({ n: r.n, content: true, text: r.line, last: r.last })));
+  for (const r of block.slice(0, end)) lines.push({ n: r.n, content: true, text: r.line, last: r.last });
   return j;
 }
 
@@ -217,10 +217,10 @@ function fixedOf(rows, i, { from, keep }, lines) {
     const r = rows[i], text = { n: r.n, content: true, text: r.line, last: r.last };
     if (r.indent === r.line.length && r.indent <= from + 1) { held.push(text); continue; }
     if (r.indent < from + 1) break;
-    lines.push(...held, text);
+    for (const h of [...held, text]) lines.push(h);
     held = [];
   }
-  if (keep) lines.push(...held);
+  if (keep) for (const h of held) lines.push(h);
   return i;
 }
 
@@ -237,6 +237,9 @@ export function readYaml(text) {
   const rows = linesOf(text, raw, broken);
   for (let i = 0; i < rows.length;) {
     if (rows[i].content) { i = contentOf(rows, i, lines, unread); continue; }
+    // (a line within a token that began on a line before, a value that runs on, is refused here too: its first line may be
+    // one the proof reads as a block scalar's text)
+    if (rows[i].within && rows[i].indent < rows[i].line.length) unread.push(`line ${rows[i].n}: a value on a line of its own, or one that runs on from the line before`);
     const fixed = rows[i].indent < rows[i].line.length && !rows[i].within ? entryOf(rows[i], lines, comments, unread) : null;
     i = fixed ? fixedOf(rows, i + 1, fixed, lines) : i + 1;
   }

