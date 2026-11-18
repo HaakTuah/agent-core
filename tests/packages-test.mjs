@@ -52,8 +52,16 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
     for (const [k, e] of Object.entries(packages ?? {})) {
       if (!k || same(base[k], e)) continue;
       const name = registryName(e.resolved), version = registryVersion(e.resolved);
-      if (!name || !version || version !== e.version) { out.push(`${k}: its address names ${name ?? "no package of npm's registry"} at ${version ?? "no version"}, and its version field ${e.version ?? "none"}`); continue; }
+      // (an address in its one plain form alone, a name as npm spells one: never one a URL parser reads otherwise)
+      const plainAddress = (() => { try { return new URL(e.resolved).href === e.resolved; } catch { return false; } })();
+      if (!name || !version || version !== e.version || !plainAddress || !/^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/u.test(name)) {
+        out.push(`${k}: its address names ${name ?? "no package of npm's registry"} at ${version ?? "no version"}${plainAddress ? "" : " in no plain form"}, and its version field ${e.version ?? "none"}`); continue;
+      }
+      // (the date read is the one of the very tarball npm ci installs: the registry's own document gives that address and
+      // that integrity for that version)
       const doc = await ask(name).catch(err => ({ status: err.message }));
+      const dist = doc.json?.name === name ? doc.json?.versions?.[version]?.dist : undefined;
+      if (doc.status === 200 && (dist?.tarball !== e.resolved || dist?.integrity !== e.integrity)) { out.push(`${name}@${version}: the registry gives another address or integrity for it than the lock file`); continue; }
       const at = Date.parse(doc.json?.time?.[version] ?? "");
       if (!(now - at >= WEEK)) out.push(`${name}@${version}: ${doc.status === 200 ? (Number.isNaN(at) ? "the registry gives no date" : `published ${new Date(at).toISOString()}`) : `the registry answered ${doc.status}`}`);
     }
@@ -67,15 +75,18 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   // (held on a lock written by hand: a version field kept while the address names another tarball, an entry with no
   // version, an address off the registry, and a young version, against answers made here)
   const day = 86400000, now = Date.parse("2026-11-18T00:00:00Z");
-  const docs = { yaml: { "2.9.1": "2026-09-01T00:00:00Z", "2.9.2": "2026-11-17T00:00:00Z" } };
-  const ask = async name => ({ status: 200, json: { time: docs[name] ?? {} } });
   const tgz = v => `https://registry.npmjs.org/yaml/-/yaml-${v}.tgz`;
+  const docs = { yaml: { time: { "2.9.1": "2026-09-01T00:00:00Z", "2.9.2": "2026-11-17T00:00:00Z" },
+    versions: { "2.9.1": { dist: { tarball: tgz("2.9.1"), integrity: "sha512-a" } }, "2.9.2": { dist: { tarball: tgz("2.9.2"), integrity: "sha512-e" } } } } };
+  const ask = async name => ({ status: 200, json: { name, ...(docs[name] ?? {}) } });
   const held = { "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } };
   const cases = [
     [{ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.2"), integrity: "sha512-b" } }, /names yaml at 2\.9\.2, and its version field 2\.9\.1/u],
     [{ ...held, "node_modules/yaml/node_modules/yaml": { resolved: tgz("2.9.2"), integrity: "sha512-c" } }, /version field none/u],
     [{ "node_modules/yaml": { version: "2.9.1", resolved: "https://example.invalid/yaml-2.9.1.tgz", integrity: "sha512-d" } }, /no package of npm's registry/u],
     [{ "node_modules/yaml": { version: "2.9.2", resolved: tgz("2.9.2"), integrity: "sha512-e" } }, /yaml@2\.9\.2: published 2026-11-17/u],
+    [{ "node_modules/yaml": { version: "2.9.1", resolved: "https://registry.npmjs.org/@s\\../z\\..\\yaml/-/z\\..\\yaml-2.9.1.tgz", integrity: "sha512-a" } }, /in no plain form/u],
+    [{ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-z" } }, /another address or integrity/u],
   ];
   const results = await Promise.all(cases.map(([lock]) => tooYoung(lock, held, ask, now)));
   ok(cases.every(([, said], i) => results[i].length === 1 && said.test(results[i][0])) && (await tooYoung(held, held, ask, now)).length === 0
