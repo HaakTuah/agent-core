@@ -3,24 +3,29 @@
 // the package's own package.json; npm checks a package's bytes against the lock file and never those fields, so a
 // licence written into a lock file by hand would be believed. This reads them back: after an install from the lock
 // file (`npm ci`, as the signatures workflow runs it, .github/workflows/signatures.yml, which runs this next), it
-// holds every entry of the lock file to the package.json of the package installed for it, in its licence, read as npm
-// writes one, and in its version. With it, the licence check's reading of the lock file is a reading of the packages.
-// It reads the entries the licence check reads, by the same reading (lockRead, in licences.mjs): a link to a folder
-// that is no workspace, a dependency written "file:", is read back from that folder's own package.json. And it fails
-// any package the install put in place that the lock file does not name, as one bundled in another's tarball and
-// left out of the lock file would be, which no check would read. What it does not hold: a package of another system,
-// which no install here brings (an optional one that names systems which leave this one out, or one that only such
-// packages ask for: counted, and said; a project that builds what ships on such a system installs it there, unread);
-// a lock file the workflow does not install from, where a project has more than one and calls the workflow for one;
-// the project's own packages (the root, a workspace, a link to one); and that a package's own package.json tells the
-// truth about its terms, which nothing but a reading of them can. It runs none of what it reads: each package.json is
-// read as JSON. Node's own modules only.
+// holds every entry of the lock file to the package installed for it, in its licence, read as npm writes one, and in
+// its version. With it, the licence check's reading of the lock file is a reading of the packages.
+// What is installed, npm reads itself: `npm query "*"`, which lists each package of the folder's installed tree by
+// where it stands, with its own package.json's fields as written (#585; npm's `npm sbom`, which the issue named, merges
+// the packages of one name and version and so reads no copy bundled beside another, as the pull request that made
+// this shows). The core keeps the policy and the rest: which entries are read, by the licence check's own reading
+// (lockRead, in licences.mjs), so a link to a folder that is no workspace, a dependency written "file:", is read back
+// from that folder's own package; what an install leaves out for another system's sake; the comparison; and each
+// failure's mend. It fails any package installed that the lock file does not name, as one bundled in another's tarball
+// and left out of the lock file would be, which no check would read, and any reached through a link that leads out of
+// the project. What it does not hold: a package of another system, which no install here brings (an optional one that
+// names systems which leave this one out, or one that only such packages ask for: counted, and said; a project that
+// builds what ships on such a system installs it there, unread); a lock file the workflow does not install from, where
+// a project has more than one and calls the workflow for one; the project's own packages (the root, a workspace, a link
+// to one); and that a package's own package.json tells the truth about its terms, which nothing but a reading of them
+// can. It runs none of what it reads, and npm query runs no package's script. Node's own modules, and npm.
 //
 //   node core/scripts/licence-installed.mjs [the folder that holds the lock file, the current one if left out]
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { isAbsolute, join, relative } from "node:path";
 import { DEEPEST, leadsOut, parseBounded } from "./guards.mjs";
-import { lockInstalled, lockPathOk, lockRead, workspacesIn } from "./licences.mjs";
+import { lockPathOk, lockRead, workspacesIn } from "./licences.mjs";
 import { started } from "./started.mjs";
 
 /** A licence as npm writes one into a lock file from a package.json's "license": the type of one written the old way,
@@ -110,19 +115,37 @@ const elsewhere = (entry, system) => !fits(entry.os, system.os) || !fits(entry.c
 // (what a lock file or a package holds, on one line of a log, and no longer than a line)
 const shown = (value) => (value === undefined ? "none" : JSON.stringify(value).replace(/[\u007f-\u009f\u2028\u2029]/gu, "?").slice(0, 200));
 
-/** A package's own package.json at `file`, read as npm reads one (a byte-order mark before it is no part of it), and
- *  only inside the project `dir`: the object, or, where it is not read, the failure's words. */
-function ownAt(dir, file) {
-  if (leadsOut(dir, file)) return "its package.json is reached through a link that leads out of the project, so it is not read. Mend: install from the lock file again (npm ci), which puts each package inside the project; where a link stays, replace the package that makes it";
-  let own;
-  try { const text = readFileSync(file, "utf8"); own = parseBounded(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text); } catch { own = null; }
-  if (!own || typeof own !== "object" || Array.isArray(own)) return `its package.json cannot be read as JSON, nested no deeper than ${DEEPEST} objects and lists. Mend: install from the lock file again (npm ci); where it still cannot be read, replace the package`;
-  return own;
+// (Windows' shell, by the path the system names, where npm is a script: checks.mjs runs npm so)
+const COMSPEC = process.env.ComSpec || "cmd.exe";
+const AGAIN = "Mend: install from the lock file again (npm ci) and run the check again; where it still cannot, run `npm query \"*\"` in the folder and mend what it says";
+
+/** What is installed in the folder `dir`, as npm reads it (`npm query "*"`): each package by where it stands, from the
+ *  folder, its own package.json's fields as written, with its "realpath"; or an error that says its mend. */
+export function installedTree(dir) {
+  const r = process.platform === "win32"
+    ? spawnSync(COMSPEC, ["/d", "/s", "/c", "npm query * --prefix ."], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 28, windowsHide: true })
+    : spawnSync("npm", ["query", "*", "--prefix", "."], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 28 });
+  // (npm's first line of its own, not the one that names its log, which holds nothing of the project's)
+  const said = (r.stderr || "").split(/\r?\n/u).map((line) => line.replace(/^npm (error|ERR!) /u, "").trim()).find((line) => line && !/complete log of this run|^Log files were not written/u.test(line))?.slice(0, 200);
+  if (r.error || r.status !== 0) throw new Error(`npm could not read what is installed (${r.error?.message ?? said ?? `it ended with ${r.status}`}). ${AGAIN}`);
+  let nodes;
+  try { nodes = parseBounded(r.stdout); } catch { nodes = null; }
+  if (!Array.isArray(nodes)) throw new Error(`npm's reading of what is installed is no list. ${AGAIN}`);
+  return new Map(nodes.filter((n) => n && typeof n === "object" && typeof n.location === "string").map((n) => [n.location, n]));
+}
+
+/** Whether npm reached the package `own` through a link that leads out of the project `dir`. */
+function outside(dir, own) {
+  if (typeof own.realpath !== "string") return true;
+  let top;
+  try { top = realpathSync(dir); } catch { return true; }
+  const rel = relative(top, own.realpath);
+  return rel.startsWith("..") || isAbsolute(rel);
 }
 
 /** The check, on the folder `dir`, which holds the lock file and the node_modules an install from it filled:
  *  { failures, summary }; `system` is the one the install ran on. */
-export function check(dir, system = thisSystem()) {
+export function check(dir, system = thisSystem(), read = installedTree) {
   const { name, lock } = lockIn(dir);
   const failures = [];
   // (every entry is written as npm writes one, or the lock file fails before anything is left out or read: lockPathOk,
@@ -131,10 +154,10 @@ export function check(dir, system = thisSystem()) {
   if (odd.length) return { failures: odd.map(([path]) => `${name}: an entry at ${shown(path)} that is not written as npm writes one. Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`), summary: `${name} not read; ${odd.length} failing (floor rule 10)` };
   let pkg = {};
   try { pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")); } catch { /* (none: the install read none, and no workspace stands) */ }
-  const context = { dir, name, lock, failures };
-  const { read, absent } = readBack(context, leftOut(lock.packages, system), pkg);
-  for (const folder of Object.keys(lock.packages).filter((path) => !lockInstalled(path))) unnamed(context, folder === "" ? "node_modules" : `${folder}/node_modules`);
-  const summary = `${read} packages of ${name} read back from the packages themselves, their licence and their version` +
+  const context = { dir, name, lock, failures, tree: read(dir) };
+  const { read: count, absent } = readBack(context, leftOut(lock.packages, system), pkg);
+  unnamed(context);
+  const summary = `${count} packages of ${name} read back from the packages themselves, their licence and their version` +
     `${absent ? `; ${absent} of another system, not installed here, not read` : ""}; ${failures.length} failing (floor rule 10)`;
   return { failures, summary };
 }
@@ -151,23 +174,26 @@ function lockIn(dir) {
   return { name, lock };
 }
 
-/** Each entry of the lock file `name` in `dir` held to the package.json of the package installed for it (check,
- *  above), its failures pushed onto `failures`; `mayLack` is what may be absent (leftOut): { read, absent }. */
-function readBack({ dir, name, lock, failures }, mayLack, pkg) {
+/** Each entry of the lock file `name` in `dir` held to the package npm reads as installed for it (check, above), its
+ *  failures pushed onto `failures`; `mayLack` is what may be absent (leftOut): { read, absent }. */
+function readBack({ dir, name, lock, failures, tree }, mayLack, pkg) {
   let read = 0, absent = 0;
   // (the entries the licence check reads, by its own reading: every installed package, a link's folder among them,
   // but a workspace, the project's own)
   for (const { path, at, entry } of lockRead(lock.packages, workspacesIn(pkg, "package.json"))) {
     if (at === null) { failures.push(`${shown(path)}: a link to a folder ${name} holds no entry for, so what it says of itself cannot be read. Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`); continue; }
-    const file = join(dir, at, "package.json");
-    if (!existsSync(file)) {
+    const own = tree.get(at);
+    // (a folder reached through a link out of the project, npm reads where the link leads, not where it stands)
+    if (!own && leadsOut(dir, join(dir, at))) { failures.push(`${shown(path)}: it is reached through a link that leads out of the project, so it is not read. Mend: install from the lock file again (npm ci), which puts each package inside the project; where a link stays, replace the package that makes it`); continue; }
+    if (!own) {
       // (only what an install leaves out for the system's sake: leftOut, above)
       if (mayLack.has(path)) absent++;
       else failures.push(`${shown(path)}: not installed, and no optional package of another system or of one alone, so what it says of itself cannot be read. Mend: install from the lock file first (npm ci), then run the check`);
       continue;
     }
-    const own = ownAt(dir, file);
-    if (typeof own === "string") { failures.push(`${shown(path)}: ${own}`); continue; }
+    if (outside(dir, own)) { failures.push(`${shown(path)}: it is reached through a link that leads out of the project, so it is not read. Mend: install from the lock file again (npm ci), which puts each package inside the project; where a link stays, replace the package that makes it`); continue; }
+    // (npm reads a package.json that is no JSON object as one that says nothing: no name, no version)
+    if (own.name === undefined && own.version === undefined) { failures.push(`${shown(path)}: its package.json says neither its name nor its version, or cannot be read as JSON. Mend: install from the lock file again (npm ci); where it still says nothing, replace the package`); continue; }
     read++;
     if (JSON.stringify(lockForm(own.license)) !== JSON.stringify(lockForm(entry.license))) failures.push(`${shown(path)}: ${name} says its licence is ${shown(entry.license)}, and its own package.json says ${shown(own.license)}. Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only, which takes each licence from the package itself`);
     if (plainVersion(own.version) !== plainVersion(entry.version)) failures.push(`${shown(path)}: ${name} says its version is ${shown(entry.version)}, and its own package.json says ${shown(own.version)}. Mend: write the lock file anew with npm, never by hand: its install, given --package-lock-only`);
@@ -175,22 +201,15 @@ function readBack({ dir, name, lock, failures }, mayLack, pkg) {
   return { read, absent };
 }
 
-// (and nothing the install put in place that the lock file does not name, as a package bundled in another's tarball
-// and left out of the lock file would be, read by no check: every package folder under each node_modules folder of
-// the project's, its own and its workspaces' and linked folders', is an entry; a link is not followed)
-function unnamed(context, folder) {
-  const { dir, name, lock, failures } = context;
-  let entries = [];
-  try { entries = readdirSync(join(dir, folder), { withFileTypes: true }); } catch { return; }
-  for (const e of entries.filter((x) => !x.name.startsWith("."))) {
-    let found = [[e.name, e]];
-    if (e.name.startsWith("@") && e.isDirectory()) { try { found = readdirSync(join(dir, folder, e.name), { withFileTypes: true }).filter((x) => !x.name.startsWith(".")).map((x) => [`${e.name}/${x.name}`, x]); } catch { found = []; } }
-    for (const [named, d] of found) {
-      if (!d.isDirectory() && !d.isSymbolicLink()) continue;
-      const at = `${folder}/${named}`;
-      if (!Object.hasOwn(lock.packages, at)) { failures.push(`${shown(at)}: installed, and ${name} holds no entry for it, so no check reads its licence: a package bundled in another's and left out of the lock file. Mend: replace the package that bundles it, or ask its makers to name what it bundles`); continue; }
-      if (d.isDirectory()) unnamed(context, `${at}/node_modules`);
-    }
+// (and nothing installed that the lock file does not name, as a package bundled in another's tarball and left out of
+// the lock file would be, read by no check: every package npm reads in the folder, the project's own and its
+// workspaces' and linked folders' packages among them, is an entry; one npm reaches only outside the project is
+// named so)
+function unnamed({ dir, name, lock, failures, tree }) {
+  for (const [at, own] of tree) {
+    if (at === "" || Object.hasOwn(lock.packages, at)) continue;
+    if (at.startsWith("../") || outside(dir, own)) failures.push(`${shown(at)}: installed through a link that leads out of the project, so it is not read. Mend: install from the lock file again (npm ci), which puts each package inside the project; where a link stays, replace the package that makes it`);
+    else failures.push(`${shown(at)}: installed, and ${name} holds no entry for it, so no check reads its licence: a package bundled in another's and left out of the lock file. Mend: replace the package that bundles it, or ask its makers to name what it bundles`);
   }
 }
 

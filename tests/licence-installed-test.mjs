@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { check, leftOut, lockForm, plainVersion } from "../scripts/licence-installed.mjs";
+import { check, installedTree, leftOut, lockForm, plainVersion } from "../scripts/licence-installed.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0, count = 0;
@@ -17,20 +17,33 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "licence-installed-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 let n = 0;
 // A project: `locked` is the lock file's packages by path; `installed`, each package's own package.json by path (a
-// path left out is a package no install brought; a string is written as it stands).
+// path left out is a package no install brought; a string is written as it stands); and, as an install makes them, a
+// link for each entry that is one to a folder that stands.
 const project = (locked, installed, lockName = "package-lock.json", workspaces) => {
   const dir = path.join(tmp, `p${++n}`);
   fs.mkdirSync(dir);
   if (workspaces) fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "bark", workspaces }));
   fs.writeFileSync(path.join(dir, lockName), JSON.stringify({ name: "bark", lockfileVersion: 3, packages: { "": { name: "bark" }, ...locked } }));
   for (const [at, own] of Object.entries(installed)) { fs.mkdirSync(path.join(dir, at), { recursive: true }); fs.writeFileSync(path.join(dir, at, "package.json"), typeof own === "string" ? own : JSON.stringify(own)); }
+  for (const [at, entry] of Object.entries(locked)) {
+    if (!entry?.link || typeof entry.resolved !== "string" || !fs.existsSync(path.join(dir, entry.resolved))) continue;
+    fs.mkdirSync(path.dirname(path.join(dir, at)), { recursive: true });
+    fs.symlinkSync(path.join(dir, entry.resolved), path.join(dir, at), "junction");
+  }
   return dir;
 };
 const LINUX = { os: "linux", cpu: "x64", libc: "glibc" }; // (the system every test here installs on, whatever runs it)
-const said = (dir) => { try { const r = check(dir, LINUX); return [...r.failures, r.summary].join("\n"); } catch (e) { return `threw: ${e.message}`; } };
+// (a project with no node_modules folder is read as npm reads one, its root alone, as the first case below holds with
+// npm itself: each npm query costs a second on Windows, and most cases here install nothing)
+const ROOT_ALONE = () => new Map([["", { location: "" }]]);
+const said = (dir) => { try { const r = check(dir, LINUX, fs.existsSync(path.join(dir, "node_modules")) ? undefined : ROOT_ALONE); return [...r.failures, r.summary].join("\n"); } catch (e) { return `threw: ${e.message}`; } };
 const A = "node_modules/mossgrip-lib", B = "node_modules/@moss/grip", C = "node_modules/bark-x/node_modules/mossgrip-lib";
 const one = (lock, own) => said(project({ [A]: { version: "1.0.0", ...lock } }, own === undefined ? {} : { [A]: own }));
 
+{
+  const bare = project({ [A]: { version: "1.0.0", license: "MIT" } }, {}), read = installedTree(bare);
+  ok(read.size === 1 && read.has("") && check(bare, LINUX).failures.join() === check(bare, LINUX, ROOT_ALONE).failures.join(), "npm reads a project with nothing installed as its root alone, as the cases below that install nothing read it", JSON.stringify([...read.keys()]));
+}
 ok(lockForm("MIT") === "MIT" && lockForm({ type: "MIT", url: "x" }) === "MIT" && lockForm(undefined) === null && lockForm("") === null && lockForm({}) === null && lockForm([]) === null
   && JSON.stringify(lockForm(["MIT", "ISC"])) === '["MIT","ISC"]' && JSON.stringify(lockForm({ url: "x" })) === '{"url":"x"}', "a licence is read as npm writes one into a lock file: the type of one written as an object, nothing for an empty one, else as it stands");
 const good = said(project(
@@ -63,7 +76,7 @@ ok(unread(3).test(tree({ optionalDependencies: { "moss-win32": "1.0.0" }, peerDe
 ok(plainVersion("v1.0.0") === "1.0.0" && plainVersion(" =1.0.0 ") === "1.0.0" && plainVersion("1.0.0-v2") === "1.0.0-v2" && plainVersion(undefined) === undefined
   && / 0 failing/.test(one({ license: "MIT" }, { version: "v1.0.0", license: "MIT" })) && / 0 failing/.test(one({ license: "MIT" }, "\ufeff" + JSON.stringify({ version: "1.0.0", license: "MIT" }))),
   "a version spelt with a v or an equals sign in the package is the version npm wrote, and a package.json that starts with a byte-order mark is read as npm reads it");
-ok(/its package\.json cannot be read as JSON/.test(one({ license: "MIT" }, "{ not json")) && /its package\.json cannot be read as JSON/.test(one({ license: "MIT" }, "[]")), "a package whose own package.json cannot be read fails");
+ok(/its package\.json says neither its name nor its version, or cannot be read as JSON\. Mend: /.test(one({ license: "MIT" }, "{ not json")) && /cannot be read as JSON\. Mend: /.test(one({ license: "MIT" }, "[]")), "a package whose own package.json cannot be read fails, saying its mend");
 const oddly = (key, entry = { version: "1.0.0", license: "MIT" }) => said(project({ [key]: entry }, { [A]: { version: "1.0.0", license: "GPL-3.0-only" } }));
 ok(["node_modules//mossgrip-lib", "node_modules///mossgrip-lib", "node_modules/./mossgrip-lib", "node_modules/x/../mossgrip-lib", "node_modules/../../elsewhere", "/abs/node_modules/x", "node_modules/mossgrip-lib/", "node_modules\\mossgrip-lib", "packages//own"]
   .every(key => /an entry at ".*" that is not written as npm writes one/.test(oddly(key)) && !/ 0 failing/.test(oddly(key))) && /an entry at "node_modules\/mossgrip-lib" that is not written as npm writes one/.test(oddly(A, "MIT")) && /not written as npm writes one/.test(oddly(A, [])),
@@ -88,7 +101,7 @@ ok(/"node_modules\/vend": package-lock\.json says its licence is "MIT", and its 
   && /a link to a folder package-lock\.json holds no entry for/.test(said(project({ "node_modules/vend": { resolved: "../outside", link: true } }, {}))),
   "a link to a folder that is no workspace is read back from that folder's own package.json; one to a folder the lock file does not hold fails");
 // what the install put in place and the lock file does not name: a package bundled in another's, its entries taken out
-const bundled = (more) => { const dir = project({ [A]: { version: "1.0.0", license: "MIT" }, "packages/own": { version: "0.0.1" } }, { [A]: { version: "1.0.0", license: "MIT" }, ...more }, "package-lock.json", ["packages/own"]); return said(dir); };
+const bundled = (more) => { const dir = project({ [A]: { version: "1.0.0", license: "MIT" }, "packages/own": { version: "0.0.1" }, "node_modules/own": { resolved: "packages/own", link: true } }, { [A]: { version: "1.0.0", license: "MIT" }, ...more }, "package-lock.json", ["packages/own"]); return said(dir); };
 ok(/"node_modules\/mossgrip-lib\/node_modules\/abbrev": installed, and package-lock\.json holds no entry for it/.test(bundled({ [`${A}/node_modules/abbrev`]: { version: "1.0.0", license: "GPL-3.0-only" } }))
   && /"node_modules\/@moss\/hidden": installed, and package-lock\.json holds no entry for it/.test(bundled({ "node_modules/@moss/hidden": { version: "1.0.0" } }))
   && /"packages\/own\/node_modules\/x": installed, and package-lock\.json holds no entry for it/.test(bundled({ "packages/own/node_modules/x": { version: "1.0.0" } }))
@@ -124,7 +137,7 @@ ok(run(fine).status === 0 && /^1 packages of package-lock\.json read back/.test(
   ok(lockForm(typed) === "MIT", "a type within a type is followed however deep it nests");
   const deep = `{"version":"1.0.0","license":${"[".repeat(20000)}"MIT"${"]".repeat(20000)}}`;
   const nested = said(project({ [A]: { version: "1.0.0", license: "MIT" } }, { [A]: deep }));
-  ok(/its package\.json cannot be read as JSON, nested no deeper than 200 objects and lists\. Mend: /u.test(nested), "a package.json nested past the bound is not read, and the failure says its mend", nested.slice(0, 400));
+  ok(/^threw: npm could not read what is installed \(.*\)\. Mend: /u.test(nested) && !/complete log/u.test(nested), "a package.json nested past what npm reads stops the reading, and the failure says what npm said and its mend", nested.slice(0, 400));
   const lockDeep = project({}, {});
   fs.writeFileSync(path.join(lockDeep, "package-lock.json"), `{"lockfileVersion":3,"packages":{"":{"x":${"[".repeat(20000)}1${"]".repeat(20000)}}}}`);
   ok(/^threw: cannot read package-lock\.json as JSON, nested no deeper than 200 .*Mend: /u.test(said(lockDeep)), "a lock file nested past the bound is refused, saying its mend", said(lockDeep).slice(0, 300));
