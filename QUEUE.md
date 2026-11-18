@@ -16,6 +16,11 @@ it merges last.
 | #593, points 1 to 3 | rule builder | |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | |
 | #593, points 8 and 9 | rule builder | #577 and #476 |
+| #625 | builder | #624 |
+| #626 | builder | #624 |
+| #627 | builder | #624 |
+| #628 | builder | #577 |
+| #629 | builder | #624 and #577 |
 | #593, points 6, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #579 | builder | |
 | #580 | builder | |

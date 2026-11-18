@@ -72,8 +72,9 @@ ok(own.length > 0 && own.every(f => !fails(fs.readFileSync(`${core}.github/workf
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-test-"));
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
-  fs.cpSync(fileURLToPath(new URL("../third-party", import.meta.url)), path.join(tmp, "core/third-party"), { recursive: true });
+  for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
+  fs.cpSync(fileURLToPath(new URL("../node_modules", import.meta.url)), path.join(tmp, "core/node_modules"), { recursive: true });
+  fs.writeFileSync(path.join(tmp, "core/.gitignore"), "/node_modules/\n"); // (as the copy holds it)
   fs.mkdirSync(path.join(tmp, ".github/workflows"), { recursive: true });
   fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), `on:\n${"  pull_request_target:\n".repeat(7)}`);
   fs.writeFileSync(path.join(tmp, ".github/workflows/b.yml"), Buffer.from("on: push\n", "utf16le"));

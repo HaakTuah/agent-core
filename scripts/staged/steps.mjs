@@ -86,7 +86,6 @@ export const UNPLANTED = {
   "16 November 2026, milestones named in order": "what it asks is the manifest's list taking a module, the act \"13 November 2026, the modules a project takes\" already plants; the milestones are a reading of what the project builds",
   "17 November 2026, a team's owners read from the host": "it needs a second person's account the host lets write, and the case's scratch repository holds its owner's alone",
   "17 November 2026, held packages looked up again": "its outcome is what npm's or NuGet's registry answers on the day of a package the project holds, which no scratch project can plant without a package of its own, and what the session puts in a sync pull request's description is no file a script reads after",
-  "17 November 2026, a private project's code scanned": "what it asks is a line of the cloud environment's set-up script, which lives outside the repository where no scratch project holds it, and what that line fetches is a wheel of 50 to 80 MB from PyPI, which the case's scratch project has no network to reach",
 };
 
 export function set(dir, opts = {}) {

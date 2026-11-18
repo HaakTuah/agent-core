@@ -41,7 +41,7 @@ const BIG = 50000;
 // ---- a project holding a copy of the core's scripts, floor and starter kit, a git repository ----
 fs.mkdirSync(p);
 gitP("init", "-q", "-b", "main");
-for (const part of ["scripts", "third-party", "floor", "setup"]) fs.cpSync(path.join(root, part), path.join(p, "core", part), { recursive: true });
+for (const part of ["scripts", "node_modules", "floor", "setup"]) fs.cpSync(path.join(root, part), path.join(p, "core", part), { recursive: true });
 write("a.md", "a file of the project's own\n");
 gitP("add", "-A");
 

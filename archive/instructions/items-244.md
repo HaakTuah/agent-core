@@ -126,9 +126,19 @@ The index, and how an item is written: `archive/instructions.md`.
      after asking what the core lacked that let an inventory's check miss a part. It stands behind "A trial of a
      maintained tool replays the part's past bugs" in `tasks/choices.md`, and the inventory's line `Replayed:`.
 
-257. **17 November 2026**, #546. A private project gets a scan of its code in place of the host's CodeQL, paid there:
-     Semgrep's engine, a program that only runs, fetched at set-up by its digest from PyPI and run with no Python, reads
-     what a pull request adds or alters with rules the core writes, since no maintained rule set carries a licence the
-     floor allows, and a finding is handled as floor rule 9 handles CodeQL's, so a private project has the same check as
-     a public one; the choice was argued in `CHOICES.md`. It stands behind "CodeQL" in `tasks/updates.md`,
-     `scripts/code-scan.mjs` and its rules.
+257. **18 November 2026**, #654, the owner's decision. Other publishers' code is registered, never carried: each package
+     the core's scripts run is named in a lock file in its registry's own form, at one exact version, and installed
+     from it by the sync, at a session's start and in each job before a check, into a folder git does not track; the
+     folder the core carried them in goes (#528, #601). In a project too, what it ships or runs of another publisher
+     is named in a lock file, however it is loaded (point 9). The owner decided it, after a session had set out what
+     carrying costs and buys against registering: one standard mechanism, the host's alerts and update proposals
+     reading what is depended on, a replacement a change to a lock file, and a failed fetch run again. It corrects
+     what #601 brought in (Brought in by: #601; Correction: rule missing; #302). It stands behind "Code of another
+     publisher is named in a lock file" in `floor/topics/dependencies.md`, and the dated entries of `CHOICES.md`.
+
+258. **17 November 2026**, #546. A private project gets a scan of its code in place of the host's CodeQL, paid there:
+     Semgrep's engine, a program that only runs, installed in the scan's own step from PyPI's lock form by its hashes
+     (#654) and run with no Python, reads what a pull request adds or alters with rules the core writes, since no
+     maintained rule set carries a licence the floor allows, and a finding is handled as floor rule 9 handles CodeQL's,
+     so a private project has the same check as a public one; the choice was argued in `CHOICES.md`. It stands behind
+     "CodeQL" in `tasks/updates.md`, `scripts/code-scan.mjs` and its rules.
