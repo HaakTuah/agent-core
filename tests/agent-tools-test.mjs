@@ -586,6 +586,17 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(moved, "add", "-A"); git(moved, "commit", "-q", "-m", "the link moved");
     git(moved, "checkout", "-q", "main"); git(moved, "merge", "-q", "--no-ff", "-m", "merge", "change2");
     fails(run(moved), "and so does one whose target the pull request moves", "Mend: rename it to .codex");
+    // (#600's code review of 462c48a: and a folder on the way to what the tool reads that is a link out, added there, or
+    // the tool folder itself)
+    for (const [base, add] of [[".Kiro/hooks/x.json", ".Kiro/Settings"], [".Kiro/settings/mcp.json", ".Kiro/Hooks"]]) {
+      const onWay = project({ [base]: "{}\n", ...listing() });
+      const added = pr(onWay, { "README.md": "a change of its own\n" });
+      git(added, "checkout", "-q", "-B", "change2");
+      fs.symlinkSync(os.tmpdir(), path.join(added, add));
+      git(added, "add", "-A"); git(added, "commit", "-q", "-m", "a folder linked out");
+      git(added, "checkout", "-q", "main"); git(added, "merge", "-q", "--no-ff", "-m", "merge", "change2");
+      fails(run(added), `a link out added as ${add} under a folder the base held in another case fails`, "Mend: rename it to .kiro");
+    }
     // (#600's fallback security review of 27d9d98: a file is held by its kind too, so none reads as a link it names)
     const asLink = project({ ".Codex/hooks.json": "{}\n", ...listing() });
     fs.symlinkSync(os.tmpdir(), path.join(asLink, ".Codex/config.toml"));
