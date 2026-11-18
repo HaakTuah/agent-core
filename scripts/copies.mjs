@@ -36,7 +36,7 @@ import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, unrooted } from "./guards.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { readBlobs } from "./blobs.mjs";
-import { projectAt } from "./core-path.mjs";
+import { THIRD_PARTY, projectAt } from "./core-path.mjs";
 import { uncommented } from "./yaml-keys.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
 // core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
@@ -181,10 +181,13 @@ function find(files, units, size, joiner, minChars, read = f => fs.readFileSync(
   return { copies, dup };
 }
 
-// An empty list checks nothing: git ls-files would list every file. `env` names another index (lsAt, below).
+// An empty list checks nothing: git ls-files would list every file. `env` names another index (lsAt, below). The
+// packages the core's copy carries from other publishers are left out, wherever a pattern reaches: they are no code or
+// prose of the project's, nor the core's own (third-party.mjs, beside this file).
+const OTHERS = `:!${CORE}${THIRD_PARTY}`;
 const ls = (specs, env = process.env) => {
   if (!specs.length) return [];
-  try { return execFileSync("git", ["ls-files", "-z", "--", ...specs], { env, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] }).split("\0").filter(Boolean); }
+  try { return execFileSync("git", ["ls-files", "-z", "--", ...specs, OTHERS], { env, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] }).split("\0").filter(Boolean); }
   catch (e) { return fail(`git cannot read the pathspecs ${specs.join(" ")}: ${unrooted(String(e.stderr || e.message).trim().split(/\r?\n/u)[0], ROOT)}. Mend: write each as a plain git pathspec, a path or a glob, with ":!" before one to leave it out, where it stands: in the config's "code" or "prose", or, for a rule file, on SECURITY.md's "the rule files:" line`); }
 };
 // The files pathspecs read in a commit's tree, as git lists them there: from an index of that tree, written to a

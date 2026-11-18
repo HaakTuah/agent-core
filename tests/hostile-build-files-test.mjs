@@ -52,6 +52,7 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   ok(quick(() => (r = licences(lockProject(each({ version: "1.0.0", license: "Moss-1.0" })))).failures.length === 30000 && said(r.failures)), "the licence check fails thirty thousand packages off its list, each with its mend, in a few seconds");
   ok(quick(() => (r = nuLock({ version: 1, dependencies: { net9: Object.fromEntries(many.map((m) => [m, { type: "Direct", resolved: "1.0.0", requested: "[1.0.0, 2.0.0)", contentHash: "x" }])) } })).failures.length === 30000 && said(r.failures)), "NuGet's lock reader fails thirty thousand packages asked for by a range, each with its mend");
   ok(quick(() => twice(`on: push\njobs:\n${"  j:\n    runs-on: x\n".repeat(100000)}`).length === 99999 && lines("\\x70".repeat(1_000_000)).length === 0), "a workflow of megabytes is read for keys given twice and for the forbidden trigger in a few seconds");
+  ok(quick(() => twice("]".repeat(100000)).length === 0 && twice(`{${",".repeat(100000)}`).length === 0 && twice("!t ".repeat(50000)).length === 0), "a text of a hundred thousand closing brackets or commas, or of fifty thousand tags, each an error the package reads, is read in a few seconds");
   ok(quick(() => twice(`a: ${"{b: ".repeat(50000)}`).length === 0 && twice(Array.from({ length: 5000 }, (_, i) => `${" ".repeat(i)}k:`).join("\n")).length === 0), "a flow value fifty thousand deep, or keys indented five thousand deep, are read without a throw");
   ok(quick(() => settings(JSON.stringify({ hooks: { Stop: [{ hooks: many.map((m) => ({ type: "command", command: `echo ${m}` })) }] } })).tools.size === 30000), "thirty thousand agent hooks are read in a few seconds");
   ok(quick(() => (r = listed({ agentTools: many.map((m) => ({ kind: "plugin", name: m, publisher: "moss", version: "^1" })) }, "c.json")).problems.length === 30000 && said(r.problems)), "thirty thousand agentTools entries pinned to a range each fail with their mend");
@@ -106,6 +107,7 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   const root = path.join(fresh({ "outside.yml": "on: push\n", "in/.github/workflows/b.yml": "on: push\n" }), "in");
   // (the whole of scripts/, as a project's copy holds it, so whatever the check imports is there)
   fs.cpSync(fileURLToPath(new URL("../scripts", import.meta.url)), path.join(root, "core/scripts"), { recursive: true });
+  fs.cpSync(fileURLToPath(new URL("../third-party", import.meta.url)), path.join(root, "core/third-party"), { recursive: true });
   fs.symlinkSync(path.join(root, "../outside.yml"), path.join(root, ".github/workflows/a.yml"));
   fs.writeFileSync(path.join(root, ".github/workflows/c.yml"), Buffer.from("\ufeffon: push\n", "utf16le"));
   for (const a of [["init", "-q"], ["add", "-A"]]) spawnSync("git", a, { cwd: root });
