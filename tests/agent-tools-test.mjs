@@ -514,6 +514,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const deep = project({ ...script, [`.claude/agents/${"a/".repeat(1000)}x.md`]: "---\nname: x\n---\n", ...listing() });
     const deepStarted = Date.now(), deepRun = run(deep, "--core");
     ok(deepRun.status === 0 && Date.now() - deepStarted < 30000, "a plain folder a thousand deep below agents is read in seconds", deepRun.out);
+    // (#647's fallback security review of 2b74d24: and a folder of agents thousands wide, each folder's entries found in the
+    // listing by a search, not a scan of it)
+    const wide = project({ ...script, ...Object.fromEntries(Array.from({ length: 3000 }, (_, i) => [`.claude/agents/s${i}/a.txt`, "a\n"])), ...listing() });
+    const wideStarted = Date.now(), wideRun = run(pr(wide, { "README.md": "x\n" }));
+    ok(wideRun.status === 0 && Date.now() - wideStarted < 30000, "a folder of agents three thousand wide is read in seconds", wideRun.out);
   }
   // (a skill's or command's body that runs a command where it is invoked, and a subagent's permission mode but the
   // default, each held as a setting no starter kit writes)
