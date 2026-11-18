@@ -576,6 +576,9 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   // commit it stands on too, where a submodule shows as an empty folder)
   const own = at => notFile(listing(root, rev ?? "HEAD"), at) || shownNotBlob(root, rev ?? "HEAD", at) || (!rev && (() => { try { const st = fs.lstatSync(path.join(root, at)); return st.isSymbolicLink() || st.isDirectory(); } catch { return false; } })());
   const linked = at => own(at) || linkedOnMain(at);
+  // (the folders of agents and commands are listed in the working tree too, so one that is a link out of the checkout is
+  // said, and held, as any other)
+  if (!rev) [".claude/agents", ".claude/commands"].forEach(names);
   const project = configured(read, skills, names, linked, () => agentFolders(root, rev ?? "HEAD").flatMap(f => f.markdown));
   const commitRev = rev ?? "HEAD";
   // (read at the commit, the working tree's at HEAD, the pull request's head: a file not committed, ignored or not, is
@@ -598,7 +601,8 @@ function agentFolders(root, rev) {
     const r = walk(root, rev, dir, [], false, [], true);
     if (r?.type !== "tree") continue;
     const prefix = r.f === "." ? "" : `${r.f}/`, below = at => at.startsWith(prefix);
-    out.push({ prefix, markdown: [...l.blobs].filter(at => below(at) && /\.md$/iu.test(at)).sort(), links: l.links.filter(below).sort() });
+    // (each Markdown file named by the path Claude Code reads it at, below the folder's own name)
+    out.push({ prefix, markdown: [...l.blobs].filter(at => below(at) && /\.md$/iu.test(at)).sort().map(at => `${dir}/${at.slice(prefix.length)}`), links: l.links.filter(below).sort() });
   }
   return out;
 }
@@ -785,9 +789,9 @@ function toolPaths(names, typeOf, whereOf = p => p) {
       // that is neither a folder nor a file, through which the tool may read a SKILL.md this check cannot)
       const type = typeOf(p), folder = type === "tree";
       if (!folder && (!inFolder || READS.test(low) || (SKILL_DIR.test(low) && type !== "blob"))) out.push(p);
-      // (each folder it reaches once, wherever links lead, so no loop of links is walked; a folder of agents or commands at
-      // any depth, any other way a few deep)
-      if (folder && (MD_DIR.test(low) || depth < 10) && !seen.has(whereOf(p))) { seen.add(whereOf(p)); visit(p, depth + 1); }
+      // (below a folder of agents or commands at any depth, each folder it reaches once, wherever links lead, so no loop of
+      // links is walked; any other way a few deep, each name visited, so one in another case is never passed by)
+      if (folder && MD_DIR.test(low) ? !seen.has(whereOf(p)) && seen.add(whereOf(p)) : folder && depth < 10) visit(p, depth + 1);
     }
   };
   visit("", 0);
