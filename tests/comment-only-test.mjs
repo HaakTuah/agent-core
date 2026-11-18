@@ -109,6 +109,10 @@ fails(edit("# data, not a comment", "# other data"), "a heredoc's # line inside 
 fails(edit('echo "a #b"', 'echo "a #c"'), "text after # inside a run block");
 fails(edit("          echo folded", "          # a line\n          echo folded"), "a # line added inside a block scalar");
 fails(edit("        run: echo hi", "        run: |\n          echo hi"), "a value turned into a block scalar");
+// (a block scalar that keeps its blank lines, `|+`, holding one alone: that line is its text, never a blank line
+// between entries; #621)
+const keptOne = "jobs:\n  a:\n    env:\n      FLAG: |+\n\n    steps:\n      - run: test -z \"$FLAG\"\n";
+fails(keptOne.replace("|+\n\n", "|+\n"), "a kept block scalar's one blank line taken out", "more than a comment", keptOne);
 // (a quote left open on a line the proof reads as a block scalar's text, where the header gives its indentation and
 // YAML would read it as a value that runs on to the end: every line after it is refused, never left unread; #621)
 const openQuote = "jobs:\n  a:\n    steps:\n      - run: |2\n         \"hi\n        name: x\n";

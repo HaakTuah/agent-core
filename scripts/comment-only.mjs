@@ -79,9 +79,11 @@ function linesOf(text, raw, broken) {
   const lineAt = at => { let lo = 0, hi = starts.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid] <= at) lo = mid; else hi = mid - 1; } return lo; };
   const rows = raw.map((line, i) => ({ line, n: i + 1, last: i === raw.length - 1 && !broken, toks: [], content: false, within: false, indent: /^ */u.exec(line)[0].length }));
   for (const t of tokensOf(text)) {
-    if (!t.src || t.src === "\n" || !rows.length) continue;
+    if (!t.src || !rows.length) continue;
     const first = lineAt(t.at), end = lineAt(t.at + t.src.length - 1);
+    // (a block scalar's text first: one of a single blank line, kept by `|+`, is a line break alone)
     if (t.content) { for (let i = first; i <= end; i++) rows[i].content = true; continue; }
+    if (t.src === "\n") continue;
     for (let i = first + 1; i <= end; i++) rows[i].within = true;
     if (!/^ +$/u.test(t.src)) rows[first].toks.push({ ...t, col: t.at - starts[first] - rows[first].indent, runs: end > first });
   }
