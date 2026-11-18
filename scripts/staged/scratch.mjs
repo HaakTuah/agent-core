@@ -173,8 +173,8 @@ const FILLS = [
   [/^FILL IN: the commands that set the project up.*$/m, "`npm test` runs the tests (`test/sum.test.mjs`) and prints \"ok sum\"; nothing to build."],
   [/^1\. FILL IN: the first task.*$/m, "1. #1, builder: sum() leaves out the last number."],
   [/^( *)FILL IN: who may change the protected files.*$/m, "$1as the floor has it."],
-  [/^( *)FILL IN: each input anyone but the user at hand can shape.*$/m, "$1None: it reads only its own command line."],
-  [/^( *)FILL IN: what reaches its users' machines.*$/m, "$1Nothing but its own source; it has no dependencies."],
+  [/^( *)FILL IN: each input anyone but the user at hand can shape[\s\S]*?project takes none\.$/m, "$1None: it reads only its own command line."],
+  [/^( *)FILL IN: what reaches its users' machines[\s\S]*?need behind it \(topic 7\)\.$/m, "$1Nothing but its own source; it has no dependencies."],
   [/^( *)FILL IN: what ships.*$/m, "$1Nothing ships yet."],
   [/^( *)FILL IN: who can reach the project beyond.*$/m, "$1No one: it has no service."],
   [/^( *)FILL IN: what its users would lose.*$/m, "$1A wrong sum; the owner, the repository's good name."],
@@ -347,7 +347,7 @@ export const seal = dir => {
   memo(dir, "objects", objectsOf(dir));
   memo(dir, "reflog", [...new Set(Object.entries(refsIn(path.join(dir, "project", ".git"), { reflog: true })).filter(([r]) => r.startsWith("refs/reflog/")).map(([, sha]) => sha))]);
 };
-const sealed = dir => memoOf(dir, "refs");
+export const sealed = dir => memoOf(dir, "refs");
 
 // A case's folder, as the brief names it: its real path, strictly under the system's temporary folder, so no home
 // folder's name reaches a brief (floor rule 11; where the temporary folder itself lies in the home folder, as on

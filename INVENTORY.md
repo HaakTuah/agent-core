@@ -128,7 +128,21 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   ScanCode, dropped on fact: Python and a large install. *Bugs:* 5, 1 and 1 (15 with the NuGet check's, the most of any
   group). **Replace** the reading underneath with `npm sbom` after the install the check already makes; **keep** the
   policy (the floor's list, the owner's yes, the scan of what no lock file holds) and the HTML reading, which goes with
-  #486's licence group.
+  #486's licence group. *Tried:* 18 November 2026 (#585), npm 11.20.0, on the 70 projects
+  `tests/licence-installed-test.mjs` makes and on a real install; the core's reading kept, on measure, since neither of
+  npm's own tools reads what is installed at its level. `npm sbom` merges the packages of one name and version, so a
+  GPL-3.0 copy of a locked ISC package bundled in another's folder went unread, and it stopped with nothing read wherever
+  a package.json had no name, a project's own root among them (15 of the 70 that pass). `npm query "*"` failed what the
+  old reading failed on all 70, but its review found four cases it reads worse, each reproduced: a plain file named
+  `@block` in a package's `node_modules` makes npm leave out every package in that folder with no word, so a bundled
+  GPL-3.0 package passed; a package.json that is itself a link out of the project passed; a valid local package with
+  no name and no version failed; and a folder named `..vendor` read as outside the project. The fallbacks were read, not
+  run (#649): license-checker-rseidelsohn walks the folders with the same `readdirScoped` npm uses, reads its failure as
+  nothing installed, and keys each package by name and version; licensee reads npm's own tree (`loadActual`); and
+  CycloneDX's npm tool runs `npm ls --long --all`: each would read the `@block` case as npm does. *Replayed:* #444 not
+  read (its cases, lock entries not written as npm writes one, lie in the lock file, which npm's reading of what is
+  installed never opens); #339, #364, #366, #386 and #447 not run (their cases lie in where the config stands, the
+  steps and the scan, which no tool tried here takes over).
 - `scripts/exact-versions.mjs`: fails a dependency of the project's own written as a range. *Runs:* any session and the
   runners. *Else:* npm's `save-exact`, dropped on fact: it writes exact versions and checks none already written.
   *Bugs:* 1. **Keep:** small and stable, a read of `package.json`.
@@ -156,7 +170,24 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   the packages; dotnet-project-licenses, dropped on fact: its last release on NuGet is 3.0.0-alpha.9 of 25 November
   2022, and none came in the year to 17 November 2026, where nuget-license published 25. *Bugs:* 7, 1, 0
   and 4. **Try** nuget-license and the SDK's own list for the reading; **keep** the fetch before the build, which is a
-  boundary of the floor's (what a build could write never decides a licence), and the policy.
+  boundary of the floor's (what a build could write never decides a licence), and the policy. *Tried:* 18 November
+  2026 (#586), nuget-license 4.0.18 (Apache-2.0) and `dotnet list package --include-transitive --format json` on .NET
+  SDK 10.0.404, on 25 projects built from the kinds of package the core's tests make, each restored from a local feed;
+  the core's reading kept, on measure, the check unchanged. Neither reads a licence before a restore has run the pull
+  request's project files: nuget-license takes only a project or solution and reads its packages from the assets file
+  a restore writes (with none, it stops), reading each licence from the `.nupkg` in the folder that restore filled,
+  hash unchecked, so a package swapped there after the restore read MIT for a GPL-3.0 one, and asking the project's
+  sources over the network for one that is missing; `dotnet list package` reads no licence at all, restores by itself
+  unless told not to, and missed a PackageDownload. Against the core, on the same 25: nuget-license read the same
+  licence in 17, read another in 5 and nothing in 3 (a crash on a non-breaking space, a package NuGet would not
+  restore, the PackageDownload), and passed 7 the core fails (a licence file and a licence address it guessed from,
+  an AND and OR without brackets, a WITH, two version ranges, the PackageDownload), failing none the core passes; it
+  holds no exact version, no owner's yes, no audit and no base. *Replayed:* #240, #274 and #280 read, after a restore
+  (MSBuild follows the Import that brings the GPL-3.0 package, though nuget-license holds no lock file, so #240's lock
+  file kept elsewhere goes unheld); #269 not read (a package folder the pull request names, its package altered to say
+  MIT, passes the locked restore and nuget-license alike); #373, #380, #366, #386 and #355 not run (a billed job, the
+  first look's choice to restore, the configs' paths, and a change of shape: none a reading of a package); #446 not
+  run (open, with no fix).
 - `.github/workflows/core.yml`, `scripts/copy-tree.mjs`, `scripts/core-path.mjs`, `scripts/core-address.mjs`: fail a
   project whose copy is not the core, whole, at the commit its manifest pins, or whose calls to the core's workflows are
   pinned elsewhere. *Runs:* the runners, where nothing of the project's runs before it; any session by hand. *Else:* the
