@@ -949,7 +949,9 @@ function lockOf(root, rev, at) {
   for (const v of via) {
     const cut = `/${v}`.indexOf("/node_modules/");
     if (l.ids.has(v) || l.dirs.has(v) || cut < 0) continue;
-    const dir = v.slice(0, cut) ? `${v.slice(0, cut)}/` : "", key = v.slice(dir.length);
+    // (the folder that holds the node_modules folder, with its "/", and the path below it: `cut` is the offset in v of the
+    // "node_modules/" it matched, the "/" it was found with being the one before it)
+    const dir = v.slice(0, cut), key = v.slice(cut);
     for (const lock of ["package-lock.json", "npm-shrinkwrap.json"]) {
       let entry;
       // (an entry too deep to parse or write back is held by the lock file's whole text)
