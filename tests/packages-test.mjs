@@ -110,7 +110,7 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   try { base = JSON.parse(execFileSync("git", ["show", `${process.env.PACKAGES_BASE || "HEAD^1"}:.packages/package-lock.json`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })).packages ?? {}; } catch { /* (no lock file at the base: every entry is new) */ }
   // (the day the week is counted to, handed in: the run's own date, or PACKAGES_TODAY's; nothing else reads the clock)
   const today = Date.parse(process.env.PACKAGES_TODAY || new Date().toISOString());
-  const young = await tooYoung(json(".packages/package-lock.json").packages, base, name => fetched(`https://registry.npmjs.org/${name.replace("/", "%2f")}`), today);
+  const young = await tooYoung(json(".packages/package-lock.json").packages, base, name => fetched(`https://registry.npmjs.org/${name.replaceAll("/", "%2f")}`), today);
   ok(young.length === 0, "each package the change brings or updates in the lock file is a week old or more by the registry's date (floor rule 7)",
     `${young.join("; ")}\nMend: wait until the version is a week old and run the job again, or take the version before it, its lock entry written by npm's own install`);
   // (held on a lock written by hand: a version field kept while the address names another tarball, an entry with no
