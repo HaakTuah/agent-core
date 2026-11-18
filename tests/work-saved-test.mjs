@@ -76,6 +76,11 @@ git(project, "commit", "-q", "-am", "a row with control characters and a third c
 git(project, "push", "-q", "origin", "main");
 r = hook("start", project);
 ok(r.stdout.includes("run the quick check (`touch QUICK-RAN`[2J)") && !fs.existsSync(path.join(project, "QUICK-RAN")), "the command is named, its second cell alone, with no control, bidirectional or separating character of any encoding, and never run", JSON.stringify(r.stdout));
+fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\n| *quick check* | `npm test \\| tee log` |\n");
+git(project, "commit", "-q", "-am", "a row with an escaped pipe");
+git(project, "push", "-q", "origin", "main");
+r = hook("start", project);
+ok(r.stdout.includes("run the quick check (`npm test | tee log`): "), "a pipe escaped in the cell is read as one, and the cell goes on past it", r.stdout);
 fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n");
 git(project, "commit", "-q", "-am", "no row");
 git(project, "push", "-q", "origin", "main");
