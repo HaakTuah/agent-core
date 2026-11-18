@@ -103,11 +103,11 @@ const leftOut = asIs => fs.readdirSync(asIs).filter(f => f.endsWith(".json")).ma
 
 // The run's options for Stryker: its command runner starting this script with --tests, in place in the working copy,
 // with the core's reporter and nothing else.
-export function optionsOf({ mutate, mapAt, scratch, report, plan, concurrency = Math.max(1, os.cpus().length) }) {
+export function optionsOf({ mutate, mapAt, scratch, report, plan, sources, concurrency = Math.max(1, os.cpus().length) }) {
   return {
     mutate, testRunner: "command", commandRunner: { command: `${word(process.execPath)} ${word(path.join(HERE, "stryker.mjs"))} --tests ${word(mapAt)}` },
     coverageAnalysis: "off", inPlace: true, timeoutMS: 24 * 3600 * 1000, timeoutFactor: 1, tempDirName: path.join(scratch, "stryker-tmp"), cleanTempDir: "always", concurrency,
-    plugins: [path.join(HERE, "stryker-plugin.mjs")], reporters: ["core-report"], coreRun: { report, plan },
+    plugins: [path.join(HERE, "stryker-plugin.mjs")], reporters: ["core-report"], coreRun: { report, plan, sources },
     logLevel: "warn", fileLogLevel: "off", warnings: { unknownOptions: false }, allowConsoleColors: false,
   };
 }
@@ -149,13 +149,16 @@ function askedOf(argv) {
 
 // The run's files in `scratch`: the tests of each file wanted, the folder the tests' runs as they stand are kept in,
 // the folder the tests running are named in, and Stryker's options. Gives the options' path and the first folder.
-function setUp(scratch, { wanted, named, testTexts, report }) {
+function setUp(scratch, { wanted, named, texts, testTexts, report }) {
   const mapAt = path.join(scratch, "tests.json"), plan = path.join(scratch, "plan.json"), configAt = path.join(scratch, "stryker.json"), asIs = path.join(scratch, "as-is");
   fs.mkdirSync(asIs);
   fs.mkdirSync(path.join(scratch, "groups"));
   fs.writeFileSync(mapAt, JSON.stringify({ files: Object.fromEntries([...wanted.keys()].map(f => [f, testsOf(f, testTexts)])), plan, asIs, groups: path.join(scratch, "groups") }));
   const mutate = named.length ? named.flatMap(a => a.split(",")).filter(Boolean) : [...wanted.keys()];
-  fs.writeFileSync(configAt, JSON.stringify(optionsOf({ mutate, mapAt, scratch, report, plan })));
+  // (each file's text as it stands, for the report: Stryker writes its own into the files in place)
+  const sources = path.join(scratch, "sources.json");
+  fs.writeFileSync(sources, JSON.stringify(Object.fromEntries([...wanted.keys()].map(f => [f, texts[f]]))));
+  fs.writeFileSync(configAt, JSON.stringify(optionsOf({ mutate, mapAt, scratch, report, plan, sources })));
   return { configAt, asIs };
 }
 
@@ -172,13 +175,13 @@ async function main(argv) {
   const t = argv.indexOf("--tests");
   if (t >= 0) return dispatch(JSON.parse(fs.readFileSync(argv[t + 1], "utf8")), process.env[ACTIVE]);
   const { out, bin, budget, named } = askedOf(argv), until = Date.now() + budget * 1000;
-  const { code, testTexts } = projectOf(), wanted = wantedOf(named, code);
+  const { code, texts, testTexts } = projectOf(), wanted = wantedOf(named, code);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "stryker-")), copies = [];
   const stop = () => { stopStryker(); stopTests(path.join(scratch, "groups")); stopAll(); takeAway(copies, scratch); process.exit(130); };
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, stop);
   try {
     copies.push(copyOf(path.join(scratch, "copy")));
-    const { configAt, asIs } = setUp(scratch, { wanted, named, testTexts, report: out });
+    const { configAt, asIs } = setUp(scratch, { wanted, named, texts, testTexts, report: out });
     fs.rmSync(out, { force: true });
     const ran = await stryker(bin, configAt, copies[0], (until - Date.now()) / 1000);
     stopTests(path.join(scratch, "groups"));

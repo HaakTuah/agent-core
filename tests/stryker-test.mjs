@@ -41,8 +41,13 @@ try {
     "once the run ends, the report is Stryker's own, with nothing a test printed");
   let threw = false;
   try { coreReporter({}); } catch { threw = true; }
-  const files = path.join(scratch, "written"), reporter = (fs.mkdirSync(files), coreReporter({ coreRun: { report: path.join(files, "r.json"), plan: path.join(files, "plan.json") } }));
-  reporter.onMutationTestingPlanReady({ mutantPlans: [] });
+  const files = path.join(scratch, "written"), sources = path.join(scratch, "sources.json");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, "x === 1; /* as Stryker rewrote it */\n");
+  fs.writeFileSync(sources, JSON.stringify({ [named(file)]: "x === 1;\n" }));
+  const reporter = (fs.mkdirSync(files), coreReporter({ coreRun: { report: path.join(files, "r.json"), plan: path.join(files, "plan.json"), sources } }));
+  reporter.onMutationTestingPlanReady({ mutantPlans: [plan("0", 0)] });
+  ok(JSON.parse(fs.readFileSync(path.join(files, "r.json"), "utf8")).files[named(file)]?.source === "x === 1;\n", "the plug-in writes each file's text as it stood before Stryker wrote its own into it, which its faults' places count in");
   reporter.onMutationTestReportReady({ files: {} });
   ok(same(fs.readdirSync(files).sort(), ["plan.json", "r.json"]) && JSON.parse(fs.readFileSync(path.join(files, "r.json"), "utf8")).schemaVersion === "1",
     "the plug-in writes each file whole beside its place and moves it there, leaving nothing half written", fs.readdirSync(files).join(", "));
@@ -106,8 +111,8 @@ try {
   ok(same(counted({ files: { a: { mutants: [{ status: "Killed" }, { status: "Pending" }, { status: "Killed" }] } } }), { Killed: 2, Pending: 1 }), "a report's faults are counted by their status");
 
   // ---- the options Stryker is given ----
-  const o = optionsOf({ mutate: ["src/a.mjs:1-2"], mapAt: "/x/tests.json", scratch: "/x", report: "/x/r.json", plan: "/x/plan.json", concurrency: 2 });
-  ok(o.testRunner === "command" && o.inPlace && o.coverageAnalysis === "off" && o.commandRunner.command.endsWith(`--tests ${word("/x/tests.json")}`) && same(o.reporters, ["core-report"]) && o.plugins[0].endsWith("stryker-plugin.mjs") && same(o.coreRun, { report: "/x/r.json", plan: "/x/plan.json" }) && same(o.mutate, ["src/a.mjs:1-2"]),
+  const o = optionsOf({ mutate: ["src/a.mjs:1-2"], mapAt: "/x/tests.json", scratch: "/x", report: "/x/r.json", plan: "/x/plan.json", sources: "/x/s.json", concurrency: 2 });
+  ok(o.testRunner === "command" && o.inPlace && o.coverageAnalysis === "off" && o.commandRunner.command.endsWith(`--tests ${word("/x/tests.json")}`) && same(o.reporters, ["core-report"]) && o.plugins[0].endsWith("stryker-plugin.mjs") && same(o.coreRun, { report: "/x/r.json", plan: "/x/plan.json", sources: "/x/s.json" }) && same(o.mutate, ["src/a.mjs:1-2"]),
     "Stryker runs this script's tests for each fault by its command runner, in place, with the core's reporter alone");
   const refused = (p, windows) => { try { word(p, windows); return false; } catch (e) { return mended(`FAIL: ${e.message}`); } };
   ok(refused("/x/a\nb", false) && refused("/x/a%PATH%b", true) && refused('/x/"a"', true) && !refused('/x/"a"', false), "a path no shell's word can hold as it is, a line break anywhere, or a % or double quote on Windows, is refused, saying the mend");
@@ -144,7 +149,7 @@ try {
     write("test/a-test.mjs", `${fs.readFileSync(path.join(dir, "test/a-test.mjs"), "utf8")}await new Promise(r => setTimeout(r, 4000));\n`);
     const slow = spawnSync(process.execPath, [SCRIPT, "--tool", TOOL, "--report", out, "--budget", "6", "src/a.mjs:1-2"], { cwd: dir, encoding: "utf8" });
     const late = JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"]?.mutants ?? [];
-    ok(slow.status === 0 && late.some(m => m.status === "Pending") && /not run \(the budget\)/.test(slow.stdout), "past its budget, Stryker is stopped and the faults it did not run are written as not run", `${slow.stdout}${slow.stderr}`);
+    ok(slow.status === 0 && late.some(m => m.status === "Pending") && JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"].source === SOURCE && /not run \(the budget\)/.test(slow.stdout), "past its budget, Stryker is stopped and the faults it did not run are written as not run", `${slow.stdout}${slow.stderr}`);
     // (a run stopped by a signal stops Stryker and all it started before it takes its working copy away, off Windows)
     if (process.platform !== "win32") {
       const strykers = () => spawnSync("pgrep", ["-f", `${TOOL}/node_modules/@stryker-mutator/core/bin/stryker.js run`], { encoding: "utf8" }).stdout.trim();

@@ -5,7 +5,9 @@
 // Stryker's own. It also writes which file each fault is in, for the tests each runs against (stryker.mjs, its
 // dispatcher). What a test printed (Stryker's "statusReason") is left out, so the report stays small, and so are
 // the tests that caught a fault ("killedBy"), which Stryker's command runner cannot name (it names its command "0").
-// The paths come from the run's own options, under "coreRun": { report, plan }. Node's own modules only.
+// The paths come from the run's own options, under "coreRun": { report, plan, sources }, `sources` a JSON file of
+// each file's text as it stood before Stryker wrote its own into it, in place, which its faults' places count in.
+// Node's own modules only.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -48,11 +50,12 @@ export function progress({ cwd = process.cwd(), read = f => fs.readFileSync(f, "
 
 // The plug-in: a reporter Stryker builds with its options.
 export function coreReporter(options) {
-  const { report, plan } = options.coreRun ?? {};
-  if (!report || !plan) throw new Error("stryker-plugin.mjs is run by stryker.mjs, which names its report and plan under \"coreRun\"");
+  const { report, plan, sources } = options.coreRun ?? {};
+  if (!report || !plan || !sources) throw new Error("stryker-plugin.mjs is run by stryker.mjs, which names its report, plan and sources under \"coreRun\"");
+  const before = JSON.parse(fs.readFileSync(sources, "utf8"));
   // (each file written whole beside its place and then moved there, so a run stopped mid-write leaves the last whole one)
   const whole = (at, value) => { const part = `${at}.part`; fs.writeFileSync(part, `${JSON.stringify(value)}\n`); fs.renameSync(part, at); };
-  const state = progress(), write = r => whole(report, r);
+  const state = progress({ read: f => before[named(f)] ?? fs.readFileSync(f, "utf8") }), write = r => whole(report, r);
   return {
     onMutationTestingPlanReady({ mutantPlans }) { const p = state.plan(mutantPlans); whole(plan, p.of); write(p.report); },
     onMutantTested(result) { write(state.tested(result)); },
