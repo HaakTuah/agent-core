@@ -47,9 +47,9 @@ export function weakened(diff) {
     else if (line.startsWith("+")) at.added.push(line.slice(1));
   }
   return files.map(f => {
-    // (a line taken out and added again as it was, moved, is neither)
-    const added = new Set(f.added.map(l => l.trim())), gone = new Set(f.gone.map(l => l.trim()));
-    const out = f.gone.filter(l => asserts(l) && !added.has(l.trim())), skipped = f.added.filter(l => skips(l) && !gone.has(l.trim()));
+    // (a line taken out and added again as it was, moved, is neither: each added once cancels one taken out, and no more)
+    const unmatched = (lines, against) => { const left = new Map(); for (const l of against) left.set(l.trim(), (left.get(l.trim()) ?? 0) + 1); return lines.filter(l => { const n = left.get(l.trim()) ?? 0; if (n) left.set(l.trim(), n - 1); return !n; }); };
+    const out = unmatched(f.gone, f.added).filter(asserts), skipped = unmatched(f.added, f.gone).filter(skips);
     const fewer = f.gone.filter(asserts).length > f.added.filter(asserts).length;
     return { file: f.file, asserts: out, skips: skipped, weaker: fewer || skipped.length > 0 };
   }).filter(f => f.asserts.length || f.skips.length);

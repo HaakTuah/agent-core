@@ -219,6 +219,12 @@ check("review", fresh("review"),
   const unsaid = fresh("review");
   gh(unsaid, "POST", "pulls/2/reviews", { event: "COMMENT", body: REVIEW.replace(/\n\nBlocking findings: 8\.\nOther findings: 0\./, ""), comments: [{ path: "src/config.mjs", line: 3, body: "A key" }] });
   ok(/declares no count of blocking findings/.test(verdict("review", unsaid).why), "review: one that declares no count fails, its line comments read with it", verdict("review", unsaid).why);
+  // (Codex's own review: a finding a line comment of its, each marked P1, and no declared count)
+  const badged = fresh("review"), items = REVIEW.split("\n").filter(l => /^\d+\. Blocking: `([^`]+)`/.test(l));
+  gh(badged, "POST", "pulls/2/reviews", { event: "COMMENT", body: "Codex Review", comments: items.map(l => ({ path: /`([^`]+)`/.exec(l)[1], line: 1, body: `![P1 Badge](https://img.shields.io/badge/P1-orange) ${l.replace(/^\d+\. Blocking: /, "")}` })) });
+  ok(verdict("review", badged).pass, "review: Codex's own review, each finding marked P1 and no count declared, passes", verdict("review", badged).why);
+  const fpReview = fingerprints(caseOf("review"), s.core);
+  ok(typeof fpReview["file: roles/shared/review-guidelines.md"] === "string", "review: the whole guidelines are fingerprinted, so any change to them makes the case due", JSON.stringify(Object.keys(fpReview)));
 }
 check("no-floor", fresh("no-floor"),
   d => gh(d, "POST", "issues/1/comments", { body: "From a builder session, on #1: the floor cannot be read at lib/core/, where the manifest says the core stands, and the submodule cannot be fetched here; nothing is done until it can." }),

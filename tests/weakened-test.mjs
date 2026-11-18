@@ -47,6 +47,10 @@ ok(found.map(f => f.weaker).join() === "true,true,true,false", "a file left with
 ok(byFile["test/sum.test.mjs"].asserts.length === 2 && byFile["test/sum.test.mjs"].skips.length === 0, "an assertion taken out and one changed are both listed, for the reviewer to rule on");
 ok(byFile["test/gone.test.mjs"].asserts.join() === "assert.ok(true);", "a deleted file is named by its header, its assertions listed");
 ok(byFile["test/new.test.mjs"].skips.length === 1 && !byFile["test/new.test.mjs"].asserts.length, "a skip added is listed; an assertion added is not");
+{
+  const twice = weakened("diff --git a/t.test.mjs b/t.test.mjs\n--- a/t.test.mjs\n+++ b/t.test.mjs\n@@ -2 +1,0 @@\n-assert.equal(actual, 1);\n@@ -5 +3,0 @@\n-assert.equal(actual, 1);\n@@ -8,0 +7 @@\n+assert.equal(actual, 1);");
+  ok(twice.length === 1 && twice[0].asserts.length === 1 && twice[0].weaker, "a line added once cancels one taken out and no more: two taken out and one added leaves one, and the file weaker", JSON.stringify(twice));
+}
 ok(weakened("").length === 0 && weakened(null).length === 0, "no diff, nothing found");
 
 // ---- the mend ----
