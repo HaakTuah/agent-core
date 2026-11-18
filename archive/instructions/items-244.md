@@ -107,3 +107,12 @@ The index, and how an item is written: `archive/instructions.md`.
      sorting was done at once: the owner, asking how far the core's rules are enforced, learned that 189 of its 310
      rules were held by being read alone, the kind a study found followed at more cost with no gain. It stands behind
      the order of the pruning's list and `reports/unheld.json`.
+
+255. **16 November 2026**, #486, points 6 to 8 and 11. A job a maintained package does is done by it, in all code, a job
+     on a format or language someone else defines first; a session searches before it writes more than about 50 lines
+     for one job, names what it looked for, and writes by hand only where the job is small and stable, no package fits,
+     fitting costs more than the job, or the package brings too much, the package passing the floor and what the
+     platform brings coming first: for a session code is cheap to write, so it writes where a person would reach for a
+     package, and the cost comes later as upkeep and as bugs in readers written by hand; point 6 gained its search on 17
+     November. It stands behind "A job a maintained package does is done by it" in `tasks/code-shape.md` and its
+     pointers in `roles/shared/how-to-work.md` and the review guidelines.
