@@ -4,7 +4,7 @@ The first line that waits on nothing is next.
 
 **Who:** *builder*, any builder session; *rule builder*, a builder on Opus; *the owner*, no session takes it up before
 the owner's own word. A line on points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or "Fixes" it if
-it merges last. #579 to #591 wait on #593's point 7.
+it merges last.
 
 ## In order
 
@@ -14,7 +14,6 @@ it merges last. #579 to #591 wait on #593's point 7.
 | #529, step 4 | builder | #528 |
 | #530, step 5 | builder; licence readers after #585 and #586 | #529 |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | |
-| #593, point 7 | rule builder | |
 | #593, points 8 and 9 | rule builder | #577 and #476 |
 | #593, points 6, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #579 | builder | |

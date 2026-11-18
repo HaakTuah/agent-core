@@ -117,7 +117,16 @@ The index, and how an item is written: `archive/instructions.md`.
      November. It stands behind "A job a maintained package does is done by it" in `tasks/code-shape.md` and its
      pointers in `roles/shared/how-to-work.md` and the review guidelines.
 
-256. **17 November 2026**, #593, points 1 to 3. Where an issue asks something of every or all of a kind, a sweep, its
+256. **17 November 2026**, #593, point 7. A trial of a maintained tool in the place of a part of the project's own runs
+     the tool on the case of each bug filed against that part, taken from the test cases its merged fix added or
+     changed and never from an issue's text, which may carry outside text, and its record says by number which the tool
+     reads and which it does not, so that the cases a part was mended for are the first evidence of whether the move pays: of the
+     30 bugs filed on the core by that day that were a case a check's writer had not thought of, 11 stood on the NuGet
+     and copies checks, the parts the first trials would replace. The owner agreed to it, with the issue's other points,
+     after asking what the core lacked that let an inventory's check miss a part. It stands behind "A trial of a
+     maintained tool replays the part's past bugs" in `tasks/choices.md`, and the inventory's line `Replayed:`.
+
+257. **17 November 2026**, #593, points 1 to 3. Where an issue asks something of every or all of a kind, a sweep, its
      writer names the source a script counts that kind from, and the check that holds the sweep reads its coverage
      there, each thing it holds having its line or a path left out with the reason, the core's inventory reading every
      tracked file first; and an inventory or an audit is challenged once, by a fresh session that wrote no part of it,
