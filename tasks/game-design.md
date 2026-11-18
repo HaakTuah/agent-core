@@ -140,7 +140,8 @@ player can choose to use.
   - A model is called only where its judgement can change what happens; the obvious, the routine and the mechanical are
     the code's.
 - **In a game played online, everything new works online,** the same on every screen, with the
-  protocol's version raised when its messages change.
+  protocol's version raised when its messages change, which an older client refuses as floor topic 5 says ("A reader
+  refuses a version it does not know").
 - **Players always play the newest version.**
   - Opening the game starts its newest version; where it cannot load itself anew, the game says a newer one is out, with
     one click to play it.

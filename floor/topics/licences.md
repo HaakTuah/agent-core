@@ -20,3 +20,6 @@ kinds `licence`, `update`, `dependency` and `security-review`.
     reading by hand gives.
 - The owner's own work carries no licence but the terms the owner gives it, all rights reserved: never add or change
   them unasked.
+  - It does not mean that a product its owner sells may hold no file of the owner's own terms: such a file, asked for
+    by the owner, is those terms. Reason: one reading took this line as standing against a licence file for a product
+    that is sold.

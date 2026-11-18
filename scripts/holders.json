@@ -27,6 +27,7 @@
       "check: scripts/versions.mjs, in part"
     ],
     "floor/topics/licences.md: 10. Licences: free to use, kept that way": "check: scripts/licences.mjs, in part",
+    "floor/topics/input.md: A reader refuses a version it does not know": "check: scripts/steps.mjs, in part",
     "floor/topics/dependencies.md: 15. Dependencies": [
       "check: scripts/licences.mjs, in part",
       "check: scripts/agent-tools.mjs, in part"
@@ -203,8 +204,10 @@
     "floor/topics/dependencies.md: 17. Dependabot's own PRs": [34],
     "floor/topics/dependencies.md: An agent's own tools are code with its sign-ins": [225],
     "floor/topics/input.md: A failure refuses": [227],
+    "floor/topics/input.md: 5. Untrusted input is checked before it is used": [257],
     "floor/topics/input.md: Every named input has hostile tests": [227],
-    "floor/topics/licences.md: 10. Licences: free to use, kept that way": [41, 198, 201],
+    "floor/topics/input.md: A reader refuses a version it does not know": [257],
+    "floor/topics/licences.md: 10. Licences: free to use, kept that way": [41, 198, 201, 257],
     "floor/topics/weaknesses.md": [164],
     "floor/topics/weaknesses.md: 9. Security alerts and reported weaknesses": [35],
     "floor/topics/weaknesses.md: In a PR's own change": [130],
@@ -376,6 +379,7 @@
     "tools/codex.md: On GitHub": [169]
   },
   "numbers": {
+    "floor/topics/input.md: A reader refuses a version it does not know": "findings; outcome: robust",
     "tasks/code-shape.md: A job a maintained package does is done by it": "findings; outcome: robust",
     "tasks/updates.md: Node": "correction: does not work; outcome: robust",
     "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",

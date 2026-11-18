@@ -194,17 +194,27 @@ const rule5 = body => { fs.writeFileSync(secFile, secAsKit.replace(/^(5\. .*\n)(
 fs.mkdirSync(path.join(lockProject, "tests/hostile"), { recursive: true });
 fs.writeFileSync(path.join(lockProject, "tests/hostile/link.test.mjs"), "\n");
 ok(!rule5("   None: it takes no input but its user's.\n").length, "rule 5 that says \"None\" names no input, and reads done");
-ok(!rule5("   - a shared link: its parts checked against their shape,\n     its hostile tests: `tests/hostile/link.test.mjs`.\n     - its query string, read by the same check.\n").length,
+ok(!rule5("   - a shared link: its parts checked against their shape, limits: 2,000 characters, 5 s,\n     its hostile tests: `tests/hostile/link.test.mjs`.\n     - its query string, read by the same check.\n").length,
   "an item that names, on a wrapped line, a file that is there reads done, the item nested in it part of it");
-ok(!rule5("   - a shared link: its hostile tests in `tests/hostile/`.\n").length, "a folder that is there counts as named");
+ok(!rule5("   - a shared link: limits: none, a link's length is the browser's; its hostile tests in `tests/hostile/`.\n").length, "a folder that is there counts as named, and \"limits: none\" is an answer");
 fs.mkdirSync(path.join(lockProject, "src"), { recursive: true });
 fs.writeFileSync(path.join(lockProject, "src/peer.mjs"), "\n");
-let missedInputs = rule5("   - a shared link: hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: checked on arrival by `src/peer.mjs`; hostile tests: `tests/hostile/peer.test.mjs`.\n");
+let missedInputs = rule5("   - a shared link: limits: 2 KB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: checked on arrival by `src/peer.mjs`; limits: 64 KB, 5 s; hostile tests: `tests/hostile/peer.test.mjs`.\n");
 ok(missedInputs.length === 1 && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
   "an item whose hostile tests are not there is reported, by its words, and only it, though the file of what checks it is there", report(missedInputs));
-missedInputs = rule5("   - a shared link: hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: hostile tests: FILL IN\n");
+missedInputs = rule5("   - a shared link: limits: 2 KB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: limits: 64 KB; hostile tests: FILL IN\n");
 ok(missedInputs.length === 1 && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
   "a \"FILL IN\" left in one item reads no other item as done: the item it stands in is reported", report(missedInputs));
+missedInputs = rule5("   - a shared link: limits: 2 KB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: limits: FILL IN; hostile tests: `tests/hostile/link.test.mjs`.\n");
+ok(missedInputs.length === 1 && /"limits:"/u.test(missedInputs[0].mend) && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
+  "an item whose limits name no number and not \"none\" is reported, by its words, and only it", report(missedInputs));
+missedInputs = rule5("   - a peer's message: hostile tests: `tests/hostile/link.test.mjs`, limits: `64` in backticks\n");
+ok(missedInputs.length === 1 && /"limits:"/u.test(missedInputs[0].mend), "a number in backticks, a path's or a name's, states no limit", report(missedInputs));
+missedInputs = rule5("   - a saved game, its version read first; limits: 1 MB, 5 s; hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message, checked by `src/version-check.mjs`; limits: 64 KB; hostile tests: `tests/hostile/link.test.mjs`.\n");
+ok(missedInputs.length === 1 && /newest version/u.test(missedInputs[0].mend) && missedInputs[0].mend.includes("a saved game") && !missedInputs[0].mend.includes("a peer's message"),
+  "an item that says its input carries a version, and names no version among its limits, is reported; a path in backticks says nothing of one", report(missedInputs));
+ok(!rule5("   - a saved game, its version read first; limits: 1 MB, 5 s, version 3; hostile tests: `tests/hostile/link.test.mjs`.\n").length,
+  "an item whose limits name the newest version its reader knows reads done");
 missedInputs = rule5("   Each message a peer sends, its size checked.\n");
 ok(missedInputs.length === 1 && missedInputs[0].mend.includes("as an item of its own"), "inputs written as a paragraph, no item in it, are reported, the mend saying to list them", report(missedInputs));
 fs.writeFileSync(secFile, secAsKit.replace(/^5\. .*\n/m, ""));
