@@ -2,11 +2,12 @@
 // failures for their mend (AGENTS.md, "A check that fails says the mend"; #254): every script a workflow of the core or
 // of the starter kit names, and every workflow with a step that fails by itself, is a check below with its test, or is
 // listed with why it fails no pull request; and each check's test calls mended() of mend.mjs. A new check, or a test
-// that stops reading the mend, fails here. It holds too that each script a workflow or a session's hook names, and each
-// workflow of the core, has its line in the inventory of the core's parts (INVENTORY.md; #534, point 4), and that each
-// file a line there names is there. Its tests workflow runs it on every pull request here. Node's own modules.
+// that stops reading the mend, fails here. It holds too that each file git tracks is claimed by a line of the inventory
+// of the core's parts (INVENTORY.md; #534, point 4) or left out there with its reason (#593, point 2), and that each
+// file a line there names is there. Its tests workflow runs it on every pull request here. Node's own modules and git.
 //
 //   node tests/mend-test.mjs
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -86,20 +87,11 @@ const workflows = [
   ...fs.readdirSync(path.join(root, "setup/template/workflows")).map(f => `setup/template/workflows/${f}`),
 ];
 const unlisted = new Set();
-// what runs: each script a workflow or a session's hook names, a test aside (the hooks' settings: Claude Code's here,
-// and each tool's that the starter kit writes)
-const named = new Set();
-const hooks = [".claude/settings.json", ...fs.readdirSync(path.join(root, "setup/template"))
-  .filter(f => /(?:hook|settings).*\.json/u.test(f)).map(f => `setup/template/${f}`)];
-for (const hook of hooks) for (const m of fs.readFileSync(path.join(root, hook), "utf8").matchAll(/scripts\/([a-z0-9-]+\.(?:mjs|sh))/gu)) {
-  if (!m[1].endsWith("-test.mjs")) named.add(`scripts/${m[1]}`);
-}
 for (const wf of workflows) {
   // each line without its comment: a "#" that starts the line or follows a space
   const code = fs.readFileSync(path.join(root, wf), "utf8").split(/\r?\n/u).map(l => l.replace(/(^|\s)#.*$/u, ""));
   for (const line of code) for (const m of line.matchAll(/scripts\/([a-z0-9-]+\.(?:mjs|sh))/gu)) {
     const name = `scripts/${m[1]}`;
-    if (!name.endsWith("-test.mjs")) named.add(name);
     if (!name.endsWith("-test.mjs") && !(name in CHECKS) && !(name in NOT_CHECKS)) unlisted.add(`${name} (named in ${wf})`);
   }
   if (code.some(l => /(?:^|[;&|{\s])exit\s+(?:1\b|"?\$)/u.test(l)) && !(wf in CHECKS) && !(wf in NOT_CHECKS)) unlisted.add(`${wf} (a step of its own fails)`);
@@ -107,20 +99,55 @@ for (const wf of workflows) {
 ok(unlisted.size === 0, `every script a workflow names, and every workflow with a step that fails by itself, is a check with its test or is said to fail no pull request${unlisted.size ? `: not so for ${[...unlisted].join(", ")}. Mend: add it to CHECKS in tests/mend-test.mjs with the test that reads its failures, or to NOT_CHECKS with why it fails no pull request` : ""}`);
 for (const [name, why] of Object.entries(NOT_CHECKS)) ok(fs.existsSync(path.join(root, name)) && why, `${name} is there, and says why it is no check`);
 
-// the inventory: a part's line is a bullet, its lines joined; the files it names are the backticked ones before its
-// first ": "
-const inventory = fs.readFileSync(path.join(root, "INVENTORY.md"), "utf8");
-const parts = new Set();
-for (const part of inventory.split(/\r?\n(?! )/u).filter(l => /^- /u.test(l))) {
-  for (const m of part.replace(/\s*\r?\n\s*/gu, " ").split(": ")[0].matchAll(/`([^`]+)`/gu)) parts.add(m[1]);
+// the inventory of the core's parts (INVENTORY.md; #534, point 4), a sweep whose source is the tracked files
+// (tasks/cleaning.md, "A sweep's scope is read, not listed"; #593, point 2): each tracked file is claimed by a part's
+// line, or lies under a path its section "What the inventory leaves out" names with the reason. A line is a bullet, its
+// lines joined; the paths it names are the backticked ones before its first ": ", a folder (ending in /) naming what
+// lies under it, and a script's line claims its test too, tests/<its name>-test.mjs.
+const LEAVES = "What the inventory leaves out";
+function inventoryOf(text) {
+  const parts = new Set(), leaves = new Map();
+  let section = "";
+  for (const block of String(text).split(/\r?\n(?! )/u)) {
+    const heading = /^#{1,6}\s+(.*)$/u.exec(block);
+    if (heading) { section = heading[1].trim(); continue; }
+    if (!/^- /u.test(block)) continue;
+    const [names, ...rest] = block.replace(/\s*\r?\n\s*/gu, " ").split(": ");
+    for (const m of names.matchAll(/`([^`]+)`/gu)) {
+      if (section === LEAVES) leaves.set(m[1], rest.join(": ").trim());
+      else parts.add(m[1]);
+    }
+  }
+  return { parts, leaves };
 }
-const runs = [...named, ...fs.readdirSync(path.join(root, ".github/workflows")).map(f => `.github/workflows/${f}`)];
-const left = runs.filter(name => !parts.has(name)).sort();
-ok(left.length === 0, `each script a workflow or a hook names, and each workflow, has its line in INVENTORY.md${left.length
-  ? `: not so for ${left.join(", ")}. Mend: add a line for each to INVENTORY.md, under the heading it belongs to, as its "How a line reads" says: what it does, where it must run, what else does it (searched on the web too), and a verdict`
+const under = (file, names) => [...names].some(n => n === file || (n.endsWith("/") && file.startsWith(n)));
+function unclaimed(files, { parts, leaves }) {
+  return files.filter(f => {
+    const test = /^tests\/(.+)-test\.mjs$/u.exec(f);
+    return !under(f, parts) && !under(f, leaves.keys()) && !(test && (parts.has(`scripts/${test[1]}.mjs`) || parts.has(`scripts/${test[1]}.sh`)));
+  });
+}
+{
+  const one = inventoryOf("# I\n\n- `scripts/a.mjs`, `setup/t/`: does a.\n- `scripts/b.mjs`: does\n  b: more.\n\n## What the inventory leaves out\n\n- `words/`: the owner's words.\n- `x.md`:\n");
+  ok(one.parts.has("scripts/a.mjs") && one.parts.has("setup/t/") && one.parts.has("scripts/b.mjs") && !one.parts.has("words/")
+    && one.leaves.get("words/") === "the owner's words." && one.leaves.get("x.md") === "",
+    "the inventory reads a part's paths before its first colon, its lines joined, and the paths left out with their reasons");
+  const files = ["scripts/a.mjs", "tests/a-test.mjs", "setup/t/k.tmpl", "words/1.md", "scripts/c.mjs", "tests/c-test.mjs", "x.md"];
+  ok(unclaimed(files, one).join() === "scripts/c.mjs,tests/c-test.mjs", "a file no line claims and no path leaves out is unclaimed, a test with its script");
+}
+const tracked = (() => {
+  try { return execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean); } catch { return null; }
+})();
+ok(tracked !== null && tracked.length > 0, `the tracked files are read${tracked ? "" : ". Mend: run the test in a clone of the repository, where git lists its files"}`);
+const inv = inventoryOf(fs.readFileSync(path.join(root, "INVENTORY.md"), "utf8"));
+const left = unclaimed(tracked ?? [], inv);
+ok(left.length === 0, `each tracked file is claimed by a line of INVENTORY.md or left out there with its reason${left.length
+  ? `: not so for ${left.length}, ${left.slice(0, 20).join(", ")}${left.length > 20 ? ", ..." : ""}. Mend: name each on the line of the part it belongs to, or add a line for it under the heading it belongs to, as "How a line reads" says (what it does, where it must run, what else does it, searched on the web too, and a verdict); or, where it is no part (a rule file's content, a record), name it or its folder under "${LEAVES}" with the reason`
   : ""}`);
-const gone = [...parts].filter(name => /^(?:scripts|\.github|setup)\//u.test(name)
-  && (name.split("/").includes("..") || !fs.existsSync(path.join(root, name)))).sort();
+const bare = [...inv.leaves].filter(([, why]) => !why).map(([name]) => name);
+ok(bare.length === 0, `each path INVENTORY.md leaves out says why${bare.length ? `: not so for ${bare.join(", ")}. Mend: after its ": ", say why it is no part of the core` : ""}`);
+const gone = [...inv.parts, ...inv.leaves.keys()].filter(name => /^(?:scripts|tests|\.github|setup)\//u.test(name) || inv.leaves.has(name))
+  .filter(name => name.split("/").includes("..") || !fs.existsSync(path.join(root, name))).sort();
 ok(gone.length === 0, `each file a line of INVENTORY.md names is there${gone.length
   ? `: not so for ${gone.join(", ")}. Mend: in INVENTORY.md, name the file where it went, or take out the line of a part that is gone`
   : ""}`);
