@@ -58,7 +58,7 @@ it merges last.
 | #391 | builder; it overlaps #355 | #530, as #355 |
 | #542 | rule builder; it changes what the orchestrator reads at its start | #457 |
 | #337 | builder | |
-| #426 | builder; a .NET reader it files waits on #529 | |
+| #675 | builder | #529 |
 | #404 | builder | |
 | #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467 and #407 |
 | #492 | rule builder; it changes floor rule 4, with the owner's yes on the issue, who may start the orchestrator, and what every role reads at its start | #397 and #467 |
