@@ -2,8 +2,8 @@
 // third-party/ (#530): its headings, its bold lead-ins and its blocks, each by the line it stands on (from 0). A block is
 // a paragraph or a list item, its lines joined, each trimmed and led by a space, a list item led by its marker; a
 // heading, and each row of a table, is a block of its own line as written. A code block, fenced or indented, and HTML
-// are no block, and nothing in them is read. A front matter's fences ("---" on the first line and its close) are read
-// as blank lines, so its lines are text, as a tool that reads the file whole reads them.
+// (a block, or a comment inside one) are no block, and nothing in them is read. A front matter ("---" on the first line
+// to its close) is one block of plain text, as a tool that reads the file whole reads it: no heading or bold in it.
 //
 //   import { readMarkdown } from "./markdown.mjs";   readMarkdown(text) -> { heads: [{ level, i, text }],
 //                                                     bolds: [{ i, text }], blocks: [{ i, text }] }
@@ -12,14 +12,20 @@ import marked from "../third-party/marked/lib/marked.umd.js";
 const { Lexer } = marked;
 const breaks = s => (s.match(/\n/gu) || []).length;
 const rows = raw => raw.replace(/\n+$/u, "").split("\n");
-const joined = raw => rows(raw).map(l => ` ${l.trim()}`).join("");
+// (a comment of HTML inside a block is read as nothing, as HTML is)
+const joined = raw => rows(raw).map(l => ` ${l.trim()}`).join("").replace(/<!--[\s\S]*?-->/gu, "");
 
 export function readMarkdown(text) {
   let src = String(text).replace(/\r\n?/gu, "\n");
-  const front = /^---\n(?:.*\n)*?---(?:\n|$)/u.exec(src);
-  if (front) src = `\n${front[0].slice(4, front[0].lastIndexOf("---"))}\n${src.slice(front[0].length)}`;
-  const out = { heads: [], bolds: [], blocks: [] };
-  walk(out, Lexer.lex(src), 0);
+  const out = { heads: [], bolds: [], blocks: [] }, front = /^---\n(?:.*\n)*?---(?:\n|$)/u.exec(src);
+  let line = 0;
+  if (front) {
+    const inner = front[0].slice(4, front[0].lastIndexOf("---"));
+    if (inner.trim()) out.blocks.push({ i: 1, text: joined(inner) });
+    line = breaks(front[0]) + (front[0].endsWith("\n") ? 0 : 1);
+    src = src.slice(front[0].length);
+  }
+  walk(out, Lexer.lex(src), line);
   return out;
 }
 
@@ -30,8 +36,11 @@ function walk(out, tokens, line) {
       out.heads.push({ level: t.depth, i: line, text: t.text });
       out.blocks.push({ i: line, text: rows(t.raw)[0] });
       bolds(out, t, line);
-    } else if (t.type === "table") rows(t.raw).forEach((l, k) => out.blocks.push({ i: line + k, text: l }));
-    else if (t.type === "paragraph" || t.type === "text") {
+    } else if (t.type === "table") {
+      rows(t.raw).forEach((l, k) => out.blocks.push({ i: line + k, text: l }));
+      // (its bold lead-ins by row: the header's line, then each row's after the line under it)
+      [t.header, ...t.rows].forEach((cells, k) => cells.forEach(c => bolds(out, c, line + (k ? k + 1 : 0))));
+    } else if (t.type === "paragraph" || t.type === "text") {
       out.blocks.push({ i: line, text: joined(t.raw) });
       bolds(out, t, line);
     } else if (t.type === "list") items(out, t.items, line);
@@ -58,12 +67,13 @@ function items(out, list, line) {
 
 // The bold spans of a block, each on the line where its raw text stands, found in turn from the last.
 function bolds(out, block, line) {
+  const whole = block.raw ?? block.text ?? ""; // (a table's cell holds its text alone, on its row's one line)
   let from = 0;
   const go = tokens => {
     for (const x of tokens ?? []) {
       if (x.type !== "strong") { go(x.tokens); continue; }
-      const k = block.raw.indexOf(x.raw, from), at = k < 0 ? from : k;
-      out.bolds.push({ i: line + breaks(block.raw.slice(0, at)), text: x.text });
+      const k = whole.indexOf(x.raw, from), at = k < 0 ? from : k;
+      out.bolds.push({ i: line + breaks(whole.slice(0, at)), text: x.text });
       from = at + x.raw.length;
     }
   };

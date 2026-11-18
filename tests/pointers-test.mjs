@@ -8,6 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readMarkdown } from "../scripts/markdown.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0;
@@ -169,4 +170,12 @@ try {
   const steering = core(".agents/rules/core.md", "# The core, for a tool\n\nAs \"Running it\" in `tasks/a.md` says.\n");
   ok(steering.status === 1 && mended(steering.out) && /FAIL: a broken pointer: \.agents\/rules\/core\.md:3: "running it" is no heading/.test(steering.out), "in the core's own run an agent tool's file is read, and a broken pointer in it fails", steering.out);
 } finally { fs.rmSync(coreDir, { recursive: true, force: true }); }
+// ---- what the check reads of Markdown (markdown.mjs, on the carried package; #530's held-out cases) ----
+{
+  const md = readMarkdown("---\nname: x\n# not a heading\n---\n# Real\n\n```\n# in code, `x.md`\n```\n\nText #123 goes on\nand on, rule 3 <!-- rule 4 -->.\n\n| **a** | b |\n| --- | --- |\n| c | **d** |\n");
+  ok(JSON.stringify(md.heads.map(h => [h.level, h.i, h.text])) === JSON.stringify([[1, 4, "Real"]]), "a heading is read where Markdown has one: none in front matter or code");
+  ok(!md.blocks.some(b => b.text.includes("x.md") || b.text.includes("rule 4")) && md.blocks.some(b => b.i === 1 && b.text.includes("name: x")), "nothing in a code block or an HTML comment is read, and front matter is text");
+  ok(md.blocks.some(b => b.i === 10 && b.text === " Text #123 goes on and on, rule 3 ."), "a line led by #123 goes on its paragraph, which is one block by its first line");
+  ok(JSON.stringify(md.bolds.map(b => [b.i, b.text])) === JSON.stringify([[13, "a"], [15, "d"]]), "a bold lead-in in a table's row is read on that row's line");
+}
 process.exit(failed ? 1 : 0);
