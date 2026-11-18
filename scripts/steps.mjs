@@ -366,7 +366,9 @@ function limitsOf(item) {
 }
 // Whether an item says its input carries a version, in its own words outside its limits and anything in backticks (a
 // path such as `scripts/exact-versions.mjs` says nothing of the input).
-const versioned = item => /\bversions?\b/i.test(item.replace(/\blimits:[\s\S]*?(?=hostile\s+tests\b|$)/i, "").replace(/`[^`]*`/g, ""));
+// An item that says its input carries none ("no version", "without a version") says nothing of one either.
+const versioned = item => /\bversions?\b/i.test(item.replace(/\blimits:[\s\S]*?(?=hostile\s+tests\b|$)/i, "").replace(/`[^`]*`/g, "")
+  .replace(/\b(?:no|without(?:\s+an?)?)\s+versions?(?:\s+numbers?)?\b/gi, ""));
 const short = l => (l.length > 80 ? `${l.slice(0, 77)}...` : l);
 // The step for the inputs rule 5 names: "None", or the starter kit's "FILL IN", reads done only while it lists no input;
 // once one is listed, each is read, and an item whose tests are still "FILL IN" names none.

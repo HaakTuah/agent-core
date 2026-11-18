@@ -215,6 +215,8 @@ ok(missedInputs.length === 1 && /newest version/u.test(missedInputs[0].mend) && 
   "an item that says its input carries a version, and names no version among its limits, is reported; a path in backticks says nothing of one", report(missedInputs));
 ok(!rule5("   - a saved game, its version read first; limits: 1 MB, 5 s, version 3; hostile tests: `tests/hostile/link.test.mjs`.\n").length,
   "an item whose limits name the newest version its reader knows reads done");
+ok(!rule5("   - a peer's message, which carries no version number; limits: 64 KB; hostile tests: `tests/hostile/link.test.mjs`.\n").length,
+  "an item that says its input carries no version is not asked to name one");
 missedInputs = rule5("   Each message a peer sends, its size checked.\n");
 ok(missedInputs.length === 1 && missedInputs[0].mend.includes("as an item of its own"), "inputs written as a paragraph, no item in it, are reported, the mend saying to list them", report(missedInputs));
 fs.writeFileSync(secFile, secAsKit.replace(/^5\. .*\n/m, ""));

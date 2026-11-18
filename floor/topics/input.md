@@ -11,8 +11,9 @@ Read before a task touches what anyone but the user at hand can shape, and by a 
   names, after the words "hostile tests:", the file or folder that holds them, in backticks, and, after the words
   "limits:", its limit in size, in count and in time, each as a number and each where it applies; its "too long" case
   uses that number.
-  - It does not mean a limit made up where a shape has none: "limits: none", with why, is an answer, nor a limit for
-    every field. Reason: "too long" means nothing until an input says how long is allowed.
+  - The limits are declared, since no script reads a reader's limit from its code exactly; the security review holds
+    them true. It does not mean a limit made up where a shape has none: "limits: none", with why, is an answer, nor a
+    limit for every field. Reason: "too long" means nothing until an input says how long is allowed.
 - **Every named input has hostile tests:** too long, the wrong type, markup, a file path, a number
   out of range, and nothing at all, each refused with nothing of it used. Whoever adds an input, or changes the code
   that reads one, writes its tests in that pull request; an input named without them is a task of its own, which the

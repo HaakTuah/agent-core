@@ -27,6 +27,7 @@
       "check: scripts/versions.mjs, in part"
     ],
     "floor/topics/licences.md: 10. Licences: free to use, kept that way": "check: scripts/licences.mjs, in part",
+    "floor/topics/input.md: 5. Untrusted input is checked before it is used": "check: scripts/steps.mjs, in part",
     "floor/topics/input.md: A reader refuses a version it does not know": "check: scripts/steps.mjs, in part",
     "floor/topics/dependencies.md: 15. Dependencies": [
       "check: scripts/licences.mjs, in part",
@@ -379,6 +380,7 @@
     "tools/codex.md: On GitHub": [169]
   },
   "numbers": {
+    "floor/topics/input.md: 5. Untrusted input is checked before it is used": "findings; outcome: robust",
     "floor/topics/input.md: A reader refuses a version it does not know": "findings; outcome: robust",
     "tasks/code-shape.md: A job a maintained package does is done by it": "findings; outcome: robust",
     "tasks/updates.md: Node": "correction: does not work; outcome: robust",
