@@ -467,6 +467,13 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const loopedKept = run(pr(looped(), { "README.md": "x\n" }));
   ok(loopedKept.status === 0 && loopedKept.out.includes(LINKED), "one the base held is noted", loopedKept.out);
   fails(run(pr(looped(), { "elsewhere/x.md": `---\nname: x\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n` })), "but not once what it leads to changes", LINKED);
+  // (a folder of Claude Code's below the project's root, which it reads where it works there)
+  const NESTED = "holds agents, skills or commands that Claude Code reads where it works in that folder";
+  fails(run(pr(project({ ...script, ...listing() }), { "app/.claude/skills/x/SKILL.md": "# x\n" })), "a folder of skills below the project's root fails", NESTED, "Mend: move them into the root's .claude folder");
+  const nested = () => project({ ...script, "app/.Claude/agents/rev.md": "---\nname: rev\n---\n", ...listing() });
+  const nestedKept = run(pr(nested(), { "README.md": "x\n" }));
+  ok(nestedKept.status === 0 && nestedKept.out.includes(NESTED), "one the base held, in whatever case, is noted", nestedKept.out);
+  fails(run(pr(nested(), { "app/.Claude/agents/rev.md": `---\nname: rev\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n` })), "but not once what it holds changes", NESTED);
   for (const at of [".claude/Agents/rev.md", ".claude/agents/rev.MD", ".claude/Commands/rev.md"]) fails(run(pr(project({ ...script, ...listing() }), { [at]: "---\nname: rev\n---\n" })), `a subagent's file in another letter case, ${at}, fails`, "in another case");
   passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": "---\nname: rev\ndescription: reviews hooks\n---\n# rev\n" })), "a subagent with no hooks in its frontmatter passes");
   const frontStood = project({ ...script, ".claude/agents/rev.md": front("hooks") });
@@ -959,7 +966,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     // (and through an installed package, by what the lock file says of it: a version or source locked anew fails)
     const lockAt = version => JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version, resolved: `https://registry.npmjs.org/pkg/-/pkg-${version}.tgz` }, "node_modules/other": { version: "1.0.0" } } });
     const viaPackage = () => { const dir = project({ ".gitignore": "node_modules/\n", "package-lock.json": lockAt("1.0.0"), ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync("node_modules/pkg/.claude", path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link into an installed package"); return dir; };
-    const UNREAD = "through a node_modules folder an install fills, whose files this check does not read";
+    const UNREAD = "through a folder the commit does not hold, which an install fills";
     const lockKept = run(pr(viaPackage(), { "package-lock.json": JSON.stringify({ ...JSON.parse(lockAt("1.0.0")), packages: { ...JSON.parse(lockAt("1.0.0")).packages, "node_modules/other": { version: "2.0.0" } } }) }));
     ok(lockKept.status === 1 && lockKept.out.includes(UNREAD), "a link the base held into an installed package fails once the lock file changes, read whole, another package's update among it", lockKept.out);
     fails(run(pr(viaPackage(), { "package-lock.json": lockAt("2.0.0") })), "but not once the pull request locks the package anew", '".claude" is a link that leads out of the checkout');
@@ -1029,6 +1036,14 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     unread("pnpm patches from a file of its own", { "package.json": JSON.stringify({ pnpm: { patchedDependencies: { "pkg@1.0.0": "custom/pkg.patch" } } }), "pnpm-lock.yaml": "lockfileVersion: '9.0'\npatchedDependencies:\n  pkg@1.0.0:\n    hash: abc\n    path: custom/pkg.patch\n", "custom/pkg.patch": "a\n" }, { "custom/pkg.patch": "b\n" });
     unread("Yarn patches from a file of its own", { "yarn.lock": "\"pkg@patch:pkg@npm%3A1.0.0#./custom/pkg.patch::locator=app%40workspace%3A.\":\n  version: 1.0.0\n", "custom/pkg.patch": "a\n" }, { "custom/pkg.patch": "b\n" });
     unread("a workspace member links from its own folder", { "pnpm-lock.yaml": "lockfileVersion: '9.0'\nimporters:\n  packages/a:\n    dependencies:\n      pkg:\n        specifier: link:../pkg\n        version: link:../pkg\n", "packages/a/package.json": "{}\n", "packages/pkg/.claude/settings.json": KIT }, { "packages/pkg/.claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), apiKeyHelper: "bash x.sh" }) }, "packages/a/node_modules/pkg/.claude");
+    // (any folder an install fills, not node_modules alone, and what an install runs from the project: its scripts, an
+    // installer's own folder, a file a hook of the installer requires, a folder of patches named, a dependency by path)
+    unread("in a virtual environment", { ".gitignore": ".venv/\n", "requirements.txt": "pkg==1.0.0\n" }, { "requirements.txt": "pkg==2.0.0\n" }, ".venv/lib/pkg/.claude");
+    unread("whose install runs a script of the project", { "package.json": JSON.stringify({ scripts: { postinstall: "node scripts/setup" } }), "package-lock.json": lockAt("1.0.0"), "scripts/setup.js": "1\n" }, { "scripts/setup.js": "2\n" });
+    unread("whose installer runs from a folder of its own", { ".yarnrc.yml": "yarnPath: .yarn/releases/yarn.cjs\n", "yarn.lock": "# x\n", ".yarn/releases/yarn.cjs": "1\n" }, { ".yarn/releases/yarn.cjs": "2\n" });
+    unread("whose installer's hook requires a file", { ".pnpmfile.cjs": "module.exports = require('./lib/hook')\n", "pnpm-lock.yaml": "lockfileVersion: '9.0'\n", "lib/hook.js": "1\n" }, { "lib/hook.js": "2\n" });
+    unread("whose patches stand in a folder named", { "package.json": JSON.stringify({ scripts: { postinstall: "patch-package --patch-dir fixes" } }), "package-lock.json": lockAt("1.0.0"), "fixes/pkg+1.0.0.diff": "a\n" }, { "fixes/pkg+1.0.0.diff": "b\n" });
+    unread("taken by its path with no lock", { "package.json": JSON.stringify({ dependencies: { pkg: "./vendor/pkg" } }), "vendor/pkg/.claude/settings.json": KIT }, { "vendor/pkg/.claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), apiKeyHelper: "bash x.sh" }) });
     const yarnAt = pkg => `# yarn lockfile v1\n\n\npkg@^1.0.0:\n  version "1.0.0"\n  resolved "https://registry.yarnpkg.com/pkg/-/pkg-1.0.0.tgz"\n${pkg}`;
     const pnpmAt = pkg => `lockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    dependencies:\n      pkg:\n        specifier: npm:real-pkg@^1.0.0\n        version: real-pkg@1.0.0\n\npackages:\n\n  real-pkg@1.0.0:\n    resolution: {integrity: ${pkg}}\n`;
     for (const [lock, at, moved] of [["yarn.lock", yarnAt, '\n"pkg@^1.0.0":\n  version "1.0.0"\n  resolved "https://example.invalid/pkg-1.0.0.tgz"\n'], ["pnpm-lock.yaml", pnpmAt, "sha512-q"]]) {
