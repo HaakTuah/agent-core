@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ARGUED, DAYS, KIT, LISTED, MEASURES, MOST, TITLE, TRIPPED, argued, atCommit, baseRecords, checkOf, due, look, parse, records, report, signs, tripped, trippedBody, where } from "../scripts/choices.mjs";
+import { ARGUED, DAYS, KIT, LINK, LISTED, MEASURES, MOST, TITLE, TRIPPED, argued, atCommit, baseRecords, checkOf, due, look, parse, records, report, signs, tripped, trippedBody, where } from "../scripts/choices.mjs";
 import { DUE } from "../scripts/look.mjs";
 import { mended } from "../scripts/mend.mjs";
 
@@ -212,9 +212,14 @@ ok(baseRecords(slotted, hist) === `${old}\n${half}` && baseRecords(empty, hist) 
 // a records file that was a link at the base stays unread there, so nothing in it fails
 fs.writeFileSync(path.join(hist, "target.md"), half); fs.rmSync(path.join(hist, "records.md")); fs.symlinkSync("target.md", path.join(hist, "records.md"));
 h("add", "-A"); h("commit", "-q", "-m", "a link"); const linkedAt = h("rev-parse", "HEAD").trim();
-ok(atCommit(linkedAt, "records.md", hist) === undefined && atCommit(linkedAt, "target.md", hist) === half, "a file that is a link at a commit is not read there, and a file is");
-ok(checkOf({ file: "records.md", unread: "a link" }, linkedAt, hist)[1] === false && checkOf({ file: "records.md", text: half }, linkedAt, hist)[1] === false,
-  "records that were a link at the base fail nothing, still a link or made a file");
+ok(atCommit(linkedAt, "records.md", hist) === LINK && atCommit(linkedAt, "target.md", hist) === half && baseRecords(linkedAt, hist) === LINK, "a file that is a link at a commit is not read there, and reads as a link, apart from no commit, and a file is read (#541)");
+const madeFile = checkOf({ file: "records.md", text: half }, linkedAt, hist);
+ok(checkOf({ file: "records.md", unread: "a link" }, linkedAt, hist)[1] === false && madeFile[1] === false && /^The base held the records as a link, which is not read, so no record/.test(madeFile[0][0]) && !/no commit here/.test(madeFile[0].join("\n")) && /listed, not failed: "half"/.test(madeFile[0].join("\n")),
+  "records that were a link at the base fail nothing, still a link or made a file, each listed, and the line says the base held a link", madeFile[0].join("\n"));
+// the manifest a link at the base: where it put the records is not read, so they read as a link too
+fs.renameSync(path.join(hist, "core-manifest.md"), path.join(hist, "manifest-target.md")); fs.symlinkSync("manifest-target.md", path.join(hist, "core-manifest.md"));
+h("add", "-A"); h("commit", "-q", "-m", "a linked manifest"); const manifestLinked = h("rev-parse", "HEAD").trim();
+ok(baseRecords(manifestLinked, hist) === LINK && /^The base held the records as a link/.test(checkOf({ file: "records.md", text: half }, manifestLinked, hist)[0][0]), "and so do records named by a manifest that was a link at the base");
 fs.rmSync(hist, { recursive: true, force: true });
 
 fs.rmSync(tmp, { recursive: true, force: true });
