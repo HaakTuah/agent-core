@@ -38,8 +38,11 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   const badLocks = [{ ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], dependencies: { b: "git+https://example.invalid/b.git" } } } },
     { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], link: true } } },
     { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], resolved: "https://example.invalid/yaml.tgz" } } },
-    { lockfileVersion: 3, requires: true, dependencies: { yaml: { version: "git+https://example.invalid/yaml.git" } } }, { ...lock, packages: null }, { ...lock, dependencies: {} }];
-  ok(bad.every(l => lockFaults(l, lock).length > 0) && badLocks.every(l => lockFaults(list, l).length > 0) && lockFaults(list, { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], dependencies: { z: "^1.2.3 || ~2", y: "latest" } } } }).length === 0,
+    { lockfileVersion: 3, requires: true, dependencies: { yaml: { version: "git+https://example.invalid/yaml.git" } } }, { ...lock, packages: null }, { ...lock, dependencies: {} },
+    { ...lock, packages: { ...lock.packages, "node_modules/a.tgz": lock.packages["node_modules/yaml"] } },
+    { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], resolved: `${lock.packages["node_modules/yaml"].resolved}?d` } } },
+    { ...lock, packages: { ...lock.packages, "": { ...lock.packages[""], scripts: {} } } }, []];
+  ok([...bad, null, []].every(l => lockFaults(l, lock).length > 0) && badLocks.every(l => lockFaults(list, l).length > 0) && lockFaults(list, { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], dependencies: { z: "^1.2.3 || ~2", y: "latest" } } } }).length === 0,
     "and a field of its own, a spec naming git, a file or a tarball, a linked entry or one from another address, each is one it refuses; a range or a tag is none");
   // (what npm installed is what the lock file names: its own record of the install, read against the lock entry by
   // entry, whatever field or npm brought another source in; the core's tests' job installs before this runs)
@@ -134,6 +137,9 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
     && (await tooYoung({ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, {}, ask, now + day)).length === 0,
     "and the week's wait reads the tarball the address names, never the version field alone, and fails an entry whose address names no version of npm's registry", results.map(r => r.join(" | ")).join(" || "));
 }
+
+// (where the lock file or the week's wait failed, nothing below installs or loads a package of it)
+if (failed) { console.log(`FAIL ${failed} of the lock file's checks above failed, so nothing of it is installed or loaded here. Mend: mend each line above as it says`); process.exit(1); }
 
 // ---- nothing of another publisher's tracked: no node_modules/, no carried folder ----
 {

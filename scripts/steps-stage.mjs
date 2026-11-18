@@ -25,6 +25,15 @@ const folds = (dir, key) => fs.existsSync(at(dir, ".github/workflows/core.yml"))
 const NUGET = `name: nuget\n\non:\n  pull_request:\n\njobs:\n  nuget:\n    uses: ${CORE}/.github/workflows/nuget.yml@${PIN}\n    with:\n      config: checks/licences.json\n`;
 
 // (a suite of the project's own that reads the core's scripts, run on a change to them and to its own code)
+// (the project's own package.json given these workspaces, or none; one is written where the project holds none, and
+// taken out again where the step wrote it)
+const workspaces = (dir, list) => {
+  const file = at(dir, "package.json"), held = fs.existsSync(file) ? JSON.parse(read(dir, "package.json")) : null;
+  const next = { ...(held ?? { name: "staged", private: true }) };
+  if (list) next.workspaces = list; else delete next.workspaces;
+  if (!list && held && Object.keys(next).join() === "name,private" && next.name === "staged") fs.rmSync(file, { force: true });
+  else write(dir, "package.json", `${JSON.stringify(next, null, 2)}\n`);
+};
 const SCRIPTS = "name: scripts-staged\n\non:\n  pull_request:\n    paths:\n      - 'src/**'\n      - 'core/scripts/**'\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n";
 // (a suite of the project's own whose path filter leaves the copy and the manifest out, as it was told, and not the
 // files that hold only calls to the core's workflows, whose pins a sync moves)
@@ -321,9 +330,16 @@ export const STAGES = {
   },
   "18 November 2026, the core's packages installed from its lock file": {
     // (a job of the project's own that runs a script of the copy with nothing installed, before it only a step that names
-    // the install and one that never runs; the mend installs first, guarded, as it can go in ahead of the sync)
-    stage: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: echo core/scripts/install.mjs\n      - if: false\n        run: node core/scripts/install.mjs\n      - run: node core/scripts/steps.mjs\n")),
-    after: dir => fs.rmSync(at(dir, ".github/workflows/scripts-staged.yml"), { force: true }),
-    mend: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\n      - run: node core/scripts/steps.mjs\n")),
+    // the install and one that never runs; and the project's own workspaces taking the copy's folder in; the mend
+    // installs first, guarded, and leaves the folder out, as each can go in ahead of the sync)
+    stage: dir => {
+      write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: echo core/scripts/install.mjs\n      - if: false\n        run: node core/scripts/install.mjs\n      - run: node core/scripts/steps.mjs\n"));
+      workspaces(dir, ["*"]);
+    },
+    after: dir => { fs.rmSync(at(dir, ".github/workflows/scripts-staged.yml"), { force: true }); workspaces(dir, undefined); },
+    mend: dir => {
+      write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\n      - run: node core/scripts/steps.mjs\n"));
+      workspaces(dir, ["*", "!core"]);
+    },
   },
 };

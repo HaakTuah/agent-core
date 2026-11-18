@@ -83,13 +83,27 @@ const KEY = /^(?:node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*\/)*node_modu
 const plainAddress = r => { try { return /^https:\/\/registry\.npmjs\.org\//u.test(r) && new URL(r).href === r; } catch { return false; } };
 export function lockFaults(list, lock) {
   const out = [], specs = (where, o) => { for (const [n, v] of Object.entries(o ?? {})) if (!registrySpec(v)) out.push(`${where}: the spec ${JSON.stringify(n)}: ${JSON.stringify(v)} names no version, range or tag of npm's registry`); };
+  if (!plainObject(list)) return ["package.json: not an object of fields"];
+  if (!plainObject(lock)) return ["package-lock.json: not an object of fields"];
   for (const k of Object.keys(list ?? {})) if (!LIST_FIELDS.includes(k)) out.push(`package.json: the field ${JSON.stringify(k)}, which the core's package list does not hold`);
   for (const f of SPEC_FIELDS) specs(`package.json ${f}`, list?.[f]);
   // (the package list's own packages at one exact version each: floor rule 7)
   for (const f of ["dependencies", "devDependencies"]) for (const [n, v] of Object.entries(list?.[f] ?? {})) if (!/^\d+\.\d+\.\d+$/u.test(String(v))) out.push(`package.json ${f}: ${JSON.stringify(n)} at ${JSON.stringify(v)}, not one exact version`);
   out.push(...formFaults(lock));
-  for (const [k, e] of Object.entries(lock?.packages ?? {})) if (k) out.push(...entryFaults(k, e ?? {}, specs));
+  for (const [k, e] of Object.entries(lock?.packages ?? {})) out.push(...(k ? entryFaults(k, e ?? {}, specs) : rootFaults(e, list)));
   return out;
+}
+
+const plainObject = v => v !== null && typeof v === "object" && !Array.isArray(v);
+
+// The lock's root entry: the package list's own name, version, licence and packages, nothing else, since npm reads it
+// where it cannot read the package list.
+function rootFaults(e, list) {
+  if (!plainObject(e)) return ["package-lock.json \"\": not an object of fields"];
+  const odd = Object.keys(e).filter(f => !["name", "version", "license", "dependencies", "devDependencies"].includes(f));
+  const differ = ["dependencies", "devDependencies"].filter(f => JSON.stringify(e[f] ?? {}) !== JSON.stringify(list[f] ?? {}));
+  return [...(odd.length ? [`package-lock.json "": the field${odd.length === 1 ? "" : "s"} ${odd.join(", ")}, which the package list does not hold`] : []),
+    ...differ.map(f => `package-lock.json "": its ${f} not the package list's`)];
 }
 
 // The lock file's own form: npm's version 3, its entries under "packages" alone, since an older form's "dependencies"
@@ -107,7 +121,14 @@ function entryFaults(k, e, specs) {
   const out = [], odd = Object.keys(e).filter(f => !ENTRY_FIELDS.has(f));
   if (!KEY.test(k)) out.push(`package-lock.json ${JSON.stringify(k)}: a key that names no folder of node_modules/`);
   if (odd.length) out.push(`package-lock.json ${k}: the field${odd.length === 1 ? "" : "s"} ${odd.join(", ")}, which no package fetched from the registry carries`);
-  if (!plainAddress(e.resolved) || !/^sha512-/u.test(e.integrity ?? "")) out.push(`package-lock.json ${k}: not fetched from npm's registry at an address in its plain form, held to its sha512`);
+  // (the folder, the version and the address bound together: the address is exactly the registry's tarball of the
+  // package the folder names, at the entry's version, so no part of an entry is free for npm to read otherwise)
+  const name = k.slice(k.lastIndexOf("node_modules/") + "node_modules/".length), base = name.slice(name.indexOf("/") + 1);
+  const named = /^(?:@[a-z0-9~-][a-z0-9._~-]*\/)?[a-z0-9~-][a-z0-9._~-]*$/u.test(name) && !/\.t(?:gz|ar)/iu.test(name);
+  const version = typeof e.version === "string" && /^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/u.test(e.version) ? e.version : null;
+  if (!named || !version || e.resolved !== `https://registry.npmjs.org/${name}/-/${base}-${version}.tgz` || !plainAddress(e.resolved) || !/^sha512-/u.test(e.integrity ?? "")) {
+    out.push(`package-lock.json ${k}: not npm's registry tarball of ${named ? name : "a package named as npm names one"} at ${version ?? "one exact version"}, held to its sha512`);
+  }
   for (const f of SPEC_FIELDS) specs(`package-lock.json ${k} ${f}`, e[f]);
   return out;
 }
