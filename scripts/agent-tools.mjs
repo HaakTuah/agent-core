@@ -492,13 +492,12 @@ function commitReader(root, rev) {
     const d = resolve(dir);
     return d?.type === "tree" ? [...(listing(root, rev).children.get(d.f) ?? [])] : [];
   };
-  // (what a name holds, as a fingerprint reads it: a file's object, or what else stands there, a link's target and a
-  // submodule's commit among it, each said with its kind, so no file reads as a link or another file)
+  // (what a name holds, as a fingerprint reads it: what the walk reaches, by its kind and git's object, a file's or a
+  // submodule's commit, and each link it passes on the way, by its object, which is its target, so a link filled in,
+  // moved or leading on to what changed is seen)
   const holds = f => {
-    const r = resolve(f), { ids, linked } = listing(root, rev);
-    if (r?.type === "blob") return `\0a file\0${ids.get(r.f)}`;
-    const parent = resolve(path.posix.dirname(f)), real = parent ? `${parent.f === "." ? "" : `${parent.f}/`}${path.posix.basename(f)}` : null;
-    return real !== null && linked.has(real) ? `\0a link to\0${textAt(root, rev, real)}` : `\0${r?.type ?? "nothing"}\0${ids.get(r?.f) ?? ""}`;
+    const via = [], r = walk(root, rev, f, via), { ids } = listing(root, rev);
+    return [r?.type ?? "nothing", ids.get(r?.f) ?? "", ...via.map(at => `${at}\0${ids.get(at)}`)].join("\0");
   };
   return { resolve, read, names, holds };
 }
@@ -621,7 +620,7 @@ function target(root, rev, at) {
   }
   return targets.get(key);
 }
-function walk(root, rev, f) {
+function walk(root, rev, f, via = []) {
   const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
   let hops = 0;
   while (left.length) {
@@ -630,6 +629,7 @@ function walk(root, rev, f) {
     if (name === "..") { if (!at.length) return null; at.pop(); continue; }
     const here = [...at, name].join("/");
     if (linked.has(here)) {
+      via.push(here);
       const to = target(root, rev, here);
       if (++hops > 40 || to === null) return null;
       left.unshift(...to.split("/"));

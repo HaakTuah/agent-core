@@ -597,6 +597,23 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       git(added, "checkout", "-q", "main"); git(added, "merge", "-q", "--no-ff", "-m", "merge", "change2");
       fails(run(added), `a link out added as ${add} under a folder the base held in another case fails`, "Mend: rename it to .kiro");
     }
+    // (#600's fallback security review of 348aaed: an entry reached through a link is held by what the walk reaches and
+    // each link on the way, so a submodule moved behind it, a broken link filled in or a link on the way moved is seen)
+    const held = (setup, change, says) => {
+      const dir = project({ ".Kiro/hooks/x.json": "{}\n", ...listing() });
+      setup(dir);
+      git(dir, "checkout", "-q", "-B", "change2");
+      change(dir);
+      git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change2");
+      fails(run(dir), says, "Mend: rename it to .kiro");
+    };
+    // (a submodule's entry, its folder left empty on disk so `git add -A` keeps it, committed on its own)
+    const sub = (dir, at, id) => { fs.mkdirSync(path.join(dir, at), { recursive: true }); git(dir, "update-index", "--add", "--cacheinfo", `160000,${id},${at}`); git(dir, "commit", "-q", "-m", `a submodule at ${at}`); };
+    const linkIn = dir => { fs.symlinkSync("../inner", path.join(dir, ".Kiro/settings")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link in"); };
+    held(dir => { linkIn(dir); sub(dir, "inner", git(dir, "rev-parse", "HEAD")); }, dir => sub(dir, "inner", git(dir, "rev-parse", "HEAD~2")), "a submodule behind a link the base held, moved, fails");
+    held(linkIn, dir => sub(dir, "inner", git(dir, "rev-parse", "HEAD")), "a broken link the base held, filled in with a submodule, fails");
+    held(linkIn, dir => { fs.symlinkSync(os.tmpdir(), path.join(dir, "inner")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "filled in"); }, "and filled in with a link out");
+    held(dir => { fs.symlinkSync(os.tmpdir(), path.join(dir, "inner")); linkIn(dir); }, dir => { fs.unlinkSync(path.join(dir, "inner")); fs.symlinkSync(path.dirname(os.tmpdir()), path.join(dir, "inner")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "moved"); }, "a link on the way the pull request moves fails");
     // (#600's fallback security review of 27d9d98: a file is held by its kind too, so none reads as a link it names)
     const asLink = project({ ".Codex/hooks.json": "{}\n", ...listing() });
     fs.symlinkSync(os.tmpdir(), path.join(asLink, ".Codex/config.toml"));
