@@ -9,6 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { kitHooks, listed } from "../scripts/agent-tools.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { kitForm } from "../scripts/hook-source.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { STEPS, notDone } from "../scripts/steps.mjs";
@@ -582,7 +583,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   // (a folder of Claude Code's below the project's root, which it reads where it works there)
   const NESTED = "is a folder of Claude Code's below the project's root";
   // (the core's own copy is none of the project's: its .claude is the core's, held to the core's commit by core.yml)
-  const manifest = at => ({ "core-manifest.md": `Core: HaakTuah/agent-core at ${"a".repeat(40)}, copied whole under ${at} (never edited here).\n` });
+  const manifest = at => ({ "core-manifest.md": `Core: ${CORE} at ${"a".repeat(40)}, copied whole under ${at} (never edited here).\n` });
   passes(run(pr(project({ ...script, ...manifest("core/"), ...listing() }), { "core/.claude/settings.json": KIT, "core/README.md": "# core\n" })), "the core's own copy, where the manifest names it, with its .claude, is no folder of the project's below its root");
   fails(run(pr(project({ ...script, ...listing() }), { "core/.claude/settings.json": KIT })), "but with no manifest, as in the core's own repository, a core/.claude fails as any other does", NESTED);
   const elsewhere = run(pr(project({ ...script, ...manifest("vendor/core/"), ...listing() }), { "vendor/core/.claude/settings.json": KIT, "core/.claude/settings.json": KIT }));
