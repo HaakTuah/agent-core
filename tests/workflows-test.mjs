@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { parseYaml } from "../scripts/workflow-run.mjs";
 import { lines, readable, reads, repeated, unlinked } from "../scripts/workflows.mjs";
-import { flowTwice, keyAt, twice, uncommented } from "../scripts/yaml-keys.mjs";
+import { twice, uncommented } from "../scripts/yaml-keys.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -49,15 +49,13 @@ ok(dup("a: 1 # a: 2\n# a: 3\nb: '#x' # c\nb: \"#y\"\n") === "b@4<3" && dup("a: 1
 ok(dup("a: &x\n  b: 1\n  b: 2\nc: *x\nc: !!str y\n") === "b@3<2,c@5<4" && dup("---\na: 1\n---\na: 2\n") === "", "a value that is only an anchor or a tag holds the mapping below it, and each document is its own");
 ok(dup("on: { push: {}, \"push\": {} }\n") === "push@1<1" && dup("on: {\n  push: {branches: [a, b]},\n  push: {} }\nx: 1\nx: 2\n") === "push@3<2,x@5<4" && dup("- {a: 1, b: [{a: 1, a: 2}], a: 2}\n") === "a@1<1,a@1<1", "in a flow mapping too, on one line or on several, and one in a list or inside another");
 ok(dup("a: {b: 1, c: {b: 2}}\nd: [a, a, {e: 1}, {e: 2}]\nf: {'g': 1, h: 'g', i}\n") === "" && dup("a: {x, x}\nb: {: 1, : 2}\n") === "x@1<1,@2<2", "while what lies in two mappings, a list's items and a value are none, and a key with no value or no name is one");
-ok(dup(`a: {'it''s': 1, "it's": 2, "q\\"": 3, 'q"': 4}\nb: {x:y: 1, x:y: 2, z: [c, d], z: {e}}\nc: {a:`) === "it's@1<1,q\"@1<1,x:y@2<2,z@2<2" && flowTwice("{a:, a:").map(f => f.key).join() === "a", "a flow key quoted either way, with a colon in it, or holding a list or a mapping, and one at the text's end");
+ok(dup(`a: {'it''s': 1, "it's": 2, "q\\"": 3, 'q"': 4}\nb: {x:y: 1, x:y: 2, z: [c, d], z: {e}}\nc: {a:`) === "it's@1<1,q\"@1<1,x:y@2<2,z@2<2" && dup("{a:, a:") === "a@1<1", "a flow key quoted either way, with a colon in it, or holding a list or a mapping, and one at the text's end");
 ok(dup("a: {\n b: 1,\n\n # c: 1\n c: 2, b: 3,\n c: 4 }\n") === "b@5<2,c@6<5" && dup(`a: ${"[".repeat(20000)}\nb: 1\nb: 2\n`) === "b@3<2" && dup(`a: [${"{b: 1, b: 2}, ".repeat(3)}]\n`) === "b@1<1,b@1<1,b@1<1", "a blank line or a comment in a flow value keeps its lines counted, and a value nested past any mark throws nothing, the rest of the file read still");
 const hostile = Date.now(), many = dup(`a: {\n${" b: 1,\n".repeat(40000)}}\n`).split(",").length;
 ok(many === 39999 && dup(`x${" ".repeat(100000)}y\n${"a".repeat(100000)}: 1\n`) === "" && Date.now() - hostile < 5000, `forty thousand keys twice in one value, and a line of a hundred thousand blanks or letters, read in a few seconds at most (${Date.now() - hostile} ms)`);
-ok(dup("env: &defaults { FOO: one, FOO: two }\n- !t [ {c: 1, c: 2} ]\n") === "FOO@1<1,c@2<2" && dup("a: {x: &y {b: 1, b: 2}, z: !t 1, z: 2}\n") === "b@1<1,z@1<1" && dup("a: {!t b: 1, &c b: 2}\n") === "b@1<1" && dup("env: { A: 'it''s # text', A: two }\n") === "A@1<1",
+ok(dup("env: &defaults { FOO: one, FOO: two }\nx:\n- !t [ {c: 1, c: 2} ]\n") === "FOO@1<1,c@3<3" && dup("a: {x: &y {b: 1, b: 2}, z: !t 1, z: 2}\n") === "b@1<1,z@1<1" && dup("a: {!t b: 1, &c b: 2}\n") === "b@1<1" && dup("env: { A: 'it''s # text', A: two }\n") === "A@1<1",
   "a flow value behind an anchor or a tag is read, a node in it behind one too, and a doubled quote inside single quotes ends neither the quote nor the line");
 ok(dup("matrix: { include: [{ os: ubuntu-latest, }], os: [windows-latest] }\n") === "" && dup("jobs: { build: { runs-on: x, }, build: { runs-on: y } }\n") === "build@1<1", "a blank between a last comma and the bracket that closes a flow value closes it there");
-ok(flowTwice("{a: 1, a: 2}").map(f => `${f.key}${f.at}<${f.first}`).join() === "a7<1" && flowTwice("{a: 1, ]b: 1, b").map(f => f.key).join() === "b" && flowTwice("[a: 1, a: 1]").length === 0 && flowTwice("{a:1, a:2}").length === 0, "a flow mapping's keys by their offsets, read on past a character no node takes; a pair in a list and a plain a:1, which is one scalar, are no key");
-ok(keyAt("a: b") .key === "a" && keyAt("url: http://x/y: z").value === "http://x/y: z" && keyAt("a:b: c").key === "a:b" && keyAt("-x: 1").key === "-x" && keyAt("a:b") === null && keyAt("- a: 1") === null && keyAt("? a") === null && keyAt("{a: 1}") === null, "a key ends at the first colon a blank or the line's end follows, and a dash, a question mark or a brace before it starts none");
 ok(uncommented("a: 'x # y' # z") === "a: 'x # y'" && uncommented(`a: "x \\" # y" # z`) === `a: "x \\" # y"` && uncommented("a: b#c") === "a: b#c" && uncommented("a: b# c") === "a: b# c" && uncommented("a: 'b\\' # c") === "a: 'b\\'" && uncommented("# all") === "" && uncommented("a: it's # x") === "a: it's", "a comment starts at a # after a blank, outside quotes, and a quote inside a word opens none");
 const was = "on: push\non: pull_request\nx: 1\n", now = "on: push\non: pull_request\nx: 1\nx: 2\nx: 3\n";
 const base = repeated([{ file: "a.yml", text: now }, { file: "b.yml", text: was }], f => (f === "a.yml" ? `${was}x: 2\n` : null));
@@ -75,6 +73,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-test-"));
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
   for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
+  fs.cpSync(fileURLToPath(new URL("../third-party", import.meta.url)), path.join(tmp, "core/third-party"), { recursive: true });
   fs.mkdirSync(path.join(tmp, ".github/workflows"), { recursive: true });
   fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), `on:\n${"  pull_request_target:\n".repeat(7)}`);
   fs.writeFileSync(path.join(tmp, ".github/workflows/b.yml"), Buffer.from("on: push\n", "utf16le"));
