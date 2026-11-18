@@ -664,14 +664,14 @@ function walk(root, rev, f, via = []) {
   return reached(at.join("/") || ".", blobs, dirs, others);
 }
 // Whether a walk goes on past `here`, `more` of the path after it: the last name may be anything the commit holds; one
-// with more after it, anything but a file, as the file system goes neither into a file nor back out of one by "..". A
-// name that is no folder the commit holds, a submodule's entry or what a clone holds beside the commit (.git among it),
-// the walk goes into and back out of by "..", as the file system may, said in `via`, so what it reaches past it is
-// still held, and a name inside it, which the commit does not hold, ends the walk.
-function goesOn({ blobs, dirs, others }, here, more, via) {
+// with more after it, a folder the commit holds, or a folder every clone holds beside what the commit lists, a
+// submodule's entry or the root's .git, which the walk goes into and back out of by "..", as the file system does, said
+// in `via` so what it reaches past it is still held; a name inside it, which the commit does not hold, and a name no
+// clone holds end the walk, as they end the file system's.
+function goesOn({ dirs, blobs, others }, here, more, via) {
   if (dirs.has(here)) return true;
   if (!more) return blobs.has(here) || others.has(here);
-  if (blobs.has(here)) return false;
+  if (!others.has(here) && here !== ".git") return false;
   via.push(here);
   return true;
 }
