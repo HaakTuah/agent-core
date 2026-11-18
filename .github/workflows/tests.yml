@@ -15,6 +15,8 @@
 # A third takes four packages from npm's registry, each at one exact version and held to its sha512 before it is
 # unpacked, with no script of theirs run: the reference parsers the hand-written readers are held to, tools that only
 # run, in the core's audit (tests/readers-test.mjs, on Linux).
+# A fourth asks npm's registry of each package the core carries in third-party/ and fetches its tarball, held to its
+# sha512 before it is unpacked, to hold each carried file to it (tests/third-party-test.mjs, on Linux).
 # Each job of the suites, two on Linux and seven on Windows on each Node, and the upgrade test, are each held to a time
 # mark (the "suites" of .github/shape.json, by scripts/shape.mjs; tasks/tests.md, "The tests have a time mark").
 # On a pull request each job runs only the suites its change can reach, against the merge's first parent, its base, and
@@ -50,8 +52,8 @@ jobs:
   # cases outgrew the licences' mark there and the faults half has no room for them (#603); and the rest (rest). Each
   # step's condition names its part in the job's list "parts", read by substring: no name holds another, but that core
   # is named beside its half. On Windows, where a suite that starts many processes runs several times slower, a job
-  # takes kit with steps, the second half with terms, the rest with tools, and each other part alone; on Linux two jobs take them, kit, core, licences, terms and
-  # tools in one, projects, sync, rest and steps,
+  # takes kit with steps, the second half with terms, the rest with tools, and each other part alone; on Linux two jobs
+  # take them, kit, core, licences, terms and tools in one, projects, sync, rest and steps,
   # with the steps run once on Linux, in the other, which keeps the name of the suite that was whole and so its mark,
   # lowered. Each part is sized by its steps' times on the slow runner, which takes half as long again as another, so
   # that it ends within its mark there too, no mark raised: on Windows, by #506's run on 02b9c4e, about 375 of 600, 320
@@ -131,6 +133,9 @@ jobs:
       - name: The lookup again of what a project holds, on recorded answers
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/held-test.mjs ')) }}
         run: node tests/held-test.mjs
+      - name: The packages the core carries, against npm's registry (on Linux, where tar unpacks them)
+        if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/third-party-test.mjs ')) }}
+        run: node tests/third-party-test.mjs
       - name: The agent-tools check
         if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-test.mjs ')) }}
         run: node tests/agent-tools-test.mjs

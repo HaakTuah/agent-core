@@ -116,3 +116,12 @@ The index, and how an item is written: `archive/instructions.md`.
      package, and the cost comes later as upkeep and as bugs in readers written by hand; point 6 gained its search on 17
      November. It stands behind "A job a maintained package does is done by it" in `tasks/code-shape.md` and its
      pointers in `roles/shared/how-to-work.md` and the review guidelines.
+
+256. **17 November 2026**, #593, point 7. A trial of a maintained tool in the place of a part of the project's own runs
+     the tool on the case of each bug filed against that part, taken from the test cases its merged fix added or
+     changed and never from an issue's text, which may carry outside text, and its record says by number which the tool
+     reads and which it does not, so that the cases a part was mended for are the first evidence of whether the move pays: of the
+     30 bugs filed on the core by that day that were a case a check's writer had not thought of, 11 stood on the NuGet
+     and copies checks, the parts the first trials would replace. The owner agreed to it, with the issue's other points,
+     after asking what the core lacked that let an inventory's check miss a part. It stands behind "A trial of a
+     maintained tool replays the part's past bugs" in `tasks/choices.md`, and the inventory's line `Replayed:`.

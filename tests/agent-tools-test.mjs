@@ -196,6 +196,7 @@ if (process.platform !== "win32") {
 const synced = project({ ...listing() });
 const HERE = fileURLToPath(new URL("..", import.meta.url));
 fs.cpSync(path.join(HERE, "scripts"), path.join(synced, "core/scripts"), { recursive: true });
+fs.cpSync(path.join(HERE, "third-party"), path.join(synced, "core/third-party"), { recursive: true });
 fs.cpSync(path.join(HERE, "setup/template"), path.join(synced, "core/setup/template"), { recursive: true });
 git(synced, "add", "-A"); git(synced, "commit", "-q", "-m", "the copy");
 const newKit = JSON.parse(KIT);
@@ -834,9 +835,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   passes(run(pr(project({ ...listing() }), withEnv({ EDITOR: "vi", DEBUG: "1" }))), "a setting's \"env\" of other variables passes");
   fails(run(pr(project({ ...listing() }), withEnv({ BASH_ENV: "scripts/x.sh" }))), "one that sets a variable a shell reads as it starts fails", SAYS, '.claude/settings.json: "env"', "Mend: take it out");
   // (each name in one run, a project being costly to set up where git is slow, as on Windows)
-  const names = ["ENV", "PATH", "Path", "NODE_OPTIONS", "GIT_DIR", "GIT_CONFIG_COUNT", "LD_PRELOAD", "BASH_FUNC_x"];
+  // (#603's fallback security review of f021c25: where git, ssh and the tool itself find their own settings too)
+  const names = ["ENV", "PATH", "Path", "NODE_OPTIONS", "GIT_DIR", "GIT_CONFIG_COUNT", "LD_PRELOAD", "BASH_FUNC_x", "HOME", "XDG_CONFIG_HOME", "SSH_ASKPASS", "CLAUDE_CODE_SHELL_PREFIX", "CLAUDE_PROJECT_DIR", "ComSpec"];
   fails(run(pr(project({ ...listing() }), withEnv(Object.fromEntries(names.map(n => [n, "x"]))))), `and so does one that sets ${names.join(", ")}`, ...names.map(n => `sets the variable "${n}"`));
   fails(run(pr(project({ ...listing() }), withEnv({ BASH_ENV: "x" }, ".claude/settings.local.json"))), "in settings.local.json too", '.claude/settings.local.json: "env"');
+  fails(run(pr(project({ ...listing() }), { ".codex/config.toml": "[profiles.fast.shell_environment_policy.set]\nHOME = \"cfg\"\n" })), "and in a Codex profile's, which replaces it where the profile is chosen", '.codex/config.toml: "profiles.fast.shell_environment_policy.set"', 'sets the variable "HOME"');
   fails(run(pr(project({ ...listing() }), { ".codex/config.toml": "[shell_environment_policy]\nset = { NODE_OPTIONS = \"x\" }\n" })), "and in Codex's config, the environment its commands are given", '.codex/config.toml: "shell_environment_policy.set"', 'sets the variable "NODE_OPTIONS"');
   fails(run(pr(project({ ...listing() }), withEnv(["BASH_ENV"]))), "an \"env\" that is no object is refused as the wrong shape", '"env" is not a JSON object');
   const held = project({ ...withEnv({ BASH_ENV: "scripts/x.sh" }), ...listing() });

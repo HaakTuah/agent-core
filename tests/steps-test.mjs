@@ -48,7 +48,7 @@ function kit(name, o) {
   fs.mkdirSync(path.join(dir, "checks"), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify(licences(o, () => false), null, 2)}\n`);
   // (the copy of the core the project holds, as far as its checks read it, and the size marks the kit writes for it)
-  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
+  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", "third-party", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, f)).size]))), null, 2)}\n`);
   execFileSync("git", ["add", "-A"], { cwd: dir });
   // (the copies check's first baseline as the starter kit writes it, its two entry files' shared sentence listed)
@@ -83,6 +83,15 @@ for (const [name, dir] of Object.entries(dirs)) {
   const runs = said("      - run: node core/scripts/strength.mjs\n        env:\n          STRENGTH_BASE: origin/main\n");
   ok(comment !== null && bare !== null && runs === null, "a named mutation tool reads done only where a workflow on pull requests runs the strength check with its base, never where one only mentions it", `${comment}\n${bare}\n${runs}`);
   fs.writeFileSync(manifest, was); fs.rmSync(flow);
+}
+// (a suite filtered to one script of the copy's, by its exact path, reads it too: every file the copy holds is read)
+{
+  const dir = dirs["an-npm-project"], flow = path.join(dir, ".github/workflows/one-script.yml");
+  const step = STEPS.find(s => s.lead === "17 November 2026, the packages the copy carries");
+  const said = paths => { fs.writeFileSync(flow, `name: one\non:\n  pull_request:\n    paths:\n${paths.map(x => `      - '${x}'\n`).join("")}jobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`); return step.check(project(dir)); };
+  const one = said(["src/**", "core/scripts/yaml-keys.mjs"]), both = said(["src/**", "core/scripts/yaml-keys.mjs", "core/third-party/**"]), own = said(["src/**"]);
+  ok(one?.includes("one-script.yml") && both === null && own === null, "a suite that runs on one script of the copy, named by its path, is reported until it runs on the packages too; one that runs on none of the copy is not", `${one}\n${both}\n${own}`);
+  fs.rmSync(flow);
 }
 // (the starter kit's `none`: no tests yet stands until the project's own code holds a test)
 {

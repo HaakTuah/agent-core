@@ -196,12 +196,18 @@ function readCodex(state, json, read) {
   addServers(state, ".codex/config.toml", state.entries(".codex/config.toml", "mcp_servers", config.mcp_servers, SERVERS), "Codex ");
   const policy = state.entries(".codex/config.toml", "shell_environment_policy", config.shell_environment_policy, "its settings");
   readEnv(state, ".codex/config.toml", "shell_environment_policy.set", policy.set);
+  // (and each profile's, which replaces it where the profile is chosen)
+  for (const [name, profile] of Object.entries(state.entries(".codex/config.toml", "profiles", config.profiles, "each profile's name to its settings"))) {
+    const its = state.entries(".codex/config.toml", `profiles.${name}`, profile, "its settings");
+    readEnv(state, ".codex/config.toml", `profiles.${name}.shell_environment_policy.set`, state.entries(".codex/config.toml", `profiles.${name}.shell_environment_policy`, its.shell_environment_policy, "its settings").set);
+  }
 }
 
-// The variables a shell, git, Node or the system's loader reads as a program starts, before what it was given to run:
-// set by a tool's settings for the programs it starts, hooks among them, they change what a hook runs, so that main's
-// copy is not all it runs (floor rule 3). Names read as Windows reads them, whatever their case.
-const STARTS = /^(?:BASH_ENV|ENV|PATH|NODE_OPTIONS|NODE_PATH|SHELLOPTS|BASHOPTS|PS4|IFS|CDPATH|GLOBIGNORE|GIT_.*|LD_.*|DYLD_.*|BASH_FUNC_.*)$/iu;
+// The variables a shell, git, ssh, Node, the system's loader or the tool itself reads as a program starts, before what
+// it was given to run, where it finds its own settings among them (HOME, XDG_CONFIG_HOME): set by a tool's settings for
+// the programs it starts, hooks among them, they change what a hook runs, so that main's copy is not all it runs (floor
+// rule 3). Names read as Windows reads them, whatever their case.
+const STARTS = /^(?:BASH_ENV|ENV|PATH|PATHEXT|COMSPEC|HOME|XDG_CONFIG_HOME|NODE_OPTIONS|NODE_PATH|SHELLOPTS|BASHOPTS|PS4|IFS|CDPATH|GLOBIGNORE|SSH_ASKPASS.*|CLAUDE_PROJECT_DIR|CLAUDE_CODE_SHELL.*|CLAUDE_CODE_GIT_BASH_PATH|GIT_.*|LD_.*|DYLD_.*|BASH_FUNC_.*)$/iu;
 // Each such variable a tool's setting `key` in `file` sets, as a problem with the entry's own text, so one the base held
 // is noted while that entry stands, whatever else of the file changes.
 function readEnv(state, file, key, env) {
