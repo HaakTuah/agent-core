@@ -81,7 +81,8 @@ it merges last.
 | #650 | rule builder | #654 |
 | #661 | builder | |
 | #662 | rule builder | |
-| #679 to #682 | rule builder; each its own PR, in order | #467 |
+| #679 to #682 | rule builder; one PR each | #467 |
+| #702 | rule builder; it changes what every role reads at its start | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
