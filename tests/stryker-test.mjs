@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { limitOf } from "../scripts/mutate.mjs";
 import { coreReporter, named, progress, strykerPlugins } from "../scripts/stryker-plugin.mjs";
-import { asItStands, counted, dispatch, optionsOf, testsFor } from "../scripts/stryker.mjs";
+import { asItStands, counted, dispatch, optionsOf, stopTests, testsFor, word } from "../scripts/stryker.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -86,17 +86,35 @@ try {
     if (!fs.existsSync("/proc")) { try { process.kill(pid, 0); alive = true; } catch { alive = false; } }
     if (alive) process.kill(pid, "SIGKILL");
     ok(slow === 1 && Date.now() - started < 30000 && !alive, "a test past its limit is stopped with every process it started, and the fault is caught", `alive: ${alive}`);
+    // (the dispatcher stopped mid-test, as Stryker's stop stops it: the test it named is stopped by stopTests, with all
+    // it started)
+    fs.rmSync(pidAt, { force: true });
+    const groupsAt = path.join(slowDir, "groups"), mapAt = path.join(slowDir, "tests.json");
+    fs.mkdirSync(groupsAt);
+    fs.writeFileSync(mapAt, JSON.stringify({ ...slowMap, groups: groupsAt }));
+    const d = spawn(process.execPath, [SCRIPT, "--tests", mapAt], { env: { ...process.env, __STRYKER_ACTIVE_MUTANT__: "7" }, stdio: "ignore" });
+    for (let i = 0; i < 100 && !(fs.existsSync(pidAt) && fs.readdirSync(groupsAt).length); i++) await new Promise(r => setTimeout(r, 100));
+    const test = Number(fs.readdirSync(groupsAt)[0]), grandchild = Number(fs.readFileSync(pidAt, "utf8"));
+    d.kill("SIGKILL");
+    await new Promise(r => d.on("exit", r));
+    stopTests(groupsAt);
+    const left = [test, grandchild].filter(p => { for (let i = 0; i < 20; i++) { try { const st = fs.readFileSync(`/proc/${p}/stat`, "utf8"); if (/^\S+ \(.*\) [ZX]/u.test(st)) return false; } catch { return false; } spawnSync("sleep", ["0.1"]); } return true; });
+    for (const p of left) try { process.kill(p, "SIGKILL"); } catch { /* (gone) */ }
+    ok(test > 0 && grandchild > 0 && !left.length && !fs.readdirSync(groupsAt).length, "a test its dispatcher was stopped in the middle of is stopped, with all it started, once Stryker is", `left: ${left.join(", ") || "none"}`);
   }
   delete process.env.__STRYKER_ACTIVE_MUTANT__;
   ok(same(counted({ files: { a: { mutants: [{ status: "Killed" }, { status: "Pending" }, { status: "Killed" }] } } }), { Killed: 2, Pending: 1 }), "a report's faults are counted by their status");
 
   // ---- the options Stryker is given ----
   const o = optionsOf({ mutate: ["src/a.mjs:1-2"], mapAt: "/x/tests.json", scratch: "/x", report: "/x/r.json", plan: "/x/plan.json", concurrency: 2 });
-  ok(o.testRunner === "command" && o.inPlace && o.coverageAnalysis === "off" && o.commandRunner.command.endsWith('--tests "/x/tests.json"') && same(o.reporters, ["core-report"]) && o.plugins[0].endsWith("stryker-plugin.mjs") && same(o.coreRun, { report: "/x/r.json", plan: "/x/plan.json" }) && same(o.mutate, ["src/a.mjs:1-2"]),
+  ok(o.testRunner === "command" && o.inPlace && o.coverageAnalysis === "off" && o.commandRunner.command.endsWith(`--tests ${word("/x/tests.json")}`) && same(o.reporters, ["core-report"]) && o.plugins[0].endsWith("stryker-plugin.mjs") && same(o.coreRun, { report: "/x/r.json", plan: "/x/plan.json" }) && same(o.mutate, ["src/a.mjs:1-2"]),
     "Stryker runs this script's tests for each fault by its command runner, in place, with the core's reporter alone");
-  threw = false;
-  try { optionsOf({ mutate: [], mapAt: '/x/"a"/tests.json', scratch: "/x", report: "r", plan: "p" }); } catch (e) { threw = mended(`FAIL: ${e.message}`); }
-  ok(threw, "a path no shell's word can hold is refused, saying the mend");
+  const refused = (p, windows) => { try { word(p, windows); return false; } catch (e) { return mended(`FAIL: ${e.message}`); } };
+  ok(refused("/x/a\nb", false) && refused("/x/a%PATH%b", true) && refused('/x/"a"', true) && !refused('/x/"a"', false), "a path no shell's word can hold as it is, a line break anywhere, or a % or double quote on Windows, is refused, saying the mend");
+  if (process.platform !== "win32") {
+    const odd = "/tmp/a $HOME `id` 'q' \\ \"d\"";
+    ok(spawnSync("sh", ["-c", `printf %s ${word(odd)}`], { encoding: "utf8" }).stdout === odd, "a path is one word of the shell, read as it is written: nothing in it is expanded");
+  }
   const bare = spawnSync(process.execPath, [SCRIPT, "--report", path.join(scratch, "r.json")], { encoding: "utf8" });
   const none = spawnSync(process.execPath, [SCRIPT, "--tool", path.join(scratch, "none"), "--report", path.join(scratch, "r.json")], { encoding: "utf8" });
   ok(bare.status === 1 && mended(bare.stderr) && none.status === 1 && /Stryker is not installed in/.test(none.stderr) && mended(none.stderr) && /npm ci --ignore-scripts/.test(none.stderr),

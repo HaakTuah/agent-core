@@ -11,8 +11,9 @@
 // - a working copy of the project's own (mutate.mjs's copyOf: a git worktree of HEAD with the files that differ from
 //   it), in which Stryker changes the files in place, so the project's own files are never changed and its tests find
 //   git as they do in the project;
-// - the budget: past it Stryker is stopped, and the faults it had not run stand in the report as not run ("Pending"),
-//   since its reporter (stryker-plugin.mjs, beside this file) writes the report as the run goes;
+// - the budget: past it Stryker is stopped, with every test it was running, and the faults it had not run stand in
+//   the report as not run ("Pending"), since its reporter (stryker-plugin.mjs, beside this file) writes the report as
+//   the run goes;
 // - the report, in the open form strength.mjs reads, at the path given.
 // Stryker itself is a tool that only runs, installed at one exact version from a lock file of the project's (the
 // core's: tests/mutation/), never with its install scripts (floor rules 7 and 15); --tool names that folder.
@@ -33,9 +34,13 @@ import { started } from "./started.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ACTIVE = "__STRYKER_ACTIVE_MUTANT__"; // (the variable Stryker's command runner names the fault to switch on by)
-// (a path as one word of the shell the command runner starts, on every system: in double quotes, none of which a path
-// the runner is given holds)
-const word = p => { if (/["\r\n]/u.test(p)) refuse(`the path ${JSON.stringify(p)} holds a character a shell's word cannot`, "run from a folder whose path holds no double quote or line break"); return `"${p}"`; };
+// A path as one word of the shell the command runner starts, read as it is written: in single quotes off Windows, each
+// of its own written as '\'', so no $, ` or \ is expanded; in double quotes on Windows, where a path that holds one, or
+// a %, is refused, as is one that holds a line break anywhere.
+export const word = (p, windows = process.platform === "win32") => {
+  if (/[\r\n\0]/u.test(p) || (windows && /["%]/u.test(p))) refuse(`the path ${JSON.stringify(p)} holds a character the shell's word cannot hold as it is`, `run from a folder whose path holds no line break${windows ? ", double quote or %" : ""}`);
+  return windows ? `"${p}"` : `'${p.replaceAll("'", "'\\''")}'`;
+};
 
 // The tests to run for one fault, those of the file the plan names for it; none in the run before any fault
 // (Stryker's dry run): from `map`, { files: { file: [tests] }, plan: <its path>, asIs: <a folder> }.
@@ -44,9 +49,28 @@ export function testsFor(map, active, readPlan = p => JSON.parse(fs.readFileSync
   return map.files[readPlan(map.plan)[active]] ?? [];
 }
 
+// The folder the tests now running are named in by their process ids, each a group of its own off Windows, so that
+// the run that stops Stryker stops them too (stopTests); set from the map by dispatch.
+let groups = null;
+
 // One run of a test with `node`, its fault switched on or not: mutate.mjs's run, which stops past its time the test
-// and all it started.
-const once = (test, seconds, env) => run(test, process.cwd(), seconds, env);
+// and all it started, named in `groups` while it runs.
+async function once(test, seconds, env) {
+  let at = null;
+  const r = await run(test, process.cwd(), seconds, env, pid => { if (groups) fs.writeFileSync(at = path.join(groups, String(pid)), ""); });
+  if (at) fs.rmSync(at, { force: true });
+  return r;
+}
+
+// Each test named in `dir` stopped with all it started: a test Stryker's stop left running, the budget past or a
+// signal come.
+export function stopTests(dir) {
+  for (const name of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
+    const pid = Number(name);
+    if (Number.isInteger(pid) && pid > 0) try { if (process.platform === "win32") spawnSync("taskkill", ["/pid", String(pid), "/t", "/f"]); else process.kill(-pid, "SIGKILL"); } catch { /* (it ended) */ }
+    fs.rmSync(path.join(dir, name), { force: true });
+  }
+}
 
 // A test as it stands, run once for the whole run, the first fault that reaches it running it with no fault switched
 // on, and kept in the folder `asIs` for those after: { result, took }. Two faults that reach it at once may both run
@@ -65,6 +89,7 @@ export async function asItStands(test, asIs, run1 = once) {
 // The tests of one fault run one after the other, each as it stands first, until one fails or runs past its limit:
 // the exit code Stryker's command runner reads, 1 where the fault was caught.
 export async function dispatch(map, active, run1 = once) {
+  groups = map.groups ?? null;
   for (const test of testsFor(map, active)) {
     const was = await asItStands(test, map.asIs, run1);
     if (was.result !== "passed") continue;
@@ -123,11 +148,12 @@ function askedOf(argv) {
 }
 
 // The run's files in `scratch`: the tests of each file wanted, the folder the tests' runs as they stand are kept in,
-// and Stryker's options. Gives the options' path and that folder.
+// the folder the tests running are named in, and Stryker's options. Gives the options' path and the first folder.
 function setUp(scratch, { wanted, named, testTexts, report }) {
   const mapAt = path.join(scratch, "tests.json"), plan = path.join(scratch, "plan.json"), configAt = path.join(scratch, "stryker.json"), asIs = path.join(scratch, "as-is");
   fs.mkdirSync(asIs);
-  fs.writeFileSync(mapAt, JSON.stringify({ files: Object.fromEntries([...wanted.keys()].map(f => [f, testsOf(f, testTexts)])), plan, asIs }));
+  fs.mkdirSync(path.join(scratch, "groups"));
+  fs.writeFileSync(mapAt, JSON.stringify({ files: Object.fromEntries([...wanted.keys()].map(f => [f, testsOf(f, testTexts)])), plan, asIs, groups: path.join(scratch, "groups") }));
   const mutate = named.length ? named.flatMap(a => a.split(",")).filter(Boolean) : [...wanted.keys()];
   fs.writeFileSync(configAt, JSON.stringify(optionsOf({ mutate, mapAt, scratch, report, plan })));
   return { configAt, asIs };
@@ -148,13 +174,14 @@ async function main(argv) {
   const { out, bin, budget, named } = askedOf(argv), until = Date.now() + budget * 1000;
   const { code, testTexts } = projectOf(), wanted = wantedOf(named, code);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "stryker-")), copies = [];
-  const stop = () => { stopStryker(); stopAll(); takeAway(copies, scratch); process.exit(130); };
+  const stop = () => { stopStryker(); stopTests(path.join(scratch, "groups")); stopAll(); takeAway(copies, scratch); process.exit(130); };
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, stop);
   try {
     copies.push(copyOf(path.join(scratch, "copy")));
     const { configAt, asIs } = setUp(scratch, { wanted, named, testTexts, report: out });
     fs.rmSync(out, { force: true });
     const ran = await stryker(bin, configAt, copies[0], (until - Date.now()) / 1000);
+    stopTests(path.join(scratch, "groups"));
     if (ran.ended && ran.code !== 0) refuse(`Stryker ended with ${ran.code}: ${ran.out.trim().split("\n").slice(-12).join("\n")}`, "run the tests that name the files as they stand, and Stryker by hand with the options above, and mend what it says");
     said(out, { asIs, ended: ran.ended, files: wanted.size });
   } finally { takeAway(copies, scratch); }
