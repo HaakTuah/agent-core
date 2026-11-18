@@ -983,7 +983,7 @@ function behindOne(at, way, { was, now, raw, changed, holds }, fail, notes) {
   const filled = !!t && !holds.has(t);
   if (hit) fail.push(`${said}, and this pull request changes ${show(hit.at)}, which an agent tool reads through it while this check follows no link. Mend: replace the link with the file or folder it leads to, committed in the project, in this pull request`);
   else if (unread) notes.push(`${said}, and the way to what its text names passes a link, which this check does not follow, so what this pull request changes past it is not read: reported, never failed. Replace the link with the file or folder it leads to, committed in the project`);
-  else if (filled) notes.push(`${said}, and its text names a path neither commit holds anything at, as one an install fills (node_modules, a virtual environment), so what an install puts there, which this check cannot read, may change what an agent tool reads through it: reported, never failed. Replace the link with the file or folder it leads to, committed in the project`);
+  else if (filled) notes.push(`${said}, and its text names a path neither commit holds anything at: one an install fills (node_modules, a virtual environment), so what an install puts there, which this check cannot read, may change what an agent tool reads through it, or one where nothing stands at all: reported, never failed. Replace the link with the file or folder it leads to, committed in the project`);
 }
 
 // Whether the base held the tool `k` the head configures: as it stands, or as the base configures it with a link's files
