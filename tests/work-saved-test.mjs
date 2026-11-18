@@ -81,6 +81,13 @@ git(project, "commit", "-q", "-am", "a row with an escaped pipe");
 git(project, "push", "-q", "origin", "main");
 r = hook("start", project);
 ok(r.stdout.includes("run the quick check (`npm test | tee log`): "), "a pipe escaped in the cell is read as one, and the cell goes on past it", r.stdout);
+for (const [cell, named] of [["a \\| b | a third column", "a | b"], ["ends in a backslash\\ ", "ends in a backslash\\"]]) {
+  fs.writeFileSync(path.join(project, "core-manifest.md"), `# Core manifest\n\n| *quick check* |   ${cell} |\n`);
+  git(project, "commit", "-q", "-am", "another row");
+  git(project, "push", "-q", "origin", "main");
+  r = hook("start", project);
+  ok(r.stdout.includes(`run the quick check (${named}): `), `the cell ${JSON.stringify(cell)} is named ${JSON.stringify(named)}, its spaces trimmed`, r.stdout);
+}
 fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n");
 git(project, "commit", "-q", "-am", "no row");
 git(project, "push", "-q", "origin", "main");

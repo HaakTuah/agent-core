@@ -56,7 +56,7 @@ fi
 # as one), kept to printable ASCII (no control, bidirectional or line-separating character of any encoding), or else
 # the slot named with its default.
 if [ "$mode" = start ]; then
-  quick=$(printf '%s\n' "$manifest" | sed -n -E 's#^\|[[:space:]]*\*quick check\*[[:space:]]*\|[[:space:]]*(([^|\\]|\\.)*)\|.*$#\1#p' | head -n 1 | sed -E 's/[[:space:]]+$//; s/\\\|/|/g' | LC_ALL=C tr -cd '\040-\176' | cut -c1-300)
+  quick=$(printf '%s\n' "$manifest" | sed -n -E 's#^\|[[:space:]]*\*quick check\*[[:space:]]*\|[[:space:]]*(([^|\\]|\\.)*)\|.*$#\1#p' | head -n 1 | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/\\\|/|/g' | LC_ALL=C tr -cd '\040-\176' | cut -c1-300)
   [ -n "$quick" ] || quick="the *quick check* its AGENTS.md names, or else its *other builders' checks*, by default its own tests"
   echo "Before your first change, run the quick check ($quick): a failure there is a bug of its own, filed, and the task goes on with what does not hang on it (the core's roles/shared/work-flow.md, \"Sessions\")."
 fi
