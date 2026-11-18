@@ -769,18 +769,22 @@ const toolLinks = l => l.links.filter(at => WAYS.has(fold(at)) || TOOL_FOLDERS.s
 // file system that ignores case gives the tool what stands under that name, which this check never reads, so one the
 // base held is noted while the links on the way and all that stands under that name are as they were.
 function caseLinks(root, rev) {
-  const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = [];
+  const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = new Map();
+  const add = (problem, held) => out.set(problem, [problem, out.has(problem) ? `${out.get(problem)[1]}\0\0\0${held}` : held]);
   // (from each tool's path, and from each link on a tool's way or under its folder, so a link to a folder held twice is
-  // seen where no tool's file stands under the name git keeps)
+  // seen where no tool's file stands under the name git keeps; each walked as Linux reads a link and again as Windows
+  // does, a problem either finds said once, held by what each way reads)
   for (const at of new Set([...toolPaths(names, f => resolve(f)?.type, p => belowDir(root, rev, p)), ...toolLinks(l)])) {
-    const via = [], misses = [], r = walk(root, rev, at, via, false, misses);
-    if (!via.some(v => l.linked.has(v))) continue;
-    // (held by what the tool reads there, found as a file system that ignores case finds it, and nothing else there)
-    const miss = r === null ? misses.find(m => !m.several) : undefined, several = misses.find(m => m.several), links = via.map(v => `${v}\0${l.ids.get(v)}`);
-    if (miss) out.push([`${at} leads, through a link, to ${miss.at} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${miss.at} stands, in this pull request`, [at, ...links, reaches(root, rev, at, true)].join("\0\0")]);
-    else if (several) out.push([`${at} leads, through a link, to ${several.at}, which the commit holds under more than one name a file system that ignores case reads as one (${several.several.join(", ")}), as macOS's and Windows' do, keeping one of them, so which an agent tool reads is not plain. Mend: keep one of those names, in this pull request`, [at, ...links, ...several.several.flatMap(n => spellings(root, rev, n, several.rest).map(p => reaches(root, rev, at, true, p)))].join("\0\0")]);
+    for (const how of [null, WAYS_READ[1]]) {
+      const via = [], misses = [], r = walk(root, rev, at, via, false, misses, false, how);
+      if (!via.some(v => l.linked.has(v))) continue;
+      // (held by what the tool reads there, found as a file system that ignores case finds it, and nothing else there)
+      const miss = r === null ? misses.find(m => !m.several) : undefined, several = misses.find(m => m.several), links = via.map(v => `${v}\0${l.ids.get(v)}`);
+      if (miss) add(`${at} leads, through a link, to ${miss.at} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${miss.at} stands, in this pull request`, [at, ...links, reaches(root, rev, at, true, at, how)].join("\0\0"));
+      else if (several) add(`${at} leads, through a link, to ${several.at}, which the commit holds under more than one name a file system that ignores case reads as one (${several.several.join(", ")}), as macOS's and Windows' do, keeping one of them, so which an agent tool reads is not plain. Mend: keep one of those names, in this pull request`, [at, ...links, ...several.several.flatMap(n => spellings(root, rev, n, several.rest).map(p => reaches(root, rev, at, true, p, how)))].join("\0\0"));
+    }
   }
-  return out;
+  return [...out.values()];
 }
 
 // Each path `rest` names below `n`, every step in each case its folder holds it in, as a file system that ignores case
@@ -1001,11 +1005,23 @@ const topOf = root => { if (!checkouts.has(root)) checkouts.set(root, fs.realpat
 function onward(root, rev, here, how, left, at, via, hops) {
   const to = linkText(root, rev, here), names = t => t.split(how.win ? /[\\/]/u : "/");
   if (hops > most(how) || to === null) return false;
-  if (!path.posix.isAbsolute(to) && !(how.win && path.win32.isAbsolute(to))) { left.unshift(...names(to)); return true; }
+  if (!path.posix.isAbsolute(to) && !(how.win && path.win32.isAbsolute(to))) { left.unshift(...names(to)); if (how.win) byName(left); return true; }
   if (!path.isAbsolute(to)) return false;
   const start = path.parse(to).root || path.sep;
   left.unshift(...names(to.slice(start.length)));
+  if (how.win) byName(left);
   return backIn(root, start, left, at, via);
+}
+// As Windows reads a path, a name and the ".." after it go together before any link on it is followed: `left`, the rest
+// of a walk's path, with each such pair taken out, in place, a ".." it begins with kept for the folder the walk stands in.
+function byName(left) {
+  const out = [];
+  for (const n of left) {
+    if (n === "" || n === ".") continue;
+    if (n === ".." && out.length && out.at(-1) !== "..") out.pop();
+    else out.push(n);
+  }
+  left.splice(0, left.length, ...out);
 }
 // The link on the way of `at`, read as Windows reads it, whose text is a whole path on a Windows drive this machine
 // cannot follow, as [the link, its text]; null where there is none. Where such a path leads on that machine, the checkout
@@ -1205,7 +1221,12 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 function reaches(root, rev, at, follow = false, from = at, how = null) {
   const posix = from.split(path.sep).join("/"), want = fold(at.split(path.sep).join("/")), { holds, names, resolve } = commitReader(root, rev, true, follow, how);
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
-  return [through(posix, want, holds, names, f => resolve(f)?.type, p => belowDir(root, rev, p)), ...skill].join("\0\0");
+  // (below Claude Code's agents or commands, where it reaches a folder, all Claude Code reads in it, as mdLinks() holds a
+  // folder there: each Markdown file at any depth, and each link and submodule with all it holds in turn, under whichever
+  // of several names a checkout gives)
+  const r = MD_DIR.test(want) ? resolve(posix) : null, l = listing(root, rev);
+  const md = r?.type === "tree" ? [everything(root, rev, r.f, p => !l.blobs.has(p) || /\.md$/iu.test(p), how)] : [];
+  return [through(posix, want, holds, names, f => resolve(f)?.type, p => belowDir(root, rev, p)), ...skill, ...md].join("\0\0");
 }
 // The way a link's path takes at a commit, as a fingerprint: what it reaches, and each link it passes, by its target,
 // read where it leaves the checkout and comes back in, and read again as Windows reads a link.
