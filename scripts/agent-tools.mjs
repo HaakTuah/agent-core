@@ -1043,7 +1043,7 @@ function sortLinks(root, base, links, fail, notes) {
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
     const lock = to !== null ? lockOf(root, "HEAD", at) : "";
     if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at, true) === reaches(root, "HEAD", at, true) && lockOf(root, base, at) === lock) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
-    else if (lock) fail.push(`${said}, through a node_modules folder an install fills, whose files this check does not read. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
+    else if (lock) fail.push(`${said}, through a node_modules folder an install fills, whose files this check does not read; one the base held is noted only while every file an install reads there stands as it was, so each change to one of them, a lock file's update among them, fails it again. Mend: replace the link with the file or folder itself, committed in the project outside node_modules, in this pull request, which ends it for good`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
   }
 }
