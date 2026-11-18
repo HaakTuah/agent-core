@@ -10,7 +10,7 @@
       "licence": "ISC",
       "files": ["LICENSE", "dist/"],
       "digest": "sha256-f4484cdfb7dc703f008a9c8de6b73c5c12af3ba4e7731a82cc15fd3e69ce970f",
-      "used": ["scripts/yaml-keys.mjs"]
+      "used": ["scripts/yaml-keys.mjs", "scripts/comment-only.mjs"]
     }
   ]
 }
