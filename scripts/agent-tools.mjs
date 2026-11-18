@@ -513,15 +513,22 @@ function commitReader(root, rev) {
     const d = resolve(dir);
     return d?.type === "tree" ? [...(listing(root, rev).children.get(d.f) ?? [])] : [];
   };
-  return { resolve, read, names };
+  // (what a name holds, as a fingerprint reads it: a file's text, or what else stands there, a link's target among it)
+  const holds = f => {
+    const text = read(f);
+    if (text !== null) return text;
+    const parent = resolve(path.posix.dirname(f)), real = parent ? `${parent.f === "." ? "" : `${parent.f}/`}${path.posix.basename(f)}` : null;
+    return real !== null && listing(root, rev).linked.has(real) ? `\0a link to ${textAt(root, rev, real)}` : `\0${resolve(f)?.type ?? "nothing"}`;
+  };
+  return { resolve, read, names, holds };
 }
 
 // Each path on the way to a tool's file that stands in another case at the commit `rev`, as [its problem, what the tool
 // reads through it], so one the base held is noted only while that stands letter for letter.
 function caseProblems(root, rev) {
-  const { resolve, read, names } = commitReader(root, rev);
+  const { resolve, names, holds } = commitReader(root, rev);
   return misnamed(toolPaths(names, at => resolve(at)?.type)).map(([at, want]) =>
-    [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, read, names)]);
+    [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, holds, names)]);
 }
 
 // Each submodule where an agent tool reads its files, in whatever case, as [its problem, the commit it names]: git gives
@@ -582,18 +589,18 @@ function misnamed(paths) {
 // of a tool folder under it with its text (and a skill's SKILL.md), so one the base held is noted only while that stands.
 // Each step below `at` is found among its folder's own names, in whatever case they stand, as a file system that
 // ignores case finds it, every one that matches.
-function through(at, want, read, names) {
+function through(at, want, holds, names) {
   const under = f => f === want || f.startsWith(`${want}/`);
   const found = (from, rest) => rest.split("/").filter(Boolean).reduce((dirs, step) => dirs.flatMap(d => names(d).filter(n => fold(n) === fold(step)).sort().map(n => `${d}/${n}`)), [from]);
-  // (a file read as nothing, no file there, is left out, so the head's reading and the base's name the same)
-  const text = (name, a) => { const t = read(a); return t === null ? [] : [`${name}\0${a}\0${t}`]; };
+  // (each entry by what it holds, a file's text or what else stands there, so one added, taken out or changed is seen)
+  const text = (name, a) => [`${name}\0${a}\0${holds(a)}`];
   const files = TOOL_FILES.filter(under).flatMap(f => found(at, f.slice(want.length)).flatMap(a => text(f, a)));
   // (of a tool folder's entries, only what the tool reads there: a hook file of Kiro's, a skill's SKILL.md)
   const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => found(at, d.slice(want.length, -1)).flatMap(dir => names(dir).sort().flatMap(n => {
     const reads = d === ".kiro/hooks/" ? (/\.json$/iu.test(n) ? [`${dir}/${n}`] : []) : found(`${dir}/${n}`, "SKILL.md");
     return reads.flatMap(a => text(`${d}${n}`, a));
   })));
-  return [at, read(at), ...files, ...folders].join("\0\0");
+  return [at, holds(at), ...files, ...folders].join("\0\0");
 }
 // The entries on the way to a tool's file, in whatever case they stand: each one the walk reaches as no folder, whose
 // name folded is a step of WAYS or lies in a tool folder, a few deep, found through `names`, so a link inside the
