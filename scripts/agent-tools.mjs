@@ -541,7 +541,7 @@ function sourcesOf(head, list, file, problems) {
   const sources = [], marked = [];
   for (const [k, why] of head.sources ?? []) {
     const said = `${describe(k)}, configured in ${head.tools.get(k)}, ${why}, so nothing shows that it runs its copy on main, where floor rule 3 has what an agent tool starts by itself run from its copy on main, and not the working tree's, which the branch it runs on can change`;
-    if (list?.from?.has(k)) marked.push([k, said]);
+    if (list?.from?.has(k)) marked.push([k, said, why === NO_KIT_WHY ? NO_KIT_HOW : HOW]);
     else sources.push([k, `${said}. Mend: ${why === NO_KIT_WHY ? NO_KIT_HOW : HOW}, in this pull request`]);
   }
   for (const k of list?.from ?? []) if (head.tools.has(k) && !head.sources?.has(k)) problems.push(`${file}: "agentTools" says of ${describe(k)} "from": ${show(TREE)}, but its command is the starter kit's form, which runs its copy on main. Mend: take "from" out of its entry, in this pull request`);
@@ -671,8 +671,9 @@ function submodules(root, rev) {
 
 // Everything a name holds at a commit, as a fingerprint: what it leads to, each entry the commit lists under that, by its
 // path and object, and, for each link among them, everything it holds in turn, each folder read once; so a name held
-// twice is held by all a tool may read under either, never by one path through it.
-function everything(root, rev, at) {
+// twice is held by all a tool may read under either, never by one path through it. With `keep`, only the entries it
+// keeps are held (each link is walked all the same).
+function everything(root, rev, at, keep = () => true) {
   const l = listing(root, rev), seen = new Set(), tops = [], entries = new Set(), todo = [at];
   // (walked a link at a time from a list, never by recursion, so no chain of links is too long for it; each entry named
   // once, however many links reach the folders it stands in)
@@ -687,7 +688,7 @@ function everything(root, rev, at) {
       if (l.linked.has(p)) todo.push(p);
     }
   }
-  return [...tops, ...[...entries].sort().map(p => `${p}\0${l.ids.get(p)}`)].join("\0\0");
+  return [...tops, ...[...entries].filter(keep).sort().map(p => `${p}\0${l.ids.get(p)}`)].join("\0\0");
 }
 // Each entry a listing holds below the folder `dir` ("" the root), from the listing's names sorted once, by a binary
 // search for where they begin, so a folder's entries cost what they are, not the whole listing.
@@ -707,10 +708,16 @@ function belowDir(root, rev, p) {
 }
 // Each link below a folder of Claude Code's agents or commands, in whatever case, as [its problem, all it leads to]:
 // Claude Code reads the Markdown files wherever such a link leads, and this check reads none of them there, so one the
-// base held is noted while all it leads to stands.
+// base held is noted while what Claude Code reads there stands: each Markdown file and each link all it leads to holds;
+// a file of another kind there changes freely.
 function mdLinks(root, rev) {
-  const held = at => `${at}\0${everything(root, rev, at)}`, folders = agentFolders(root, rev);
-  return [...[...new Set(folders.flatMap(f => f.ways))].map(at => [`${at} is a link on the way to a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads only those of plain folders the project commits. Mend: replace it with the folder itself, committed in the project, in this pull request`, held(at)]),
+  const l = listing(root, rev), read = p => !l.blobs.has(p) || /\.md$/iu.test(p);
+  const held = at => `${at}\0${everything(root, rev, at, read)}`;
+  // (.claude as a link on the way, by what stands at its agents and commands alone, as Claude Code reads nothing else
+  // there for them)
+  const way = at => (fold(at) === ".claude" ? AGENT_DIRS.map(d => held(`${at}/${d.split("/")[1]}`)).join("\0\0") : held(at));
+  const folders = agentFolders(root, rev);
+  return [...[...new Set(folders.flatMap(f => f.ways))].map(at => [`${at} is a link on the way to a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads only those of plain folders the project commits. Mend: replace it with the folder itself, committed in the project, in this pull request`, way(at)]),
     ...[...new Set(folders.flatMap(f => f.links))].map(at => [`${at} is a link below a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads none of them there. Mend: replace it with the files themselves, committed in the project, in this pull request`, held(at)])];
 }
 // Each folder of Claude Code's below the project's root, in whatever case, a folder, a link or a submodule, as [its
@@ -741,11 +748,22 @@ function caseLinks(root, rev) {
     // (held by what the tool reads there, found as a file system that ignores case finds it, and nothing else there)
     const miss = r === null ? misses.find(m => !m.several) : undefined, several = misses.find(m => m.several), links = via.map(v => `${v}\0${l.ids.get(v)}`);
     if (miss) out.push([`${at} leads, through a link, to ${miss.at} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${miss.at} stands, in this pull request`, [at, ...links, reaches(root, rev, at, true)].join("\0\0")]);
-    else if (several) out.push([`${at} leads, through a link, to ${several.at}, which the commit holds under more than one name a file system that ignores case reads as one (${several.several.join(", ")}), as macOS's and Windows' do, keeping one of them, so which an agent tool reads is not plain. Mend: keep one of those names, in this pull request`, [at, ...links, ...several.several.map(n => everything(root, rev, n))].join("\0\0")]);
+    else if (several) out.push([`${at} leads, through a link, to ${several.at}, which the commit holds under more than one name a file system that ignores case reads as one (${several.several.join(", ")}), as macOS's and Windows' do, keeping one of them, so which an agent tool reads is not plain. Mend: keep one of those names, in this pull request`, [at, ...links, ...several.several.flatMap(n => spellings(root, rev, n, several.rest).map(p => reaches(root, rev, at, true, p)))].join("\0\0")]);
   }
   return out;
 }
 
+// Each path `rest` names below `n`, every step in each case its folder holds it in, as a file system that ignores case
+// may give any of them; a step no folder holds, as it stands. Paths that lead to the same place are kept once, so the
+// list grows only with the places there are.
+function spellings(root, rev, n, rest) {
+  const { names, resolve } = commitReader(root, rev, true, true);
+  const once = list => [...new Map(list.map(p => { const r = resolve(p); return [r ? `${r.type}\0${r.f}` : `\0${p}`, p]; })).values()];
+  return rest.split("/").filter(Boolean).reduce((dirs, step) => once(dirs.flatMap(d => {
+    const found = names(d).filter(m => fold(m) === fold(step)).sort().map(m => `${d}/${m}`);
+    return found.length ? found : [`${d}/${step}`];
+  })), [n]);
+}
 // Whether a commit's listing holds `at` as anything but a plain file: a link, a folder or a submodule's entry.
 const notFile = (l, at) => l.linked.has(at) || l.dirs.has(at) || l.others.has(at);
 // Whether what git shows at `rev:at` is no plain file, asked of git for that path alone, so one broken entry elsewhere
@@ -928,7 +946,7 @@ function walk(root, rev, f, via = [], lenient = false, misses = [], follow = fal
       left.unshift(...to.split("/"));
       continue;
     }
-    noteMiss(listing(root, rev), at, name, misses, hops > 0);
+    noteMiss(listing(root, rev), at, name, misses, hops > 0, left.join("/"));
     if (!goesOn(listing(root, rev), here, left.length > 0, via, lenient)) return null;
     at.push(name);
   }
@@ -1007,16 +1025,17 @@ function foldsIn(l, dir) {
 // Where a walk meets a name the commit holds nothing at, while its folder holds that name in another case, which a
 // file system that ignores case finds in its place, that name, said in `misses` as { at }; and, past a link, where it
 // meets a name its folder holds beside another that folds alike, which such a file system keeps one of, so which the
-// tool reads is not plain, those names, as { at, several }; `linked`, whether the walk had passed a link.
-function noteMiss(l, at, name, misses, linked) {
+// tool reads is not plain, those names, as { at, several, rest }; `linked`, whether the walk had passed a link, and
+// `rest`, the path the walk had left there.
+function noteMiss(l, at, name, misses, linked, rest) {
   const here = [...at, name].join("/"), dir = at.join("/") || ".", path = n => (dir === "." ? n : `${dir}/${n}`);
   const same = [...(foldsIn(l, dir).get(fold(name)) ?? [])].sort();
   if (l.dirs.has(here) || l.blobs.has(here) || l.others.has(here) || l.linked.has(here)) {
-    if (linked && same.length > 1) misses.push({ at: here, several: same.map(path) });
+    if (linked && same.length > 1) misses.push({ at: here, several: same.map(path), rest });
     return;
   }
   // (and where it holds none of that name but several in other cases, those, as which is read is not plain either)
-  if (same.length > 1) misses.push({ at: here, several: same.map(path) });
+  if (same.length > 1) misses.push({ at: here, several: same.map(path), rest });
   else if (same.length) misses.push({ at: path(same[0]) });
 }
 // Whether a walk goes on past `here`, `more` of the path after it: the last name may be anything the commit holds; one
@@ -1120,13 +1139,13 @@ function sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes
 function sortSources({ sources, marked }, { head, baseProject, baseList, core, file }, fail, notes) {
   const before = new Set(baseProject ? [...baseProject.ids.values()].flatMap(set => [...set]) : []);
   const stood = k => !!baseProject && [...head.ids.get(k)].every(id => before.has(id)) && baseProject.sources.has(k);
-  const how = HOW;
   for (const [k, problem] of sources) {
     if (!core && !baseProject) notes.push(`with no base to read against, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}`);
     else if (!core && stood(k) && !baseList?.from.has(k)) notes.push(`as the base held it, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}; or, to list it in the baseline, give its entry in ${file} "from": ${show(TREE)}`);
     else fail.push(problem);
   }
-  for (const [k, said] of marked) {
+  // (each with its own mend: a setting no starter kit writes is taken out or moved, a hook rewritten in the kit's form)
+  for (const [k, said, how] of marked) {
     if (core) fail.push(`${said}, and in the core's own repository none may stand. Mend: ${how}, and take "from" out of its entry, in this pull request`);
     else if (!baseProject || stood(k)) notes.push(`${said}: its entry lists it in the baseline ("from": ${show(TREE)}), to be worked down`);
     else fail.push(`${said}, and its entry says "from": ${show(TREE)}, but the base held no such hook, and the baseline lists only what stood before. Mend: ${how}, and take "from" out of its entry, in this pull request`);
@@ -1140,8 +1159,9 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 // link and submodule on the way held by its object, of what it reaches only what a tool reads there, and for a skill's
 // folder its SKILL.md; so a link held as the base held it is held by that too, and nothing else that stands there. With
 // `follow`, each name is found as a file system that ignores case finds it.
-function reaches(root, rev, at, follow = false) {
-  const posix = at.split(path.sep).join("/"), want = fold(posix), { holds, names, resolve } = commitReader(root, rev, true, follow);
+// With `from`, what a tool reads through `at` read from that path instead, as under each of several names that fold alike.
+function reaches(root, rev, at, follow = false, from = at) {
+  const posix = from.split(path.sep).join("/"), want = fold(at.split(path.sep).join("/")), { holds, names, resolve } = commitReader(root, rev, true, follow);
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
   return [through(posix, want, holds, names, f => resolve(f)?.type, p => belowDir(root, rev, p)), ...skill].join("\0\0");
 }

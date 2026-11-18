@@ -4,9 +4,10 @@
 // workflow security-review.yml beside scripts/security-review.mjs, in the same job, always from the default branch's
 // copy, on what GitHub's own API gives of the pull request and its comments. It waits only while the summary Codex's
 // own app keeps on the pull request says its code review is running on the pull request's head commit. The wait ends
-// when Codex's code review finishes, or when a comment that opens "Code review:" from the repository's owner, a member
-// or a collaborator names that commit by its whole SHA, all forty characters, since a commit can be made to share a
-// short one's first characters: how the next reviewer, or the fallback reviewer, posts the review it took over.
+// when Codex's code review finishes, or when a comment that opens "Code review:", as first posted and never edited
+// since, from the repository's owner, a member or a collaborator names that commit by its whole SHA, all forty
+// characters, since a commit can be made to share a short one's first characters: how the next reviewer, or the
+// fallback reviewer, posts the review it took over.
 // Given the pull request's commits and files, it also waits while a pull request that needs a code review
 // (tasks/reviews.md, "Which") has had none: neither Codex's code review completed nor such a comment names the head
 // commit, or one that only updates from `main` follow (merges whose second parent is no commit of the pull request's,
@@ -21,7 +22,8 @@
 // sync gets no review; that its copy is the core's is scripts/pure-sync.mjs's to prove, not this check's). Given
 // neither list, it waits only for a review running, as it did before it read them. A list GitHub cut short (3000
 // files, 250 commits) is read as needing a review and as proving no update from main. A pull request that leaves this
-// script alone and whose head does not hold it as the default branch does (BOUND=false, which the workflow sets) stood
+// script alone and whose head does not hold it as the default branch does (BOUND=false, which the workflow sets), and
+// that the host says was opened before the default branch's copy came (SINCE; boundOf in security-review.mjs), stood
 // before the check came:
 // its missing review is said in the status, never waited for (AGENTS.md, "Nothing locks a project"); brought up to
 // date with main, it is held. A summary whose state cannot be read counts as no review of Codex's, with a warning. It
@@ -34,14 +36,14 @@
 //
 // Usage:  node scripts/code-review-wait.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its commits, the same> <its files, the same> [<the merges clean-merges.mjs proved>]]
-//         ADVISORY=false for a status that waits; BOUND=false for a pull request from before the check; RUN_URL for
+//         ADVISORY=false for a status that waits; BOUND=false and SINCE for a pull request from before the check; RUN_URL for
 //         the link the status carries.
 import { existsSync, readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
 import { copyOf } from "./core-path.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
-import { RUNNING, UNREAD, WRITERS, codexState, form, pinsAlone, standsFrom, status, unproved, whole } from "./security-review.mjs";
+import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, form, pinsAlone, standsFrom, status, unproved, whole } from "./security-review.mjs";
 
 export const CONTEXT = "code-review";
 const SHA = /^[0-9a-f]{40}$/u;
@@ -61,8 +63,8 @@ export function judge(pull, comments, commits, files, rules = [], bound = true, 
 function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges, copy) {
   const short = sha.slice(0, 7);
   // the whole SHAs a posted code review names, never a prefix: an old review naming the first characters of another
-  // commit must not stand for this one
-  const posted = new Set(list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association))
+  // commit must not stand for this one; and only as it was first posted, where the pull request is held (bound)
+  const posted = new Set(list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && (!bound || asPosted(comment)))
     .flatMap((comment) => (comment.body.match(/(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/giu) ?? []).map((found) => found.toLowerCase())));
   const running = review !== null && typeof review === "object" && review.commit_sha === sha && RUNNING.includes(review.status);
   if (running) {
@@ -128,6 +130,7 @@ if (started(import.meta.url)) {
   try { rules = ruleFiles(undefined, undefined, { tools: true }); } catch { rules = []; }
   // (and the core's copy, at the path the default branch's manifest names, checked out here: core-path.mjs)
   const copy = existsSync("core-manifest.md") ? copyOf(".") : null;
-  const verdict = judge(read(pullFile), read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, process.env.BOUND !== "false", mergesFile ? read(mergesFile) : undefined, copy);
+  const pull = read(pullFile);
+  const verdict = judge(pull, read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, boundOf(process.env.BOUND, pull, process.env.SINCE), mergesFile ? read(mergesFile) : undefined, copy);
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL, CONTEXT), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }

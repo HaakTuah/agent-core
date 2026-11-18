@@ -438,6 +438,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ["a Codex model provider whose token command, in the kit's form, runs in another folder", { ".codex/config.toml": `[model_providers.p.auth]\ncommand = "bash"\nargs = ["-c", ${JSON.stringify(KIT_HOOK.slice("bash -c '".length, -1))}]\ncwd = "sub"\n`, ...listing(SKILL, { kind: "hook", name: `Codex model_providers.p.auth: bash -c ${KIT_HOOK.slice("bash -c '".length, -1)}`, publisher: "this project" }) }],
     ["a Codex model provider with no command, by where it sends a key", { ".codex/config.toml": "[model_providers.p]\nbase_url = \"https://example.invalid/v1\"\nenv_key = \"KEY\"\n" }],
   ]) fails(run(pr(project({ ...script, ...listing(SKILL) }), files)), `${what} fails as a hook of no kit's form does`, "is of a kind no starter kit writes, so nothing shows that it runs its copy on main", "Mend: take it out of the project's files");
+  // (Codex's code review of ccb1705: and one marked as the baseline's, new, fails with that same mend, never the kit's form)
+  const providerMarked = run(pr(project({ ...script, ...listing(SKILL) }), { ".codex/config.toml": "[model_providers.p]\nbase_url = \"https://example.invalid/v1\"\nenv_key = \"KEY\"\n", ...listing(SKILL, { kind: "hook", name: "Codex model_providers.p: its settings", publisher: "this project", from: "the working tree" }) }));
+  fails(providerMarked, "a setting of no kit's form, new and marked as the baseline's, fails with the mend that can be taken", "the base held no such hook", "Mend: take it out of the project's files");
+  ok(!providerMarked.out.includes("Mend: write its command in the starter kit's form"), "and its mend is not to rewrite a command it may not have", providerMarked.out);
   fails(run(pr(project({ ...script, ...listing() }), { ".mcp.json": { mcpServers: { api: { type: "http", url: "https://example.invalid/mcp", headersHelper: TREE_HOOK } } } })), "a remote server's headersHelper not in the kit's form fails as a hook does", NOT_KIT);
   // (#647's fallback security review of 341004e: the frontmatter split as Claude Code splits it, and held whole in any
   // form but a plain mapping of simple keys, in a subagent at any depth and a command too)
@@ -476,6 +480,18 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(subAdded, "add", "-A"); git(subAdded, "commit", "-q", "-m", "a link"); git(subAdded, "checkout", "-q", "main"); git(subAdded, "merge", "-q", "--no-ff", "-m", "merge", "change");
     const WAY = "is a link on the way to a folder of Claude Code's agents or commands";
     fails(run(subAdded), "a link added in the folder agents lead to through a link fails, as that link is held by all it leads to", WAY);
+    // (Codex's code review of ce1e8bd: held by what Claude Code reads there alone, so a file of another kind changes
+    // freely, while a Markdown file changed or added fails)
+    const notesKept = run(pr(viaDocs(), { "docs/notes.txt": "x\n" }));
+    ok(notesKept.status === 0 && notesKept.out.includes(WAY), "a link the base held to agents is noted while only a file Claude Code does not read there changes", notesKept.out);
+    fails(run(pr(viaDocs(), { "docs/a.md": "---\nname: a\ndescription: changed\n---\n" })), "but not once a Markdown file there changes", WAY);
+    fails(run(pr(viaDocs(), { "docs/deep/b.MD": "---\nname: b\n---\n" })), "nor once one is added, at any depth, in whatever case", WAY);
+    // (Codex's code review of be69079: .claude a link on the way, held by what stands at its agents and commands alone)
+    const viaCfg = () => { const dir = project({ ...script, ...listing() }); fs.renameSync(path.join(dir, ".claude"), path.join(dir, "cfg")); fs.mkdirSync(path.join(dir, "cfg/agents"), { recursive: true }); fs.writeFileSync(path.join(dir, "cfg/agents/a.md"), "---\nname: a\n---\n"); fs.writeFileSync(path.join(dir, "cfg/README.md"), "# cfg\n"); fs.symlinkSync("cfg", path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents through .claude as a link"); return dir; };
+    const readmeKept = run(pr(viaCfg(), { "cfg/README.md": "# changed\n" }));
+    ok(readmeKept.status === 0 && readmeKept.out.includes(WAY), "a .claude link the base held is noted while only Markdown outside its agents and commands changes", readmeKept.out);
+    fails(run(pr(viaCfg(), { "cfg/agents/a.md": "---\nname: a\ndescription: changed\n---\n" })), "but not once an agent there changes", WAY);
+    fails(run(pr(viaCfg(), { "cfg/commands/c.md": "# c\n" })), "nor once a command is added there", WAY);
     const loops = viaDocs();
     for (let i = 0; i < 6; i++) fs.symlinkSync(".", path.join(loops, `docs/l${i}`));
     git(loops, "add", "-A"); git(loops, "commit", "-q", "-m", "loops behind a link");
@@ -484,6 +500,15 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const agentPkg = () => { const dir = project({ ...script, ".gitignore": "node_modules/\n", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "1.0.0" } } }), ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../node_modules/pkg/agents", path.join(dir, ".claude/agents/pkg")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents from a package"); return dir; };
     const agentPkgKept = run(pr(agentPkg(), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "6.6.6" } } }) }));
     ok(agentPkgKept.status === 0 && agentPkgKept.out.includes(LINKED), "a link the base held below agents into an installed package is reported, never failed, when its lock changes", agentPkgKept.out);
+    // (many such links the base held, nothing changed, are read in seconds)
+    const manyPkg = viaDocs();
+    fs.writeFileSync(path.join(manyPkg, ".gitignore"), "node_modules/\n"); fs.writeFileSync(path.join(manyPkg, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: {} }));
+    for (let i = 0; i < 300; i++) fs.symlinkSync("../node_modules/pkg/agents", path.join(manyPkg, `docs/l${i}`));
+    git(manyPkg, "add", "-A"); git(manyPkg, "commit", "-q", "-m", "many links into a package");
+    for (let i = 0; i < 400; i++) { fs.mkdirSync(path.join(manyPkg, `fx/f${i}`), { recursive: true }); fs.writeFileSync(path.join(manyPkg, `fx/f${i}/package.json`), "{}\n"); }
+    git(manyPkg, "add", "-A"); git(manyPkg, "commit", "-q", "-m", "and many packages");
+    const manyStarted = Date.now(), manyKept = run(pr(manyPkg, { "README.md": "x\n" }));
+    ok(manyKept.status === 0 && manyKept.out.includes(WAY) && Date.now() - manyStarted < 30000, "while 300 such links the base held, beside 400 packages, nothing changed, are noted in seconds", `${Date.now() - manyStarted} ms\n${manyKept.out.slice(0, 2000)}`);
     // (#647's fallback security review of 90bcf1a: a folder of agents or commands that is a link out of the checkout fails
     // as any such link does; a folder in another case a link reaches first is still read for its case; and a hook is named
     // by the path Claude Code reads it at)
@@ -977,6 +1002,20 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const twiceKept = run(pr(twice(), { "README.md": "x\n" }));
     ok(twiceKept.status === 0 && twiceKept.out.includes(SEVERAL), "one the base held is noted, not failed", twiceKept.out);
     fails(run(pr(twice(), { "cfg/settings/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what the tool may read under the other name changes", SEVERAL);
+    // (Codex's code review of a2ed364: held by what a tool may read under each name alone, so what else stands there
+    // changes freely, while a tool's file changed or added under either name fails)
+    const twiceDoc = run(pr(twice(), { "Cfg/README.md": "x\n", "cfg/notes.txt": "y\n" }));
+    ok(twiceDoc.status === 0 && twiceDoc.out.includes(SEVERAL), "one the base held is noted while what no tool reads under either name changes", twiceDoc.out);
+    fails(run(pr(twice(), { "Cfg/settings/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what the tool may read under the name git keeps changes", SEVERAL);
+    fails(run(pr(twice(), { "Cfg/hooks/lint.json": JSON.stringify({ version: "v1", hooks: [] }) })), "nor once a hook file is added under the name git keeps", SEVERAL);
+    // (its fallback security review of f8559d9: and under each spelling of each name past the first held twice)
+    const twiceDeep = () => { const dir = project({ "A/b/settings/mcp.json": "{}\n", "a/b/settings/mcp.json": "{}\n", "A/B/hooks/n.txt": "x\n", "A/B/settings/mcp.json": "{}\n", ...listing() }); fs.symlinkSync("A/b", path.join(dir, ".kiro")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through names held twice"); return dir; };
+    fails(run(pr(twiceDeep(), { "A/B/hooks/new.json": JSON.stringify({ version: "v1", hooks: [] }) })), "a hook file added under another spelling of a name past the first held twice fails", SEVERAL);
+    fails(run(pr(twiceDeep(), { "A/B/settings/mcp.json": "{ \"mcpServers\": {} }\n" })), "and so does a tool's file changed there", SEVERAL);
+    const manyWays = project({ "A/xy/k": "x\n", "A/xY/k": "x\n", "A/Xy/k": "x\n", "A/XY/k": "x\n", "a/k": "x\n", ...listing() });
+    fs.symlinkSync(`A/${"xy/../".repeat(10)}xy`, path.join(manyWays, ".kiro")); git(manyWays, "add", "-A"); git(manyWays, "commit", "-q", "-m", "a link through many spellings");
+    const waysStarted = Date.now(), waysKept = run(pr(manyWays, { "README.md": "x\n" }));
+    ok(waysKept.status === 0 && waysKept.out.includes(SEVERAL) && Date.now() - waysStarted < 30000, "a link the base held through many spellings of each step is read in seconds, each place once", `${Date.now() - waysStarted} ms\n${waysKept.out.slice(0, 1500)}`);
     const kiroHook = command => ({ version: "v1", hooks: [{ name: "lint", trigger: "Stop", action: { type: "command", command } }] });
     // (a hook file added under the other name, where no tool's path the walk takes passes, is held all the same; and a
     // link to a folder held twice is seen where no tool's file stands under the name git keeps, or where the name it
