@@ -36,7 +36,7 @@ import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
 import { Unread, call, calls, commands, uncommented, copiesConfig, folded, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
-import { reads } from "./workflows.mjs";
+import { draftHoles, reads } from "./workflows.mjs";
 import { twice } from "./yaml-keys.mjs";
 import { releaseAge, WAIT } from "./licences.mjs";
 import { codeOf, covers, pinFault, pinRead } from "./licence-scan.mjs";
@@ -297,19 +297,13 @@ function nugetPathsHold(p) {
   return wrong.length ? `The \`paths:\` of a call to the NuGet check let through a change to every file a build of the project's reads, or the check starts on none of its changes: add each, by its exact path, to ${wrong.map(([f, missed]) => `\`.github/workflows/${f}\`: ${missed.map(asPattern).join(", ")}`).join("; ")} (a name shown with "?" holds a control character or a backtick: rename it).` : null;
 }
 
-// A call to one of the core's pull-request checks whose job is skipped on a draft runs on a pull request once it is
-// ready only where its trigger starts it when one is marked ready (#375): without that, the check a draft skipped never
-// runs on that head, and a ruleset counts the skip as passed. Each workflow where a call does so is named.
+// A call to one of the core's pull-request checks whose job is skipped on a draft, or which skips a draft by itself (the
+// description check's), runs on a pull request once it is ready only where its trigger starts it when one is marked
+// ready (#375, #502): without that, the check a draft skipped never runs on that head, and a ruleset counts the skip as
+// passed. Each workflow where a call does so is named, as the workflow check reads it (workflows.mjs, draftHoles).
 function readyOnlyHolds(p) {
-  const checks = /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget)\.yml@/i;
-  readable(p, text => checks.test(text));
-  // (the types a workflow's pull_request trigger lists, GitHub's own where it lists none or names the event alone, as
-  // `on: pull_request` or `on: [push, pull_request]`; null where it has no such trigger)
-  const types = on => typeof on === "string" || Array.isArray(on) ? ([].concat(on).includes("pull_request") ? [] : null)
-    : on && typeof on === "object" && "pull_request" in on ? [].concat(on.pull_request?.types ?? []).map(String) : null;
-  const wrong = Object.entries(p.workflows).filter(([, w]) => types(w.yaml?.on) !== null && !types(w.yaml.on).includes("ready_for_review")
-    && Object.values(w.yaml.jobs ?? {}).some(job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/`.toLowerCase()) && checks.test(job.uses)
-      && /\bpull_request\.draft\b/.test(String(job.if ?? ""))));
+  readable(p, text => /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget|pr-description)\.yml@/i.test(text));
+  const wrong = Object.entries(p.workflows).filter(([, w]) => w.yaml && draftHoles(w.yaml).length);
   return wrong.length ? `A call to the core's checks whose job is skipped on a draft never runs once the pull request is marked ready, since its trigger leaves that out: add \`ready_for_review\` to the \`types:\` under \`pull_request:\` (where it lists none, \`types: [opened, reopened, synchronize, ready_for_review]\`) in ${wrong.map(([f]) => `\`.github/workflows/${shown(f)}\``).join(", ")}.` : null;
 }
 
@@ -875,6 +869,7 @@ export const STEPS = [
   { lead: "17 November 2026, held packages looked up again", cost: COST.read, unread: "whether a package has gone stale is its registry's answer on the day, and GitHub's, not a file's: the session that syncs runs `node core/scripts/held.mjs` once and puts what it prints in the sync pull request's description, each package gone stale a task; the scheduled look runs it again each month" },
   { lead: "17 November 2026, the packages the copy carries", cost: COST.workflow, check: scriptsWithPackages,
     partly: "which suites read the core's scripts is the project's own logic, read by the review" },
+  { lead: "18 November 2026, a check a draft skips runs once ready", cost: COST.check, held: "the workflow check" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the
