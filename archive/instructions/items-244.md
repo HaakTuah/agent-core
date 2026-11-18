@@ -125,3 +125,11 @@ The index, and how an item is written: `archive/instructions.md`.
      and copies checks, the parts the first trials would replace. The owner agreed to it, with the issue's other points,
      after asking what the core lacked that let an inventory's check miss a part. It stands behind "A trial of a
      maintained tool replays the part's past bugs" in `tasks/choices.md`, and the inventory's line `Replayed:`.
+
+257. **17 November 2026**, #563. The audit's reader asks of a project's documents what it asks of its code: which of
+     its descriptions no longer say what the code does, each with the document and line and what it no longer
+     matches; each such find is a task of the cleaning lane, taken at the dose, and the audit mends nothing and adds
+     no job. "No description left untrue" is held by being read, so what a change misses stays untrue until someone
+     happens to read it. The owner agreed to it in a chat session, as the third of three ways to gain on what the
+     core already has. It stands behind "The audit's reader has a fixed brief and fixed questions" in
+     `tasks/cleaning.md`.

@@ -70,6 +70,7 @@
     ],
     "roles/shared/work-flow.md: An exemption leaves a mark": "check: scripts/pr-description.mjs, in part",
     "tasks/cleaning.md: The state report leads with the outcomes": "check: scripts/outcomes.mjs, in part",
+    "tasks/cleaning.md: The audit's reader has a fixed brief and fixed questions": "audit",
     "roles/shared/inbox.md: Bugs don't wait": "check: GitHub's closing of an issue whose \"Fixes #n\" reaches the default branch, in part",
     "roles/orchestrator.md: A stalled lane": "check: scripts/stalled.mjs, in part",
     "roles/shared/review-guidelines.md: A mark on what every session reads": [
@@ -293,6 +294,7 @@
     "tasks/cleaning.md": [226],
     "tasks/cleaning.md: No process number is a builder's goal": [244],
     "tasks/cleaning.md: The state report leads with the outcomes": [244, 251],
+    "tasks/cleaning.md: The audit's reader has a fixed brief and fixed questions": [257],
     "tasks/code-shape.md": [226],
     "tasks/code-shape.md: A job a maintained package does is done by it": [255],
     "tasks/done-when.md": [240],
@@ -399,6 +401,7 @@
     "tasks/choices.md: A trial of a maintained tool replays the part's past bugs": "correction: does not work; outcome: robust",
     "roles/shared/review-guidelines.md: A mechanical move is read by its rule and a sample": "findings; outcome: robust",
     "tasks/cleaning.md: The state report leads with the outcomes": "correction: does not work; outcome: robust",
+    "tasks/cleaning.md: The audit's reader has a fixed brief and fixed questions": "correction: looks wrong; outcome: readable",
     "floor/topics/dependencies.md: A new one is looked up in its registry": "check fires; outcome: robust; rare harm",
     "floor/topics/dependencies.md: A new one is taken in an order": "findings; outcome: robust",
     "floor/topics/what-ships.md: A package found bad goes at once": "correction: rule missing; outcome: robust; rare harm"
