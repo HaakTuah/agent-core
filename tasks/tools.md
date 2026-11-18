@@ -87,5 +87,5 @@ open, only where it is run with `--open` and gh answers.
 | How a task is handed over | carried: `roles/orchestrator.md`, a session or helper it starts | carried: `tools/codex.md`, its plug-in's subagent or its command line | carried: `tools/kiro.md`, its editor or `kiro-cli chat` | carried: `tools/antigravity.md`, a conversation in its editor | carried: `tools/copilot.md`, a conversation on GitHub |
 | How a review is asked | carried: `tasks/reviews.md`, the fallback reviewer | carried: `tools/codex.md`, its app on GitHub | carried: `tools/kiro.md`, a fresh session given the review's brief | carried: `tools/antigravity.md`, a fresh session of it with that brief | carried: `tools/copilot.md`, its code review |
 | The orchestrator | carried: `roles/orchestrator.md` | not yet | not yet | not yet | not yet |
-| The staged run | carried: `reports/staged-cases.json` | not yet | not yet: #400 | not yet | not yet |
+| The staged run | carried: `scripts/staged.mjs`, every case passed | not yet | not yet: #400 | not yet | not yet |
 | Its issue for what is not yet carried | none | #679 | #680 | #681 | #682 |
