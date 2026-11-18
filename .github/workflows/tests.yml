@@ -44,8 +44,9 @@ concurrency:
 
 jobs:
   # (the suites are split in parts that run side by side, each under a time mark of its own: the core's checks from
-  # plain git on whole scratch projects, with the hostile tests of the core's inputs (projects); the sync and its proof
-  # (sync); the starter kit (kit); the steps' test (steps); the check of the core's copy (core.yml) on scratch projects (core), on
+  # plain git on whole scratch projects, and what they leave out for the copy, with the hostile tests of the core's
+  # inputs (projects); the sync and its proof (sync); the starter kit (kit); the steps' test (steps); the check of the
+  # core's copy (core.yml) on scratch projects (core), on
   # Windows in two halves of its test, the faults it names and where the copy stands (faults, places); the
   # personal-terms check's own job (terms); the licence, NuGet and lookup (and its lookup again) checks, with the hostile
   # tests of build files and packages (licences); the agent-tools check (tools), on Windows beside the rest, since its
@@ -290,6 +291,9 @@ jobs:
       - name: The core's checks from plain git (check.mjs), on scratch projects
         if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/check-test.mjs ')) }}
         run: node tests/check-test.mjs
+      - name: What a project's checks leave out for the core's copy, held to README.md's list
+        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/copy-left-out-test.mjs ')) }}
+        run: node tests/copy-left-out-test.mjs
       - name: The sync, and the proof that a sync is pure, against every way a sync branch can carry more
         if: ${{ !cancelled() && contains(matrix.parts, 'sync') && (env.RUN == 'all' || contains(env.RUN, ' tests/pure-sync-test.mjs ')) }}
         run: node tests/pure-sync-test.mjs
