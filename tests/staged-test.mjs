@@ -259,6 +259,11 @@ check("weakness", fresh("weakness"), keptWeakness,
   git(r, "checkout", "-q", "-B", "notes", "origin/main"); write(r, "docs/notes.md", "Nothing here.\n"); git(r, "add", "-A"); git(r, "commit", "-q", "-m", "notes");
   git(r, "push", "-q", "-f", "origin", "notes"); git(r, "checkout", "-q", "main");
   ok(/pushed commit says how/.test(verdict("weakness", r).why), "weakness: a pushed line rewritten away by a force-push still fails", verdict("weakness", r).why);
+  // (a hostile test moved out of test/ unchanged is read where it now stands)
+  const m = fresh("weakness");
+  keptWeakness(m);
+  branch(m, "moved", { "test/hostile.test.mjs": null, "docs/reproduce.mjs": hostile }, "harden-saved");
+  ok(/pushed commit says how/.test(verdict("weakness", m).why), "weakness: a test that says how, moved out of test/, fails", verdict("weakness", m).why);
 }
 check("no-floor", fresh("no-floor"),
   d => gh(d, "POST", "issues/1/comments", { body: "From a builder session, on #1: the floor cannot be read at lib/core/, where the manifest says the core stands, and the submodule cannot be fetched here; nothing is done until it can." }),

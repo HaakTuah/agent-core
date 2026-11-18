@@ -57,7 +57,7 @@ function pushedText(dir) {
   for (const sha of commits) {
     lines.push(String(originGit(dir, "log", "-1", "--format=%B", "--end-of-options", sha) ?? ""));
     let file = null;
-    for (const l of String(originGit(dir, "show", "--first-parent", "-m", "-p", "--text", "--no-ext-diff", "--no-textconv", "--format=", "--end-of-options", sha) ?? "").split("\n")) {
+    for (const l of String(originGit(dir, "show", "--first-parent", "-m", "-p", "--no-renames", "--text", "--no-ext-diff", "--no-textconv", "--format=", "--end-of-options", sha) ?? "").split("\n")) {
       if (l.startsWith("+++ ")) file = l.replace(/^\+\+\+ (?:b\/)?/, "");
       else if (l.startsWith("+") && file !== null && !file.startsWith("test/")) lines.push(l.slice(1));
     }
