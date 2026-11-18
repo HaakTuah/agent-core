@@ -64,7 +64,7 @@ held(workflows.has("core.yml") && scripts.has("copies.mjs") && scripts.has("pr-d
 
 // What is no check of the copy, each with why: a script or a workflow found above that is no row of the list.
 const NOT_CHECKS = {
-  "checks.mjs": "it runs its parts' checks, each a row or named here; its own look before the npm install is the row `checks.mjs signatures`",
+  "checks.mjs": "it runs its parts' checks, each a row or named here; its own look before it installs is the row `checks.mjs signatures`",
   "manifest-reads.mjs": "it reports and never fails, and reads the copy only as the source of the modules and slots",
   "licences.mjs": "it reads the lock files and audit entries the project's config names; its scan of the tree is the row licence-scan.mjs",
   "exact-versions.mjs": "it reads the lock files the project's config names",
@@ -163,7 +163,9 @@ const PAIRS = {
     return [waits("core/scripts/x.mjs"), waits("scripts/x.mjs"), ""];
   }],
   "licence-scan.mjs": ["licence-scan-stage.mjs's project, scanned: a file that carries a licence notice", () => {
-    const found = f => licenceScan(dir => { licenceWrite("core-manifest.md", "# Core manifest\n")(dir); licenceWrite(f, "/*! moss v1 */\n")(dir); });
+    // (a licence notice, built from pieces as the test runs, so this file holds none for the core's own scan to read)
+    const NOTICE = `/${"*"}! moss v1 */\n`;
+    const found = f => licenceScan(dir => { licenceWrite("core-manifest.md", "# Core manifest\n")(dir); licenceWrite(f, NOTICE)(dir); });
     const [a, b] = [found("core/scripts/moss.min.js"), found("scripts/moss.min.js")];
     return [a.length > 0, b.length > 0, `inside: ${a.join("; ")}\noutside: ${b.join("; ")}`];
   }],
