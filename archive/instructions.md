@@ -7,8 +7,9 @@ lists under "behind" the items behind each rule (`AGENTS.md`, "The archive is po
 own words of items 1 to 245 stay in the core's repository alone, in `words/` under the same numbers, which a project's
 copy leaves out; `scripts/holders.mjs` holds the two forms in step. A new item goes at the end of the newest file
 below, numbered after the last, with its date, the issue that carries the owner's word and one line of the reasoning,
-the words themselves staying on the issue; once that file passes about 20 KB, the next item starts a new one, named for
-its number.
+the words themselves staying on the issue; the first item of a new month starts a new one, named for its number, since
+a date is the only meaning a record's cut can have (`tasks/cleaning.md`, "Size asks"), the files that stand kept as
+they are.
 
 Item N is in the file below whose first number is the highest at or below N. Search them rather than read them whole.
 

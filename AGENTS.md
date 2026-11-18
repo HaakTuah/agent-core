@@ -133,6 +133,15 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   to make room. Reason: each start is paid at every task, and a cap that decided where a rule stands would hide it
   from who must keep it. Held by `scripts/size.mjs`, and `.github/workflows/size.yml`, which fails a raise of more
   than one step, and one in a PR with no "Leanness check:" comment.
+- **A role's start holds what any of its tasks can break** (#469). By default a line of a file a role reads at its
+  start, as `scripts/reading.mjs` gives it, stays there only where any task of that role can break it, the test the
+  floor's own file keeps; a line only some kinds of task can break moves to a module read when a task calls for it.
+  Whoever cuts or joins a file read at a start puts the test to each line it moves or leaves; a line of the review
+  guidelines moves so under the owner's agreement of 18 November 2026, relayed into its pull request (floor rule 3).
+  It does not mean a size to reach, nor that a line any task can break leaves the start to make room, nor a rewrite of
+  the files that stand. Reason: what stands at the start is paid at every task, and one study of rule files found that
+  they raise what a task costs without raising how often it succeeds. Held by no check yet: which tasks can break a
+  line is a reading; `scripts/read-total.mjs` shows what a move saves.
 - **A release is cut on the owner's word:** another owner's project takes the core only
   from a release (`README.md`, "How a project takes the core", point 1), so one is cut when the owner says the core as
   it stands may be handed on, never by a session's own choice: the owner's standing word is that it may each time the

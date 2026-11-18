@@ -1,8 +1,8 @@
 # Cleaning, and the audit of how code is put together
 
-Read by a builder that takes a cleaning task, by the session that takes an audit's task or the state report and by its
-reader, and by the orchestrator when it hands out lanes: the kinds `cleaning` and `audit`. What the
-code is held to: `tasks/code-shape.md`.
+Read by a builder that takes a cleaning task or cuts or joins files, by the session that takes an audit's task or the
+state report and by its reader, and by the orchestrator when it hands out lanes: the kinds `cleaning` and `audit`. What
+the code is held to: `tasks/code-shape.md`.
 
 - **The state of a codebase sets the dose.** By default a codebase is in one of three states, which
   `core/scripts/dose.mjs` reads from the shape check's baseline: the share of the functions and imports the check
@@ -96,3 +96,30 @@ code is held to: `tasks/code-shape.md`.
   property of the code keeps a baseline that may not get worse (`tasks/code-shape.md`). It does not mean a session may
   not read them. Reason: a number made a goal stops measuring what it stood for. Held by no check: none reads a target
   set in prose without guessing; the brief's rule (`tasks/helpers.md`) and the reviews carry it.
+- **Size asks; a reader who reads less answers** (#469). By default a file past its mark, the *size marks*' split mark
+  (about 20 KB where they set none), sets whoever changes it one question: in what ways could it be split so that
+  someone reads less? That builder lists the ways found in the pull request, each with the reader who would read less,
+  a role or a kind of task. Where there is one, the file is split along it, in a pull request of its own with behaviour
+  proven unchanged; where none, it stays whole, its line in the marks' baseline (`"past"`) giving the reason, and the
+  question is not asked again until it has grown by a quarter or a new kind of reader comes. A split leaves no reader
+  reading more: where whoever reads one part needs the other every time, it is no split. A dated record (the archive's
+  item files, the reports) is cut by month where it is cut at all, those that stand kept as they are. It does not mean
+  a file is cut to meet a number, nor that the caps on what a role reads at its start go, where size is the cost itself
+  (the core's `AGENTS.md`, "The size caps keep the rules lean and decide nothing else"). Reason: a mark on size is a
+  weak sign that a file holds two things, and files were cut where nothing was gained. Held by the reading-size check
+  (`core/scripts/reading-size.mjs`), which fails a file past its mark that a pull request changes with no line in
+  `"past"`, one whose line names neither a split's issue nor why it stays whole, and one grown a quarter past it.
+- **A cut or a join lowers the total read** (#469). By default what a change to how rule files are cut brings down is
+  the sum of what the core's tasks read, each file opened counted as a cost of its own, never one file's size:
+  `core/scripts/read-total.mjs` works it out from what the reading script gives each role and kind of task and from
+  the last 30 merged pull requests, each read as the kinds of task its changed paths make it. Whoever cuts or joins
+  such files runs it on the base and on the branch (`--compare`) and shows both in the pull request, which passes three
+  conditions: the sum goes down; no role or kind of task reads more, its extra opens counted; and none loses a file it
+  read before, unless the pull request says why it never needed it, on a line `Never needed:`. It goes both ways: two
+  files the same readers always open together are joined where the sum goes down by it, and where a part of a long
+  file is all a kind of task needs, the reading script may name the part, the file staying whole. A file of any size
+  that several kinds of task open is a candidate, and the audit's reader is shown those (`read-total.mjs
+  --candidates`). It does not mean reading is cut by keeping a session from what its task calls for. Reason: the
+  lowest total has an optimum, since each file opened is a call and one more file a session can miss. Held by
+  `read-total.mjs --compare` in the core's size workflow, which fails a pull request that adds or takes out a file the
+  reading script names where a condition fails, and by the state report, which gives the sum beside the last one's.

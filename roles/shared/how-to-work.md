@@ -34,9 +34,9 @@ pillars hold it up: **one fact, one place**, **split by meaning**, **keep it lea
 - **Keep it lean:** every change removes what it replaces, in the same PR: no commented-out code, no
   "old" copies, nothing left unused. Look for an existing helper or package (`tasks/code-shape.md`) before writing one.
 - **Split by meaning, from the start:** each file holds one thing people look up on its own, as
-  small as that thing is; new work goes into its own file. A file past about 20 KB probably holds two things.
-  - A split goes in its own PR, behaviour proven unchanged; a file past the *size marks*' split mark is split before it
-    is changed.
+  small as that thing is; new work goes into its own file.
+  - A file past the *size marks*' split mark asks, before it is changed, how a split lets a reader read less: split
+    so, in its own PR, behaviour proven unchanged, or, where none, kept whole (`tasks/cleaning.md`, "Size asks").
 - **Principles over rules:** where a rule's letter would defeat its purpose, follow the purpose, say
   so under "Readings taken", and flag the rule to be fixed.
   - Never for the floor, nor for a rule the project's `AGENTS.md` marks as a safety rule.
