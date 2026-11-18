@@ -52,8 +52,8 @@ jobs:
   # cases outgrew the licences' mark there and the faults half has no room for them (#603); and the rest (rest). Each
   # step's condition names its part in the job's list "parts", read by substring: no name holds another, but that core
   # is named beside its half. On Windows, where a suite that starts many processes runs several times slower, a job
-  # takes kit with steps, the second half with terms, the rest with tools, and each other part alone; on Linux two jobs take them, kit, core, licences, terms and
-  # tools in one, projects, sync, rest and steps,
+  # takes kit with steps, the second half with terms, the rest with tools, and each other part alone; on Linux two jobs
+  # take them, kit, core, licences, terms and tools in one, projects, sync, rest and steps,
   # with the steps run once on Linux, in the other, which keeps the name of the suite that was whole and so its mark,
   # lowered. Each part is sized by its steps' times on the slow runner, which takes half as long again as another, so
   # that it ends within its mark there too, no mark raised: on Windows, by #506's run on 02b9c4e, about 375 of 600, 320
