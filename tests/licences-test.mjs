@@ -21,11 +21,14 @@ const ok = (cond, what, more = "") => { console.log(`${cond ? "ok  " : "FAIL"} $
   const core = f => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
   const pin = core(".node-version").trim();
   const entry = JSON.parse(core(".github/licences-audit.json")).entries.filter(e => e.name === "Node.js");
-  const summed = [...core("scripts/node.sh").matchAll(/^\s*([0-9][0-9.]*)-(x86_64|aarch64)\)/gmu)].map(m => `${m[1]}-${m[2]}`);
+  // (every pattern of node.sh's case on "$want-$(uname -m)", each alternative of it, the closing *) aside: a glob or an
+  // alternative above the pin's lines would take over from them)
+  const block = /case "\$want-\$\(uname -m\)" in\n([\s\S]*?)\nesac/u.exec(core("scripts/node.sh").replace(/\r\n/gu, "\n"))?.[1] ?? "";
+  const summed = [...block.matchAll(/^\s*([^\s()]+)\)/gmu)].flatMap(m => m[1].split("|")).filter(p => p !== "*");
   const want = ["aarch64", "x86_64"].map(arch => `${pin}-${arch}`);
   ok(entry.length === 1 && entry[0].version === pin && JSON.stringify([...summed].sort()) === JSON.stringify(want),
     `the audit's entry for Node, and node.sh's sums, one for each architecture, name the pin in .node-version, ${pin}`,
-    `the entry names ${entry.map(e => e.version).join(", ") || "nothing"}, node.sh sums ${summed.join(", ") || "nothing"}, where ${want.join(" and ")} are wanted. Mend: set "version" of the entry "Node.js" in .github/licences-audit.json to the version .node-version names, and give node.sh that version's two sums, in the pull request that moves the pin (tasks/updates.md, "Node")`);
+    `the entry names ${entry.map(e => e.version).join(", ") || "nothing"}, node.sh sums ${summed.join(", ") || "nothing"}, where ${want.join(" and ")} are wanted. Mend: set "version" of the entry "Node.js" in .github/licences-audit.json to the version .node-version names, and give node.sh's case that version's two sums, one for x86_64 and one for aarch64, with no other pattern but its closing *), in the pull request that moves the pin (tasks/updates.md, "Node")`);
 }
 
 const lists = policy({ data: ["mossgrip-data"], fonts: ["mossgrip-face"] });
