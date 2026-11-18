@@ -135,10 +135,10 @@ const live = new Set();
 export const stopAll = () => { for (const stop of live) stop(); };
 
 // One run of a test file in a working copy: "passed", "failed" or "timeout", and how long it took, in seconds.
-export function run(test, cwd, limit) {
+export function run(test, cwd, limit, env = process.env) {
   return new Promise(done => {
     // (in a group of its own off Windows, so that a test past its time is stopped with what it started)
-    const start = Date.now(), group = process.platform !== "win32", child = spawn(process.execPath, [test], { cwd, stdio: "ignore", detached: group });
+    const start = Date.now(), group = process.platform !== "win32", child = spawn(process.execPath, [test], { cwd, env, stdio: "ignore", detached: group });
     const stop = () => { try { if (group) process.kill(-child.pid, "SIGKILL"); else child.kill("SIGKILL"); } catch { /* (it ended) */ } };
     live.add(stop);
     const timer = setTimeout(() => { stop(); live.delete(stop); done({ result: "timeout", took: limit }); }, limit * 1000);

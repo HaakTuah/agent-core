@@ -50,9 +50,11 @@ export function progress({ cwd = process.cwd(), read = f => fs.readFileSync(f, "
 export function coreReporter(options) {
   const { report, plan } = options.coreRun ?? {};
   if (!report || !plan) throw new Error("stryker-plugin.mjs is run by stryker.mjs, which names its report and plan under \"coreRun\"");
-  const state = progress(), write = r => fs.writeFileSync(report, `${JSON.stringify(r)}\n`);
+  // (each file written whole beside its place and then moved there, so a run stopped mid-write leaves the last whole one)
+  const whole = (at, value) => { const part = `${at}.part`; fs.writeFileSync(part, `${JSON.stringify(value)}\n`); fs.renameSync(part, at); };
+  const state = progress(), write = r => whole(report, r);
   return {
-    onMutationTestingPlanReady({ mutantPlans }) { const p = state.plan(mutantPlans); fs.writeFileSync(plan, `${JSON.stringify(p.of)}\n`); write(p.report); },
+    onMutationTestingPlanReady({ mutantPlans }) { const p = state.plan(mutantPlans); whole(plan, p.of); write(p.report); },
     onMutantTested(result) { write(state.tested(result)); },
     onMutationTestReportReady(final) { write(state.ended(final)); },
   };

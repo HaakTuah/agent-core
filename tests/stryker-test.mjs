@@ -6,7 +6,7 @@
 // --tool in the suites, and with it in the step that installs Stryker for the tests' strength.
 //
 //   node tests/stryker-test.mjs [--tool <folder>]
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -41,6 +41,11 @@ try {
     "once the run ends, the report is Stryker's own, with nothing a test printed");
   let threw = false;
   try { coreReporter({}); } catch { threw = true; }
+  const files = path.join(scratch, "written"), reporter = (fs.mkdirSync(files), coreReporter({ coreRun: { report: path.join(files, "r.json"), plan: path.join(files, "plan.json") } }));
+  reporter.onMutationTestingPlanReady({ mutantPlans: [] });
+  reporter.onMutationTestReportReady({ files: {} });
+  ok(same(fs.readdirSync(files).sort(), ["plan.json", "r.json"]) && JSON.parse(fs.readFileSync(path.join(files, "r.json"), "utf8")).schemaVersion === "1",
+    "the plug-in writes each file whole beside its place and moves it there, leaving nothing half written", fs.readdirSync(files).join(", "));
   ok(threw && strykerPlugins[0].kind === "Reporter" && strykerPlugins[0].name === "core-report" && same(coreReporter.inject, ["options"]), "the plug-in is a reporter that takes Stryker's options, and refuses to run without its paths");
 
   // ---- each fault's tests, and their limits ----
@@ -53,14 +58,35 @@ try {
   const calls = [], fake = results => (test, seconds, env) => { const on = "__STRYKER_ACTIVE_MUTANT__" in env; calls.push([test, seconds, on ? "with the fault" : "as it stands"]); return results[`${test}${on ? " with" : ""}`]; };
   process.env.__STRYKER_ACTIVE_MUTANT__ = "7";
   const run1 = fake({ "test/a-test.mjs": { result: "failed", took: 1 }, "test/b-test.mjs": { result: "passed", took: 2 }, "test/b-test.mjs with": { result: "failed", took: 1 } });
-  const caught = dispatch(map, "7", run1);
+  const caught = await dispatch(map, "7", run1);
   ok(caught === 1 && same(calls, [["test/a-test.mjs", 60, "as it stands"], ["test/b-test.mjs", 60, "as it stands"], ["test/b-test.mjs", limitOf(2), "with the fault"]]),
     "a test is run as it stands first, with no fault switched on; one that fails there is left out; the next, with the fault in, is held to mutate.mjs's limit, and its failing catches the fault", JSON.stringify(calls));
   calls.length = 0;
-  ok(dispatch(map, "7", fake({ "test/b-test.mjs with": { result: "passed", took: 2 } })) === 0 && same(calls, [["test/b-test.mjs", limitOf(2), "with the fault"]]),
+  ok(await dispatch(map, "7", fake({ "test/b-test.mjs with": { result: "passed", took: 2 } })) === 0 && same(calls, [["test/b-test.mjs", limitOf(2), "with the fault"]]),
     "a test is run as it stands once for the whole run, and a fault no test fails on survives", JSON.stringify(calls));
-  ok(asItStands("test/a-test.mjs", map.asIs, () => { throw new Error("run again"); }).result === "failed", "a test's run as it stands is kept for the faults after");
-  ok(dispatch(map, "7", fake({ "test/b-test.mjs with": { result: "timeout", took: 9 } })) === 1, "a test past its limit with the fault in catches it");
+  ok((await asItStands("test/a-test.mjs", map.asIs, () => { throw new Error("run again"); })).result === "failed", "a test's run as it stands is kept for the faults after");
+  ok(await dispatch(map, "7", fake({ "test/b-test.mjs with": { result: "timeout", took: 9 } })) === 1, "a test past its limit with the fault in catches it");
+  // (a real test past its limit, which leaves a process of its own running: it is stopped with it, off Windows, where
+  // a test runs in a group of its own)
+  if (process.platform !== "win32") {
+    const slowDir = path.join(scratch, "slow"), pidAt = path.join(slowDir, "child.pid");
+    fs.mkdirSync(slowDir);
+    fs.writeFileSync(path.join(slowDir, "slow-test.mjs"), `import { spawn } from "node:child_process";\nimport fs from "node:fs";\nconst c = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" });\nfs.writeFileSync(${JSON.stringify(pidAt)}, String(c.pid));\nawait new Promise(r => setTimeout(r, 60000));\n`);
+    const slowMap = { files: { "src/a.mjs": [path.join(slowDir, "slow-test.mjs")] }, plan: map.plan, asIs: path.join(slowDir, "as-is") };
+    fs.mkdirSync(slowMap.asIs);
+    fs.writeFileSync(path.join(slowMap.asIs, `${Buffer.from(slowMap.files["src/a.mjs"][0]).toString("hex")}.json`), JSON.stringify({ result: "passed", took: -3 }));
+    process.env.__STRYKER_ACTIVE_MUTANT__ = "7";
+    const started = Date.now(), slow = await dispatch(slowMap, "7");
+    delete process.env.__STRYKER_ACTIVE_MUTANT__;
+    const pid = Number(fs.readFileSync(pidAt, "utf8"));
+    // (a process killed is gone once it is reaped, a moment after: up to 2 s, read from /proc where it stands)
+    const gone = () => { try { return !fs.existsSync(`/proc/${pid}`) || /^\S+ \(.*\) [ZX]/u.test(fs.readFileSync(`/proc/${pid}/stat`, "utf8")); } catch { return true; } };
+    for (let i = 0; i < 20 && !gone(); i++) await new Promise(r => setTimeout(r, 100));
+    let alive = !gone();
+    if (!fs.existsSync("/proc")) { try { process.kill(pid, 0); alive = true; } catch { alive = false; } }
+    if (alive) process.kill(pid, "SIGKILL");
+    ok(slow === 1 && Date.now() - started < 30000 && !alive, "a test past its limit is stopped with every process it started, and the fault is caught", `alive: ${alive}`);
+  }
   delete process.env.__STRYKER_ACTIVE_MUTANT__;
   ok(same(counted({ files: { a: { mutants: [{ status: "Killed" }, { status: "Pending" }, { status: "Killed" }] } } }), { Killed: 2, Pending: 1 }), "a report's faults are counted by their status");
 
@@ -101,6 +127,16 @@ try {
     const slow = spawnSync(process.execPath, [SCRIPT, "--tool", TOOL, "--report", out, "--budget", "6", "src/a.mjs:1-2"], { cwd: dir, encoding: "utf8" });
     const late = JSON.parse(fs.readFileSync(out, "utf8")).files["src/a.mjs"]?.mutants ?? [];
     ok(slow.status === 0 && late.some(m => m.status === "Pending") && /not run \(the budget\)/.test(slow.stdout), "past its budget, Stryker is stopped and the faults it did not run are written as not run", `${slow.stdout}${slow.stderr}`);
+    // (a run stopped by a signal stops Stryker and all it started before it takes its working copy away, off Windows)
+    if (process.platform !== "win32") {
+      const strykers = () => spawnSync("pgrep", ["-f", `${TOOL}/node_modules/@stryker-mutator/core/bin/stryker.js run`], { encoding: "utf8" }).stdout.trim();
+      const child = spawn(process.execPath, [SCRIPT, "--tool", TOOL, "--report", out, "src/a.mjs:1-2"], { cwd: dir, stdio: "ignore" });
+      for (let i = 0; i < 100 && !strykers(); i++) await new Promise(r => setTimeout(r, 100));
+      const was = strykers();
+      child.kill("SIGTERM");
+      await new Promise(r => child.on("exit", r));
+      ok(was && !strykers() && git("worktree", "list").trim().split("\n").length === 1, "a run stopped by a signal stops Stryker with it, and takes its working copy away", `before: ${was || "none"}; after: ${strykers() || "none"}`);
+    }
   } else console.log("note the run with Stryker itself needs --tool <the folder it is installed in>: the tests workflow gives it in the step that installs Stryker");
 } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 

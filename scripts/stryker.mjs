@@ -28,7 +28,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { LONGEST, Refused, copyOf, limitOf, projectOf, refuse, stopAll, takeAway, testsOf, wantedOf } from "./mutate.mjs";
+import { LONGEST, Refused, copyOf, limitOf, projectOf, refuse, run, stopAll, takeAway, testsOf, wantedOf } from "./mutate.mjs";
 import { started } from "./started.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -44,21 +44,19 @@ export function testsFor(map, active, readPlan = p => JSON.parse(fs.readFileSync
   return map.files[readPlan(map.plan)[active]] ?? [];
 }
 
-// One run of a test with `node`, its fault switched on or not: "passed", "failed" or "timeout", and its time in seconds.
-function once(test, seconds, env) {
-  const start = Date.now(), r = spawnSync(process.execPath, [test], { stdio: "ignore", env, timeout: seconds * 1000, killSignal: "SIGKILL" });
-  return { result: r.error?.code === "ETIMEDOUT" || r.signal ? "timeout" : r.status === 0 ? "passed" : "failed", took: (Date.now() - start) / 1000 };
-}
+// One run of a test with `node`, its fault switched on or not: mutate.mjs's run, which stops past its time the test
+// and all it started.
+const once = (test, seconds, env) => run(test, process.cwd(), seconds, env);
 
 // A test as it stands, run once for the whole run, the first fault that reaches it running it with no fault switched
 // on, and kept in the folder `asIs` for those after: { result, took }. Two faults that reach it at once may both run
 // it, each writing the same.
-export function asItStands(test, asIs, run1 = once) {
+export async function asItStands(test, asIs, run1 = once) {
   const at = path.join(asIs, `${Buffer.from(test).toString("hex")}.json`);
   try { return JSON.parse(fs.readFileSync(at, "utf8")); } catch { /* (not yet run) */ }
   const env = { ...process.env };
   delete env[ACTIVE];
-  const r = run1(test, LONGEST, env), part = `${at}.${process.pid}`;
+  const r = await run1(test, LONGEST, env), part = `${at}.${process.pid}`;
   fs.writeFileSync(part, JSON.stringify(r));
   fs.renameSync(part, at);
   return r;
@@ -66,11 +64,11 @@ export function asItStands(test, asIs, run1 = once) {
 
 // The tests of one fault run one after the other, each as it stands first, until one fails or runs past its limit:
 // the exit code Stryker's command runner reads, 1 where the fault was caught.
-export function dispatch(map, active, run1 = once) {
+export async function dispatch(map, active, run1 = once) {
   for (const test of testsFor(map, active)) {
-    const was = asItStands(test, map.asIs, run1);
+    const was = await asItStands(test, map.asIs, run1);
     if (was.result !== "passed") continue;
-    if (run1(test, limitOf(was.took), process.env).result !== "passed") return 1;
+    if ((await run1(test, limitOf(was.took), process.env)).result !== "passed") return 1;
   }
   return 0;
 }
@@ -89,6 +87,9 @@ export function optionsOf({ mutate, mapAt, scratch, report, plan, concurrency = 
   };
 }
 
+// Stryker, while it runs: the way to stop it with all it started, for a signal that stops this run.
+let stopStryker = () => {};
+
 // Stryker run in the working copy, stopped past `seconds`: { ended, out }, `ended` false where the budget stopped it.
 function stryker(bin, configAt, cwd, seconds) {
   return new Promise(done => {
@@ -97,8 +98,9 @@ function stryker(bin, configAt, cwd, seconds) {
     const keep = d => { out = (out + d).slice(-4000); };
     child.stdout.on("data", keep); child.stderr.on("data", keep);
     const stop = () => { try { if (group) process.kill(-child.pid, "SIGKILL"); else spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"]); } catch { /* (it ended) */ } };
+    stopStryker = stop;
     const timer = Number.isFinite(seconds) ? setTimeout(() => { stopped = true; stop(); }, Math.max(1, seconds) * 1000) : null;
-    child.on("close", code => { if (timer) clearTimeout(timer); done({ ended: !stopped, code, out }); });
+    child.on("close", code => { if (timer) clearTimeout(timer); stopStryker = () => {}; done({ ended: !stopped, code, out }); });
   });
 }
 
@@ -146,7 +148,7 @@ async function main(argv) {
   const { out, bin, budget, named } = askedOf(argv), until = Date.now() + budget * 1000;
   const { code, testTexts } = projectOf(), wanted = wantedOf(named, code);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "stryker-")), copies = [];
-  const stop = () => { stopAll(); takeAway(copies, scratch); process.exit(130); };
+  const stop = () => { stopStryker(); stopAll(); takeAway(copies, scratch); process.exit(130); };
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, stop);
   try {
     copies.push(copyOf(path.join(scratch, "copy")));
