@@ -8,8 +8,8 @@ repos/<owner>/<repo>/pulls/<n>/copilot-code-review`. It marks nothing blocking: 
 `pulls/<n>/reviews`).
 
 As a builder (from its documentation, docs.github.com, its pages "Adding repository custom instructions", "About
-GitHub Copilot cloud agent", "Using Copilot in the cloud on GitHub", "Hooks for GitHub Copilot" and "GitHub Copilot hooks
-reference", read on 18 November 2026, until it has passed the staged cases: `tasks/tools.md`):
+GitHub Copilot cloud agent", "Using Copilot in the cloud on GitHub", "Hooks for GitHub Copilot" and "GitHub Copilot
+hooks reference", read on 18 November 2026, until it has passed the staged cases: `tasks/tools.md`):
 - **What it reads:** the nearest `AGENTS.md` in the folders it works in, so it needs no entry file; its documentation
   names no way to pull a file in, so it opens each file that names itself (`tools/other-builders.md`).
 - **Handed a task:** on GitHub, the brief as the first message of a conversation started from an issue an owner filed
