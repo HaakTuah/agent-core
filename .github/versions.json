@@ -16,7 +16,7 @@
       "pattern": "export const VERSION = \"(\\d+\\.\\d+\\.\\d+)\";",
       "days": 7,
       "sameMajor": true,
-      "how": "Put the version in `VERSION` in `scripts/code-scan.mjs`, and in `WHEELS` the path on PyPI's file host and the SHA-256 of each wheel PyPI lists for it (its JSON API, `https://pypi.org/pypi/semgrep/<version>/json`), with floor rule 7's checks: the release notes read, its licence still LGPL-2.1, and `tests/code-scan-test.mjs` passing on Linux and Windows, which runs the engine on its samples. Also the version in the licence audit's entry for the engine (`.github/licences-audit.json`). Every project takes it by its sync."
+      "how": "Put the version in `VERSION` in `scripts/code-scan.mjs`, and in `WHEELS` the path on PyPI's file host and the SHA-256 of each wheel PyPI lists for it (its JSON API, `https://pypi.org/pypi/semgrep/<version>/json`), in `ENGINES` the digest of each wheel's engine (`engineDigest` of `engineFiles` with its copy `osemgrep`), with floor rule 7's checks: the release notes read, its licence still LGPL-2.1, and `tests/code-scan-test.mjs` passing on Linux and Windows, which runs the engine on its samples. Also the version in the licence audit's entry for the engine (`.github/licences-audit.json`). Every project takes it by its sync."
     }
   ]
 }

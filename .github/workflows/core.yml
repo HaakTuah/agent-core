@@ -344,6 +344,9 @@ jobs:
       # engine is fetched by its wheel's digest, before anything of the change runs, and reads the files the change adds
       # or alters with the core's rules, failing a finding the base did not hold; with no build for the runner, or no
       # fetch, it says it did not run and decides nothing)
+      - name: The code scan, which a call with no input does not run
+        if: ${{ success() && steps.core-at.outcome == 'skipped' }}
+        run: echo "code scan: not run: core.yml was called with none of its inputs, so the copy's scripts do not run here; the one job of the core's setup/sync-notes.md, \"17 November 2026, the checks as one job\", runs it"
       - name: The code scan's engine, fetched by its digest where the host's CodeQL does not scan the project
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' }}
         timeout-minutes: 5

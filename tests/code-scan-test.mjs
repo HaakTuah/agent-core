@@ -16,7 +16,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir, tally, zip } from "../scripts/scratch-core.mjs";
-import { VERSION, WHEELS, engineAt, engineFiles, falseAlarms, fetchEngine, hostScans, scan, system, wheelAddress } from "../scripts/code-scan.mjs";
+import { CORE } from "../scripts/core-address.mjs";
+import { ENGINES, VERSION, WHEELS, digestAt, engineAt, engineDigest, engineFiles, falseAlarms, fetchEngine, hostScans, place, scan, system, unreadListed, unreadOf, wheelAddress } from "../scripts/code-scan.mjs";
 
 const { ok, done } = tally();
 const tmp = scratchDir("code-scan-test-");
@@ -57,6 +58,29 @@ ok(throws(() => engineFiles(zip([[`${BIN}README`, "x"]]), "linux")) && throws(()
 // what a description lists as false alarms, and whether the host scans a project
 ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false alarm: `b.py:3`, why\nscan false alarm: `c.cs:1`\nSee Scan false alarm: `d.js:4`")].join(" ") === "src/a.js:12 b.py:3",
   "a false alarm is a line of its own, opening \"Scan false alarm:\" with its place in backticks");
+// what the engine was given and did not read whole, and what a description lists as unread
+{
+  const read = unreadOf(["a.py", "b.py", "c.py", "d.py"], { scanned: new Set(["a.py", "b.py", "c.py"]), errors: [{ path: "b.py", partial: false, what: "Timeout when running py-command on b.py:" }, { path: "c.py", partial: true, what: "Syntax error at line c.py:2:" }] });
+  ok(read.map(u => u.file).join(" ") === "b.py d.py" && /stopped on it: Timeout/u.test(read[0].why) && /did not scan it/u.test(read[1].why), "a file the engine did not scan, or stopped on, is unread; one it parsed in part is read", JSON.stringify(read));
+  ok([...unreadListed("Scan unread: `big/data.py`, a generated table\n- Scan unread: `x.cs`\nscan unread: `y.py`\n<b>Scan unread: `z.py`</b>")].join(" ") === "big/data.py x.cs" && unreadListed(undefined).size === 0, "a file is listed unread on a line of its own, opening \"Scan unread:\" with its path in backticks");
+}
+// the engine's folder: an engine held to its pin, and a folder that holds none never replaced
+{
+  ok(Object.keys(ENGINES).join(" ") === Object.keys(WHEELS).join(" ") && Object.values(ENGINES).every(d => /^[0-9a-f]{64}$/u.test(d)), "each system with a wheel has its engine's digest pinned");
+  const files = [{ name: "semgrep-core", bytes: Buffer.from("engine") }, { name: "libs/libz.so.1", bytes: Buffer.from("lib") }];
+  const into = path.join(tmp, "placed");
+  place(files, into, "linux");
+  ok(digestAt(into) === engineDigest([...files, { name: "osemgrep", bytes: Buffer.from("engine") }]), "an engine placed is the files given and its copy, by their digest");
+  fs.writeFileSync(path.join(into, "libs", "libz.so.1"), "a library changed");
+  ok(digestAt(into) !== engineDigest([...files, { name: "osemgrep", bytes: Buffer.from("engine") }]), "a library changed after the fetch changes the digest");
+  const kept = path.join(tmp, "a-project");
+  fs.mkdirSync(kept); fs.writeFileSync(path.join(kept, "keep.txt"), "kept");
+  ok(throws(() => place(files, kept, "linux")) && fs.readFileSync(path.join(kept, "keep.txt"), "utf8") === "kept", "a folder that stands and holds no engine is refused, and left as it was");
+  const forged = path.join(tmp, "forged");
+  fs.mkdirSync(forged); fs.writeFileSync(path.join(forged, `osemgrep${process.platform === "win32" ? ".exe" : ""}`), "a stand-in that finds nothing");
+  const refused = scan(tmp, { dir: forged });
+  ok(refused.failed && /the engine in .* is not the one pinned/u.test(refused.lines.join("\n")) && mended(refused.lines.join("\n")), "an engine whose files are not the pinned ones is never run: the scan fails, saying its mend", refused.lines.join("\n"));
+}
 // (hostile descriptions: nothing, the wrong type, markup, a path, a number out of range, too long; none lists a finding
 // it does not name exactly, and none takes long)
 {
@@ -74,8 +98,10 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
   const before = hostScans(p);
   fs.writeFileSync(path.join(p, ".github", "workflows", "text.yml"), "jobs:\n  a:\n    runs-on: x\n    steps:\n      - run: |\n          uses: owner/core/.github/workflows/codeql.yml@main\n");
   const inText = hostScans(p);
-  fs.writeFileSync(path.join(p, ".github", "workflows", "scan.yaml"), "jobs:\n  analyze:\n    uses: owner/core/.github/workflows/codeql.yml@0123456789abcdef0123456789abcdef01234567\n");
-  ok(!before && !inText && hostScans(p) && !hostScans(tmp), "the host scans a project where a job of a workflow calls the core's codeql.yml, not where a comment or a step's text only names it");
+  fs.writeFileSync(path.join(p, ".github", "workflows", "other.yml"), `jobs:\n  a:\n    uses: someone/else/.github/workflows/codeql.yml@${"0".repeat(40)}\n  b:\n    uses: ${CORE}/.github/workflows/codeql.yml@main\n`);
+  const another = hostScans(p);
+  fs.writeFileSync(path.join(p, ".github", "workflows", "scan.yaml"), `jobs:\n  analyze:\n    uses: ${CORE}/.github/workflows/codeql.yml@0123456789abcdef0123456789abcdef01234567\n`);
+  ok(!before && !inText && !another && hostScans(p) && !hostScans(tmp), "the host scans a project where a job calls the core's own codeql.yml at a full commit, not where a comment or a step's text names it, nor another's or one at a branch");
   const skipped = await fetchEngine(path.join(tmp, "not-fetched"), { sys: "linux-x64", get: () => { throw new Error("no fetch was due"); }, root: p });
   ok(/not fetched: a workflow calls the core's codeql\.yml/u.test(skipped) && !fs.existsSync(path.join(tmp, "not-fetched")), "where the host's CodeQL scans the project, nothing is fetched", skipped);
 }
@@ -189,6 +215,14 @@ def ok5(cur):
   git("mv", "old.py", "new.py");
   fs.writeFileSync(path.join(repo, "flow.js"), fs.readFileSync(path.join(repo, "flow.js"), "utf8").replace("\"uptime\"", "req.query.command"));
   if (linked) { fs.rmSync(path.join(repo, "handler.py")); fs.writeFileSync(path.join(repo, "handler.py"), "import os\ndef run(user_input):\n    os.system(user_input)\n"); }
+  // (files the engine would leave out by itself: past its size limit, under tests/ or vendor/, or named by an ignore file)
+  const WEAK = "import os\ndef far(arg):\n    os.system(\"ls \" + arg)\n";
+  fs.mkdirSync(path.join(repo, "tests"), { recursive: true }); fs.mkdirSync(path.join(repo, "vendor"), { recursive: true });
+  fs.writeFileSync(path.join(repo, "tests", "t.py"), WEAK.replace("far", "in_tests"));
+  fs.writeFileSync(path.join(repo, "vendor", "v.py"), WEAK.replace("far", "vendored"));
+  fs.writeFileSync(path.join(repo, "large.py"), `${WEAK.replace("far", "large")}# ${"x".repeat(1100000)}\n`);
+  fs.writeFileSync(path.join(repo, "ignored.py"), WEAK.replace("far", "ignored"));
+  fs.writeFileSync(path.join(repo, ".semgrepignore"), "ignored.py\nlarge.py\ntests/\nvendor/\n");
   // a pull request: one line it adds is a weakness, one hidden behind a comment, one listed as a false alarm
   fs.appendFileSync(path.join(repo, "tasks.py"), "def added(name):\n    os.system(\"rm \" + name)  # nosemgrep\ndef listed(n):\n    os.popen(\"ls \" + n)\n");
   // (files named so that git would quote them in a diff's header, or so that they read as an option)
@@ -205,6 +239,10 @@ def ok5(cur):
   ok(/reported, not failed: \[id\]\.ts:2:/u.test(out) && !out.includes("FAIL: [id].ts"), "a file whose name is a pattern to git is read by its name alone, and a finding that stood in it, its line's comment changed, is reported, not failed", out);
   ok(!linked || out.includes("FAIL: handler.py:3:"), "a link the change makes a file is scanned, its finding failing", out);
   ok(/reported, not failed: new\.py:4: .* which stood before this change/u.test(out) && !out.includes("FAIL: new.py"), "a file the change renames, its finding unchanged, is known by its name at the base: reported, not failed", out);
+  ok(["tests/t.py:3", "vendor/v.py:3", "large.py:3", "ignored.py:3"].every(f => out.includes(`FAIL: ${f}:`)), "a file past the engine's size limit, under tests/ or vendor/, or named by an ignore file is scanned, its finding failing", out);
+  ok(!/FAIL: [^:]+: the engine did not scan it/u.test(out), "every file the scan names to the engine is read", out);
+  const unlisted = run(["--base", "HEAD~1"], "Scan unread: `large.py`, a table generated by a tool");
+  ok(/passed: large\.py: listed in the description as one the engine cannot read/u.test(unlisted.stdout) && !unlisted.stdout.includes("large.py:3"), "a file the description lists as unread is not handed to the engine, and said so", unlisted.stdout);
   ok(out.includes("FAIL: flow.js:5:"), "input the change brings to a sink whose line it leaves as it was fails: the base held no such finding", out);
   ok(/reported, not failed: tasks\.py:5: .* which stood before this change/u.test(out) && !/^FAIL: (web|Handlers)/mu.test(out), "a weakness on a line that stood before is reported, and passes", out);
   ok(!/link\.py/u.test(out), "a file that is a link is not read", out);
@@ -212,7 +250,7 @@ def ok5(cur):
   const explained = run(["--base", "HEAD~1"], listedAll);
   ok(explained.status === 0 && /passed: tasks\.py:\d+: .* listed in the description as a false alarm/u.test(explained.stdout), "a finding the description lists as a false alarm passes, said so", explained.stdout + explained.stderr);
   const host = path.join(repo, ".github", "workflows"); fs.mkdirSync(host, { recursive: true });
-  fs.writeFileSync(path.join(host, "codeql.yml"), "jobs:\n  a:\n    uses: owner/core/.github/workflows/codeql.yml@main\n");
+  fs.writeFileSync(path.join(host, "codeql.yml"), `jobs:\n  a:\n    uses: ${CORE}/.github/workflows/codeql.yml@${"1".repeat(40)}\n`);
   const added = run(["--base", "HEAD~1"]);
   ok(added.status === 1 && !/not run/u.test(added.stdout), "a call to codeql.yml the change adds does not switch the scan off: the base's workflows are read", added.stdout);
   const hosted = run([]);

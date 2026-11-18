@@ -29,5 +29,5 @@ them); the paths `.github/dependabot.yml`, `.node-version` and `.node-least`. It
 **CodeQL,** where the repository has it, checks every PR into `main`, every push to it and once a week; a finding is
 handled as floor rule 9 says. Where a project calls no `codeql.yml`, as a private one does not, the code scan
 (`scripts/code-scan.mjs`) reads what each PR adds or alters in its place, and its finding is handled the same way: the
-code mended, or a false alarm listed in the PR's description on a line "Scan false alarm:" for its security review to
-confirm; its engine's version is taken as any version Dependabot cannot see (`.github/versions.json`).
+code mended, or a false alarm listed in the PR's description on a line "Scan false alarm:", and a file the engine
+cannot read on a line "Scan unread:", for its security review to confirm; its engine's version is taken as any version Dependabot cannot see (`.github/versions.json`).
