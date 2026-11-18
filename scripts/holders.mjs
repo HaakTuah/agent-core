@@ -11,8 +11,8 @@
 // ("numbers" in holders.json; #303): it fails a key that is no rule, and a number in no form outcomes.mjs's NUMBER reads.
 // The core's own repository alone; its tests workflow runs it on every pull request here. In a project, --own reads the
 // project's own rules the same way (#662): those of the rule files its sessions read, as the project's own files name
-// them (floor rule 3's, with what its SECURITY.md adds, and the files its AGENTS.md and CLAUDE.md pull in by an "@" line,
-// none of the core's copy), against its list OWN, which names for each its check, test, simulation or script, "audit",
+// them (floor rule 3's, the files an agent tool takes its instructions from, what its SECURITY.md adds, and the files
+// its AGENTS.md and CLAUDE.md pull in by an "@" line, none of the core's copy, where its manifest places it), against its list OWN, which names for each its check, test, simulation or script, "audit",
 // "describes" or "none". It fails nothing there, a wrong entry of the list included: the project's monthly state report
 // lists each rule with no holder, those read at a session's start first, and its sessions work them down as tasks.
 // Node's own modules only.
@@ -21,12 +21,14 @@
 //   node scripts/holders.mjs --list              the counts, and each rule with no holder
 //   node core/scripts/holders.mjs --own          from a project's root: its own rules' counts, and each with no holder
 //   node core/scripts/holders.mjs --own --write  the same, after writing OWN: each rule it does not name added as "none"
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { inStep, items } from "./archive.mjs";
+import { copyOf } from "./core-path.mjs";
 import { inProject, leadsOut } from "./guards.mjs";
 import { NUMBER } from "./outcomes.mjs";
-import { FLOOR, ruleFiles } from "./rule-files.mjs";
+import { FLOOR, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { FOLDERS, ROOT, rules, rulesOf } from "./rules.mjs";
 import { started } from "./started.mjs";
 import { CASES } from "./staged.mjs";
@@ -140,10 +142,12 @@ const OWN_PATHS = /^(?:[\w.@-]+\/)+[\w.@-]+$|^[\w-]+\.\w+$/u;
 // AGENTS.md and CLAUDE.md, and the files they pull in by an "@" line); and `read`, a file's text or null.
 export function ownFiles(root) {
   const read = f => { try { const at = path.join(root, f); return inProject(f) && !leadsOut(root, at) && fs.statSync(at).isFile() ? fs.readFileSync(at, "utf8") : null; } catch { return null; } };
-  const mine = f => !/^core(?:\/|$)/u.test(path.posix.normalize(f)) && read(f) !== null;
+  // (the core's copy where the manifest places it, core/ by default: its rules are the core's, never the project's)
+  const copy = copyOf(root), mine = f => !`${path.posix.normalize(f)}/`.startsWith(copy) && read(f) !== null;
+  const list = dir => { try { return execFileSync("git", ["-C", root, "ls-files", "-z", "--", dir], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean); } catch { return []; } };
   const pulled = ["AGENTS.md", "CLAUDE.md"].flatMap(f => [...(read(f) ?? "").matchAll(/^@(\S+\.md)[ \t]*\r?$/gmu)].map(m => path.posix.normalize(m[1])));
   let listed;
-  try { listed = ruleFiles(read, () => []); } catch { listed = FLOOR; }
+  try { listed = ruleFiles(read, list, { tools: true }); } catch { listed = [...FLOOR, ...toolFiles(read, list)]; }
   const start = new Set(["AGENTS.md", "CLAUDE.md", ...pulled]);
   return { files: [...new Set([...listed, ...pulled])].filter(mine).map(file => ({ file, start: start.has(file) })), read };
 }

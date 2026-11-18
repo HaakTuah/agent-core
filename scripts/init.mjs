@@ -246,6 +246,8 @@ function firstBaselines(here) {
     execFileSync(process.execPath, [`core/scripts/${check}.mjs`, `checks/${check}.json`, "--first"], { cwd: here, env: guarded(), stdio: ["ignore", "ignore", "inherit"] });
     git(["add", "--", `checks/${check}-baseline.json`], here, guarded());
   }
+  // (a pin from before #662 holds a holders.mjs with no --own: the list is then the sync's step, and nothing is run)
+  if (!fs.readFileSync(path.join(here, "core/scripts/holders.mjs"), "utf8").includes("--own")) return;
   execFileSync(process.execPath, ["core/scripts/holders.mjs", "--own", "--write"], { cwd: here, env: guarded(), stdio: ["ignore", "ignore", "inherit"] });
   git(["add", "--", "checks/holders.json"], here, guarded());
 }
@@ -305,7 +307,8 @@ function writeKit(o, here, pin, out) {
 
 // What the kit wrote, and what it leaves for the project and for the owner.
 function sayLeft(o, pin, out) {
-  console.log(`The starter kit is written: ${out.length + 5} files (the last five checks/sizes.json, checks/licences.json, checks/copies-baseline.json, checks/shape-baseline.json and checks/holders.json), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
+  const made = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", ...(fs.existsSync("checks/holders.json") ? ["checks/holders.json"] : [])];
+  console.log(`The starter kit is written: ${out.length + made.length} files (the last ${made.length === 5 ? "five" : "four"} ${made.slice(0, -1).join(", ")} and ${made.at(-1)}), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
   const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
   console.log(`\nLeft for the project, each marked FILL IN:\n${open.join("\n")}`);
   console.log(`  checks/copies.json: "code", the project's own code as git pathspecs, once it has any`);

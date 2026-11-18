@@ -11,6 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { inStep } from "../scripts/archive.mjs";
 import { OWN, counts, holders, ownHolders, ownReport, report } from "../scripts/holders.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { fingerprint, rules, rulesOf } from "../scripts/rules.mjs";
 
@@ -113,7 +114,7 @@ ok(numbersBad.wrong.length === 2 && numbersBad.wrong.some(w => w.includes("\"num
 ok(own.status === 0 && !own.stderr, "the core's own holders.json names only rules that stand, and checks that are there", own.stderr);
 const failing = project({ "tasks/x.md: Gone": "audit" });
 fs.mkdirSync(path.join(failing, "scripts", "staged"));
-for (const f of ["archive.mjs", "guards.mjs", "holders.mjs", "rule-files.mjs", "rules.mjs", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
+for (const f of ["archive.mjs", "core-address.mjs", "core-path.mjs", "guards.mjs", "holders.mjs", "rule-files.mjs", "rules.mjs", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
 fs.writeFileSync(path.join(failing, "scripts", "staged.mjs"), "export const CASES = [];\n");
 fs.writeFileSync(path.join(failing, "scripts", "outcomes.mjs"), "export const NUMBER = /^$/u;\n");
 const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.mjs")], { encoding: "utf8" });
@@ -130,6 +131,19 @@ put("SECURITY.md", "# Security\n\n3. **The protected files,** besides:\n   - **t
 put("docs/design.md", "# Design\n\n**Saves are small.** Read on need.\n");
 put("core/floor/security.md", "# The floor\n\n**1. Nothing secret.** The core's.\n");
 put("tests/style.test.js", "");
+// (a tool's own file of the project's, and a copy of the core where its manifest places it, under shared/core/)
+const copied = fs.mkdtempSync(path.join(tmp, "own-"));
+const put2 = (f, t) => { fs.mkdirSync(path.dirname(path.join(copied, f)), { recursive: true }); fs.writeFileSync(path.join(copied, f), t); };
+put2("AGENTS.md", "# A tool\n\n@shared/core/floor/security.md\n\n- **Keep it short.** Words.\n");
+put2("SECURITY.md", "# Security\n");
+put2("core-manifest.md", "Core: " + CORE + " at " + "a".repeat(40) + ", copied whole under shared/core/ (never edited here).\n");
+put2("shared/core/floor/security.md", "# The floor\n\n**1. Nothing secret.** The core's.\n");
+put2("GEMINI.md", "# Gemini\n\n- **Ask before a big change.** Words.\n");
+spawnSync("git", ["init", "-q"], { cwd: copied });
+spawnSync("git", ["add", "-A"], { cwd: copied });
+const tooled = ownHolders(copied).rules.map(r => r.key);
+ok(tooled.includes("GEMINI.md: Ask before a big change") && tooled.includes("AGENTS.md: Keep it short") && !tooled.some(k => k.startsWith("shared/core/")),
+  "a tool's own file of the project's is read for its rules, and the core's copy is left out where the manifest places it", tooled.join("; "));
 const ownCli = (...a) => spawnSync(process.execPath, [path.join(root, "scripts", "holders.mjs"), "--own", ...a], { cwd: proj, encoding: "utf8" });
 const unlisted = ownHolders(proj);
 ok(JSON.stringify(unlisted.rules.map(r => r.key).sort()) === JSON.stringify(["AGENTS.md: Each computer player keeps its style", "AGENTS.md: Name things plainly", "SECURITY.md: The protected files", "SECURITY.md: the rule files", "docs/design.md: Saves are small", "docs/play.md: A turn ends on a move"]) && !unlisted.list
