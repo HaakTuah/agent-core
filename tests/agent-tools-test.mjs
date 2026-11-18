@@ -1138,6 +1138,12 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const hostMoved = run(pr(linkTo("node_modules/pkg/.claude", entryAt("https://registry.example.invalid/pkg-1.0.0.tgz", "sha512-same")), entryAt("https://mirror.example.invalid/pkg-1.0.0.tgz", "sha512-same")));
     ok(hostMoved.status === 0 && hostMoved.out.includes("may have changed"), "one whose package's entry moves to another host with the same integrity is reported, never failed", hostMoved.out);
     fails(run(pr(linkTo("node_modules/pkg/.claude", entryAt("https://registry.example.invalid/pkg-1.0.0.tgz", "sha512-same")), entryAt("https://registry.example.invalid/pkg-1.0.0.tgz", "sha512-other"))), "while one whose integrity changes fails", "locks the package it leads into anew");
+    // (Codex's code review of 7e403ef: one that leaves the checkout and comes back in to node_modules is read by the
+    // checkout's own lock)
+    const backIn = how => { const dir = linkTo("node_modules/pkg/.claude"); fs.unlinkSync(path.join(dir, ".claude")); fs.symlinkSync(how(fs.realpathSync(dir)), path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link out and back in"); return dir; };
+    for (const [what, how] of [["by ..", dir => `../${path.basename(dir)}/node_modules/pkg/.claude`], ["by a whole path", dir => `${dir}/node_modules/pkg/.claude`]]) {
+      fails(run(pr(backIn(how), { "package-lock.json": lockAt("2.0.0") })), `one that comes back into the checkout ${what} fails once its package is locked anew`, "locks the package it leads into anew");
+    }
     const flagged = run(pr(linkTo("node_modules/pkg/.claude"), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version: "1.0.0", dev: true } } }) }));
     ok(flagged.status === 0 && flagged.out.includes("locked as before"), "while a flag of its entry's alone, set anew, leaves it a note", flagged.out);
     const lockLink = () => { const dir = linkTo("node_modules/pkg/.claude", { "locks/package-lock.json": lockAt("1.0.0") }); fs.rmSync(path.join(dir, "package-lock.json")); fs.symlinkSync("locks/package-lock.json", path.join(dir, "package-lock.json")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "the lock as a link"); return dir; };

@@ -1193,20 +1193,30 @@ const NPM_LOCKS = ["package-lock.json", "npm-shrinkwrap.json"];
 // (read once for each link at each commit; a link met again while it is read, a loop, and one past eight links deep,
 // are read loosely, so a check that cannot finish reading them reports them and never stalls)
 const pkgLocks = new Map(), READING = { exact: "", loose: "\0a loop of links" }, TOO_DEEP = { exact: "", loose: "\0past eight links deep" };
+const OUTSIDE = { loose: "\0outside the checkout" };
 function pkgLock(root, rev, at, depth = 0) {
   if (depth > 8) return TOO_DEEP;
   const memo = `${root}\0${rev}\0${at}`;
   if (!pkgLocks.has(memo)) { pkgLocks.set(memo, READING); pkgLocks.set(memo, pkgLockOf(root, rev, at, depth)); }
   return pkgLocks.get(memo);
 }
+// The link `v`'s target `to` as a path from the checkout's root, a way out and back in resolved against the checkout's
+// own place; null where it ends outside the checkout, whose lock files this check does not read.
+function inCheckout(root, v, to) {
+  const t = to.split("\\").join("/"), joined = path.posix.isAbsolute(t) ? t : path.posix.join(path.posix.dirname(v), t);
+  if (!path.posix.isAbsolute(joined) && !path.posix.normalize(joined).startsWith("../")) return path.posix.normalize(joined);
+  const top = topOf(root), rel = path.relative(top, path.resolve(top, joined));
+  return rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel) ? null : rel.split(path.sep).join("/");
+}
 function pkgLockOf(root, rev, at, depth) {
   const posix = at.split(path.sep).join("/"), via = [], l = listing(root, rev), out = { exact: new Set(), loose: new Set() };
   walk(root, rev, posix, via, true, [], true);
   for (const v of new Set([posix, ...via])) {
     const to = l.linked.has(v) ? linkText(root, rev, v) : null;
-    const p = to === null ? "" : path.posix.normalize(path.posix.join(path.posix.dirname(v), to.split("\\").join("/")));
-    const m = [...`/${p}`.matchAll(/\/node_modules(?:\/|$)/giu)].at(-1);
-    if (m) lockEntries(root, rev, p.slice(0, Math.max(m.index - 1, 0)), `/${p}`.slice(m.index + "/node_modules/".length).split("/"), out, depth);
+    const p = to === null ? "" : inCheckout(root, v, to);
+    const m = p === null ? null : [...`/${p}`.matchAll(/\/node_modules(?:\/|$)/giu)].at(-1);
+    if (p === null) out.loose.add(OUTSIDE.loose);
+    else if (m) lockEntries(root, rev, p.slice(0, Math.max(m.index - 1, 0)), `/${p}`.slice(m.index + "/node_modules/".length).split("/"), out, depth);
   }
   return { exact: [...out.exact].sort().join("\0\0"), loose: [...out.loose].sort().join("\0\0") };
 }
@@ -1265,7 +1275,7 @@ function npmEntry(text, key) {
 }
 // Whether what the lock files say of a link's package, read loosely, changed, or could not be read to its end (a loop of
 // links, or one too deep), so the package may have changed unread.
-const UNREAD = new RegExp(`${READING.loose}|${TOO_DEEP.loose}`, "u");
+const UNREAD = new RegExp(`${READING.loose}|${TOO_DEEP.loose}|${OUTSIDE.loose}`, "u");
 const mayHaveChanged = (was, now) => was.loose !== now.loose || UNREAD.test(now.loose);
 // A link the base held to what the commit does not hold, as it stood: failed where the pull request locks the package
 // it leads into anew by an entry read exactly (pkgLock()), reported as one whose package may have changed where only what
