@@ -166,8 +166,11 @@ ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.y
   ok(job(sel, 'run: if [ "$RUN" = all ]; then node --test; else node --test $RUN; fi') && !job(sel, 'run: if [ "$RUN" = all ]; then node --test; elif [ "$RUN" != none ]; then node --test $RUN; fi')
     && !job(sel, "if: env.RUN == 'all'\n        run: node --test") && !job(sel, "if: ${{ env.RUN == 'all' || contains(env.RUN, ' test/a.test.mjs ') }}\n        run: node --test test/a.test.mjs")
     && job(sel, "if: env.RUN == 'all'\n        run: node --test\n      - if: env.RUN != 'all'\n        run: node --test $RUN") && job(sel, "if: contains(env.RUN, 'no')\n        run: node --test")
+    && job(sel, "if: ${{ !(env.RUN == 'all') }}\n        run: node --test") && job(sel, "if: ${{ env.RUN == 'all' || github.event_name == 'push' }}\n        run: node --test")
+    && !job(sel, "if: ${{ !cancelled() && (env.RUN == 'all' || contains(env.RUN, ' test/a.test.mjs ')) }}\n        run: node --test test/a.test.mjs")
+    && job(sel, 'run: [ "$RUN" != none ] || true; node --test $RUN')
     && job("node core/scripts/select.mjs --env RUN", 'run: if [ "$RUN" = all ]; then node --test; elif [ "$RUN" != none ]; then node --test $RUN; fi'),
-    "it reads done only where the selection gives --passed and every step that reads RUN runs nothing on \"none\": an if: read only as == 'all' or contains(env.RUN, ' <file> '), or a run comparing $RUN with none; a condition such as != 'all', or a contains that \"none\" could hold, is reported");
+    "it reads done only where the selection gives --passed and every step that reads RUN runs nothing on \"none\", in a shape it can read so: an if: whose parts joined by && hold RUN in one part, nothing but == 'all' and contains(env.RUN, ' <file> ') joined by ||, or the run line the mend gives; any other shape is reported: != 'all', a negation, an || with another term, a contains that \"none\" could hold, a run line of another shape");
   fs.rmSync(pushed);
 }
 

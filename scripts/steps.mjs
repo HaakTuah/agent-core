@@ -231,15 +231,39 @@ function selectionRuns(p) {
 // of the check that gates the tests (core/tasks/tests.md, "A tree that passed is not run again"); null where it does,
 // or where no such job selects (the step of the tests a change can reach asks that first); else the mend.
 // (the step that selects gives --passed; and every step that reads RUN after it runs nothing on "none", so that no
-// runner is handed that word or an empty list, which it would read as every test: its `if:` reads RUN only as
-// `env.RUN == 'all'` or `contains(env.RUN, ' <file> ')`, each false for "none", or its run compares $RUN with none;
-// a condition read any other way cannot be told to keep "none" out, and is reported)
+// runner is handed that word or an empty list, which it would read as every test. Only shapes that can be read to be
+// false on "none" count, any other is reported: an `if:` whose parts joined by && at its top hold RUN in one part
+// alone, that part nothing but `env.RUN == 'all'` and `contains(env.RUN, ' <file> ')` joined by ||, each false for
+// "none"; or a run that is the line the mend gives, `if [ "$RUN" = all ]; then …; elif [ "$RUN" != none ]; then … $RUN; fi`)
 const passes = job => (job?.steps ?? []).some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run) && /(?<![\w-])--passed(?![\w-])/u.test(step.run));
 const RUN_IN_RUN = /\$\{?RUN\}?(?![\w])/u, RUN_IN_IF = /\benv\.RUN\b/u;
-const KEEPS_NONE_OUT = /env\.RUN\s*==\s*'all'|contains\(\s*env\.RUN\s*,\s*' [^']*\S[^']* '\s*\)/gu;
+const SAFE_TERM = /^(env\.RUN\s*==\s*'all'|contains\(\s*env\.RUN\s*,\s*' [^' ]+ '\s*\))$/u;
+const RUN_LINE = /^if \[ "\$RUN" = all \]; then [^;\n]+; elif \[ "\$RUN" != none \]; then [^;\n]+ \$RUN; fi$/u;
+// (an expression split at its top level by `op`, its parentheses kept whole; null where they do not pair)
+function topLevel(text, op) {
+  const parts = [];
+  let depth = 0, from = 0, quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === "'") quoted = !quoted;
+    else if (!quoted && c === "(") depth++;
+    else if (!quoted && c === ")" && --depth < 0) return null;
+    else if (!quoted && depth === 0 && text.startsWith(op, i)) { parts.push(text.slice(from, i).trim()); from = i + op.length; i += op.length - 1; }
+  }
+  return depth === 0 && !quoted ? [...parts, text.slice(from).trim()] : null;
+}
+const unwrapped = t => { let x = t.trim(); while (x.startsWith("(") && x.endsWith(")") && topLevel(x.slice(1, -1), "&&")) x = x.slice(1, -1).trim(); return x; };
+function ifKeepsNone(expression) {
+  const body = expression.trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1");
+  const ands = topLevel(unwrapped(body), "&&");
+  const reading = ands?.filter(part => RUN_IN_IF.test(part)) ?? [];
+  if (reading.length !== 1) return false;
+  const ors = topLevel(unwrapped(reading[0]), "||");
+  return !!ors && ors.every(term => SAFE_TERM.test(unwrapped(term)));
+}
 const keepsNone = step => {
-  if (typeof step?.if === "string" && RUN_IN_IF.test(step.if)) return !RUN_IN_IF.test(step.if.replace(KEEPS_NONE_OUT, ""));
-  return typeof step?.run !== "string" || !RUN_IN_RUN.test(step.run) || /\$\{?RUN\}?"?\s*!?=\s*"?none\b/u.test(step.run);
+  if (typeof step?.if === "string" && RUN_IN_IF.test(step.if)) return ifKeepsNone(step.if);
+  return typeof step?.run !== "string" || !RUN_IN_RUN.test(step.run) || RUN_LINE.test(step.run.trim());
 };
 const honoursNone = job => {
   const after = (job?.steps ?? []).filter(step => !(typeof step?.run === "string" && SELECT_RUN.test(step.run)));
@@ -253,7 +277,7 @@ function passedRuns(p) {
   const missing = Object.entries(p.workflows).filter(([, { yaml }]) => onPush(yaml?.on) && onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => Object.entries(yaml.jobs ?? {})
     .filter(([, job]) => (job?.steps ?? []).some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run)) && !(passes(job) && honoursNone(job)))
     .map(([name]) => `\`.github/workflows/${file}\`, its job \`${name}\``));
-  return missing.length ? `The selection runs on a push with nothing to say whether the merged tree passed already (${missing.join("; ")}): give its step \`--passed <the check that gates the tests>\` on a push's first run alone (the job's own check, such as \`tests\`, as a ruleset requires it; in bash, \`\${SELECT_PASSED:+--passed "$SELECT_PASSED"}\` with \`SELECT_PASSED\` set so on a push and empty otherwise), \`GH_TOKEN: \${{ github.token }}\` on that step on a push alone, and \`checks: read\` beside \`contents: read\` in the job's permissions; and have every step that reads \`RUN\` run nothing where it says \`none\` (\`if [ \"$RUN\" = all ]; then <the whole suite>; elif [ \"$RUN\" != none ]; then <the runner> $RUN; fi\`, or an \`if:\` that reads it only as \`env.RUN == 'all'\` or \`contains(env.RUN, ' <file> ')\`), since a runner given no file runs every test, and one given \`none\` fails; then a push that merges a pull request's head whose tree it holds, whose run selected the whole suite and passed that check, runs no test again. Leave it off any job, or entry of a job's matrix, that a pull request does not run, whose suite ran nowhere else, and any whose tests read what no tree holds (a release's tag, the day). Nothing fails meanwhile: the whole suite runs on a push as before.` : null;
+  return missing.length ? `The selection runs on a push with nothing to say whether the merged tree passed already (${missing.join("; ")}): give its step \`--passed <the check that gates the tests>\` on a push's first run alone (the job's own check, such as \`tests\`, as a ruleset requires it; in bash, \`\${SELECT_PASSED:+--passed "$SELECT_PASSED"}\` with \`SELECT_PASSED\` set so on a push and empty otherwise), \`GH_TOKEN: \${{ github.token }}\` on that step on a push alone, and \`checks: read\` beside \`contents: read\` in the job's permissions; and have every step that reads \`RUN\` run nothing where it says \`none\` (\`if [ \"$RUN\" = all ]; then <the whole suite>; elif [ \"$RUN\" != none ]; then <the runner> $RUN; fi\`, or an \`if:\` whose parts joined by \`&&\` hold \`RUN\` in one part alone, nothing but \`env.RUN == 'all'\` and \`contains(env.RUN, ' <file> ')\` joined by \`||\`), since a runner given no file runs every test, and one given \`none\` fails; then a push that merges a pull request's head whose tree it holds, whose run selected the whole suite and passed that check, runs no test again. Leave it off any job, or entry of a job's matrix, that a pull request does not run, whose suite ran nowhere else, and any whose tests read what no tree holds (a release's tag, the day). Nothing fails meanwhile: the whole suite runs on a push as before.` : null;
 }
 
 // Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
