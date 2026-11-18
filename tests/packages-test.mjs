@@ -31,6 +31,9 @@ const json = f => JSON.parse(fs.readFileSync(path.join(root, f), "utf8"));
   ok(reqs.length > 0 && reqs.every(l => /^[A-Za-z0-9][\w.-]*==\d+(?:\.\d+)+\s/u.test(l) && /--hash=sha256:[0-9a-f]{64}/u.test(l)), "requirements.txt names each PyPI package at one exact version, each with the SHA-256 of its wheels, so that what is installed is held to those hashes", reqs.join("\n"));
   const config = json(".github/licences.json");
   ok((config.lockfiles ?? []).includes("package-lock.json"), "the core's licence check reads the lock file, so the licence check and the lookup hold each package (floor rules 10 and 15)");
+  // (an install script never runs, whatever npm command is run at the core's root or a copy's: the mechanism holds it)
+  const npmrc = fs.readFileSync(path.join(root, ".npmrc"), "utf8");
+  ok(/^ignore-scripts\s*=\s*true$/mu.test(npmrc) && /^min-release-age\s*=\s*7$/mu.test(npmrc) && (config.ignoreScriptsIn ?? []).includes(".npmrc"), "the core's .npmrc, which the copy carries, keeps every package's install script off and waits a week, and the licence check holds it there (floor rules 7 and 15)", npmrc);
 }
 
 // ---- nothing of another publisher's tracked: no node_modules/, no carried folder ----
@@ -49,7 +52,7 @@ try {
   fs.writeFileSync(path.join(project, "node_modules/yaml/package.json"), JSON.stringify({ name: "yaml", version: "0.0.1", main: "index.js" }));
   fs.writeFileSync(path.join(project, "node_modules/yaml/index.js"), "module.exports = { Lexer: class {}, project: true };\n");
   fs.cpSync(path.join(root, "scripts"), path.join(copy, "scripts"), { recursive: true });
-  for (const f of ["package.json", "package-lock.json", "requirements.txt", ".gitignore"]) fs.copyFileSync(path.join(root, f), path.join(copy, f));
+  for (const f of ["package.json", "package-lock.json", "requirements.txt", ".gitignore", ".npmrc"]) fs.copyFileSync(path.join(root, f), path.join(copy, f));
   // (each script that loads a package, by the call that loads it; a script that loads one and has no case here fails)
   const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")` };
   const loads = fs.readdirSync(path.join(root, "scripts")).filter(f => f.endsWith(".mjs") && f !== "packages.mjs" && /\bload(?:Sync)?\("/u.test(fs.readFileSync(path.join(root, "scripts", f), "utf8")));

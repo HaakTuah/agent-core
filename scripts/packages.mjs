@@ -51,8 +51,7 @@ export function pypiFile(rel) {
     if (at.startsWith(own) && fs.statSync(at).isFile()) file = at;
   } catch { /* not installed: said below */ }
   if (!file) {
-    const script = path.relative(process.cwd(), process.argv[1] ?? "") || "this check";
-    console.error(`FAIL: ${script} did not run: ${rel} is not installed in ${path.relative(process.cwd(), root) || "."}${path.sep}pypi. Mend: run node ${path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"))} pypi, which installs it from the core's requirements.txt with Python's pip, then run the check again`);
+    console.error(`FAIL: the check did not run: ${rel} is not installed in ${path.relative(process.cwd(), root) || "."}${path.sep}pypi. Mend: run node ${path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"))} pypi, which installs it from the core's requirements.txt with Python's pip, then run the check again`);
     process.exit(1);
   }
   return file;
@@ -62,8 +61,7 @@ export function pypiFile(rel) {
 function found(name) {
   const file = entry(name);
   if (!file) {
-    const script = path.relative(process.cwd(), process.argv[1] ?? "") || "this check";
-    console.error(`FAIL: ${script} did not run: the package ${name} is not installed in ${path.relative(process.cwd(), root) || "."}${path.sep}node_modules. Mend: run node ${path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"))}, which installs the core's packages from its lock file, then run the check again`);
+    console.error(`FAIL: the check did not run: the package ${name} is not installed in ${path.relative(process.cwd(), root) || "."}${path.sep}node_modules. Mend: run node ${path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"))}, which installs the core's packages from its lock file, then run the check again`);
     process.exit(1);
   }
   return file;
