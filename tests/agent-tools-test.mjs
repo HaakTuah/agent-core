@@ -566,6 +566,8 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   fails(run(pr(project({ ...script, ...listing(SK), ".claude/skills/s/SKILL.md": "# s\n" }), { ".claude/skills/s/SKILL.md": "---\nname: s\nallowed-tools: Bash(*)\n---\n# s\n" })), "a skill's tools it lets run without asking fail as a setting", NOKIT);
   // (a folder of Claude Code's below the project's root, which it reads where it works there)
   const NESTED = "is a folder of Claude Code's below the project's root";
+  // (the core's own copy is none of the project's: its .claude is the core's, held to the core's commit by core.yml)
+  passes(run(pr(project({ ...script, ...listing() }), { "core/.claude/settings.json": KIT, "core/README.md": "# core\n" })), "the core's own copy, with its .claude, is no folder of the project's below its root");
   fails(run(pr(project({ ...script, ...listing() }), { "app/.claude/skills/x/SKILL.md": "# x\n" })), "a folder of skills below the project's root fails", NESTED, "Mend: move what it holds into the root's .claude folder");
   const nested = () => project({ ...script, "app/.Claude/agents/rev.md": "---\nname: rev\n---\n", ...listing() });
   const nestedKept = run(pr(nested(), { "README.md": "x\n" }));

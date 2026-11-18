@@ -61,6 +61,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { copyOf } from "./core-path.mjs";
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
 import { fetchedBy } from "./hook-source.mjs";
@@ -723,9 +724,11 @@ function mdLinks(root, rev) {
 // Each folder of Claude Code's below the project's root, in whatever case, a folder, a link or a submodule, as [its
 // problem, all it holds]: Claude Code reads its settings, agents, skills and commands where it works in that folder, and
 // this check reads only the root's, so one the base held is noted while all it holds stands.
+// The core's copy is left out: core.yml holds it to the core's own commit, whose .claude is the core's.
 function nestedClaude(root, rev) {
-  const found = new Set();
+  const found = new Set(), copy = copyOf(root);
   for (const at of listing(root, rev).ids.keys()) {
+    if (at.startsWith(copy)) continue;
     // (found a name at a time, so a name in any normal form is cut where it stands)
     const parts = at.split("/"), i = parts.findIndex((n, k) => k > 0 && fold(n) === ".claude");
     if (i > 0) found.add(parts.slice(0, i + 1).join("/"));
