@@ -88,7 +88,7 @@ const show = value => JSON.stringify(value) ?? String(value);
 // file's text or null; `skills()` the names of the folders under .claude/skills/ that hold a SKILL.md; `files(dir)` the
 // names in a folder of the project (here .kiro/hooks); `linked(path)` whether the project, or main, holds a path as a
 // link.
-export function configured(read, skills, files = () => [], linked = () => false) {
+export function configured(read, skills, files = () => [], linked = () => false, isLink = () => false) {
   // (each tool's name, as the list writes it, and what it is: for a hook its tool, event, matcher and the whole hook,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
   // (`texts`: each problem met reading a file, with that file's text, so one the base held as it stands can be told)
@@ -129,7 +129,7 @@ export function configured(read, skills, files = () => [], linked = () => false)
   for (const name of plugins) add(`plugin ${name}`, canonical(["plugin", name, marketOf(name, markets)]));
   addServers(state, ".mcp.json", entries(".mcp.json", "mcpServers", json(".mcp.json")?.mcpServers, SERVERS), "");
   for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); readFrontmatter(state, `.claude/skills/${name}/SKILL.md`, read(`.claude/skills/${name}/SKILL.md`)); }
-  for (const file of [...markdownUnder(files, ".claude/agents"), ...markdownUnder(files, ".claude/commands")]) readFrontmatter(state, file, read(file));
+  for (const file of [...markdownUnder(files, isLink, ".claude/agents"), ...markdownUnder(files, isLink, ".claude/commands")]) readFrontmatter(state, file, read(file));
   readKiro(state, json, files);
   readCodex(state, json, read);
   return { tools, ids, problems, texts, baselined, sources, pins: pinsOf(plugins, markets, servers) };
@@ -338,14 +338,17 @@ const FRONT = /^\uFEFF?---\s*\n([\s\S]*?)---\s*\n?/u, FRONT_MAX = 1 << 16, SIMPL
 function readFrontmatter(state, file, text) {
   const front = FRONT.exec(text ?? "")?.[1];
   if (front === undefined) return;
-  const lines = front.split(/\r?\n/u), top = lines.filter(l => l.trim() && !/^\s*#/u.test(l) && !/^\s/u.test(l));
-  const plain = front.length <= FRONT_MAX && !/^\s+\S/u.test(lines.find(l => l.trim() && !/^\s*#/u.test(l)) ?? "") && top.every(l => SIMPLE.test(l));
+  // (split at every line break a YAML reader takes, a lone carriage return's among them; only a space or a tab indents, so
+  // a line led by any other blank is read at the top, where it is no simple key)
+  const lines = front.split(/\r\n?|\n/u), top = lines.filter(l => l.trim() && !/^[ \t]*#/u.test(l) && !/^[ \t]/u.test(l));
+  const plain = front.length <= FRONT_MAX && !/^[ \t]/u.test(lines.find(l => l.trim() && !/^[ \t]*#/u.test(l)) ?? "") && top.every(l => SIMPLE.test(l));
   const runs = top.some(l => ["hooks", "mcpservers"].includes(fold(SIMPLE.exec(l)?.[1] ?? "").replace(/[_-]/gu, "")));
   if (!plain || runs) addHook(state, file, { tool: "", event: `${file} frontmatter`, matcher: "", hook: front, runs: true, text: "what it may run", commands: [NO_KIT], setting: true });
 }
-// The Markdown files under a folder of Claude Code's, its subfolders' among them, a few deep, as it finds them.
-function markdownUnder(files, dir, depth = 0) {
-  return files(dir).sort().flatMap(n => (/\.md$/iu.test(n) ? [`${dir}/${n}`] : depth < 8 ? markdownUnder(files, `${dir}/${n}`, depth + 1) : []));
+// The Markdown files under a folder of Claude Code's, at any depth, as it finds them, never through a link below it,
+// which mdLinks() holds instead, so each folder is read once.
+function markdownUnder(files, isLink, dir) {
+  return files(dir).sort().flatMap(n => (/\.md$/iu.test(n) ? [`${dir}/${n}`] : isLink(`${dir}/${n}`) ? [] : markdownUnder(files, isLink, `${dir}/${n}`)));
 }
 function readCommands(state, file, settings) {
   for (const key of COMMANDS) {
@@ -578,12 +581,19 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   // commit it stands on too, where a submodule shows as an empty folder)
   const own = at => notFile(listing(root, rev ?? "HEAD"), at) || shownNotBlob(root, rev ?? "HEAD", at) || (!rev && (() => { try { const st = fs.lstatSync(path.join(root, at)); return st.isSymbolicLink() || st.isDirectory(); } catch { return false; } })());
   const linked = at => own(at) || linkedOnMain(at);
-  const project = configured(read, skills, names, linked);
+  const project = configured(read, skills, names, linked, at => isLinkAt(root, rev, at));
   // (read at the commit, the working tree's at HEAD, the pull request's head: a file not committed, ignored or not, is
   // no file of the project's, and the base is read the same way)
-  for (const [problem, text] of [...caseProblems(root, rev ?? "HEAD"), ...submodules(root, rev ?? "HEAD"), ...caseLinks(root, rev ?? "HEAD")]) { project.problems.push(problem); project.texts.set(problem, text); project.baselined.add(problem); }
+  for (const [problem, text] of [...caseProblems(root, rev ?? "HEAD"), ...submodules(root, rev ?? "HEAD"), ...caseLinks(root, rev ?? "HEAD"), ...mdLinks(root, rev ?? "HEAD")]) { project.problems.push(problem); project.texts.set(problem, text); project.baselined.add(problem); }
   if (!rev && listing(root, "HEAD").failed) project.problems.push(`the commit HEAD cannot be listed by git (an error, or names past ${LISTING_MAX} bytes), so this check cannot read the tools' files there. Mend: run the check again; where it fails the same way, take out of this pull request what makes its tree too large to list`);
   return { ...project, links };
+}
+
+// Whether the project holds `at` as a link: at the commit `rev`, git's mode 120000; in the working tree, a link there or
+// in the commit it stands on.
+function isLinkAt(root, rev, at) {
+  if (listing(root, rev ?? "HEAD").linked.has(at)) return true;
+  try { return !rev && fs.lstatSync(path.join(root, at)).isSymbolicLink(); } catch { return false; }
 }
 
 // A commit's files as an agent tool reads them: a path walked as the file system walks it, a link inside the checkout
@@ -611,8 +621,9 @@ function commitReader(root, rev, lenient = false, follow = false) {
 // what it is held by, so a path a tool may reach there is seen, which only ever makes the check stricter)
 function caseProblems(root, rev) {
   const { resolve, names, holds } = commitReader(root, rev, true), typeOf = f => resolve(f)?.type;
-  return misnamed(toolPaths(names, typeOf)).map(([at, want]) =>
-    [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, holds, names, typeOf)]);
+  const isLink = p => listing(root, rev).linked.has(p);
+  return misnamed(toolPaths(names, typeOf, isLink)).map(([at, want]) =>
+    [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, holds, names, typeOf, isLink)]);
 }
 
 // Each submodule where an agent tool reads its files, in whatever case, as [its problem, the commit it names]: git gives
@@ -624,7 +635,7 @@ function submodules(root, rev) {
   for (const [at, id] of l.gitlinks) if (WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d))) out.set(at, [`${at} is a submodule where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${id}`]);
   // (the submodule a walk reaches, or one it stops at with more of the path left, a link leading into its folder: from
   // each tool's path, and from each link anywhere under a tool's folder, a skill's own folders among them)
-  for (const at of new Set([...toolPaths(names, f => resolve(f)?.type), ...toolLinks(l)])) {
+  for (const at of new Set([...toolPaths(names, f => resolve(f)?.type, p => l.linked.has(p)), ...toolLinks(l)])) {
     const via = [], r = walk(root, rev, at, via), sub = r?.type === "commit" ? r.f : via.find(v => l.gitlinks.has(v));
     if (sub && !out.has(at) && !out.has(sub)) out.set(at, [`${at} leads, through a link, to the submodule ${sub}, where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${sub}\0${l.ids.get(sub)}`]);
   }
@@ -642,6 +653,12 @@ function everything(root, rev, at, seen = new Set()) {
   const prefix = r.f === "." ? "" : `${r.f}/`, under = [...l.ids.keys()].filter(p => p.startsWith(prefix)).sort();
   return [top, ...under.map(p => `${p}\0${l.ids.get(p)}`), ...under.filter(p => l.linked.has(p)).map(p => everything(root, rev, p, seen))].join("\0\0");
 }
+// Each link below a folder of Claude Code's agents or commands, in whatever case, as [its problem, all it leads to]:
+// Claude Code reads the Markdown files wherever such a link leads, and this check reads none of them there, so one the
+// base held is noted while all it leads to stands.
+function mdLinks(root, rev) {
+  return listing(root, rev).links.filter(at => MD_DIR.test(fold(at))).map(at => [`${at} is a link below a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads none of them there. Mend: replace it with the files themselves, committed in the project, in this pull request`, `${at}\0${everything(root, rev, at)}`]);
+}
 // The links a commit holds on a tool's way or under a tool's folder, in whatever case.
 const toolLinks = l => l.links.filter(at => WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d)));
 
@@ -652,7 +669,7 @@ function caseLinks(root, rev) {
   const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = [];
   // (from each tool's path, and from each link on a tool's way or under its folder, so a link to a folder held twice is
   // seen where no tool's file stands under the name git keeps)
-  for (const at of new Set([...toolPaths(names, f => resolve(f)?.type), ...toolLinks(l)])) {
+  for (const at of new Set([...toolPaths(names, f => resolve(f)?.type, p => l.linked.has(p)), ...toolLinks(l)])) {
     const via = [], misses = [], r = walk(root, rev, at, via, false, misses);
     if (!via.some(v => l.linked.has(v))) continue;
     // (held by what the tool reads there, found as a file system that ignores case finds it, and nothing else there)
@@ -715,7 +732,7 @@ function misnamed(paths) {
 // of a tool folder under it with its text (and a skill's SKILL.md), so one the base held is noted only while that stands.
 // Each step below `at` is found among its folder's own names, in whatever case they stand, as a file system that
 // ignores case finds it, every one that matches.
-function through(at, want, holds, names, typeOf) {
+function through(at, want, holds, names, typeOf, isLink = () => false) {
   const under = f => f === want || f.startsWith(`${want}/`);
   // (an entry on the way that is neither a folder nor a file, a link out or a submodule's among them, stops the walk
   // there and is held by what stands there, as a tool's file is)
@@ -736,7 +753,7 @@ function through(at, want, holds, names, typeOf) {
   // submodule's commit)
   const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => found(at, d.slice(want.length, -1)).flatMap(dir => typeOf(dir) !== "tree" ? text(d, dir) : names(dir).sort().flatMap(n => {
     // (a Markdown file of Claude Code's agents or commands at any depth, as it finds them)
-    const md = (p, depth) => (typeOf(p) === "tree" && depth < 8 ? names(p).sort().flatMap(m => md(`${p}/${m}`, depth + 1)) : /\.md$/iu.test(p) ? [p] : []);
+    const md = p => (typeOf(p) === "tree" && !isLink(p) ? names(p).sort().flatMap(m => md(`${p}/${m}`)) : /\.md$/iu.test(p) || isLink(p) ? [p] : []);
     const reads = d === ".kiro/hooks/" ? (/\.json$/iu.test(n) ? [`${dir}/${n}`] : []) : d !== ".claude/skills/" ? md(`${dir}/${n}`, 0) : [...(["blob", "tree"].includes(typeOf(`${dir}/${n}`)) ? [] : [`${dir}/${n}`]), ...found(`${dir}/${n}`, "SKILL.md")];
     return reads.flatMap(a => text(`${d}${n}`, a));
   })));
@@ -750,7 +767,7 @@ const READS = /^(?:\.kiro\/hooks\/[^/]+\.json|\.claude\/(?:agents|commands)\/(?:
 // Whether a path, folded, is looked at: a step of WAYS, and, in a tool folder, only what the tool reads there, a skill's
 // folder on its way, or a folder of agents or commands at any depth.
 const looked = (low, inFolder) => (inFolder ? READS.test(low) || SKILL_DIR.test(low) || MD_DIR.test(low) : WAYS.has(low));
-function toolPaths(names, typeOf) {
+function toolPaths(names, typeOf, isLink = () => false) {
   const out = [], folders = TOOL_FOLDERS.map(d => d.slice(0, -1));
   const visit = (at, depth) => {
     for (const n of names(at || ".")) {
@@ -761,7 +778,8 @@ function toolPaths(names, typeOf) {
       // that is neither a folder nor a file, through which the tool may read a SKILL.md this check cannot)
       const type = typeOf(p), folder = type === "tree";
       if (!folder && (!inFolder || READS.test(low) || (SKILL_DIR.test(low) && type !== "blob"))) out.push(p);
-      if (folder && depth < 10) visit(p, depth + 1);
+      // (never into a folder of agents or commands through a link, which mdLinks() holds; any other way a few deep)
+      if (folder && (MD_DIR.test(low) ? !isLink(p) : depth < 10)) visit(p, depth + 1);
     }
   };
   visit("", 0);
@@ -990,7 +1008,7 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 function reaches(root, rev, at, follow = false) {
   const posix = at.split(path.sep).join("/"), want = fold(posix), { holds, names, resolve } = commitReader(root, rev, true, follow);
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
-  return [through(posix, want, holds, names, f => resolve(f)?.type), ...skill].join("\0\0");
+  return [through(posix, want, holds, names, f => resolve(f)?.type, p => listing(root, rev).linked.has(p)), ...skill].join("\0\0");
 }
 // What an install reads for each path a link passes through with a node_modules folder on it, which an install fills
 // whatever the commit holds there: the whole text of each file of INSTALL_READS in the folder that holds that
@@ -999,7 +1017,7 @@ function reaches(root, rev, at, follow = false) {
 // never one, nor a path outside it), and a folder of patches; so a link the base held is noted only while all of that
 // stands. "" where no node_modules folder is on its way.
 const INSTALL_READS = ["package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".yarnrc.yml", ".yarnrc", ".npmrc", ".pnpmfile.cjs", "bun.lock", "bun.lockb"];
-const FROM = /(?:link|file|portal|workspace):([^"'\n,}\]#]+)/gu, PATCHES = ["patches", ".yarn/patches"];
+const FROM = /(?:link|file|portal|workspace):([^"'\n,}\]#]+)/gu, PATCHES = ["patches", ".yarn/patches"], PATCH_FILE = /[^\s"'#:,{}[\]]+\.patch\b/gu;
 function lockOf(root, rev, at) {
   const posix = at.split(path.sep).join("/"), via = [], out = new Set(), r = walk(root, rev, posix, via, true, [], true);
   // (each name the walk passed beyond the commit, where it ended, and the link's own target read as a path, which a walk
@@ -1021,15 +1039,24 @@ function lockOf(root, rev, at) {
 function installRead(root, rev, dir) {
   const l = listing(root, rev), there = f => (dir ? `${dir}/${f}` : f), out = [];
   const held = f => (notFile(l, f) ? `${f}\0${everything(root, rev, f)}` : `${f}\0${textAt(root, rev, f)}`);
-  const from = new Set(PATCHES.map(there));
+  const from = new Set(PATCHES.map(there)), add = fromBases(l, dir, from);
   for (const f of INSTALL_READS) {
     out.push(held(there(f)));
     const text = textAt(root, rev, there(f)) ?? "";
-    for (const m of text.matchAll(FROM)) from.add(path.posix.normalize(path.posix.join(dir || ".", m[1].trim())));
-    if (/^(?:package-lock|npm-shrinkwrap)\.json$/u.test(f)) for (const resolved of npmLinks(text)) from.add(path.posix.normalize(path.posix.join(dir || ".", resolved)));
+    for (const m of text.matchAll(FROM)) add(m[1].trim());
+    // (and each patch file it names, wherever it stands, as a patch: or a list of patched dependencies names one)
+    for (const m of text.matchAll(PATCH_FILE)) add(m[0]);
+    if (/^(?:package-lock|npm-shrinkwrap)\.json$/u.test(f)) for (const resolved of npmLinks(text)) add(resolved);
   }
   for (const p of [...from].sort()) if (p !== "." && p !== ".." && !p.startsWith("../") && !path.posix.isAbsolute(p)) out.push(`from ${p}\0${everything(root, rev, p)}`);
   return out;
+}
+// What adds a path an install's file names to `from`: read from the folder of that file and from each folder of a
+// package below it, as pnpm reads a workspace member's from that member's folder; "." never, which names the project
+// or the package itself.
+function fromBases(l, dir, from) {
+  const bases = [dir || ".", ...[...l.blobs].filter(f => f.endsWith("/package.json") && (!dir || f.startsWith(`${dir}/`))).map(f => path.posix.dirname(f))];
+  return rel => { if (rel !== "." && rel !== "./") bases.forEach(b => from.add(path.posix.normalize(path.posix.join(b, rel)))); };
 }
 // The "resolved" of each entry an npm lock file's text marks as a link to a folder of the project; none where it
 // cannot be read, its whole text being held all the same.

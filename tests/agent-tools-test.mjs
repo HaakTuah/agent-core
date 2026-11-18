@@ -451,10 +451,23 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ["one in a subfolder", ".claude/agents/sub/rev.md", `---\nname: rev\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`],
     ["a command's", ".claude/commands/rev.md", `---\ndescription: rev\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`],
     ["one with tool servers", ".claude/agents/rev.md", "---\nname: rev\nmcp_servers:\n  x:\n    type: stdio\n    command: bash\n---\n"],
+    // (#647's fallback security review of 304f1e9: a lone carriage return, which YAML reads as a line's end, and a
+    // subagent at any depth)
+    ["one with a key after a lone carriage return", ".claude/agents/rev.md", `---\nname: rev\ndescription: d\n\rhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`],
+    ["one nine folders deep", ".claude/agents/1/2/3/4/5/6/7/8/9/rev.md", `---\nname: rev\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`],
     ["one too long to read", ".claude/agents/rev.md", `---\nname: rev\ndescription: ${"x".repeat(70000)}\n---\n`],
   ]) fails(run(pr(project({ ...script, ...listing() }), { [file]: text })), `a frontmatter, ${what}, fails as a setting of no kit's form does`, "is of a kind no starter kit writes", "Mend: take it out of the project's files");
   passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/sub/rev.md": "---\nname: rev\ndescription: \"reviews: hooks and all\"\ntools: [Read, Grep]\nmodel: opus\n---\n# rev\n" })), "a plain frontmatter of simple keys passes, at any depth");
-  for (const at of [".claude/Agents/rev.md", ".claude/agents/rev.MD"]) fails(run(pr(project({ ...script, ...listing() }), { [at]: "---\nname: rev\n---\n" })), `a subagent's file in another letter case, ${at}, fails`, "in another case");
+  // (a link below a folder of agents or commands fails, and is held by all it leads to; links back to their own folder
+  // are read once, not followed)
+  const LINKED = "is a link below a folder of Claude Code's agents or commands";
+  const looped = () => { const dir = project({ ...script, ".claude/agents/rev.md": "---\nname: rev\n---\n", "elsewhere/x.md": "---\nname: x\n---\n", ...listing() }); for (let i = 0; i < 6; i++) fs.symlinkSync(".", path.join(dir, `.claude/agents/l${i}`)); fs.symlinkSync("../../elsewhere", path.join(dir, ".claude/agents/out")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "links below agents"); return dir; };
+  const started = Date.now(), loopedNew = run(looped(), "--core");
+  ok(loopedNew.status === 1 && loopedNew.out.includes(LINKED) && Date.now() - started < 30000, "links below a folder of agents fail, read once each, in seconds", loopedNew.out);
+  const loopedKept = run(pr(looped(), { "README.md": "x\n" }));
+  ok(loopedKept.status === 0 && loopedKept.out.includes(LINKED), "one the base held is noted", loopedKept.out);
+  fails(run(pr(looped(), { "elsewhere/x.md": `---\nname: x\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n` })), "but not once what it leads to changes", LINKED);
+  for (const at of [".claude/Agents/rev.md", ".claude/agents/rev.MD", ".claude/Commands/rev.md"]) fails(run(pr(project({ ...script, ...listing() }), { [at]: "---\nname: rev\n---\n" })), `a subagent's file in another letter case, ${at}, fails`, "in another case");
   passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": "---\nname: rev\ndescription: reviews hooks\n---\n# rev\n" })), "a subagent with no hooks in its frontmatter passes");
   const frontStood = project({ ...script, ".claude/agents/rev.md": front("hooks") });
   const frontKept = run(pr(frontStood, { ".claude/agents/rev.md": `${front("hooks")}more of its prompt\n` }));
@@ -1011,6 +1024,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ok(berryKept.status === 0 && berryKept.out.includes("as the base held it"), "a Yarn project's own files an install does not read, changed, leave the link noted", berryKept.out);
     fails(run(pr(viaWith({ "package-lock.json": lockAt("1.0.0") }, "node_modules"), { "package-lock.json": lockAt("2.0.0") })), "a link the base held to node_modules itself fails once its lock changes", UNREAD);
     unread("npm links to a folder with a space in its name", { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { resolved: "my pkgs/pkg", link: true } } }), "my pkgs/pkg/.claude/settings.json": KIT }, { "my pkgs/pkg/.claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), apiKeyHelper: "bash x.sh" }) });
+    // (#647's fallback security review of 304f1e9: a patch file at any path a lock or package.json names, and a path a
+    // workspace member's lock entry names from that member's folder)
+    unread("pnpm patches from a file of its own", { "package.json": JSON.stringify({ pnpm: { patchedDependencies: { "pkg@1.0.0": "custom/pkg.patch" } } }), "pnpm-lock.yaml": "lockfileVersion: '9.0'\npatchedDependencies:\n  pkg@1.0.0:\n    hash: abc\n    path: custom/pkg.patch\n", "custom/pkg.patch": "a\n" }, { "custom/pkg.patch": "b\n" });
+    unread("Yarn patches from a file of its own", { "yarn.lock": "\"pkg@patch:pkg@npm%3A1.0.0#./custom/pkg.patch::locator=app%40workspace%3A.\":\n  version: 1.0.0\n", "custom/pkg.patch": "a\n" }, { "custom/pkg.patch": "b\n" });
+    unread("a workspace member links from its own folder", { "pnpm-lock.yaml": "lockfileVersion: '9.0'\nimporters:\n  packages/a:\n    dependencies:\n      pkg:\n        specifier: link:../pkg\n        version: link:../pkg\n", "packages/a/package.json": "{}\n", "packages/pkg/.claude/settings.json": KIT }, { "packages/pkg/.claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), apiKeyHelper: "bash x.sh" }) }, "packages/a/node_modules/pkg/.claude");
     const yarnAt = pkg => `# yarn lockfile v1\n\n\npkg@^1.0.0:\n  version "1.0.0"\n  resolved "https://registry.yarnpkg.com/pkg/-/pkg-1.0.0.tgz"\n${pkg}`;
     const pnpmAt = pkg => `lockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    dependencies:\n      pkg:\n        specifier: npm:real-pkg@^1.0.0\n        version: real-pkg@1.0.0\n\npackages:\n\n  real-pkg@1.0.0:\n    resolution: {integrity: ${pkg}}\n`;
     for (const [lock, at, moved] of [["yarn.lock", yarnAt, '\n"pkg@^1.0.0":\n  version "1.0.0"\n  resolved "https://example.invalid/pkg-1.0.0.tgz"\n'], ["pnpm-lock.yaml", pnpmAt, "sha512-q"]]) {
