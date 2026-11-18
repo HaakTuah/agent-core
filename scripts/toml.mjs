@@ -36,33 +36,38 @@ export function parseToml(text) {
 // else -1. Only that kind of string: a literal string, a comment or a one-line string reads a backslash as itself or
 // ends at its line, and the package reads them right. Each string and comment is passed in one walk.
 function quotesLost(s) {
-  const end = (from, close, oneLine, escapes) => {
-    let j = from;
-    while (j < s.length && !(oneLine && s[j] === "\n")) {
-      if (escapes && s[j] === "\\") j += 2;
-      else if (s.startsWith(close, j)) return j;
-      else j++;
-    }
-    return j;
-  };
   for (let i = 0; i < s.length;) {
-    if (s[i] === "#") { i = end(i, "\n", true, false); continue; }
+    if (s[i] === "#") { i = endOf(s, i, "\n", true, false); continue; }
     if (s[i] !== '"' && s[i] !== "'") { i++; continue; }
-    const many = s.startsWith(s[i].repeat(3), i), from = i + (many ? 3 : 1), basic = s[i] === '"';
-    const at = end(from, many ? s[i].repeat(3) : s[i], !many, basic);
+    const q = s[i], many = s.startsWith(q.repeat(3), i), from = i + (many ? 3 : 1);
+    const at = endOf(s, from, many ? q.repeat(3) : q, !many, q === '"');
     let close = at + (many ? 3 : 1);
-    while (many && s[close] === s[i] && close - at < 5) close++;
-    if (many && basic && close - at > 3) {
-      // (back over the blanks before the close, a line break among them, to a backslash whose run is odd)
-      let k = at, broke = false;
-      while (k > from && /[ \t\n]/u.test(s[k - 1])) broke = s[--k] === "\n" || broke;
-      let run = 0;
-      while (k - run > from && s[k - run - 1] === "\\") run++;
-      if (broke && run % 2 === 1) return k - 1;
-    }
+    while (many && s[close] === q && close - at < 5) close++;
+    const lost = many && q === '"' && close - at > 3 ? backslashBefore(s, from, at) : -1;
+    if (lost >= 0) return lost;
     i = close;
   }
   return -1;
+}
+
+// Where a string or comment from `from` ends: at `close`, or at its line's end where it is one line, or at the text's.
+function endOf(s, from, close, oneLine, escapes) {
+  let j = from;
+  while (j < s.length && !(oneLine && s[j] === "\n")) {
+    if (escapes && s[j] === "\\") j += 2;
+    else if (s.startsWith(close, j)) return j;
+    else j++;
+  }
+  return j;
+}
+
+// Back from `at` over the blanks, a line break among them, to a backslash whose run is odd: its place, or -1.
+function backslashBefore(s, from, at) {
+  let k = at, broke = false;
+  while (k > from && /[ \t\n]/u.test(s[k - 1])) broke = s[--k] === "\n" || broke;
+  let run = 0;
+  while (k - run > from && s[k - run - 1] === "\\") run++;
+  return broke && run % 2 === 1 ? k - 1 : -1;
 }
 
 // A value the package read, as JSON would hold it (above), walked with a stack of its own, never by recursion.
