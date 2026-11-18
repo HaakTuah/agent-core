@@ -35,6 +35,7 @@
     "floor/topics/dependencies.md: 17. Dependabot's own PRs": "check: scripts/security-review.mjs, in part",
     "tools/claude.md: Pass both model and effort": "check: scripts/helper-call.mjs, in part",
     "tasks/code-shape.md: How strong the tests are is measured on the lines a pull request changes": "check: scripts/strength.mjs, in part",
+    "tasks/code-shape.md: A comment says why the code is so, never what changed": "check: scripts/shape.mjs",
     "tasks/game-design.md: Every action is answered within a tenth of a second": "check: scripts/screens.mjs, in part",
     "tasks/game-design.md: An effect is sized to the event and returns to rest": "check: scripts/screens.mjs, in part",
     "tasks/game-design.md: The display is judged over the busiest scene": "check: scripts/screens.mjs, in part",
@@ -295,6 +296,7 @@
     "tasks/cleaning.md: The state report leads with the outcomes": [244, 251],
     "tasks/code-shape.md": [226],
     "tasks/code-shape.md: A job a maintained package does is done by it": [255],
+    "tasks/code-shape.md: A comment says why the code is so, never what changed": [257],
     "tasks/done-when.md": [240],
     "tasks/game-design.md: A loss explains itself": [242],
     "tasks/game-design.md: Chance comes before the choice where it can": [242],
@@ -377,6 +379,7 @@
   },
   "numbers": {
     "tasks/code-shape.md: A job a maintained package does is done by it": "findings; outcome: robust",
+    "tasks/code-shape.md: A comment says why the code is so, never what changed": "check fires; outcome: readable",
     "tasks/updates.md: Node": "correction: does not work; outcome: robust",
     "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",
     "AGENTS.md: Every rule says what holds it": "findings; outcome: robust",

@@ -125,3 +125,11 @@ The index, and how an item is written: `archive/instructions.md`.
      and copies checks, the parts the first trials would replace. The owner agreed to it, with the issue's other points,
      after asking what the core lacked that let an inventory's check miss a part. It stands behind "A trial of a
      maintained tool replays the part's past bugs" in `tasks/choices.md`, and the inventory's line `Replayed:`.
+
+257. **16 November 2026**, #458. A comment says why the code is so, never what changed: what changed, when and for
+     which task is git's to hold, and a mark of it in a comment (a change's heading, what the code was, a change's
+     date, the task that changed it) is counted by the shape check, the ones that stand listed and worked down, a new
+     one failing. Agents write such marks by habit and every later session pays to read them, which "Keep it lean" did
+     not name; the owner agreed to it with the other points read from an evaluation's counts, on the test of taking
+     what is good for every development cycle and no brake that would slow the owner's own projects. It stands behind
+     "A comment says why the code is so, never what changed" in `tasks/code-shape.md`.

@@ -45,7 +45,6 @@ it merges last.
 | #314 | rule builder | |
 | #456 | rule builder; it changes the floor (rules 5 and 10) | |
 | #457 | rule builder; point 1's reading of tests for a clock or process waits on #529 | |
-| #458 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose rule list it reads |
 | #361 | rule builder, points 1 and 2 only | |

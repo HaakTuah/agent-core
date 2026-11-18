@@ -10,7 +10,8 @@
     "csharp",
     "python",
     "scripts",
-    "screens"
+    "screens",
+    "changes"
   ],
   "listed": {
     "function: scripts/licence-commands.mjs#atCommand": {

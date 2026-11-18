@@ -54,7 +54,8 @@ const BULK = 30; // a commit that touches more of the measured files than this i
 const OPEN = { ")": "(", "]": "[", "}": "{" };
 
 // The tokens of a file's text: { t: "id" | "num" | "str" | "regex" | "punct", v, line, at }, `at` where it starts in the
-// text (for a template's runs, where the run ends). Comments and white space are dropped; a template literal is a
+// text (for a template's runs, where the run ends). Comments and white space are dropped, each comment's lines kept in
+// the list's `comments` ({ line, text }; shape.mjs reads them for a change's mark); a template literal is a
 // "str" token for each run of its text, with the code of each ${ } between them. With
 // `jsx` (jsxIn, below), an element of JSX is a "jsx" token at its <, with the code of each { } in it between ( and );
 // where one never closes, the list's `lost` is true, and its functions cannot be told.
@@ -62,8 +63,12 @@ export function tokens(src, jsx = false) {
   const lex = new Lexer(src, jsx);
   lex.code(false);
   lex.out.lost = lex.lost;
+  lex.out.comments = lex.comments;
   return lex.out;
 }
+
+// Each line of a comment, from `a` (where its text starts) to `b`, as { line, text }, from the line `line` on.
+export const commentLines = (src, a, b, line) => src.slice(a, b).split("\n").map((text, k) => ({ line: line + k, text }));
 
 // Whether a file's tokens are read with JSX: a file of .jsx or .tsx, and one of JavaScript, where no expression may
 // start with a < (in TypeScript one may: a cast, <T>x, which a file of .tsx cannot hold).
@@ -76,7 +81,7 @@ const TYPE_PARAMETER = /^<\s*(?:const\s+)?[A-Za-z_$][\w$]*\s*(?:,|=|extends\b)/u
 
 class Lexer {
   constructor(src, jsx) {
-    Object.assign(this, { src, jsx, n: src.length, out: [], parens: [], prev: null, line: 1, lost: false, nest: 0 });
+    Object.assign(this, { src, jsx, n: src.length, out: [], parens: [], prev: null, line: 1, lost: false, nest: 0, comments: [] });
     // (parens: for each open (, whether it opens an if, for, while or with's condition)
     this.i = src.startsWith("#!") ? src.indexOf("\n") : 0;
     if (this.i < 0) this.i = this.n;
@@ -114,9 +119,10 @@ class Lexer {
     const { src, i, n } = this;
     if (c === "\n") { this.line++; this.i++; return true; }
     if (c === " " || c === "\t" || c === "\r" || c === "\f" || c === "\v" || c === "\ufeff") { this.i++; return true; }
-    if (c === "/" && src[i + 1] === "/") { while (this.i < n && src[this.i] !== "\n") this.i++; return true; }
+    if (c === "/" && src[i + 1] === "/") { while (this.i < n && src[this.i] !== "\n") this.i++; this.comments.push(...commentLines(src, i + 2, this.i, this.line)); return true; }
     if (c !== "/" || src[i + 1] !== "*") return false;
     const e = src.indexOf("*/", i + 2), end = e < 0 ? n : e + 2;
+    this.comments.push(...commentLines(src, i + 2, e < 0 ? n : e, this.line));
     this.lines(i, end);
     this.i = end;
     return true;

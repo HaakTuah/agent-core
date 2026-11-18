@@ -51,6 +51,8 @@ const BAD = {
   "a package wrapped twice": config(two({ wraps: ["lodash"] }, { wraps: ["lodash"] })),
   "a circle of uses": config(two({ uses: ["view"] }, { uses: ["rules"] })),
   "screens that are no list": config({ screens: "playwright" }),
+  "changes that are no list": config({ changes: "Changed:" }),
+  "a change's mark JavaScript cannot read as a pattern": config({ changes: ["(unclosed"] }),
   "a selection that is no object": config({ select: ["test/a.test.js"] }),
   "a selection's unknown key": config({ select: { always: ["test/a.test.js"] } }),
   "a selection's list that is no list": config({ select: { proof: "test/a.test.js" } }),
@@ -116,6 +118,23 @@ const mono = survey({ "packages/engine/package.json": JSON.stringify({ name: "@g
   parseConfig(JSON.stringify({ baseline: "b.json", code: ["packages"], systems: { engine: { paths: ["packages/engine/"], entrance: "packages/engine/src/index.ts" }, web: { paths: ["packages/web/"], uses: ["engine"] } } })));
 ok(same(ids(mono), ["inside: web -> engine: packages/web/src/page.ts -> packages/engine/src/inner.ts"]), "a package the repository holds itself is read as its files: its entrance holds, by its name too", ids(mono));
 
+// ---- the comments that mark a change (#458) ----
+const changeCfg = cfg({ changes: ["^\\s*Ticket: [A-Z]+-\\d+"] });
+const marked = survey({
+  "src/a.js": "// Changed: the loop runs once (old code below)\nconst a = 1; // Fixed in #12\n/* Previously: a map\n * Added 2024-05-01\n * then the rest of a comment that\n * changed: nothing, a line going on in small letters\n */\nconst s = \"// Changed: in a string\";\n// Ticket: ABC-12, the task's own mark\n// moved here 2025-01-02 from b.js\n// replaced by utf-8, a reason\n",
+  "src/b.cs": "// CHANGED: a heading in capitals\n/// was renamed from Foo for ABC-9 (a reason, no mark)\nclass B {}\n",
+  "src/c.py": "# Updated for PR 42\nx = '# Changed: in a string'\n",
+  "src/d.js": "// Why the loop runs twice: the reader needs both passes (#458 gives the reason)\nexport const d = 1;\n",
+}, changeCfg);
+const changes = ids(marked).filter(id => id.startsWith("change: "));
+ok(same(changes, ["change: src/a.js: /^\\s*Ticket:\\x20[A-Z]+-\\d+/", "change: src/a.js: a change's date", "change: src/a.js: a change's heading", "change: src/a.js: the task that changed it", "change: src/a.js: what the code was", "change: src/b.cs: a change's heading", "change: src/c.py: the task that changed it"])
+  && marked.entries.get("change: src/a.js: a change's heading").n.count === 2 && readerOf("change: src/a.js: a change's date", marked.readers) === "changes" && fileOf("change: src/a.js: what the code was") === "src/a.js"
+  && groupOf("change: src/a.js: /^\\s*Ticket:\\x20[A-Z]+-\\d+/").group === "/^\\s*Ticket:\\x20[A-Z]+-\\d+/",
+  "a comment line that marks a change is an entry of the reader \"changes\", counted by file and mark, in JavaScript, C# and Python, a mark of the config's too; a string, a line going on in small letters, a reason and a pointer to an issue are none", changes.join("\n"));
+const changeSaid = verdict({ config: changeCfg, at: "c.json", self: "s", found: marked, baselineText: JSON.stringify({ reads: ["javascript", "jsx", "csharp", "python", "scripts", "screens", "changes"], listed: {} }) }).fail.flat().join("\n");
+ok(mended(changeSaid) && /comment lines? marks? what changed/.test(changeSaid) && /commit's message/.test(changeSaid), "a new comment that marks a change fails, its mend saying where the words go", changeSaid);
+const unread = verdict({ config: changeCfg, at: "c.json", self: "s", found: marked, baselineText: JSON.stringify({ reads: ["javascript", "jsx", "csharp", "python", "scripts", "screens"], listed: {} }) });
+ok(!unread.fail.flat().join("\n").includes("what changed"), "a baseline written before the check read them fails nothing over them (Nothing locks a project)", unread.fail.flat().join("\n"));
 // ---- the tests that open a screen ----
 const screenCfg = cfg({ ...two({ domain: "rules" }, { domain: "display", uses: ["rules"] }), tests: ["src/**/*.test.js", "Tests/**"], screens: ["playwright", "@testing-library", "System.Windows.Forms"] });
 const screened = survey({
@@ -233,9 +252,9 @@ ok(v.fail.length === 0, "a use declared in the config with its first import pass
 ok(parseBaseline(JSON.stringify({ audited: { day: "2026-11-15", listed: 3, read: 90 }, listed: {} }), "b.json", "").audited.listed === 3, "a baseline keeps the day and the counts of its last audit");
 
 // a reader the baseline does not name yet: what the base held of it is said, never failed (a sync turns nothing red)
-const csBig = { "src/A.cs": `namespace N;\nclass A {\n${csLong("Big", 70)}}\n` }, allReads = { reads: ["javascript", "jsx", "csharp", "python", "scripts", "screens"] };
+const csBig = { "src/A.cs": `namespace N;\nclass A {\n${csLong("Big", 70)}}\n` }, allReads = { reads: ["javascript", "jsx", "csharp", "python", "scripts", "screens", "changes"] };
 v = judge({ now: csBig, baseline: listed([]), base: baseOf(listed([]), csBig) });
-ok(v.fail.length === 0 && v.notes.some(n => /written before the check read files that hold JSX, C#, Python, scripts that share one global space, the tests that open a screen, a window or a device: 1 breach that stood before is not listed yet/.test(n) && /--write/.test(n)),
+ok(v.fail.length === 0 && v.notes.some(n => /written before the check read files that hold JSX, C#, Python, scripts that share one global space, the tests that open a screen, a window or a device, the comments that mark a change: 1 breach that stood before is not listed yet/.test(n) && /--write/.test(n)),
   "a baseline written before a reader came: what the base held of it is said, not failed", JSON.stringify(v));
 v = judge({ now: { ...csBig, "src/B.cs": `namespace N;\nclass B {\n${csLong("New", 70)}}\n` }, baseline: listed([]), base: baseOf(listed([]), csBig) });
 ok(mended(said(v)) && v.fail.length === 1 && /1 function passes/.test(said(v)) && /B\.cs#New/.test(said(v)) && !/A\.cs/.test(said(v)), "and what is new of it fails, from the sync on", said(v));
@@ -250,7 +269,7 @@ ok(mended(said(v)) && /src\/b\.tsx/.test(said(v)) && /cannot follow/.test(said(v
 const refusedReads = reads => { try { parseBaseline(JSON.stringify({ reads, listed: {} }), "b.json", ""); return ""; } catch (e) { return `FAIL: ${e.message}`; } };
 ok(mended(refusedReads("all")) && mended(refusedReads(["javascript", "cobol"])), "readers that are no list, or a name no reader has, are refused, with their mend");
 v = judge({ now: csBig, baseline: JSON.stringify({ reads: ["javascript"], listed: {} }), base: baseOf(JSON.stringify({ ...allReads, listed: { "function: src/A.cs#Big": { lines: 70, depth: 0, branches: 0 } } }), csBig) });
-ok(mended(said(v)) && /no longer names 5 readers that origin\/main's names: jsx, csharp, python, scripts, screens/.test(said(v)), "a baseline that drops a reader its base named fails, so that what it lists cannot go unlisted while it stands", said(v));
+ok(mended(said(v)) && /no longer names 6 readers that origin\/main's names: jsx, csharp, python, scripts, screens/.test(said(v)), "a baseline that drops a reader its base named fails, so that what it lists cannot go unlisted while it stands", said(v));
 
 // ---- whole runs, in a scratch repository ----
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shape-test-"));
@@ -362,14 +381,14 @@ git("checkout", "-q", "--", ".");
 put("checks/shape.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"checks/shape-baseline.json"', '"checks/moved.json"'));
 put("checks/moved.json", JSON.stringify({ reads: ["javascript"], listed: {} }));
 r = run([], { SHAPE_BASE: "base" });
-ok(r.status === 1 && mended(r.out) && /no longer names 5 readers/.test(r.out), "a baseline moved to a new path is compared with the one the base's config names: its readers too only grow", r.out);
+ok(r.status === 1 && mended(r.out) && /no longer names 6 readers/.test(r.out), "a baseline moved to a new path is compared with the one the base's config names: its readers too only grow", r.out);
 fs.rmSync(path.join(dir, "checks/moved.json"));
 git("checkout", "-q", "--", ".");
 put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/other.json` |\n");
 put("checks/other.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"checks/shape-baseline.json"', '"checks/moved.json"'));
 put("checks/moved.json", JSON.stringify({ reads: ["javascript"], listed: {} }));
 r = run([], { SHAPE_BASE: "base" });
-ok(r.status === 1 && mended(r.out) && /no longer names 5 readers/.test(r.out), "a config moved by the manifest is compared with the one the base's own manifest names, its baseline too", r.out);
+ok(r.status === 1 && mended(r.out) && /no longer names 6 readers/.test(r.out), "a config moved by the manifest is compared with the one the base's own manifest names, its baseline too", r.out);
 for (const f of ["core-manifest.md", "checks/other.json", "checks/moved.json"]) fs.rmSync(path.join(dir, f));
 git("checkout", "-q", "--", ".");
 put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/gone.json` |\n");

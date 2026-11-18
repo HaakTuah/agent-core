@@ -52,11 +52,12 @@ export function logicalLines(src) {
   lex.code(false);
   lex.close();
   lex.lines.lost = lex.lost;
+  lex.lines.comments = lex.comments;
   return lex.lines;
 }
 
 class Lexer {
-  constructor(src) { Object.assign(this, { src, n: src.length, i: 0, line: 1, depth: 0, indent: 0, start: true, current: null, lines: [], nest: 0, lost: false }); }
+  constructor(src) { Object.assign(this, { src, n: src.length, i: 0, line: 1, depth: 0, indent: 0, start: true, current: null, lines: [], nest: 0, lost: false, comments: [] }); }
 
   push(t, v, l = this.line) {
     if (!this.current) this.current = { indent: this.indent, line: l, end: l, toks: [] };
@@ -98,7 +99,9 @@ class Lexer {
     if (c === "\\" && this.src.startsWith("\r\n", this.i + 1)) { this.line++; this.i += 3; return true; }
     if (c === " " || c === "\t" || c === "\r" || c === "\f" || c === "﻿") { this.i++; return true; }
     if (c !== "#") return false;
+    const from = this.i + 1;
     while (this.i < this.n && this.src[this.i] !== "\n") this.i++;
+    this.comments.push({ line: this.line, text: this.src.slice(from, this.i) });
     return true;
   }
 
@@ -251,7 +254,7 @@ export function readPython(src) {
     if (st.word) stack.push({ indent: ln.indent, fn: inner, control: CONTROL.has(st.word), types: st.word === "if" && isTypeChecking(ln.toks) });
   }
   for (const f of functions) { f.lines = f.end - f.line + 1; delete f.end; }
-  return { functions: lines.lost ? null : functions, imports, toks: lines.flatMap(l => l.toks) };
+  return { functions: lines.lost ? null : functions, imports, toks: lines.flatMap(l => l.toks), comments: lines.comments };
 }
 
 // A logical line's simple statements: those after `;`, and of a compound statement those after its header's colon

@@ -125,6 +125,17 @@ one declared entrance.
   "One fact, one place" forbids a second copy of a fact, and code joined too early is harder to change than two plain
   pieces. Reason: exact copies were held, and copies that differ only in their names were up to 2.5% of a codebase
   that nothing saw. Held by the copies check's report.
+- **A comment says why the code is so, never what changed** (#458). By default a comment explains what a reader cannot
+  see in the code: a reason, a limit, a pointer to where the reason is written; what changed, when and for which task
+  is git's to hold, in the commit's message and the pull request's description. The trigger is a line of a comment
+  that holds a mark of a change in the shape check's list (a change's heading such as "Changed:", what the code was, a
+  change's date, the task that changed it; `core/scripts/shape-readers.mjs`, and the config's "changes", which a
+  project adds to): the check counts them by file, those that stand are in its baseline and are worked down at the
+  dose (`tasks/cleaning.md`), and a pull request that adds one fails, its builder moving the words to the commit or
+  the pull request. It does not mean a pointer to an issue that gives the reason, a comment a tool needs, a rule on
+  how many comments code has, nor a rewrite of the comments that stand. Reason: agents write such marks by habit and
+  every later session pays to read them; one project held 13,461 such lines in 1,026 files. Held by the shape check,
+  whose list loses, in the pull request that finds it, a pattern that proves to guess.
 
 **What has no mark here.** A hub, a file most others import: one that holds one small fact is as it should be, and
 the audit's reader judges the others. The time a user waits on gets its own measure as its rule comes (#318).
@@ -132,7 +143,7 @@ the audit's reader judges the others. The time a user waits on gets its own meas
 **What the check reads.** JavaScript and TypeScript, JSX among them, C# and Python, each by a reader of its own
 (`core/scripts/shape-readers.mjs`); in C# what a file takes from another is read from its using directives alone. Of
 scripts that share one global space (no import, no export), it holds that each file adds at most one name there and
-no two declare the same. It never runs the code it reads, and never guesses: an import that leads nowhere it can tell,
+no two declare the same. Of every file's comments, it counts the lines that mark a change. It never runs the code it reads, and never guesses: an import that leads nowhere it can tell,
 a file whose JSX its reader cannot follow and a file in another language are counted and said on every run, never
 failed, and the audit's reader holds that code to these rules. A baseline names the readers whose finds it lists, so
 a reader that comes later turns nothing red: what stood is said until `--write` lists it. A project that has not

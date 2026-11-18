@@ -12,6 +12,8 @@
 //   - the clock or randomness of its own in a system of the domain "rules", which is passed both;
 //   - a name that joins the global space scripts with no import or export share: a second name of one file there, or
 //     a name that two such files declare.
+//   - a line of a comment that marks a change, by the marks of shape-readers.mjs and the config's "changes", counted by
+//     file and mark (tasks/code-shape.md, "A comment says why the code is so, never what changed"; #458).
 // What stood before is in the baseline ("baseline", a file the project keeps), and never fails: a listed function may
 // shrink and may not grow, and a listed import may go. The baseline only shrinks: against the branch a pull request
 // merges into (SHAPE_BASE, set by the workflow) an entry may join only where it stood on that branch already, as this
@@ -32,7 +34,8 @@
 // The config's other keys: "code" and "tests", git pathspecs of what is read (tests for their imports alone);
 // "aliases", each prefix an import may start with to the path it stands for; "suites", each suite's time mark in
 // seconds, a number or one for each of Node's names for a platform ({ "linux": 60, "win32": 240 }); and those of what
-// the tests cost (tasks/tests.md; #275, #321): "screens", what a test imports that opens a screen, a window or a
+// the tests cost (tasks/tests.md; #275, #321): "changes", the patterns of a change's mark the project adds, each a
+// regular expression with the u flag (the reader "changes"); "screens", what a test imports that opens a screen, a window or a
 // device (a package or module by the name it is imported under, or the start of one), so that each test file that
 // imports one is an entry ("screen: <test> -> <what>", found by the reader
 // "screens"), new ones failing as any breach does; "select", for select.mjs beside this file: "proof", pathspecs of the
@@ -68,7 +71,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE, cycles, resolve } from "./code-shape.mjs";
 import { inProject, logged } from "./guards.mjs";
-import { FIRST_READS, PACKAGE_FILES, READERS, index, isCode, isPackageFile, linked, reading, shared } from "./shape-readers.mjs";
+import { CHANGE_MARKS, FIRST_READS, PACKAGE_FILES, READERS, index, isCode, isPackageFile, linked, reading, shared } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 
 export const KIT = "checks/shape.json";
@@ -79,7 +82,7 @@ export const MARKS = { lines: 60, depth: 4, branches: 15 };
 export const DOMAINS = ["rules", "saved-data", "computer-players", "display", "input", "network", "storage", "platform", "packages", "tools", "tests"];
 // What the rules never use: nothing outward.
 export const OUTWARD = ["display", "input", "network", "storage", "platform"];
-const KEYS = ["baseline", "code", "tests", "systems", "aliases", "platform", "marks", "suites", "screens", "select", "wait", "long"];
+const KEYS = ["baseline", "code", "tests", "systems", "aliases", "platform", "marks", "suites", "screens", "changes", "select", "wait", "long"];
 const SELECT_KEYS = ["proof", "whole", "none"];
 // The seconds from which a measurement runs as a job outside the session, where the config gives none (#321).
 export const LONG = 3600;
@@ -94,6 +97,7 @@ const optional = (v, test) => v === undefined || test(v);
 const isName = v => typeof v === "string" && /^[a-z][a-z0-9-]*$/u.test(v);
 const plainPath = s => typeof s === "string" && /^[\w@.-][\w@. -]*(\/[\w@.-][\w@. -]*)*\/?$/u.test(s) && !s.split("/").includes("..");
 const wholeNumbers = o => Object.values(o).every(n => Number.isInteger(n) && n > 0);
+const pattern = s => { try { new RegExp(s, "u"); return true; } catch { return false; } };
 const aSecond = n => Number.isFinite(n) && n > 0;
 const seconds = v => aSecond(v) || (isObject(v) && Object.keys(v).length > 0 && Object.values(v).every(aSecond));
 const KIT_FORM = "write it as the starter kit does (core/setup/template/shape.json.tmpl): a JSON object with \"baseline\", the baseline's path, and \"code\", git pathspecs of the code to read";
@@ -107,6 +111,7 @@ function readLists(c, at) {
   for (const k of ["code", "tests"]) if (!optional(c[k], strings)) refuse(`"${k}" in ${at} is not a list of words`, "list git pathspecs there (\":!\" leaves a path out)");
   if (!optional(c.platform, strings)) refuse(`"platform" in ${at} is not a list of words`, "list there each package or module of Node's that binds code to one platform, by the name it is imported under");
   if (!optional(c.screens, strings)) refuse(`"screens" in ${at} is not a list of words`, "list there each package or module a test imports that opens a screen, a window or a device, by the name it is imported under");
+  if (!optional(c.changes, v => strings(v) && v.every(pattern))) refuse(`"changes" in ${at} is not a list of patterns`, "list there each pattern of a change's mark in a comment the project adds, as a regular expression JavaScript reads (with its u flag), or take it out");
   if (!optional(c.select, v => isObject(v) && Object.keys(v).every(k => SELECT_KEYS.includes(k)) && Object.values(v).every(strings))) refuse(`"select" in ${at} is not in the form the check reads`, `give it ${SELECT_KEYS.map(k => `"${k}"`).join(", ")} alone, each a list of git pathspecs`);
   for (const k of ["wait", "long"]) if (!optional(c[k], aSecond)) refuse(`"${k}" in ${at} is not a number of seconds`, `give it a number of seconds above 0, or take it out`);
   if (!c.code?.length) refuse(`${at} names no "code" to read`, "list the code's folders in \"code\", as git pathspecs (\":!\" leaves a path out)");
@@ -161,7 +166,7 @@ export function parseConfig(text, at = KIT) {
   if (!isObject(systems)) refuse(`"systems" in ${at} is not an object`, "give each system's name its \"paths\", and what else it declares: \"uses\", \"entrance\", \"domain\", \"wraps\"");
   for (const [name, s] of Object.entries(systems)) readSystem(name, s, systems, at);
   const select = Object.fromEntries(SELECT_KEYS.map(k => [k, c.select?.[k] ?? []]));
-  return { baseline: c.baseline, code: c.code, tests: c.tests ?? [], systems, platform: c.platform ?? [], screens: c.screens ?? [], select, wait: c.wait, long: c.long ?? LONG, ...readMarks(c, at), wrapped: readTogether(systems, at) };
+  return { baseline: c.baseline, code: c.code, tests: c.tests ?? [], systems, platform: c.platform ?? [], screens: c.screens ?? [], changes: [...Object.entries(CHANGE_MARKS), ...(c.changes ?? []).map(p => [`/${p.replaceAll(": ", ":\\x20")}/`, new RegExp(p, "u")])], select, wait: c.wait, long: c.long ?? LONG, ...readMarks(c, at), wrapped: readTogether(systems, at) };
 }
 
 // ---- what stands ----
@@ -208,6 +213,17 @@ function markedFunctions(ctx, file, fns) {
     seen.set(fn.name, k);
     add(ctx, "function", `${file}#${fn.name}${k > 1 ? `#${k}` : ""}`, fn.name, { lines: fn.lines, depth: fn.depth, branches: fn.branches, line: fn.line });
   }
+}
+
+// The comments that mark a change, by the config's marks ("changes"): for each mark, how many lines of the file's
+// comments hold it, a line counted under the first it holds.
+function changeMarks(ctx, file, comments) {
+  const counts = new Map();
+  for (const { text } of comments ?? []) {
+    const mark = ctx.config.changes.find(([, re]) => re.test(text));
+    if (mark) counts.set(mark[0], (counts.get(mark[0]) ?? 0) + 1);
+  }
+  for (const [mark, count] of counts) add(ctx, "change", `${file}: ${mark}`, mark, { count });
 }
 
 // The clock and randomness of a file's own, by the runs of tokens its reader names (`own`).
@@ -305,6 +321,7 @@ function oneFile(ctx, file, r) {
   if (!r.functions) { ctx.read.jsx++; add(ctx, "lost", file, file); }
   else if (!ctx.tests.has(file)) markedFunctions(ctx, file, r.functions);
   if (domain === "rules") ownClock(ctx, file, r);
+  changeMarks(ctx, file, r.comments);
   for (const imp of r.imports) { if (r.lang === "javascript") oneImport(ctx, from, imp); else foreign(ctx, from, imp, r); }
   const names = ctx.tests.has(file) ? null : shared(file, r, ctx.idx);
   if (names) ctx.scripts.set(file, names);
@@ -368,7 +385,7 @@ export function groupOf(id) {
   if (kind === "crossing" || kind === "inside") return { kind, group: key.slice(0, key.indexOf(": ")) };
   if (kind === "cycle") return { kind, group: "cycle" };
   if (kind === "lost") return { kind, group: key }; // (a file lost covers itself alone)
-  if (kind === "clock" || kind === "global") return { kind, group: key.slice(key.lastIndexOf(": ") + 2) };
+  if (kind === "clock" || kind === "global" || kind === "change") return { kind, group: key.slice(key.lastIndexOf(": ") + 2) };
   return { kind, group: key.slice(key.lastIndexOf(" -> ") + 4) };
 }
 
@@ -376,7 +393,7 @@ export function groupOf(id) {
 export function fileOf(id) {
   const { kind } = groupOf(id), key = id.slice(kind.length + 2);
   if (kind === "function") return key.slice(0, key.indexOf("#", key.lastIndexOf("/") + 1));
-  if (kind === "clock" || kind === "global") return key.slice(0, key.lastIndexOf(": "));
+  if (kind === "clock" || kind === "global" || kind === "change") return key.slice(0, key.lastIndexOf(": "));
   if (kind === "lost") return key;
   const from = kind === "crossing" || kind === "inside" ? key.slice(key.indexOf(": ") + 2) : key;
   return from.slice(0, from.indexOf(" -> "));
@@ -384,7 +401,7 @@ export function fileOf(id) {
 
 // The reader that found an entry: the reader of its file as the check reads it now, the shared space's own; null where
 // the file is not read now.
-export const readerOf = (id, readers) => { const { kind } = groupOf(id); return kind === "global" ? "scripts" : kind === "screen" ? "screens" : readers.get(fileOf(id)) ?? null; };
+export const readerOf = (id, readers) => { const { kind } = groupOf(id); return kind === "global" ? "scripts" : kind === "screen" ? "screens" : kind === "change" ? "changes" : readers.get(fileOf(id)) ?? null; };
 
 const NUMBERS = ["lines", "depth", "branches", "count"];
 // Whether an entry's numbers are within a listed one's: each no more than listed, or, for a function, than its mark.
@@ -502,6 +519,8 @@ const SAID = {
     "make the file a module that imports what it uses and exports what it offers; where the page cannot load it so, put what it adds under the one name the file declares there already (an object of its functions), and give a name that two files declare one home"],
   screen: n => [`${plural(n, "test imports", "tests import")} what opens a screen, a window or a device, where no test of ${n === 1 ? "its" : "their"} file did before`,
     "test what it guards beneath the screen, through the system it uses, and take the import out; only where the screen, the window or the device itself is what the test guards, list the entry in the baseline with that reason under \"grown\", by its id, and in the pull request"],
+  change: n => [`${plural(n, "comment line marks", "comment lines mark")} what changed, when or for which task, more than the file's comments did before (a change's heading such as "Changed:", what the code was, a change's date, the task that changed it)`,
+    "move what changed, when and for which task to the commit's message or the pull request's description, and keep in the comment only why the code is so, or a pointer to the issue that gives the reason; where a mark of the config's (\"changes\") takes a comment that says why for a change's mark, take that pattern out of the config in this pull request"],
   clock: n => [`${plural(n, "file", "files")} of the rules ${n === 1 ? "reads" : "read"} the clock or ${n === 1 ? "makes" : "make"} randomness of ${n === 1 ? "its" : "their"} own`, "pass the time and the source of randomness in as arguments, so that the same input gives the same result"],
 };
 
