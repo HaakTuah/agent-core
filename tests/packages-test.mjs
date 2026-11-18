@@ -29,14 +29,17 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   const entries = Object.entries(lock.packages ?? {}).filter(([k]) => k);
   ok(lock.lockfileVersion === 3 && wanted.every(([n, v]) => lock.packages?.[`node_modules/${n}`]?.version === v), "package-lock.json is npm's own, and holds each package at the version package.json names", JSON.stringify(Object.keys(lock.packages ?? {})));
   ok(entries.every(([, e]) => /^https:\/\/registry\.npmjs\.org\//u.test(e.resolved ?? "") && /^sha512-/u.test(e.integrity ?? "")), "each entry comes from npm's registry, held to its sha512", entries.filter(([, e]) => !/^sha512-/u.test(e.integrity ?? "")).map(([k]) => k).join(", "));
-  // (every dependency spec npm reads, the package list's and each lock entry's, is a version, range or tag of npm's
-  // registry: one naming git, a web address, a file or a folder would have npm fetch from there in the lock's place;
-  // and the package list holds no field but its own, an override among those it does not hold)
-  const SPEC = /^[\w.^~<>=|*+ -]*$/u, specs = o => Object.entries(o ?? {}).filter(([, v]) => typeof v !== "string" || !SPEC.test(v) || /^\./u.test(v));
-  const KEYS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
-  const odd = [...KEYS.flatMap(f => specs(list[f]).map(([n, v]) => `package.json ${f} ${n}: ${v}`)), ...Object.keys(list).filter(k => !["name", "private", "description", "license", "dependencies", "devDependencies"].includes(k)).map(k => `package.json: ${k}`),
-    ...entries.flatMap(([k, e]) => KEYS.flatMap(f => specs(e[f]).map(([n, v]) => `${k} ${f} ${n}: ${v}`)))];
-  ok(odd.length === 0, "every dependency spec in the package list and the lock file is a version, range or tag of npm's registry, and the package list holds its own fields alone", odd.slice(0, 5).join("; "));
+  // (what the package list and lock file hold, as install.mjs reads them before npm runs: their own fields, registry
+  // entries alone, and every spec a version, range or tag of npm's registry)
+  const { lockFaults, ENTRY_FIELDS } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href);
+  const faults = lockFaults(list, lock);
+  ok(faults.length === 0, "the package list and the lock file hold what install.mjs takes: their own fields, registry entries alone, and every spec a version, range or tag of npm's registry", faults.slice(0, 5).join("; "));
+  const bad = [{ ...list, overrides: {} }, { ...list, devDependencies: { x: "git+https://example.invalid/x.git" } }, { ...list, devDependencies: { x: "ids.tgz" } }, { ...list, devDependencies: { x: "1.0.0 || a.tar.gz" } }, { ...list, devDependencies: { x: "file:x" } }];
+  const badLocks = [{ ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], dependencies: { b: "git+https://example.invalid/b.git" } } } },
+    { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], link: true } } },
+    { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], resolved: "https://example.invalid/yaml.tgz" } } }];
+  ok(bad.every(l => lockFaults(l, lock).length > 0) && badLocks.every(l => lockFaults(list, l).length > 0) && lockFaults({ ...list, devDependencies: { x: "^1.2.3 || ~2", y: "latest" } }, lock).length === 0,
+    "and a field of its own, a spec naming git, a file or a tarball, a linked entry or one from another address, each is one it refuses; a range or a tag is none");
   // (what npm installed is what the lock file names: its own record of the install, read against the lock entry by
   // entry, whatever field or npm brought another source in; the core's tests' job installs before this runs)
   const record = (() => { try { return JSON.parse(fs.readFileSync(path.join(root, "node_modules/.package-lock.json"), "utf8")).packages ?? {}; } catch { return null; } })();
@@ -64,8 +67,7 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   const whole = e => JSON.stringify(Object.keys(e ?? {}).sort().map(k => [k, e[k]]));
   const same = (a, b) => Boolean(a) && whole(a) === whole(b);
   const SAID = ["dependencies", "optionalDependencies", "peerDependencies", "peerDependenciesMeta", "license"];
-  const FIELDS = new Set(["version", "resolved", "integrity", "license", "dev", "optional", "devOptional", "peer", "engines", "bin", "funding",
-    "dependencies", "optionalDependencies", "peerDependencies", "peerDependenciesMeta", "os", "cpu", "libc", "deprecated", "hasInstallScript"]);
+  const { ENTRY_FIELDS: FIELDS } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href);
   // (each entry that fails, with what is wrong; `ask(name)` gives the registry's document of a package, as fetched does)
   const tooYoung = async (packages, base, ask, now) => {
     const out = [];
@@ -228,6 +230,8 @@ try {
   refuses("a shrinkwrap stands beside the lock file", () => fs.copyFileSync(path.join(copy, "package-lock.json"), path.join(copy, "npm-shrinkwrap.json")), () => fs.rmSync(path.join(copy, "npm-shrinkwrap.json")), /npm-shrinkwrap\.json stands beside the lock file/u);
   const copyNpmrc = fs.readFileSync(path.join(copy, ".npmrc"), "utf8");
   refuses("the .npmrc holds a line beside the core's own two settings", () => fs.appendFileSync(path.join(copy, ".npmrc"), `"${["regi", "stry"].join("")}" = https://example.invalid/\n`), () => fs.writeFileSync(path.join(copy, ".npmrc"), copyNpmrc), /holds a line beside the core's own two settings/u);
+  const copyList = fs.readFileSync(path.join(copy, "package.json"), "utf8");
+  refuses("the package list names a dependency of git, before npm runs", () => fs.writeFileSync(path.join(copy, "package.json"), JSON.stringify({ ...JSON.parse(copyList), devDependencies: { x: "git+https://example.invalid/x.git" } })), () => fs.writeFileSync(path.join(copy, "package.json"), copyList), /names no version, range or tag of npm's registry/u);
   const elsewhere = path.join(tmp, "elsewhere");
   fs.mkdirSync(elsewhere);
   fs.writeFileSync(path.join(elsewhere, "kept.txt"), "kept\n");

@@ -67,6 +67,38 @@ export function npmrcOthers(text) {
     .filter(l => !/^[ \t]*(?:[#;].*)?$/u.test(l) && !/^[ \t]*(?:ignore-scripts[ \t]*=[ \t]*true|min-release-age[ \t]*=[ \t]*\d+)[ \t]*$/u.test(l));
 }
 
+// What the core's package list and lock file may hold, read before npm runs (install.mjs) and by the core's own test:
+// the package list its own fields alone; each lock entry a folder of node_modules/ named in npm's name characters,
+// fetched from npm's registry at an address in its one plain form and held to its sha512, with no field but those a
+// package fetched from the registry carries; and every dependency spec a version, range or tag of npm's registry,
+// never one that names git, a web address, a file, a folder or a tarball, which the npm that comes with the least Node
+// would fetch, and run its prepare script, whatever setting says otherwise (#654). Each fault as a line; none, [].
+export const ENTRY_FIELDS = new Set(["version", "resolved", "integrity", "license", "dev", "optional", "devOptional", "peer", "engines", "bin", "funding",
+  "dependencies", "optionalDependencies", "peerDependencies", "peerDependenciesMeta", "os", "cpu", "libc", "deprecated", "hasInstallScript"]);
+const LIST_FIELDS = ["name", "private", "description", "license", "dependencies", "devDependencies"];
+const SPEC_FIELDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
+const registrySpec = v => typeof v === "string" && /^[\w.^~<>=|*+ -]*$/u.test(v) && !/^\./u.test(v) && !/\.t(?:gz|ar)\b/iu.test(v);
+const KEY = /^(?:node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*\/)*node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*$/u;
+const plainAddress = r => { try { return /^https:\/\/registry\.npmjs\.org\//u.test(r) && new URL(r).href === r; } catch { return false; } };
+export function lockFaults(list, lock) {
+  const out = [], specs = (where, o) => { for (const [n, v] of Object.entries(o ?? {})) if (!registrySpec(v)) out.push(`${where}: the spec ${JSON.stringify(n)}: ${JSON.stringify(v)} names no version, range or tag of npm's registry`); };
+  for (const k of Object.keys(list ?? {})) if (!LIST_FIELDS.includes(k)) out.push(`package.json: the field ${JSON.stringify(k)}, which the core's package list does not hold`);
+  for (const f of SPEC_FIELDS) specs(`package.json ${f}`, list?.[f]);
+  if (lock?.lockfileVersion !== 3) out.push("package-lock.json: not npm's own form, version 3");
+  for (const [k, e] of Object.entries(lock?.packages ?? {})) if (k) out.push(...entryFaults(k, e ?? {}, specs));
+  return out;
+}
+
+// One lock entry's faults, its specs' through `specs(where, fields)`.
+function entryFaults(k, e, specs) {
+  const out = [], odd = Object.keys(e).filter(f => !ENTRY_FIELDS.has(f));
+  if (!KEY.test(k)) out.push(`package-lock.json ${JSON.stringify(k)}: a key that names no folder of node_modules/`);
+  if (odd.length) out.push(`package-lock.json ${k}: the field${odd.length === 1 ? "" : "s"} ${odd.join(", ")}, which no package fetched from the registry carries`);
+  if (!plainAddress(e.resolved) || !/^sha512-/u.test(e.integrity ?? "")) out.push(`package-lock.json ${k}: not fetched from npm's registry at an address in its plain form, held to its sha512`);
+  for (const f of SPEC_FIELDS) specs(`package-lock.json ${k} ${f}`, e[f]);
+  return out;
+}
+
 // Whether the package could not be installed because the registry did not answer, in a project's pull request
 // (install.mjs): a script that reads it checks this first and says that part did not run, as a warning, keeping every
 // failure it found without the package (#654, point 4).

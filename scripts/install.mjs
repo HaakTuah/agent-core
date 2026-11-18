@@ -14,7 +14,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { npmrcOthers } from "./packages.mjs";
+import { lockFaults, npmrcOthers } from "./packages.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const windows = process.platform === "win32";
@@ -35,6 +35,12 @@ export const REGISTRIES = {
 function refusal(lock, into) {
   if (lock !== "package-lock.json") return null;
   const at = f => path.join(root, f);
+  // (what the package list and lock file hold, read before npm runs: the npm that comes with the least Node fetches
+  // whatever source a spec names, and runs its prepare script, whatever setting says otherwise)
+  let faults;
+  try { faults = lockFaults(JSON.parse(fs.readFileSync(at("package.json"), "utf8")), JSON.parse(fs.readFileSync(at(lock), "utf8"))); }
+  catch (e) { faults = [`${lock} or package.json cannot be read (${e.message})`]; }
+  if (faults.length) return `${faults[0]}${faults.length > 1 ? `, and ${faults.length - 1} more` : ""}. Mend: write the package list and lock file as npm's own install from its registry writes them, with no other source`;
   if (fs.existsSync(at("npm-shrinkwrap.json"))) return `${at("npm-shrinkwrap.json")} stands beside the lock file, and would be installed from in its place. Mend: take it out; the core's packages are named in package-lock.json alone`;
   let npmrc = "";
   try { npmrc = fs.readFileSync(at(".npmrc"), "utf8"); } catch { /* (none: npm's own registry) */ }
