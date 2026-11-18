@@ -13,7 +13,6 @@ it merges last. #579 to #591 wait on #593's point 7.
 | #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue | |
 | #529, step 4 | builder | #528 |
 | #530, step 5 | builder; licence readers after #585 and #586 | #529 |
-| #534, point 13 | rule builder | |
 | #593, points 1 to 3 | rule builder | |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | |
 | #593, point 7 | rule builder | |
