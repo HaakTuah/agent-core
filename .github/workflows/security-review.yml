@@ -134,17 +134,27 @@ jobs:
             exit 0
           fi
           d=$(mktemp -d)
-          gh api "repos/$REPO/pulls/$NUMBER" > "$d/pull.json"
-          gh api --paginate --slurp "repos/$REPO/issues/$NUMBER/comments?per_page=100" > "$d/comments.json"
-          gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/comments?per_page=100" > "$d/findings.json"
-          gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/commits?per_page=100" > "$d/commits.json"
-          gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100" > "$d/files.json"
+          # the pull request and what it holds, all five read by the step's 60th second, twenty seconds at most a read,
+          # so that what comes after keeps its time and both statuses are written within the job's (#632); where one is
+          # not read in time, nothing is there to write a status from, and the step fails, saying so
+          from_host() {
+            local file=$1 what=$2 left; shift 2
+            left=$((60 - SECONDS))
+            if [ "$left" -gt 0 ] && timeout "$((left < 20 ? left : 20))" gh api "$@" > "$d/$file"; then return 0; fi
+            echo "::error::FAIL the host gave no $what of pull request #$NUMBER by the step's 60th second, so the security-review status was not written. Mend: run this job again from the pull request's checks once GitHub answers."
+            false
+          }
+          from_host pull.json "state" "repos/$REPO/pulls/$NUMBER"
+          from_host comments.json "comments" --paginate --slurp "repos/$REPO/issues/$NUMBER/comments?per_page=100"
+          from_host findings.json "review comments" --paginate --slurp "repos/$REPO/pulls/$NUMBER/comments?per_page=100"
+          from_host commits.json "commits" --paginate --slurp "repos/$REPO/pulls/$NUMBER/commits?per_page=100"
+          from_host files.json "list of files" --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100"
           # whether the pull request is held by what a script of the check reads more: not where it leaves the script
           # alone, its head holds it as it stood before this branch's, and the host says it was opened before the
           # default branch's copy came (it stood before the check came, and is told, never waited for: AGENTS.md,
           # "Nothing locks a project"; the script decides that last from came, below); always where it changes the
           # script itself, where its list of files is cut short, or where the head's copy cannot be read for any reason
-          # but its absence
+          # but its absence, ten seconds at most (#632)
           head=$(jq -r '.head.sha // empty' "$d/pull.json")
           held() {
             local p="$ROOT/scripts/$1" theirs
@@ -154,7 +164,7 @@ jobs:
               || jq -e --arg p "$p" 'any(.[][]; .filename == $p or .previous_filename == $p)' "$d/files.json" \
                 > /dev/null
             then echo true; return; fi
-            if theirs=$(gh api "repos/$REPO/contents/$p?ref=$head" --jq .sha 2> "$d/error"); then
+            if theirs=$(timeout 10 gh api "repos/$REPO/contents/$p?ref=$head" --jq .sha 2> "$d/error"); then
               if [ "$theirs" = "$(git rev-parse "HEAD:$p")" ]; then echo true; else echo false; fi
             elif grep -q "HTTP 404" "$d/error"; then echo false # the head holds no such script: from before it came
             else echo true; fi
