@@ -784,13 +784,13 @@ function folded(l, at, name) {
   if (l.dirs.has(here) || l.blobs.has(here) || l.others.has(here) || l.linked.has(here)) return name;
   return foldsIn(l, at.join("/") || ".").get(fold(name))?.[0] ?? name;
 }
-// The names a listing's folder `dir` holds, by their folded form, each list sorted; built once a folder, so a walk's
+// The names a listing's folder `dir` holds, by their folded form, each list in the listing's order; built once a folder, so a walk's
 // every step does not fold every name beside it again.
 function foldsIn(l, dir) {
   l.folds ??= new Map();
   if (!l.folds.has(dir)) {
     const by = new Map();
-    for (const n of [...(l.children.get(dir) ?? [])].sort()) by.set(fold(n), [...(by.get(fold(n)) ?? []), n]);
+    for (const n of l.children.get(dir) ?? []) by.set(fold(n), [...(by.get(fold(n)) ?? []), n]);
     l.folds.set(dir, by);
   }
   return l.folds.get(dir);
@@ -801,7 +801,7 @@ function foldsIn(l, dir) {
 // tool reads is not plain, those names, as { at, several, rest }, `rest` the path the walk had left there.
 function noteMiss(l, at, name, misses, rest) {
   const here = [...at, name].join("/"), dir = at.join("/") || ".", path = n => (dir === "." ? n : `${dir}/${n}`);
-  const same = foldsIn(l, dir).get(fold(name)) ?? [];
+  const same = [...(foldsIn(l, dir).get(fold(name)) ?? [])].sort();
   if (l.dirs.has(here) || l.blobs.has(here) || l.others.has(here) || l.linked.has(here)) {
     if (rest !== false && same.length > 1) misses.push({ at: here, several: same.map(path), rest });
     return;
@@ -952,33 +952,15 @@ function lockOf(root, rev, at) {
     const dir = v.slice(0, cut) ? `${v.slice(0, cut)}/` : "", key = v.slice(dir.length);
     for (const lock of ["package-lock.json", "npm-shrinkwrap.json"]) {
       let entry;
-      // (an entry too deep to write back is read as one that cannot be read, as one too deep to parse is)
-      try { entry = JSON.stringify(JSON.parse(textAt(root, rev, `${dir}${lock}`) ?? "null")?.packages?.[key] ?? null); } catch { entry = "unreadable"; }
+      // (an entry too deep to parse or write back is held by the lock file's whole text)
+      const text = textAt(root, rev, `${dir}${lock}`);
+      try { entry = JSON.stringify(JSON.parse(text ?? "null")?.packages?.[key] ?? null); } catch { entry = `unreadable\0${text}`; }
       out.push(`${dir}${lock}\0${key}\0${entry}`);
     }
-    const name = key.slice(key.lastIndexOf("node_modules/") + "node_modules/".length);
-    for (const lock of ["yarn.lock", "pnpm-lock.yaml"]) out.push(`${dir}${lock}\0${name}\0${entriesOf(textAt(root, rev, `${dir}${lock}`), name)}`);
+    // (of yarn's and pnpm's, the whole text, as no reading of their entries here is the one the package manager makes)
+    for (const lock of ["yarn.lock", "pnpm-lock.yaml"]) out.push(`${dir}${lock}\0${textAt(root, rev, `${dir}${lock}`)}`);
   }
   return out.join("\0\0");
-}
-// Of a yarn or pnpm lock's text, the entries that name the package `name`, each its line and the lines indented under
-// it, so a change to another package's entry leaves them as they were; a key names it where, unquoted and past a leading
-// "/", it is the name, or starts with the name and "@" or "/" (a yarn header's every key, split at ", ", is read so).
-function entriesOf(text, name) {
-  if (text === null) return null;
-  const lines = text.split(/\r?\n/u), out = [], indent = l => l.length - l.trimStart().length;
-  const names = key => key.split(/,\s*/u).some(k => {
-    const bare = k.trim().replace(/^["']|["']$/gu, "").replace(/^\//u, "");
-    return bare === name || bare.startsWith(`${name}@`) || bare.startsWith(`${name}/`);
-  });
-  for (let i = 0; i < lines.length; i++) {
-    const colon = lines[i].search(/:(?:\s|$)/u);
-    if (colon < 0 || !lines[i].trim() || !names(lines[i].slice(0, colon))) continue;
-    const at = indent(lines[i]);
-    out.push(lines[i]);
-    while (i + 1 < lines.length && (!lines[i + 1].trim() || indent(lines[i + 1]) > at)) out.push(lines[++i]);
-  }
-  return out.join("\n");
 }
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {

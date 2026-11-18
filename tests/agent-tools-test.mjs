@@ -901,16 +901,24 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const lockKept = run(pr(viaPackage(), { "package-lock.json": JSON.stringify({ ...JSON.parse(lockAt("1.0.0")), packages: { ...JSON.parse(lockAt("1.0.0")).packages, "node_modules/other": { version: "2.0.0" } } }) }));
     ok(lockKept.status === 0 && lockKept.out.includes("as the base held it"), "a link the base held into an installed package is noted while the lock file holds that package as it was", lockKept.out);
     fails(run(pr(viaPackage(), { "package-lock.json": lockAt("2.0.0") })), "but not once the pull request locks the package anew", '".claude" is a link that leads out of the checkout');
-    // (#633's fallback security review of b0f654f: an entry too deep to write back fails with the mend, not a crash; and of
-    // a yarn or pnpm lock, only the package's own entries are read, so another package's update leaves the link noted)
-    fails(run(pr(viaPackage(), { "package-lock.json": `{"lockfileVersion":3,"packages":{"node_modules/pkg":${"[".repeat(200000)}${"]".repeat(200000)}}}` })), "and an entry too deep to read back fails with its mend", '".claude" is a link that leads out of the checkout', "Mend:");
-    const yarnAt = (pkg, other) => `# yarn lockfile v1\n\n\nother@^1.0.0:\n  version "${other}"\n  resolved "https://registry.yarnpkg.com/other/-/other-${other}.tgz"\n\npkg@^1.0.0, "pkg@npm:^1.0.0":\n  version "${pkg}"\n  resolved "https://registry.yarnpkg.com/pkg/-/pkg-${pkg}.tgz"\n  dependencies:\n    other "^1.0.0"\n`;
-    const pnpmAt = (pkg, other) => `lockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    dependencies:\n      other:\n        specifier: ^1.0.0\n        version: ${other}\n      pkg:\n        specifier: ^1.0.0\n        version: ${pkg}\n\npackages:\n\n  other@${other}:\n    resolution: {integrity: sha512-o}\n\n  pkg@${pkg}:\n    resolution: {integrity: sha512-p}\n`;
-    for (const [lock, at] of [["yarn.lock", yarnAt], ["pnpm-lock.yaml", pnpmAt]]) {
-      const viaLock = () => { const dir = project({ ".gitignore": "node_modules/\n", [lock]: at("1.0.0", "1.0.0"), ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync("node_modules/pkg/.claude", path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link into an installed package"); return dir; };
-      const otherMoved = run(pr(viaLock(), { [lock]: at("1.0.0", "1.2.0") }));
-      ok(otherMoved.status === 0 && otherMoved.out.includes("as the base held it"), `with ${lock}, another package locked anew leaves it noted`, otherMoved.out);
-      fails(run(pr(viaLock(), { [lock]: at("2.0.0", "1.0.0") })), `but the package it passes through, locked anew in ${lock}, fails`, '".claude" is a link that leads out of the checkout');
+    // (#633's fallback security reviews of b0f654f and acf5691: an entry too deep to write back fails with the mend, not a
+    // crash, and is held by the lock file's text; and a yarn or pnpm lock is read whole, as no reading of its entries here
+    // is the package manager's: an alias's package, or a key written in another form, is locked elsewhere in it)
+    // (#633's fallback security review of acf5691: where a link's target stands in no case but folds alike to a folder
+    // and a link beside it, the one the listing gives first is read, as before the names were folded once a folder)
+    const order = () => { const dir = project({ "CONF/settings.json": KIT, "other/settings.json": KIT, ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync("conf", path.join(dir, ".claude")); fs.symlinkSync("other", path.join(dir, "Conf")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link to a name in no case"); return dir; };
+    fails(run(pr(order(), { "other/settings.json": JSON.stringify({ ...JSON.parse(KIT), hooks: { ...JSON.parse(KIT).hooks, SessionStart: [{ hooks: [{ type: "command", command: "bash scripts/x.sh" }] }] } }) })), "a hook added where a link to a name in no case leads, through a link beside a folder of that name, fails", ".claude");
+    const deep = version => `{"lockfileVersion":3,"packages":{"node_modules/pkg":{"version":"${version}","x":${"[".repeat(200000)}${"]".repeat(200000)}}}}`;
+    fails(run(pr(viaPackage(), { "package-lock.json": deep("1.0.0") })), "and an entry too deep to read back fails with its mend", '".claude" is a link that leads out of the checkout', "Mend:");
+    const deepHeld = () => { const dir = viaPackage(); fs.writeFileSync(path.join(dir, "package-lock.json"), deep("1.0.0")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a deep entry"); return dir; };
+    fails(run(pr(deepHeld(), { "package-lock.json": deep("2.0.0") })), "and so does one held too deep by the base, locked anew", '".claude" is a link that leads out of the checkout');
+    const yarnAt = pkg => `# yarn lockfile v1\n\n\npkg@^1.0.0:\n  version "1.0.0"\n  resolved "https://registry.yarnpkg.com/pkg/-/pkg-1.0.0.tgz"\n${pkg}`;
+    const pnpmAt = pkg => `lockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    dependencies:\n      pkg:\n        specifier: npm:real-pkg@^1.0.0\n        version: real-pkg@1.0.0\n\npackages:\n\n  real-pkg@1.0.0:\n    resolution: {integrity: ${pkg}}\n`;
+    for (const [lock, at, moved] of [["yarn.lock", yarnAt, '\n"pkg@^1.0.0":\n  version "1.0.0"\n  resolved "https://example.invalid/pkg-1.0.0.tgz"\n'], ["pnpm-lock.yaml", pnpmAt, "sha512-q"]]) {
+      const viaLock = () => { const dir = project({ ".gitignore": "node_modules/\n", [lock]: at(lock === "yarn.lock" ? "" : "sha512-p"), ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync("node_modules/pkg/.claude", path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link into an installed package"); return dir; };
+      const kept = run(pr(viaLock(), { "README.md": "a change of its own\n" }));
+      ok(kept.status === 0 && kept.out.includes("as the base held it"), `with ${lock} as it stood, it is noted`, kept.out);
+      fails(run(pr(viaLock(), { [lock]: at(moved) })), `but ${lock} changed fails, read whole`, '".claude" is a link that leads out of the checkout');
     }
   }
 }
