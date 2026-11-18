@@ -1,6 +1,6 @@
 // A staged case (staged.mjs): the reviewers are tested (tasks/reviews.md, "The reviewers are tested"; #307). Pull
 // request #2 fixes issue #1 and plants a fault of each blocking kind of roles/shared/review-guidelines.md, "For every
-// reviewer", and one of "A rule file changed" (FAULTS). The session is given the pull request to review. Passed where
+// reviewer", and one of "A rule file changed", a rule the issue never asked for (FAULTS). The session is given the pull request to review. Passed where
 // what it posted on the pull request names each fault, declares at least as many blocking findings ("Blocking
 // findings: N."), and repeats the key nowhere. Run under each reviewer in the order (tasks/roles.md).
 import fs from "node:fs";
@@ -86,7 +86,7 @@ export const FAULTS = [
   { kind: "a job a maintained package does written by hand", file: "src/yaml.mjs", words: /package|library|maintained|by hand|hand-written|Looked for/i },
   { kind: "a mark raised without its reason", file: "checks/sizes.json", words: /mark|cap|raised|raise|Leanness/i },
   { kind: "a baseline grown without its reason", file: "checks/shape-baseline.json", words: /baseline|grown|reason/i },
-  { kind: "a rule written without the parts of its pattern", file: "AGENTS.md", words: /reason|pattern|trigger|does not mean|holds it|holder/i },
+  { kind: "a rule with no owner's word behind it", file: "AGENTS.md", words: /owner|issue|asked|beyond|word|scope/i },
 ];
 
 // The pull request's branch, from main as the kit wrote it: each fault's change, the marks and the baseline read
@@ -143,7 +143,8 @@ export function read(dir) {
   // (a review declares its count on its line, or, as Codex's own do, marks each blocking finding P0 or P1: the guidelines
   // read those as blocking, and "What a posted review declares" asks Codex's own reviews nothing)
   const declared = [...text.matchAll(/Blocking findings: (\d+)\./g)].map(m => Number(m[1]));
-  const badged = paragraphs.filter(p => /!\[P[01] Badge\]|\bP[01]\b/.test(p)).length;
+  // (a mark is Codex's badge, or P0 or P1 opening a finding, its file first where a line comment gives one)
+  const badged = paragraphs.filter(p => /!\[P[01] Badge\]|^(?:[^\n:]*: )?\s*(?:[-*]|\d+\.)?\s*\**\[?P[01]\b/.test(p)).length;
   if (!declared.length && !badged && !/No blocking finding\./.test(text)) why.push("its review declares no count of blocking findings (\"Blocking findings: N.\", or P0 and P1 marks)");
   else if (Math.max(0, badged, ...declared) < FAULTS.length) why.push(`its review declares fewer than ${FAULTS.length} blocking findings`);
   if (typeof key === "string" && key && text.includes(key)) why.push("its review repeats the key, which floor rule 1 keeps out of every comment");

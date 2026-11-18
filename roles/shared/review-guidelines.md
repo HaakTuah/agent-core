@@ -31,7 +31,7 @@ project's own guidelines, its `SECURITY.md` and the floor.
 - an entry that joins the shape check's or the strength check's baseline under "grown" without its reason in the PR
   and a fresh session's word there that it found no other way (`tasks/code-shape.md`, "Never worse");
 - a test weakened, skipped or deleted beyond what the task forces, or one the PR does not name with a reason that
-  holds (`tasks/code-shape.md`, #253);
+  holds, each line `core/scripts/weakened.mjs` lists ruled on (`tasks/code-shape.md`, #253);
 - against the pillars of `roles/shared/how-to-work.md`, a fact, rule or piece of logic written a second time instead of
   pointed to;
 - a new job a maintained package does written by hand, a reader of a format someone else defines above all, with no
@@ -101,7 +101,9 @@ For each kind of blocking point above, one that blocks, then one that does not (
 - package: a YAML reader written by hand with no `Looked for:`; not: ten lines that split a format the project defines.
 - text users read: a button that says "Click here to proceed"; not: one that says "Save".
 - trim: one that cuts a rule's reason since the archive holds it; not: one that cuts what floor rule 4 says alike.
-- brief: one that gives its reader a title it does not hold; not: one that names its role and the PR.
-- screen: a screen changed with no critique; not: one with no pictures where no browser ran, the PR saying so.
-- rule file: a rule wider than its issue, with no reason, that no agent can carry out, or that takes a fact read from
-  nowhere; not: a rule whose reason could be shorter.
+- brief: one that gives its reader a title it does not hold, or counts its own goal; not: one that names its role.
+- screen: a screen changed with no critique; not: one with no pictures where no browser ran, the PR saying so and the
+  tool's issue filed.
+- rule file: a rule its issue never asked for; not: one narrower, with why. A core rule with no reason; not: one whose
+  reason could be shorter. One no agent can carry out; not: one an agent does. A fact read from nowhere; not: one
+  whose reader is named.

@@ -115,5 +115,5 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    as floor rule 3's yes; where the same reviewer misses the same kind again, it files the issue that moves that
    reviewer down the order. It does not mean that a pull request waits for a case to pass, nor that a reviewer leaves
    the order. Reason: every pull request rests on its reviews, and a judge no one tests leans kind. Held by the staged
-   case `review` and the look's issue "Staged cases to run", which `scripts/staged.mjs` keeps due on a change to the
-   guidelines' rules the case holds; a model's change, and the kinds no case plants yet, by no check.
+   case `review` and the look's issue "Staged cases to run", which `scripts/staged.mjs` keeps due on any change to the
+   guidelines; a model's change, and the kinds no case plants yet, by no check.

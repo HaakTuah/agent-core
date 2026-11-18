@@ -116,11 +116,11 @@ one declared entrance.
   trigger is a pull request that leaves a test file with fewer lines that assert, deletes it, or skips a case in it:
   its builder names that file on the description's line `Tests changed:`, with why, and the reviewer rules on it,
   checking that the reason holds (#307). It does not mean that a test which proves nothing must stay, nor that an
-  assertion only changed is named: it may be made stricter, and the check lists it for the reviewer. Reason: a measure
-  on changed lines cannot see a test weakened elsewhere, and a test made to pass is the cheapest way to green. Held, in
-  part, by the description check (`core/scripts/weakened.mjs` lists the lines, in the test files the *shape check*'s
-  config names), which fails a description that leaves such a file off the line; an assertion loosened in place, or on
-  a line of a call spread over several, no check tells without guessing, and the reviews read it
+  assertion only changed is named: it may be made stricter, and the check lists it for the reviewer, who rules on it.
+  Reason: a measure on changed lines cannot see a test weakened elsewhere, and a test made to pass is the cheapest way
+  to green. Held, in part, by the description check (`core/scripts/weakened.mjs` lists the lines, in the test files the
+  *shape check*'s config names), which fails a description that leaves such a file off the line; an assertion loosened
+  in place, or on a line of a call spread over several, no check tells without guessing, and the reviews read it
   (`roles/shared/review-guidelines.md`).
 - **Near-copies are reported.** By default code that only looks like other code fails nothing. The trigger is a run
   of code that matches another once names and numbers are set aside: the copies check lists it on every run, and the
