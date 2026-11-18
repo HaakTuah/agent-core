@@ -1144,6 +1144,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     for (const [what, how] of [["by ..", dir => `../${path.basename(dir)}/node_modules/pkg/.claude`], ["by a whole path", dir => `${dir}/node_modules/pkg/.claude`]]) {
       fails(run(pr(backIn(how), { "package-lock.json": lockAt("2.0.0") })), `one that comes back into the checkout ${what} fails once its package is locked anew`, "locks the package it leads into anew");
     }
+    const plainOut = run(pr(linkTo("../shared/.claude"), { "README.md": "x\n" }));
+    ok(plainOut.status === 0 && !plainOut.out.includes("may have changed") && plainOut.out.includes("reported, never failed"), "one to a folder outside the checkout through no node_modules keeps its plain note, saying nothing of a lock", plainOut.out);
+    const nmOut = run(pr(linkTo("../shared/node_modules/pkg/.claude"), { "README.md": "x\n" }));
+    ok(nmOut.status === 0 && nmOut.out.includes("may have changed"), "while one outside it through a node_modules folder, whose lock is not read, is reported as one that may have changed", nmOut.out);
     const flagged = run(pr(linkTo("node_modules/pkg/.claude"), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version: "1.0.0", dev: true } } }) }));
     ok(flagged.status === 0 && flagged.out.includes("locked as before"), "while a flag of its entry's alone, set anew, leaves it a note", flagged.out);
     const lockLink = () => { const dir = linkTo("node_modules/pkg/.claude", { "locks/package-lock.json": lockAt("1.0.0") }); fs.rmSync(path.join(dir, "package-lock.json")); fs.symlinkSync("locks/package-lock.json", path.join(dir, "package-lock.json")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "the lock as a link"); return dir; };

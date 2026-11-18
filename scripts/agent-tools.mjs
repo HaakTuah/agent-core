@@ -1215,7 +1215,8 @@ function pkgLockOf(root, rev, at, depth) {
     const to = l.linked.has(v) ? linkText(root, rev, v) : null;
     const p = to === null ? "" : inCheckout(root, v, to);
     const m = p === null ? null : [...`/${p}`.matchAll(/\/node_modules(?:\/|$)/giu)].at(-1);
-    if (p === null) out.loose.add(OUTSIDE.loose);
+    // (one that ends outside the checkout through a node_modules folder is read loosely: the lock beside it is not read)
+    if (p === null && /(?:^|\/)node_modules(?:\/|$)/iu.test(to.split("\\").join("/"))) out.loose.add(OUTSIDE.loose);
     else if (m) lockEntries(root, rev, p.slice(0, Math.max(m.index - 1, 0)), `/${p}`.slice(m.index + "/node_modules/".length).split("/"), out, depth);
   }
   return { exact: [...out.exact].sort().join("\0\0"), loose: [...out.loose].sort().join("\0\0") };
