@@ -251,7 +251,8 @@ try {
   refuses("node_modules is a link", () => fs.symlinkSync(elsewhere, path.join(pk, "node_modules"), "junction"), () => fs.unlinkSync(path.join(pk, "node_modules")), /node_modules is a link/u);
   ok(fs.existsSync(path.join(elsewhere, "kept.txt")), "and what the link pointed at is kept");
   const moved = path.join(tmp, "packages-elsewhere");
-  refuses(".packages is a link", () => { fs.renameSync(pk, moved); fs.symlinkSync(moved, pk, "junction"); }, () => { fs.unlinkSync(pk); fs.renameSync(moved, pk); }, /\.packages is a link/u);
+  // (a stray file in the link's target, which the link's refusal names before anything is read through it)
+  refuses(".packages is a link, named before what stands where it points", () => { fs.renameSync(pk, moved); fs.writeFileSync(path.join(moved, "stray"), "\n"); fs.symlinkSync(moved, pk, "junction"); }, () => { fs.unlinkSync(pk); fs.rmSync(path.join(moved, "stray")); fs.renameSync(moved, pk); }, /\.packages is a link(?![^]*"stray")/u);
   ok(!fs.existsSync(path.join(moved, "node_modules")) && fs.existsSync(path.join(pk, "package-lock.json")), "and nothing is installed through it");
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 
