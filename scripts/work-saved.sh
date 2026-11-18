@@ -4,7 +4,7 @@
 # and says in a line where Node is not on the path, so the helper hook is off, what the branch's changed paths call
 # for (core archive 234), and whether the owner's stop switch is set (core archive 201);
 # stop keeps the reply from ending while any is, once: a second stop in a row goes through, so a push that cannot be
-# made never traps a session. It only reads the repository, with the git settings that run commands (fsmonitor, hooks)
+# made never traps a session. At the start it installs the core's packages where none are (below); else it only reads the repository, with the git settings that run commands (fsmonitor, hooks)
 # turned off; the start asks origin for the switch with the user's own SSH and sign-in setup, never a prompt, and with
 # origin's settings that run commands set aside. Claude Code runs the copy merged into main (the project's
 # .claude/settings.json; floor rule 3), never the working tree's, so an edit runs once it is reviewed.
@@ -27,6 +27,14 @@ if [ "$mode" = start ]; then
   copy=$(printf '%s\n' "$manifest" | sed -n -E 's#^Floor copy: (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)( .*)?$#\1#p' | head -n 1)
   if [ -n "$copy" ] && [ -d "${at}floor" ] && ! diff -r -q "${at}floor" "$copy" >/dev/null 2>&1; then
     echo "The floor's own copy under $copy differs from the floor under ${at}floor/, the core's that the library carries. Mend: copy ${at}floor/ over it, whole, in a pull request of its own."
+  fi
+fi
+# The core's packages (#654): at the start, where the copy holds a lock file and nothing is installed beside it, npm
+# installs them from it, as the copy's scripts/install.mjs does: no install script runs, nothing of the branch's runs,
+# and it gives up after 20 seconds, inside the hook's 30. A note, never a block: a check that needs a package says so, with its mend.
+if [ "$mode" = start ] && [ -f "${at}package-lock.json" ] && [ ! -f "${at}node_modules/.package-lock.json" ] && command -v npm >/dev/null 2>&1; then
+  if ! (cd "./${at}" && timeout 20 npm ci --ignore-scripts --no-audit --no-fund >/dev/null 2>&1); then
+    echo "The core's packages are not installed: npm could not install them from ${at}package-lock.json. Mend: run node ${at}scripts/install.mjs before running a check."
   fi
 fi
 # (a note, never a block: the helper hook is started by node, so without it there the hook stops nothing)

@@ -10,7 +10,8 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const windows = process.platform === "win32";
-const ci = () => spawnSync(windows ? "npm.cmd" : "npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], { cwd: root, encoding: "utf8", shell: windows });
+// (on Windows npm is a .cmd file, which Node starts only through the shell; the arguments are the script's own)
+const ci = () => spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], { cwd: root, encoding: "utf8", shell: windows });
 
 const began = Date.now();
 let r = ci();
@@ -19,7 +20,7 @@ if (r.status !== 0) {
   r = ci();
 }
 if (r.status !== 0) {
-  console.error(`FAIL: the core's packages could not be installed from ${root}package-lock.json, twice: ${(r.stderr || r.error?.message || "").trim().split("\n").slice(-3).join(" ")}. Mend: run this again once npm's registry answers; if it fails again, file it as a fault (npm needs Node's own npm, and the network to reach registry.npmjs.org)`);
+  console.error(`FAIL: the core's packages could not be installed from ${root}package-lock.json, twice: ${(r.stderr || r.error?.message || "").trim().split("\n").slice(-3).join(" ")}. Mend: run this again once npm's registry answers; if it fails again, file it as a fault (it takes the npm that comes with Node, and a network that reaches registry.npmjs.org)`);
   process.exit(1);
 }
 console.log(`ok   the core's packages installed from package-lock.json in ${((Date.now() - began) / 1000).toFixed(1)} s`);
