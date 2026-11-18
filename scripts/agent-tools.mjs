@@ -61,7 +61,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { copyOf } from "./core-path.mjs";
+import { corePath } from "./core-path.mjs";
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
 import { fetchedBy } from "./hook-source.mjs";
@@ -673,8 +673,9 @@ function submodules(root, rev) {
 // Everything a name holds at a commit, as a fingerprint: what it leads to, each entry the commit lists under that, by its
 // path and object, and, for each link among them, everything it holds in turn, each folder read once; so a name held
 // twice is held by all a tool may read under either, never by one path through it. With `keep`, only the entries it
-// keeps are held (each link is walked all the same).
-function everything(root, rev, at, keep = () => true) {
+// keeps are held (each link is walked all the same). Each name walked, `at` and each link reached under it, is said in
+// `walked`.
+function everything(root, rev, at, keep = () => true, walked = []) {
   const l = listing(root, rev), seen = new Set(), tops = [], entries = new Set(), todo = [at];
   // (walked a link at a time from a list, never by recursion, so no chain of links is too long for it; each entry named
   // once, however many links reach the folders it stands in)
@@ -689,6 +690,7 @@ function everything(root, rev, at, keep = () => true) {
       if (l.linked.has(p)) todo.push(p);
     }
   }
+  walked.push(...todo);
   return [...tops, ...[...entries].filter(keep).sort().map(p => `${p}\0${l.ids.get(p)}`)].join("\0\0");
 }
 // Each entry a listing holds below the folder `dir` ("" the root), from the listing's names sorted once, by a binary
@@ -713,7 +715,8 @@ function belowDir(root, rev, p) {
 // a file of another kind there changes freely.
 function mdLinks(root, rev) {
   const l = listing(root, rev), read = p => !l.blobs.has(p) || /\.md$/iu.test(p);
-  const held = at => `${at}\0${everything(root, rev, at, read)}`;
+  // (and by what the lock files say of the package each link walked leads into: pkgLock())
+  const held = at => { const walked = [], all = everything(root, rev, at, read, walked); return [at, all, ...walked.map(w => pkgLock(root, rev, w))].join("\0"); };
   // (.claude as a link on the way, by what stands at its agents and commands alone, as Claude Code reads nothing else
   // there for them)
   const way = at => (fold(at) === ".claude" ? AGENT_DIRS.map(d => held(`${at}/${d.split("/")[1]}`)).join("\0\0") : held(at));
@@ -724,11 +727,12 @@ function mdLinks(root, rev) {
 // Each folder of Claude Code's below the project's root, in whatever case, a folder, a link or a submodule, as [its
 // problem, all it holds]: Claude Code reads its settings, agents, skills and commands where it works in that folder, and
 // this check reads only the root's, so one the base held is noted while all it holds stands.
-// The core's copy is left out: core.yml holds it to the core's own commit, whose .claude is the core's.
+// The core's copy, where the manifest names one, is left out: core.yml holds it to the core's own commit, whose .claude is
+// the core's. With no manifest, as in the core's own repository, nothing is left out.
 function nestedClaude(root, rev) {
-  const found = new Set(), copy = copyOf(root);
+  const found = new Set(), copy = corePath(root);
   for (const at of listing(root, rev).ids.keys()) {
-    if (at.startsWith(copy)) continue;
+    if (copy && at.startsWith(copy)) continue;
     // (found a name at a time, so a name in any normal form is cut where it stands)
     const parts = at.split("/"), i = parts.findIndex((n, k) => k > 0 && fold(n) === ".claude");
     if (i > 0) found.add(parts.slice(0, i + 1).join("/"));
@@ -1179,6 +1183,38 @@ function away(root, rev, at) {
   const l = listing(root, rev), r = walk(root, rev, at.split(path.sep).join("/"), [], true, [], true);
   return !r || !(r.f === "." || l.dirs.has(r.f) || l.ids.has(r.f));
 }
+// What the lock files say of the package a link leads into, where its way passes a node_modules folder an install fills:
+// in the folder that holds that node_modules and each folder above it, an npm lock file's entry for that package's path,
+// and a yarn, pnpm or bun lock file whole, as no reading of their entries here is the package manager's; the whole of an
+// npm lock where the link leads to node_modules itself. "" where no node_modules is on its way. So a link the base held
+// fails where the pull request locks its package anew, which changes what a tool runs there, and is a note otherwise.
+const NPM_LOCKS = ["package-lock.json", "npm-shrinkwrap.json"], OTHER_LOCKS = ["yarn.lock", "pnpm-lock.yaml", "bun.lock", "bun.lockb"];
+function pkgLock(root, rev, at) {
+  const posix = at.split(path.sep).join("/"), via = [], l = listing(root, rev), out = new Set();
+  walk(root, rev, posix, via, true, [], true);
+  for (const v of new Set([posix, ...via])) {
+    const to = l.linked.has(v) ? linkText(root, rev, v) : null;
+    const p = to === null ? "" : path.posix.normalize(path.posix.join(path.posix.dirname(v), to.split("\\").join("/")));
+    const m = [...`/${p}`.matchAll(/\/node_modules(?:\/|$)/giu)].at(-1);
+    if (m) lockEntries(root, rev, p.slice(0, Math.max(m.index - 1, 0)), `/${p}`.slice(m.index + "/node_modules/".length).split("/"), out);
+  }
+  return [...out].sort().join("\0\0");
+}
+// Into `out`, what the lock files say of the package `rest` names (its scope and name, or none) in `dir`'s node_modules.
+function lockEntries(root, rev, dir, rest, out) {
+  const name = (rest[0]?.startsWith("@") ? rest.slice(0, 2) : rest.slice(0, 1)).filter(Boolean).join("/");
+  for (let up = dir; ; up = up.includes("/") ? up.slice(0, up.lastIndexOf("/")) : "") {
+    const there = f => (up ? `${up}/${f}` : f), key = path.posix.relative(up || ".", `${dir ? `${dir}/` : ""}node_modules/${name}`).replace(/\/$/u, "");
+    for (const f of NPM_LOCKS) {
+      const text = textAt(root, rev, there(f));
+      let entry = text;
+      try { entry = name ? JSON.stringify(JSON.parse(text)?.packages?.[key] ?? null) : text; } catch { /* (held by its text) */ }
+      out.add(`${there(f)}\0${entry}`);
+    }
+    for (const f of OTHER_LOCKS) out.add(`${there(f)}\0${textAt(root, rev, there(f))}`);
+    if (!up) break;
+  }
+}
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {
     let to = null;
@@ -1189,7 +1225,9 @@ function sortLinks(root, base, links, fail, notes) {
     const held = base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && wayOf(root, base, at) === wayOf(root, "HEAD", at);
     const out = to !== null && away(root, "HEAD", at), stood = held && out && away(root, base, at);
     const there = "to what the commit does not hold (outside the checkout, or in a folder an install fills, as node_modules or a virtual environment), which this check cannot read";
-    if (stood) notes.push(`${said}, ${there}, as the base held it: reported, never failed. Replace it with the file or folder itself, committed in the project`);
+    const locked = stood && pkgLock(root, base, at) !== pkgLock(root, "HEAD", at);
+    if (locked) fail.push(`${said}, ${there}, and this pull request locks the package it leads into anew, which changes what an agent tool runs there unread. Mend: replace the link with the file or folder itself, committed in the project, or take it out, in this pull request`);
+    else if (stood) notes.push(`${said}, ${there}, as the base held it: reported, never failed while the package it leads into is locked as before. Replace it with the file or folder itself, committed in the project`);
     else if (held && reaches(root, base, at, true) === reaches(root, "HEAD", at, true)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
     else if (out) fail.push(`${said}, ${there}. Mend: replace the link with the file or folder itself, committed in the project, in this pull request`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);

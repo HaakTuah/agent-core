@@ -498,8 +498,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const loopsStarted = Date.now(), loopsKept = run(pr(loops, { "README.md": "x\n" }));
     ok(loopsKept.status === 0 && loopsKept.out.includes(WAY) && Date.now() - loopsStarted < 30000, "loops of links behind a link are never walked, and the link the base held is noted", loopsKept.out);
     const agentPkg = () => { const dir = project({ ...script, ".gitignore": "node_modules/\n", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "1.0.0" } } }), ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../node_modules/pkg/agents", path.join(dir, ".claude/agents/pkg")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents from a package"); return dir; };
-    const agentPkgKept = run(pr(agentPkg(), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "6.6.6" } } }) }));
-    ok(agentPkgKept.status === 0 && agentPkgKept.out.includes(LINKED), "a link the base held below agents into an installed package is reported, never failed, when its lock changes", agentPkgKept.out);
+    fails(run(pr(agentPkg(), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "6.6.6" } } }) })), "a link the base held below agents into an installed package fails once the pull request locks that package anew", LINKED);
+    const otherPkg = run(pr(agentPkg(), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "1.0.0" }, "node_modules/other": { version: "2.0.0" } } }) }));
+    ok(otherPkg.status === 0 && otherPkg.out.includes(LINKED), "while another package locked anew leaves it a note", otherPkg.out);
     // (many such links the base held, nothing changed, are read in seconds)
     const manyPkg = viaDocs();
     fs.writeFileSync(path.join(manyPkg, ".gitignore"), "node_modules/\n"); fs.writeFileSync(path.join(manyPkg, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: {} }));
@@ -567,7 +568,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   // (a folder of Claude Code's below the project's root, which it reads where it works there)
   const NESTED = "is a folder of Claude Code's below the project's root";
   // (the core's own copy is none of the project's: its .claude is the core's, held to the core's commit by core.yml)
-  passes(run(pr(project({ ...script, ...listing() }), { "core/.claude/settings.json": KIT, "core/README.md": "# core\n" })), "the core's own copy, with its .claude, is no folder of the project's below its root");
+  const manifest = at => ({ "core-manifest.md": `Core: HaakTuah/agent-core at ${"a".repeat(40)}, copied whole under ${at} (never edited here).\n` });
+  passes(run(pr(project({ ...script, ...manifest("core/"), ...listing() }), { "core/.claude/settings.json": KIT, "core/README.md": "# core\n" })), "the core's own copy, where the manifest names it, with its .claude, is no folder of the project's below its root");
+  fails(run(pr(project({ ...script, ...listing() }), { "core/.claude/settings.json": KIT })), "but with no manifest, as in the core's own repository, a core/.claude fails as any other does", NESTED);
+  const elsewhere = run(pr(project({ ...script, ...manifest("vendor/core/"), ...listing() }), { "vendor/core/.claude/settings.json": KIT, "core/.claude/settings.json": KIT }));
+  ok(elsewhere.status === 1 && elsewhere.out.includes("core/.claude is a folder") && !elsewhere.out.includes("vendor/core/.claude is a folder"), "and where the manifest names another path, that one alone is left out", elsewhere.out);
   fails(run(pr(project({ ...script, ...listing() }), { "app/.claude/skills/x/SKILL.md": "# x\n" })), "a folder of skills below the project's root fails", NESTED, "Mend: move what it holds into the root's .claude folder");
   const nested = () => project({ ...script, "app/.Claude/agents/rev.md": "---\nname: rev\n---\n", ...listing() });
   const nestedKept = run(pr(nested(), { "README.md": "x\n" }));
@@ -1094,9 +1099,18 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const added = target => { const dir = project({ ".gitignore": "node_modules/\n.venv/\n", ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "no link yet"); git(dir, "checkout", "-q", "-B", "change"); fs.symlinkSync(target, path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link"); git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change"); return dir; };
     for (const target of ["node_modules/pkg/.claude", "Node_Modules/pkg/.claude", ".venv/lib/pkg/.claude", "node_modules", "../outside/.claude", "app/node_modules/pkg/.claude"]) {
       fails(run(added(target)), `a link added to ${target} fails`, UNHELD, "Mend: replace the link with the file or folder itself");
-      const kept = run(pr(linkTo(target), { "package-lock.json": lockAt("2.0.0"), "README.md": "x\n" }));
-      ok(kept.status === 0 && kept.out.includes(UNHELD) && kept.out.includes("reported, never failed"), `one the base held, to ${target}, is reported, never failed, whatever else changes`, kept.out);
+      const kept = run(pr(linkTo(target), { "README.md": "x\n" }));
+      ok(kept.status === 0 && kept.out.includes(UNHELD) && kept.out.includes("reported, never failed"), `one the base held, to ${target}, is reported, never failed, while its package is locked as before`, kept.out);
+      // (and where the pull request locks the package it leads into anew, by its own entry in the lock file, what a tool
+      // runs there changes: it fails; through no node_modules, it stays reported whatever the lock says)
+      const key = { "node_modules/pkg/.claude": "node_modules/pkg", "Node_Modules/pkg/.claude": "node_modules/pkg", "node_modules": "node_modules/pkg", "app/node_modules/pkg/.claude": "app/node_modules/pkg" }[target];
+      const relocked = run(pr(linkTo(target), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, [key ?? "node_modules/pkg"]: { version: "2.0.0" } } }) }));
+      if (key) fails(relocked, `but one to ${target} fails once its package is locked anew`, "locks the package it leads into anew", "Mend: replace the link with the file or folder itself, committed in the project, or take it out");
+      else ok(relocked.status === 0 && relocked.out.includes("reported, never failed"), `while one to ${target}, through no node_modules, stays reported whatever the lock says`, relocked.out);
     }
+    const otherLocked = run(pr(linkTo("node_modules/pkg/.claude"), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version: "1.0.0" }, "node_modules/other": { version: "2.0.0" } } }) }));
+    ok(otherLocked.status === 0 && otherLocked.out.includes("reported, never failed"), "a link the base held into a package stays reported while another package is locked anew", otherLocked.out);
+    fails(run(pr(linkTo("node_modules/pkg/.claude", { "yarn.lock": "pkg@1:\n  version 1.0.0\n" }), { "yarn.lock": "pkg@1:\n  version 1.0.1\n" })), "and one fails where a yarn lock beside it changes, read whole", "locks the package it leads into anew");
     const moved = linkTo("node_modules/pkg/.claude");
     git(moved, "checkout", "-q", "-B", "change"); fs.unlinkSync(path.join(moved, ".claude")); fs.symlinkSync("node_modules/other/.claude", path.join(moved, ".claude"));
     git(moved, "add", "-A"); git(moved, "commit", "-q", "-m", "moved"); git(moved, "checkout", "-q", "main"); git(moved, "merge", "-q", "--no-ff", "-m", "merge", "change");
