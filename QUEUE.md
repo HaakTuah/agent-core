@@ -62,7 +62,6 @@ it merges last.
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 1 | rule builder | |
 | #486, point 5 | builder | the types record reopening |
-| #460, point 1 | builder | |
 | #460, point 2 (the author's address) | builder | |
 | #460, point 3 (a copy in a test) | builder | |
 | #460, point 4 (names in descriptions) | builder | |
