@@ -1,6 +1,7 @@
 // Checks how the core takes the packages of other publishers its scripts run (#654): from its lock file, installed by
 // scripts/install.mjs into node_modules/, which git does not track, and loaded by scripts/packages.mjs from there alone.
-// The lock file is in npm's own form, each package at one exact version from npm's registry with a sha512; nothing of
+// The lock file is in npm's own form, each package at one exact version from npm's registry with a sha512, and each it
+// brings or updates a week old by the registry's date (floor rule 7), which npm ci never asks; nothing of
 // another publisher's is tracked in the core, or so in any copy, which core.yml holds to the core; and each script that
 // loads a package, with none installed, says it did not run and how to install, never passing, nor reading a project's
 // own install of the same name.
@@ -33,6 +34,26 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   // (an install script never runs, whatever npm command is run at the core's root or a copy's: the mechanism holds it)
   const npmrc = fs.readFileSync(path.join(root, ".npmrc"), "utf8");
   ok(/^ignore-scripts\s*=\s*true$/mu.test(npmrc) && /^min-release-age\s*=\s*7$/mu.test(npmrc) && (config.ignoreScriptsIn ?? []).includes(".npmrc"), "the core's .npmrc, which the copy carries, keeps every package's install script off and waits a week, and the licence check holds it there (floor rules 7 and 15)", npmrc);
+}
+
+// ---- the week's wait on each package the change brings or updates (floor rule 7) ----
+// npm ci installs a lock file as it is written, so the .npmrc's wait holds only what npm resolves itself: each entry
+// new or at another version than at the base (the merge's first parent, or PACKAGES_BASE) is asked of npm's registry
+// for its date.
+{
+  const WEEK = 7 * 86400000;
+  let base = {};
+  try { base = JSON.parse(execFileSync("git", ["show", `${process.env.PACKAGES_BASE || "HEAD^1"}:package-lock.json`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })).packages ?? {}; } catch { /* (no lock file at the base: every entry is new) */ }
+  const changed = Object.entries(json("package-lock.json").packages ?? {}).filter(([k, e]) => k && base[k]?.version !== e.version);
+  const { fetched } = await import(pathToFileURL(path.join(root, "scripts/lookup.mjs")).href);
+  const young = [];
+  for (const [k, e] of changed) {
+    const name = k.slice(k.lastIndexOf("node_modules/") + "node_modules/".length);
+    const doc = await fetched(`https://registry.npmjs.org/${name.replace("/", "%2f")}`).catch(err => ({ status: err.message }));
+    const at = Date.parse(doc.json?.time?.[e.version] ?? "");
+    if (!(Date.now() - at >= WEEK)) young.push(`${name}@${e.version} (${doc.status === 200 ? (Number.isNaN(at) ? "no date" : new Date(at).toISOString()) : `the registry answered ${doc.status}`})`);
+  }
+  ok(young.length === 0, `each of the ${changed.length} package${changed.length === 1 ? "" : "s"} the change brings or updates in the lock file is a week old or more by the registry's date (floor rule 7)`, young.join(", "));
 }
 
 // ---- nothing of another publisher's tracked: no node_modules/, no carried folder ----
