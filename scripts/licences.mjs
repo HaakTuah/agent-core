@@ -251,10 +251,11 @@ export function shippedPaths(packages, workspaces, manifest) {
 }
 
 // The lines of an `.npmrc` as npm reads them: split at each line feed and each carriage return, alone or together,
-// after a leading byte-order mark. A line that holds any character but a tab and printable ASCII may read otherwise to
-// npm than to the patterns below, so it is never one of the settings they vouch for: listed, and never counted as set.
+// after a leading byte-order mark. A line that holds a line or paragraph separator reads otherwise to npm than to the
+// patterns below, so it is never one of the settings they vouch for: listed, and never counted as set. Every other
+// space npm trims as they do, so a line that stood before reads the same.
 const npmrcLines = (npmrc) => npmrc.replace(/^\uFEFF/u, "").split(/[\r\n]+/u);
-const plain = (line) => !/[^\t\x20-\x7e]/u.test(line);
+const plain = (line) => !/[\u2028\u2029]/u.test(line);
 
 /**
  * The lines of an `.npmrc` that are not one of a few settings known to leave where npm fetches from alone: npm reads
