@@ -53,7 +53,7 @@ import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from
 import { WAITS, waitsOn } from "./pr-description.mjs";
 import { pathIn } from "./reading.mjs";
 import { ownerOf } from "./releases.mjs";
-import { HOURS, openPulls, stalled } from "./stalled.mjs";
+import { handedOff, HOURS, openPulls, stalled } from "./stalled.mjs";
 import { started } from "./started.mjs";
 import { timeOf } from "./moment.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
@@ -151,7 +151,8 @@ const plain = text => String(text ?? "").replace(/[\u0000-\u001f\u007f-\u009f]/g
 
 // The idle list: `lanes` as stalled() gives them, each with `checks`. Drafts with green checks first, then the rest,
 // longest idle first; each line says draft or ready, its checks, what it waits on and for how long, and where its
-// line and the label needs-owner disagree, that mend.
+// line and the label needs-owner disagree, that mend; and where its description holds no hand-off note
+// (tasks/tools.md, "A change of tool loses nothing"; #306), that it has none.
 export function idleBody(lanes, hours) {
   const first = l => (l.draft && l.checks === "green" ? 0 : 1);
   const sorted = [...lanes].sort((a, b) => first(a) - first(b) || b.waited - a.waited);
@@ -164,7 +165,7 @@ export function idleBody(lanes, hours) {
       const says = w ? (w.kind ? `waits on ${quoted(w.said)}` : `its line ${quoted(`${WAITS} ${w.said}`)} is in none of the forms`) : `says nothing of what it waits on`;
       const owner = w?.kind === "the owner", labelled = (l.labels ?? []).includes("needs-owner");
       const mend = owner && !labelled ? "; to label needs-owner" : !owner && labelled ? "; to take needs-owner off, or say the owner's question in its line" : "";
-      return `- #${l.number} (${l.draft ? "draft" : "ready"}, checks ${l.checks}): ${says}; ${l.waited.toFixed(1)} h since its last push${mend}.`;
+      return `- #${l.number} (${l.draft ? "draft" : "ready"}, checks ${l.checks}): ${says}; ${l.waited.toFixed(1)} h since its last push${handedOff(l.body) ? "" : "; no hand-off note"}${mend}.`;
     })].join("\n");
 }
 
