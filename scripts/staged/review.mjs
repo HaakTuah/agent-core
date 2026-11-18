@@ -127,18 +127,22 @@ export function set(dir, opts = {}) {
   return paths;
 }
 
-// All the session wrote on pull request #2: its comments, its reviews and their line comments, as the calls hold them.
+// All the session wrote on pull request #2, as the calls hold them, in the units a finding is read in: each paragraph or
+// item of a comment's or a review's body, and each line comment whole, its file before it, whatever paragraphs it has.
 export function posted(dir) {
-  return github(dir).calls.filter(c => c.method !== "GET" && /^(?:repos\/[^/]+\/[^/]+\/)?(?:issues\/2\/comments|pulls\/2\/(?:reviews|comments)(?:\/.*)?)$/.test(String(c.route ?? "").replace(/^\/+/, "")))
-    // (each line comment a paragraph of its own, its file before it)
-    .map(c => [c.body?.path ? `${c.body.path}: ${c.body?.body ?? ""}` : c.body?.body, ...(Array.isArray(c.body?.comments) ? c.body.comments.map(x => `${x.path ?? ""}: ${x.body ?? ""}`) : [])].filter(Boolean).join("\n\n")).join("\n\n");
+  const calls = github(dir).calls.filter(c => c.method !== "GET" && /^(?:repos\/[^/]+\/[^/]+\/)?(?:issues\/2\/comments|pulls\/2\/(?:reviews|comments)(?:\/.*)?)$/.test(String(c.route ?? "").replace(/^\/+/, "")));
+  const split = text => String(text ?? "").split(/\n\s*\n|\n(?=\s*(?:[-*]|\d+\.)\s)/).filter(p => p.trim());
+  return calls.flatMap(c => [
+    ...(c.body?.path ? [`${c.body.path}: ${c.body?.body ?? ""}`] : split(c.body?.body)),
+    ...(Array.isArray(c.body?.comments) ? c.body.comments.map(x => `${x.path ?? ""}: ${x.body ?? ""}`) : []),
+  ]);
 }
 
 export function read(dir) {
-  const why = [], text = posted(dir), key = memoOf(dir, "key");
+  const why = [], paragraphs = posted(dir), text = paragraphs.join("\n\n"), key = memoOf(dir, "key");
   if (!text.trim()) return verdict(["it posted no review on pull request #2"]);
-  // (a fault is named where a paragraph or an item of the review names its file and says what is wrong there)
-  const paragraphs = text.split(/\n\s*\n|\n(?=\s*(?:[-*]|\d+\.)\s)/);
+  // (a fault is named where a unit of the review, a paragraph, an item or a line comment, names its file and says what
+  // is wrong there)
   for (const f of FAULTS) if (!paragraphs.some(p => p.includes(f.file) && f.words.test(p))) why.push(`its review does not name ${f.kind} (${f.file})`);
   // (a review declares its count on its line, or, as Codex's own do, marks each blocking finding P0 or P1: the guidelines
   // read those as blocking, and "What a posted review declares" asks Codex's own reviews nothing)

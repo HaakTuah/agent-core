@@ -32,17 +32,20 @@ export const SKIP = /#\[ignore\b|\bpytest\.skip\s*\(|\b(?:it|test|describe|conte
 const LONG = 1000;
 const asserts = l => ASSERT.test(l.slice(0, LONG)), skips = l => SKIP.test(l.slice(0, LONG));
 
-// What a diff (git diff -U0) does to the tests: [{ file, asserts, skips, weaker }], `asserts` the lines that assert it
-// takes out or changes, `skips` the lines that skip it adds, `weaker` where the file is left with fewer lines that
-// assert or gains a skip; a file named only where it holds one of them.
+// What a diff (git diff -U0) does to the tests: [{ file, asserts, skips, weaker, deleted? }], `asserts` the lines that
+// assert it takes out or changes, `skips` the lines that skip it adds, `weaker` where the file is deleted, left with
+// fewer lines that assert, or gains a skip; a file named only where it is deleted or holds one of them.
 export function weakened(diff) {
   const files = [];
   let at = null;
   for (const line of String(diff ?? "").split("\n")) {
     // (a file's name from its header, "diff --git a/<it> b/<it>" with no rename, so a file deleted is named too)
     // (a name git quotes is no header this reads by its name: testsChanged() gives each file its name from git's list)
-    if (line.startsWith("diff --git ")) { const header = /^diff --git a\/(.+?) b\/(.+)$/u.exec(line); at = { file: header?.[2] ?? null, gone: [], added: [] }; files.push(at); continue; }
+    if (line.startsWith("diff --git ")) { const header = /^diff --git a\/(.+?) b\/(.+)$/u.exec(line); at = { file: header?.[2] ?? null, gone: [], added: [], deleted: false, body: false }; files.push(at); continue; }
     if (!at || /^(?:---|\+\+\+) /u.test(line)) continue;
+    // (a file the pull request deletes is weaker whatever it held: a test with no line a pattern reads tests all the same)
+    if (!at.body && /^deleted file mode /u.test(line)) { at.deleted = true; continue; }
+    if (line.startsWith("@@")) { at.body = true; continue; }
     if (line.startsWith("-")) at.gone.push(line.slice(1));
     else if (line.startsWith("+")) at.added.push(line.slice(1));
   }
@@ -51,8 +54,8 @@ export function weakened(diff) {
     const unmatched = (lines, against) => { const left = new Map(); for (const l of against) left.set(l.trim(), (left.get(l.trim()) ?? 0) + 1); return lines.filter(l => { const n = left.get(l.trim()) ?? 0; if (n) left.set(l.trim(), n - 1); return !n; }); };
     const out = unmatched(f.gone, f.added).filter(asserts), skipped = unmatched(f.added, f.gone).filter(skips);
     const fewer = f.gone.filter(asserts).length > f.added.filter(asserts).length;
-    return { file: f.file, asserts: out, skips: skipped, weaker: fewer || skipped.length > 0 };
-  }).filter(f => f.asserts.length || f.skips.length);
+    return { file: f.file, asserts: out, skips: skipped, weaker: f.deleted || fewer || skipped.length > 0, ...(f.deleted ? { deleted: true } : {}) };
+  }).filter(f => f.deleted || f.asserts.length || f.skips.length);
 }
 
 // The mend where the description does not name, on its line LINE (that line and the lines right after it, to the next
@@ -65,7 +68,7 @@ export function changedMend(body, found, list = "node core/scripts/weakened.mjs"
   if (start >= 0) for (let i = start; i < lines.length && (i === start || lines[i].trim()); i++) said += `${lines[i]}\n`;
   const unnamed = found.filter(f => !said.includes(`\`${f.file}\``));
   if (!unnamed.length) return null;
-  return `the description does not name, on its line "${LINE}", each test file this pull request leaves with fewer lines that assert, or in which it skips a case: ${unnamed.map(f => `\`${plain(f.file)}\` (${[f.asserts.length && `${f.asserts.length} assertion line${f.asserts.length === 1 ? "" : "s"} taken out or changed`, f.skips.length && `${f.skips.length} skip${f.skips.length === 1 ? "" : "s"} added`].filter(Boolean).join(", ")})`).join(", ")}. Mend: add the line "${LINE}" naming each file in backticks with why (the case proved nothing, the assertion was made stricter, the case moved), so that the reviewer rules on each; ${list} lists the lines`;
+  return `the description does not name, on its line "${LINE}", each test file this pull request deletes, leaves with fewer lines that assert, or skips a case in: ${unnamed.map(f => `\`${plain(f.file)}\` (${[f.deleted && "deleted", f.asserts.length && `${f.asserts.length} assertion line${f.asserts.length === 1 ? "" : "s"} taken out or changed`, f.skips.length && `${f.skips.length} skip${f.skips.length === 1 ? "" : "s"} added`].filter(Boolean).join(", ")})`).join(", ")}. Mend: add the line "${LINE}" naming each file in backticks with why (the case proved nothing, the assertion was made stricter, the case moved), so that the reviewer rules on each; ${list} lists the lines`;
 }
 
 // What the pull request in the checkout at `dir` does to its tests, as weakened() gives it; null where it cannot be

@@ -51,6 +51,12 @@ ok(byFile["test/new.test.mjs"].skips.length === 1 && !byFile["test/new.test.mjs"
   const twice = weakened("diff --git a/t.test.mjs b/t.test.mjs\n--- a/t.test.mjs\n+++ b/t.test.mjs\n@@ -2 +1,0 @@\n-assert.equal(actual, 1);\n@@ -5 +3,0 @@\n-assert.equal(actual, 1);\n@@ -8,0 +7 @@\n+assert.equal(actual, 1);");
   ok(twice.length === 1 && twice[0].asserts.length === 1 && twice[0].weaker, "a line added once cancels one taken out and no more: two taken out and one added leaves one, and the file weaker", JSON.stringify(twice));
 }
+{
+  const smoke = weakened("diff --git a/test/smoke.test.mjs b/test/smoke.test.mjs\ndeleted file mode 100644\n--- a/test/smoke.test.mjs\n+++ /dev/null\n@@ -1,2 +0,0 @@\n-import { run } from \"../src/run.mjs\";\n-run([1, 2]);");
+  ok(smoke.length === 1 && smoke[0].deleted && smoke[0].weaker && /`test\/smoke\.test\.mjs` \(deleted\)/.test(changedMend("", smoke)), "a test file deleted is weaker and named, though no line of it asserts by a pattern", JSON.stringify(smoke));
+  const added = weakened("diff --git a/test/x.test.mjs b/test/x.test.mjs\n--- a/test/x.test.mjs\n+++ b/test/x.test.mjs\n@@ -1 +1 @@\n-deleted file mode 100644\n+x");
+  ok(added.length === 0, "a line of a file's body that reads like git's header is no deletion", JSON.stringify(added));
+}
 ok(weakened("").length === 0 && weakened(null).length === 0, "no diff, nothing found");
 
 // ---- the mend ----

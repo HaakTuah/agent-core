@@ -223,6 +223,10 @@ check("review", fresh("review"),
   const badged = fresh("review"), items = REVIEW.split("\n").filter(l => /^\d+\. Blocking: `([^`]+)`/.test(l));
   gh(badged, "POST", "pulls/2/reviews", { event: "COMMENT", body: "Codex Review", comments: items.map(l => ({ path: /`([^`]+)`/.exec(l)[1], line: 1, body: `![P1 Badge](https://img.shields.io/badge/P1-orange) ${l.replace(/^\d+\. Blocking: /, "")}` })) });
   ok(verdict("review", badged).pass, "review: Codex's own review, each finding marked P1 and no count declared, passes", verdict("review", badged).why);
+  // (a line comment with a title, a blank line and its explanation is read whole, its file kept with it)
+  const titled = fresh("review");
+  gh(titled, "POST", "pulls/2/reviews", { event: "COMMENT", body: "Codex Review", comments: items.map(l => ({ path: /`([^`]+)`/.exec(l)[1], line: 1, body: `**[P1] A finding**\n\n${l.replace(/^\d+\. Blocking: /, "")}` })) });
+  ok(verdict("review", titled).pass, "review: a line comment with a title and its explanation in paragraphs of their own is read whole", verdict("review", titled).why);
   const fpReview = fingerprints(caseOf("review"), s.core);
   ok(typeof fpReview["file: roles/shared/review-guidelines.md"] === "string", "review: the whole guidelines are fingerprinted, so any change to them makes the case due", JSON.stringify(Object.keys(fpReview)));
 }
