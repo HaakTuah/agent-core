@@ -151,7 +151,7 @@ if (failed) { console.log(`FAIL ${failed} of the lock file's checks above failed
   const theirs = f => /(?:^|\/)node_modules(?:\/|$)/u.test(f) || f.startsWith("third-party/");
   ok(!tracked.some(theirs), "no file of another publisher's is tracked in the core, nor a link in its install's place: its packages are installed, never carried", tracked.filter(theirs).slice(0, 5).join(", "));
   const ignore = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
-  ok(/^\/\.packages\/node_modules$/mu.test(ignore) && ["/.packages/.npmrc", "/.packages/package.json", "/.packages/package-lock.json"].every(f => ignore.split("\n").includes(`!${f}`)), "the core's .gitignore, which travels to the copy's root, keeps the install out of git, a link in its place too, and the copy's package list, lock file and .npmrc in it");
+  ok(/^\/\.packages\/node_modules$/mu.test(ignore) && ["/.packages/", "/.packages/.npmrc", "/.packages/package.json", "/.packages/package-lock.json"].every(f => ignore.split("\n").includes(`!${f}`)), "the core's .gitignore, which travels to the copy's root, keeps the install out of git, a link in its place too, and the copy's package list, lock file and .npmrc in it");
   // (the .npmrc the copy carries holds the core's own two settings alone, which install.mjs holds it to too)
   const { npmrcOthers } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href), npmrc = fs.readFileSync(path.join(root, ".packages/.npmrc"), "utf8");
   ok(npmrcOthers(npmrc).length === 0, "the core's .npmrc holds nothing but its own two settings, so the install and the signatures' check ask npm's own registry, with no token, proxy or certificate of another's", npmrcOthers(npmrc).join(" | "));
@@ -186,12 +186,12 @@ try {
   const plain = call("yaml-keys.mjs", `uncommented("a: 1 # b")`);
   ok(plain.status === 0 && plain.stdout.trim() === JSON.stringify("a: 1"), "what needs no package runs with nothing installed, so a project's own workflow that runs the copies check is not stopped", `${plain.stdout}${plain.stderr}`);
   // (and the install puts each package where the scripts load it from, untracked)
-  // (a project whose own .gitignore leaves out an .npmrc and a lock file still tracks the copy's)
-  fs.writeFileSync(path.join(project, ".gitignore"), ".npmrc\npackage-lock.json\npackage.json\n");
+  // (a project whose own .gitignore leaves out an .npmrc, a lock file and every dot folder still tracks the copy's)
+  fs.writeFileSync(path.join(project, ".gitignore"), ".*\n!.gitignore\n.npmrc\npackage-lock.json\npackage.json\n");
   execFileSync("git", ["init", "-q"], { cwd: project });
   execFileSync("git", ["add", "-A"], { cwd: project });
   const staged = execFileSync("git", ["ls-files"], { cwd: project, encoding: "utf8" }).split("\n");
-  ok(["core/.packages/.npmrc", "core/.packages/package.json", "core/.packages/package-lock.json"].every(f => staged.includes(f)) && !staged.some(f => f.startsWith("core/.packages/node_modules/")), "a project whose .gitignore leaves out .npmrc and lock files tracks the copy's all the same", staged.filter(f => f.startsWith("core/") && !f.startsWith("core/scripts/")).join(", "));
+  ok(["core/.packages/.npmrc", "core/.packages/package.json", "core/.packages/package-lock.json"].every(f => staged.includes(f)) && !staged.some(f => f.startsWith("core/.packages/node_modules/")), "a project whose .gitignore leaves out .npmrc and lock files, and dot folders, tracks the copy's all the same", staged.filter(f => f.startsWith("core/") && !f.startsWith("core/scripts/")).join(", "));
   fs.rmSync(path.join(project, ".git"), { recursive: true, force: true });
   const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env });
   const lock = JSON.parse(fs.readFileSync(path.join(pk, "package-lock.json"), "utf8"));
@@ -240,6 +240,7 @@ try {
   };
   fs.rmSync(path.join(pk, "node_modules"), { recursive: true, force: true });
   refuses("a shrinkwrap stands beside the lock file", () => fs.copyFileSync(path.join(pk, "package-lock.json"), path.join(pk, "npm-shrinkwrap.json")), () => fs.rmSync(path.join(pk, "npm-shrinkwrap.json")), /npm-shrinkwrap\.json stands beside the lock file/u);
+  refuses("a file stands in .packages/ beside the core's own", () => { fs.mkdirSync(path.join(pk, "etc")); fs.writeFileSync(path.join(pk, "etc", "npmrc"), "\n"); }, () => fs.rmSync(path.join(pk, "etc"), { recursive: true }), /holds "etc" beside the package list/u);
   const copyNpmrc = fs.readFileSync(path.join(pk, ".npmrc"), "utf8");
   refuses("the .npmrc holds a line beside the core's own two settings", () => fs.appendFileSync(path.join(pk, ".npmrc"), `"${["regi", "stry"].join("")}" = https://example.invalid/\n`), () => fs.writeFileSync(path.join(pk, ".npmrc"), copyNpmrc), /holds a line beside the core's own two settings/u);
   const copyList = fs.readFileSync(path.join(pk, "package.json"), "utf8");

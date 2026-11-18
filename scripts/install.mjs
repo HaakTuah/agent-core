@@ -32,9 +32,17 @@ export const REGISTRIES = {
 };
 
 // What keeps an install from running where it could reach past the core's own files: for npm's registry, a shrinkwrap
-// beside the lock file, which its program reads first; an .npmrc with any line but the core's own two settings; and an
+// beside the lock file, which its program reads first; any other file in .packages/; an .npmrc with any line but the core's own two settings; and an
 // install folder that is a link, or stands in one (.packages/), or holds what git tracks, which the install would empty.
 // Each as the failure's words with its mend; null where none stands.
+const PACKAGE_FILES = new Set(["package.json", "package-lock.json", ".npmrc", "node_modules"]);
+// A file in .packages/ beside the core's own: a shrinkwrap, which npm reads first, or any other, such as one npm would
+// read as its own settings where a command names the folder. The failure's words with its mend; null where none stands.
+function strays(at) {
+  if (fs.existsSync(at("npm-shrinkwrap.json"))) return `${at("npm-shrinkwrap.json")} stands beside the lock file, and would be installed from in its place. Mend: take it out; the core's packages are named in .packages/package-lock.json alone`;
+  const extra = fs.readdirSync(packages).filter(f => !PACKAGE_FILES.has(f));
+  return extra.length ? `${packages} holds ${extra.map(f => JSON.stringify(f)).join(", ")} beside the package list, lock file, .npmrc and install. Mend: take ${extra.length === 1 ? "it" : "them"} out; the folder holds those alone` : null;
+}
 function refusal(lock, into) {
   if (lock !== REGISTRIES.npm.lock) return null;
   const at = f => path.join(packages, f);
@@ -44,7 +52,8 @@ function refusal(lock, into) {
   try { faults = lockFaults(JSON.parse(fs.readFileSync(at("package.json"), "utf8")), JSON.parse(fs.readFileSync(at("package-lock.json"), "utf8"))); }
   catch (e) { faults = [`${lock} or .packages/package.json cannot be read (${e.message})`]; }
   if (faults.length) return `${faults[0]}${faults.length > 1 ? `, and ${faults.length - 1} more` : ""}. Mend: write the package list and lock file as npm's own install from its registry writes them, with no other source`;
-  if (fs.existsSync(at("npm-shrinkwrap.json"))) return `${at("npm-shrinkwrap.json")} stands beside the lock file, and would be installed from in its place. Mend: take it out; the core's packages are named in .packages/package-lock.json alone`;
+  const stray = strays(at);
+  if (stray) return stray;
   let npmrc = "";
   try { npmrc = fs.readFileSync(at(".npmrc"), "utf8"); } catch { /* (none: npm's own registry) */ }
   const others = npmrcOthers(npmrc);
