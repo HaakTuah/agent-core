@@ -141,31 +141,48 @@ const ABOUT = /^(?:this project|its kind: \S.*|every project)$/u;
 // review, describes }, none, wrong, toCore, bare }, `part` the rules a check or test holds in part, `bare` the files
 // read that hold no rule the check reads (none opening with a bold lead).
 export function ownRules(files, read, listText, copy = copyOf(), there = f => read(f) !== null) {
+  const { all, bare } = ownFiles(files, read, copy), { list, wrong } = listOf(listText);
+  const keys = new Set(all.map(r => r.key)), toCore = [];
+  const counts = { all: all.length, check: 0, test: 0, part: 0, review: 0, describes: 0 }, none = [];
+  for (const r of all) {
+    const e = Object.hasOwn(list, r.key) ? list[r.key] : null, kind = heldBy(r.key, e, there, wrong);
+    if (kind === null) { none.push(r.key); continue; }
+    if (kind) counts[kind]++;
+    if (!ABOUT.test(String(e.about ?? ""))) wrong.push(`${OWN}: "${r.key}" says no "about" the check reads. Mend: write "this project", "its kind: <kind>" or "every project"`);
+    else if (e.about !== "this project") toCore.push(`${r.key} (${e.about})`);
+  }
+  for (const k of Object.keys(list)) if (!keys.has(k)) wrong.push(`${OWN}: "${k}" names no rule that stands. Mend: take it out, or name the rule by its file and bold lead as it stands now`);
+  return { rules: all, counts, none, wrong, toCore, bare };
+}
+
+// The rules of a project's own files, the copy of the core and the manifest aside, and the files read that hold none.
+function ownFiles(files, read, copy) {
   const bare = [];
   const all = files.filter(f => !f.startsWith(copy) && f !== MANIFEST).flatMap(f => {
     const t = read(f), found = t === null ? [] : rulesOf(f, t);
     if (t !== null && !found.length) bare.push(f);
     return found;
   });
-  const keys = new Set(all.map(r => r.key)), wrong = [], toCore = [];
+  return { all, bare };
+}
+
+// The list's "rules" object from its text (an empty one where there is no list), and what is wrong with it.
+function listOf(listText) {
+  const wrong = [];
   let list = {};
-  if (listText !== null) {
-    try { list = JSON.parse(listText)?.rules ?? {}; } catch { wrong.push(`${OWN} cannot be read as JSON. Mend: write it as { "rules": { "<file>: <bold lead>": { "held": "check: <path>", "about": "this project" } } }`); }
-    if (!list || typeof list !== "object" || Array.isArray(list)) { wrong.push(`${OWN} holds no "rules" object. Mend: write it as { "rules": { "<file>: <bold lead>": { "held": ..., "about": ... } } }`); list = {}; }
-  }
-  const counts = { all: all.length, check: 0, test: 0, part: 0, review: 0, describes: 0 }, none = [];
-  for (const r of all) {
-    const e = Object.hasOwn(list, r.key) ? list[r.key] : null, m = OWN_HELD.exec(String(e?.held ?? ""));
-    if (!e || !m) { none.push(r.key); if (e) wrong.push(`${OWN}: "${r.key}" is held by "${e.held}", in no form it reads. Mend: write "check: <path>", "test: <path>", "review" or "describes"`); continue; }
-    const kind = m[3] ? "part" : m[1] ?? m[4] ?? m[5];
-    // (a check or test that is not there holds nothing: its entry is said, and the rule is counted as held by none)
-    if (m[2] && !/^[a-z]+:/iu.test(m[2]) && !there(m[2])) wrong.push(`${OWN}: "${r.key}" is held by ${m[2]}, which is not there. Mend: name the check or test that holds it, or what holds it now`);
-    else counts[kind]++;
-    if (!ABOUT.test(String(e.about ?? ""))) wrong.push(`${OWN}: "${r.key}" says no "about" the check reads. Mend: write "this project", "its kind: <kind>" or "every project"`);
-    else if (e.about !== "this project") toCore.push(`${r.key} (${e.about})`);
-  }
-  for (const k of Object.keys(list)) if (!keys.has(k)) wrong.push(`${OWN}: "${k}" names no rule that stands. Mend: take it out, or name the rule by its file and bold lead as it stands now`);
-  return { rules: all, counts, none, wrong, toCore, bare };
+  if (listText === null) return { list, wrong };
+  try { list = JSON.parse(listText)?.rules ?? {}; } catch { wrong.push(`${OWN} cannot be read as JSON. Mend: write it as { "rules": { "<file>: <bold lead>": { "held": "check: <path>", "about": "this project" } } }`); }
+  if (!list || typeof list !== "object" || Array.isArray(list)) { wrong.push(`${OWN} holds no "rules" object. Mend: write it as { "rules": { "<file>: <bold lead>": { "held": ..., "about": ... } } }`); list = {}; }
+  return { list, wrong };
+}
+
+// What holds the rule `key` by its entry `e`: the kind it counts under; "" where its check or test is not there, which
+// holds nothing (its entry said, in `wrong`); null where the list names no holder in a form it reads.
+function heldBy(key, e, there, wrong) {
+  const m = OWN_HELD.exec(String(e?.held ?? ""));
+  if (!e || !m) { if (e) wrong.push(`${OWN}: "${key}" is held by "${e.held}", in no form it reads. Mend: write "check: <path>", "test: <path>", "review" or "describes"`); return null; }
+  if (m[2] && !/^[a-z]+:/iu.test(m[2]) && !there(m[2])) { wrong.push(`${OWN}: "${key}" is held by ${m[2]}, which is not there. Mend: name the check or test that holds it, or what holds it now`); return ""; }
+  return m[3] ? "part" : m[1] ?? m[4] ?? m[5];
 }
 
 // Of the core's rules a project takes, those a check holds whole there: the rules of the modules its manifest leaves

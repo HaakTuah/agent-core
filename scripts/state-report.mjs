@@ -179,18 +179,22 @@ function heldHere(manifest) {
 // through the core's own rule names alone, `known`), and, of a public project (`open`), its outcomes (outcomes.mjs's
 // outcomesFrom, which lets through its own measures' names and words alone); null where none is in its form. The commit its copy holds is kept
 // only where `named` (the owner's public project).
+// (each count's whole-line form, and what is written anew from it; `named`, whether the copy's commit is kept)
+const COUNT_FORMS = [
+  [/^- copy: ([0-9a-f]{40}|not read)(?:, (\d{1,9}) commits behind the core's main)?\.$/, (m, named) => `copy${named && m[1] !== "not read" ? ` ${m[1]}` : ""}${m[2] ? ` ${m[2]} commits behind the core's main` : m[1] === "not read" ? " not read" : ""}`],
+  [/^- steps not done: (\d{1,6}|not read)\.$/, m => `steps not done: ${m[1]}`],
+  [/^- merged in (\d{4}-\d\d): (\d{1,6}), the core's share (\d{1,3}%|none merged) \(sync (\d{1,6}), upkeep (\d{1,6}), update (\d{1,6}), own (\d{1,6})\)\.$/,
+    m => `merged in ${m[1]}: ${m[2]}, the core's share ${m[3]} (sync ${m[4]}, upkeep ${m[5]}, update ${m[6]}, own ${m[7]})`],
+  [/^- merged in (\d{4}-\d\d): not read /, m => `merged in ${m[1]}: not read`],
+  [/^- rules held by a check: the project's own (\d{1,6}) of (\d{1,6}), the core's (\d{1,6}) of (\d{1,6})\.$/, m => `rules held by a check: its own ${m[1]} of ${m[2]}, the core's ${m[3]} of ${m[4]}`],
+  [/^- rules held by a check: not read\.$/, () => "rules held by a check: not read"],
+];
 export function countsFrom(text, named, known = new Set(rules().map(r => r.key)), open = named) {
   const part = String(text ?? "").split(`**${COUNTS}**`)[1] ?? "";
   const out = [];
   for (const line of part.split(/\r?\n/)) {
-    let m;
-    if ((m = /^- copy: ([0-9a-f]{40}|not read)(?:, (\d{1,9}) commits behind the core's main)?\.$/.exec(line))) out.push(`copy${named && m[1] !== "not read" ? ` ${m[1]}` : ""}${m[2] ? ` ${m[2]} commits behind the core's main` : m[1] === "not read" ? " not read" : ""}`);
-    else if ((m = /^- steps not done: (\d{1,6}|not read)\.$/.exec(line))) out.push(`steps not done: ${m[1]}`);
-    else if ((m = /^- merged in (\d{4}-\d\d): (\d{1,6}), the core's share (\d{1,3}%|none merged) \(sync (\d{1,6}), upkeep (\d{1,6}), update (\d{1,6}), own (\d{1,6})\)\.$/.exec(line)))
-      out.push(`merged in ${m[1]}: ${m[2]}, the core's share ${m[3]} (sync ${m[4]}, upkeep ${m[5]}, update ${m[6]}, own ${m[7]})`);
-    else if ((m = /^- merged in (\d{4}-\d\d): not read /.exec(line))) out.push(`merged in ${m[1]}: not read`);
-    else if ((m = /^- rules held by a check: the project's own (\d{1,6}) of (\d{1,6}), the core's (\d{1,6}) of (\d{1,6})\.$/.exec(line))) out.push(`rules held by a check: its own ${m[1]} of ${m[2]}, the core's ${m[3]} of ${m[4]}`);
-    else if (/^- rules held by a check: not read\.$/.test(line)) out.push("rules held by a check: not read");
+    const said = COUNT_FORMS.map(([form, write]) => { const m = form.exec(line); return m && write(m, named); }).find(Boolean);
+    if (said) out.push(said);
   }
   const cited = citedFrom(text, known);
   if (cited) out.push(cited);
