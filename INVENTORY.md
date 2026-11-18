@@ -189,9 +189,10 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   *Runs:* the runners. *Else:* it is the host's maintained tool already. On a private repository it is paid, so a
   private project does not call it (`README.md`, "A private repository"), and `scripts/code-scan.mjs` scans it in
   its place. *Bugs:* 1. **Keep** for a public project.
-- `scripts/code-scan.mjs`, `scripts/code-scan.yml`: where no workflow calls `codeql.yml`, fetches Semgrep's engine by
-  its wheel's digest at set-up and scans the code a pull request adds or alters with the core's own rules, failing a
-  finding its base did not hold. *Runs:* a cloud session's set-up and any session, and a step of `core.yml`'s one job.
+- `scripts/code-scan.mjs`, `scripts/code-scan.yml`: where no workflow calls `codeql.yml`, has Semgrep's engine
+  installed from `requirements.txt` (`scripts/install.mjs pypi`) and scans the code a pull request adds or alters with
+  the core's own rules, failing a finding its base did not hold. *Runs:* two steps of `core.yml`'s one job, and any
+  session that installs the engine.
   *Else:* argued in `CHOICES.md`, "Choice: a private project's code is scanned by Semgrep's engine, with the core's own
   rules" (#546): ast-grep, Opengrep and a score more weighed there; the rules are the core's since no maintained set
   carries a licence the floor allows. *Bugs:* 0. **Keep:** the engine is a maintained tool already; the rules and the
@@ -282,8 +283,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   what a release asks is the core's.
 - `scripts/install.mjs`, `scripts/packages.mjs`: install the packages of other publishers the scripts run from the
   core's lock file into `node_modules/` beside it, and load each from there alone, a missing one saying its mend
-  (#654). *Runs:* any session, at its start and at each sync, and on the host's runners before each check. *Else:*
-  npm's own `npm ci`, which does the install, kept; a folder of carried packages (#528), dropped on the owner's
+  (#654); and, named, the code scan's engine from `requirements.txt` into `pypi/` with pip (#546). *Runs:* any session, at its start and at each sync, and on the host's runners before each check. *Else:*
+  npm's own `npm ci` and pip's `install --require-hashes`, which do the installs, kept; a folder of carried packages (#528), dropped on the owner's
   decision of 18 November 2026. *Bugs:* none. **Keep:** the install is npm's; the scripts run it once more after a
   failed fetch and say the mend.
 - **What the starter kit holds** (`setup/template/`, 32 files on 17 November 2026), weighed by the challenge: eight

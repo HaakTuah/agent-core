@@ -8,14 +8,13 @@
 // the scan off. A finding the pull request's description lists on a line "Scan false alarm: `<path>:<line>`, <why>"
 // passes, said so, for its security review to confirm, as floor rule 9 says of CodeQL's false alarms. With no base, as
 // on a push to main, it reads every tracked file of the kinds it reads and reports what it finds.
-//   The engine is a tool that only runs, fetched at set-up and never while the check runs (#534, point 5): `--fetch`
-// takes `semgrep-core` and the libraries beside it from the wheel of Semgrep 1.185.0 on PyPI built for this system,
-// checked by the wheel's SHA-256 here, into a folder outside the repository, and puts it there under the name
-// `osemgrep` too, the name by which it runs as a whole command with no Python. Nothing of the wheel runs before its
-// digest is checked, and no install script runs at all; the engine as it stands is held to a digest of all its files,
-// pinned here, before each run, and a folder that stands and holds no engine is never replaced. Where this system has no build (an Intel Mac, Windows on arm64)
-// or the fetch fails, it says so and exits 0; where the engine is not in its folder, the scan says that it did not run
-// and why, and decides nothing (#459). The engine runs with no variable but those a program needs to start and a home
+//   The engine is a tool that only runs, installed before the check and never while it runs (#534, point 5; #654):
+// `--install` runs `install.mjs pypi`, which installs the wheel of Semgrep 1.185.0 for this system from the core's
+// `requirements.txt`, PyPI's own lock form, by its SHA-256, into the core's `pypi/` folder, with pip and no package
+// code run; it does so only where the host's CodeQL does not scan the project and, with a base, the change adds or
+// alters a file of the kinds the scan reads. The scan runs `semgrep-core` from there under the name `osemgrep`, by which
+// it runs as a whole command with no Python. Where the engine is not installed, the scan fails, saying so and how to
+// install it (packages.mjs). The engine runs with no variable but those a program needs to start and a home
 // and temporary folder of its own, so no token reaches it, and with its metrics off; a comment in the code that would
 // silence a finding (`nosemgrep`) silences none, and the files are named to it, so no ignore file of the project's
 // leaves one out. Each file is handed to the engine past its own limits of size and place, and one it
@@ -25,11 +24,9 @@
 // project, is not read, nor the core's copy, whose code the host's CodeQL scans in the core's own public repository.
 // Node's own modules, git, and the engine.
 //
-//   node core/scripts/code-scan.mjs --fetch [--engine <folder>]     at set-up: a cloud session's, a job's
-//   node core/scripts/code-scan.mjs [--base <commit>] [--description <file>] [--engine <folder>]
-//        (the description from the file, or else from PR_BODY; the engine's folder by default under the home folder's
-//        .cache/agent-core)
-import { createHash } from "node:crypto";
+//   node core/scripts/code-scan.mjs --install [--base <commit>]     before the check, in its job: a step of core.yml
+//   node core/scripts/code-scan.mjs [--base <commit>] [--description <file>]
+//        (the description from the file, or else from PR_BODY; the engine from the core's pypi/semgrep/bin)
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -40,141 +37,22 @@ import { copyOf } from "./core-path.mjs";
 import { leadsOut, logged } from "./guards.mjs";
 import { MEND } from "./mend.mjs";
 import { started } from "./started.mjs";
+import { pypiFile } from "./packages.mjs";
 import { parseYaml } from "./workflow-run.mjs";
-import { zipEntries, zipRead } from "./zip.mjs";
 
-export const VERSION = "1.185.0";
-const FILES = "https://files.pythonhosted.org/packages/";
-// The wheel built for each system, by its path on PyPI's file host and its SHA-256, as PyPI lists them for this version.
-export const WHEELS = {
-  "linux-x64": ["f2/13/0d4dc8d124794105f300082c46e3d8ad45eac7af63113b57a5966629b5a3", "manylinux_2_34_x86_64", "0eb6aaadad5b957af96d1300487e10af1dc8016e8ef53072effb48cd4906c02b"],
-  "linux-arm64": ["ba/4e/cae05468e1b8c33a18bafb25539f845d6f35e6e58973ebdd2aafa6b387ed", "manylinux_2_34_aarch64", "8cffbaf80abb8e39abc6d7a86588dcf94b7ddc1f40e8e16e555a1116347be3ef"],
-  "linux-x64-musl": ["fb/60/e0557977f9b0ae3a5158e2a311c35f8ed59359cac2788bb3c6dc461de3dc", "musllinux_1_2_x86_64", "f030c391af948b493ae2220a1b64372df5f18adf8e2dd909ab62035364c51890"],
-  "linux-arm64-musl": ["c6/4e/77b2128d3a7f2e1f9abbeb4b0d7f9f59957663b6aa01a9b2e0f4d1c1b915", "musllinux_1_2_aarch64", "99fde53fda44c25d8ab27424f421947b0a0186d86ce888c593a6da62b811d783"],
-  "darwin-arm64": ["63/8a/746b73f404709f89cecbd80f7dcd4e347b21353bfdea163cb23158d4593f", "macosx_11_0_arm64", "d54c7dc22f6f360e0f9f850b1ecdfe00ec755600f9cf2ec6be3928b42818f1b4"],
-  "win32-x64": ["8e/8e/c8d5135ff77a60e825c08b68272a924572e59841d01beba29be7041d2c75", "win_amd64", "91812ac0856cfe5b6135a4dffde3052a04c36a46e4e82e78793e3a07e51d7894"],
-};
-// The digest of the engine each wheel gives (engineDigest of its files and the copy), held before every run, so that an
-// engine that stands where it was fetched and was changed since is never run.
-export const ENGINES = {
-  "linux-x64": "a98ba5693cb403e11de82a439a7c053a24b641b06132feaea3af8ec24ac230ab",
-  "linux-arm64": "ec8d40b8e3deaff61a221a7c3d92758fd5c830644dfc92b628cb755d86339225",
-  "linux-x64-musl": "05895102d942715d509b40ded9adf8bdbd1911bb8f7769fa884d9aea3a94473c",
-  "linux-arm64-musl": "cbd43e7ec49189162de787565171253c844fffbf8bd8b102af420276e71d133d",
-  "darwin-arm64": "b479a21a9cb125b4c852fe3516d207553460f3c604cf90a48d257a371cb9c3b8",
-  "win32-x64": "c2ddc1aa1e3c4b15dda884f775d5a5d034fc22eb54f5bd12fa5fa67634aca7dc",
-};
-export const wheelAddress = ([at, tag]) =>
-  `${FILES}${at}/semgrep-${VERSION}-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-${tag}.whl`;
-const WHEEL_MOST = 128 << 20; // the most a wheel may weigh: each is 48 to 81 MB
-const FILE_MOST = 512 << 20; // the most one file of it may inflate to: the engine is 220 to 267 MB
-const BIN = `semgrep-${VERSION}.data/purelib/semgrep/bin/`;
+// The engine's version, as the core's requirements.txt names it: the one place it is written.
+const VERSION = (() => {
+  try { return /^semgrep==(\S+)/mu.exec(fs.readFileSync(new URL("../requirements.txt", import.meta.url), "utf8"))?.[1]; } catch { return undefined; }
+})() ?? "(no version named)";
 const KINDS = /\.(?:[cm]?js|jsx|ts|tsx|cs|py)$/u;
 const RULES = fileURLToPath(new URL("code-scan.yml", import.meta.url));
 const exe = (sys = process.platform) => (sys === "win32" ? ".exe" : "");
-
-/** This machine's system as WHEELS names it: platform, architecture and, on Linux, "-musl" where its C library is no glibc. */
-export function system(platform = process.platform, arch = process.arch, glibc = process.report?.getReport()?.header?.glibcVersionRuntime) {
-  return `${platform}-${arch}${platform === "linux" && !glibc ? "-musl" : ""}`;
-}
-
-/** The folder the engine is kept in: given, or under the home folder, outside any repository. */
-export const engineAt = given => path.resolve(given || path.join(os.homedir(), ".cache", "agent-core", `semgrep-${VERSION}`));
-
-/** The engine's files in a wheel checked by its digest: [{ name, bytes }], each a plain name under the wheel's bin
- *  folder (or one folder down, as Linux's and macOS's libs/), the Python files left; throws where the wheel holds a
- *  name that is no such plain name, or no engine. */
-export function engineFiles(wheel, sys = process.platform) {
-  const out = [];
-  for (const e of zipEntries(wheel)) {
-    if (!e.name.startsWith(BIN) || e.name.endsWith("/") || e.name.endsWith(".py")) continue;
-    const name = e.name.slice(BIN.length);
-    if (!/^(?:libs\/)?[A-Za-z0-9_+-][A-Za-z0-9._+-]*$/u.test(name)) throw new Error(`the wheel names a file ${logged(name)} this does not take`);
-    out.push({ name, bytes: zipRead(wheel, e, FILE_MOST) });
-  }
-  if (!out.some(f => f.name === `semgrep-core${exe(sys)}`)) throw new Error("the wheel holds no engine");
-  return out;
-}
-
-/** The engine's files with the copy it runs by as a whole command: what `place` writes. */
-const withCopy = (files, sys) => [...files, { name: `osemgrep${exe(sys)}`, bytes: files.find(f => f.name === `semgrep-core${exe(sys)}`).bytes }];
-
-/** A digest of an engine's files: the SHA-256 of each file's name and SHA-256, in the order of their names, so that
- *  every file the engine loads, its libraries among them, is held to the pin. */
-export function engineDigest(files) {
-  const lines = files.map(f => `${f.name}\0${createHash("sha256").update(f.bytes).digest("hex")}\n`).sort();
-  return createHash("sha256").update(lines.join("")).digest("hex");
-}
-
-/** The digest of the engine as it stands in `dir`, every file under it read, the copy too; null where a link or
- *  anything but a plain file stands there, or nothing does. */
-export function digestAt(dir) {
-  const files = [];
-  const walk = rel => {
-    for (const e of fs.readdirSync(path.join(dir, rel), { withFileTypes: true })) {
-      const name = rel ? `${rel}/${e.name}` : e.name;
-      if (e.isDirectory()) walk(name);
-      else if (e.isFile()) files.push({ name, bytes: fs.readFileSync(path.join(dir, name)) });
-      else throw new Error(`${name} is no plain file`);
-    }
-  };
-  try { walk(""); } catch { return null; }
-  return files.length ? engineDigest(files) : null;
-}
-
-/** Puts the engine's files into `dir` through a folder beside it, so that a fetch cut short leaves no engine half
- *  written, and the engine a second time under the name it runs by as a whole command. A folder that stands there and
- *  holds no engine is refused, never removed: a slip in naming it must not cost a project or a home folder. */
-export function place(files, dir, sys = process.platform) {
-  if (fs.existsSync(dir) && !fs.existsSync(path.join(dir, `semgrep-core${exe(sys)}`))) throw new Error(`${dir} stands and holds no engine, so it is left as it is`);
-  const tmp = `${dir}.part-${process.pid}`;
-  fs.rmSync(tmp, { recursive: true, force: true });
-  for (const { name, bytes } of withCopy(files, sys)) {
-    fs.mkdirSync(path.dirname(path.join(tmp, name)), { recursive: true });
-    fs.writeFileSync(path.join(tmp, name), bytes, { mode: 0o755 });
-  }
-  fs.rmSync(dir, { recursive: true, force: true });
-  fs.mkdirSync(path.dirname(dir), { recursive: true });
-  fs.renameSync(tmp, dir);
-}
-
-/** Fetches the engine into `dir` at set-up; always resolves, to the line it prints. */
-export async function fetchEngine(dir, { sys = system(), get = fetch, root = process.cwd(), base = null } = {}) {
-  if (hostScans(root, base)) return `semgrep ${VERSION}: not fetched: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project`;
-  if (base && !targets(root, base).length) return `semgrep ${VERSION}: not fetched: the change adds or alters no file of the kinds the scan reads`;
-  const wheel = WHEELS[sys];
-  if (!wheel) return `NOT FETCHED: Semgrep ${VERSION}: no build of its engine for ${sys}; the code scan will say it did not run here`;
-  if (fs.existsSync(dir) && digestAt(dir) === ENGINES[sys]) return `semgrep ${VERSION}: present in ${dir}`;
-  try {
-    const r = await get(wheelAddress(wheel), { signal: AbortSignal.timeout(600000) });
-    if (!r.ok) return `NOT FETCHED: Semgrep ${VERSION}: PyPI's file host answered ${r.status}`;
-    const bytes = Buffer.from(await r.arrayBuffer());
-    if (bytes.length > WHEEL_MOST) return `NOT FETCHED: Semgrep ${VERSION}: the wheel weighs more than ${WHEEL_MOST} bytes`;
-    const sum = createHash("sha256").update(bytes).digest("hex");
-    if (sum !== wheel[2]) return `NOT FETCHED: Semgrep ${VERSION}: the wheel's SHA-256 is ${sum}, not ${wheel[2]}; nothing of it was taken`;
-    place(engineFiles(bytes, sys.split("-")[0]), dir, sys.split("-")[0]);
-  } catch (e) {
-    return `NOT FETCHED: Semgrep ${VERSION}: ${logged(e.message)}`;
-  }
-  return digestAt(dir) === ENGINES[sys] && ran(dir) ? `semgrep ${VERSION}: fetched into ${dir}` : `NOT FETCHED: Semgrep ${VERSION}: the engine fetched is not the one pinned here, or does not run here`;
-}
 
 /** The variables the engine runs with: what a program needs to start, and a home and temporary folder of its own. */
 function engineEnv(home) {
   const env = { HOME: home, USERPROFILE: home, TMPDIR: home, TEMP: home, TMP: home, SEMGREP_SEND_METRICS: "off" };
   for (const name of ["PATH", "Path", "SYSTEMROOT", "SystemRoot", "WINDIR", "LANG"]) if (process.env[name]) env[name] = process.env[name];
   return env;
-}
-
-/** Whether the engine in `dir` runs and is the version pinned here. */
-function ran(dir) {
-  const bin = path.join(dir, `osemgrep${exe()}`);
-  if (!fs.existsSync(bin)) return false;
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "code-scan-"));
-  try {
-    const r = spawnSync(bin, ["--experimental", "--version"], { encoding: "utf8", env: engineEnv(home), timeout: 60000 });
-    return r.status === 0 && r.stdout.trim() === VERSION;
-  } finally { fs.rmSync(home, { recursive: true, force: true }); }
 }
 
 // A call to the core's own codeql.yml, at a full commit: a call to another's, or at a branch, is no scan the core vouches for.
@@ -235,13 +113,13 @@ export function falseAlarms(text) {
 /** Runs the engine on the files, a batch at a time: { findings: [{ file, line, rule, message }], errors }, or
  *  { failed } where it did not run. */
 export function runEngine(dir, root, files) {
-  const bin = path.join(dir, `osemgrep${exe()}`);
+  const bin = path.join(dir, `semgrep-core${exe()}`);
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "code-scan-"));
   const findings = [], errors = [], scanned = new Set();
   try {
     for (let i = 0; i < files.length; i += 200) {
       const r = spawnSync(bin, ["scan", "--experimental", "--metrics=off", "--disable-version-check", "--disable-nosem", "--max-target-bytes=0", "--timeout", "30", "--json", "-q", "--config", RULES, "--", ...files.slice(i, i + 200)],
-        { cwd: root, encoding: "utf8", env: engineEnv(home), maxBuffer: 1 << 30, timeout: 900000 });
+        { cwd: root, encoding: "utf8", env: engineEnv(home), maxBuffer: 1 << 30, timeout: 900000, argv0: `osemgrep${exe()}` });
       let out;
       try { out = JSON.parse(r.stdout); } catch { return { failed: `the engine gave no answer it could read (exit ${r.status ?? r.signal ?? r.error?.code}): ${logged(String(r.stderr ?? "").trim().split("\n").pop() ?? "")}` }; }
       readAnswer(out, { findings, errors, scanned });
@@ -335,15 +213,6 @@ export function verdicts(findings, { root, base, stood, added, explained }) {
 
 const UNREAD_MEND = at => `${MEND}mend the file so the engine reads it (one past the engine's 30 seconds for a rule, split; one it cannot parse, made valid), or, where it must stay so, add to the pull request's description a line "Scan unread: \`${at}\`, <why>" for its security review to confirm (floor rule 9)`;
 
-/** What stops the scan before the engine runs: no engine, or an engine not the pinned one; null where neither does. */
-function gate(dir) {
-  if (!fs.existsSync(path.join(dir, `osemgrep${exe()}`))) {
-    return { lines: [`code scan: did not run: Semgrep's engine is not in ${dir} (fetched at set-up by \`node <the core's copy>/scripts/code-scan.mjs --fetch\`, or no build of it for ${system()}); it decides nothing`], failed: false };
-  }
-  if (digestAt(dir) !== ENGINES[system()]) return { lines: [`FAIL: code scan: the engine in ${dir} is not the one pinned for ${system()}: a file of it changed since it was fetched, or was added, so it is not run. ${MEND}remove that folder and run \`node <the core's copy>/scripts/code-scan.mjs --fetch\` to fetch it again; where it changes again, tell the owner, since something on this machine writes there`], failed: true };
-  return null;
-}
-
 /** The lines for what the engine did not read whole: with a base, each file it did not read fails, unless the
  *  description lists it as unread; a listed file it read whole is said, since the listing excuses nothing there; a
  *  listed file held back (`held`), since the engine gave no answer with it, passes, said so; with no base, each is said. */
@@ -372,13 +241,20 @@ export function answer(dir, root, files, listed, run = runEngine) {
   return { got: read.length ? run(dir, root, read) : { findings: [], errors: [], scanned: new Set() }, held, read };
 }
 
+/** Why the engine is not installed for this change, or null where it is: the host's CodeQL scans the project, or the
+ *  change adds or alters no file of the kinds the scan reads. */
+export function installNot(root, base = null) {
+  if (hostScans(root, base)) return "a workflow calls the core's codeql.yml, so the host's CodeQL scans this project";
+  if (base && !targets(root, base).length) return "the change adds or alters no file of the kinds the scan reads";
+  return null;
+}
+
 /** The scan: { lines, failed }, each line to print. */
-export function scan(root, { base = null, description = "", dir = engineAt() } = {}) {
+export function scan(root, { base = null, description = "", dir = null } = {}) {
   if (hostScans(root, base)) return { lines: ["code scan: not run: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project"], failed: false };
   const files = targets(root, base);
   if (!files.length) return { lines: [`code scan: no file of the kinds it reads ${base ? "changed" : "tracked"}`], failed: false };
-  const stopped = gate(dir);
-  if (stopped) return stopped;
+  dir ??= path.dirname(pypiFile(`semgrep/bin/semgrep-core${exe()}`));
   const listed = base ? unreadListed(description) : new Set();
   const { got, held, read } = answer(dir, root, files, listed);
   if (got.failed) return base
@@ -398,13 +274,15 @@ export function scan(root, { base = null, description = "", dir = engineAt() } =
 if (started(import.meta.url)) {
   const args = process.argv.slice(2);
   const opt = name => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
-  const dir = engineAt(opt("--engine"));
-  if (args.includes("--fetch")) {
-    console.log(await fetchEngine(dir, { base: opt("--base") || null }));
+  const base = opt("--base") || null;
+  if (args.includes("--install")) {
+    const why = installNot(process.cwd(), base);
+    if (why) console.log(`semgrep ${VERSION}: not installed: ${why}`);
+    else process.exitCode = spawnSync(process.execPath, [fileURLToPath(new URL("install.mjs", import.meta.url)), "pypi"], { stdio: "inherit" }).status ?? 1;
   } else {
     const file = opt("--description");
     const description = file ? fs.readFileSync(file, "utf8") : process.env.PR_BODY ?? "";
-    const { lines, failed } = scan(process.cwd(), { base: opt("--base") || null, description, dir });
+    const { lines, failed } = scan(process.cwd(), { base, description });
     for (const l of lines) console.log(l);
     process.exitCode = failed ? 1 : 0;
   }

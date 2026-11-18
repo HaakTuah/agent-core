@@ -40,11 +40,11 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
      lookup (`scripts/lookup.mjs`) and its lookup again of what a project holds (`scripts/held.mjs`, through the
      lookup's readers); Node itself is checked against its SHA-256 by `scripts/node.sh`, and the code scan's wheel by
-     its own (`scripts/code-scan.mjs`); hostile tests: `tests/hostile-packages-test.mjs`, and for the wheel
-     `tests/code-scan-test.mjs`.
+     its own, which pip checks against `requirements.txt` (`scripts/install.mjs pypi`); hostile tests:
+     `tests/hostile-packages-test.mjs`, and for the scan `tests/code-scan-test.mjs`.
    - the code a pull request adds or alters, and its description's lines "Scan false alarm:" and "Scan unread:": read
-     by the code scan (`scripts/code-scan.mjs`), which hands the files by name to Semgrep's engine, held to its pinned
-     digest, with no variable that holds a token, fails a file it could not read, and silences no finding a comment in
+     by the code scan (`scripts/code-scan.mjs`), which hands the files by name to Semgrep's engine, installed from its
+     wheel's pinned hash, with no variable that holds a token, fails a file it could not read, and silences no finding a comment in
      the code asks it to; hostile tests: `tests/code-scan-test.mjs`.
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
    (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are
@@ -53,10 +53,11 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    machine whose own Node is below the least long-term line in `.node-least`, or that has none, with
    `npm pack --ignore-scripts`, or with no npm by curl from the registry's own address over HTTPS, never installing it,
    and checks against its SHA-256 before it runs; and Semgrep's engine (`semgrep-core` from the `semgrep` wheel on PyPI
-   at the version in `scripts/code-scan.mjs`), which that script fetches at set-up for a project the host's CodeQL does
-   not scan, checked by the wheel's SHA-256 before any of it is written, and runs with no Python and no install.
-17. **Dependabot** updates only the workflows' GitHub actions (`.github/dependabot.yml`); this repository names no
-    manifest or lock file, so no other PR of Dependabot's meets it.
+   at the version and hashes in `requirements.txt`), which `scripts/install.mjs pypi` installs with pip in the code
+   scan's own step for a project the host's CodeQL does not scan, the wheel checked by its SHA-256, no dependency
+   taken and none of its code run, and which the scan runs with no Python.
+17. **Dependabot** updates the workflows' GitHub actions and the packages of the core's lock files, `package-lock.json`
+    and `requirements.txt` (`.github/dependabot.yml`), each a week after its release.
 
 The threat model's part: the core has no users of its own; what an attacker would want of it is a rule loosened here
 that every project then takes, so a change reaches a project only through a sync PR there: a pure sync gets no review

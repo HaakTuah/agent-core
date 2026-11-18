@@ -22,9 +22,10 @@
 # (nuget, advisory), each through the copy's scripts/checks.mjs, which holds their steps and says what each holds, as
 # those workflows run it. They run only where every step of its own check passed, so a copy not proved the core runs
 # nothing here; then each runs even where one of them before it failed, so every failure is said; the code scan of a
-# project the host's CodeQL does not scan follows them, with any of those inputs and none of its own, its engine fetched
-# by its digest before anything of the change runs (scripts/code-scan.mjs; #546); the package checks go last, each in a
-# step of its own, and the NuGet check, which runs the pull request's build files, after all.
+# project the host's CodeQL does not scan follows them, with any of those inputs and none of its own, its engine
+# installed from the core's requirements.txt by its hashes in a step before it (scripts/code-scan.mjs; #546, #654); the
+# package checks go last, each in a step of its own, and the NuGet check, which runs the pull request's build files,
+# after all.
 # One job bills one runner's minutes where four or five did (#377); with no such input it runs its own check alone, as
 # before.
 name: core
@@ -343,20 +344,21 @@ jobs:
           PARTS: ${{ inputs.parts }}
         run: node "$CORE_AT"scripts/checks.mjs description --parts "$PARTS"
       # (the code scan of a private project, #546: where no workflow of the base calls the core's codeql.yml, Semgrep's
-      # engine is fetched by its wheel's digest, before anything of the change runs, and reads the files the change adds
-      # or alters with the core's rules, failing a finding the base did not hold; with no build for the runner, or no
-      # fetch, it says it did not run and decides nothing)
+      # engine is installed from the core's requirements.txt by its wheels' hashes, with the runner's pip, before the scan
+      # runs and only where the change adds or alters a file the scan reads (#654), and reads those files with the core's
+      # rules, failing a finding the base did not hold; an engine not installed fails the scan, saying how to install it)
       - name: The code scan, which a call with no input does not run
         if: ${{ success() && steps.core-at.outcome == 'skipped' }}
         run: echo "code scan: not run: core.yml was called with none of its inputs, so the copy's scripts do not run here; the one job of the core's setup/sync-notes.md, \"17 November 2026, the checks as one job\", runs it"
-      - name: The code scan's engine, fetched by its digest where the host's CodeQL does not scan the project
+      - name: The code scan's engine, installed from the core's lock file where the host's CodeQL does not scan the project
+        id: scan-engine
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' }}
         timeout-minutes: 5
         env:
           BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
-        run: node "$CORE_AT"scripts/code-scan.mjs --fetch ${BASE:+--base "$BASE"}
+        run: node "$CORE_AT"scripts/code-scan.mjs --install ${BASE:+--base "$BASE"}
       - name: The code scan
-        if: ${{ !cancelled() && steps.core-at.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' && steps.scan-engine.outcome == 'success' }}
         timeout-minutes: 5
         env:
           BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}

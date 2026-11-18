@@ -5,6 +5,8 @@
 //   import { load, loadSync } from "./packages.mjs";   const { Lexer } = await load("yaml");
 //                                                     loadSync("yaml"): the same, at once, for a package of CommonJS,
 //                                                     so a script loads it only where it is used, never on import
+//   pypiFile("semgrep/bin/semgrep-core"): a file of a PyPI package, installed by `install.mjs pypi` into the core's
+//                                                     pypi/ alone (code-scan.mjs's engine; #546)
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -37,6 +39,23 @@ function entry(name) {
     const at = need.resolve(name);
     return fs.realpathSync(at).startsWith(own) ? at : null;
   } catch { return null; }
+}
+
+// The path of a file of a PyPI package in the core's own pypi/, which `install.mjs pypi` installs from requirements.txt;
+// where it is not there, or leads out of that folder, the same failure, with the command that installs it.
+export function pypiFile(rel) {
+  let file = null;
+  try {
+    const own = fs.realpathSync(path.join(root, "pypi")) + path.sep;
+    const at = fs.realpathSync(path.join(root, "pypi", rel));
+    if (at.startsWith(own) && fs.statSync(at).isFile()) file = at;
+  } catch { /* not installed: said below */ }
+  if (!file) {
+    const script = path.relative(process.cwd(), process.argv[1] ?? "") || "this check";
+    console.error(`FAIL: ${script} did not run: ${rel} is not installed in ${path.relative(process.cwd(), root) || "."}${path.sep}pypi. Mend: run node ${path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"))} pypi, which installs it from the core's requirements.txt with Python's pip, then run the check again`);
+    process.exit(1);
+  }
+  return file;
 }
 
 // The package's entry file; where it is not installed, the failure.

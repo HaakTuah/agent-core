@@ -23,11 +23,11 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, posix } from "node:path";
+import { inflateRawSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { baseOf, configAt, loadConfig, textAt } from "./licences.mjs";
 import { NOT_A_FILE, REGISTRY, heldBefore, lockPackages, nugetConfig, readProject, sourcesOf, twoHashes, unmarked } from "./nuget.mjs";
 import { started } from "./started.mjs";
-import { zipEntries, zipRead } from "./zip.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
 
 const FLAT = "https://api.nuget.org/v3-flatcontainer/"; // the registry's own address for package files
@@ -40,10 +40,26 @@ const shown = (text) => String(text).replace(/[\u0000-\u001f\u007f\u0085\u2028\u
 
 /** The manifest (.nuspec) at the root of a package file, as text; throws where the file is no package this reads. */
 export function nuspecOf(zip) {
-  const found = zipEntries(zip).filter(e => !e.name.includes("/") && e.name.toLowerCase().endsWith(".nuspec"));
+  const end = zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]), Math.max(0, zip.length - 22));
+  if (end < 0 || zip.length - end > 22 + 65535) throw new Error("no zip's end of directory");
+  const entries = zip.readUInt16LE(end + 10), dirAt = zip.readUInt32LE(end + 16);
+  if (entries === 0xffff || dirAt === 0xffffffff) throw new Error("a zip of the 64-bit form, which this does not read");
+  const found = [];
+  for (let at = dirAt, i = 0; i < entries; i++) {
+    if (zip.readUInt32LE(at) !== 0x02014b50) throw new Error("a zip whose directory this does not read");
+    const method = zip.readUInt16LE(at + 10), size = zip.readUInt32LE(at + 20), nameLen = zip.readUInt16LE(at + 28);
+    const extraLen = zip.readUInt16LE(at + 30), commentLen = zip.readUInt16LE(at + 32), local = zip.readUInt32LE(at + 42);
+    const name = zip.subarray(at + 46, at + 46 + nameLen).toString("utf8");
+    if (!name.includes("/") && name.toLowerCase().endsWith(".nuspec")) found.push({ method, size, local });
+    at += 46 + nameLen + extraLen + commentLen;
+  }
   if (found.length !== 1) throw new Error(`${found.length} manifests at the package's root, where it holds one`);
-  try { return zipRead(zip, found[0], MANIFEST_MAX).toString("utf8"); }
-  catch (e) { throw new Error(e.message.replace(/^an entry/u, "a manifest")); }
+  const { method, size, local } = found[0];
+  if (zip.readUInt32LE(local) !== 0x04034b50) throw new Error("a zip whose entry this does not read");
+  const data = zip.subarray(local + 30 + zip.readUInt16LE(local + 26) + zip.readUInt16LE(local + 28)).subarray(0, size);
+  if (method === 0) return data.toString("utf8");
+  if (method === 8) return inflateRawSync(data, { maxOutputLength: MANIFEST_MAX }).toString("utf8");
+  throw new Error(`a manifest packed in a way this does not read (method ${method})`);
 }
 
 /**

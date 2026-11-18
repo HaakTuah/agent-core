@@ -321,8 +321,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `core/scripts/agent-tools.mjs` for its agents' tools, and its own check holds its
      packages to floor rule 10's list. In CodeQL's place, `core.yml`'s one job, called with its inputs, scans the code a
      pull request adds or alters with Semgrep's engine and the core's own rules (`core/scripts/code-scan.mjs`; #546),
-     failing a finding its base did not hold, the engine fetched by its digest in a step of that job, and in a cloud session by the set-up's `node core/scripts/code-scan.mjs --fetch`;
-     where it cannot be had, the scan says it did not run and decides nothing. Its Actions settings must allow this repository's workflows, and each check
+     failing a finding its base did not hold, the engine installed from the core's `requirements.txt` by its hashes in a
+     step of that job before it (`node core/scripts/install.mjs pypi`, with the runner's pip), and only where the change
+     touches a file the scan reads; where it is not installed, as in a session that has not run that command, the scan
+     fails, saying so. Its Actions settings must allow this repository's workflows, and each check
      there spends paid minutes, which its owner set aside by making it private (so no step waits for the owner's yes
      over them: floor rule 14), so each runs only where a change can affect it and only once a pull request is ready:
      its calls to `core.yml` and `personal-terms.yml`, as the starter kit writes them, also start when a pull request

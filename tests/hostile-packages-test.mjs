@@ -15,11 +15,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { crc32, deflateRawSync } from "node:zlib";
 import { check as installed } from "../scripts/licence-installed.mjs";
 import { scan } from "../scripts/licence-scan.mjs";
 import { licenceOk } from "../scripts/licences.mjs";
 import { quick, said, scratch } from "../scripts/hostile.mjs";
-import { zip } from "../scripts/scratch-core.mjs";
 import { manifestLicence } from "../scripts/nuget.mjs";
 import { contentHash, fetchAll, named, nuspecOf } from "../scripts/nuget-fetch.mjs";
 import { lookUp, npmFacts, repository } from "../scripts/lookup.mjs";
@@ -37,6 +37,21 @@ const ALLOW = new Set(["MIT"]);
 const LINUX = { os: "linux", cpu: "x64", libc: "glibc" };
 const lockOf = (packages) => JSON.stringify({ lockfileVersion: 3, packages: { "": {}, ...packages } });
 const one = (own, lock = { version: "1.0.0", license: "MIT" }) => installed(fresh({ "package-lock.json": lockOf({ "node_modules/moss-a": lock }), ...(own === undefined ? {} : { "node_modules/moss-a/package.json": typeof own === "string" ? own : JSON.stringify(own) }) }), LINUX);
+// a zip, as a NuGet package file is one: each [name, text, deflated]
+function zip(files) {
+  const locals = [], centrals = [];
+  let at = 0;
+  for (const [name, text, deflate = true] of files) {
+    const raw = Buffer.from(text), data = deflate ? deflateRawSync(raw) : raw, nm = Buffer.from(name), head = Buffer.alloc(30), central = Buffer.alloc(46);
+    head.writeUInt32LE(0x04034b50, 0); head.writeUInt16LE(deflate ? 8 : 0, 8); head.writeUInt32LE(crc32(raw), 14); head.writeUInt32LE(data.length, 18); head.writeUInt32LE(raw.length, 22); head.writeUInt16LE(nm.length, 26);
+    central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(deflate ? 8 : 0, 10); central.writeUInt32LE(crc32(raw), 16); central.writeUInt32LE(data.length, 20); central.writeUInt32LE(raw.length, 24); central.writeUInt16LE(nm.length, 28); central.writeUInt32LE(at, 42);
+    locals.push(head, nm, data); centrals.push(central, nm);
+    at += 30 + nm.length + data.length;
+  }
+  const dir = Buffer.concat(centrals), end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10); end.writeUInt32LE(dir.length, 12); end.writeUInt32LE(at, 16);
+  return Buffer.concat([...locals, dir, end]);
+}
 const nuspec = (licence, id = "Moss.A") => `<?xml version="1.0" encoding="utf-8"?><package><metadata><id>${id}</id><version>1.0.0</version><license type="expression">${licence}</license></metadata></package>`;
 // the fetch, from a folder source holding `file` as moss.a.1.0.0.nupkg, held to the lock's content hash `hash` (the
 // file's own, where none is given): { failures, written }, written being every file under the scratch folder it made

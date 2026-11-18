@@ -1,59 +1,24 @@
-// Tests of the code scan (code-scan.mjs): the engine's fetch, held to its wheel's digest with nothing taken from a wheel
-// that is not it, and from a wheel only the engine's plain files; and, where this system has a build of the engine and
-// PyPI's file host answers, the engine itself, fetched as a session's set-up fetches it, on samples written here, each
-// line a planted weakness (BAD) or a safe look-alike (SAFE), in JavaScript, TypeScript, C# and Python: every planted
-// one found and no look-alike, by the core's own rules (code-scan.yml); then the scan of a pull request in a scratch
-// repository, failing a finding on a line it adds with its mend, passing one its description lists as a false alarm,
-// reporting one that stood before, and silenced by no comment in the code. On Linux and on Windows. Git and Node's own
-// modules; the network for the engine's wheel.
+// Tests of the code scan (code-scan.mjs): whether a change needs the engine installed; and, where the engine installs
+// from the core's requirements.txt (`install.mjs pypi`, with Python's pip and PyPI reachable), the engine itself, on
+// samples written here, each line a planted weakness (BAD) or a safe look-alike (SAFE), in JavaScript, TypeScript, C#
+// and Python: every planted one found and no look-alike, by the core's own rules (code-scan.yml); then the scan of a
+// pull request in a scratch repository, failing a finding on a line it adds with its mend, passing one its description
+// lists as a false alarm, reporting one that stood before, and silenced by no comment in the code. On Linux and on
+// Windows. Git and Node's own modules; Python's pip and the network for the engine's wheel.
 //
 //   node tests/code-scan-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { scratchDir, tally, zip } from "../scripts/scratch-core.mjs";
+import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 import { CORE } from "../scripts/core-address.mjs";
-import { ENGINES, VERSION, WHEELS, digestAt, engineAt, engineDigest, engineFiles, falseAlarms, fetchEngine, hostScans, place, scan, system, answer as engineAnswer, verdicts, unreadLines, unreadListed, unreadOf, wheelAddress } from "../scripts/code-scan.mjs";
+import { falseAlarms, hostScans, installNot, scan, answer as engineAnswer, verdicts, unreadLines, unreadListed, unreadOf } from "../scripts/code-scan.mjs";
 
 const { ok, done } = tally();
 const tmp = scratchDir("code-scan-test-");
 const SCRIPT = fileURLToPath(new URL("../scripts/code-scan.mjs", import.meta.url));
-const throws = fn => { try { fn(); return false; } catch { return true; } };
-const BIN = `semgrep-${VERSION}.data/purelib/semgrep/bin/`;
-const answer = bytes => async () => ({ ok: true, status: 200, arrayBuffer: async () => bytes });
-
-// which wheel a system takes, and where it is
-ok(system("linux", "x64", "2.39") === "linux-x64" && system("linux", "arm64", null) === "linux-arm64-musl" && system("win32", "x64") === "win32-x64" && system("darwin", "x64") === "darwin-x64",
-  "a system is named by platform and architecture, and on Linux by whether its C library is glibc");
-ok(Object.values(WHEELS).every(([at, , sum]) => /^[0-9a-f]{2}\/[0-9a-f]{2}\/[0-9a-f]{60}$/u.test(at) && /^[0-9a-f]{64}$/u.test(sum)) && !WHEELS["darwin-x64"] && !WHEELS["win32-arm64"],
-  "each wheel is named by its path on PyPI's file host and its SHA-256, and there is none for an Intel Mac or Windows on arm64");
-ok(wheelAddress(WHEELS["win32-x64"]).startsWith("https://files.pythonhosted.org/packages/8e/8e/") && wheelAddress(WHEELS["win32-x64"]).endsWith(`semgrep-${VERSION}-cp310.cp311.cp312.cp313.cp314.py310.py311.py312.py313.py314-none-win_amd64.whl`),
-  "a wheel's address is PyPI's file host's, over HTTPS");
-
-// the engine's files out of a wheel: its plain files under bin/, never a Python file, a name that climbs, or none
-const engine = [[`${BIN}semgrep-core`, "engine"], [`${BIN}libs/libz.so.1`, "a library", false], [`${BIN}__init__.py`, "python"], ["semgrep/__main__.py", "python"]];
-const took = engineFiles(zip(engine), "linux");
-ok(took.map(f => f.name).join(" ") === "semgrep-core libs/libz.so.1" && took[0].bytes.toString() === "engine", "the engine and its libraries are taken from the wheel's bin folder, deflated or stored, and nothing else");
-ok(engineFiles(zip([[`${BIN}semgrep-core.exe`, "engine"]]), "win32").length === 1 && throws(() => engineFiles(zip([[`${BIN}semgrep-core`, "engine"]]), "win32")), "on Windows the engine is semgrep-core.exe, and a wheel without it holds no engine");
-for (const name of ["../x", "libs/../../x", "a/b/c", ".hidden", "libs/.x", "x\\y"]) ok(throws(() => engineFiles(zip([...engine, [`${BIN}${name}`, "x"]]), "linux")), `a wheel naming ${name} under its bin folder is refused whole`);
-ok(throws(() => engineFiles(zip([[`${BIN}README`, "x"]]), "linux")) && throws(() => engineFiles(Buffer.from("not a zip"), "linux")), "a wheel with no engine, or no zip, is refused");
-
-// the fetch: a wheel whose digest is not the pin's, a system with no build, an error from the host; nothing is placed
-{
-  const dir = path.join(tmp, "fetched");
-  const wrong = await fetchEngine(dir, { sys: "linux-x64", get: answer(zip(engine)), root: tmp });
-  ok(/^NOT FETCHED: .*SHA-256 is [0-9a-f]{64}, not 0eb6/u.test(wrong) && !fs.existsSync(dir) && !fs.readdirSync(tmp).some(n => n.startsWith("fetched")), "a wheel whose SHA-256 is not the pin's is refused, and nothing of it is written", wrong);
-  const none = await fetchEngine(dir, { sys: "darwin-x64", get: () => { throw new Error("no fetch was due"); }, root: tmp });
-  ok(/^NOT FETCHED: .*no build of its engine for darwin-x64/u.test(none) && !fs.existsSync(dir), "a system with no build fetches nothing and says so", none);
-  const gone = await fetchEngine(dir, { sys: "linux-x64", get: async () => ({ ok: false, status: 404 }), root: tmp });
-  ok(/^NOT FETCHED: .*answered 404/u.test(gone) && !fs.existsSync(dir), "a host that answers an error leaves nothing and says so", gone);
-  const big = await fetchEngine(dir, { sys: "linux-x64", get: answer(Buffer.alloc((128 << 20) + 1)), root: tmp });
-  ok(/^NOT FETCHED: .*weighs more than/u.test(big) && !fs.existsSync(dir), "a wheel past its bound is refused before its digest is read", big);
-}
 
 // what a description lists as false alarms, and whether the host scans a project
 ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false alarm: `b.py:3`, why\nscan false alarm: `c.cs:1`\nSee Scan false alarm: `d.js:4`")].join(" ") === "src/a.js:12 b.py:3",
@@ -78,25 +43,6 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
   ok(own.fails.length === 1 && mended(own.fails.join("\n")), "with nothing known to stand at the base, a finding fails as the change's own, saying its mend", own.fails.join("\n"));
   ok([...unreadListed("Scan unread: `big/data.py`, a generated table\n- Scan unread: `x.cs`\nscan unread: `y.py`\n<b>Scan unread: `z.py`</b>")].join(" ") === "big/data.py x.cs" && unreadListed(undefined).size === 0, "a file is listed unread on a line of its own, opening \"Scan unread:\" with its path in backticks");
 }
-// the engine's folder: an engine held to its pin, and a folder that holds none never replaced
-{
-  ok(Object.keys(ENGINES).join(" ") === Object.keys(WHEELS).join(" ") && Object.values(ENGINES).every(d => /^[0-9a-f]{64}$/u.test(d)), "each system with a wheel has its engine's digest pinned");
-  const files = [{ name: "semgrep-core", bytes: Buffer.from("engine") }, { name: "libs/libz.so.1", bytes: Buffer.from("lib") }];
-  const into = path.join(tmp, "placed");
-  place(files, into, "linux");
-  ok(digestAt(into) === engineDigest([...files, { name: "osemgrep", bytes: Buffer.from("engine") }]), "an engine placed is the files given and its copy, by their digest");
-  fs.writeFileSync(path.join(into, "libs", "libz.so.1"), "a library changed");
-  ok(digestAt(into) !== engineDigest([...files, { name: "osemgrep", bytes: Buffer.from("engine") }]), "a library changed after the fetch changes the digest");
-  const kept = path.join(tmp, "a-project");
-  fs.mkdirSync(kept); fs.writeFileSync(path.join(kept, "keep.txt"), "kept");
-  ok(throws(() => place(files, kept, "linux")) && fs.readFileSync(path.join(kept, "keep.txt"), "utf8") === "kept", "a folder that stands and holds no engine is refused, and left as it was");
-  const forged = path.join(tmp, "forged");
-  fs.mkdirSync(forged); fs.writeFileSync(path.join(forged, `osemgrep${process.platform === "win32" ? ".exe" : ""}`), "a stand-in that finds nothing");
-  const holder = path.join(tmp, "holder"), hg = (...a) => execFileSync("git", a, { cwd: holder, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
-  fs.mkdirSync(holder); hg("init", "-q"); fs.writeFileSync(path.join(holder, "a.py"), "x = 1\n"); hg("add", "-A"); hg("commit", "-q", "-m", "code");
-  const refused = scan(holder, { dir: forged });
-  ok(refused.failed && /the engine in .* is not the one pinned/u.test(refused.lines.join("\n")) && mended(refused.lines.join("\n")), "an engine whose files are not the pinned ones is never run: the scan fails, saying its mend", refused.lines.join("\n"));
-}
 // (hostile descriptions: nothing, the wrong type, markup, a path, a number out of range, too long; none lists a finding
 // it does not name exactly, and none takes long)
 {
@@ -120,21 +66,20 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
   ok(!before && !inText && !another && hostScans(p) && !hostScans(tmp), "the host scans a project where a job calls the core's own codeql.yml at a full commit, not where a comment or a step's text names it, nor another's or one at a branch");
   const nothing = path.join(tmp, "no-code"), g = (...a) => execFileSync("git", a, { cwd: nothing, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
   fs.mkdirSync(nothing); g("init", "-q"); g("commit", "-q", "--allow-empty", "-m", "base"); fs.writeFileSync(path.join(nothing, "README.md"), "words\n"); g("add", "-A"); g("commit", "-q", "-m", "docs");
-  const idle = await fetchEngine(path.join(tmp, "not-fetched"), { sys: "linux-x64", get: () => { throw new Error("no fetch was due"); }, root: nothing, base: "HEAD~1" });
-  ok(/not fetched: the change adds or alters no file of the kinds the scan reads/u.test(idle) && !fs.existsSync(path.join(tmp, "not-fetched")), "a change of no file the scan reads fetches nothing", idle);
+  ok(installNot(nothing, "HEAD~1") === "the change adds or alters no file of the kinds the scan reads" && installNot(nothing) === null, "a change of no file the scan reads installs no engine; with no base, as on a push to main, the engine is installed");
   ok(scan(nothing, { base: "HEAD~1", dir: path.join(tmp, "no-engine-here") }).lines.join("").includes("no file of the kinds it reads changed"), "and its scan says so, with no engine to ask");
-  const skipped = await fetchEngine(path.join(tmp, "not-fetched"), { sys: "linux-x64", get: () => { throw new Error("no fetch was due"); }, root: p });
-  ok(/not fetched: a workflow calls the core's codeql\.yml/u.test(skipped) && !fs.existsSync(path.join(tmp, "not-fetched")), "where the host's CodeQL scans the project, nothing is fetched", skipped);
+  ok(/a workflow calls the core's codeql\.yml/u.test(installNot(p) ?? ""), "where the host's CodeQL scans the project, no engine is installed");
 }
 
-// the engine itself, where this system has a build and the host answers
-const fetched = await fetchEngine(engineAt(path.join(os.tmpdir(), `code-scan-test-engine-${VERSION}`)), { root: tmp });
-const dir = engineAt(path.join(os.tmpdir(), `code-scan-test-engine-${VERSION}`));
-if (!/^semgrep /u.test(fetched)) {
-  console.log(`skip the engine's own cases: ${fetched}`);
-  ok(!WHEELS[system()] || /NOT FETCHED/u.test(fetched), "where the engine cannot be had, the fetch says why");
+// the engine itself, installed from the core's requirements.txt as the scan's own step installs it
+const installed = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/install.mjs", import.meta.url)), "pypi"], { encoding: "utf8" });
+const dir = fileURLToPath(new URL("../pypi/semgrep/bin/", import.meta.url));
+const engineHere = fs.existsSync(path.join(dir, `semgrep-core${process.platform === "win32" ? ".exe" : ""}`));
+if (installed.status !== 0 || !engineHere) {
+  console.log(`skip the engine's own cases: ${(installed.stderr || installed.stdout).trim().split("\n").pop()}`);
+  ok(installed.status !== 0 && /Mend: /u.test(installed.stderr), "where the engine cannot be installed, the install says why, and its mend", installed.stderr);
 } else {
-  ok(true, `the engine is fetched and runs here, on ${system()}: ${fetched}`);
+  ok(/installed from requirements\.txt into pypi\//u.test(installed.stdout), `the engine is installed and runs here, on ${process.platform}-${process.arch}`, installed.stdout);
   const SAMPLES = {
     "web.js": `const { exec, execFile } = require("child_process");
 const fs = require("fs");
@@ -251,7 +196,7 @@ def ok5(cur):
   for (const odd of ODD) fs.writeFileSync(path.join(repo, odd), "import os\ndef go(arg):\n    os.system(\"ls \" + arg)\n");
   try { fs.symlinkSync("tasks.py", path.join(repo, "link.py")); } catch { /* (no links made here, as on Windows without the right) */ }
   git("add", "-A"); git("commit", "-q", "-m", "change");
-  const run = (args, body = "") => spawnSync(process.execPath, [SCRIPT, ...args, "--engine", dir], { cwd: repo, encoding: "utf8", env: { ...env, PR_BODY: body } });
+  const run = (args, body = "") => spawnSync(process.execPath, [SCRIPT, ...args], { cwd: repo, encoding: "utf8", env: { ...env, PR_BODY: body } });
   const failing = run(["--base", "HEAD~1"]);
   const out = failing.stdout + failing.stderr;
   ok(failing.status === 1 && /FAIL: tasks\.py:\d+: a parameter reaches a shell command \(py-command\), which this change brings/u.test(out) && mended(out), "a weakness the change brings fails, saying its mend", out);
@@ -277,10 +222,6 @@ def ok5(cur):
   const hosted = run([]);
   ok(hosted.status === 0 && /not run: a workflow calls the core's codeql\.yml/u.test(hosted.stdout), "where the host's CodeQL scans the project, the scan does not run, and says so", hosted.stdout);
   fs.rmSync(host, { recursive: true });
-  const none = spawnSync(process.execPath, [SCRIPT, "--base", "HEAD~1", "--engine", path.join(tmp, "no-engine")], { cwd: repo, encoding: "utf8", env });
-  ok(none.status === 0 && /did not run: Semgrep's engine is not in .* it decides nothing/u.test(none.stdout), "with no engine, the scan says it did not run and decides nothing", none.stdout);
 }
 
-// (the samples' digest is never a wheel's: what the fetch holds the wheel to is only the pin)
-ok(createHash("sha256").update(zip(engine)).digest("hex") !== WHEELS["linux-x64"][2], "the test's own wheel is no pinned one");
 done("the code scan");

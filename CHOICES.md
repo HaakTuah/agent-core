@@ -774,3 +774,10 @@ and its commands are in the pull request that adds this record.
   update of the engine; a whole scan with the core's rules taking more than 30 seconds on 100,000 lines on 4 cores;
   no Semgrep release for 90 days; Opengrep publishing its engine on npm or PyPI under LGPL with no Commons Clause; or
   a project of the owner's in Python, or the owner's computer an Intel Mac.
+- **Reopened on 18 November 2026 by the owner's decision (#654):** other publishers' code is registered, never
+  carried, and the fetchers written by hand give way where a registry's lock file does their job, this engine's named.
+  The engine now comes from `requirements.txt`, PyPI's own lock form, each wheel by its SHA-256, which
+  `scripts/install.mjs pypi` installs with pip in the scan's own step, no dependency taken and none of its code run;
+  the scan runs it from there, still with no Python. The fetch written for it, its unzip and the digests of the engine
+  go, and Dependabot proposes its updates. Python 3.10 or later is now needed where the engine is installed, which every
+  host's runner holds; the pick stands.

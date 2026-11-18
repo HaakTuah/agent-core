@@ -26,6 +26,9 @@ const json = f => JSON.parse(fs.readFileSync(path.join(root, f), "utf8"));
   const entries = Object.entries(lock.packages ?? {}).filter(([k]) => k);
   ok(lock.lockfileVersion === 3 && wanted.every(([n, v]) => lock.packages?.[`node_modules/${n}`]?.version === v), "package-lock.json is npm's own, and holds each package at the version package.json names", JSON.stringify(Object.keys(lock.packages ?? {})));
   ok(entries.every(([, e]) => /^https:\/\/registry\.npmjs\.org\//u.test(e.resolved ?? "") && /^sha512-/u.test(e.integrity ?? "")), "each entry comes from npm's registry, held to its sha512", entries.filter(([, e]) => !/^sha512-/u.test(e.integrity ?? "")).map(([k]) => k).join(", "));
+  // (PyPI's lock form, the code scan's engine alone, installed only where its step names it: #546)
+  const reqs = fs.readFileSync(path.join(root, "requirements.txt"), "utf8").replace(/\\\r?\n/gu, " ").split(/\r?\n/u).filter(l => l.trim() && !l.startsWith("#"));
+  ok(reqs.length > 0 && reqs.every(l => /^[A-Za-z0-9][\w.-]*==\d+(?:\.\d+)+\s/u.test(l) && /--hash=sha256:[0-9a-f]{64}/u.test(l)), "requirements.txt names each PyPI package at one exact version, each with the SHA-256 of its wheels, so that what is installed is held to those hashes", reqs.join("\n"));
   const config = json(".github/licences.json");
   ok((config.lockfiles ?? []).includes("package-lock.json"), "the core's licence check reads the lock file, so the licence check and the lookup hold each package (floor rules 10 and 15)");
 }
@@ -34,7 +37,7 @@ const json = f => JSON.parse(fs.readFileSync(path.join(root, f), "utf8"));
 {
   const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
   ok(!tracked.some(f => /(?:^|\/)node_modules\//u.test(f) || f.startsWith("third-party/")), "no file of another publisher's is tracked in the core: its packages are installed, never carried", tracked.filter(f => /node_modules\/|^third-party\//u.test(f)).slice(0, 5).join(", "));
-  ok(/^\/node_modules\/$/mu.test(fs.readFileSync(path.join(root, ".gitignore"), "utf8")), "the core's .gitignore, which travels to the copy's root, keeps the install out of git");
+  ok(/^\/node_modules\/$/mu.test(fs.readFileSync(path.join(root, ".gitignore"), "utf8")) && /^\/pypi\/$/mu.test(fs.readFileSync(path.join(root, ".gitignore"), "utf8")), "the core's .gitignore, which travels to the copy's root, keeps both installs out of git");
 }
 
 // ---- with nothing installed, a script that loads a package says it did not run, and how to install ----
@@ -46,7 +49,7 @@ try {
   fs.writeFileSync(path.join(project, "node_modules/yaml/package.json"), JSON.stringify({ name: "yaml", version: "0.0.1", main: "index.js" }));
   fs.writeFileSync(path.join(project, "node_modules/yaml/index.js"), "module.exports = { Lexer: class {}, project: true };\n");
   fs.cpSync(path.join(root, "scripts"), path.join(copy, "scripts"), { recursive: true });
-  for (const f of ["package.json", "package-lock.json", ".gitignore"]) fs.copyFileSync(path.join(root, f), path.join(copy, f));
+  for (const f of ["package.json", "package-lock.json", "requirements.txt", ".gitignore"]) fs.copyFileSync(path.join(root, f), path.join(copy, f));
   // (each script that loads a package, by the call that loads it; a script that loads one and has no case here fails)
   const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")` };
   const loads = fs.readdirSync(path.join(root, "scripts")).filter(f => f.endsWith(".mjs") && f !== "packages.mjs" && /\bload(?:Sync)?\("/u.test(fs.readFileSync(path.join(root, "scripts", f), "utf8")));
@@ -55,6 +58,17 @@ try {
   for (const f of loads) {
     const r = call(f, CALLS[f]), out = `${r.stdout}${r.stderr}`;
     ok(r.status === 1 && /did not run: the package \S+ is not installed/u.test(out) && /install\.mjs/u.test(out) && mended(out), `${f}, with nothing installed beside the copy, says it did not run and how to install, and does not take the project's own package of the name`, out);
+  }
+  // (the code scan, with its engine not installed, on a change it would read: it did not run, and says how to install)
+  const g = (...a) => execFileSync("git", a, { cwd: project, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
+  g("init", "-q"); fs.writeFileSync(path.join(project, "a.py"), "x = 1\n"); g("add", "a.py"); g("commit", "-q", "-m", "code");
+  const scanned = spawnSync(process.execPath, [path.join(copy, "scripts/code-scan.mjs")], { cwd: project, encoding: "utf8", timeout: 60000 }), scanOut = `${scanned.stdout}${scanned.stderr}`;
+  ok(scanned.status === 1 && /did not run: semgrep\/bin\/semgrep-core(?:\.exe)? is not installed/u.test(scanOut) && /install\.mjs pypi/u.test(scanOut) && mended(scanOut), "the code scan, with no engine installed beside the copy, says it did not run and how to install it, never passing", scanOut);
+  fs.mkdirSync(path.join(copy, "pypi"), { recursive: true }); fs.writeFileSync(path.join(tmp, "outside"), "not the engine");
+  try { fs.symlinkSync(path.join(tmp, "outside"), path.join(copy, "pypi", "leads-out")); } catch { /* (no links here: the case is not run) */ }
+  if (fs.existsSync(path.join(copy, "pypi", "leads-out"))) {
+    const out = call("packages.mjs", `pypiFile("leads-out")`);
+    ok(out.status === 1 && /did not run: leads-out is not installed/u.test(`${out.stdout}${out.stderr}`), "a file under pypi/ that leads out of it is no file of the install", `${out.stdout}${out.stderr}`);
   }
   // (a script that imports one of them for what needs no package runs with nothing installed: the copies check)
   const plain = call("yaml-keys.mjs", `uncommented("a: 1 # b")`);

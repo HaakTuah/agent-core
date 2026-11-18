@@ -26,3 +26,12 @@ updates:
       packages:
         patterns: ["*"]
         update-types: ["minor", "patch"] # a new major is its own PR (tasks/updates.md)
+  # The code scan's engine, in requirements.txt, PyPI's lock form, each wheel by its hash (#546, #654): each update read
+  # against its release notes and licence, its hashes taken anew, and the scan's test run on its samples.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7

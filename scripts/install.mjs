@@ -20,6 +20,9 @@ const windows = process.platform === "win32";
 // only through the shell, and each argument is the script's own)
 export const REGISTRIES = {
   npm: { lock: "package-lock.json", into: "node_modules/", run: () => spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], { cwd: root, encoding: "utf8", shell: windows }) },
+  // (the code scan's engine alone, #546: pip takes each wheel at the hash requirements.txt names, binaries only, none
+  // of their dependencies and none of their code run, into pypi/; Python 3.10 or later, as every GitHub runner holds)
+  pypi: { lock: "requirements.txt", into: "pypi/", run: () => spawnSync("python3", ["-I", "-m", "pip", "install", "--require-hashes", "--no-deps", "--only-binary=:all:", "--no-compile", "--no-input", "--disable-pip-version-check", "--upgrade", "--target", path.join(root, "pypi"), "-r", path.join(root, "requirements.txt")], { cwd: root, encoding: "utf8" }) },
 };
 
 const named = process.argv.slice(2);
