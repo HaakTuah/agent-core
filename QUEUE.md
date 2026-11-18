@@ -57,7 +57,6 @@ it merges last.
 | #355 | builder | #530: the readers left go on the parser #529 brings |
 | #391 | builder; it overlaps #355 | #530, as #355 |
 | #542 | rule builder; it changes what the orchestrator reads at its start | #457 |
-| #337 | builder | |
 | #426 | builder; a .NET reader it files waits on #529 | |
 | #404 | builder | |
 | #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467 and #407 |
