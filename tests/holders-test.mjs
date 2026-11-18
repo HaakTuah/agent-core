@@ -167,6 +167,9 @@ put("docs/play.md", "# Play\n\n- **A turn ends on a move.** Rules of play.\n- **
 const hostile = ownReport(proj);
 ok(hostile.every(l => !l.includes("\n")) && !hostile.some(l => /(?:^|[^`'])@(?:ghost|octocat)/u.test(l.replace(/`[^`]*`/gu, ""))) && hostile.some(l => l.includes("`x?::error::key @ghost`")),
   "text from the project's files goes into the report on one line, in code spans, so no workflow command or mention acts (floor rule 5)", hostile.join("\n"));
+fs.writeFileSync(path.join(proj, OWN), '{"holders": @ghost }');
+const unreadable = ownReport(proj).join("\n");
+ok(/cannot be read \(`[^`]*@ghost[^`]*`\)/u.test(unreadable) && !/@ghost/u.test(unreadable.replace(/`[^`]*`/gu, "")), "a list that cannot be read is named with JSON's own words in a code span, so no mention in it acts", unreadable);
 put("docs/play.md", "# Play\n\n- **A turn ends on a move.** Rules of play.\n");
 fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { ...written, "AGENTS.md: Each computer player keeps its style": "check: tests/style.test.js", "docs/design.md: Saves are small": "check: tests/saves.test.js", "AGENTS.md: Gone": "audit", "docs/play.md: A turn ends on a move": "check: the code review" } }));
 r2 = ownCli();

@@ -166,7 +166,7 @@ export function ownHolders(root = process.cwd()) {
   let named = {};
   if (text !== null) {
     try { named = JSON.parse(text).holders ?? {}; if (typeof named !== "object" || Array.isArray(named)) throw new Error('its "holders" is no object'); }
-    catch (e) { named = {}; wrong.push(`${OWN} cannot be read (${String(e.message).split("\n")[0]}). Mend: write it as JSON, its "holders" an object keyed by each rule's file and lead`); }
+    catch (e) { named = {}; wrong.push(`${OWN} cannot be read (${span(String(e.message).split("\n")[0])}). Mend: write it as JSON, its "holders" an object keyed by each rule's file and lead`); }
   }
   for (const [key, value] of Object.entries(named)) {
     if (!by.has(key)) { wrong.push(`${OWN} names ${span(key)}, which is no rule of the project's own rule files as they stand. Mend: write the key as the rule's file and bold lead now read, or take it out where the rule has gone`); continue; }
@@ -187,7 +187,7 @@ export function ownReport(root = process.cwd(), scripts = "core/scripts") {
   if (!h.rules.length) return ["- The project's own rule files hold no rule with a bold lead, so none is counted."];
   const none = [...c.none.filter(k => h.start.has(k)), ...c.none.filter(k => !h.start.has(k))];
   return [
-    `- Of ${c.all} rules of the project's own (${files.map(f => `\`${f}\``).join(", ")}): ${c.check} held whole by a check, ${c.audit} by the audit, ${c.part} in part; ${c.describes} describe and bind no one; ${c.none.length} have no holder (\`node ${scripts}/holders.mjs --own\`, its list \`${OWN}\`${h.list ? "" : ", not written yet"}).`,
+    `- Of ${c.all} rules of the project's own (${files.map(span).join(", ")}): ${c.check} held whole by a check, ${c.audit} by the audit, ${c.part} in part; ${c.describes} describe and bind no one; ${c.none.length} have no holder (\`node ${scripts}/holders.mjs --own\`, its list \`${OWN}\`${h.list ? "" : ", not written yet"}).`,
     ...(none.length ? [`- No holder, worst first (read at a session's start, then on need): the session that takes this report files each as a task at the project's pace, a check where one can read its breach exactly, named in \`${OWN}\`; a move to where it is read on need; or a proposal that it goes, which is the owner's to decide. Where its file is a copy made from elsewhere, the change goes to whoever writes that source. Nothing fails meanwhile: ${none.map(span).join("; ")}.`] : []),
     ...h.wrong.map(w => `- ${w}.`),
   ];
@@ -198,7 +198,7 @@ export function writeOwn(root = process.cwd()) {
   const h = ownHolders(root), at = path.join(root, OWN);
   if (leadsOut(root, at)) throw new Error(`${OWN} leads out of the project. Mend: take out the link on its way, then run it again`);
   let j = {};
-  if (fs.existsSync(at)) { try { j = JSON.parse(fs.readFileSync(at, "utf8")); } catch (e) { throw new Error(`${OWN} cannot be read (${String(e.message).split("\n")[0]}). Mend: write it as JSON, or take it out and run this again`); } }
+  if (fs.existsSync(at)) { try { j = JSON.parse(fs.readFileSync(at, "utf8")); } catch (e) { throw new Error(`${OWN} cannot be read (${span(String(e.message).split("\n")[0])}). Mend: write it as JSON, or take it out and run this again`); } }
   const named = j.holders && typeof j.holders === "object" && !Array.isArray(j.holders) ? j.holders : {};
   for (const r of h.rules) named[r.key] ??= "none";
   fs.mkdirSync(path.dirname(at), { recursive: true });
