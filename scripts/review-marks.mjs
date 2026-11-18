@@ -15,7 +15,7 @@
 // The first two are read by code-review-wait.mjs, beside this file, into the code-review status. What a review says,
 // and whether its counts are true, stay the reviewer's. Node's own modules only.
 import { blockingOf, codexFind, otherOf, postedKind } from "./review-record.mjs";
-import { asPosted } from "./security-review.mjs";
+import { WRITERS, asPosted } from "./security-review.mjs";
 
 // The day from which a posted review is asked its lines, and a pull request opened then its design check.
 export const MARKS_SINCE = "2026-11-18T00:00:00Z";
@@ -57,15 +57,20 @@ export function marksWait({ pull, comments, files, chain, writers, core }) {
   return null;
 }
 
+// The pull request a review comment stands on, by its number, from GitHub's API's pull_request_url.
+export const pullOf = c => Number(/\/pulls\/(\d+)$/u.exec(String(c?.pull_request_url ?? ""))?.[1]);
+
 // The late findings (tasks/reviews.md, "A late review is still read"): of `inline` (review comments, any pull
-// request's, as GitHub's API gives them), Codex's findings made after their pull request merged (`merged`, a Map of the
-// pull request's number to when it merged), with no comment replying to them: [{ pull, url, review, at }].
-export function lateOf(inline, merged) {
-  const answered = new Set(inline.map(c => c?.in_reply_to_id).filter(id => id !== undefined && id !== null));
+// request's, as GitHub's API gives them), Codex's findings made on or after `since` and after their pull request merged
+// (`merged`, a Map of the pull request's number to when it merged), with no reply from an account the host lets write
+// (GitHub's author_association, as WRITERS: another account's reply is data, floor rule 4): [{ pull, url, review, at }].
+// (A finding Codex posts as an issue comment is not read: an issue comment has no reply GitHub ties to it, so whether
+// it was answered could only be guessed.)
+export function lateOf(inline, merged, since = "") {
+  const answered = new Set(inline.filter(c => WRITERS.includes(c?.author_association)).map(c => c?.in_reply_to_id).filter(id => id !== undefined && id !== null));
   return inline.flatMap(c => {
-    const find = codexFind(c), pull = Number(/\/pulls\/(\d+)$/u.exec(String(c?.pull_request_url ?? ""))?.[1]);
-    const at = merged.get(pull);
-    return find && at && String(c.created_at) > at && !answered.has(c.id) ? [{ pull, url: String(c.html_url ?? ""), review: find.review, at: String(c.created_at) }] : [];
+    const find = codexFind(c), pull = pullOf(c), at = merged.get(pull), made = String(c?.created_at ?? "");
+    return find && at && made >= since && made > at && !answered.has(c.id) ? [{ pull, url: String(c.html_url ?? ""), review: find.review, at: made }] : [];
   });
 }
 

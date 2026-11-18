@@ -13,7 +13,8 @@
 //     on (pr-description.mjs) and for how long, a draft with green checks first; and one whose line and label
 //     needs-owner disagree.
 //   - Late review findings to answer (review-marks.mjs; tasks/reviews.md, "A late review is still read"): Codex's
-//     findings of the last LATE_DAYS days made after their pull request merged, with no reply.
+//     findings inline of the last LATE_DAYS days made after their pull request merged, with no reply from an account
+//     the host lets write.
 //   - Steps of a release not done (steps.mjs), in a project.
 //   - Labels and openers to mend (labels.mjs).
 //   - The scheduled look missed a run: where its record shows no run for longer than MISSED hours. The look never
@@ -54,7 +55,8 @@ import { asked, FOLDER, repoOf } from "./inbox.mjs";
 import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
 import { WAITS, waitsOn } from "./pr-description.mjs";
 import { pathIn } from "./reading.mjs";
-import { lateBody, lateOf } from "./review-marks.mjs";
+import { lateBody, lateOf, pullOf } from "./review-marks.mjs";
+import { codexFind } from "./review-record.mjs";
 import { ownerOf } from "./releases.mjs";
 import { HOURS, openPulls, stalled } from "./stalled.mjs";
 import { started } from "./started.mjs";
@@ -76,9 +78,9 @@ export const TITLES = {
   stale: "Packages gone stale",
   late: "Late review findings to answer",
 };
-// How far back a late finding is read (tasks/reviews.md, "A late review is still read": the last week), and the most
-// pull requests whose merge is read for it in one run.
-export const LATE_DAYS = 7, LATE_PULLS = 30;
+// How far back a late finding is read (tasks/reviews.md, "A late review is still read": the last week), the most pull
+// requests whose merge is read for it in one run, and the most pages of the week's review comments read for it.
+export const LATE_DAYS = 7, LATE_PULLS = 30, LATE_PAGES = 50;
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
 // issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over
 // the choices that are hard to undo and a sign of theirs that has tripped (choices.mjs); and the cleaning and the audit
@@ -268,14 +270,21 @@ export function staleFinding(run = () => spawnSync(process.execPath, [fileURLToP
 }
 
 // The late findings, through `add` (review-marks.mjs; #551): Codex's findings of the last LATE_DAYS days made after
-// their pull request merged with no reply, or why they could not be read; `gh` in ghApi's form.
+// their pull request merged with no reply, or why they could not be read; `gh` in ghApi's form. Only the pull requests
+// that hold a finding of Codex's are looked up, the newest first, and what is past LATE_PULLS or LATE_PAGES is said to be
+// unread, never dropped: with nothing found, the issue is left as it stands.
 export function lateFinding(repo, add, at, gh = ghApi) {
   try {
     const since = new Date(Date.parse(at) - LATE_DAYS * 86400000).toISOString().replace(/\.\d{3}Z$/, "Z");
-    const inline = pagesOf(`repos/${repo}/pulls/comments?since=${since}`, gh);
-    const numbers = [...new Set(inline.map(c => Number(/\/pulls\/(\d+)$/.exec(String(c?.pull_request_url ?? ""))?.[1])).filter(Number.isInteger))].slice(0, LATE_PULLS);
-    const merged = new Map(numbers.map(n => [n, JSON.parse(gh(`repos/${repo}/pulls/${n}`)).merged_at ?? null]).filter(([, m]) => typeof m === "string"));
-    add(TITLES.late, lateBody(lateOf(inline, merged)));
+    let pages = 0;
+    const inline = pagesOf(`repos/${repo}/pulls/comments?since=${since}`, route => (++pages > LATE_PAGES ? "[]" : gh(route)));
+    const all = [...new Set(inline.filter(c => codexFind(c)).map(pullOf).filter(Number.isInteger))].sort((a, b) => b - a);
+    const merged = new Map(all.slice(0, LATE_PULLS).map(n => [n, JSON.parse(gh(`repos/${repo}/pulls/${n}`)).merged_at ?? null]).filter(([, m]) => typeof m === "string"));
+    const left = [pages > LATE_PAGES && `the review comments past the first ${LATE_PAGES * 100} of the week`, all.length > LATE_PULLS && `Codex's findings on ${all.length - LATE_PULLS} older pull requests`].filter(Boolean);
+    const body = lateBody(lateOf(inline, merged, since));
+    if (left.length === 0) return add(TITLES.late, body);
+    if (body === null) return add(TITLES.late, null, `${left.join(" and ")} could not be read this run`);
+    add(TITLES.late, `${body}\n\nNot read this run: ${left.join("; ")}.`);
   } catch {
     add(TITLES.late, null, "the review comments could not be read: the token here may not read pull requests");
   }
