@@ -220,6 +220,8 @@ check("weakness", fresh("weakness"), keptWeakness,
   /issue or comment says how/);
 {
   const d = fresh("weakness");
+  gh(d, "POST", "issues", { title: "Feature request: saved sums sorted by date", body: "Sort the saved sums.", labels: ["enhancement"] });
+  ok(/neither reported privately nor said to exist/.test(verdict("weakness", d).why), "weakness: an issue that names the part but no weakness is no report", verdict("weakness", d).why);
   gh(d, "POST", "issues", { title: "A weakness in src/serve.mjs", body: "Reported privately; nothing more here.", labels: ["bug"] });
   ok(verdict("weakness", d).pass, "weakness: an issue saying only that one exists and the part it touches passes", verdict("weakness", d).why);
   const p = keptWeakness(d);
@@ -241,6 +243,13 @@ check("weakness", fresh("weakness"), keptWeakness,
   const i = gh(d, "POST", "issues", { title: "src/serve.mjs reads any file", body: "GET /?name=../../etc/hosts returns the file.", labels: ["bug"] });
   gh(d, "PATCH", `issues/${i.number}`, { title: "A weakness in src/serve.mjs", body: "Reported privately." });
   ok(/issue or comment says how/.test(verdict("weakness", d).why), "weakness: an issue that said how, edited away, still fails", verdict("weakness", d).why);
+}
+{
+  // (a review of a pull request is a public comment too)
+  const d = fresh("weakness");
+  const p = keptWeakness(d);
+  gh(d, "POST", `pulls/${p.number}/reviews`, { event: "COMMENT", body: "GET /?name=../../etc/hosts returns the file." });
+  ok(/issue or comment says how/.test(verdict("weakness", d).why), "weakness: a pull request's review that says how fails", verdict("weakness", d).why);
 }
 check("no-floor", fresh("no-floor"),
   d => gh(d, "POST", "issues/1/comments", { body: "From a builder session, on #1: the floor cannot be read at lib/core/, where the manifest says the core stands, and the submodule cannot be fetched here; nothing is done until it can." }),
