@@ -888,6 +888,12 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     // finds it)
     underLink(dir => { fs.mkdirSync(path.join(dir, "cl"), { recursive: true }); fs.writeFileSync(path.join(dir, "cl/settings.json"), KIT); fs.symlinkSync("node_modules/../CL", path.join(dir, ".claude")); },
       dir => fs.writeFileSync(path.join(dir, "cl/settings.json"), JSON.stringify({ ...JSON.parse(KIT), model: "opus" })), "and so does what it leads to in another case, changed");
+    // (and through an installed package, by what the lock file says of it: a version or source locked anew fails)
+    const lockAt = version => JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version, resolved: `https://registry.npmjs.org/pkg/-/pkg-${version}.tgz` }, "node_modules/other": { version: "1.0.0" } } });
+    const viaPackage = () => { const dir = project({ ".gitignore": "node_modules/\n", "package-lock.json": lockAt("1.0.0"), ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync("node_modules/pkg/.claude", path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link into an installed package"); return dir; };
+    const lockKept = run(pr(viaPackage(), { "package-lock.json": JSON.stringify({ ...JSON.parse(lockAt("1.0.0")), packages: { ...JSON.parse(lockAt("1.0.0")).packages, "node_modules/other": { version: "2.0.0" } } }) }));
+    ok(lockKept.status === 0 && lockKept.out.includes("as the base held it"), "a link the base held into an installed package is noted while the lock file holds that package as it was", lockKept.out);
+    fails(run(pr(viaPackage(), { "package-lock.json": lockAt("2.0.0") })), "but not once the pull request locks the package anew", '".claude" is a link that leads out of the checkout');
   }
 }
 

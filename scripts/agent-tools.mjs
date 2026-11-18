@@ -887,12 +887,32 @@ function reaches(root, rev, at, follow = false) {
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
   return [through(posix, want, holds, names, f => resolve(f)?.type), ...skill].join("\0\0");
 }
+// What the lock files say of each name a link's path passes through where the commit holds nothing but an install puts
+// a package, as an ignored node_modules folder: an npm lock file's entry for that path, beside the node_modules folder
+// it lies in, and a yarn or pnpm lock file there whole; so a link the base held, through a package the pull request
+// locks at another version or source, is held by that too.
+function lockOf(root, rev, at) {
+  const via = [], l = listing(root, rev), out = [];
+  walk(root, rev, at.split(path.sep).join("/"), via, true, [], true);
+  for (const v of via) {
+    const cut = `/${v}`.indexOf("/node_modules/");
+    if (l.ids.has(v) || l.dirs.has(v) || cut < 0) continue;
+    const dir = v.slice(0, cut) ? `${v.slice(0, cut)}/` : "", key = v.slice(dir.length);
+    for (const lock of ["package-lock.json", "npm-shrinkwrap.json"]) {
+      let entry;
+      try { entry = JSON.parse(textAt(root, rev, `${dir}${lock}`) ?? "null")?.packages?.[key] ?? null; } catch { entry = "unreadable"; }
+      out.push(`${dir}${lock}\0${key}\0${JSON.stringify(entry)}`);
+    }
+    for (const lock of ["yarn.lock", "pnpm-lock.yaml"]) out.push(`${dir}${lock}\0${textAt(root, rev, `${dir}${lock}`)}`);
+  }
+  return out.join("\0\0");
+}
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {
     let to = null;
     try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
-    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at, true) === reaches(root, "HEAD", at, true)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
+    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at, true) === reaches(root, "HEAD", at, true) && lockOf(root, base, at) === lockOf(root, "HEAD", at)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
   }
 }
