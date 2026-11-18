@@ -112,6 +112,10 @@ fs.mkdirSync(big);
 fs.writeFileSync(path.join(big, "core-manifest.md"), `${copied("vendor/core/")}${"x".repeat(1 << 20)}`);
 ok(manifestText(path.join(odd, "core-manifest.md")) === "" && corePath(odd) === "core/" && floorCopy(odd) === null && corePath(big) === "core/" && manifestText(path.join(tmp, "nowhere", "core-manifest.md")) === null,
   "a manifest that is a folder, or past a mebibyte, reads as empty and so as the usual path; none, as null");
+const edge = path.join(tmp, "edge");
+fs.mkdirSync(edge);
+fs.writeFileSync(path.join(edge, "core-manifest.md"), carried().padEnd(1 << 20, " "));
+ok(corePath(edge) === "lib/core/" && floorCopy(edge) === "floor-copy/", "a manifest of a mebibyte exactly is read, its path and its floor copy among it");
 // (through a link too: to a folder here, never to a device, which a mutant of the check would read without end and
 // take the machine's memory with it)
 if (process.platform !== "win32") {

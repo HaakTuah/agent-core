@@ -645,6 +645,8 @@ ok(versionsStep.check(inMemory({ "a.yml": stepped("cd tools && node scripts/exac
 // step asks its companion run of each)
 ok(["package-lock.json", "npm-shrinkwrap.json"].every(f => kind({ ...inMemory({}, { [f]: "{}" }), root: tmp }).o.packages === "." && typeof versionsStep.check(inMemory({ "a.yml": stepped("node core/scripts/licences.mjs l.json") }, { [f]: "{}" })) === "string"),
   "a project holding npm-shrinkwrap.json in place of package-lock.json reads as npm, and the exact-versions step asks of it as of the other");
+ok(["core/package-lock.json", "node_modules/a/npm-shrinkwrap.json", "tools/node_modules/b/package-lock.json"].every(f => versionsStep.check(inMemory({ "a.yml": stepped("node core/scripts/licences.mjs l.json") }, { [f]: "{}" })) === null),
+  "a lock file inside the core's copy or an installed package asks nothing of the project");
 // (the review of b6aaf95: a shell's options read so that its -c string is found, and a shell not given a file is not
 // read silently; more commands that run no script; a wrapper that moves the folder)
 ok(["sh -euo pipefail -c 'node core/scripts/copies.mjs config/c.json'", "bash -eo pipefail -c 'node core/scripts/copies.mjs config/c.json'", "pwsh -ep Bypass -Command 'node core/scripts/copies.mjs config/c.json'",
