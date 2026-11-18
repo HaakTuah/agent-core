@@ -202,11 +202,12 @@ function readCodex(state, json, read) {
   }
 }
 
-// The variables a shell, git, ssh, Node, the system's loader or the tool itself reads as a program starts, before what
-// it was given to run, where it finds its own settings among them (HOME, XDG_CONFIG_HOME): set by a tool's settings for
-// the programs it starts, hooks among them, they change what a hook runs, so that main's copy is not all it runs (floor
-// rule 3). Names read as Windows reads them, whatever their case.
-const STARTS = /^(?:BASH_ENV|ENV|PATH|PATHEXT|COMSPEC|HOME|XDG_CONFIG_HOME|NODE_OPTIONS|NODE_PATH|SHELLOPTS|BASHOPTS|PS4|IFS|CDPATH|GLOBIGNORE|SSH_ASKPASS.*|CLAUDE_PROJECT_DIR|CLAUDE_CODE_SHELL.*|CLAUDE_CODE_GIT_BASH_PATH|GIT_.*|LD_.*|DYLD_.*|BASH_FUNC_.*)$/iu;
+// The variables a shell, git, ssh, Node, the system's loader (its locales and converters among it) or the tool itself
+// reads as a program starts, before what it was given to run, where it finds its own settings and the shell it runs
+// commands with among them (HOME, XDG_CONFIG_HOME, SHELL): set by a tool's settings for the programs it starts, hooks
+// among them, they change what a hook runs, so that main's copy is not all it runs (floor rule 3). Names read as Windows
+// reads them, whatever their case.
+const STARTS = /^(?:BASH_ENV|ENV|PATH|PATHEXT|COMSPEC|HOME|XDG_CONFIG_HOME|SHELL|GCONV_PATH|LOCPATH|NLSPATH|GCM_.*|NODE_OPTIONS|NODE_PATH|SHELLOPTS|BASHOPTS|PS4|IFS|CDPATH|GLOBIGNORE|SSH_ASKPASS.*|CLAUDE_PROJECT_DIR|CLAUDE_CODE_SHELL.*|CLAUDE_CODE_GIT_BASH_PATH|GIT_.*|LD_.*|DYLD_.*|BASH_FUNC_.*)$/iu;
 // Each such variable a tool's setting `key` in `file` sets, as a problem with the entry's own text, so one the base held
 // is noted while that entry stands, whatever else of the file changes.
 function readEnv(state, file, key, env) {
