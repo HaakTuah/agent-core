@@ -1103,14 +1103,30 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       ok(kept.status === 0 && kept.out.includes(UNHELD) && kept.out.includes("reported, never failed"), `one the base held, to ${target}, is reported, never failed, while its package is locked as before`, kept.out);
       // (and where the pull request locks the package it leads into anew, by its own entry in the lock file, what a tool
       // runs there changes: it fails; through no node_modules, it stays reported whatever the lock says)
-      const key = { "node_modules/pkg/.claude": "node_modules/pkg", "Node_Modules/pkg/.claude": "node_modules/pkg", "node_modules": "node_modules/pkg", "app/node_modules/pkg/.claude": "app/node_modules/pkg" }[target];
+      const key = { "node_modules/pkg/.claude": "node_modules/pkg", "Node_Modules/pkg/.claude": "node_modules/pkg", "app/node_modules/pkg/.claude": "app/node_modules/pkg" }[target];
       const relocked = run(pr(linkTo(target), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, [key ?? "node_modules/pkg"]: { version: "2.0.0" } } }) }));
       if (key) fails(relocked, `but one to ${target} fails once its package is locked anew`, "locks the package it leads into anew", "Mend: replace the link with the file or folder itself, committed in the project, or take it out");
-      else ok(relocked.status === 0 && relocked.out.includes("reported, never failed"), `while one to ${target}, through no node_modules, stays reported whatever the lock says`, relocked.out);
+      else ok(relocked.status === 0 && relocked.out.includes("reported, never failed"), `while one to ${target}, through no package an entry names, stays reported whatever the lock says`, relocked.out);
+    }
+    // (its fallback security review of 7e403ef: the entry found in whatever case; a workspace's package by all its folder
+    // holds; a lock read through a link; and what no entry can be read of exactly, reported)
+    fails(run(pr(linkTo("node_modules/Pkg/.claude"), { "package-lock.json": lockAt("2.0.0") })), "one to a package in another case fails once its entry, found in whatever case, changes", "locks the package it leads into anew");
+    const workspace = () => linkTo("node_modules/m/.claude", { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/m": { resolved: "packages/m", link: true } } }), "packages/m/package.json": "{}\n", "packages/m/.claude/settings.json": KIT });
+    fails(run(pr(workspace(), { "packages/m/.claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), model: "opus" }) })), "one to a workspace's package fails once that package's own folder changes", "locks the package it leads into anew");
+    const lockLink = () => { const dir = linkTo("node_modules/pkg/.claude", { "locks/package-lock.json": lockAt("1.0.0") }); fs.rmSync(path.join(dir, "package-lock.json")); fs.symlinkSync("locks/package-lock.json", path.join(dir, "package-lock.json")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "the lock as a link"); return dir; };
+    fails(run(pr(lockLink(), { "locks/package-lock.json": lockAt("2.0.0") })), "one fails where the lock it is read by is a link and what it leads to locks the package anew", "locks the package it leads into anew");
+    for (const [what, files, change] of [["its package.json", { "package.json": "{}\n" }, { "package.json": JSON.stringify({ dependencies: { pkg: "github:example/pkg" } }) }], ["a scope's folder it leads to, locked anew", {}, { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/@s/pkg": { version: "2.0.0" } } }) }]]) {
+      const loose = run(pr(linkTo(what.startsWith("a scope") ? "node_modules/@s" : "node_modules/pkg/.claude", files), change));
+      ok(loose.status === 0 && loose.out.includes("may have changed what an agent tool runs there"), `one is reported, never failed, where ${what} changes`, loose.out);
     }
     const otherLocked = run(pr(linkTo("node_modules/pkg/.claude"), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version: "1.0.0" }, "node_modules/other": { version: "2.0.0" } } }) }));
     ok(otherLocked.status === 0 && otherLocked.out.includes("reported, never failed"), "a link the base held into a package stays reported while another package is locked anew", otherLocked.out);
-    fails(run(pr(linkTo("node_modules/pkg/.claude", { "yarn.lock": "pkg@1:\n  version 1.0.0\n" }), { "yarn.lock": "pkg@1:\n  version 1.0.1\n" })), "and one fails where a yarn lock beside it changes, read whole", "locks the package it leads into anew");
+    // (a lock file whose entry for the package no reader here reads exactly, a yarn, pnpm or bun lock, changed: reported
+    // as one whose package may have changed, never failed, so another dependency's update fails nothing)
+    for (const [lock, before, after] of [["yarn.lock", "pkg@1:\n  version 1.0.0\n", "pkg@1:\n  version 1.0.1\n"], ["pnpm-lock.yaml", "packages:\n  pkg@1.0.0: {}\n", "packages:\n  pkg@1.0.1: {}\n"], ["bun.lock", "{ \"packages\": { \"pkg\": [\"pkg@1.0.0\"] } }\n", "{ \"packages\": { \"pkg\": [\"pkg@1.0.1\"] } }\n"]]) {
+      const loose = run(pr(linkTo("node_modules/pkg/.claude", { [lock]: before }), { [lock]: after }));
+      ok(loose.status === 0 && loose.out.includes("may have changed what an agent tool runs there") && loose.out.includes("Replace the link with the file or folder itself"), `a link the base held into a package is reported, never failed, where its ${lock} changes`, loose.out);
+    }
     const moved = linkTo("node_modules/pkg/.claude");
     git(moved, "checkout", "-q", "-B", "change"); fs.unlinkSync(path.join(moved, ".claude")); fs.symlinkSync("node_modules/other/.claude", path.join(moved, ".claude"));
     git(moved, "add", "-A"); git(moved, "commit", "-q", "-m", "moved"); git(moved, "checkout", "-q", "main"); git(moved, "merge", "-q", "--no-ff", "-m", "merge", "change");

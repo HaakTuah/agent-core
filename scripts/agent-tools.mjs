@@ -715,8 +715,8 @@ function belowDir(root, rev, p) {
 // a file of another kind there changes freely.
 function mdLinks(root, rev) {
   const l = listing(root, rev), read = p => !l.blobs.has(p) || /\.md$/iu.test(p);
-  // (and by what the lock files say of the package each link walked leads into: pkgLock())
-  const held = at => { const walked = [], all = everything(root, rev, at, read, walked); return [at, all, ...walked.map(w => pkgLock(root, rev, w))].join("\0"); };
+  // (and by what the lock files say exactly of the package each link walked leads into: pkgLock())
+  const held = at => { const walked = [], all = everything(root, rev, at, read, walked); return [at, all, ...walked.map(w => pkgLock(root, rev, w).exact)].join("\0"); };
   // (.claude as a link on the way, by what stands at its agents and commands alone, as Claude Code reads nothing else
   // there for them)
   const way = at => (fold(at) === ".claude" ? AGENT_DIRS.map(d => held(`${at}/${d.split("/")[1]}`)).join("\0\0") : held(at));
@@ -1183,14 +1183,15 @@ function away(root, rev, at) {
   const l = listing(root, rev), r = walk(root, rev, at.split(path.sep).join("/"), [], true, [], true);
   return !r || !(r.f === "." || l.dirs.has(r.f) || l.ids.has(r.f));
 }
-// What the lock files say of the package a link leads into, where its way passes a node_modules folder an install fills:
-// in the folder that holds that node_modules and each folder above it, an npm lock file's entry for that package's path,
-// and a yarn, pnpm or bun lock file whole, as no reading of their entries here is the package manager's; the whole of an
-// npm lock where the link leads to node_modules itself. "" where no node_modules is on its way. So a link the base held
-// fails where the pull request locks its package anew, which changes what a tool runs there, and is a note otherwise.
-const NPM_LOCKS = ["package-lock.json", "npm-shrinkwrap.json"], OTHER_LOCKS = ["yarn.lock", "pnpm-lock.yaml", "bun.lock", "bun.lockb"];
+// What the lock files say of the package a link leads into, where its way passes a node_modules folder an install fills,
+// in the folder that holds that node_modules and each folder above it, as { exact, loose } (lockEntries()): `exact`, what
+// an npm lock file says of that package, read exactly; `loose`, what no entry can be read of exactly. Each "" where no
+// node_modules is on its way. So a link the base held fails where the pull request locks its package anew by an entry
+// read exactly, which changes what a tool runs there; is reported as one whose package may have changed where only what
+// cannot be read exactly changed, as any dependency's update does there; and is a note otherwise.
+const NPM_LOCKS = ["package-lock.json", "npm-shrinkwrap.json"];
 function pkgLock(root, rev, at) {
-  const posix = at.split(path.sep).join("/"), via = [], l = listing(root, rev), out = new Set();
+  const posix = at.split(path.sep).join("/"), via = [], l = listing(root, rev), out = { exact: new Set(), loose: new Set() };
   walk(root, rev, posix, via, true, [], true);
   for (const v of new Set([posix, ...via])) {
     const to = l.linked.has(v) ? linkText(root, rev, v) : null;
@@ -1198,22 +1199,51 @@ function pkgLock(root, rev, at) {
     const m = [...`/${p}`.matchAll(/\/node_modules(?:\/|$)/giu)].at(-1);
     if (m) lockEntries(root, rev, p.slice(0, Math.max(m.index - 1, 0)), `/${p}`.slice(m.index + "/node_modules/".length).split("/"), out);
   }
-  return [...out].sort().join("\0\0");
+  return { exact: [...out.exact].sort().join("\0\0"), loose: [...out.loose].sort().join("\0\0") };
 }
-// Into `out`, what the lock files say of the package `rest` names (its scope and name, or none) in `dir`'s node_modules.
+// Into `out`'s two sets, what the lock files say of the package `rest` names (its scope and name; none for node_modules
+// itself or a scope's folder) in `dir`'s node_modules. Exactly: an npm lock's entry for it, its key found in whatever
+// case, each lock read through a link as an install reads it, and, where the entry links the package to a folder of the
+// project (a workspace's, or a file: dependency), all that folder holds. Loosely: an npm lock with no such entry, or none
+// read, whole; a yarn, pnpm or bun lock, the package.json and .npmrc, whole; and each folder of patches.
+const LOOSE_READS = ["yarn.lock", "pnpm-lock.yaml", "bun.lock", "bun.lockb", "package.json", ".npmrc"], PATCHES = ["patches", ".yarn/patches"];
 function lockEntries(root, rev, dir, rest, out) {
-  const name = (rest[0]?.startsWith("@") ? rest.slice(0, 2) : rest.slice(0, 1)).filter(Boolean).join("/");
+  const scoped = rest[0]?.startsWith("@"), name = (scoped ? (rest[1] ? rest.slice(0, 2) : []) : rest.slice(0, 1)).filter(Boolean).join("/");
+  const { read } = commitReader(root, rev, true, true);
   for (let up = dir; ; up = up.includes("/") ? up.slice(0, up.lastIndexOf("/")) : "") {
-    const there = f => (up ? `${up}/${f}` : f), key = path.posix.relative(up || ".", `${dir ? `${dir}/` : ""}node_modules/${name}`).replace(/\/$/u, "");
-    for (const f of NPM_LOCKS) {
-      const text = textAt(root, rev, there(f));
-      let entry = text;
-      try { entry = name ? JSON.stringify(JSON.parse(text)?.packages?.[key] ?? null) : text; } catch { /* (held by its text) */ }
-      out.add(`${there(f)}\0${entry}`);
-    }
-    for (const f of OTHER_LOCKS) out.add(`${there(f)}\0${textAt(root, rev, there(f))}`);
+    const there = f => (up ? `${up}/${f}` : f), key = path.posix.relative(up || ".", `${dir ? `${dir}/` : ""}node_modules/${name}`);
+    for (const f of NPM_LOCKS) npmRead(root, rev, there(f), read(there(f)), name && key, up, out);
+    for (const f of LOOSE_READS) out.loose.add(`${there(f)}\0${read(there(f))}`);
+    for (const d of PATCHES) out.loose.add(`${there(d)}\0${everything(root, rev, there(d))}`);
     if (!up) break;
   }
+}
+// What one npm lock file, `f` with its `text`, says of the package at `key` (none: read loosely), into `out`'s two sets,
+// with all the folder of the project it links the package to holds, `up` the lock's folder.
+function npmRead(root, rev, f, text, key, up, out) {
+  const entry = key ? npmEntry(text, key) : undefined;
+  if (entry === undefined) return void out.loose.add(`${f}\0${text}`);
+  out.exact.add(`${f}\0${JSON.stringify(entry)}`);
+  if (entry?.link && typeof entry.resolved === "string") out.exact.add(`${f} links to\0${everything(root, rev, path.posix.normalize(path.posix.join(up || ".", entry.resolved)))}`);
+}
+// An npm lock's entry for the package at `key`, found as written or in another case, as a file system that ignores case
+// finds the folder; undefined where the lock does not parse or holds no such entry.
+function npmEntry(text, key) {
+  let packages;
+  try { packages = JSON.parse(text ?? "")?.packages; } catch { return undefined; }
+  if (!packages || typeof packages !== "object") return undefined;
+  if (Object.hasOwn(packages, key)) return packages[key];
+  const found = Object.keys(packages).find(k => fold(k) === fold(key));
+  return found === undefined ? undefined : packages[found];
+}
+// A link the base held to what the commit does not hold, as it stood: failed where the pull request locks the package
+// it leads into anew by an entry read exactly (pkgLock()), reported as one whose package may have changed where only what
+// cannot be read exactly changed, and reported otherwise.
+function sortStood(root, base, at, said, there, fail, notes) {
+  const was = pkgLock(root, base, at), now = pkgLock(root, "HEAD", at);
+  if (was.exact !== now.exact) fail.push(`${said}, ${there}, and this pull request locks the package it leads into anew, which changes what an agent tool runs there unread. Mend: replace the link with the file or folder itself, committed in the project, or take it out, in this pull request`);
+  else if (was.loose !== now.loose) notes.push(`${said}, ${there}, as the base held it, and a lock file this check cannot read the package's entry of changes beside it, so the package it leads into may have changed what an agent tool runs there: reported, never failed. Replace the link with the file or folder itself, committed in the project, or take it out`);
+  else notes.push(`${said}, ${there}, as the base held it: reported, never failed while the package it leads into is locked as before. Replace it with the file or folder itself, committed in the project`);
 }
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {
@@ -1225,9 +1255,7 @@ function sortLinks(root, base, links, fail, notes) {
     const held = base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && wayOf(root, base, at) === wayOf(root, "HEAD", at);
     const out = to !== null && away(root, "HEAD", at), stood = held && out && away(root, base, at);
     const there = "to what the commit does not hold (outside the checkout, or in a folder an install fills, as node_modules or a virtual environment), which this check cannot read";
-    const locked = stood && pkgLock(root, base, at) !== pkgLock(root, "HEAD", at);
-    if (locked) fail.push(`${said}, ${there}, and this pull request locks the package it leads into anew, which changes what an agent tool runs there unread. Mend: replace the link with the file or folder itself, committed in the project, or take it out, in this pull request`);
-    else if (stood) notes.push(`${said}, ${there}, as the base held it: reported, never failed while the package it leads into is locked as before. Replace it with the file or folder itself, committed in the project`);
+    if (stood) sortStood(root, base, at, said, there, fail, notes);
     else if (held && reaches(root, base, at, true) === reaches(root, "HEAD", at, true)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
     else if (out) fail.push(`${said}, ${there}. Mend: replace the link with the file or folder itself, committed in the project, in this pull request`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
