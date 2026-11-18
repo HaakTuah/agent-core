@@ -1084,6 +1084,8 @@ function reaches(root, rev, at, follow = false) {
 // commit holds nothing at, as a folder an install fills (node_modules, a virtual environment and the like). This check
 // cannot read what stands there, so such a link is new where the pull request adds or changes it, and one the base held
 // is reported, never failed, whatever else changes (core archive 207).
+// The way a link's path takes at a commit, as a fingerprint: what it reaches, and each link it passes, by its target.
+const wayOf = (root, rev, at) => commitReader(root, rev, true, true).holds(at.split(path.sep).join("/"));
 function away(root, rev, at) {
   const l = listing(root, rev), r = walk(root, rev, at.split(path.sep).join("/"), [], true, [], true);
   return !r || !(r.f === "." || l.dirs.has(r.f) || l.ids.has(r.f));
@@ -1094,8 +1096,11 @@ function sortLinks(root, base, links, fail, notes) {
     try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
     const held = base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to, out = to !== null && away(root, "HEAD", at);
+    // (reported only where the base's link led away too, by the same links on its way: one the pull request makes lead
+    // away, by a link it adds or changes further along, is new)
+    const stood = held && out && away(root, base, at) && wayOf(root, base, at) === wayOf(root, "HEAD", at);
     const there = "to what the commit does not hold (outside the checkout, or in a folder an install fills, as node_modules or a virtual environment), which this check cannot read";
-    if (held && out) notes.push(`${said}, ${there}, as the base held it: reported, never failed. Replace it with the file or folder itself, committed in the project`);
+    if (stood) notes.push(`${said}, ${there}, as the base held it: reported, never failed. Replace it with the file or folder itself, committed in the project`);
     else if (held && reaches(root, base, at, true) === reaches(root, "HEAD", at, true)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
     else if (out) fail.push(`${said}, ${there}. Mend: replace the link with the file or folder itself, committed in the project, in this pull request`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);

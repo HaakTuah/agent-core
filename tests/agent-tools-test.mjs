@@ -1060,6 +1060,13 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(moved, "checkout", "-q", "-B", "change"); fs.unlinkSync(path.join(moved, ".claude")); fs.symlinkSync("node_modules/other/.claude", path.join(moved, ".claude"));
     git(moved, "add", "-A"); git(moved, "commit", "-q", "-m", "moved"); git(moved, "checkout", "-q", "main"); git(moved, "merge", "-q", "--no-ff", "-m", "merge", "change");
     fails(run(moved), "but a link the base held, moved, is new", UNHELD);
+    // (#693's fallback security review of 5fe85c6: one the base held to what the commit holds, made by the pull request
+    // to lead away by a link further along, or one whose link further along the pull request moves, is new)
+    const swap = (build, change) => { const dir = project({ ".gitignore": "node_modules/\n", ...listing() }); build(dir); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "base"); git(dir, "checkout", "-q", "-B", "change"); change(dir); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "change"); git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change"); return dir; };
+    fails(run(swap(dir => { fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.mkdirSync(path.join(dir, "cfg/agents"), { recursive: true }); fs.writeFileSync(path.join(dir, "cfg/settings.json"), KIT); fs.writeFileSync(path.join(dir, "cfg/agents/a.md"), "---\nname: a\n---\n"); fs.symlinkSync("cfg", path.join(dir, ".claude")); },
+      dir => { fs.rmSync(path.join(dir, "cfg"), { recursive: true, force: true }); fs.symlinkSync("node_modules/evil", path.join(dir, "cfg")); })), "a link the base held to what the commit holds, made to lead away by a link further along, is new", UNHELD);
+    fails(run(swap(dir => { fs.mkdirSync(path.join(dir, "conf"), { recursive: true }); fs.rmSync(path.join(dir, ".claude/settings.json")); fs.symlinkSync("../conf/settings.json", path.join(dir, ".claude/settings.json")); fs.rmSync(path.join(dir, "conf"), { recursive: true }); fs.symlinkSync("node_modules/a", path.join(dir, "conf")); },
+      dir => { fs.unlinkSync(path.join(dir, "conf")); fs.symlinkSync("node_modules/evil", path.join(dir, "conf")); })), "and so is one whose link further along the pull request moves", UNHELD);
 
   }
 }
