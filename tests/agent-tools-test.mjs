@@ -786,6 +786,23 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(twin, "add", "-A"); git(twin, "commit", "-q", "-m", "the link moved");
     git(twin, "checkout", "-q", "main"); git(twin, "merge", "-q", "--no-ff", "-m", "merge", "change2");
     fails(run(twin), "and so does a skill's link moved to a folder whose SKILL.md is the same", "Mend: rename it to .claude/skills");
+    // (a link whose target the commit holds only in another case, which a file system that ignores case follows)
+    const LINK_SAYS = "in another case, which an agent tool reads there";
+    for (const [at, to, file] of [[".kiro/settings", "../Inner", "inner/mcp.json"], [".claude/skills/s", "../../Sk", "sk/SKILL.md"], [".mcp.json", "Real.json", "real.json"]]) {
+      const caseLink = project({ [file]: "{}\n", ...listing() });
+      fs.mkdirSync(path.dirname(path.join(caseLink, at)), { recursive: true });
+      fs.symlinkSync(to, path.join(caseLink, at));
+      git(caseLink, "add", "-A"); git(caseLink, "commit", "-q", "-m", "a link in another case");
+      fails(run(caseLink, "--core"), `${at} linked to ${to}, held as ${file.split("/")[0]}, fails`, `${at} leads, through a link, to`, LINK_SAYS, "Mend: write the link's target as");
+    }
+    const caseHeld = project({ "inner/mcp.json": "{}\n", ...listing() });
+    fs.mkdirSync(path.join(caseHeld, ".kiro"), { recursive: true });
+    fs.symlinkSync("../Inner", path.join(caseHeld, ".kiro/settings"));
+    git(caseHeld, "add", "-A"); git(caseHeld, "commit", "-q", "-m", "a link in another case");
+    const caseKept = run(pr(caseHeld, { "README.md": "a change of its own\n" }));
+    ok(caseKept.status === 0 && caseKept.out.includes(LINK_SAYS), "one the base held is noted, not failed", caseKept.out);
+    fails(run(pr(caseHeld, { "inner/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what stands under its target changes", LINK_SAYS);
+    passes(run(pr(project({ "Inner/mcp.json": "{}\n", ...listing() }), { "README.md": "x\n" })), "a folder in another case that no link leads to is none of this");
   }
 }
 

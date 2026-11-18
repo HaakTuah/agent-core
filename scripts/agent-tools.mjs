@@ -499,7 +499,7 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   const project = configured(read, skills, names, linked);
   // (read at the commit, the working tree's at HEAD, the pull request's head: a file not committed, ignored or not, is
   // no file of the project's, and the base is read the same way)
-  for (const [problem, text] of [...caseProblems(root, rev ?? "HEAD"), ...submodules(root, rev ?? "HEAD")]) { project.problems.push(problem); project.texts.set(problem, text); }
+  for (const [problem, text] of [...caseProblems(root, rev ?? "HEAD"), ...submodules(root, rev ?? "HEAD"), ...caseLinks(root, rev ?? "HEAD")]) { project.problems.push(problem); project.texts.set(problem, text); }
   if (!rev && listing(root, "HEAD").failed) project.problems.push(`the commit HEAD cannot be listed by git (an error, or names past ${LISTING_MAX} bytes), so this check cannot read the tools' files there. Mend: run the check again; where it fails the same way, take out of this pull request what makes its tree too large to list`);
   return { ...project, links };
 }
@@ -544,6 +544,20 @@ function submodules(root, rev) {
     if (sub && !out.has(at) && !out.has(sub)) out.set(at, [`${at} leads, through a link, to the submodule ${sub}, where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${sub}\0${l.ids.get(sub)}`]);
   }
   return [...out.values()];
+}
+
+// Each tool's path a link leads to a name the commit holds in another case only, as [its problem, what it is held by]: a
+// file system that ignores case gives the tool what stands under that name, which this check never reads, so one the
+// base held is noted while the links on the way and all that stands under that name are as they were.
+function caseLinks(root, rev) {
+  const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = [];
+  for (const at of toolPaths(names, f => resolve(f)?.type)) {
+    const via = [], misses = [];
+    if (walk(root, rev, at, via, misses) !== null || !misses.length || !via.some(v => l.linked.has(v))) continue;
+    const m = misses[0], under = [...l.ids].filter(([a]) => a === m || a.startsWith(`${m}/`)).sort().map(([a, id]) => `${a}\0${id}`);
+    out.push([`${at} leads, through a link, to ${m} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${m} stands, in this pull request`, [at, ...via.map(v => `${v}\0${l.ids.get(v)}`), ...under].join("\0\0")]);
+  }
+  return out;
 }
 
 // Whether a commit's listing holds `at` as anything but a plain file: a link, a folder or a submodule's entry.
@@ -659,7 +673,7 @@ function target(root, rev, at) {
   }
   return targets.get(key);
 }
-function walk(root, rev, f, via = []) {
+function walk(root, rev, f, via = [], misses = []) {
   const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
   let hops = 0;
   while (left.length) {
@@ -674,10 +688,19 @@ function walk(root, rev, f, via = []) {
       left.unshift(...to.split("/"));
       continue;
     }
+    noteMiss(listing(root, rev), at, name, misses);
     if (!goesOn(listing(root, rev), here, left.length > 0, via)) return null;
     at.push(name);
   }
   return reached(at.join("/") || ".", blobs, dirs, others);
+}
+// Where a walk meets `here`, a name the commit holds nothing at, while its folder holds that name in another case, which
+// a file system that ignores case finds in its place, that name, said in `misses`.
+function noteMiss({ blobs, dirs, others, children }, at, name, misses) {
+  const here = [...at, name].join("/");
+  if (dirs.has(here) || blobs.has(here) || others.has(here)) return;
+  const dir = at.join("/") || ".", other = [...(children.get(dir) ?? [])].find(n => n !== name && fold(n) === fold(name));
+  if (other !== undefined) misses.push(dir === "." ? other : `${dir}/${other}`);
 }
 // Whether a walk goes on past `here`, `more` of the path after it: the last name may be anything the commit holds; one
 // with more after it, a folder the commit holds, or a folder every clone holds beside what the commit lists, a
