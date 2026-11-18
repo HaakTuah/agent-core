@@ -97,6 +97,7 @@ jobs:
         with:
           node-version-file: ${{ matrix.node }}
       - name: The core's packages, installed from its lock file for the suites (#654)
+        id: install
         run: node scripts/install.mjs
       - name: The suites this change can reach (on main, and in a re-run, every one)
         env:
@@ -387,7 +388,7 @@ jobs:
           LOOKUP_BASE: ${{ github.event.pull_request.base.sha }} # empty on a push to main, where nothing is new
         run: node scripts/lookup.mjs .github/licences.json
       - name: The registry's signature on each of the core's own installed packages (floor rule 7; once, on Linux)
-        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }} # (only where the install's refusals passed)
         working-directory: .packages
         run: npm audit signatures --prefix=. # (the folder's own settings and every package of its lock, never a workspace root above it)
       - name: Every tool the core's own agents load is listed (floor topic 15)

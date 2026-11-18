@@ -46,6 +46,9 @@ function strays(at) {
 function refusal(lock, into) {
   if (lock !== REGISTRIES.npm.lock) return null;
   const at = f => path.join(packages, f);
+  const folder = path.join(root, into.replace(/\/$/u, "")); // (no "/" after it, which would read the link's target)
+  // (a link first, before anything is read through it)
+  for (const f of [packages, folder]) if (fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()) return `${f} is a link, which the install would write through, or empty. Mend: remove the link, then run this again`;
   // (what the package list and lock file hold, read before npm runs: the npm that comes with the least Node fetches
   // whatever source a spec names, and runs its prepare script, whatever setting says otherwise)
   let faults;
@@ -58,8 +61,6 @@ function refusal(lock, into) {
   try { npmrc = fs.readFileSync(at(".npmrc"), "utf8"); } catch { /* (none: npm's own registry) */ }
   const others = npmrcOthers(npmrc);
   if (others.length) return `${at(".npmrc")} holds ${others.length === 1 ? "a line" : `${others.length} lines`} beside the core's own two settings (the first: ${JSON.stringify(others[0].slice(0, 80))}), which npm would read: a registry, a host's token, a proxy or a certificate would send the install elsewhere. Mend: take ${others.length === 1 ? "that line" : "those lines"} out; the core's .npmrc holds ignore-scripts=true and min-release-age alone`;
-  const folder = path.join(root, into.replace(/\/$/u, "")); // (no "/" after it, which would read the link's target)
-  for (const f of [packages, folder]) if (fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()) return `${f} is a link, which the install would write through, or empty. Mend: remove the link, then run this again`;
   let tracked = "";
   try { tracked = spawnSync("git", ["ls-files", "--", into], { cwd: root, encoding: "utf8" }).stdout ?? ""; } catch { /* (no git: nothing tracked) */ }
   if (tracked.trim()) return `${folder} holds files git tracks, which the install would replace. Mend: take them out of git (git rm -r --cached ${into}), then run this again`;
