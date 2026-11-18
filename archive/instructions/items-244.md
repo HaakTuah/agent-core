@@ -125,3 +125,11 @@ The index, and how an item is written: `archive/instructions.md`.
      and copies checks, the parts the first trials would replace. The owner agreed to it, with the issue's other points,
      after asking what the core lacked that let an inventory's check miss a part. It stands behind "A trial of a
      maintained tool replays the part's past bugs" in `tasks/choices.md`, and the inventory's line `Replayed:`.
+
+257. **17 November 2026**, #594. What the core is for: work its owner would approve if shown it blind, reached by the
+     right checks and balances, each kept while it raises that share and dropped when it does not, refined toward the
+     best point within reach and again as the tools change; and, since the share can be counted, a monthly blind sample
+     of the month before's merged work, laid out without its story, that the owner answers and the state report
+     counts, advisory and waiting on nothing. The owner agreed to the section and the sample, after saying the idea is
+     the core of agent-core and asking whether it has a place in the repository. It stands behind the README's "What
+     the core is for", `scripts/blind-sample.mjs` and the outcomes' line of the share approved.
