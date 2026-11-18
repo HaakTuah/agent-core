@@ -675,7 +675,7 @@ export const STEPS = [
     // (the core's licences.yml runs exact-versions.mjs itself; a project that runs the licence script from a workflow of
     // its own runs it beside it)
     check: p => {
-      if (!p.files.some(f => /(^|\/)package-lock\.json$/.test(f) && !f.startsWith(corePath(p.root) || "core/") && !f.split("/").includes("node_modules"))) return null;
+      if (!p.files.some(f => /(^|\/)(?:package-lock|npm-shrinkwrap)\.json$/.test(f) && !f.startsWith(corePath(p.root) || "core/") && !f.split("/").includes("node_modules"))) return null;
       if (calls(p, "licences.yml").length) return null;
       const own = runFiles(p, "licences.mjs");
       return own.length && !own.some(f => runFiles(p, "exact-versions.mjs").includes(f))

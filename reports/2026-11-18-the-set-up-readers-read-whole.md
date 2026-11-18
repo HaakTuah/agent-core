@@ -201,7 +201,7 @@ tracked link to `/dev/zero`: `project()` reads it as missing in 65 ms; `corePath
 steps pass it `p.manifest`). Test: one case in steps-test.mjs:280-327's link block (not on Windows, as its others).
 The kind of project: any; only its own tracked files cause it. Size: small; fits #577 or the pass's pull request.
 
-### Tests small enough for the pass's own pull request (cases in `tests/steps-test.mjs`)
+### Tests small enough for the pass's own pull request (cases in `tests/steps-test.mjs`), each done in #624
 
 **C. Every kit option round-tripped.** Run the round-trip assertion of steps-test.mjs:59-70 inside `kit()`, at
 creation, so the six kits made later (a-bare, a-plain `{}`, a-root-nuget `{nuget: ".", private}`, another-npm,
@@ -212,16 +212,18 @@ game}` (about 1.6 s each on Linux; the Windows `suites-kit` mark is 600 s, .gith
 **D. The slots the part reads, at a path not the kit's:** *shape check*, *choice records*, *progress file*, each a row
 naming another file, the step reading that file and its mend naming it. Kinds: README.md:382, 389, 400.
 
-**E. npm's second lock file:** a project with `npm-shrinkwrap.json` and no `package-lock.json`: `kind()` reads it as
+**E. npm's second lock file** (it failed, a bug of A's form: fixed in #624, both readers reading either lock file): a project with `npm-shrinkwrap.json` and no `package-lock.json`: `kind()` reads it as
 npm and the step "12 November 2026, exact versions" reads it (fresh.mjs:66, steps.mjs:678 read only
 `package-lock.json`). Kinds: licences.mjs:496-501. If it fails, it is a bug (A's form).
 
-**F. .NET project files:** `kind()` on a project holding only a `.sln`, `.slnx`, `.fsproj` or `.vbproj` reads it as
+**F. .NET project files** (and in any case of its extension, which failed: `kind()`'s pattern was case-sensitive, fixed in #624): `kind()` on a project holding only a `.sln`, `.slnx`, `.fsproj` or `.vbproj` reads it as
 NuGet (fresh.mjs:69). One in-memory loop.
 
 **G. Runners:** a job on `macos-latest` and one on an organisation's runner group read by steps.mjs:490-498 as the
-step's shell says, and by check-configs.mjs:210-211 as bash. One case beside lookup-test.mjs:369-372 and one beside
-steps-test.mjs:411-416.
+step's shell says, and by check-configs.mjs:210-211 as bash. Both cases in steps-test.mjs.
+
+**J. No or a wrong `Core:` line, read by the steps and fresh:** a kit project whose manifest has no `Core:` line, or one
+in neither form, reads its copy at `core/` with every step done, and fresh lists the line alone.
 
 ### Large, each a task filed
 
@@ -234,3 +236,18 @@ read before and after (`tasks/tests.md`).
 **I. A carried core in a submodule** (part of A, filed with it: #628): `git ls-files` lists the gitlink alone, so the copy's files are in
 no `p.files`; the steps that list `${copy}scripts/` (steps.mjs:273) see none. Test with core-yml-test.mjs:163-181's
 submodule set-up, run through `notDone` and `fresh`.
+
+**Tasks against kinds:** of the 22 "no test", 3 need none (where it is built, how it releases, *follows*). The other 19
+each have a task:
+- C: the option pairs (87-89).
+- A, #628: the copy at another path, carried by a library, its line and its floor copy (92-94, 98, 99), with I's
+  submodule (140).
+- B, fixed: a link to a device (141).
+- D: the three slots (109-111).
+- E, fixed: npm's second lock file (135).
+- F: the .NET project files (137).
+- G: the runners (131, 132).
+- J: no or a wrong `Core:` line, through the steps and fresh (100).
+- H, #629: a link on Windows (128), where git's comparison on the Windows-held project reads it.
+
+Every kind with no test has a task.

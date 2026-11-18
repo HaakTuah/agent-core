@@ -77,7 +77,20 @@ const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget
 const dirs = Object.fromEntries(Object.entries(kinds).map(([name, o]) => [name, kit(name, o)]));
 // (the pairs of options no other kit of this file is made with: npm in a private repository, a private game, a game
 // built with NuGet)
-for (const [name, o] of Object.entries({ "a-private-npm-project": { packages: ".", private: true }, "a-private-game": { private: true, game: true }, "a-dotnet-game": { nuget: "src", game: true } })) kit(name, o);
+const pairs = Object.fromEntries(Object.entries({ "a-private-npm-project": { packages: ".", private: true }, "a-private-game": { private: true, game: true }, "a-dotnet-game": { nuget: "src", game: true } }).map(([name, o]) => [name, kit(name, o)]));
+// (a manifest with no `Core:` line, or one in neither form: the copy is read at core/, the default, and nothing throws;
+// beside a fresh start the line alone is listed, as the kit writes it)
+{
+  const at = pairs["a-dotnet-game"], manifest = path.join(at, "core-manifest.md"), was = fs.readFileSync(manifest, "utf8");
+  for (const [what, text] of [["no `Core:` line", was.replace(/^Core: .*\n/m, "")], ["a `Core:` line in neither form", was.replace(/^Core: .*$/m, "Core: a line the reader does not know")]]) {
+    fs.writeFileSync(manifest, text);
+    let missed = null, found = null, threw = null;
+    try { missed = notDone(at); const p = project(at); found = differences(p, fresh(p)); } catch (e) { threw = e; }
+    ok(!threw && !missed.length && found.length === 1 && found[0].startsWith("core-manifest.md: lacks the paragraph \"Core: "),
+      `a manifest with ${what}: the steps read the copy at core/, every one done, and beside a fresh start only the line is listed`, threw?.stack ?? `${report(missed ?? [])}\n${(found ?? []).join("\n")}`);
+  }
+  fs.writeFileSync(manifest, was);
+}
 // (a named tool is done only where a workflow on pull requests runs the check with its base)
 {
   const dir = dirs["an-npm-project"], manifest = path.join(dir, "core-manifest.md"), was = fs.readFileSync(manifest, "utf8");
@@ -491,8 +504,8 @@ ok(["node $GITHUB_WORKSPACE/core/scripts/copies.mjs config/c.json", 'node "${{ g
     "a NuGet lookup on a macOS runner counts, as on Linux; one on an organisation's runner group does not");
 }
 // (a .NET project known by a solution or a project file of any of its languages: each reads as NuGet, in its folder)
-ok([["src/App.sln", "src"], ["src/App.slnx", "src"], ["src/App/App.fsproj", "src/App"], ["src/App/App.vbproj", "src/App"], ["App.sln", "."]].every(([f, at]) => kind({ ...inMemory({}, { [f]: "<Project />\n" }), root: tmp }).o.nuget === at),
-  "a project holding only a .sln, .slnx, .fsproj or .vbproj reads as a NuGet project, set up in that file's folder");
+ok([["src/App.sln", "src"], ["src/App.slnx", "src"], ["src/App/App.fsproj", "src/App"], ["src/App/App.vbproj", "src/App"], ["App.sln", "."], ["src/App.SLN", "src"]].every(([f, at]) => kind({ ...inMemory({}, { [f]: "<Project />\n" }), root: tmp }).o.nuget === at),
+  "a project holding only a .sln, .slnx, .fsproj or .vbproj, in any case, reads as a NuGet project, set up in that file's folder");
 ok(["node core\\scripts\\copies.mjs config\\c.json", 'node "core\\scripts\\copies.mjs" "config\\c.json"', "node core/scripts/copies.mjs 'config\\c.json'"].every(run => copiesOf({ "a.yml": stepped(run) }) === null),
   "a path with \"\\\", one file on Windows and another on Linux, is not read");
 ok(copiesOf({ "a.yml": stepped("node ../core/scripts/copies.mjs ../config/c.json", { "working-directory": "app" }) }) === "config/c.json"
@@ -628,6 +641,10 @@ const longEnv = Date.now();
 ok(notRead("copies", { "a.yml": stepped(`env ${"-S ".repeat(20000)}'node core/scripts/copies.mjs c.json'`) }) && Date.now() - longEnv < 1500, "many of env's options are read in one pass", `${Date.now() - longEnv} ms`);
 const versionsStep = STEPS.find(s => s.lead === "12 November 2026, exact versions");
 ok(versionsStep.check(inMemory({ "a.yml": stepped("cd tools && node scripts/exact-versions.mjs x.json") }, { "package-lock.json": "{}" })) === null, "where the project runs no licence check of its own, a companion run it cannot place asks nothing");
+// (npm known by either lock file it installs from, package-lock.json or npm-shrinkwrap.json: each reads as npm, and the
+// step asks its companion run of each)
+ok(["package-lock.json", "npm-shrinkwrap.json"].every(f => kind({ ...inMemory({}, { [f]: "{}" }), root: tmp }).o.packages === "." && typeof versionsStep.check(inMemory({ "a.yml": stepped("node core/scripts/licences.mjs l.json") }, { [f]: "{}" })) === "string"),
+  "a project holding npm-shrinkwrap.json in place of package-lock.json reads as npm, and the exact-versions step asks of it as of the other");
 // (the review of b6aaf95: a shell's options read so that its -c string is found, and a shell not given a file is not
 // read silently; more commands that run no script; a wrapper that moves the folder)
 ok(["sh -euo pipefail -c 'node core/scripts/copies.mjs config/c.json'", "bash -eo pipefail -c 'node core/scripts/copies.mjs config/c.json'", "pwsh -ep Bypass -Command 'node core/scripts/copies.mjs config/c.json'",
