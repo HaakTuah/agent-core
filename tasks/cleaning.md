@@ -81,9 +81,9 @@ code is held to: `tasks/code-shape.md`.
 
   It does not mean that the reader mends what it finds, nor that an audit made before these questions stood is made
   again: what it left unanswered is answered at the next. Nor does it mean that a dated record is brought up to date
-  (`roles/shared/how-to-work.md`, "No description left untrue"), or that a job is added for the ninth. Reason: what was measured was fixed and what was
-  judged had no standard, so two audits could not be compared; checks piled on make code harder to change; and a
-  description a change missed stays untrue until someone happens to read it. Held by the
+  (`roles/shared/how-to-work.md`, "No description left untrue"), or that a job is added for the ninth. Reason: what
+  was measured was fixed and what was judged had no standard, so two audits could not be compared; checks piled on make
+  code harder to change; and a description a change missed stays untrue until someone happens to read it. Held by the
   scheduled look, whose issue for an audit says this brief, and by the reviews of the pull request that holds the
   report, which read that each question is answered on the scale.
 - **The state report leads with the outcomes** (#302). By default the monthly state report names the five outcomes the
