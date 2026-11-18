@@ -10,7 +10,6 @@ it merges last. #579 to #591 wait on #593's point 7.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #486, points 6 to 8 and 11 | rule builder | |
 | #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue | |
 | #528, step 3 | rule builder | #527 |
 | #529, step 4 | builder | #528 |
