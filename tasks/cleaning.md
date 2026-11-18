@@ -94,11 +94,11 @@ of a kind, or builds what it asks (#593): the kinds `cleaning`, `audit` and `swe
 - **An inventory or an audit is challenged once for what it missed** (#593). By default one session makes a sweep. The
   trigger is its record written: the session that took the sweep's task then starts a fresh session that wrote no part
   of it, which reads the whole once and asks what it lacks: a part not listed, a tool not weighed, a question not put.
-  Its finds are written into the record, with a line that opens `Challenged:` and the day. It does not mean the trials
-  of a choice that is hard to undo (`tasks/choices.md`), which stay for such a choice, nor that the audit's fixed
+  Its finds are written into the record, with a line that opens `Challenged` and gives the day. It does not mean the
+  trials of a choice that is hard to undo (`tasks/choices.md`), which stay for such a choice, nor that the audit's fixed
   questions change: the challenge asks what they did not. Reason: whoever builds a sweep builds what its issue names,
-  and nothing in the flow asks what the issue itself left out. Held by no check yet: the line `Challenged:` shows that
-  it ran, and `core/scripts/holders.mjs` lists it until something holds it.
+  and nothing in the flow asks what the issue itself left out. Held by no check yet: the line `Challenged` shows that it
+  ran, and `core/scripts/holders.mjs` lists it until something holds it.
 - **The state report leads with the outcomes** (#302). By default the monthly state report names the five outcomes the
   owner named, the product does what was asked, is fast, can be read and changed by a newcomer, can be used by a new
   user, does not break, each with its direct measure first or the words that it has none yet, every other number under
