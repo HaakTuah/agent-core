@@ -287,8 +287,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that runs each case with its rules taken out, stay the core's: each costs whole sessions a month, which a project is
   not asked to carry, and a project may write a staged case of its own, which nothing asks of it. Nothing changes it.
   It does not mean that a rule with no holder, or a wrong line of the list, fails anything, is removed or stops binding,
-  that a session removes or rewords a project's rule on its own reading, that a review is a holder, or that a count of
-  a rule's citations stands in for one. Reason: a rule file read at every session's start with nothing that enforces
+  or that a session removes or rewords a project's rule on its own reading; what is no holder is as "Every rule says
+  what holds it" says. Reason: a rule file read at every session's start with nothing that enforces
   it is the case the study behind #545 measured, no gain in the work and more cost. Held by `tests/holders-test.mjs`,
   on a scratch project with one rule held and one not, by `tests/look-test.mjs`, for the report's list, and by the step
   `scripts/steps.mjs` reads for the first list.
