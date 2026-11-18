@@ -21,8 +21,8 @@
 // tool server's command points, are the review's. A tool's file, or a folder on its way, in another letter case, as the
 // commit holds it, fails, as the tool may read it, save one the base held while what the tool reads through it stands;
 // so does a submodule where a tool reads its files, save one the base held at that commit. So does a variable a tool's
-// settings set (Claude Code's "env", Codex's shell environment policy) that changes how the programs a hook runs start,
-// save one the base held while its entry stands.
+// settings set (Claude Code's "env", Codex's shell environment policy) but those KEPT lists, any other of which may
+// change how the programs a hook runs start, save one the base held while its entry stands.
 //
 // Where each hook's command comes from (#407; floor rule 3, what an agent tool starts by itself runs from its copy on
 // `main`): a hook of any tool read here runs its copy on main only where each command it may run, Codex's for Windows
@@ -203,18 +203,29 @@ function readCodex(state, json, read) {
   }
 }
 
-// The variables a shell, git, ssh, Node, the system's loader (its locales and converters among it) or the tool itself
-// reads as a program starts, before what it was given to run, where it finds its own settings and the shell it runs
-// commands with among them (HOME, XDG_CONFIG_HOME, SHELL): set by a tool's settings for the programs it starts, hooks
-// among them, they change what a hook runs, so that main's copy is not all it runs (floor rule 3). Names read as Windows
-// reads them, whatever their case.
-const STARTS = /^(?:BASH_ENV|ENV|PATH|PATHEXT|COMSPEC|HOME|XDG_CONFIG_HOME|SHELL|GCONV_PATH|LOCPATH|NLSPATH|GCM_.*|NODE_OPTIONS|NODE_PATH|SHELLOPTS|BASHOPTS|PS4|IFS|CDPATH|GLOBIGNORE|SSH_ASKPASS.*|CLAUDE_PROJECT_DIR|CLAUDE_CODE_SHELL.*|CLAUDE_CODE_GIT_BASH_PATH|GIT_.*|LD_.*|DYLD_.*|BASH_FUNC_.*)$/iu;
+// The variables a tool's settings may set for the programs it starts, each kept for its reason: any other may change
+// how a program a hook runs starts (a shell, git, ssh, Node, the system's loader), so that main's copy is not all it
+// runs (floor rule 3), and no list of such names can be shown whole, so the variables kept are listed instead. Names are
+// read as Windows reads them, whatever their case.
+const KEPT = [
+  // (Claude Code's model, provider and API settings: Claude Code reads them, no program a hook runs does)
+  /^ANTHROPIC_/iu,
+  // (Claude Code's own settings, but those that choose the shell or the shell's path a command runs with, where it looks
+  // for its settings above the project, or what it may do without asking)
+  /^CLAUDE_CODE_(?!.*(?:SHELL|GIT_BASH|AUTOMOUNT|DANGEROUS|SKIP_PERMISSIONS))/iu,
+  // (Claude Code's switches that turn a feature or a report off)
+  /^DISABLE_/iu,
+  // (Claude Code's limits and timeouts)
+  /^(?:MAX_THINKING_TOKENS|MCP_TIMEOUT|MCP_TOOL_TIMEOUT|API_TIMEOUT_MS|BASH_DEFAULT_TIMEOUT_MS|BASH_MAX_TIMEOUT_MS|BASH_MAX_OUTPUT_LENGTH)$/iu,
+  // (switches programs read for their output, their time zone or whether they report, never to find what to run)
+  /^(?:CI|TZ|NO_COLOR|FORCE_COLOR|DO_NOT_TRACK)$/iu,
+];
 // Each such variable a tool's setting `key` in `file` sets, as a problem with the entry's own text, so one the base held
 // is noted while that entry stands, whatever else of the file changes.
 function readEnv(state, file, key, env) {
   for (const [name, value] of Object.entries(state.entries(file, key, env, "each variable's name to its value"))) {
-    if (!STARTS.test(name)) continue;
-    const problem = `${file}: "${key}" sets the variable "${name}", which changes how the programs a hook runs start, so nothing shows a hook runs main's copy alone (floor rule 3). Mend: take it out of "${key}", in this pull request; where a tool needs it, the owner sets it on the machine`;
+    if (KEPT.some(kept => kept.test(name))) continue;
+    const problem = `${file}: "${key}" sets the variable "${name}", which is none of those a tool's settings may set (the agent-tools check's KEPT): another may change how the programs a hook runs start, so nothing shows a hook runs main's copy alone (floor rule 3). Mend: take it out of "${key}", in this pull request; where a tool needs it, the owner sets it on the machine, or, where it is a tool's own setting that no program a hook runs reads, its name joins KEPT with its reason`;
     state.problems.push(problem);
     state.texts.set(problem, `${file}\0${key}\0${name}\0${JSON.stringify(value)}`);
   }
