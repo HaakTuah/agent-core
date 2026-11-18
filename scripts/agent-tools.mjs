@@ -513,12 +513,13 @@ function commitReader(root, rev) {
     const d = resolve(dir);
     return d?.type === "tree" ? [...(listing(root, rev).children.get(d.f) ?? [])] : [];
   };
-  // (what a name holds, as a fingerprint reads it: a file's text, or what else stands there, a link's target among it)
+  // (what a name holds, as a fingerprint reads it: a file's object, or what else stands there, a link's target and a
+  // submodule's commit among it, each said with its kind, so no file reads as a link or another file)
   const holds = f => {
-    const text = read(f);
-    if (text !== null) return text;
+    const r = resolve(f), { ids, linked } = listing(root, rev);
+    if (r?.type === "blob") return `\0a file\0${ids.get(r.f)}`;
     const parent = resolve(path.posix.dirname(f)), real = parent ? `${parent.f === "." ? "" : `${parent.f}/`}${path.posix.basename(f)}` : null;
-    return real !== null && listing(root, rev).linked.has(real) ? `\0a link to ${textAt(root, rev, real)}` : `\0${resolve(f)?.type ?? "nothing"}`;
+    return real !== null && linked.has(real) ? `\0a link to\0${textAt(root, rev, real)}` : `\0${r?.type ?? "nothing"}\0${ids.get(r?.f) ?? ""}`;
   };
   return { resolve, read, names, holds };
 }
@@ -528,7 +529,7 @@ function commitReader(root, rev) {
 function caseProblems(root, rev) {
   const { resolve, names, holds } = commitReader(root, rev);
   return misnamed(toolPaths(names, at => resolve(at)?.type)).map(([at, want]) =>
-    [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, holds, names)]);
+    [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, holds, names, f => resolve(f)?.type)]);
 }
 
 // Each submodule where an agent tool reads its files, in whatever case, as [its problem, the commit it names]: git gives
@@ -589,15 +590,16 @@ function misnamed(paths) {
 // of a tool folder under it with its text (and a skill's SKILL.md), so one the base held is noted only while that stands.
 // Each step below `at` is found among its folder's own names, in whatever case they stand, as a file system that
 // ignores case finds it, every one that matches.
-function through(at, want, holds, names) {
+function through(at, want, holds, names, typeOf) {
   const under = f => f === want || f.startsWith(`${want}/`);
   const found = (from, rest) => rest.split("/").filter(Boolean).reduce((dirs, step) => dirs.flatMap(d => names(d).filter(n => fold(n) === fold(step)).sort().map(n => `${d}/${n}`)), [from]);
   // (each entry by what it holds, a file's text or what else stands there, so one added, taken out or changed is seen)
   const text = (name, a) => [`${name}\0${a}\0${holds(a)}`];
   const files = TOOL_FILES.filter(under).flatMap(f => found(at, f.slice(want.length)).flatMap(a => text(f, a)));
-  // (of a tool folder's entries, only what the tool reads there: a hook file of Kiro's, a skill's SKILL.md)
+  // (of a tool folder's entries, only what the tool reads there: a hook file of Kiro's, a skill's SKILL.md, and the
+  // skill's folder itself where it is no file, by what stands there, a link's target or a submodule's commit)
   const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => found(at, d.slice(want.length, -1)).flatMap(dir => names(dir).sort().flatMap(n => {
-    const reads = d === ".kiro/hooks/" ? (/\.json$/iu.test(n) ? [`${dir}/${n}`] : []) : found(`${dir}/${n}`, "SKILL.md");
+    const reads = d === ".kiro/hooks/" ? (/\.json$/iu.test(n) ? [`${dir}/${n}`] : []) : [...(typeOf(`${dir}/${n}`) === "blob" ? [] : [`${dir}/${n}`]), ...found(`${dir}/${n}`, "SKILL.md")];
     return reads.flatMap(a => text(`${d}${n}`, a));
   })));
   return [at, holds(at), ...files, ...folders].join("\0\0");
@@ -614,9 +616,10 @@ function toolPaths(names, typeOf) {
       // (nor, in a tool folder, a path that is neither what the tool reads nor a skill's folder on its way: never looked at)
       if ((!WAYS.has(low) && !inFolder) || (inFolder && !READS.test(low) && !SKILL_DIR.test(low))) continue;
       // (whatever the walk reaches that is no folder is named, a file, a link that leads nowhere or out, a submodule's
-      // entry; in a tool folder, only what the tool reads there: a hook file, a skill's SKILL.md)
-      const folder = typeOf(p) === "tree";
-      if (!folder && (!inFolder || READS.test(low))) out.push(p);
+      // entry; in a tool folder, only what the tool reads there, a hook file, a skill's SKILL.md, and a skill's folder
+      // that is neither a folder nor a file, through which the tool may read a SKILL.md this check cannot)
+      const type = typeOf(p), folder = type === "tree";
+      if (!folder && (!inFolder || READS.test(low) || (SKILL_DIR.test(low) && type !== "blob"))) out.push(p);
       if (folder && depth < 4) visit(p, depth + 1);
     }
   };
@@ -668,7 +671,7 @@ function reached(f, blobs, dirs) {
   return { f, type: blobs.has(f) ? "blob" : "commit" };
 }
 
-// The files and links of the commit `rev`, git asked once for each commit: { blobs, links, linked, others, dirs,
+// The files and links of the commit `rev`, git asked once for each commit: { blobs, links, linked, ids, others, dirs,
 // children, failed }; its bound (bytes of names) may be lowered for a test.
 const listings = new Map(), LISTING_MAX = Number(process.env.AGENT_TOOLS_LISTING_MAX) > 0 ? Number(process.env.AGENT_TOOLS_LISTING_MAX) : 1 << 28;
 function listing(root, rev) {
@@ -683,6 +686,8 @@ function listing(root, rev) {
   // (a file is a plain or an executable blob; a submodule's entry, 160000, is no file the commit holds)
   const found = { blobs: new Set(entries.filter(([mode]) => mode === "100644" || mode === "100755").map(([, at]) => at)), links: entries.filter(([mode]) => mode === "120000").map(([, at]) => at) };
   found.linked = new Set(found.links);
+  // (each entry's object, a file's blob or a submodule's commit, by its path)
+  found.ids = new Map(entries.map(([, at, id]) => [at, id]));
   // (and any other entry, a submodule's among them, and the folders on every entry's way, each by its path)
   found.others = new Set(entries.filter(([mode]) => mode !== "100644" && mode !== "100755" && mode !== "120000").map(([, at]) => at));
   // (a submodule's entry by its path, with the commit it names)
