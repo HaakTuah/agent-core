@@ -119,6 +119,7 @@ export function configured(read, skills, files = () => [], linked = () => false)
     declaredMarkets(settings, file, markets);
     readHooks(state, file, settings);
     readEnv(state, file, "env", settings?.env);
+    readCommands(state, file, settings);
     for (const [name, on] of Object.entries(entries(file, "enabledPlugins", settings?.enabledPlugins, "each plug-in's \"name@marketplace\" to true"))) if (on) { tools.set(`plugin ${name}`, file); plugins.push(name); }
   }
   // (a plug-in is what its name and its marketplace's declared source make it, so one fetched from elsewhere is another;
@@ -295,6 +296,20 @@ function addHook(state, file, { tool, event, matcher, given = matcher, hook, run
   // (the starter kit's own hooks too: they are in its form, and what they fetch must be no link, as any hook's)
   readSource(state, name, commands);
 }
+// The settings by which Claude Code runs a command of its own, not as a hook: each read as a hook is, named by its key, so
+// one not in the starter kit's form is held as a hook is (floor rule 3), and each is listed as one; a value of another
+// shape than Claude Code takes is refused.
+const COMMANDS = ["apiKeyHelper", "awsAuthRefresh", "awsCredentialExport", "gcpAuthRefresh", "otelHeadersHelper", "statusLine", "fileSuggestion"];
+function readCommands(state, file, settings) {
+  for (const key of COMMANDS) {
+    const value = settings?.[key];
+    if (value === undefined || value === null) continue;
+    const command = typeof value === "string" ? value : value?.type === "command" && typeof value.command === "string" ? value.command : null;
+    if (command === null) { state.flag(`${file}: "${key}" is neither a command nor { "type": "command", "command" }. Mend: write it as Claude Code takes it`, file); continue; }
+    addHook(state, file, { tool: "", event: key, matcher: "", hook: value, runs: true, text: command, commands: [command] });
+  }
+}
+
 // Each hook with a command that is not the starter kit's form, into `state.sources` with why: nothing shows it runs its
 // copy on main (hook-source.mjs); nor where the file the kit's form fetches the project holds as a link (`linked`), whose
 // target's name main gives in the script's place, a file the branch can change.

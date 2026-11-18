@@ -410,6 +410,17 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     fails(added(KIT_HOOK.replace("main:scripts/format.sh", `main:${spelt}`)), `and one that fetches ${spelt}, another spelling of a file`, NOT_KIT);
   passes(added(KIT_HOOK), "a new hook in the kit's form passes");
   passes(added(kitCommand(" check now")), "and so does one with plain words after its script, which main's copy reads");
+  // (the settings by which Claude Code runs a command of its own, read as hooks are)
+  const withSetting = (key, value) => ({ ".claude/settings.json": { ...JSON.parse(KIT), [key]: value } });
+  const named = (key, command) => ({ kind: "hook", name: `${key}: ${command}`, publisher: "this project" });
+  for (const [key, value] of [["apiKeyHelper", TREE_HOOK], ["awsAuthRefresh", TREE_HOOK], ["awsCredentialExport", TREE_HOOK], ["gcpAuthRefresh", TREE_HOOK], ["otelHeadersHelper", TREE_HOOK], ["statusLine", { type: "command", command: TREE_HOOK }], ["fileSuggestion", { type: "command", command: TREE_HOOK }]])
+    fails(run(pr(project({ ...script, ...listing() }), { ...withSetting(key, value), ...listing(named(key, TREE_HOOK)) })), `Claude Code's "${key}" not in the kit's form fails as a hook does`, NOT_KIT);
+  passes(run(pr(project({ ...script, ...listing() }), { ...withSetting("statusLine", { type: "command", command: KIT_HOOK }), ...listing(named("statusLine", KIT_HOOK)) })), "one in the kit's form passes, listed");
+  fails(run(pr(project({ ...script, ...listing() }), withSetting("statusLine", { type: "command", command: KIT_HOOK }))), "and fails unlisted", 'the hook "statusLine: ');
+  fails(run(pr(project({ ...script, ...listing() }), withSetting("apiKeyHelper", ["bash", "x"]))), "a setting of another shape is refused", '"apiKeyHelper" is neither a command nor');
+  const helperStood = project({ ...script, ...withSetting("apiKeyHelper", TREE_HOOK) });
+  const helperKept = run(pr(helperStood, { "README.md": "a change of its own\n" }));
+  ok(helperKept.status === 0 && helperKept.out.includes(`the hook "apiKeyHelper: ${TREE_HOOK}"`), "one the base held is noted, not failed", helperKept.out);
   fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK, fromWorkingTree)) })), "a new one marked as the baseline's fails all the same: the baseline lists only what stood", "the base held no such hook");
   const stood = project({ ...script, ".claude/settings.json": withHook(TREE_HOOK) });
   const kept = run(pr(stood, { "README.md": "a change of its own\n" }));
