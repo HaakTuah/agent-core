@@ -59,7 +59,8 @@ function entry(name) {
 
 // The package's entry file; where it is not installed, the failure. Where the job's install could not reach the
 // registry, in a project's pull request (install.mjs), a warning that the check did not run, failing nothing (#654,
-// point 4); in a job of a workflow, the mend is the install step the job lacks.
+// point 4); in a job of a workflow, the mend is the install step the job lacks, in a pull request of its own, so that a
+// sync pull request stays pure.
 function found(name) {
   const file = entry(name);
   if (!file) {
@@ -70,7 +71,7 @@ function found(name) {
       process.exit(0);
     }
     const mend = process.env.GITHUB_ACTIONS === "true"
-      ? `add a step that runs node ${install} to this job, before the step that runs this check, or, where the job has one, run the job again`
+      ? `in a pull request of its own, never a sync pull request, add the step if [ -f ${install} ]; then node ${install}; fi to this job before the step that runs this check, then run the job again; where the job has such a step, run the job again`
       : `run node ${install}, which installs the core's packages from its lock file, then run the check again`;
     console.error(`FAIL: the check did not run: the package ${name} is not installed in ${at} as package-lock.json names it. Mend: ${mend}`);
     process.exit(1);

@@ -65,9 +65,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    165; #252; #527). The packages of other publishers its scripts run are never in the copy: its `package-lock.json`
    names each, at one exact version, and `core/scripts/install.mjs` installs them from npm's registry into
    `core/node_modules/`, which the copy's `.gitignore` keeps out of git: the sync runs it after it writes the copy, a
-   session's start runs npm's own install where none is (the work-saved hook), and each of the core's workflows a
-   project calls runs it before its checks; a check that finds a package missing says it did not run, with that
-   command (#654). A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
+   session's start runs npm's own install where what is installed is not what the lock file names and the copy's npm
+   files are `main`'s own (the work-saved hook), and each of the core's workflows a project calls runs it before its
+   checks; a check that finds a package missing says it did not run, with that command (#654). Its devDependencies,
+   which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
    copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
