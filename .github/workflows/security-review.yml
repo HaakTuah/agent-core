@@ -125,6 +125,7 @@ jobs:
           ADVISORY: ${{ inputs.advisory }}
           REVIEWERS: ${{ inputs.reviewers }}
           SERVER: ${{ github.server_url }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -156,6 +157,22 @@ jobs:
             elif grep -q "HTTP 404" "$d/error"; then echo false # the head holds no such script: from before it came
             else echo true; fi
           }
+          # when the default branch's copy of a script of the check came, as the host dates it: the merge of the pull
+          # request that brought it, else that commit; nothing where it cannot be read, and the script then holds the
+          # pull request (it holds one opened since then whatever its head holds: boundOf in security-review.mjs)
+          came() {
+            local p="$ROOT/scripts/$1" c at=
+            p="${p#./}"
+            c=$(timeout 10 gh api "repos/$REPO/commits?path=$(jq -rn --arg v "$p" '$v | @uri')&sha=$(jq -rn --arg v "$DEFAULT" '$v | @uri')&per_page=1" 2> /dev/null \
+              | jq -r '.[0].sha // empty' 2> /dev/null) || c=
+            [[ "$c" =~ ^[0-9a-f]{40}$ ]] || return 0
+            at=$(timeout 10 gh api "repos/$REPO/commits/$c/pulls" 2> /dev/null \
+              | jq -r --arg b "$DEFAULT" '[.[] | select(.merged_at != null and .base.ref == $b) | .merged_at] | min // empty' 2> /dev/null) || at=
+            [ -n "$at" ] || at=$(timeout 10 gh api "repos/$REPO/commits/$c" 2> /dev/null | jq -r '.commit.committer.date // empty' 2> /dev/null) || at=
+            echo "$at"
+          }
+          # held as the workflow reads it (BOUND), and, where not, when the script came (SINCE), for the script to decide
+          bound() { BOUND=$(held "$1"); SINCE=; if [ "$BOUND" = false ]; then SINCE=$(came "$1"); fi; export BOUND SINCE; }
           # the head's commits, in a clone of its own that fetches them by the head's SHA (never a ref GitHub moves after
           # the push) and checks out nothing, all within the job's time so its status is always written, so no file of
           # the pull request's is on disk and none runs; git sends the token to this repository's own address alone,
@@ -234,7 +251,8 @@ jobs:
             else echo "The host's rights of $login could not be read: a review of theirs counts only where the input reviewers names it."; fi
           done
           jq -s '.' "$d/rights.txt" > "$d/rights.json"
-          BOUND=$(held security-review.mjs) PURE="$pure" RIGHTS="$d/rights.json" node "$ROOT/scripts/security-review.mjs" "$d/pull.json" \
+          bound security-review.mjs
+          PURE="$pure" RIGHTS="$d/rights.json" node "$ROOT/scripts/security-review.mjs" "$d/pull.json" \
             "$d/comments.json" "$d/findings.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/out.json"
           sha=$(jq -r '.sha // empty' "$d/out.json")
           if [ -z "$sha" ]; then
@@ -249,7 +267,8 @@ jobs:
           # whose core is older has no such script, and says nothing of it)
           # (a fault in it warns and leaves the job as green as the security-review status left it)
           if [ -f "$ROOT/scripts/code-review-wait.mjs" ]; then
-            if BOUND=$(held code-review-wait.mjs) node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
+            bound code-review-wait.mjs
+            if node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
               "$d/comments.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/code.json" \
               && jq -r '.status | "\(.state): \(.description)"' "$d/code.json" \
               && jq '.status' "$d/code.json" | gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then :
