@@ -50,6 +50,7 @@ const CHECKS = {
   "scripts/manifest-reads.mjs": "tests/manifest-reads-test.mjs",
   "scripts/holders.mjs": "tests/holders-test.mjs",
   "scripts/entry-files.mjs": "tests/entry-files-test.mjs",
+  "scripts/tools-offer.mjs": "tests/tools-offer-test.mjs",
   "scripts/reading.mjs": "tests/reading-test.mjs",
   "scripts/select.mjs": "tests/select-test.mjs",
   "scripts/shape.mjs": "tests/shape-test.mjs",
