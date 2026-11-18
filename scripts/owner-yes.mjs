@@ -6,7 +6,8 @@
 // `maintain` or `admin`, of an account whose type is User: tasks/github-calls.md). A quoted line passes where it is found so: whitespace counts as one blank, the issue's own
 // ">" marks are read through, and "[…]" (floor rule 11's details left out) splits a line into pieces each found in
 // one text. It never guesses: it reads text and the host's answer on each account's right. What it does not read:
-// whether the quote covers the change (the design check's), and who last edited a text (the host gives its author).
+// whether the quote covers the change (the design check's). A text that was edited counts only where every account the
+// host names among its editors has the higher right too, since one who may only write can edit another's text.
 // It reads only the core's own repository: in a project the floor and the core's review guidelines stand in the
 // copy, which a sync alone changes (floor rule 8), so a sync is never asked. gh, git and Node's own modules.
 import { spawnSync } from "node:child_process";
@@ -64,11 +65,17 @@ export function yesOf({ paths, body, texts, read = true }) {
   return { mend: `this pull request changes ${named}, which asks the owner's yes (floor rule 3), and no line it quotes under "${WORD}" stands word for word in the text of ${issues.map(n => `#${n}`).join(", ")} from an account with the higher right. Mend: ${how}; where the issue holds no yes for this change, file one asking the owner and leave this pull request unmerged meanwhile` };
 }
 
-// Of the issues `issues` of `repo`, the texts written by an account the host gives the higher right, each readable(),
-// through gh: { texts, read }, read false where an issue, a page of its comments or an account's right could not be read
-// (the texts read so far are kept, so a quote found among them still passes).
-export function textsOf(repo, issues, gh = route => { const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 24 }); return r.status === 0 ? JSON.parse(r.stdout) : null; }) {
-  const rights = new Map(), texts = [];
+// The query of GraphQL that gives, for each of `ids` (the host's node ids of issues and comments), whether it was
+// edited and by whom: the host gives every editor, the first 100 of them.
+export const editsQuery = ids => `query { nodes(ids: [${ids.map(id => JSON.stringify(id)).join(", ")}]) { id ... on UserContentEditable { lastEditedAt userContentEdits(first: 100) { totalCount nodes { editor { login } } } } } }`;
+const NODE = /^[A-Za-z0-9_=-]{1,100}$/u;
+
+// Of the issues `issues` of `repo`, the texts written by an account the host gives the higher right, and edited, where
+// at all, by such accounts alone, each readable(), through gh (a REST route, or "graphql" with its query): { texts, read },
+// read false where an issue, a page of its comments, an account's right or a text's editors could not be read, or the
+// comments ran past MOST_PAGES (the texts read so far are kept, so a quote found among them still passes).
+export function textsOf(repo, issues, gh = (route, query) => { const r = spawnSync("gh", query === undefined ? ["api", route] : ["api", "graphql", "-f", `query=${query}`], { encoding: "utf8", maxBuffer: 1 << 24 }); return r.status === 0 ? JSON.parse(r.stdout) : null; }) {
+  const rights = new Map(), texts = [], kept = [];
   let read = true;
   // (a login of no account's form, a bot's among them, is no owner; one the host does not answer on is unread)
   const higher = login => {
@@ -81,15 +88,30 @@ export function textsOf(repo, issues, gh = route => { const r = spawnSync("gh", 
   try {
     for (const n of issues) {
       const issue = gh(`repos/${repo}/issues/${n}`);
-      if (!issue) return { texts, read: false };
-      const notes = [{ login: String(issue.user?.login ?? ""), body: issue.body }];
+      if (!issue) { read = false; continue; }
+      const notes = [{ login: String(issue.user?.login ?? ""), body: issue.body, id: issue.node_id }];
       for (let page = 1; page <= MOST_PAGES; page++) {
         const one = gh(`repos/${repo}/issues/${n}/comments?per_page=100&page=${page}`);
-        if (!Array.isArray(one)) return { texts, read: false };
-        notes.push(...one.map(c => ({ login: String(c.user?.login ?? ""), body: c.body })));
+        if (!Array.isArray(one)) { read = false; break; }
+        notes.push(...one.map(c => ({ login: String(c.user?.login ?? ""), body: c.body, id: c.node_id })));
         if (one.length < 100) break;
+        // (a last page still full: comments past it were not read)
+        if (page === MOST_PAGES) read = false;
       }
-      for (const note of notes) if (higher(note.login)) texts.push(readable(note.body));
+      kept.push(...notes.filter(note => higher(note.login)));
+    }
+    // (each text kept, where its editors are all of the higher right; one whose id or editors the host does not give,
+    // or gives past its first 100, is unread)
+    const ids = kept.map(note => note.id).filter(id => typeof id === "string" && NODE.test(id));
+    if (ids.length < kept.length) read = false;
+    const nodes = ids.length ? gh("graphql", editsQuery(ids))?.data?.nodes : [];
+    const by = new Map((Array.isArray(nodes) ? nodes : []).filter(node => typeof node?.id === "string").map(node => [node.id, node]));
+    for (const note of kept) {
+      const node = by.get(note.id), edits = node?.userContentEdits;
+      if (node === undefined) { read = false; continue; }
+      if (node.lastEditedAt === null) { texts.push(readable(note.body)); continue; }
+      if (!Array.isArray(edits?.nodes) || edits.totalCount !== edits.nodes.length) { read = false; continue; }
+      if (edits.nodes.every(edit => higher(String(edit?.editor?.login ?? "")))) texts.push(readable(note.body));
     }
   } catch { return { texts, read: false }; }
   return { texts, read };
