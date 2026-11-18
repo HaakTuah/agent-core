@@ -569,6 +569,23 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(viaLink, "add", "-A"); git(viaLink, "commit", "-q", "-m", "settings through a link");
     write(viaLink, ".codex/Config.toml", "notify = [\"bash\", \"x.sh\"]\n");
     passes(run(pr(viaLink, { "README.md": "a change of its own\n" })), "an ignored file in another case is still read as ignored where a tool's folder is a link");
+    // (#600's code review of 681de78: what the tool reads there and is no file, a link out among it, is held to the base
+    // as a file's text is, by what it holds)
+    const heldDir = project({ ".Codex/hooks.json": "{}\n", ...listing() });
+    const addLink = pr(heldDir, { "README.md": "a change of its own\n" });
+    git(addLink, "checkout", "-q", "-B", "change2");
+    fs.symlinkSync(os.tmpdir(), path.join(addLink, ".Codex/config.toml"));
+    git(addLink, "add", "-A"); git(addLink, "commit", "-q", "-m", "a link out added");
+    git(addLink, "checkout", "-q", "main"); git(addLink, "merge", "-q", "--no-ff", "-m", "merge", "change2");
+    fails(run(addLink), "a link out added under a folder the base held in another case fails", "Mend: rename it to .codex");
+    const moved = project({ ".Codex/hooks.json": "{}\n", ...listing() });
+    fs.symlinkSync(os.tmpdir(), path.join(moved, ".Codex/config.toml"));
+    git(moved, "add", "-A"); git(moved, "commit", "-q", "-m", "a link out");
+    git(moved, "checkout", "-q", "-B", "change2"); fs.unlinkSync(path.join(moved, ".Codex/config.toml"));
+    fs.symlinkSync(path.dirname(os.tmpdir()), path.join(moved, ".Codex/config.toml"));
+    git(moved, "add", "-A"); git(moved, "commit", "-q", "-m", "the link moved");
+    git(moved, "checkout", "-q", "main"); git(moved, "merge", "-q", "--no-ff", "-m", "merge", "change2");
+    fails(run(moved), "and so does one whose target the pull request moves", "Mend: rename it to .codex");
     // (#600's fallback security review of 8dfe536: behind a link of the tool's own name, an entry in another case that is no
     // folder the walk reaches is named too, whatever it is)
     for (const [link, to, inside, says] of [[".kiro", "k", "hooks/x.JSON", "Mend: rename it to .kiro/hooks/x.json"], [".codex", "c", "Config.toml", "Mend: rename it to .codex/config.toml"], [".claude/skills", "../s", "n/Skill.md", "Mend: rename it to .claude/skills/n/SKILL.md"]]) {
