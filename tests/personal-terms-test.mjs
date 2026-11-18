@@ -342,6 +342,8 @@ fs.writeFileSync(path.join(keptDir, "betterleaks"), `#!/bin/sh\ntouch '${ran}'\n
 const notBuilt = check(pull([[{ "b.md": "x\n" }]]), { go: failing, store: keptTool });
 ok(sum && !notBuilt.passed && mended(notBuilt.out) && notBuilt.out.includes("could not be built here at its pin") && !fs.existsSync(ran),
   "where Betterleaks cannot be built at its pin, the check fails saying the mend, and a kept copy that differs from its sum never runs", notBuilt.out);
+const tooLong = check(pull([[{ "b.md": "x\n" }]]), { terms: `${term}\n${"q".repeat(2001)}\n` });
+ok(!tooLong.passed && mended(tooLong.out) && tooLong.out.includes("longer than 2,000 bytes") && !tooLong.out.includes(term), "a term longer than the check can read whole fails, saying the mend, never hanging", tooLong.out);
 const none = check(pull([[{ "b.md": `${term}\n` }]]), { terms: "" });
 ok(none.passed && none.out.includes("PERSONAL_TERMS is not set"), "without the secret it passes with a note: the check stays optional", none.out);
 

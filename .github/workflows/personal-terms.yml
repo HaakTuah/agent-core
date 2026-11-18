@@ -166,6 +166,11 @@ jobs:
           # back to the line it came from, by bytes (LC_ALL=C). The run stands in a folder of its own, so that no ignore
           # file there is read, and what it says on its errors, which may quote a rule, is never printed)
           longest=$(LC_ALL=C awk '{ if (length($0) > m) m = length($0) } END { print m + 0 }' "$list")
+          # (a term far longer than any name, past which the pieces' overlap would not hold it)
+          if [ "$longest" -gt 2000 ]; then
+            echo "FAIL PERSONAL_TERMS holds a term longer than 2,000 bytes, which the check cannot read whole, so nothing was read. Mend: the owner shortens that term in the repository's Actions secret PERSONAL_TERMS; a session files an issue labelled needs-owner saying so."
+            rm -rf "$work"; exit 1
+          fi
           pieces() { LC_ALL=C awk -v w=20000 -v o="$longest" 'function out(s) { print s; print "" }
             { n = length($0); if (n <= w) { out($0); next } for (i = 1; ; i += w - o) { out(substr($0, i, w)); if (i + w > n) break } }'; }
           back() { LC_ALL=C awk -v w=20000 -v o="$longest" -v h=33000 'NR == FNR { if ($1 != "") hit[$1] = 1; next }
