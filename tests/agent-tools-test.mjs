@@ -725,6 +725,16 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(chain, "add", "-A"); git(chain, "commit", "-q", "-m", "the chain moved");
     git(chain, "checkout", "-q", "main"); git(chain, "merge", "-q", "--no-ff", "-m", "merge", "change2");
     fails(run(chain), "a link on the way the pull request moves fails a path in another case the base held", "Mend: rename it to .claude/skills");
+    // (#600's fallback security review of 462c48a: a link to a folder in the checkout, moved to one whose SKILL.md is the same)
+    const twin = project({ "docs/a/SKILL.md": "# a\n", "docs/b/SKILL.md": "# a\n", "docs/b/run.sh": "echo b\n", ...listing() });
+    fs.mkdirSync(path.join(twin, ".claude/Skills"), { recursive: true });
+    fs.symlinkSync("../../docs/a", path.join(twin, ".claude/Skills/foo"));
+    git(twin, "add", "-A"); git(twin, "commit", "-q", "-m", "a skill linked in");
+    git(twin, "checkout", "-q", "-B", "change2"); fs.unlinkSync(path.join(twin, ".claude/Skills/foo"));
+    fs.symlinkSync("../../docs/b", path.join(twin, ".claude/Skills/foo"));
+    git(twin, "add", "-A"); git(twin, "commit", "-q", "-m", "the link moved");
+    git(twin, "checkout", "-q", "main"); git(twin, "merge", "-q", "--no-ff", "-m", "merge", "change2");
+    fails(run(twin), "and so does a skill's link moved to a folder whose SKILL.md is the same", "Mend: rename it to .claude/skills");
   }
 }
 
