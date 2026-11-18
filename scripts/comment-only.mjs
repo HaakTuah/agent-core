@@ -24,10 +24,12 @@
 // files outside what it reads, it refuses those that run by themselves or decide what does (RUNS_TOO below) and lists
 // the rest: it exits 0 where there are none, 1 where it refuses, and 2 where others changed, which the session's
 // "Security review:" comment says of, file by file, why each runs neither by itself nor with credentials
-// (tasks/reviews.md, point 3). It prints the head it checked, for that comment and the merge. Git and Node's own
-// modules only; it changes nothing.
+// (tasks/reviews.md, point 3). It prints the head it checked, for that comment and the merge. Git, Node's own modules
+// and the lexer of the YAML package the core carries (third-party/yaml), which says where each token of a line and each
+// block scalar's text ends, this proof deciding what it reads (#530); it changes nothing.
 import "./whole-output.mjs";
 import { execFileSync } from "node:child_process";
+import { Lexer } from "../third-party/yaml/dist/index.js";
 import { started } from "./started.mjs";
 
 export const RUNS = /(?:^|\/)(?:\.(?:github|claude)(?:\/|$)|action\.ya?ml$)/iu; // what runs by itself, as far as this proof reads it
@@ -50,123 +52,194 @@ const DIRECTIVE = /\b(?:ignore|disable|suppress|skip|allowlist|nosec|noqa|nosemg
 // a plain step's name YAML 1.1 or 1.2 reads as no string
 const NOT_TEXT = /^(?:~|null|true|false|yes|no|on|off|y|n)$/iu;
 
-// one node from `at`: { kind, text, end, comment } (kind "key" for a key, its text without the ":"), or { why }
-function node(rest, at) {
+// The text's tokens as the YAML package the core carries reads them (its lexer, third-party/yaml; #530), each
+// { src, at, content }: its text, its offset in the text, and whether it is a block scalar's text, the lines after its
+// header, which hold no YAML. The lexer's own marks, which stand for no text, are left out.
+function tokensOf(text) {
+  const out = [];
+  let at = 0, marked = false, header = false;
+  for (const src of new Lexer().lex(text)) {
+    if (src === "\x02" || src === "\x18") continue; // (a document's start; a [ ] or { } left open, read below)
+    if (src === "\x1f") { marked = true; continue; }
+    out.push({ src, at, content: marked && header });
+    if (marked) header = false;
+    else if (src[0] === "|" || src[0] === ">") header = true;
+    marked = false;
+    at += src.length;
+  }
+  return out;
+}
+
+// The text's lines, each { line, n, last, toks, content, within }: its tokens (each with `col`, its column past the
+// line's indentation), whether it is a block scalar's text, and whether it lies within a token that began on a line
+// before (a value that runs on, read as such on its first line).
+function linesOf(text, raw, broken) {
+  const starts = [];
+  for (let i = 0, at = 0; i < raw.length; at += raw[i].length + 1, i++) starts.push(at);
+  const lineAt = at => { let lo = 0, hi = starts.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (starts[mid] <= at) lo = mid; else hi = mid - 1; } return lo; };
+  const rows = raw.map((line, i) => ({ line, n: i + 1, last: i === raw.length - 1 && !broken, toks: [], content: false, within: false, indent: /^ */u.exec(line)[0].length }));
+  for (const t of tokensOf(text)) {
+    if (!t.src || t.src === "\n" || !rows.length) continue;
+    const first = lineAt(t.at), end = lineAt(t.at + t.src.length - 1);
+    if (t.content) { for (let i = first; i <= end; i++) rows[i].content = true; continue; }
+    for (let i = first + 1; i <= end; i++) rows[i].within = true;
+    if (!/^ +$/u.test(t.src)) rows[first].toks.push({ ...t, col: t.at - starts[first] - rows[first].indent, runs: end > first });
+  }
+  return rows;
+}
+
+// one node of a line's text `rest` from `at`, its tokens `toks` (each with its column in `rest`): { kind, text, start,
+// end, comment } (kind "key" for a key, its text without the ":"), or { why }
+function node(rest, toks, at) {
   while (rest[at] === " ") at++;
   if (at >= rest.length) return { kind: "empty", text: "", start: at, end: at, comment: null };
   const c = rest[at], next = rest[at + 1];
   const spaced = next === undefined || next === " ";
   if (c === "#") return rest[at - 1] === " " ? { kind: "empty", text: "", start: at, end: at, comment: at } : { why: "a # that opens no comment" };
-  if (c === "|" || c === ">") {
-    const m = HEADER.exec(rest.slice(at));
-    if (!m) return { why: "a block scalar's header this proof does not read" };
-    const comment = m[1] === undefined ? null : rest.length - m[1].length;
-    const text = rest.slice(at, comment ?? rest.length).replace(/ +$/u, "");
-    return { kind: "block", text, start: at, end: rest.length, comment, fixed: /[1-9]/u.test(text) };
+  if (c === "|" || c === ">") return header(rest, at);
+  const why = barred(c, spaced);
+  if (why) return { why };
+  const k = toks.findIndex(t => t.col === at);
+  if (k < 0) return { why: "a node the YAML package does not start where this proof does" };
+  if (c === "[" || c === "{") return flow(rest, toks, k);
+  if (c === '"' || c === "'") return quoted(rest, toks, k);
+  return plain(rest, toks, k);
+}
+
+// what a node may not start with, as this proof reads YAML: why, or null
+function barred(c, spaced) {
+  if (c === "-" && spaced) return "a sequence on a key's line";
+  if (c === ":" && spaced) return "a key with no name";
+  if ("&*!".includes(c)) return "an anchor, alias or tag";
+  if ("?%@`".includes(c)) return "an explicit key or a character YAML reserves";
+  return "]},".includes(c) ? "a [ ] or { } out of place" : null;
+}
+
+// a block scalar's header, with its comment if any
+function header(rest, at) {
+  const m = HEADER.exec(rest.slice(at));
+  if (!m) return { why: "a block scalar's header this proof does not read" };
+  const comment = m[1] === undefined ? null : rest.length - m[1].length;
+  const text = rest.slice(at, comment ?? rest.length).replace(/ +$/u, "");
+  return { kind: "block", text, start: at, end: rest.length, comment, fixed: /[1-9]/u.test(text) };
+}
+
+// a [ ] or { }, ending at the token that closes the one the k-th opens, on its own line
+function flow(rest, toks, k) {
+  const at = toks[k].col;
+  let depth = 0, j = k;
+  for (; j < toks.length; j++) {
+    if ("[{".includes(toks[j].src)) depth++;
+    else if ("]}".includes(toks[j].src) && --depth === 0) break;
   }
-  if (c === "-" && spaced) return { why: "a sequence on a key's line" };
-  if (c === ":" && spaced) return { why: "a key with no name" };
-  if ("&*!".includes(c)) return { why: "an anchor, alias or tag" };
-  if ("?%@`".includes(c)) return { why: "an explicit key or a character YAML reserves" };
-  if ("]},".includes(c)) return { why: "a [ ] or { } out of place" };
-  if (c === "[" || c === "{") {
-    let depth = 0, j = at;
-    for (; j < rest.length; j++) {
-      const ch = rest[j];
-      if (`"'#&*!`.includes(ch)) return { why: "a quote, #, anchor, alias or tag inside [ ] or { }" };
-      if (ch === "[" || ch === "{") depth++;
-      else if (ch === "]" || ch === "}") { depth--; if (depth === 0) { j++; break; } }
-    }
-    if (depth !== 0) return { why: "a [ ] or { } that runs on to the next line" };
-    return after(rest, at, j, "flow");
-  }
-  if (c === '"' || c === "'") {
-    let j = at + 1;
-    for (; j < rest.length; j++) {
-      if (c === '"' && rest[j] === "\\") { j++; continue; }
-      if (rest[j] === c) { if (c === "'" && rest[j + 1] === "'") { j++; continue; } break; }
-    }
-    if (j >= rest.length) return { why: "a quoted value that runs on to the next line" };
-    return after(rest, at, j + 1, "quoted");
-  }
-  // a plain scalar: it ends at " #" (a comment) or at ": " or a final ":" (a key)
-  for (let j = at; j < rest.length; j++) {
-    if (rest[j] === "#" && rest[j - 1] === " ") return { kind: "plain", text: rest.slice(at, j).replace(/ +$/u, ""), start: at, end: j, comment: j };
-    if (rest[j] === ":" && (j + 1 === rest.length || rest[j + 1] === " ")) return { kind: "key", text: rest.slice(at, j), start: at, end: j + 1, comment: null };
-  }
+  const end = j < toks.length ? toks[j].col + 1 : rest.length;
+  if (/["'#&*!]/u.test(rest.slice(at, end))) return { why: "a quote, #, anchor, alias or tag inside [ ] or { }" };
+  if (j >= toks.length || toks.slice(k, j).some(t => t.runs)) return { why: "a [ ] or { } that runs on to the next line" };
+  return after(rest, toks, j + 1, at, end, "flow");
+}
+
+// a quoted value, as the lexer ends it: on its own line, closed by its quote (one no backslash escapes, or past the
+// pairs of quotes that stand for one)
+function quoted(rest, toks, k) {
+  const t = toks[k], q = t.src[0], body = t.src.slice(1);
+  const trail = (q === '"' ? /\\*"$/u : /'+$/u).exec(body)?.[0] ?? "";
+  const closed = !t.runs && (q === '"' ? trail.length % 2 === 1 : trail.length % 2 === 1);
+  if (!closed) return { why: "a quoted value that runs on to the next line" };
+  return after(rest, toks, k + 1, t.col, t.col + t.src.length, "quoted");
+}
+
+// a plain value, as the lexer ends it: at " #" (a comment), or at ": " or a final ":" (a key)
+function plain(rest, toks, k) {
+  const t = toks[k], at = t.col;
+  if (t.runs) return { why: "a value that runs on to the next line" };
+  const n = toks[k + 1];
+  if (n?.src === ":" && (n.col + 1 === rest.length || rest[n.col + 1] === " ")) return { kind: "key", text: rest.slice(at, n.col), start: at, end: n.col + 1, comment: null };
+  const note = toks.slice(k + 1).find(x => x.src[0] === "#" && rest[x.col - 1] === " ");
+  if (note) return { kind: "plain", text: rest.slice(at, note.col).replace(/ +$/u, ""), start: at, end: note.col, comment: note.col };
   return { kind: "plain", text: rest.slice(at).replace(/ +$/u, ""), start: at, end: rest.length, comment: null };
 }
 
 // what may follow a quoted value or one in [ ] or { }: nothing, a comment, or the ":" that makes it a key
-function after(rest, at, end, kind) {
-  let j = end;
-  while (rest[j] === " ") j++;
-  if (j >= rest.length) return { kind, text: rest.slice(at, end), start: at, end, comment: null };
-  if (rest[j] === "#" && j > end) return { kind, text: rest.slice(at, end), start: at, end, comment: j };
-  if (rest[j] === ":" && (j + 1 === rest.length || rest[j + 1] === " ") && kind === "quoted") return { kind: "key", text: rest.slice(at, end), start: at, end: j + 1, comment: null };
+function after(rest, toks, k, at, end, kind) {
+  const n = toks[k];
+  if (!n) return { kind, text: rest.slice(at, end), start: at, end, comment: null };
+  if (n.src[0] === "#" && n.col > end) return { kind, text: rest.slice(at, end), start: at, end, comment: n.col };
+  if (n.src === ":" && (n.col + 1 === rest.length || rest[n.col + 1] === " ") && kind === "quoted") return { kind: "key", text: rest.slice(at, end), start: at, end: n.col + 1, comment: null };
   return { why: `text after a ${kind === "flow" ? "[ ] or { }" : "quoted value"}` };
+}
+
+// A block scalar's text, read by the lexer: each line as it stands, its last marked where the file ends with no line
+// break, the break being part of the text. Blank lines before its first line may not hold more spaces than it; blank
+// lines after its last are no part of it unless its header keeps them (`|+`), nor are they where they hold no more
+// spaces than its text's indentation, YAML reading a line of more spaces as text.
+function contentOf(rows, i, lines, unread) {
+  let j = i;
+  while (j < rows.length && rows[j].content) j++;
+  const block = rows.slice(i, j), blank = r => r.indent === r.line.length, first = block.find(r => !blank(r));
+  if (first && block.slice(0, block.indexOf(first)).some(r => r.line.length > first.indent)) unread.push(`line ${first.n}: a block scalar's first line less indented than a blank line before it`);
+  let end = block.length;
+  if (!lines.at(-1)?.value?.includes("+")) while (end > 0 && blank(block[end - 1]) && !(first && block[end - 1].line.length > first.indent)) end--;
+  lines.push(...block.slice(0, end).map(r => ({ n: r.n, content: true, text: r.line, last: r.last })));
+  return j;
+}
+
+// A line's key, if it has one, and its value, from `at`, past its "- "s: { key, keyCol, value } or { why }.
+function keyAndValue(rest, toks, at, indent) {
+  const first = node(rest, toks, at);
+  if (first.why || first.kind !== "key") return { key: null, keyCol: null, value: first, why: first.why };
+  const value = node(rest, toks, first.end);
+  const why = value.why ?? (value.kind === "key" ? "two keys on one line" : value.kind !== "empty" && rest[first.end] !== " " ? "a value with no space after its key" : null);
+  return { key: first.text, keyCol: indent + at, value, why };
+}
+
+// One line of YAML that is no block scalar's text, read into `lines` and `comments`, or what is unread of it.
+function entryOf(r, lines, comments, unread) {
+  const { line, n, indent } = r, rest = line.slice(indent);
+  if (rest[0] === "#") { comments.push({ text: rest, at: lines.length, own: true }); return; }
+  if (/^(?:---|\.\.\.)(?: |$)/u.test(rest)) { unread.push(`line ${n}: a document marker`); return; }
+  let at = 0, items = 0, dash = indent;
+  while (rest[at] === "-" && (at + 1 === rest.length || rest[at + 1] === " ")) { items++; dash = indent + at; at++; while (rest[at] === " ") at++; }
+  const { key, keyCol, value, why } = keyAndValue(rest, r.toks, at, indent);
+  if (why) { unread.push(`line ${n}: ${why}`); return; }
+  const cut = value.comment === null ? rest.length : value.comment;
+  const note = rest.slice(cut);
+  if (note) comments.push({ text: note, at: lines.length, own: false });
+  lines.push({ n, indent, items, key, keyCol, kind: value.kind, value: value.text, valueAt: value.kind === "empty" ? null : indent + value.start, note, text: line.slice(0, indent + cut).replace(/ +$/u, "") });
+  return value.fixed ? { from: key !== null ? keyCol : dash, keep: value.text.includes("+") } : null;
+}
+
+// A block scalar whose header gives its indentation (`|2`): its text read as more than YAML may, never less, every line
+// past the column its key or its last "- " stands at, and the blank lines among them, those after its last kept only
+// where its header keeps them. Returns the line after it.
+function fixedOf(rows, i, { from, keep }, lines) {
+  let held = [];
+  for (; i < rows.length; i++) {
+    const r = rows[i], text = { n: r.n, content: true, text: r.line, last: r.last };
+    if (r.indent === r.line.length && r.indent <= from + 1) { held.push(text); continue; }
+    if (r.indent < from + 1) break;
+    lines.push(...held, text);
+    held = [];
+  }
+  if (keep) lines.push(...held);
+  return i;
 }
 
 /** How YAML reads `text`, line by line: { lines, unread }. Each line kept is either a block scalar's ("content", as it
  *  stands) or one with its entries (items, the "- " before its key or value; key; value); comment lines and blank lines
- *  between entries are left out, a line's own comment cut off. `unread` says, by line, what this proof cannot read. */
+ *  between entries are left out, a line's own comment cut off. `unread` says, by line, what this proof cannot read.
+ *  The YAML package's lexer says where each token and each block scalar's text ends; this proof, what it reads. */
 export function readYaml(text) {
   const unread = [], lines = [], comments = [];
   const bad = UNREAD.exec(text);
   if (bad) return { lines, comments, unread: [`line ${text.slice(0, bad.index).split("\n").length}: a tab, carriage return, byte order mark, another control character or line break, or a character YAML refuses`] };
   const raw = text.split("\n"), broken = text.endsWith("\n");
   if (broken) raw.pop(); // (what follows the last line break is no line)
-  // in a block scalar: { from, keep, at, blanks }: the column its text must pass (its key's, or the last "- "'s where it
-  // has no key), whether its trailing blank lines are kept (`|+`), its text's indentation, from its header where given
-  // (one column past `from`, which reads more as text than YAML may, never less) or else once read, and the blank
-  // lines held until a line of its text follows. Blank lines after its last line
-  // are no part of it unless kept, nor are they where YAML reads a line of spaces past its indentation as text; and its
-  // last line, a blank one too, where the file ends with no line break, is marked, the break being part of the text
-  let block = null;
-  const close = () => { if (block.keep) lines.push(...block.blanks); block = null; };
-  for (let i = 0; i < raw.length; i++) {
-    const line = raw[i], n = i + 1;
-    const indent = /^ */u.exec(line)[0].length;
-    const blank = indent === line.length;
-    if (block) {
-      if (blank && !(indent > (block.at ?? Infinity))) { block.blanks.push({ n, content: true, text: line, last: i === raw.length - 1 && !broken }); continue; }
-      if (block.at === undefined) {
-        block.at = Math.max(block.from + 1, indent);
-        if (indent >= block.at && block.blanks.some(b => b.text.length > indent)) unread.push(`line ${n}: a block scalar's first line less indented than a blank line before it`);
-      }
-      if (indent >= block.at) {
-        lines.push(...block.blanks, { n, content: true, text: line, last: i === raw.length - 1 && !broken });
-        block.blanks = [];
-        continue;
-      }
-      close();
-    }
-    if (blank) continue;
-    const rest = line.slice(indent);
-    if (rest[0] === "#") { comments.push({ text: rest, at: lines.length, own: true }); continue; }
-    if (/^(?:---|\.\.\.)(?: |$)/u.test(rest)) { unread.push(`line ${n}: a document marker`); continue; }
-    let at = 0, items = 0, dash = indent;
-    while (rest[at] === "-" && (at + 1 === rest.length || rest[at + 1] === " ")) { items++; dash = indent + at; at++; while (rest[at] === " ") at++; }
-    let first = node(rest, at), key = null, keyCol = null, value = first;
-    if (first.why) { unread.push(`line ${n}: ${first.why}`); continue; }
-    if (first.kind === "key") {
-      key = first.text; keyCol = indent + at;
-      value = node(rest, first.end);
-      if (value.why) { unread.push(`line ${n}: ${value.why}`); continue; }
-      if (value.kind === "key") { unread.push(`line ${n}: two keys on one line`); continue; }
-      if (value.kind !== "empty" && rest[first.end] !== " ") { unread.push(`line ${n}: a value with no space after its key`); continue; }
-    }
-    const cut = value.comment === null ? rest.length : value.comment;
-    const valueAt = value.kind === "empty" ? null : indent + value.start;
-    const note = rest.slice(cut);
-    if (note) comments.push({ text: note, at: lines.length, own: false });
-    lines.push({ n, indent, items, key, keyCol, kind: value.kind, value: value.text, valueAt, note, text: line.slice(0, indent + cut).replace(/ +$/u, "") });
-    if (value.kind === "block") {
-      const from = key !== null ? keyCol : dash;
-      block = { from, at: value.fixed ? from + 1 : undefined, keep: value.text.includes("+"), blanks: [] };
-    }
+  const rows = linesOf(text, raw, broken);
+  for (let i = 0; i < rows.length;) {
+    if (rows[i].content) { i = contentOf(rows, i, lines, unread); continue; }
+    const fixed = rows[i].indent < rows[i].line.length && !rows[i].within ? entryOf(rows[i], lines, comments, unread) : null;
+    i = fixed ? fixedOf(rows, i + 1, fixed, lines) : i + 1;
   }
-  if (block) close();
   // one entry a line: a line that is no key and no item continues a value, or stands alone where YAML would read it so;
   // and nothing deeper may follow a line that holds its value, where YAML would read it as that value running on
   const entries = lines.filter(l => !l.content);
