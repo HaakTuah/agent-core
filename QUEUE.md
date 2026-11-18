@@ -22,7 +22,7 @@ it merges last.
 | #627 | builder | #624 |
 | #628 | builder | #577 |
 | #629 | builder | #624 and #577 |
-| #593, points 6, 10 and 11 | rule builder | #593's points 1 to 3 |
+| #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #579 | builder | |
 | #580 | builder | |
 | #581 | rule builder; it changes `AGENTS.md`'s *mutation tool* | |
@@ -79,9 +79,10 @@ it merges last.
 | #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
-| #652 | rule builder; it changes `tasks/choices.md` | |
+| #652 | rule builder | |
 | #650 | rule builder | #654 |
 | #661 | builder | |
+| #662 | rule builder | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
