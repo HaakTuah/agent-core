@@ -376,6 +376,7 @@
     "tools/codex.md: On GitHub": [169]
   },
   "numbers": {
+    "roles/shared/inbox.md: Nothing goes to the owner to be answered": "correction: misread; outcome: asked",
     "tasks/code-shape.md: A job a maintained package does is done by it": "findings; outcome: robust",
     "tasks/updates.md: Node": "correction: does not work; outcome: robust",
     "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",
