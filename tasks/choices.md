@@ -32,9 +32,9 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
     the host's own setting), the writer lists what that mechanism gives beside its main job, a line each, and says for
     each what does that job under the option, or that nothing does; the challenger reads the list for what it lacks. It
     does not mean the standard mechanism is picked, nor a list for a choice that leaves none. Reason: the record that
-    carried packages in the core's copy weighed size, the offline case and the exact copy, and never listed what a lock
-    file gives beside the install (the host's alerts, update proposals, the registry's audit, the list of what is
-    inside), each of which carrying dropped and was found one at a time (#650, #637);
+    chose to carry packages in the core's copy weighed size, the offline case and the exact copy, and never listed what
+    a lock file gives beside the install (the host's alerts, update proposals, the registry's audit, the list of what
+    is inside), each of which was lost when the packages were carried and found one at a time (#650, #637);
   - **the same trial for each option kept** (#515): each option kept goes through one trial on the project's hardest
     part, not an argument; where a stand-in was measured in an option's place (one runtime for its kind, a start-up
     time for a port), the record says so and what was not tried. Reason: two languages on that record's short list
