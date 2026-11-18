@@ -56,6 +56,13 @@ ok(many === 39999 && dup(`x${" ".repeat(100000)}y\n${"a".repeat(100000)}: 1\n`) 
 const nest = k => `x: ${"[".repeat(k)}{a: 1, a: 2}${"]".repeat(k)}\ny: 1\ny: 2\n`, deep = Date.now();
 ok(["? ", "[", "{", "- ", "? - "].every(form => dup(`${form.repeat(12500)}\n`) === "" && dup(`${form.repeat(12500)}\n`) === "") && dup(nest(125)) === "a@1<1,y@3<2" && dup(nest(126)) === "y@3<2" && Date.now() - deep < 5000,
   `a list or mapping nested past 128 deep, a document counted as one, is read as an empty value, the rest of the text read still, and twelve thousand marks of any nesting, read twice, stop nothing (#610; ${Date.now() - deep} ms)`);
+// (block nesting some thousands deep, closed by a line at a lower indent, which the package's parser cannot close: the
+// text is said to be read only in part, and the check fails it with its mend, never passing it as holding no key)
+let indented = "x:\n"; for (let i = 1; i < 2500; i++) indented += `${" ".repeat(i)}k:\n`;
+const past = [`on: push\non: pull_request\nx:\n  ${"? ".repeat(2500)}a\nz: 1\n`, `on: push\non: pull_request\nx:\n  ${"- ".repeat(5000)}a\nz: 1\n`, `on: a\non: b\n${indented}z: 1\n`];
+const unreadDeep = repeated(past.map((text, i) => ({ file: `deep${i}.yml`, text })), () => null);
+ok(past.every(t => dup(t).endsWith("null@1<null")) && unreadDeep.fails.length === 3 && unreadDeep.fails.every(l => /^FAIL deep\d\.yml:1: the file nests its lists or mappings some thousands deep, past what this check reads/.test(l)) && mended(unreadDeep.fails.join("\n")),
+  "a text nested some thousands deep in block form, past what the parser can close, is read as unread, and the check fails it with its mend (#610)", unreadDeep.fails.join("\n"));
 ok(dup("env: &defaults { FOO: one, FOO: two }\nx:\n- !t [ {c: 1, c: 2} ]\n") === "FOO@1<1,c@3<3" && dup("a: {x: &y {b: 1, b: 2}, z: !t 1, z: 2}\n") === "b@1<1,z@1<1" && dup("a: {!t b: 1, &c b: 2}\n") === "b@1<1" && dup("env: { A: 'it''s # text', A: two }\n") === "A@1<1",
   "a flow value behind an anchor or a tag is read, a node in it behind one too, and a doubled quote inside single quotes ends neither the quote nor the line");
 ok(dup("matrix: { include: [{ os: ubuntu-latest, }], os: [windows-latest] }\n") === "" && dup("jobs: { build: { runs-on: x, }, build: { runs-on: y } }\n") === "build@1<1", "a blank between a last comma and the bracket that closes a flow value closes it there");

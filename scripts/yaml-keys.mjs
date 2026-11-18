@@ -7,7 +7,10 @@
 // or a list) or an alias is passed over, and each line break, \r\n, \r or \n, is one, as GitHub reads it. What it
 // does not read: a list or mapping nested more than DEEPEST deep, far past what a workflow holds, which it reads as an
 // empty value, the rest of the text read still, since Node stops by itself where the package builds one some 800 deep
-// (#610); and text that is no YAML past where the package can read it, which GitHub refuses all the same.
+// (#610); a text whose lists or mappings nest some thousands deep in block form, past what the package's parser can
+// close, which is read as none of its keys and said so, an entry whose key is null, for the check to fail with its mend,
+// since GitHub refuses such a file all the same; and text that is no YAML past where the package can read it. It holds
+// one document's tokens at a time, so a text of many documents takes no more memory than reading them did.
 import { Composer, LineCounter, Parser, isScalar, visit } from "../third-party/yaml/dist/index.js";
 
 export const DEEPEST = 128;
@@ -42,21 +45,30 @@ export function uncommented(line) {
 }
 
 // The keys given twice in one mapping of a YAML text, each as { line, key, first }: the line of the second, the key as
-// YAML reads it and the line of the first, numbered from 1, in the order of the seconds in the text.
+// YAML reads it and the line of the first, numbered from 1, in the order of the seconds in the text; and, where the
+// text could not be read to its end, { line: 1, key: null, first: null } after them.
 export function twice(text) {
-  const found = [], lines = new LineCounter();
+  const found = [], lines = new LineCounter(), cut = new Set();
+  const composer = new Composer({ schema: "failsafe", uniqueKeys: false });
+  const read = doc => visit(doc, { Map(_, map) {
+    const seen = new Map();
+    for (const { key } of map.items) {
+      if (!isScalar(key) || !key.range || cut.has(key.range[0])) continue;
+      const name = String(key.value), at = key.range[0];
+      if (seen.has(name)) found.push({ at, line: lines.linePos(at).line, key: name, first: lines.linePos(seen.get(name)).line });
+      else seen.set(name, at);
+    }
+  } });
+  let whole = true;
   try {
-    const tokens = Array.from(new Parser(lines.addNewLine).parse(String(text).replace(/^\ufeff/u, "").replace(/\r\n?/gu, "\n")));
-    const cut = pruned(tokens);
-    for (const doc of new Composer({ schema: "failsafe", uniqueKeys: false }).compose(tokens)) visit(doc, { Map(_, map) {
-      const seen = new Map();
-      for (const { key } of map.items) {
-        if (!isScalar(key) || !key.range || cut.has(key.range[0])) continue;
-        const name = String(key.value), at = key.range[0];
-        if (seen.has(name)) found.push({ at, line: lines.linePos(at).line, key: name, first: lines.linePos(seen.get(name)).line });
-        else seen.set(name, at);
-      }
-    } });
-  } catch { return []; } // (a text that runs the package out of its stack: read as holding none)
-  return found.sort((a, b) => a.at - b.at).map(({ line, key, first }) => ({ line, key, first }));
+    // (each of the parser's tokens pruned and composed as it comes, so one document's tokens are held at a time)
+    for (const token of new Parser(lines.addNewLine).parse(String(text).replace(/^\ufeff/u, "").replace(/\r\n?/gu, "\n"))) {
+      const one = [token];
+      for (const offset of pruned(one)) cut.add(offset);
+      for (const doc of composer.next(one[0])) read(doc);
+    }
+    for (const doc of composer.end()) read(doc);
+  } catch { whole = false; } // (a text that runs the package's parser out of its stack: what was read before stands)
+  const out = found.sort((a, b) => a.at - b.at).map(({ line, key, first }) => ({ line, key, first }));
+  return whole ? out : [...out, { line: 1, key: null, first: null }];
 }

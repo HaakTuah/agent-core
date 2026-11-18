@@ -85,7 +85,10 @@ export function repeated(files, before) {
     for (const { line, key, first } of twice(text)) {
       const old = !before || held.get(key) > 0;
       held.set(key, (held.get(key) ?? 0) - 1);
-      (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}:${line}: the key ${JSON.stringify(key)} is given twice in one mapping (first on line ${first}), so GitHub refuses the whole file and runs none of its jobs${old ? (before ? ", as it did on the base" : "") : ""}. Mend: keep one of the two keys, with what both said in it (two if: conditions joined by &&, two env: mappings as one)`);
+      const was = old ? (before ? ", as it did on the base" : "") : "";
+      (old ? notes : fails).push(key === null
+        ? `${old ? "note" : "FAIL"} ${file}:${line}: the file nests its lists or mappings some thousands deep, past what this check reads, so a key given twice in it is not read, and GitHub refuses such a file all the same${was}. Mend: nest it no deeper than a workflow needs, a few levels`
+        : `${old ? "note" : "FAIL"} ${file}:${line}: the key ${JSON.stringify(key)} is given twice in one mapping (first on line ${first}), so GitHub refuses the whole file and runs none of its jobs${was}. Mend: keep one of the two keys, with what both said in it (two if: conditions joined by &&, two env: mappings as one)`);
     }
   }
   return { fails, notes };
