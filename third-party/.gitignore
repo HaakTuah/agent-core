@@ -1,0 +1,3 @@
+# Nothing here is ignored, whatever a project's own patterns say (dist/, build/, *.js): each file is the core's, and the
+# commit that syncs the copy must hold it, or core.yml finds the copy differing from the core (scripts/third-party.mjs).
+!*

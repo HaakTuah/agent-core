@@ -11,7 +11,6 @@ it merges last. #579 to #591 wait on #593's point 7.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue | |
-| #528, step 3 | rule builder | #527 |
 | #529, step 4 | builder | #528 |
 | #530, step 5 | builder; licence readers after #585 and #586 | #529 |
 | #534, point 13 | rule builder | |
