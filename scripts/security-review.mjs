@@ -3,8 +3,8 @@
 // review that starts by itself is waited for on every pull request)? Run by the core's workflow security-review.yml,
 // always from the default branch's copy, on what GitHub's own API gives of the pull request and its comments. It takes
 // two things as proof: the summary Codex's own app keeps on the pull request (its login and kind are GitHub's, which no
-// one else can post under), saying its security review is completed; or a comment that opens "Security review:" from
-// the repository's owner, an account the host lets write (a person's account whose role GitHub gives as write, maintain
+// one else can post under), saying its security review is completed; or a comment that opens "Security review:", as it
+// was first posted and never edited since (on a pull request held by the check), from the repository's owner, an account the host lets write (a person's account whose role GitHub gives as write, maintain
 // or admin, read by the workflow from its rights each run: a team's owners, roles/shared/teams.md, #412), or an account
 // the project names (the workflow's input "reviewers"), with a say in the repository by GitHub's own word (owner, member
 // or collaborator), which is how another reviewer's, or the fallback reviewer's, is posted (tasks/reviews.md, point 3;
@@ -48,7 +48,8 @@
 // rule 8's one). Given no list of the files (a workflow older than this script), it asks one review, as it did before
 // it read them; a list GitHub cut short (3000 files) is read as one that changes what runs by itself. Of a pull request
 // that leaves this script alone and whose head does not hold it as the default branch does (BOUND=false, which the
-// workflow sets), which stood before the check came, it says the second is missing and never waits for it, and so it
+// workflow sets) and that the host says was opened before the default branch's copy came, which stood before the
+// check came, it says the second is missing and never waits for it, and so it
 // says of a review posted before Codex's running one began, or before its summary last changed where it marks a finding
 // open, and of one that names no commit the head stands on, and it counts a member's or collaborator's review that it
 // does not name, saying so (AGENTS.md, "Nothing locks a project"); brought up to date with main, it is held. What it
@@ -64,7 +65,8 @@
 //
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its review comments, the same> [<its commits, the same> [<its files, the same> [<the merges proved>]]]]
-//         ADVISORY=false for a status that waits; BOUND=false for a pull request from before the check; RUN_URL for
+//         ADVISORY=false for a status that waits; BOUND=false for a pull request from before the check, with SINCE
+//         the host's time the default branch's copy of the script came, which it was opened before (boundOf); RUN_URL for
 //         the link the status carries; REVIEWERS for the accounts named; RIGHTS for a file of GitHub's answers on
 //         their rights (collaborators/<login>/permission, as a JSON list); PURE for the head pure-sync.mjs proved.
 import { readFileSync } from "node:fs";
@@ -151,26 +153,42 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
   const list = flat(comments);
-  const { all, unnamed } = postedBy(pull, list, bound, more.reviewers, more.rights);
+  const { all, unnamed, edited } = postedBy(pull, list, bound, more.reviewers, more.rights);
   const read = codex(list), review = read.review, warning = read.unread ? UNREAD : undefined;
   const { running, posted, changed } = sinceBegun(all, read);
   const { chain, stand, forHead, cut } = forTheHead(pull, commits, sha, more.merges, posted);
   let verdict = judgeWith({ sha, list, posted, forHead, stand, bind: chain !== undefined, review, pull, reviewComments, commits, changed, bound, pure: more.pure === true, cut, mends: mendsFor(read) });
   verdict = begunAfter(verdict, { sha, running, all, posted, bound });
   verdict = floorTwo(verdict, { sha, pull, files, posted, review, bound, pure: more.pure });
+  if (edited && all.length === 0 && !verdict.done) verdict = { ...verdict, why: EDITED };
   if (unnamed && verdict.done) verdict = { ...verdict, why: `${verdict.why}; a review from an account not named counts, as before this check came` };
   return warning ? { ...verdict, warning } : verdict;
 }
-// the posted reviews that count (all), and whether one by an account not named counts all the same (unnamed)
+// whether a comment stands as it was first posted: GitHub's two times for it the same, never edited since (a reaction
+// changes neither)
+export const asPosted = (comment) => typeof comment.created_at === "string" && comment.updated_at === comment.created_at;
+// what a waiting status says where a review that would count was edited after it was posted
+export const EDITED = "a \"Security review:\" was edited after it was posted, so counts no longer. Mend: post it again as a new comment";
+// whether a pull request is held by this check: always where the workflow found it held (BOUND, given as text, not
+// "false"); where its head holds an older copy of the script, only where the host says it was opened before the
+// default branch's copy came (SINCE, the host's time for that), never by where its branch began
+export function boundOf(held, pull, since) {
+  if (held !== "false") return true;
+  const opened = Date.parse(pull?.created_at), came = Date.parse(since);
+  return !(Number.isFinite(opened) && Number.isFinite(came) && opened < came);
+}
+// the posted reviews that count (all), whether one by an account not named counts all the same (unnamed), and whether
+// one that would count was edited since it was posted (edited)
 function postedBy(pull, list, bound, reviewers, rights) {
   const whose = counted(pull, reviewers, writersOf(rights));
   const writers = list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association));
   // (of a pull request whose head does not hold this check as the default branch does, which stood before it came, a
-  // member's or collaborator's review counts as it did then, and the status says so: AGENTS.md, "Nothing locks a
-  // project")
-  const all = bound ? writers.filter((comment) => whose(comment.user)) : writers;
+  // member's or collaborator's review counts as it did then, an edited one too, and the status says so: AGENTS.md,
+  // "Nothing locks a project")
+  const theirs = bound ? writers.filter((comment) => whose(comment.user)) : writers;
+  const all = bound ? theirs.filter(asPosted) : theirs;
   const unnamed = !bound && writers.some((comment) => !whose(comment.user));
-  return { all, unnamed };
+  return { all, unnamed, edited: all.length < theirs.length };
 }
 // whether Codex's own review runs, the posted reviews that count while it does, and when its summary last changed
 function sinceBegun(all, read) {
@@ -398,7 +416,7 @@ if (started(import.meta.url)) {
   };
   // (PURE: the head's whole SHA, where pure-sync.mjs, run by the workflow from the default branch's copy, proved it)
   const pull = read(pullFile);
-  const verdict = judge(pull, read(commentsFile), reviewCommentsFile ? read(reviewCommentsFile) : [], commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, process.env.BOUND !== "false",
+  const verdict = judge(pull, read(commentsFile), reviewCommentsFile ? read(reviewCommentsFile) : [], commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, boundOf(process.env.BOUND, pull, process.env.SINCE),
     { reviewers: reviewersOf(process.env.REVIEWERS), rights: process.env.RIGHTS ? read(process.env.RIGHTS) : undefined, pure: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.PURE === pull.head.sha,
       merges: mergesFile ? read(mergesFile) : undefined });
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
