@@ -164,7 +164,9 @@ export function ownHolders(root = process.cwd()) {
     if (!by.has(key)) { wrong.push(`${OWN} names "${key}", which is no rule of the project's own rule files as they stand. Mend: write the key as the rule's file and bold lead now read, or take it out where the rule has gone`); continue; }
     for (const v of (Array.isArray(value) ? value : [value]).filter(v => v !== "none")) {
       const h = holderOf(key, v, root, OWN, OWN_PATHS);
-      if (typeof h === "string") wrong.push(h); else by.get(key).push(h);
+      // (a review reads what a session judged, and fails nothing by itself: it holds no rule)
+      if (typeof h !== "string" && h.kind === "check" && /\breview/iu.test(h.by)) wrong.push(`${OWN}: "${key}" is held by "${h.by}", a review, which holds no rule. Mend: name the test, check, simulation or script that fails where the rule is broken, or write "none"`);
+      else if (typeof h === "string") wrong.push(h); else by.get(key).push(h);
     }
   }
   return { rules: all, by, wrong, start, list: text !== null };
@@ -178,7 +180,7 @@ export function ownReport(root = process.cwd(), scripts = "core/scripts") {
   const none = [...c.none.filter(k => h.start.has(k)), ...c.none.filter(k => !h.start.has(k))];
   return [
     `- Of ${c.all} rules of the project's own (${files.map(f => `\`${f}\``).join(", ")}): ${c.check} held whole by a check, ${c.audit} by the audit, ${c.part} in part; ${c.describes} describe and bind no one; ${c.none.length} have no holder (\`node ${scripts}/holders.mjs --own\`, its list \`${OWN}\`${h.list ? "" : ", not written yet"}).`,
-    ...(none.length ? [`- No holder, worst first (read at a session's start, then on need), each a task at the dose: a check where one can read its breach exactly, named in \`${OWN}\`; a move to where it is read on need; or a proposal that it goes, which is the owner's to decide. Where its file is a copy made from elsewhere, the change goes to whoever writes that source. Nothing fails meanwhile: ${none.join("; ")}.`] : []),
+    ...(none.length ? [`- No holder, worst first (read at a session's start, then on need): the session that takes this report files each as a task at the project's pace, a check where one can read its breach exactly, named in \`${OWN}\`; a move to where it is read on need; or a proposal that it goes, which is the owner's to decide. Where its file is a copy made from elsewhere, the change goes to whoever writes that source. Nothing fails meanwhile: ${none.join("; ")}.`] : []),
     ...h.wrong.map(w => `- ${w}.`),
   ];
 }

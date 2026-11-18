@@ -273,25 +273,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `scripts/holders.mjs`, in `.github/workflows/tests.yml`, which fails where `holders.json` names a rule that no longer
   stands, a check that is not there or a number in no form, and by the heading's check, which asks the line "Number:"
   where the heading holds more than "None".
-- **A project's own rules name what holds them** (#662). By default the rules a project writes for itself, each
-  paragraph or item with a bold lead in the rule files its sessions read, as its own files name them (floor rule 3's
-  and those its `SECURITY.md` adds, and the files its `AGENTS.md` and `CLAUDE.md` pull in by an `@` line, none of the
-  core's copy; never a list its owner keeps), are read as the core's are: `scripts/holders.mjs --own`, run from the
-  project, reads them against its list `checks/holders.json`, which names for each the check, test, simulation or
-  script that fails where it is broken, the audit, that it describes, or that none holds it. The starter kit writes the
-  first list, and a sync's step asks it of a project that has none. Each month the project's state report lists each
-  rule with no holder, those read at a session's start first, and its sessions work them down as tasks at the dose, as
-  the core's are (#545): a check where one can read the breach exactly, the rule moved to where it is read on need, or
-  a proposal that it goes, which is the owner's to decide; where a rule file is a copy made from elsewhere, the list is
-  made all the same, and a change to the rule goes to whoever writes that source. The staged cases, and the pruning
-  that runs each case with its rules taken out, stay the core's: each costs whole sessions a month, which a project is
-  not asked to carry, and a project may write a staged case of its own, which nothing asks of it. Nothing changes it.
-  It does not mean that a rule with no holder, or a wrong line of the list, fails anything, is removed or stops binding,
-  or that a session removes or rewords a project's rule on its own reading; what is no holder is as "Every rule says
-  what holds it" says. Reason: a rule file read at every session's start with nothing that enforces
-  it is the case the study behind #545 measured, no gain in the work and more cost. Held by `tests/holders-test.mjs`,
-  on a scratch project with one rule held and one not, by `tests/look-test.mjs`, for the report's list, and by the step
-  `scripts/steps.mjs` reads for the first list.
+- **A project's own rules name what holds them** (#662). By default the rules a project writes for itself, in the
+  rule files its sessions read as its own files name them, are read as the core's are: `scripts/holders.mjs --own`,
+  run from the project, reads them against its list `checks/holders.json`, which the starter kit writes and a sync's
+  step asks for (`setup/sync-notes.md`, which gives the files and the list's forms). Each month the session that takes
+  the project's state report files, for each rule it lists with no holder, those read at a session's start first, a
+  task at the project's pace: a check where one can read the breach exactly, the rule moved to where it is read on
+  need, or a proposal that it goes, which is the owner's to decide. The staged cases and the pruning stay the core's,
+  for the whole sessions each costs a month. Nothing changes it. It does not mean that a rule with no holder, or a wrong
+  line of the list, fails anything, is removed or stops binding, that a session rewords a project's rule on its own
+  reading, nor that a review, or how often a rule is cited, holds one. Reason: a rule file read at every session's
+  start with nothing that enforces it is the case the study behind #545 measured, no gain in the work and more cost.
+  Held by `tests/holders-test.mjs`, on a scratch project with one rule held and one not, by `tests/look-test.mjs`, for
+  the report's list, and by the step `scripts/steps.mjs` reads for the first list.
 - **Staged cases hold what no check reads** (#235). By default a rule is held by a check; where none
   can read its breach exactly, since the breach lies in what a session does, a staged case holds it: a scratch project
   (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by

@@ -381,7 +381,7 @@
     "tasks/updates.md: Node": "correction: does not work; outcome: robust",
     "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",
     "AGENTS.md: Every rule says what holds it": "findings; outcome: robust",
-    "AGENTS.md: A project's own rules name what holds them": "findings; outcome: fast",
+    "AGENTS.md: A project's own rules name what holds them": "findings; outcome: robust",
     "AGENTS.md: Rules are pruned by their numbers": "correction: misread; outcome: asked",
     "AGENTS.md: Proof is sized to what a thing costs others": "findings; outcome: robust",
     "roles/shared/teams.md: Who is an owner": "correction: misread; outcome: asked",

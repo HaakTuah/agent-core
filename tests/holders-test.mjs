@@ -139,12 +139,12 @@ let r2 = ownCli("--write");
 const written = JSON.parse(fs.readFileSync(path.join(proj, OWN), "utf8")).holders;
 ok(r2.status === 0 && Object.keys(written).length === 6 && Object.values(written).every(v => v === "none") && /6 have no holder/.test(r2.stdout),
   "--write writes the first list, each rule named as held by none, and fails nothing", `${r2.stdout}${r2.stderr}`);
-fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { ...written, "AGENTS.md: Each computer player keeps its style": "check: tests/style.test.js", "docs/design.md: Saves are small": "check: tests/saves.test.js", "AGENTS.md: Gone": "audit" } }));
+fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { ...written, "AGENTS.md: Each computer player keeps its style": "check: tests/style.test.js", "docs/design.md: Saves are small": "check: tests/saves.test.js", "AGENTS.md: Gone": "audit", "docs/play.md: A turn ends on a move": "check: the code review" } }));
 const held = ownHolders(proj), lines = ownReport(proj);
-ok(counts(held).check === 1 && counts(held).none.length === 5 && held.wrong.length === 2 && held.wrong.every(w => /Mend: /.test(w)),
-  "the list names one rule's check, which is there; one that is not there, and a rule that is gone, are wrong, each with its mend", held.wrong.join("\n"));
+ok(counts(held).check === 1 && counts(held).none.length === 5 && held.wrong.length === 3 && held.wrong.some(w => w.includes("a review, which holds no rule")) && held.wrong.every(w => /Mend: /.test(w)),
+  "the list names one rule's check, which is there; one that is not there, a review named as a check, and a rule that is gone, are wrong, each with its mend", held.wrong.join("\n"));
 const listed = lines.find(l => l.startsWith("- No holder")) ?? "";
-ok(/^- Of 6 rules of the project's own .*: 1 held whole by a check, .* 5 have no holder/.test(lines[0]) && listed.indexOf("docs/play.md: A turn ends on a move") < listed.indexOf("docs/design.md: Saves are small") && !listed.includes("Each computer player") && lines.filter(l => /Mend: /.test(l)).length === 2,
+ok(/^- Of 6 rules of the project's own .*: 1 held whole by a check, .* 5 have no holder/.test(lines[0]) && listed.indexOf("docs/play.md: A turn ends on a move") < listed.indexOf("docs/design.md: Saves are small") && !listed.includes("Each computer player") && lines.filter(l => /Mend: /.test(l)).length === 3,
   "the report's lines: the counts, the rules with no holder, those read at a session's start first, and each wrong line of the list", lines.join("\n"));
 r2 = ownCli();
 ok(r2.status === 0 && /No holder/.test(r2.stdout), "--own fails nothing, a wrong list included", `${r2.stdout}${r2.stderr}`);
