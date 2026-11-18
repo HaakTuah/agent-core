@@ -500,8 +500,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     fs.writeFileSync(path.join(manyPkg, ".gitignore"), "node_modules/\n"); fs.writeFileSync(path.join(manyPkg, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: {} }));
     for (let i = 0; i < 300; i++) fs.symlinkSync("../node_modules/pkg/agents", path.join(manyPkg, `docs/l${i}`));
     git(manyPkg, "add", "-A"); git(manyPkg, "commit", "-q", "-m", "many links into a package");
+    for (let i = 0; i < 400; i++) { fs.mkdirSync(path.join(manyPkg, `fx/f${i}`), { recursive: true }); fs.writeFileSync(path.join(manyPkg, `fx/f${i}/package.json`), "{}\n"); }
+    git(manyPkg, "add", "-A"); git(manyPkg, "commit", "-q", "-m", "and many packages");
     const manyStarted = Date.now(), manyKept = run(pr(manyPkg, { "README.md": "x\n" }));
-    ok(manyKept.status === 0 && manyKept.out.includes(WAY) && Date.now() - manyStarted < 30000, "while 300 such links the base held, nothing changed, are noted in seconds", `${Date.now() - manyStarted} ms\n${manyKept.out.slice(0, 2000)}`);
+    ok(manyKept.status === 0 && manyKept.out.includes(WAY) && Date.now() - manyStarted < 30000, "while 300 such links the base held, beside 400 packages, nothing changed, are noted in seconds", `${Date.now() - manyStarted} ms\n${manyKept.out.slice(0, 2000)}`);
     // (#647's fallback security review of 90bcf1a: a folder of agents or commands that is a link out of the checkout fails
     // as any such link does; a folder in another case a link reaches first is still read for its case; and a hook is named
     // by the path Claude Code reads it at)

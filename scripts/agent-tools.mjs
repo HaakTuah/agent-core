@@ -1106,7 +1106,8 @@ function installReadOf(root, rev, dir) {
     for (const m of text.matchAll(PATCH_FILE)) add(m[0]);
     if (/^(?:package-lock|npm-shrinkwrap)\.json$/u.test(f)) for (const resolved of npmLinks(text)) add(resolved);
   }
-  out.push(...members(l, dir).flatMap(member => INSTALL_READS.map(f => `member ${held(`${member}/${f}`)}`)));
+  // (of a member's, only those the commit holds: one it adds is seen as new all the same)
+  out.push(...members(l, dir).flatMap(member => INSTALL_READS.map(f => `${member}/${f}`).filter(f => l.blobs.has(f) || notFile(l, f)).map(f => `member ${held(f)}`)));
   for (const p of [...from].sort()) if (p !== "." && p !== ".." && !p.startsWith("../") && !path.posix.isAbsolute(p)) out.push(`from ${p}\0${everything(root, rev, p)}`);
   return out;
 }
