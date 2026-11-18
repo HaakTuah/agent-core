@@ -863,7 +863,7 @@ function sortLinks(root, base, links, fail, notes) {
     let to = null;
     try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
-    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at) === reaches(root, "HEAD", at)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
+    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at, true) === reaches(root, "HEAD", at, true)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
   }
 }

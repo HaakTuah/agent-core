@@ -855,6 +855,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       dir => { fs.unlinkSync(path.join(dir, "cl/skills")); fs.symlinkSync("../s2", path.join(dir, "cl/skills")); }, "a link under a held link out, moved, fails");
     underLink(dir => { fs.mkdirSync(path.join(dir, "cl"), { recursive: true }); fs.writeFileSync(path.join(dir, "cl/settings.json"), KIT); skillAt(dir, "s1"); fs.symlinkSync("../s1", path.join(dir, "cl/skills")); fs.symlinkSync("node_modules/../cl", path.join(dir, ".claude")); },
       dir => fs.writeFileSync(path.join(dir, "s1/x/SKILL.md"), "# changed\n"), "and so does what a link under it leads to, changed");
+    // (#618's fallback security review of 8ff37cf: and what it leads to in another case, as a file system that ignores case
+    // finds it)
+    underLink(dir => { fs.mkdirSync(path.join(dir, "cl"), { recursive: true }); fs.writeFileSync(path.join(dir, "cl/settings.json"), KIT); fs.symlinkSync("node_modules/../CL", path.join(dir, ".claude")); },
+      dir => fs.writeFileSync(path.join(dir, "cl/settings.json"), JSON.stringify({ ...JSON.parse(KIT), model: "opus" })), "and so does what it leads to in another case, changed");
   }
 }
 
