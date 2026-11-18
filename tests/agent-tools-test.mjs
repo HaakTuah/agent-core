@@ -542,6 +542,12 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(hopMoved, "checkout", "-q", "-B", "change2"); fs.unlinkSync(path.join(hopMoved, "lib/hop")); fs.symlinkSync("d/b.md", path.join(hopMoved, "lib/hop"));
     git(hopMoved, "add", "-A"); git(hopMoved, "commit", "-q", "-m", "the hop moved"); git(hopMoved, "checkout", "-q", "main"); git(hopMoved, "merge", "-q", "--no-ff", "-m", "merge", "change2");
     fails(run(hopMoved), "and one named as no Markdown file fails once a link on its way changes", LINKED);
+    // (as Windows reads a link's text, a name and the ".." after it go before any link is followed, so a link the base held
+    // whose text steps into a link and back out is held by where Windows lands, not by where the inner link leads)
+    const backOut = () => { const dir = project({ ...script, "lib/a.md": "# a\n", "lib/deep/er/k.md": "# k\n", ...listing() }); fs.symlinkSync("deep\\er", path.join(dir, "lib/l")); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("..\\..\\lib\\l\\..", path.join(dir, ".claude/agents/x")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link stepping back out of a link"); return dir; };
+    fails(run(pr(backOut(), { "lib/evil.md": "---\nname: evil\npermissionMode: default\n---\n" })), "a link the base held below agents whose Windows text steps out of a link it names fails once Markdown is added where Windows lands", LINKED);
+    const backKept = run(pr(backOut(), { "README.md": "x\n" }));
+    ok(backKept.status === 0 && backKept.out.includes(LINKED), "and is noted while nothing there changes", backKept.out);
     const loops = viaDocs();
     for (let i = 0; i < 6; i++) fs.symlinkSync(".", path.join(loops, `docs/l${i}`));
     git(loops, "add", "-A"); git(loops, "commit", "-q", "-m", "loops behind a link");
@@ -1073,6 +1079,13 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const twiceDoc = run(pr(twice(), { "Cfg/README.md": "x\n", "cfg/notes.txt": "y\n" }));
     ok(twiceDoc.status === 0 && twiceDoc.out.includes(SEVERAL), "one the base held is noted while what no tool reads under either name changes", twiceDoc.out);
     fails(run(pr(twice(), { "Cfg/settings/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what the tool may read under the name git keeps changes", SEVERAL);
+    // (a link below agents to a name the commit holds as a file and as a folder in another case, which a checkout that
+    // ignores case may give as the folder: held by the Markdown files below that folder too)
+    const fileAndFolder = () => { const dir = project({ "lib/d": "a file\n", "lib/D/b.md": "# b\n", ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../lib/d", path.join(dir, ".claude/agents/x")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link to a file and a folder that fold alike"); return dir; };
+    fails(run(pr(fileAndFolder(), { "lib/D/b.md": "---\nname: b\npermissionMode: default\n---\n" })), "a link the base held below agents to a file and a folder of another case fails once a Markdown file in the folder changes", SEVERAL);
+    fails(run(pr(fileAndFolder(), { "lib/D/deep/c.MD": "# c\n" })), "and once one is added there, at any depth", SEVERAL);
+    const bothKept = run(pr(fileAndFolder(), { "lib/D/notes.txt": "x\n" }));
+    ok(bothKept.status === 0 && bothKept.out.includes(SEVERAL), "and is noted while only what Claude Code does not read there changes", bothKept.out);
     fails(run(pr(twice(), { "Cfg/hooks/lint.json": JSON.stringify({ version: "v1", hooks: [] }) })), "nor once a hook file is added under the name git keeps", SEVERAL);
     // (its fallback security review of f8559d9: and under each spelling of each name past the first held twice)
     const twiceDeep = () => { const dir = project({ "A/b/settings/mcp.json": "{}\n", "a/b/settings/mcp.json": "{}\n", "A/B/hooks/n.txt": "x\n", "A/B/settings/mcp.json": "{}\n", ...listing() }); fs.symlinkSync("A/b", path.join(dir, ".kiro")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through names held twice"); return dir; };

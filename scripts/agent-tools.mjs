@@ -1001,11 +1001,23 @@ const topOf = root => { if (!checkouts.has(root)) checkouts.set(root, fs.realpat
 function onward(root, rev, here, how, left, at, via, hops) {
   const to = linkText(root, rev, here), names = t => t.split(how.win ? /[\\/]/u : "/");
   if (hops > most(how) || to === null) return false;
-  if (!path.posix.isAbsolute(to) && !(how.win && path.win32.isAbsolute(to))) { left.unshift(...names(to)); return true; }
+  if (!path.posix.isAbsolute(to) && !(how.win && path.win32.isAbsolute(to))) { left.unshift(...names(to)); if (how.win) byName(left); return true; }
   if (!path.isAbsolute(to)) return false;
   const start = path.parse(to).root || path.sep;
   left.unshift(...names(to.slice(start.length)));
+  if (how.win) byName(left);
   return backIn(root, start, left, at, via);
+}
+// As Windows reads a path, a name and the ".." after it go together before any link on it is followed: `left`, the rest
+// of a walk's path, with each such pair taken out, in place, a ".." it begins with kept for the folder the walk stands in.
+function byName(left) {
+  const out = [];
+  for (const n of left) {
+    if (n === "" || n === ".") continue;
+    if (n === ".." && out.length && out.at(-1) !== "..") out.pop();
+    else out.push(n);
+  }
+  left.splice(0, left.length, ...out);
 }
 // The link on the way of `at`, read as Windows reads it, whose text is a whole path on a Windows drive this machine
 // cannot follow, as [the link, its text]; null where there is none. Where such a path leads on that machine, the checkout
@@ -1205,7 +1217,11 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 function reaches(root, rev, at, follow = false, from = at, how = null) {
   const posix = from.split(path.sep).join("/"), want = fold(at.split(path.sep).join("/")), { holds, names, resolve } = commitReader(root, rev, true, follow, how);
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
-  return [through(posix, want, holds, names, f => resolve(f)?.type, p => belowDir(root, rev, p)), ...skill].join("\0\0");
+  // (below Claude Code's agents or commands, where it reaches a folder, each Markdown file and link at any depth in it, as
+  // Claude Code reads them there, under whichever of several names a checkout gives)
+  const r = MD_DIR.test(want) ? resolve(posix) : null, l = listing(root, rev);
+  const md = r?.type === "tree" ? (belowDir(root, rev, r.f) ?? entriesBelow(l, "")).filter(p => /\.md$/iu.test(p) || l.linked.has(p)).map(p => `${p}\0${holds(p)}`) : [];
+  return [through(posix, want, holds, names, f => resolve(f)?.type, p => belowDir(root, rev, p)), ...skill, ...md].join("\0\0");
 }
 // The way a link's path takes at a commit, as a fingerprint: what it reaches, and each link it passes, by its target,
 // read where it leaves the checkout and comes back in, and read again as Windows reads a link.
