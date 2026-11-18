@@ -94,9 +94,9 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
     another product. Held by the critique's last three questions.
 15. **On a desktop,** a program uses the platform's own controls and conventions, windows that resize, and right-click
     menus where users expect them, on each of the *desktop platforms*. It does not mean a site opened on a desktop, nor
-    a game's playing scene: it binds a game's menus and settings (#484). Reason: a desktop program that ignores its
-    platform feels foreign there, and a game's table on a television has no window to resize. Held by the critique and the pictures at
-    each window size.
+    a scene that fills the whole screen by design, as a table shown on a television does: there it binds the menus and
+    settings alone (#484). Reason: a desktop program that ignores its platform feels foreign there, and a scene made to
+    fill a television has no window to resize. Held by the critique and the pictures at each window size.
 
 ## What the builder does before review
 
