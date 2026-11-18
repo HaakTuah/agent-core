@@ -914,8 +914,8 @@ function walk(root, rev, f, via = [], lenient = false, misses = [], follow = fal
     let name = left.shift();
     if (name === "" || name === ".") continue;
     if (name === "..") {
-      if (!at.length && !(how && ++hops <= most(how) && backIn(root, path.dirname(topOf(root)), left, at, via))) return null;
-      at.pop();
+      hops = up(root, how, left, at, via, hops);
+      if (hops < 0) return null;
       continue;
     }
     if (follow) name = folded(listing(root, rev), at, name);
@@ -933,6 +933,13 @@ function walk(root, rev, f, via = [], lenient = false, misses = [], follow = fal
     at.push(name);
   }
   return reached(at.join("/") || ".", blobs, dirs, others);
+}
+// A walk's step back by "..", its `hops` links followed so far: out of the folder it stands in, or, at the checkout's
+// root with `how`, out of the checkout, counted as a link (backIn()); the links followed after it, or -1 where the walk
+// ends there.
+function up(root, how, left, at, via, hops) {
+  if (at.length) { at.pop(); return hops; }
+  return how && hops < most(how) && backIn(root, path.dirname(topOf(root)), left, at, via) ? hops + 1 : -1;
 }
 // How many links a walk read as `how` says follows.
 const most = how => (how?.win ? 63 : 40);
