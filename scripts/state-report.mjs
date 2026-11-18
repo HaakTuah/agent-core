@@ -161,6 +161,18 @@ export function readCounts({ repo, manifest, month, steps, gh = ghApi }) {
   return { pin, behind, steps, merged };
 }
 
+// What a push waits on and the minutes GitHub bills a pull request (wait.mjs), from a state report's measures, above its
+// counts: their numbers alone, each read by a whole-line form.
+function waitsFrom(text) {
+  const out = [];
+  for (const line of String(text ?? "").split(/\r?\n/)) {
+    let m;
+    if ((m = /^- what a push waits on: (\d{1,6}\.\d) min, the median of the last (\d{1,3}) merged pull requests' checks[,;]/.exec(line))) out.push(`a push waits ${m[1]} min (median of ${m[2]})`);
+    else if ((m = /^- billed minutes a pull request: (\d{1,9}), the median of the last (\d{1,3}) merged pull requests' last push,/.exec(line))) out.push(`billed minutes a pull request: ${m[1]} (median of ${m[2]})`);
+  }
+  return out;
+}
+
 // A project's counts for the core, from its state report's text, as one line: each count of its own heading read by a
 // whole-line form that holds numbers and fixed words alone, and written anew from what it holds, so no other text of
 // the project's reaches the core's report, then, read so from its measures, what a push waits on and the minutes GitHub
@@ -179,12 +191,7 @@ export function countsFrom(text, named, known = new Set(rules().map(r => r.key))
       out.push(`merged in ${m[1]}: ${m[2]}, the core's share ${m[3]} (sync ${m[4]}, upkeep ${m[5]}, update ${m[6]}, own ${m[7]})`);
     else if ((m = /^- merged in (\d{4}-\d\d): not read /.exec(line))) out.push(`merged in ${m[1]}: not read`);
   }
-  // (the wait and the billed minutes stand among its measures, above its counts: their numbers alone are carried)
-  for (const line of String(text ?? "").split(/\r?\n/)) {
-    let m;
-    if ((m = /^- what a push waits on: (\d{1,6}\.\d) min, the median of the last (\d{1,3}) merged pull requests' checks[,;]/.exec(line))) out.push(`a push waits ${m[1]} min (median of ${m[2]})`);
-    else if ((m = /^- billed minutes a pull request: (\d{1,9}), the median of the last (\d{1,3}) merged pull requests' last push,/.exec(line))) out.push(`billed minutes a pull request: ${m[1]} (median of ${m[2]})`);
-  }
+  out.push(...waitsFrom(text));
   const cited = citedFrom(text, known);
   if (cited) out.push(cited);
   const outcomes = open ? outcomesFrom(text) : null; // (a private project's outcomes are not carried: #450's security review)
