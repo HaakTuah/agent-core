@@ -205,10 +205,13 @@ export function licenceOk(expression, allow) {
   }
 }
 
-/** The package a registry tarball address names (`https://registry.npmjs.org/<name>/-/<file>.tgz`), or undefined. */
+/** The package a registry tarball address names (`https://registry.npmjs.org/<name>/-/<file>.tgz`), or undefined: only
+ *  an address in its one plain form, which a URL parser reads as it is written, and a name of the characters npm's
+ *  names are spelled in, so the name read is the package the address fetches. */
 export function registryName(resolved) {
-  const match = /^https:\/\/registry\.npmjs\.org\/((?:@[^/]+\/)?[^/@]+)\/-\/[^/]+\.tgz$/u.exec(resolved ?? "");
-  return match?.[1];
+  const match = /^https:\/\/registry\.npmjs\.org\/((?:@[A-Za-z0-9][\w.~-]*\/)?[A-Za-z0-9][\w.~-]*)\/-\/[A-Za-z0-9][\w.~+-]*\.tgz$/u.exec(resolved ?? "");
+  if (!match) return undefined;
+  try { return new URL(resolved).href === resolved ? match[1] : undefined; } catch { return undefined; }
 }
 
 /** The version a registry tarball address names (`.../-/<name>-<version>.tgz`, the name without its scope), or undefined. */

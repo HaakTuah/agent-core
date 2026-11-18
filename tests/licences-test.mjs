@@ -28,7 +28,9 @@ ok(all(["GPL-3.0-only", "LGPL-2.1-or-later", "MPL-2.0", "EUPL-1.2", "OSL-3.0", "
   && all(["GPL-3.0-only", "LGPL-2.1-or-later", "MPL-2.0", "EUPL-1.2", "OSL-3.0", "CECILL-2.1", "MS-RL"], code, false), "tools may use every licence the Open Source Initiative approves, what ships none of its copyleft ones");
 ok(all(["BUSL-1.1", "SSPL-1.0", "Elastic-2.0", "CC-BY-NC-4.0", "CC-BY-ND-4.0", undefined], tool, false), "nor any terms floor rule 10 never allows");
 ok(registryName("https://registry.npmjs.org/mossgrip-data/-/mossgrip-data-1.0.0.tgz") === "mossgrip-data" && registryName("https://registry.npmjs.org/@moss/grip/-/grip-1.0.0.tgz") === "@moss/grip"
-  && [undefined, "file:vendor/mossgrip-data.tgz", "vendor/mossgrip-data", "git+https://mossgrip.example/data.git", "https://mossgrip.example/mossgrip-data/-/mossgrip-data-1.0.0.tgz"].every((r) => registryName(r) === undefined),
+  && [undefined, "file:vendor/mossgrip-data.tgz", "vendor/mossgrip-data", "git+https://mossgrip.example/data.git", "https://mossgrip.example/mossgrip-data/-/mossgrip-data-1.0.0.tgz",
+    "https://registry.npmjs.org/@moss\\../z\\..\\grip/-/z\\..\\grip-1.0.0.tgz", "https://registry.npmjs.org/mossgrip-data/../grip/-/grip-1.0.0.tgz", "https://registry.npmjs.org/%2e%2e/-/grip-1.0.0.tgz"].every((r) => registryName(r) === undefined)
+  && registryName("https://registry.npmjs.org/JSONStream/-/JSONStream-1.3.5.tgz") === "JSONStream",
   "names a package by its registry address, never by a name the lockfile could be given");
 ok(registryVersion("https://registry.npmjs.org/mossgrip-data/-/mossgrip-data-1.0.0.tgz") === "1.0.0" && registryVersion("https://registry.npmjs.org/@moss/grip/-/grip-2.0.0-beta.1.tgz") === "2.0.0-beta.1"
   && registryVersion("https://registry.npmjs.org/mossgrip-data/-/lichen-1.0.0.tgz") === undefined && registryVersion("file:vendor/mossgrip-data-1.0.0.tgz") === undefined && registryVersion(undefined) === undefined,
