@@ -820,12 +820,20 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 
 // Each link out of the checkout into `fail`, save one the base held as it stands, into `notes`: what stood before turns
 // nothing red.
+// What the link `at` reaches in the commit `rev`, its path read through any folder a working copy may hold beside the
+// commit (one CI's checkout lacks among them): each link on the way, by its object, and what it reaches with all that
+// stands under it, so a link held as the base held it is held by that too.
+function reaches(root, rev, at) {
+  const via = [], l = listing(root, rev), r = walk(root, rev, at.split(path.sep).join("/"), via, true);
+  const under = r ? [...l.ids].filter(([a]) => r.f === "." || a === r.f || a.startsWith(`${r.f}/`)).sort() : [];
+  return JSON.stringify([r?.type ?? null, ...via.map(v => [v, l.ids.get(v) ?? null]), ...under]);
+}
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {
     let to = null;
     try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
-    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
+    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at) === reaches(root, "HEAD", at)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
   }
 }

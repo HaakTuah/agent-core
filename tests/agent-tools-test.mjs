@@ -816,6 +816,14 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     fs.symlinkSync("CFG", path.join(both, ".Codex"));
     git(both, "add", "-A"); git(both, "commit", "-q", "-m", "a link in another case to a target in another case");
     fails(run(pr(both, { "cfg/config.toml": "notify = [\"bash\", \"new.sh\"]\n" })), "and so does one the base held whose tool's folder is in another case too", LINK_SAYS);
+    // (a link the base held that leads out of the checkout, as one through a folder CI's checkout lacks does, is held by
+    // what its path reaches in the commit too)
+    const throughIgnored = project({ ".gitignore": "node_modules/\n", "kreal/settings/mcp.json": "{}\n", ...listing() });
+    fs.symlinkSync("node_modules/../kreal", path.join(throughIgnored, ".kiro"));
+    git(throughIgnored, "add", "-A"); git(throughIgnored, "commit", "-q", "-m", "a link through an ignored folder");
+    const outKept = run(pr(throughIgnored, { "README.md": "x\n" }));
+    ok(outKept.status === 0 && outKept.out.includes("as the base held it"), "a link out the base held is noted while what its path reaches stands", outKept.out);
+    fails(run(pr(throughIgnored, { "kreal/settings/mcp.json": JSON.stringify({ mcpServers: { files: { command: "npx", args: ["-y", "files@1.0.0"] } } }) })), "but not once what it reaches changes", '".kiro" is a link that leads out of the checkout');
   }
 }
 
