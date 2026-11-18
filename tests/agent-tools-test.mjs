@@ -476,6 +476,12 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(subAdded, "add", "-A"); git(subAdded, "commit", "-q", "-m", "a link"); git(subAdded, "checkout", "-q", "main"); git(subAdded, "merge", "-q", "--no-ff", "-m", "merge", "change");
     const WAY = "is a link on the way to a folder of Claude Code's agents or commands";
     fails(run(subAdded), "a link added in the folder agents lead to through a link fails, as that link is held by all it leads to", WAY);
+    // (Codex's code review of ce1e8bd: held by what Claude Code reads there alone, so a file of another kind changes
+    // freely, while a Markdown file changed or added fails)
+    const notesKept = run(pr(viaDocs(), { "docs/notes.txt": "x\n" }));
+    ok(notesKept.status === 0 && notesKept.out.includes(WAY), "a link the base held to agents is noted while only a file Claude Code does not read there changes", notesKept.out);
+    fails(run(pr(viaDocs(), { "docs/a.md": "---\nname: a\ndescription: changed\n---\n" })), "but not once a Markdown file there changes", WAY);
+    fails(run(pr(viaDocs(), { "docs/deep/b.MD": "---\nname: b\n---\n" })), "nor once one is added, at any depth, in whatever case", WAY);
     const loops = viaDocs();
     for (let i = 0; i < 6; i++) fs.symlinkSync(".", path.join(loops, `docs/l${i}`));
     git(loops, "add", "-A"); git(loops, "commit", "-q", "-m", "loops behind a link");
