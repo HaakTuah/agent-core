@@ -54,17 +54,18 @@ function kit(name, o) {
   // (the copies check's first baseline as the starter kit writes it, its two entry files' shared sentence listed)
   execFileSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: dir, stdio: "ignore" });
   fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), `${JSON.stringify({ reads: Object.keys(READERS), listed: {} }, null, 2)}\n`);
+  roundTrip(name, o, dir);
   return dir;
 }
-const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget: "src", private: true }, "a-game": { packages: "web", game: true } };
-const dirs = Object.fromEntries(Object.entries(kinds).map(([name, o]) => [name, kit(name, o)]));
-for (const [name, dir] of Object.entries(dirs)) {
+// (every kit, as it is written and before any case changes it: every step done, its kind read back, no difference from a
+// fresh start; so each value of each option the kit takes is held wherever a kit is made with it)
+function roundTrip(name, given, dir) {
   const missed = notDone(dir);
   ok(!missed.length && report(missed).startsWith("Every step a check reads is done"), `${name}, as the starter kit writes it: no step is reported not done`, report(missed));
   const p = project(dir);
   const { o } = kind(p);
-  ok(o.owner === "someone-else" && o.name === name && o.packages === kinds[name].packages && o.nuget === kinds[name].nuget && !!o.private === !!kinds[name].private && !!o.game === !!kinds[name].game,
-    `${name}: its kind is read from what it holds, as the starter kit was told it`, JSON.stringify(o));
+  ok(o.owner === "someone-else" && o.name === name && o.packages === given.packages && o.nuget === given.nuget && !!o.private === !!given.private && !!o.game === !!given.game,
+    `${name}: its kind is read from what it holds, as the starter kit was told it (${JSON.stringify(given)})`, JSON.stringify(o));
   const found = differences(p, fresh(p));
   ok(!found.length && freshReport(found).includes("no difference"), `${name}: beside a fresh start, no difference`, found.join("\n"));
   // (the core's own manifest check, on the modules of this commit: a module the list neither takes nor leaves out would
@@ -72,6 +73,11 @@ for (const [name, dir] of Object.entries(dirs)) {
   const moduleNotes = manifestNotes({ manifest: p.manifest, moduleTexts: { ...texts("roles/shared"), ...texts("tasks"), ...texts("tools") } });
   ok(!moduleNotes.length, `${name}: its manifest takes or leaves out each module, so the manifest check gives no note`, moduleNotes.join("\n"));
 }
+const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget: "src", private: true }, "a-game": { packages: "web", game: true } };
+const dirs = Object.fromEntries(Object.entries(kinds).map(([name, o]) => [name, kit(name, o)]));
+// (the pairs of options no other kit of this file is made with: npm in a private repository, a private game, a game
+// built with NuGet)
+for (const [name, o] of Object.entries({ "a-private-npm-project": { packages: ".", private: true }, "a-private-game": { private: true, game: true }, "a-dotnet-game": { nuget: "src", game: true } })) kit(name, o);
 // (a named tool is done only where a workflow on pull requests runs the check with its base)
 {
   const dir = dirs["an-npm-project"], manifest = path.join(dir, "core-manifest.md"), was = fs.readFileSync(manifest, "utf8");
@@ -134,6 +140,51 @@ ok(JSON.stringify(notDone(lockProject).map(m => m.lead)) === JSON.stringify(some
 for (const lead of Object.keys(STAGES).filter(l => some.includes(l))) STAGES[lead].mend(lockProject);
 ok(!notDone(lockProject).length, "and their mends make every one done");
 for (const lead of some) STAGES[lead].after?.(lockProject);
+
+// ---- a slot whose row names a file of the project's own, not the kit's: the step reads that file, its mend names it ----
+{
+  const at = dirs["a-dotnet-project"], manifest = path.join(at, "core-manifest.md"), was = fs.readFileSync(manifest, "utf8");
+  const slot = row => fs.writeFileSync(manifest, was.replace("| *large file* |", `${row}\n| *large file* |`));
+  const stepOf = lead => STEPS.filter(s => s.lead === lead);
+  const write = (f, text) => { fs.mkdirSync(path.dirname(path.join(at, f)), { recursive: true }); fs.writeFileSync(path.join(at, f), text); };
+  // (the shape check: its config at the row's path reads done; gone from there, it is reported by that path, though the
+  // kit's path still holds one)
+  const shape = stepOf("16 November 2026, how code is put together"), kitShape = fs.readFileSync(path.join(at, "checks/shape.json"), "utf8");
+  slot("| *shape check* | `core/scripts/shape.mjs` with `config/shape.json` |");
+  write("config/shape.json", kitShape);
+  const shapeThere = notDone(at, shape);
+  fs.rmSync(path.join(at, "config"), { recursive: true });
+  const shapeGone = notDone(at, shape);
+  ok(!shapeThere.length && shapeGone.length === 1 && shapeGone[0].mend.includes("`config/shape.json`") && !shapeGone[0].mend.includes("checks/shape.json"),
+    "a *shape check* row that names a config of its own: the step reads that config, and where it is gone says so by its path, never reading the kit's", `${report(shapeThere)}\n${report(shapeGone)}`);
+  // (the choice records: a record that lacks its lines is read at the row's path, and one at the kit's path is not read)
+  const today = stepOf("17 November 2026, what the project would be built on today"), lacking = "# Choices\n\n## Choice: the database\n\nWe picked one.\n";
+  slot("| *choice records* | `docs/decisions.md` |");
+  write("docs/decisions.md", lacking);
+  const choicesThere = notDone(at, today);
+  fs.rmSync(path.join(at, "docs/decisions.md"));
+  const kitChoices = fs.readFileSync(path.join(at, "docs/choices.md"), "utf8");
+  write("docs/choices.md", lacking);
+  const choicesAtKit = notDone(at, today);
+  write("docs/choices.md", kitChoices);
+  ok(choicesThere.length === 1 && choicesThere[0].mend.includes("`docs/decisions.md`") && !choicesAtKit.length,
+    "a *choice records* row that names a file of its own: the step reads that file and its mend names it, and the kit's path is not read", `${report(choicesThere)}\n${report(choicesAtKit)}`);
+  // (the progress file: one past a quarter of the general mark, with no mark of its own, is reported by the row's path;
+  // the kit's path, however long, is not read)
+  const progress = stepOf("15 November 2026, the progress file holds order only"), kitProgress = fs.readFileSync(path.join(at, "docs/PROGRESS.md"), "utf8");
+  fs.writeFileSync(manifest, was.replace("| *progress file* | `docs/PROGRESS.md` |", "| *progress file* | `PLAN.md` |"));
+  write("PLAN.md", "- #1 a line\n".repeat(1000));
+  const progressThere = notDone(at, progress);
+  write("PLAN.md", "- #1 a line\n");
+  write("docs/PROGRESS.md", "- #1 a line\n".repeat(1000));
+  const progressAtKit = notDone(at, progress);
+  write("docs/PROGRESS.md", kitProgress);
+  fs.rmSync(path.join(at, "PLAN.md"));
+  ok(progressThere.length === 1 && progressThere[0].mend.includes("Trim `PLAN.md`") && !progressAtKit.length,
+    "a *progress file* row that names a file of its own: the step reads that file and its mend names it, and the kit's path is not read", `${report(progressThere)}\n${report(progressAtKit)}`);
+  fs.writeFileSync(manifest, was);
+  ok(!notDone(at).length, "and the project as it was reads every step done again", report(notDone(at)));
+}
 
 // ---- a suite's path filter, read as GitHub reads one: `?` and `+` repeat the character before them (#379) ----
 const SUITE_LEAD = "12 November 2026, a sync and the project's own suites";
@@ -425,7 +476,23 @@ ok(["node $GITHUB_WORKSPACE/core/scripts/copies.mjs config/c.json", 'node "${{ g
     steps: [...Array.from({ length: 19000 }, () => ({ run: "echo x" })), { run: "node core/scripts/copies.mjs $GITHUB_WORKSPACE/config/c.json" }] } } };
   ok(copiesOf({ "a.yml": labelled }) === "config/c.json" && Date.now() - manyLabels < 1500, "a job's many labels, over many steps, are read once", `${Date.now() - manyLabels} ms`);
   ok(copiesOf({ "a.yml": stepped("node ../core/scripts/copies.mjs config/c.json", { "working-directory": "%GITHUB_WORKSPACE%/app" }, { "runs-on": "ubuntu-latest" }) }) === null, "a folder named by a shell's variable, which no shell fills there, is not read");
+  // (a macOS runner's shell is bash; an organisation's runner group may hold Windows machines, so its shell cannot be told)
+  ok(["macos-latest", "macos-14"].every(r => rooted("$GITHUB_WORKSPACE", {}, { "runs-on": r }) === "config/c.json" && rooted("$env:GITHUB_WORKSPACE", {}, { "runs-on": r }) === null)
+    && [{ group: "org-runners" }, { group: "org-runners", labels: ["ubuntu-latest"] }].every(r => rooted("$GITHUB_WORKSPACE", {}, { "runs-on": r }) === null && rooted("$env:GITHUB_WORKSPACE", {}, { "runs-on": r }) === null),
+    "on a macOS runner the root is read as bash names it; on an organisation's runner group, whose shell cannot be told, in no shell's spelling");
 }
+// (the same runners, read by the new-package step for whether a lookup's failure stops its step: a macOS runner's bash
+// does; a runner group's shell, which may be Windows' pwsh, cannot be told, so its lookup does not count)
+{
+  const lookupStep = STEPS.find(s => s.lead === "16 November 2026, a new package looked up");
+  const on = runner => lookupStep.check({ ...inMemory({ "a.yml": { on: { pull_request: null }, jobs: { a: { "runs-on": runner, steps: [{ uses: "actions/checkout@v7", with: { "fetch-depth": 2 } },
+    { run: "node core/scripts/lookup.mjs c.json --nuget" }, { run: "node core/scripts/nuget.mjs c.json" }] } } } }), root: tmp });
+  ok(on("ubuntu-latest") === null && on("macos-latest") === null && [{ group: "org-runners" }, { group: "org-runners", labels: ["ubuntu-latest"] }].every(r => on(r)?.includes("add a step that runs `node core/scripts/lookup.mjs`")),
+    "a NuGet lookup on a macOS runner counts, as on Linux; one on an organisation's runner group does not");
+}
+// (a .NET project known by a solution or a project file of any of its languages: each reads as NuGet, in its folder)
+ok([["src/App.sln", "src"], ["src/App.slnx", "src"], ["src/App/App.fsproj", "src/App"], ["src/App/App.vbproj", "src/App"], ["App.sln", "."]].every(([f, at]) => kind({ ...inMemory({}, { [f]: "<Project />\n" }), root: tmp }).o.nuget === at),
+  "a project holding only a .sln, .slnx, .fsproj or .vbproj reads as a NuGet project, set up in that file's folder");
 ok(["node core\\scripts\\copies.mjs config\\c.json", 'node "core\\scripts\\copies.mjs" "config\\c.json"', "node core/scripts/copies.mjs 'config\\c.json'"].every(run => copiesOf({ "a.yml": stepped(run) }) === null),
   "a path with \"\\\", one file on Windows and another on Linux, is not read");
 ok(copiesOf({ "a.yml": stepped("node ../core/scripts/copies.mjs ../config/c.json", { "working-directory": "app" }) }) === "config/c.json"
