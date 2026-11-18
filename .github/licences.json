@@ -1,5 +1,8 @@
 {
+  "lockfiles": ["tests/mutation/package-lock.json"],
   "ships": [],
+  "data": ["caniuse-lite"],
+  "ignoreScriptsIn": ["tests/mutation/.npmrc"],
   "audit": ".github/licences-audit.json",
   "scan": {
     "served": [],

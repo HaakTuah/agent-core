@@ -1,7 +1,7 @@
 // How strong the tests are (tasks/code-shape.md, "How strong the tests are"; #253), for every project that takes the
 // core: whether the tests would fail if a fault were put into the code on purpose, measured on the lines a pull request
-// changes. The project's *mutation tool* (its manifest's row; the core's AGENTS.md names its own, mutate.mjs beside
-// this file) puts the faults in and writes what it found in the open form of a mutation report (the
+// changes. The project's *mutation tool* (its manifest's row; the core's AGENTS.md names its own, Stryker run by
+// stryker.mjs beside this file) puts the faults in and writes what it found in the open form of a mutation report (the
 // mutation-testing-elements schema, as Stryker writes it); this script runs it, with no shell, as the row says,
 // `{lines}` given the lines to fault (<file>:<first>-<last>, joined by commas) and `{report}` the file to write, and
 // reads the report: a fault a test failed on (Killed, Timeout) was caught, one none did (Survived, NoCoverage)

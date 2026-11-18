@@ -47,7 +47,8 @@ then one release"; #322), and of `tasks/planning.md` the point on a task's relea
 holds no copy; the *report*: the PR's description (`reports/` keeps
 those written before 12 November 2026, and the staged cases' record); the *audits*: `reports/`; the *choice records*:
 `CHOICES.md`; the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
-the *mutation tool*: `node scripts/mutate.mjs --report {report} {lines}`, the core's own, in `tests.yml`;
+the *mutation tool*: `node scripts/stryker.mjs --tool tests/mutation --report {report} {lines}`, Stryker at the version
+`tests/mutation/`'s lock file pins (#581), in `tests.yml`;
 the archive is `archive/instructions.md`, the items behind each rule listed in `scripts/holders.json`; the *settling references* and the *descriptions*:
 `README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
 `tests.yml`, its baseline empty (#259); the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines

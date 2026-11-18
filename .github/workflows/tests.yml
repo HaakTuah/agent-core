@@ -23,9 +23,9 @@
 # says on its summary what it ran; a push to main, and a re-run, runs every suite (scripts/select.mjs; tasks/tests.md,
 # "A pull request runs the tests its change can reach"); the checks of the core itself, each a step of its own after
 # the suites, run every time.
-# After them, on Linux, the core's own mutation tool puts faults into the lines a pull request changes and runs the
-# tests that name each file against them (scripts/strength.mjs with scripts/mutate.mjs; tasks/code-shape.md, "How
-# strong the tests are"), in working copies of its own, with no secret.
+# After them, on Linux, the core's mutation tool, Stryker, puts faults into the lines a pull request changes and runs
+# the tests that name each file against them (scripts/strength.mjs with scripts/stryker.mjs; tasks/code-shape.md, "How
+# strong the tests are"), in a working copy of its own, with no secret.
 name: tests
 
 on:
@@ -184,6 +184,9 @@ jobs:
       - name: The core's own mutation tool
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/mutate-test.mjs ')) }}
         run: node tests/mutate-test.mjs
+      - name: Stryker's run as a mutation tool, without Stryker itself
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/stryker-test.mjs ')) }}
+        run: node tests/stryker-test.mjs
       - name: The stand-in's record
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/stand-in-record-test.mjs ')) }}
         run: node tests/stand-in-record-test.mjs
@@ -377,6 +380,12 @@ jobs:
       - name: What the core's own workflows and scripts use, each to its list
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
         run: node scripts/licences.mjs .github/licences.json
+      - name: Every package of the core's own lock files at one exact version, from npm's registry (floor rule 7)
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
+        run: node scripts/exact-versions.mjs .github/licences.json
+      - name: Each package a pull request brings into the core's own lock files, looked up in its registry (floor topic 15; once, on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') && github.event_name == 'pull_request' }}
+        run: node scripts/lookup.mjs .github/licences.json
       - name: Every tool the core's own agents load is listed (floor topic 15)
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
         run: node scripts/agent-tools.mjs .github/licences.json --core
@@ -399,8 +408,17 @@ jobs:
         env:
           SUITE: ${{ matrix.suite }}
         run: node scripts/shape.mjs .github/shape.json --suite "$SUITE" --since "$SUITES_START"
-      # (after the time mark, which it is no part of: the faults put into the lines a pull request changes, with the
-      # base the copies baseline fetched; the tool stops at its budget and says what it left unrun)
+      # (after the time mark, which it is no part of: Stryker, the core's mutation tool, installed from its lock file at
+      # the versions it pins, with no package's install scripts (floor rules 7 and 15), and its run tested with it; then
+      # the faults put into the lines a pull request changes, with the base the copies baseline fetched; the tool stops
+      # at its budget and says what it left unrun)
+      - name: Stryker, from its lock file, with no install scripts (once, on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'rest') && github.event_name == 'pull_request' }}
+        working-directory: tests/mutation
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Stryker's run as a mutation tool, with Stryker itself (once, on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'rest') && github.event_name == 'pull_request' && (env.RUN == 'all' || contains(env.RUN, ' tests/stryker-test.mjs ')) }}
+        run: node tests/stryker-test.mjs --tool tests/mutation
       - name: How strong the tests are, on the lines the pull request changes (once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'rest') && github.event_name == 'pull_request' }}
         env:

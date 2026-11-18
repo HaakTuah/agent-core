@@ -72,9 +72,9 @@ code is held to: `tasks/code-shape.md`.
     audit's task runs it on the whole codebase, outside the suite and on a machine where the project's tests may run
     (floor rule 18), with `core/scripts/strength.mjs --whole`, which writes the tests' strength baseline in the same
     pull request, one that changes no code or test; the reader reads its number beside the last one's
-    (`tasks/code-shape.md`, #253). That session runs `core/scripts/test-record.mjs` too, with the whole run's report
-    where the tool names every test that caught a fault (`mutate.mjs --every`), and puts its table in the report; the
-    reader decides on each test it proposes (`tasks/tests.md`).
+    (`tasks/code-shape.md`, #253). That session runs `core/scripts/test-record.mjs` too, with a whole run's report
+    that names every test that caught a fault (`mutate.mjs --every`; Stryker run by `stryker.mjs` names none), and
+    puts its table in the report; the reader decides on each test it proposes (`tasks/tests.md`).
 
   It does not mean that the reader mends what it finds, nor that an audit made before these questions stood is made
   again: what it left unanswered is answered at the next. Reason: what was measured was fixed and what was judged had

@@ -31,7 +31,9 @@ import { links, reached } from "./select.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
-const LONGEST = 60; // seconds: a test slower as it stands (a whole upgrade) is no test a fault is run against
+export const LONGEST = 60; // seconds: a test slower as it stands (a whole upgrade) is no test a fault is run against
+// The time a test may take with a fault in, in seconds, from the time it took as it stands: past it, the fault is caught.
+export const limitOf = took => Math.max(10, Math.ceil(3 * took + 5));
 // (git's settings that run a command by themselves, off: no hook runs as a working copy is checked out)
 const SAFE = ["-c", "core.fsmonitor=false", "-c", `core.hooksPath=${os.devNull}`];
 const git = (args, cwd = ".") => execFileSync("git", [...SAFE, ...args], { cwd, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
@@ -40,8 +42,8 @@ const SINGLE = { "<": "<=", ">": ">=" };
 const NAMES = { "&&": "LogicalOperator", "||": "LogicalOperator", "+": "ArithmeticOperator", "-": "ArithmeticOperator" };
 const VALUE = new Set(["str", "num", "regex"]);
 
-class Refused extends Error {}
-const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
+export class Refused extends Error {}
+export const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
 
 // The line and column (both from 1) of an offset in a text.
 function placeOf(src, at) {
@@ -92,7 +94,7 @@ export function faults(src, wanted = () => true) {
 
 // The files and lines named on the command line: a Map of file to a function of a line number, or null for every
 // line of every file of the code.
-function wantedOf(args, code) {
+export function wantedOf(args, code) {
   if (!args.length) return new Map(code.map(f => [f, () => true]));
   const out = new Map();
   for (const part of args.flatMap(a => a.split(",")).filter(Boolean)) {
@@ -130,10 +132,10 @@ function jobsOf({ wanted, texts, tests, testTexts, config, every }) {
 
 // The tests running now, each stopped with what it started where the run is stopped (`stopAll`).
 const live = new Set();
-const stopAll = () => { for (const stop of live) stop(); };
+export const stopAll = () => { for (const stop of live) stop(); };
 
 // One run of a test file in a working copy: "passed", "failed" or "timeout", and how long it took, in seconds.
-function run(test, cwd, limit) {
+export function run(test, cwd, limit) {
   return new Promise(done => {
     // (in a group of its own off Windows, so that a test past its time is stopped with what it started)
     const start = Date.now(), group = process.platform !== "win32", child = spawn(process.execPath, [test], { cwd, stdio: "ignore", detached: group });
@@ -168,7 +170,7 @@ function noLinkOnTheWay(dir, f) {
 
 // A working copy of the project: a git worktree of HEAD, with the files that differ from it, staged or not, and the new
 // ones copied in, those deleted taken out, and its installed dependencies linked.
-function copyOf(dir) {
+export function copyOf(dir) {
   git(["worktree", "add", "--detach", "--quiet", dir, "HEAD"]);
   const differ = [...git(["diff", "-z", "--name-only", "--no-renames", "HEAD"]).split("\0"), ...git(["ls-files", "-z", "--others", "--exclude-standard"]).split("\0")].filter(Boolean);
   for (const f of differ) {
@@ -226,7 +228,7 @@ function linkInstalled(installed, to, dir) {
 async function judge(jobs, copies, budget, every = false) {
   const until = Date.now() + budget * 1000, asIs = new Map(), left = new Set();
   const checked = (test, dir) => {
-    if (!asIs.has(test)) asIs.set(test, run(test, dir, LONGEST).then(r => (r.result === "passed" ? Math.max(10, Math.ceil(3 * r.took + 5)) : (left.add(test), 0))));
+    if (!asIs.has(test)) asIs.set(test, run(test, dir, LONGEST).then(r => (r.result === "passed" ? limitOf(r.took) : (left.add(test), 0))));
     return asIs.get(test);
   };
   const one = async (job, dir) => {
@@ -271,11 +273,23 @@ export function report(texts, jobs) {
 }
 
 // The working copies taken away, as the run ends or is stopped.
-function takeAway(copies, scratch) {
+export function takeAway(copies, scratch) {
   for (const to of linked.splice(0)) unlink(to);
   for (const dir of copies.splice(0)) try { git(["worktree", "remove", "--force", dir]); } catch { /* (taken away below) */ }
   fs.rmSync(scratch, { recursive: true, force: true });
   try { git(["worktree", "prune"]); } catch { /* (nothing to prune) */ }
+}
+
+// The project's code and tests, as the shape check's config (where shape.mjs finds it) reads them: the config, each
+// file's text, the tests, the files of code that are no test, and each test's text.
+export function projectOf() {
+  const rules = [path.join(".", "core-manifest.md"), path.join(".", "AGENTS.md")].map(f => (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : null)).find(t => t !== null);
+  const configAt = where(rules);
+  try { notLinked(configAt); } catch (e) { refuse(String(e.message).split(". Mend: ")[0], "make the shape check's config a plain file of the project's own"); }
+  const config = parseConfig(fs.readFileSync(configAt, "utf8"), configAt);
+  const { texts, tests } = standing(config);
+  const code = Object.keys(texts).filter(f => !tests.has(f) && !f.endsWith("package.json"));
+  return { config, texts, tests, code, testTexts: Object.fromEntries([...tests].filter(t => t in texts).map(t => [t, texts[t]])) };
 }
 
 async function main(argv) {
@@ -283,13 +297,8 @@ async function main(argv) {
   const b = argv.indexOf("--budget"), budget = Number(b >= 0 ? argv[b + 1] : process.env.MUTATE_BUDGET || Infinity);
   if (!out || !(budget > 0)) refuse("the mutation tool was not told where to write its report, or its budget is no number of seconds", "run node scripts/mutate.mjs --report <file> [--budget <seconds>] [<file>[:<first>-<last>],...]");
   const every = argv.includes("--every"), named = argv.filter((a, i) => i !== at && i !== at + 1 && i !== b && i !== b + 1 && a !== "--every");
-  const rules = [path.join(".", "core-manifest.md"), path.join(".", "AGENTS.md")].map(f => (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : null)).find(t => t !== null);
-  const configAt = where(rules);
-  try { notLinked(configAt); } catch (e) { refuse(String(e.message).split(". Mend: ")[0], "make the shape check's config a plain file of the project's own"); }
-  const config = parseConfig(fs.readFileSync(configAt, "utf8"), configAt);
-  const { texts, tests } = standing(config);
-  const code = Object.keys(texts).filter(f => !tests.has(f) && !f.endsWith("package.json"));
-  const wanted = wantedOf(named, code), testTexts = Object.fromEntries([...tests].filter(t => t in texts).map(t => [t, texts[t]]));
+  const { config, texts, tests, code, testTexts } = projectOf();
+  const wanted = wantedOf(named, code);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "mutate-")), copies = [];
   const stop = () => { stopAll(); takeAway(copies, scratch); process.exit(130); };
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, stop);
