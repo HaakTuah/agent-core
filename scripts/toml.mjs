@@ -1,5 +1,5 @@
 // A reader of TOML for what the core's checks read in a project's own files, Codex's `.codex/config.toml` first
-// (agent-tools.mjs): the `smol-toml` package carried in third-party/ reads it (#530), and this module gives what it read
+// (agent-tools.mjs): the `smol-toml` package, installed from the core's lock file (#654), reads it (#530), and this module gives what it read
 // as JSON would hold it: true and false as booleans, a whole number JavaScript holds exactly as a number, and any other
 // number or a date as text, which no check here reads. Text the package cannot read as TOML, a key given twice
 // included, is refused, as the tool that reads the file refuses it, and so is a value nested deeper than guards.mjs's
@@ -7,8 +7,12 @@
 //
 //   import { parseToml } from "./toml.mjs";   parseToml(text) -> an object, or throws a SyntaxError naming the line, or,
 //                                             where the whole nests too deep, saying so of the file
-import { parse, TomlDate, TomlError } from "../third-party/smol-toml/dist/index.cjs";
 import { DEEPEST, tooDeep } from "./guards.mjs";
+import { loadSync } from "./packages.mjs";
+
+// (loaded where parseToml first runs, so a script that imports this module for nothing it reads runs with nothing
+// installed; plain and scalar run only under parseToml)
+let toml;
 
 // (a key set as a plain property, never through a setter: "__proto__" is a key like any other)
 const put = (table, key, value) => Object.defineProperty(table, key, { value, enumerable: true, writable: true, configurable: true });
@@ -19,8 +23,9 @@ export function parseToml(text) {
   const raw = String(text), s = /\r(?!\n)/u.test(raw) ? raw : raw.replace(/\r\n/gu, "\n"), lost = quotesLost(s);
   if (lost >= 0) throw new SyntaxError(`line ${s.slice(0, lost).split("\n").length}: a string's line-ending backslash runs into its closing quotes, which the TOML package reads wrong`);
   let read;
-  try { read = parse(s, { integersAsBigInt: true, maxDepth: DEEPEST }); } catch (e) {
-    if (!(e instanceof TomlError)) throw new SyntaxError(`the file cannot be read as TOML (${String(e?.message ?? e).split("\n")[0]})`);
+  toml ??= loadSync("smol-toml");
+  try { read = toml.parse(s, { integersAsBigInt: true, maxDepth: DEEPEST }); } catch (e) {
+    if (!(e instanceof toml.TomlError)) throw new SyntaxError(`the file cannot be read as TOML (${String(e?.message ?? e).split("\n")[0]})`);
     const what = e.message.split("\n")[0].replace(/^Invalid TOML document: /u, "");
     throw new SyntaxError(`line ${e.line}: ${/excessively nested/u.test(what) ? `a value nests deeper than ${DEEPEST}` : what}`);
   }
@@ -80,7 +85,7 @@ function plain(value) {
       const out = new Array(v.length);
       put(into, key, out);
       for (let k = v.length - 1; k >= 0; k--) stack.push([v[k], out, k]);
-    } else if (v !== null && typeof v === "object" && !(v instanceof TomlDate)) {
+    } else if (v !== null && typeof v === "object" && !(v instanceof toml.TomlDate)) {
       const out = {};
       put(into, key, out);
       // (each table's keys put in the order they were written, as the stack gives them back)
@@ -94,6 +99,6 @@ function plain(value) {
 function scalar(v) {
   if (typeof v === "bigint") return Number.isSafeInteger(Number(v)) ? Number(v) : String(v);
   if (typeof v === "number") return Number.isNaN(v) ? "nan" : v === Infinity ? "inf" : v === -Infinity ? "-inf" : Number.isInteger(v) ? v.toFixed(1) : String(v);
-  if (v instanceof TomlDate) return v.toISOString();
+  if (v instanceof toml.TomlDate) return v.toISOString();
   return v;
 }

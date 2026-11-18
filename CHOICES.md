@@ -286,6 +286,19 @@ adds this record.
   halves at once in any case, so the gap protected none that synced straight across it, and the upgrade test, a
   project from the starter kit of release-4 and one of release-5 each synced straight to the second pull request's
   commit, passed every check unchanged. A release cut between the two would have stopped the batch's queue for nothing.
+- **Reopened on 18 November 2026 by the owner's decision (#654):** other publishers' code is registered, never
+  carried, in a project too (point 9). It corrects what #601 brought in (Brought in by: #601; Correction: rule missing;
+  #302). One sign here had tripped first: a carried file raised the core's own code scanning's alerts, on #605 (the
+  parser's runtime), and its pull request waited a night on the owner; #637 was what was done about it, and once
+  nothing is carried its points 1, 2 and 4 have nothing to act on and are not built. Whether that alone met the sign is
+  moot, the owner having decided: what was not weighed when step 3 was argued is the registry's own lock file,
+  installed at set-up, and what a lock file gives (#652): the host's alerts and update proposals read what the core
+  depends on, and replacing a package is a change to the lock file. What stands: the path, its steps and their order,
+  and no fetch while a check runs. What gives way: step 3's folder and its list; each package is an entry of
+  `package-lock.json`, installed by the sync, at a session's start and in each job before a check
+  (`scripts/install.mjs`), and held by the core's own licence check and lookup, which read that lock file. The signs
+  above that read the carried files read the install instead: a package that turns a project's check red or raises its
+  alerts, or an install that adds more than 30 s to a job.
 - Reopens it: the suites' verdicts differ between the least Node and the pin, on Linux or Windows (the least
   goes); a hook's start passes 100 ms on Windows; a carried file turns a project's check red or raises its code
   scanning's alerts; a port's comparison differs beyond its definition's mend (that reader stays); the replay of fixed
@@ -310,8 +323,14 @@ adds this record.
   was argued there and kept, as was no fetch while a check runs. What gives way: the one exact Node stays the pin of
   the host's checks, beside a least long-term Node the scripts promise to run on, tested in the core's suites and used
   by a session whose machine holds it (the path's first step).
-- Reopens it: a package the core needs cannot run on the pinned Node from the copy with nothing installed (it needs a
-  native build or an install script), or the packages carried in the copy pass 20 MB.
+- Reopened on 18 November 2026 by the owner's decision (#654): other publishers' code is registered, never carried.
+  What was not weighed when "nothing installed in a project" was argued: the registry's own lock file, installed at
+  set-up, and what a lock file gives (#652). What stands: the scripts in JavaScript, run by the pinned Node from the
+  copy, and no fetch while a check runs. What gives way: "nothing installed": the core's packages are installed from
+  its `package-lock.json` into the copy's `node_modules/`, which git does not track, by the sync, at a session's start
+  and in each job before a check (`scripts/install.mjs`); a script loads them from there alone (`scripts/packages.mjs`).
+- Reopens it: a package the core needs cannot run on the pinned Node without a native build or an install script, or
+  the install adds more than 30 s to a job on the host's runners.
 
 ## Choice: one parser, tree-sitter, carried in the copy, reads every language's structure
 
@@ -408,6 +427,12 @@ counter and its commands are in the pull request that adds this record (#487).
 - **What a sync asks of a project:** for this record, nothing. The line that builds the first reader the picked way
   says what its sync asks; by this record, no install, no host to reach, and a reader's new findings listed in the
   check's baseline, as any new reading is ("Nothing locks a project").
+- **Reopened on 18 November 2026 by the owner's decision (#654):** other publishers' code is registered, never
+  carried. What was not weighed: the registry's own lock file, installed at set-up (#652). What stands: tree-sitter as
+  the parser, its runtime and each grammar at one exact version, and no fetch while a check runs. What gives way:
+  "carried in the copy": the runtime and each grammar are entries of the core's `package-lock.json`, installed as
+  every package is (`scripts/install.mjs`), their integrity the registry's, their licences read by the core's licence
+  check from the lock file; the list of SHA-256 and the carried notices go with the folder.
 - **What is written by hand today** (#486, point 10). Counted on 16 November 2026: each stand-in's lines, and the
   issues labelled `bug` that name its script (of the 50 so labelled). In the order of what each is worth, each
   replaced by itself, with a trial of its own, at the dose, as cleaning is (`tasks/cleaning.md`), and each that brings

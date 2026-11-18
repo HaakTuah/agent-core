@@ -307,7 +307,7 @@ try {
   const nugetJob = (...lines) => writeFileSync(join(tmp, ".github/workflows/own.yml"), `name: own\non:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n${lines.map((l) => `      - run: ${l}\n`).join("")}`);
   nugetJob("dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget");
   missed = notDone(tmp, step);
-  ok(missed.length === 1 && /with nothing before it in its job but the checkout, `setup-` actions and the core's lookup, exact-versions, licence and agent-tools scripts/u.test(missed[0].mend), `a NuGet lookup after the restore, which runs the pull request's build files, does not count (${missed.map((m) => m.mend)})`);
+  ok(missed.length === 1 && /with nothing before it in its job but the checkout, `setup-` actions and the core's lookup, exact-versions, licence, agent-tools and install scripts/u.test(missed[0].mend), `a NuGet lookup after the restore, which runs the pull request's build files, does not count (${missed.map((m) => m.mend)})`);
   nugetJob("node core/scripts/lookup.mjs c.json --nuget", "dotnet restore --locked-mode", "node core/scripts/nuget.mjs c.json");
   ok(notDone(tmp, step).length === 0, "and before it, it does");
   nugetJob("node core/scripts/exact-versions.mjs c.json", "node core/scripts/lookup.mjs c.json --nuget", "node core/scripts/lookup.mjs c.json", "node core/scripts/nuget.mjs c.json");

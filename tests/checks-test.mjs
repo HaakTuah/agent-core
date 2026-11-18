@@ -105,13 +105,13 @@ const run = (dir, args, extra = {}) => {
   git(dir, "commit", "-q", "-am", "a doc");
   const npm = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base });
   ok(npm.status === 0 && /nothing to verify/.test(npm.out) && !/^== Install/m.test(npm.out), "signatures: a change to a doc alone installs nothing", npm.out);
-  fs.mkdirSync(path.join(dir, "core/third-party/a"), { recursive: true });
-  fs.writeFileSync(path.join(dir, "core/third-party/package.json"), "{\"type\": \"commonjs\"}\n");
-  fs.writeFileSync(path.join(dir, "core/third-party/a/package.json"), "{}\n");
+  fs.mkdirSync(path.join(dir, "core"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "core/package.json"), "{\"private\": true, \"dependencies\": {\"yaml\": \"2.9.1\"}}\n");
+  fs.writeFileSync(path.join(dir, "core/package-lock.json"), "{\"lockfileVersion\": 3, \"packages\": {}}\n");
   git(dir, "add", "-A");
-  git(dir, "commit", "-q", "-m", "the packages the copy carries");
+  git(dir, "commit", "-q", "-m", "a sync moves the core's lock file");
   const carried = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base });
-  ok(carried.status === 0 && /nothing to verify/.test(carried.out) && !/^== Install/m.test(carried.out), "and so does a package.json in the folder of packages the core's copy carries, which is no list of the project's", carried.out);
+  ok(carried.status === 0 && /nothing to verify/.test(carried.out) && !/^== Install/m.test(carried.out), "and so does the core's own package list and lock file in its copy, which the core's own repository checks", carried.out);
   fs.mkdirSync(path.join(dir, ".github/workflows"), { recursive: true });
   fs.writeFileSync(path.join(dir, ".github/workflows/core.yml"), "name: core\n");
   git(dir, "add", "-A");

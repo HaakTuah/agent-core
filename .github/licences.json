@@ -1,4 +1,6 @@
 {
+  "lockfiles": ["package-lock.json"],
+  "ignoreScriptsIn": [".npmrc"],
   "ships": [],
   "audit": ".github/licences-audit.json",
   "scan": {

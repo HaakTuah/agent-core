@@ -165,11 +165,23 @@ function sync(tmp) {
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
   execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(tmp, ["archive", pin], { encoding: "buffer", maxBuffer: 1 << 28 }) });
   fs.writeFileSync(manifest, text.replace(lineRe, line => line.replace(old, pin)));
+  install(dir);
 
   const moved = moveCalls(pin, tmp);
   if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); return; }
   sayMoved({ at, old, pin, release, manifest, moved }, tmp);
   report(at, dir, kitsOf(old, tmp));
+}
+
+// The new copy's packages, installed from its lock file by its own install script, into its node_modules/, which git does
+// not track (#654); a copy from before it has none. One that fails twice leaves the copy written and says so, with the
+// command to run again: the sync's pull request holds the copy alone, and no registry's silence fails it.
+function install(dir) {
+  const script = path.join(dir, "scripts", "install.mjs");
+  if (!fs.existsSync(script)) return;
+  const r = spawnSync(process.execPath, [script], { encoding: "utf8" });
+  process.stdout.write(r.stdout ?? "");
+  if (r.status !== 0) console.log(`note the copy is written, but its packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node ${path.relative(process.cwd(), script)} before running a check`);
 }
 
 // The core is fetched into a temporary folder, removed however the sync ends.

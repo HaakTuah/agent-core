@@ -15,8 +15,9 @@
 # A third takes four packages from npm's registry, each at one exact version and held to its sha512 before it is
 # unpacked, with no script of theirs run: the reference parsers the hand-written readers are held to, tools that only
 # run, in the core's audit (tests/readers-test.mjs, on Linux).
-# A fourth asks npm's registry of each package the core carries in third-party/ and fetches its tarball, held to its
-# sha512 before it is unpacked, to hold each carried file to it (tests/third-party-test.mjs, on Linux).
+# Each job first installs the core's own packages from its lock file, from npm's registry, running no install script
+# (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
+# tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
 # Each job of the suites, two on Linux and seven on Windows on each Node, and the upgrade test, are each held to a time
 # mark (the "suites" of .github/shape.json, by scripts/shape.mjs; tasks/tests.md, "The tests have a time mark").
 # On a pull request each job runs only the suites its change can reach, against the merge's first parent, its base, and
@@ -94,6 +95,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ${{ matrix.node }}
+      - name: The core's packages, installed from its lock file for the suites (#654)
+        run: node scripts/install.mjs
       - name: The suites this change can reach (on main, and in a re-run, every one)
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
@@ -133,9 +136,9 @@ jobs:
       - name: The lookup again of what a project holds, on recorded answers
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/held-test.mjs ')) }}
         run: node tests/held-test.mjs
-      - name: The packages the core carries, against npm's registry (on Linux, where tar unpacks them)
-        if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/third-party-test.mjs ')) }}
-        run: node tests/third-party-test.mjs
+      - name: The core's packages, from its lock file alone
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/packages-test.mjs ')) }}
+        run: node tests/packages-test.mjs
       - name: The agent-tools check
         if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-test.mjs ')) }}
         run: node tests/agent-tools-test.mjs
@@ -435,6 +438,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
+      - name: The core's packages, installed from its lock file for the upgrade test (#654)
+        run: node scripts/install.mjs
       - name: The tests this change can reach (on main, and in a re-run, every one)
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}

@@ -125,3 +125,13 @@ The index, and how an item is written: `archive/instructions.md`.
      and copies checks, the parts the first trials would replace. The owner agreed to it, with the issue's other points,
      after asking what the core lacked that let an inventory's check miss a part. It stands behind "A trial of a
      maintained tool replays the part's past bugs" in `tasks/choices.md`, and the inventory's line `Replayed:`.
+
+257. **18 November 2026**, #654, the owner's decision. Other publishers' code is registered, never carried: each package
+     the core's scripts run is named in a lock file in its registry's own form, at one exact version, and installed
+     from it by the sync, at a session's start and in each job before a check, into a folder git does not track; the
+     folder the core carried them in goes (#528, #601). In a project too, what it ships or runs of another publisher
+     is named in a lock file, however it is loaded (point 9). The owner decided it, after a session had set out what
+     carrying costs and buys against registering: one standard mechanism, the host's alerts and update proposals
+     reading what is depended on, a replacement a change to a lock file, and a failed fetch run again. It corrects
+     what #601 brought in (Brought in by: #601; Correction: rule missing; #302). It stands behind "Code of another
+     publisher is named in a lock file" in `floor/topics/dependencies.md`, and the dated entries of `CHOICES.md`.

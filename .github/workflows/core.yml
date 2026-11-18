@@ -320,6 +320,8 @@ jobs:
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' }}
         with:
           node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
+      - name: The core's packages, installed from its lock file for the core's checks (#654)
+        run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then node "${CORE_AT}scripts/install.mjs"; fi
       - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.copies != '' }}
         timeout-minutes: 5
