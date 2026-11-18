@@ -620,6 +620,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const plainOnWay = project({ ".Kiro/hooks/x.json": "{}\n", ".Kiro/settings": "a\n", ...listing() });
     const plainRun = run(pr(plainOnWay, { ".Kiro/settings": "b\n" }));
     ok(plainRun.status === 0, "a plain file on the way to a tool's file, changed, changes nothing the base held", plainRun.out);
+    // (#600's fallback security review of 4252c30: one taken out is seen, as the tool then reads what it hid)
+    fails(run(pr(project({ ".Kiro/hooks/x.json": "{}\n", ".Kiro/settings": "a\n", ...listing() }), { ".Kiro/settings": null })), "and one taken out fails", "Mend: rename it to .kiro");
+    // (and a link through a submodule's folder and back out of it by "..", to a file the pull request changes)
+    held(dir => { fs.mkdirSync(path.join(dir, "real"), { recursive: true }); fs.writeFileSync(path.join(dir, "real/mcp.json"), "{}\n"); fs.symlinkSync("../sub/../real", path.join(dir, ".Kiro/settings")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through a submodule"); sub(dir, "sub", git(dir, "rev-parse", "HEAD")); }, dir => { fs.writeFileSync(path.join(dir, "real/mcp.json"), "{ \"mcpServers\": {} }\n"); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "changed"); }, "a file reached through a submodule's folder and out of it, changed, fails");
     // (#600's fallback security review of 27d9d98: a file is held by its kind too, so none reads as a link it names)
     const asLink = project({ ".Codex/hooks.json": "{}\n", ...listing() });
     fs.symlinkSync(os.tmpdir(), path.join(asLink, ".Codex/config.toml"));

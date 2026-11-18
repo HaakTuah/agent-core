@@ -564,12 +564,13 @@ function through(at, want, holds, names, typeOf) {
   const under = f => f === want || f.startsWith(`${want}/`);
   // (an entry on the way that is neither a folder nor a file, a link out or a submodule's among them, stops the walk
   // there and is held by what stands there, as a tool's file is)
-  const stops = new Set();
+  const stops = new Set(), plain = new Set();
   const found = (from, rest) => rest.split("/").filter(Boolean).reduce((dirs, step, i, steps) => dirs.flatMap(d => names(d).filter(n => fold(n) === fold(step)).sort().map(n => `${d}/${n}`)).filter(p => {
-    // (a plain file on the way gives the tool nothing to read there, so it is not held)
+    // (a plain file on the way gives the tool nothing to read there, so it is held by standing there alone, not by its
+    // text)
     const type = typeOf(p);
     if (i === steps.length - 1 || type === "tree") return true;
-    if (type !== "blob") stops.add(p);
+    (type === "blob" ? plain : stops).add(p);
     return false;
   }), [from]);
   // (each entry by what it holds, a file's text or what else stands there, so one added, taken out or changed is seen)
@@ -582,7 +583,7 @@ function through(at, want, holds, names, typeOf) {
     const reads = d === ".kiro/hooks/" ? (/\.json$/iu.test(n) ? [`${dir}/${n}`] : []) : [...(["blob", "tree"].includes(typeOf(`${dir}/${n}`)) ? [] : [`${dir}/${n}`]), ...found(`${dir}/${n}`, "SKILL.md")];
     return reads.flatMap(a => text(`${d}${n}`, a));
   })));
-  return [at, holds(at), ...files, ...folders, ...[...stops].sort().flatMap(a => text("on the way", a))].join("\0\0");
+  return [at, holds(at), ...files, ...folders, ...[...stops].sort().flatMap(a => text("on the way", a)), ...[...plain].sort().map(a => `a file on the way\0${a}`)].join("\0\0");
 }
 // The entries on the way to a tool's file, in whatever case they stand: each one the walk reaches as no folder, whose
 // name folded is a step of WAYS or lies in a tool folder, a few deep, found through `names`, so a link inside the
@@ -637,13 +638,19 @@ function walk(root, rev, f, via = []) {
       left.unshift(...to.split("/"));
       continue;
     }
-    // (a name with more of the path after it must be a folder: the file system goes neither into a file nor back out of
-    // one by ".."; a submodule's entry it stops at is said in `via`, its commit being what a clone fills it with)
-    if (!dirs.has(here) && left.length && others.has(here)) via.push(here);
-    if (!dirs.has(here) && (left.length || (!blobs.has(here) && !others.has(here)))) return null;
+    if (!goesOn(listing(root, rev), here, left.length > 0, via)) return null;
     at.push(name);
   }
   return reached(at.join("/") || ".", blobs, dirs);
+}
+// Whether a walk goes on past `here`, `more` of the path after it: a name with more after it must be a folder, as the
+// file system goes neither into a file nor back out of one by ".."; the last may be anything the commit holds. A
+// submodule's entry is a folder on disk, whose names the commit does not hold, so the walk goes into it, and back out
+// by "..", the entry said in `via`, its commit being what a clone fills it with.
+function goesOn({ blobs, dirs, others }, here, more, via) {
+  if (dirs.has(here)) return true;
+  if (more && others.has(here)) { via.push(here); return true; }
+  return !more && (blobs.has(here) || others.has(here));
 }
 
 // The path a walk at a commit reached, and what it is there: the checkout's root, which no listing names (as a link to
