@@ -582,12 +582,14 @@ function misnamed(paths) {
 // ignores case finds it, every one that matches.
 function through(at, want, holds, names, typeOf) {
   const under = f => f === want || f.startsWith(`${want}/`);
-  // (an entry on the way that is no folder, a link out or a submodule's among them, stops the walk there and is held by
-  // what stands there, as a tool's file is)
+  // (an entry on the way that is neither a folder nor a file, a link out or a submodule's among them, stops the walk
+  // there and is held by what stands there, as a tool's file is)
   const stops = new Set();
   const found = (from, rest) => rest.split("/").filter(Boolean).reduce((dirs, step, i, steps) => dirs.flatMap(d => names(d).filter(n => fold(n) === fold(step)).sort().map(n => `${d}/${n}`)).filter(p => {
-    if (i === steps.length - 1 || typeOf(p) === "tree") return true;
-    stops.add(p);
+    // (a plain file on the way gives the tool nothing to read there, so it is not held)
+    const type = typeOf(p);
+    if (i === steps.length - 1 || type === "tree") return true;
+    if (type !== "blob") stops.add(p);
     return false;
   }), [from]);
   // (each entry by what it holds, a file's text or what else stands there, so one added, taken out or changed is seen)
@@ -656,7 +658,8 @@ function walk(root, rev, f, via = []) {
       continue;
     }
     // (a name with more of the path after it must be a folder: the file system goes neither into a file nor back out of
-    // one by "..")
+    // one by ".."; a submodule's entry it stops at is said in `via`, its commit being what a clone fills it with)
+    if (!dirs.has(here) && left.length && others.has(here)) via.push(here);
     if (!dirs.has(here) && (left.length || (!blobs.has(here) && !others.has(here)))) return null;
     at.push(name);
   }
