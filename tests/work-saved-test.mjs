@@ -211,5 +211,28 @@ ok(!/STOP|floor's own copy/.test(hook("start", project).stdout), "a project whos
   ok(/floor's own copy under floor-copy\/ differs from the floor under lib\/core\/floor\/.*Mend: /.test(said) && !/STOP/.test(said), "a floor's own copy that differs from the carried floor is named, with its mend", said);
 }
 
+// The core's packages (#654): at the start, installed from the copy's lock file only where it, the package list and the
+// .npmrc are main's own; a branch's own .npmrc or lock file installs nothing, and says so with the mend.
+{
+  const pkg = path.join(tmp, "packages"), origin = path.join(tmp, "packages.git");
+  fs.mkdirSync(path.join(pkg, "core", "scripts"), { recursive: true });
+  fs.copyFileSync(fileURLToPath(new URL("../scripts/work-saved.sh", import.meta.url)), path.join(pkg, "core", "scripts", "work-saved.sh"));
+  for (const f of ["package.json", "package-lock.json", ".npmrc"]) fs.copyFileSync(fileURLToPath(new URL(`../${f}`, import.meta.url)), path.join(pkg, "core", f));
+  fs.writeFileSync(path.join(pkg, "core-manifest.md"), "# Core manifest\n");
+  git(tmp, "init", "-q", "--bare", "-b", "main", origin);
+  git(pkg, "init", "-q", "-b", "main");
+  git(pkg, "add", "-A");
+  git(pkg, "commit", "-q", "-m", "a copy with its lock file");
+  git(pkg, "remote", "add", "origin", origin);
+  git(pkg, "push", "-q", "-u", "origin", "main");
+  const installed = () => fs.existsSync(path.join(pkg, "core", "node_modules", "yaml", "package.json"));
+  fs.appendFileSync(path.join(pkg, "core", ".npmrc"), "git=./run-me.sh\n");
+  let said = hook("start", pkg).stdout;
+  ok(!installed() && /packages are not installed: this branch's core\/package\.json, core\/package-lock\.json or core\/\.npmrc is not main's.*Mend: /.test(said), "a branch whose .npmrc is not main's installs nothing at the start, and says the mend", said);
+  git(pkg, "checkout", "-q", "--", "core/.npmrc");
+  said = hook("start", pkg).stdout;
+  ok(installed() && !/packages are not installed/.test(said), "where the copy's lock file, package list and .npmrc are main's, the start installs from them", said);
+}
+
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the work-saved hook`);
 process.exitCode = failed ? 1 : 0;

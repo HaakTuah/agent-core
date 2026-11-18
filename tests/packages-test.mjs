@@ -17,6 +17,8 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 let failed = 0;
 const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}${cond || !detail ? "" : `\n${String(detail).slice(0, 1500)}`}`); if (!cond) failed++; };
 const json = f => JSON.parse(fs.readFileSync(path.join(root, f), "utf8"));
+// (run as outside a workflow, whatever runs this: a workflow's variables change what a failure says and where it goes)
+const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(GITHUB_|CORE_PACKAGES_)/u.test(k)));
 
 // ---- the lock file: npm's own form, one exact version each, from the registry, with its sha512 ----
 {
@@ -37,7 +39,8 @@ const json = f => JSON.parse(fs.readFileSync(path.join(root, f), "utf8"));
 {
   const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
   ok(!tracked.some(f => /(?:^|\/)node_modules\//u.test(f) || f.startsWith("third-party/")), "no file of another publisher's is tracked in the core: its packages are installed, never carried", tracked.filter(f => /node_modules\/|^third-party\//u.test(f)).slice(0, 5).join(", "));
-  ok(/^\/node_modules\/$/mu.test(fs.readFileSync(path.join(root, ".gitignore"), "utf8")), "the core's .gitignore, which travels to the copy's root, keeps the install out of git");
+  const ignore = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
+  ok(/^\/node_modules\/$/mu.test(ignore) && ["/.npmrc", "/package.json", "/package-lock.json"].every(f => ignore.split("\n").includes(`!${f}`)), "the core's .gitignore, which travels to the copy's root, keeps the install out of git, and the copy's package list, lock file and .npmrc in it");
 }
 
 // ---- with nothing installed, a script that loads a package says it did not run, and how to install ----
@@ -54,7 +57,7 @@ try {
   const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")` };
   const loads = fs.readdirSync(path.join(root, "scripts")).filter(f => f.endsWith(".mjs") && f !== "packages.mjs" && /\bload(?:Sync)?\("/u.test(fs.readFileSync(path.join(root, "scripts", f), "utf8")));
   ok(loads.length > 0 && loads.every(f => CALLS[f]), "each script that loads a package has its call here", loads.filter(f => !CALLS[f]).join(", "));
-  const call = (f, expr) => spawnSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts", f)).href)}); console.log(JSON.stringify(m.${expr}));`], { cwd: project, encoding: "utf8", timeout: 60000 });
+  const call = (f, expr) => spawnSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts", f)).href)}); console.log(JSON.stringify(m.${expr}));`], { cwd: project, encoding: "utf8", timeout: 60000, env });
   for (const f of loads) {
     const r = call(f, CALLS[f]), out = `${r.stdout}${r.stderr}`;
     ok(r.status === 1 && /did not run: the package \S+ is not installed/u.test(out) && /install\.mjs/u.test(out) && mended(out), `${f}, with nothing installed beside the copy, says it did not run and how to install, and does not take the project's own package of the name`, out);
@@ -63,20 +66,43 @@ try {
   const plain = call("yaml-keys.mjs", `uncommented("a: 1 # b")`);
   ok(plain.status === 0 && plain.stdout.trim() === JSON.stringify("a: 1"), "what needs no package runs with nothing installed, so a project's own workflow that runs the copies check is not stopped", `${plain.stdout}${plain.stderr}`);
   // (and the install puts each package where the scripts load it from, untracked)
-  const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000 });
+  // (a project whose own .gitignore leaves out an .npmrc and a lock file still tracks the copy's)
+  fs.writeFileSync(path.join(project, ".gitignore"), ".npmrc\npackage-lock.json\npackage.json\n");
+  execFileSync("git", ["init", "-q"], { cwd: project });
+  execFileSync("git", ["add", "-A"], { cwd: project });
+  const staged = execFileSync("git", ["ls-files"], { cwd: project, encoding: "utf8" }).split("\n");
+  ok(["core/.npmrc", "core/package.json", "core/package-lock.json"].every(f => staged.includes(f)) && !staged.some(f => f.startsWith("core/node_modules/")), "a project whose .gitignore leaves out .npmrc and lock files tracks the copy's all the same", staged.filter(f => f.startsWith("core/") && !f.startsWith("core/scripts/")).join(", "));
+  fs.rmSync(path.join(project, ".git"), { recursive: true, force: true });
+  const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env });
   const lock = JSON.parse(fs.readFileSync(path.join(copy, "package-lock.json"), "utf8"));
   const installed = Object.keys(lock.packages).filter(k => k).every(k => fs.existsSync(path.join(copy, k, "package.json")));
   ok(r.status === 0 && installed, "install.mjs installs each package of the lock file into the copy's node_modules", `${r.stdout}${r.stderr}`);
-  const loaded = spawnSync(process.execPath, ["--input-type=module", "-e", `const { load } = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); const m = await load("yaml"); console.log(m.project ? "project" : typeof m.Lexer);`], { cwd: project, encoding: "utf8" });
+  const loaded = spawnSync(process.execPath, ["--input-type=module", "-e", `const { load } = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); const m = await load("yaml"); console.log(m.project ? "project" : typeof m.Lexer);`], { cwd: project, encoding: "utf8", env });
   ok(loaded.status === 0 && loaded.stdout.trim() === "function", "and load() takes the copy's own, never the project's", `${loaded.stdout}${loaded.stderr}`);
+  // (an install npm recorded for another lock file is no install of this one: the package did not run)
+  const record = path.join(copy, "node_modules/.package-lock.json"), kept = fs.readFileSync(record, "utf8");
+  const other = JSON.parse(kept);
+  other.packages["node_modules/yaml"].resolved = "https://example.invalid/yaml.tgz";
+  fs.writeFileSync(record, JSON.stringify(other));
+  const stale = call("yaml-keys.mjs", CALLS["yaml-keys.mjs"]);
+  ok(stale.status === 1 && /did not run: the package yaml is not installed .* as package-lock\.json names it/u.test(stale.stderr) && mended(stale.stderr), "a package installed from another lock file than the copy's is never loaded: the check did not run, with its mend", `${stale.stdout}${stale.stderr}`);
+  // (in a project's pull request whose install could not reach the registry, the check says it did not run, and fails nothing)
+  const unreached = spawnSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/yaml-keys.mjs")).href)}); m.${CALLS["yaml-keys.mjs"]};`], { cwd: project, encoding: "utf8", env: { ...env, CORE_PACKAGES_UNREACHED: "1" } });
+  ok(unreached.status === 0 && /^::warning::The check did not run: the package yaml could not be installed/mu.test(unreached.stdout) && /Mend: run this job again/u.test(unreached.stdout), "where the job's install could not reach the registry, a check that needs a package says as a warning that it did not run, and fails nothing (#654, point 4)", `${unreached.stdout}${unreached.stderr}`);
+  fs.writeFileSync(record, kept);
   // (a lock file whose integrity the registry's tarball does not match: twice refused, then a failure that says the mend)
   const wrong = JSON.parse(fs.readFileSync(path.join(copy, "package-lock.json"), "utf8"));
   const first = Object.keys(wrong.packages).find(k => k);
   wrong.packages[first].integrity = `sha512-${Buffer.alloc(64, 7).toString("base64")}`;
   fs.writeFileSync(path.join(copy, "package-lock.json"), JSON.stringify(wrong, null, 2));
   fs.rmSync(path.join(copy, "node_modules"), { recursive: true, force: true });
-  const refused = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000 });
+  const refused = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env });
   ok(refused.status === 1 && /runs again/u.test(refused.stderr) && /could not be installed .*twice/u.test(refused.stderr) && mended(refused.stderr), "an install that fails is run once more, and a second failure fails, saying the mend", refused.stderr);
+  // (in a project's pull request, the same failure fails nothing: the job is told, and each check after it says it did not run)
+  const jobEnv = path.join(tmp, "github-env");
+  fs.writeFileSync(jobEnv, "");
+  const warned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...env, GITHUB_EVENT_NAME: "pull_request", GITHUB_ENV: jobEnv } });
+  ok(warned.status === 0 && /^::warning::The core's packages could not be installed .*twice/mu.test(warned.stdout) && /Mend: run this job again/u.test(warned.stdout) && /^CORE_PACKAGES_UNREACHED=1$/mu.test(fs.readFileSync(jobEnv, "utf8")), "in a project's pull request a second failed install is a warning, and tells the job's later checks", `${warned.status} ${warned.stdout}${warned.stderr}`);
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 
 process.exit(failed ? 1 : 0);
