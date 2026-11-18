@@ -1106,12 +1106,12 @@ function installReadOf(root, rev, dir) {
     for (const m of text.matchAll(PATCH_FILE)) add(m[0]);
     if (/^(?:package-lock|npm-shrinkwrap)\.json$/u.test(f)) for (const resolved of npmLinks(text)) add(resolved);
   }
-  for (const member of [...l.blobs].filter(f => f.endsWith("/package.json") && (!dir || f.startsWith(`${dir}/`))).map(f => path.posix.dirname(f)).sort()) {
-    for (const f of INSTALL_READS) out.push(`member ${held(`${member}/${f}`)}`);
-  }
+  out.push(...members(l, dir).flatMap(member => INSTALL_READS.map(f => `member ${held(`${member}/${f}`)}`)));
   for (const p of [...from].sort()) if (p !== "." && p !== ".." && !p.startsWith("../") && !path.posix.isAbsolute(p)) out.push(`from ${p}\0${everything(root, rev, p)}`);
   return out;
 }
+// Each folder of a package below `dir` ("" the root), as a workspace's members stand.
+const members = (l, dir) => [...l.blobs].filter(f => f.endsWith("/package.json") && (!dir || f.startsWith(`${dir}/`))).map(f => path.posix.dirname(f)).sort();
 // What adds a path an install's file names to `from`: read from the folder of that file and from each folder of a
 // package below it, as pnpm reads a workspace member's from that member's folder; "." never, which names the project
 // or the package itself.
