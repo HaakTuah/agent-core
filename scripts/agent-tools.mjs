@@ -128,8 +128,8 @@ export function configured(read, skills, files = () => [], linked = () => false,
   // of a marketplace of the "settings" kind, its own fields and this plug-in's entries alone, as pluginPin() reads it)
   for (const name of plugins) add(`plugin ${name}`, canonical(["plugin", name, marketOf(name, markets)]));
   addServers(state, ".mcp.json", entries(".mcp.json", "mcpServers", json(".mcp.json")?.mcpServers, SERVERS), "");
-  for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); readFrontmatter(state, `.claude/skills/${name}/SKILL.md`, read(`.claude/skills/${name}/SKILL.md`)); }
-  for (const file of markdown()) readFrontmatter(state, file, read(file));
+  for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); readFrontmatter(state, `.claude/skills/${name}/SKILL.md`, read(`.claude/skills/${name}/SKILL.md`)); readShell(state, `.claude/skills/${name}/SKILL.md`, read(`.claude/skills/${name}/SKILL.md`)); }
+  for (const file of markdown()) { readFrontmatter(state, file, read(file)); if (/^\.claude\/commands\//iu.test(file.normalize("NFC"))) readShell(state, file, read(file)); }
   readKiro(state, json, files);
   readCodex(state, json, read);
   return { tools, ids, problems, texts, baselined, sources, pins: pinsOf(plugins, markets, servers) };
@@ -344,6 +344,17 @@ function readFrontmatter(state, file, text) {
   const plain = front.length <= FRONT_MAX && !/^[ \t]/u.test(lines.find(l => l.trim() && !/^[ \t]*#/u.test(l)) ?? "") && top.every(l => SIMPLE.test(l));
   const runs = top.some(l => ["hooks", "mcpservers"].includes(fold(SIMPLE.exec(l)?.[1] ?? "").replace(/[_-]/gu, "")));
   if (!plain || runs) addHook(state, file, { tool: "", event: `${file} frontmatter`, matcher: "", hook: front, runs: true, text: "what it may run", commands: [NO_KIT], setting: true });
+  // (and a permission mode of a subagent's own but the default, which lets it run what it would ask about)
+  const mode = top.map(l => SIMPLE.exec(l)).find(m => m && fold(m[1]).replace(/[_-]/gu, "") === "permissionmode");
+  const value = mode ? mode[0].slice(mode[0].indexOf(":") + 1).replace(/\s#.*$/u, "").trim().replace(/^["']|["']$/gu, "") : "default";
+  if (value !== "default") addHook(state, file, { tool: "", event: `${file} permissionMode`, matcher: "", hook: front, runs: true, text: value, commands: [NO_KIT], setting: true });
+}
+// A skill's or a command's body that runs a command where it is invoked (`!` and a command in backquotes, or a block
+// opened by three backquotes and `!`): the whole text read as a setting no starter kit writes, so one the pull request
+// adds or changes is new.
+const SHELL = /!`|^[ \t]*(?:```|~~~)[ \t]*!/mu;
+function readShell(state, file, text) {
+  if (text !== null && SHELL.test(text)) addHook(state, file, { tool: "", event: `${file} shell`, matcher: "", hook: text, runs: true, text: "the commands its text runs", commands: [NO_KIT], setting: true });
 }
 function readCommands(state, file, settings) {
   for (const key of COMMANDS) {

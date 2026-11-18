@@ -498,6 +498,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const claudeLinked = project({ "cfg/settings.json": KIT, "cfg/agents/x.md": "---\nname: x\n---\n", ...listing() });
     fs.rmSync(path.join(claudeLinked, ".claude"), { recursive: true, force: true }); fs.symlinkSync("cfg", path.join(claudeLinked, ".claude")); git(claudeLinked, "add", "-A"); git(claudeLinked, "commit", "-q", "-m", "a .claude through a link");
     fails(run(claudeLinked, "--core"), "and so does .claude as a link, where the agents are reached through it", '.claude is a link on the way to a folder');
+    // (a .claude link in another case beside a plain one, and one the base held through which an agent is added)
+    const upper = project({ ...script, "cfg/agents/x.md": "---\nname: x\n---\n", ...listing() });
+    fs.symlinkSync("cfg", path.join(upper, ".CLAUDE")); git(upper, "add", "-A"); git(upper, "commit", "-q", "-m", "a .CLAUDE link");
+    fails(run(upper, "--core"), "and a .claude link in another case beside a plain .claude", ".CLAUDE is a link on the way to a folder");
+    fails(run(pr(claudeLinked, { "cfg/agents/y.md": `---\nname: y\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n` })), "and one the base held, once an agent is added through it", ".claude is a link on the way to a folder");
     // (#647's fallback security review of 8922450: a chain of links too long for recursion is read, and fails with
     // its mend)
     const chain = project({ ...script, ...listing() });
@@ -509,6 +514,18 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const deepStarted = Date.now(), deepRun = run(deep, "--core");
     ok(deepRun.status === 0 && Date.now() - deepStarted < 30000, "a plain folder a thousand deep below agents is read in seconds", deepRun.out);
   }
+  // (a skill's or command's body that runs a command where it is invoked, and a subagent's permission mode but the
+  // default, each held as a setting no starter kit writes)
+  const NOKIT = "is of a kind no starter kit writes";
+  const SK = { kind: "skill", name: "s", publisher: "this project" };
+  fails(run(pr(project({ ...script, ...listing(SK), ".claude/skills/s/SKILL.md": "# s\n" }), { ".claude/skills/s/SKILL.md": "# s\nThe branch: !`git branch --show-current`\n" })), "a skill's body that runs a command inline fails", NOKIT, "shell: the commands its text runs");
+  fails(run(pr(project({ ...script, ...listing() }), { ".claude/commands/c.md": "# c\n```!\nbash x.sh\n```\n" })), "and so does a command's block that runs one", NOKIT);
+  passes(run(pr(project({ ...script, ...listing() }), { ".claude/commands/c.md": "# c\nSay `hello`, and nothing more!\n" })), "a command whose text runs nothing passes");
+  const shellStood = project({ ...script, ".claude/commands/c.md": "# c\n!`date`\n", ...listing() });
+  const shellKept = run(pr(shellStood, { "README.md": "x\n" }));
+  ok(shellKept.status === 0 && shellKept.out.includes("as the base held it"), "one the base held is noted while its text stands", shellKept.out);
+  for (const mode of ["bypassPermissions", "'acceptEdits' # quoted"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": `---\nname: rev\npermissionMode: ${mode}\n---\n` })), `a subagent's permission mode ${mode} fails`, NOKIT, "permissionMode");
+  passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": "---\nname: rev\npermissionMode: default\n---\n" })), "and its default passes");
   // (a folder of Claude Code's below the project's root, which it reads where it works there)
   const NESTED = "holds agents, skills or commands that Claude Code reads where it works in that folder";
   fails(run(pr(project({ ...script, ...listing() }), { "app/.claude/skills/x/SKILL.md": "# x\n" })), "a folder of skills below the project's root fails", NESTED, "Mend: move them into the root's .claude folder");
