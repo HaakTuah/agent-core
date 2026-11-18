@@ -25,12 +25,13 @@
 // change how the programs a hook runs start, save one the base held while its entry stands.
 //
 // Where each hook's command comes from (#407; floor rule 3, what an agent tool starts by itself runs from its copy on
-// `main`): a hook of any tool read here runs its copy on main only where each command it may run, Codex's for Windows
-// among them, is the starter kit's form (hook-source.mjs), which fetches its script from main, and the file it fetches
-// is no link; any other fails, since nothing shows it does not run the working tree's copy, which the branch it runs on
-// can change. One that stood before is listed in the baseline, its
-// entry saying "from": "the working tree", and noted; the baseline only shrinks: a new hook marked so fails, and so does
-// a mark taken out while its hook stands, or a mark on a hook in the kit's form.
+// `main`): a hook of any tool read here, and each setting by which a tool runs a command of its own (Claude Code's
+// apiKeyHelper, statusLine and the like; Codex's notify and its model providers' token commands), read as a hook, runs
+// its copy on main only where each command it may run, Codex's for Windows among them, is the starter kit's form
+// (hook-source.mjs), which fetches its script from main, and the file it fetches is no link; any other fails, since
+// nothing shows it does not run the working tree's copy, which the branch it runs on can change. One that stood before
+// is listed in the baseline, its entry saying "from": "the working tree", and noted; the baseline only shrinks: a new
+// hook marked so fails, and so does a mark taken out while its hook stands, or a mark on a hook in the kit's form.
 //
 // A listed plug-in or tool server is held to the pin its own configuration gives, where it gives one in a form read here
 // (#352; Claude Code's plug-in and tool-server documentation): a plug-in by its marketplace in "extraKnownMarketplaces",
@@ -119,6 +120,7 @@ export function configured(read, skills, files = () => [], linked = () => false)
     declaredMarkets(settings, file, markets);
     readHooks(state, file, settings);
     readEnv(state, file, "env", settings?.env);
+    readCommands(state, file, settings);
     for (const [name, on] of Object.entries(entries(file, "enabledPlugins", settings?.enabledPlugins, "each plug-in's \"name@marketplace\" to true"))) if (on) { tools.set(`plugin ${name}`, file); plugins.push(name); }
   }
   // (a plug-in is what its name and its marketplace's declared source make it, so one fetched from elsewhere is another;
@@ -172,6 +174,10 @@ function readKiro(state, json, files) {
 // 2026): the hooks of .codex/hooks.json, and those written inline in .codex/config.toml under "hooks", both as Claude
 // Code's are, each named "Codex <event> <matcher>: <command>"; config.toml's "notify", the program Codex starts at
 // each turn's end, as the hook "Codex notify: <its words>"; and config.toml's "mcp_servers", as "Codex <name>".
+// A program's words as the one command a shell would run them as: a word that needs no quote as written and any other
+// single-quoted, so a fetch keeps its context, the kit's form given as bash, -c and its script reads as the kit's, and
+// "scripts/my hook.py" stays one path.
+const shellWords = words => words.map(w => (/^[\w./:@%+,=-]+$/u.test(w) ? w : `'${w.replace(/'/gu, "'\\''")}'`)).join(" ");
 function readCodex(state, json, read) {
   const hooksFile = json(".codex/hooks.json");
   state.entries(".codex/hooks.json", "hooks", hooksFile?.hooks, "each event to its hooks");
@@ -188,11 +194,18 @@ function readCodex(state, json, read) {
   readHooks(state, ".codex/config.toml", config, "Codex");
   const notify = config.notify;
   if (Array.isArray(notify) && notify.length && notify.every(w => typeof w === "string")) {
-    // (its words are a program and its arguments, each one whole: they are read as the one command a shell would run them
-    // as, a word that needs no quote as written and any other single-quoted, so a fetch keeps its context, the kit's form
-    // given as bash, -c and its script reads as the kit's, and "scripts/my hook.py" stays one path)
-    const command = notify.map(w => (/^[\w./:@%+,=-]+$/u.test(w) ? w : `'${w.replace(/'/gu, "'\\''")}'`)).join(" ");
-    addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [command] });
+    // (its words are a program and its arguments, each one whole, read as shellWords reads them)
+    addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [shellWords(notify)] });
+  }
+  // (a model provider's commands that print a token, which Codex runs by itself: each read as a hook is, its command and
+  // its arguments as notify's words are)
+  for (const [id, provider] of Object.entries(state.entries(".codex/config.toml", "model_providers", config.model_providers, "each provider's id to its settings"))) {
+    for (const [key, part] of [["auth", provider?.auth], ["gateway_oauth.credential_export", provider?.gateway_oauth?.credential_export]]) {
+      if (part?.command === undefined) continue;
+      const words = [part.command, ...(Array.isArray(part.args) ? part.args : [])];
+      if (!words.every(w => typeof w === "string")) { state.flag(`.codex/config.toml: "model_providers.${id}.${key}" holds a command or arguments that are no text. Mend: write them as Codex takes them`, ".codex/config.toml"); continue; }
+      addHook(state, ".codex/config.toml", { tool: "Codex", event: `model_providers.${id}.${key}`, matcher: "", hook: part, runs: true, text: words.join(" "), commands: [shellWords(words)], setting: true });
+    }
   }
   addServers(state, ".codex/config.toml", state.entries(".codex/config.toml", "mcp_servers", config.mcp_servers, SERVERS), "Codex ");
   const policy = state.entries(".codex/config.toml", "shell_environment_policy", config.shell_environment_policy, "its settings");
@@ -274,10 +287,11 @@ function readHooks(state, file, settings, tool = "") {
 }
 // One hook, into configured()'s `state`: its name, as the list writes it, `tool`, `event`, `matcher` and `text`; its
 // id, all of it; and the files of the project its `commands` take from the working tree.
-function addHook(state, file, { tool, event, matcher, given = matcher, hook, runs, text, commands }) {
+function addHook(state, file, { tool, event, matcher, given = matcher, hook, runs, text, commands, setting = false }) {
   const name = `hook ${tool ? `${tool} ` : ""}${event}${matcher ? ` ${matcher}` : ""}: ${text}`;
-  // (Claude Code's hooks keep the id they had before other tools were read, so a base read by an older copy is the same)
-  const id = canonical(tool ? ["hook", tool, event, given ?? "", hook] : ["hook", event, given ?? "", hook]);
+  // (Claude Code's hooks keep the id they had before other tools were read, so a base read by an older copy is the same;
+  // a setting's is of its own kind, so a hook under an event of a setting's name is never read as the setting it names)
+  const id = canonical(setting ? ["setting", tool, event, hook] : tool ? ["hook", tool, event, given ?? "", hook] : ["hook", event, given ?? "", hook]);
   // (a hook's name is its event, matcher and command, split at the first ": ": a matcher holding one would let two
   // hooks share a name)
   if (matcher.includes(": ") && !state.clashed.has(`matcher ${file} ${event} ${matcher}`)) {
@@ -295,6 +309,20 @@ function addHook(state, file, { tool, event, matcher, given = matcher, hook, run
   // (the starter kit's own hooks too: they are in its form, and what they fetch must be no link, as any hook's)
   readSource(state, name, commands);
 }
+// The settings by which Claude Code runs a command of its own, not as a hook: each read as a hook is, named by its key, so
+// one not in the starter kit's form is held as a hook is (floor rule 3), and each is listed as one; a value of another
+// shape than Claude Code takes is refused.
+const COMMANDS = ["apiKeyHelper", "awsAuthRefresh", "awsCredentialExport", "gcpAuthRefresh", "otelHeadersHelper", "statusLine", "fileSuggestion"];
+function readCommands(state, file, settings) {
+  for (const key of COMMANDS) {
+    const value = settings?.[key];
+    if (value === undefined || value === null) continue;
+    const command = typeof value === "string" ? value : value?.type === "command" && typeof value.command === "string" ? value.command : null;
+    if (command === null) { state.flag(`${file}: "${key}" is neither a command nor { "type": "command", "command" }. Mend: write it as Claude Code takes it`, file); continue; }
+    addHook(state, file, { tool: "", event: key, matcher: "", hook: value, runs: true, text: command, commands: [command], setting: true });
+  }
+}
+
 // Each hook with a command that is not the starter kit's form, into `state.sources` with why: nothing shows it runs its
 // copy on main (hook-source.mjs); nor where the file the kit's form fetches the project holds as a link (`linked`), whose
 // target's name main gives in the script's place, a file the branch can change.
@@ -559,8 +587,10 @@ function caseProblems(root, rev) {
 function submodules(root, rev) {
   const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = new Map();
   for (const [at, id] of l.gitlinks) if (WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d))) out.set(at, [`${at} is a submodule where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${id}`]);
-  // (the submodule a walk reaches, or one it stops at with more of the path left, a link leading into its folder)
-  for (const at of toolPaths(names, f => resolve(f)?.type)) {
+  // (the submodule a walk reaches, or one it stops at with more of the path left, a link leading into its folder: from
+  // each tool's path, and from each link anywhere under a tool's folder, a skill's own folders among them)
+  const under = l.links.filter(at => WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d)));
+  for (const at of new Set([...toolPaths(names, f => resolve(f)?.type), ...under])) {
     const via = [], r = walk(root, rev, at, via), sub = r?.type === "commit" ? r.f : via.find(v => l.gitlinks.has(v));
     if (sub && !out.has(at) && !out.has(sub)) out.set(at, [`${at} leads, through a link, to the submodule ${sub}, where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${sub}\0${l.ids.get(sub)}`]);
   }
@@ -573,11 +603,12 @@ function submodules(root, rev) {
 function caseLinks(root, rev) {
   const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = [];
   for (const at of toolPaths(names, f => resolve(f)?.type)) {
-    const via = [], misses = [];
-    if (walk(root, rev, at, via, false, misses) !== null || !misses.length || !via.some(v => l.linked.has(v))) continue;
+    const via = [], misses = [], r = walk(root, rev, at, via, false, misses);
+    if (!via.some(v => l.linked.has(v))) continue;
     // (held by what the tool reads there, found as a file system that ignores case finds it, and nothing else there)
-    const m = misses[0];
-    out.push([`${at} leads, through a link, to ${m} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${m} stands, in this pull request`, [at, ...via.map(v => `${v}\0${l.ids.get(v)}`), reaches(root, rev, at, true)].join("\0\0")]);
+    const miss = r === null ? misses.find(m => !m.several) : undefined, several = misses.find(m => m.several), links = via.map(v => `${v}\0${l.ids.get(v)}`);
+    if (miss) out.push([`${at} leads, through a link, to ${miss.at} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${miss.at} stands, in this pull request`, [at, ...links, reaches(root, rev, at, true)].join("\0\0")]);
+    else if (several) out.push([`${at} leads, through a link, to ${several.at}, which the commit holds under more than one name a file system that ignores case reads as one (${several.several.join(", ")}), as macOS's and Windows' do, keeping one of them, so which an agent tool reads is not plain. Mend: keep one of those names, in this pull request`, [at, ...links, ...several.several.map(n => readAs(root, rev, n, several.rest))].join("\0\0")]);
   }
   return out;
 }
@@ -605,8 +636,9 @@ function shownNotBlob(root, rev, at) {
   return shown.get(key);
 }
 // A name as a file system that folds case compares it: wholly, so a letter whose upper case is another's ("\u017f" and
-// "s") is the same, which lower case alone does not make it.
-const fold = name => name.toUpperCase().toLowerCase();
+// "s") is the same, which lower case alone does not make it; and in one of Unicode's normal forms, NFC, as macOS's
+// compares a letter written whole and one written with a joining mark.
+const fold = name => name.normalize("NFC").toUpperCase().toLowerCase().normalize("NFC");
 // The tools' files this check reads, and their folders, as each tool names them.
 const TOOL_FILES = [".claude/settings.json", ".claude/settings.local.json", ".mcp.json", ".kiro/settings/mcp.json", ".codex/hooks.json", ".codex/config.toml"];
 const TOOL_FOLDERS = [".claude/skills/", ".kiro/hooks/"];
@@ -690,10 +722,38 @@ const targets = new Map(), PATH_MAX = 4096;
 function target(root, rev, at) {
   const key = `${root}\0${rev}\0${at}`;
   if (!targets.has(key)) {
-    const to = textAt(root, rev, at) ?? "/";
+    const l = listing(root, rev), read = l.linked.has(at) ? linkTexts(root, rev).get(l.ids.get(at)) : undefined;
+    const to = read === undefined ? textAt(root, rev, at) ?? "/" : read ?? "/";
     targets.set(key, path.posix.isAbsolute(to) || to.length > PATH_MAX ? null : to);
   }
   return targets.get(key);
+}
+// The text of each link a commit's listing holds, by its object, asked of git in two processes for them all, not one a
+// link: their sizes, then the text of those no longer than PATH_MAX, the rest null; a link git does not answer for is
+// left out, and read on its own.
+const linkTextsOf = new Map();
+function linkTexts(root, rev) {
+  const key = `${root}\0${rev}`;
+  if (linkTextsOf.has(key)) return linkTextsOf.get(key);
+  const l = listing(root, rev), out = new Map(), ids = [...new Set(l.links.map(at => l.ids.get(at)))];
+  const ask = (how, list) => execFileSync("git", ["--no-replace-objects", "cat-file", how], { cwd: root, input: `${list.join("\n")}\n`, stdio: ["pipe", "pipe", "ignore"], maxBuffer: LISTING_MAX });
+  try {
+    const small = [];
+    for (const line of ids.length ? ask("--batch-check", ids).toString("utf8").split("\n") : []) {
+      const [id, type, size] = line.split(" ");
+      if (type === "blob" && Number(size) <= PATH_MAX) small.push(id);
+      else if (type === "blob") out.set(id, null);
+    }
+    const all = small.length ? ask("--batch", small) : Buffer.alloc(0);
+    for (let at = 0; at < all.length;) {
+      const end = all.indexOf(10, at), [id, type, size] = all.subarray(at, end).toString("utf8").split(" "), n = Number(size);
+      if (type !== "blob" || !(n >= 0)) break;
+      out.set(id, all.subarray(end + 1, end + 1 + n).toString("utf8"));
+      at = end + 2 + n;
+    }
+  } catch { /* (each read on its own) */ }
+  linkTextsOf.set(key, out);
+  return out;
 }
 function walk(root, rev, f, via = [], lenient = false, misses = [], follow = false) {
   const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
@@ -711,26 +771,43 @@ function walk(root, rev, f, via = [], lenient = false, misses = [], follow = fal
       left.unshift(...to.split("/"));
       continue;
     }
-    noteMiss(listing(root, rev), at, name, misses);
+    noteMiss(listing(root, rev), at, name, misses, hops > 0 && left.join("/"));
     if (!goesOn(listing(root, rev), here, left.length > 0, via, lenient)) return null;
     at.push(name);
   }
   return reached(at.join("/") || ".", blobs, dirs, others);
 }
-// Where a walk meets `here`, a name the commit holds nothing at, while its folder holds that name in another case, which
-// a file system that ignores case finds in its place, that name, said in `misses`.
 // The name a file system that ignores case finds for `name` in the folder `at`: `name` where the commit holds it, else
 // one of the folder's names that folds to it.
-function folded({ blobs, dirs, others, linked, children }, at, name) {
+function folded(l, at, name) {
   const here = [...at, name].join("/");
-  if (dirs.has(here) || blobs.has(here) || others.has(here) || linked.has(here)) return name;
-  return [...(children.get(at.join("/") || ".") ?? [])].find(n => fold(n) === fold(name)) ?? name;
+  if (l.dirs.has(here) || l.blobs.has(here) || l.others.has(here) || l.linked.has(here)) return name;
+  return foldsIn(l, at.join("/") || ".").get(fold(name))?.[0] ?? name;
 }
-function noteMiss({ blobs, dirs, others, children }, at, name, misses) {
-  const here = [...at, name].join("/");
-  if (dirs.has(here) || blobs.has(here) || others.has(here)) return;
-  const dir = at.join("/") || ".", other = [...(children.get(dir) ?? [])].find(n => n !== name && fold(n) === fold(name));
-  if (other !== undefined) misses.push(dir === "." ? other : `${dir}/${other}`);
+// The names a listing's folder `dir` holds, by their folded form, each list in the listing's order; built once a folder, so a walk's
+// every step does not fold every name beside it again.
+function foldsIn(l, dir) {
+  l.folds ??= new Map();
+  if (!l.folds.has(dir)) {
+    const by = new Map();
+    for (const n of l.children.get(dir) ?? []) by.set(fold(n), [...(by.get(fold(n)) ?? []), n]);
+    l.folds.set(dir, by);
+  }
+  return l.folds.get(dir);
+}
+// Where a walk meets a name the commit holds nothing at, while its folder holds that name in another case, which a
+// file system that ignores case finds in its place, that name, said in `misses` as { at }; and, past a link, where it
+// meets a name its folder holds beside another that folds alike, which such a file system keeps one of, so which the
+// tool reads is not plain, those names, as { at, several, rest }, `rest` the path the walk had left there.
+function noteMiss(l, at, name, misses, rest) {
+  const here = [...at, name].join("/"), dir = at.join("/") || ".", path = n => (dir === "." ? n : `${dir}/${n}`);
+  const same = [...(foldsIn(l, dir).get(fold(name)) ?? [])].sort();
+  if (l.dirs.has(here) || l.blobs.has(here) || l.others.has(here) || l.linked.has(here)) {
+    if (rest !== false && same.length > 1) misses.push({ at: here, several: same.map(path), rest });
+    return;
+  }
+  const other = same.find(n => n !== name);
+  if (other !== undefined) misses.push({ at: path(other) });
 }
 // Whether a walk goes on past `here`, `more` of the path after it: the last name may be anything the commit holds; one
 // with more after it, a folder the commit holds, or a folder every clone holds beside what the commit lists, a
@@ -853,17 +930,46 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 // link and submodule on the way held by its object, of what it reaches only what a tool reads there, and for a skill's
 // folder its SKILL.md; so a link held as the base held it is held by that too, and nothing else that stands there. With
 // `follow`, each name is found as a file system that ignores case finds it.
+// What a tool reads through the name `at`, `rest` the path after it: what the walk reaches there, read as reaches() reads.
+function readAs(root, rev, at, rest) {
+  return commitReader(root, rev, true, true).holds(rest ? `${at}/${rest}` : at);
+}
 function reaches(root, rev, at, follow = false) {
   const posix = at.split(path.sep).join("/"), want = fold(posix), { holds, names, resolve } = commitReader(root, rev, true, follow);
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
   return [through(posix, want, holds, names, f => resolve(f)?.type), ...skill].join("\0\0");
+}
+// What the lock files say of each name a link's path passes through where the commit holds nothing but an install puts
+// a package, as an ignored node_modules folder: an npm lock file's entry for that path, beside the node_modules folder
+// it lies in, and a yarn or pnpm lock file there whole; so a link the base held, through a package the pull request
+// locks at another version or source, is held by that too.
+function lockOf(root, rev, at) {
+  const via = [], l = listing(root, rev), out = [];
+  walk(root, rev, at.split(path.sep).join("/"), via, true, [], true);
+  for (const v of via) {
+    const cut = `/${v}`.indexOf("/node_modules/");
+    if (l.ids.has(v) || l.dirs.has(v) || cut < 0) continue;
+    // (the folder that holds the node_modules folder, with its "/", and the path below it: `cut` is the offset in v of the
+    // "node_modules/" it matched, the "/" it was found with being the one before it)
+    const dir = v.slice(0, cut), key = v.slice(cut);
+    for (const lock of ["package-lock.json", "npm-shrinkwrap.json"]) {
+      let entry;
+      // (an entry too deep to parse or write back is held by the lock file's whole text)
+      const text = textAt(root, rev, `${dir}${lock}`);
+      try { entry = JSON.stringify(JSON.parse(text ?? "null")?.packages?.[key] ?? null); } catch { entry = `unreadable\0${text}`; }
+      out.push(`${dir}${lock}\0${key}\0${entry}`);
+    }
+    // (of yarn's and pnpm's, the whole text, as no reading of their entries here is the one the package manager makes)
+    for (const lock of ["yarn.lock", "pnpm-lock.yaml"]) out.push(`${dir}${lock}\0${textAt(root, rev, `${dir}${lock}`)}`);
+  }
+  return out.join("\0\0");
 }
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {
     let to = null;
     try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
-    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at, true) === reaches(root, "HEAD", at, true)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
+    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at, true) === reaches(root, "HEAD", at, true) && lockOf(root, base, at) === lockOf(root, "HEAD", at)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
   }
 }

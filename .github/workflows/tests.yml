@@ -21,8 +21,13 @@
 # mark (the "suites" of .github/shape.json, by scripts/shape.mjs; tasks/tests.md, "The tests have a time mark").
 # On a pull request each job runs only the suites its change can reach, against the merge's first parent, its base, and
 # says on its summary what it ran; a push to main, and a re-run, runs every suite (scripts/select.mjs; tasks/tests.md,
-# "A pull request runs the tests its change can reach"); the checks of the core itself, each a step of its own after
-# the suites, run every time.
+# "A pull request runs the tests its change can reach"), but a push's first run that merges a pull request's head whose
+# tree it holds, whose change selected every suite and whose check "tests" passed there runs none of the suites that
+# pull request ran, the least Node's on Windows kept (select.mjs --passed, which asks GitHub of that check with the
+# run's token, given to it on a push alone, that token reading checks besides the contents; tasks/tests.md, "A tree
+# that passed is not run again"; #457); the upgrade test and the staged cases, which read the release tags and the day,
+# never in the tree, run on every push; and the checks of the core itself, each a step of its own after the suites, run
+# every time.
 # After them, on Linux, the core's own mutation tool puts faults into the lines a pull request changes and runs the
 # tests that name each file against them (scripts/strength.mjs with scripts/mutate.mjs; tasks/code-shape.md, "How
 # strong the tests are"), in working copies of its own, with no secret.
@@ -81,6 +86,10 @@ jobs:
           - { suite: suites-licences, os: windows-latest, parts: licences }
           - { suite: suites-rest, os: windows-latest, parts: rest tools }
         exclude: ${{ github.event_name == 'pull_request' && fromJSON('[{"node":".node-least","suite":"suites-projects"},{"node":".node-least","suite":"suites-sync"},{"node":".node-least","suite":"suites-kit"},{"node":".node-least","suite":"suites-core"},{"node":".node-least","suite":"suites-core-places"},{"node":".node-least","suite":"suites-licences"},{"node":".node-least","suite":"suites-rest"}]') || fromJSON('[]') }}
+    # (the run's token reads the checks too: the selection asks whether "tests" passed on the merged head, on a push)
+    permissions:
+      contents: read
+      checks: read
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     defaults:
@@ -94,10 +103,14 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ${{ matrix.node }}
-      - name: The suites this change can reach (on main, and in a re-run, every one)
+      - name: The suites this change can reach (on main, and in a re-run, every one, but none where the merged head passed this tree whole)
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
-        run: node scripts/select.mjs .github/shape.json --env RUN
+          # (on a push's first run, of a job a pull request also runs: the check whose pass on the merged head, whose tree
+          # this push holds, lets the suites select nothing; the least Node's jobs on Windows run on a push alone; #457)
+          SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && !(matrix.os == 'windows-latest' && matrix.node == '.node-least') && 'tests' || '' }}
+          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}
+        run: node scripts/select.mjs .github/shape.json --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}
       - name: The second the suites start at, for their time mark
         run: echo "SUITES_START=$(date +%s)" >> "$GITHUB_ENV"
       - name: The versions check
