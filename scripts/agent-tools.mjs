@@ -504,12 +504,12 @@ function commitReader(root, rev, lenient = false) {
 
 // Each path on the way to a tool's file that stands in another case at the commit `rev`, as [its problem, what the tool
 // reads through it], so one the base held is noted only while that stands letter for letter.
-// (the paths found as the commit holds them; what they are held by read leniently, through any name a working copy may
-// hold beside the commit, so a change that may reach the tool there is seen, which only ever makes the check stricter)
+// (read leniently, through any name a working copy may hold beside the commit, both what is found in another case and
+// what it is held by, so a path a tool may reach there is seen, which only ever makes the check stricter)
 function caseProblems(root, rev) {
-  const { resolve, names } = commitReader(root, rev), wide = commitReader(root, rev, true);
-  return misnamed(toolPaths(names, at => resolve(at)?.type)).map(([at, want]) =>
-    [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, wide.holds, wide.names, f => wide.resolve(f)?.type)]);
+  const { resolve, names, holds } = commitReader(root, rev, true), typeOf = f => resolve(f)?.type;
+  return misnamed(toolPaths(names, typeOf)).map(([at, want]) =>
+    [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, holds, names, typeOf)]);
 }
 
 // Whether a commit's listing holds `at` as anything but a plain file: a link, a folder or a submodule's entry.

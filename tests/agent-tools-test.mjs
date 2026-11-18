@@ -639,6 +639,11 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     // among them: #600's fallback security review of 09ed8b5)
     fails(run(pr(absentKept, { "real/mcp.json": "{ \"mcpServers\": {} }\n" })), "what a working copy may give a tool there, changed, fails", "Mend: rename it to .kiro");
     for (const via of [".git/refs/..", "node_modules"]) held(dir => { fs.mkdirSync(path.join(dir, "real"), { recursive: true }); fs.writeFileSync(path.join(dir, "real/mcp.json"), "{}\n"); fs.symlinkSync(`../${via}/../real`, path.join(dir, ".Kiro/settings")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through a folder beside the commit"); }, dir => { fs.writeFileSync(path.join(dir, "real/mcp.json"), "{ \"mcpServers\": {} }\n"); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "changed"); }, `a file reached through ${via} and out of it, changed, fails`);
+    // (#600's fallback security review of 1a67694: and a path in another case found through such a folder)
+    const behindRefs = project({ "kreal/Settings/mcp.json": "{}\n", ...listing() });
+    fs.symlinkSync(".git/refs/../../kreal", path.join(behindRefs, ".kiro"));
+    git(behindRefs, "add", "-A"); git(behindRefs, "commit", "-q", "-m", "a tool's folder through .git's own");
+    fails(run(behindRefs, "--core"), "a path in another case behind a link through a folder beside the commit fails", "Mend: rename it to .kiro/settings");
     // (#600's fallback security review of 27d9d98: a file is held by its kind too, so none reads as a link it names)
     const asLink = project({ ".Codex/hooks.json": "{}\n", ...listing() });
     fs.symlinkSync(os.tmpdir(), path.join(asLink, ".Codex/config.toml"));
