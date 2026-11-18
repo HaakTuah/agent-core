@@ -342,17 +342,19 @@ function readFrontmatter(state, file, text) {
   // a line led by any other blank is read at the top, where it is no simple key)
   const lines = front.split(/\r\n?|\n/u), top = lines.filter(l => l.trim() && !/^[ \t]*#/u.test(l) && !/^[ \t]/u.test(l));
   const plain = front.length <= FRONT_MAX && !/^[ \t]/u.test(lines.find(l => l.trim() && !/^[ \t]*#/u.test(l)) ?? "") && top.every(l => SIMPLE.test(l));
-  const runs = top.some(l => ["hooks", "mcpservers"].includes(fold(SIMPLE.exec(l)?.[1] ?? "").replace(/[_-]/gu, "")));
+  // (its hooks, its tool servers, and the tools it lets run without asking, under any key that folds to theirs)
+  const runs = top.some(l => ["hooks", "mcpservers", "allowedtools"].includes(fold(SIMPLE.exec(l)?.[1] ?? "").replace(/[_-]/gu, "")));
   if (!plain || runs) addHook(state, file, { tool: "", event: `${file} frontmatter`, matcher: "", hook: front, runs: true, text: "what it may run", commands: [NO_KIT], setting: true });
   // (and a permission mode of a subagent's own but the default, which lets it run what it would ask about)
-  const mode = top.map(l => SIMPLE.exec(l)).find(m => m && fold(m[1]).replace(/[_-]/gu, "") === "permissionmode");
-  const value = mode ? mode[0].slice(mode[0].indexOf(":") + 1).replace(/\s#.*$/u, "").trim().replace(/^["']|["']$/gu, "") : "default";
-  if (value !== "default") addHook(state, file, { tool: "", event: `${file} permissionMode`, matcher: "", hook: front, runs: true, text: value, commands: [NO_KIT], setting: true });
+  // (each key that folds to it, whichever one a reader keeps: all must be exactly "permissionMode: default")
+  const modes = top.map(l => SIMPLE.exec(l)).filter(m => m && fold(m[1]).replace(/[_-]/gu, "") === "permissionmode");
+  const values = modes.map(m => `${m[1]}: ${m[0].slice(m[0].indexOf(":") + 1).replace(/\s#.*$/u, "").trim().replace(/^["']|["']$/gu, "")}`);
+  if (values.some(v => v !== "permissionMode: default")) addHook(state, file, { tool: "", event: `${file} permissionMode`, matcher: "", hook: front, runs: true, text: values.join(", "), commands: [NO_KIT], setting: true });
 }
 // A skill's or a command's body that runs a command where it is invoked (`!` and a command in backquotes, or a block
-// opened by three backquotes and `!`): the whole text read as a setting no starter kit writes, so one the pull request
+// opened by three backquotes and `!`, anywhere in the text, as Claude Code finds it): the whole text read as a setting no starter kit writes, so one the pull request
 // adds or changes is new.
-const SHELL = /!`|^[ \t]*(?:```|~~~)[ \t]*!/mu;
+const SHELL = /!`|(?:```|~~~)[ \t]*!/u;
 function readShell(state, file, text) {
   if (text !== null && SHELL.test(text)) addHook(state, file, { tool: "", event: `${file} shell`, matcher: "", hook: text, runs: true, text: "the commands its text runs", commands: [NO_KIT], setting: true });
 }
@@ -696,16 +698,17 @@ function mdLinks(root, rev) {
   return [...[...new Set(folders.flatMap(f => f.ways))].map(at => [`${at} is a link on the way to a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads only those of plain folders the project commits. Mend: replace it with the folder itself, committed in the project, in this pull request`, held(at)]),
     ...[...new Set(folders.flatMap(f => f.links))].map(at => [`${at} is a link below a folder of Claude Code's agents or commands, which it reads the Markdown files of wherever the link leads, while this check reads none of them there. Mend: replace it with the files themselves, committed in the project, in this pull request`, held(at)])];
 }
-// Each folder of Claude Code's below the project's root that holds its agents, skills or commands, in whatever case, as
-// [its problem, all it holds]: Claude Code reads them where it works in that folder, and this check reads only the
-// root's, so one the base held is noted while all it holds stands.
+// Each folder of Claude Code's below the project's root, in whatever case, a folder, a link or a submodule, as [its
+// problem, all it holds]: Claude Code reads its settings, agents, skills and commands where it works in that folder, and
+// this check reads only the root's, so one the base held is noted while all it holds stands.
 function nestedClaude(root, rev) {
   const found = new Set();
   for (const at of listing(root, rev).ids.keys()) {
-    const m = /^(.+\/\.claude)\/(?:agents|skills|commands)\//iu.exec(at.normalize("NFC"));
-    if (m) found.add(at.slice(0, m[1].length));
+    // (found a name at a time, so a name in any normal form is cut where it stands)
+    const parts = at.split("/"), i = parts.findIndex((n, k) => k > 0 && fold(n) === ".claude");
+    if (i > 0) found.add(parts.slice(0, i + 1).join("/"));
   }
-  return [...found].sort().map(at => [`${at} holds agents, skills or commands that Claude Code reads where it works in that folder, while this check reads only the project root's. Mend: move them into the root's .claude folder, or take them out, in this pull request`, `${at}\0${everything(root, rev, at)}`]);
+  return [...found].sort().map(at => [`${at} is a folder of Claude Code's below the project's root, whose settings, agents, skills and commands it reads where it works in that folder, while this check reads only the project root's. Mend: move what it holds into the root's .claude folder, or take it out, in this pull request`, `${at}\0${everything(root, rev, at)}`]);
 }
 // The links a commit holds on a tool's way or under a tool's folder, in whatever case.
 const toolLinks = l => l.links.filter(at => WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d)));

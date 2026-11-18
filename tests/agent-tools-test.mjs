@@ -526,13 +526,27 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   ok(shellKept.status === 0 && shellKept.out.includes("as the base held it"), "one the base held is noted while its text stands", shellKept.out);
   for (const mode of ["bypassPermissions", "'acceptEdits' # quoted"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": `---\nname: rev\npermissionMode: ${mode}\n---\n` })), `a subagent's permission mode ${mode} fails`, NOKIT, "permissionMode");
   passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": "---\nname: rev\npermissionMode: default\n---\n" })), "and its default passes");
+  // (#693's fallback security review of fdd2d96: every key that folds to the permission mode, whichever a reader keeps;
+  // a block that runs a command wherever it stands; and the tools a skill lets run without asking)
+  for (const front of ["PermissionMode: default\npermissionMode: bypassPermissions", "permissionMode: default\npermissionMode: bypassPermissions"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": `---\nname: rev\n${front}\n---\n` })), `a permission mode written twice, ${front.split("\n")[0]} first, fails`, NOKIT, "permissionMode");
+  for (const body of ["# c\n> ```!\nbash x.sh\n```\n", "# c\n````!\nbash x.sh\n````\n", "# c\nRun this: ```!\nbash x.sh\n```\n"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/commands/c.md": body })), `a command's block that runs a command, ${JSON.stringify(body.split("\n")[1])}, fails`, NOKIT);
+  fails(run(pr(project({ ...script, ...listing(SK), ".claude/skills/s/SKILL.md": "# s\n" }), { ".claude/skills/s/SKILL.md": "---\nname: s\nallowed-tools: Bash(*)\n---\n# s\n" })), "a skill's tools it lets run without asking fail as a setting", NOKIT);
   // (a folder of Claude Code's below the project's root, which it reads where it works there)
-  const NESTED = "holds agents, skills or commands that Claude Code reads where it works in that folder";
-  fails(run(pr(project({ ...script, ...listing() }), { "app/.claude/skills/x/SKILL.md": "# x\n" })), "a folder of skills below the project's root fails", NESTED, "Mend: move them into the root's .claude folder");
+  const NESTED = "is a folder of Claude Code's below the project's root";
+  fails(run(pr(project({ ...script, ...listing() }), { "app/.claude/skills/x/SKILL.md": "# x\n" })), "a folder of skills below the project's root fails", NESTED, "Mend: move what it holds into the root's .claude folder");
   const nested = () => project({ ...script, "app/.Claude/agents/rev.md": "---\nname: rev\n---\n", ...listing() });
   const nestedKept = run(pr(nested(), { "README.md": "x\n" }));
   ok(nestedKept.status === 0 && nestedKept.out.includes(NESTED), "one the base held, in whatever case, is noted", nestedKept.out);
   fails(run(pr(nested(), { "app/.Claude/agents/rev.md": `---\nname: rev\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n` })), "but not once what it holds changes", NESTED);
+  fails(run(pr(project({ ...script, ...listing() }), { "app/.claude/settings.json": KIT })), "and so do a nested folder's settings", NESTED);
+  const nfd = () => project({ ...script, ["e\u0301/.claude/agents/rev.md"]: "---\nname: rev\n---\n", ...listing() });
+  fails(run(pr(nfd(), { ["e\u0301/.claude/agents/rev.md"]: "---\nname: rev\npermissionMode: bypassPermissions\n---\n" })), "and one below a name in another normal form, changed", NESTED);
+  if (LINKS) {
+    const nestedLink = project({ ...script, "shared/skills/x/SKILL.md": "# x\n", ...listing() });
+    fs.mkdirSync(path.join(nestedLink, "app"), { recursive: true }); fs.symlinkSync("../shared", path.join(nestedLink, "app/.claude"));
+    git(nestedLink, "add", "-A"); git(nestedLink, "commit", "-q", "-m", "a nested .claude as a link");
+    fails(run(nestedLink, "--core"), "and a nested .claude that is a link", NESTED);
+  }
   for (const at of [".claude/Agents/rev.md", ".claude/agents/rev.MD", ".claude/Commands/rev.md"]) fails(run(pr(project({ ...script, ...listing() }), { [at]: "---\nname: rev\n---\n" })), `a subagent's file in another letter case, ${at}, fails`, "in another case");
   passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": "---\nname: rev\ndescription: reviews hooks\n---\n# rev\n" })), "a subagent with no hooks in its frontmatter passes");
   const frontStood = project({ ...script, ".claude/agents/rev.md": front("hooks") });
