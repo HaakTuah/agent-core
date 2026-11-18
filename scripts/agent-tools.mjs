@@ -996,31 +996,21 @@ const checkouts = new Map();
 const topOf = root => { if (!checkouts.has(root)) checkouts.set(root, fs.realpathSync(root)); return checkouts.get(root); };
 // The link `here`, the walk's `hops`th, its text put before what is left of a walk's path, read as `how` says: false
 // where it leads nowhere this machine can follow (past the links followed, no text, or a whole path on a drive this
-// machine has none of, save one through the checkout's own folder: onDrive()), and a whole path walked from its start by
-// backIn().
+// machine has none of, never guessed into the checkout by a folder's name: driveCut()), and a whole path walked from its
+// start by backIn().
 function onward(root, rev, here, how, left, at, via, hops) {
   const to = linkText(root, rev, here), names = t => t.split(how.win ? /[\\/]/u : "/");
   if (hops > most(how) || to === null) return false;
   if (!path.posix.isAbsolute(to) && !(how.win && path.win32.isAbsolute(to))) { left.unshift(...names(to)); return true; }
-  if (!path.isAbsolute(to)) return onDrive(root, to, left, at, via);
+  if (!path.isAbsolute(to)) return false;
   const start = path.parse(to).root || path.sep;
   left.unshift(...names(to.slice(start.length)));
   return backIn(root, start, left, at, via);
 }
-// A whole path on a Windows drive, which this machine has none of: where one of its names is the checkout's own folder's,
-// in whatever case, the rest after the last such is walked in the checkout from its root, said in `via`, and true; else
-// false. So a link the base held there is held by what it would reach in a checkout of that name, never by nothing.
-function onDrive(root, to, left, at, via) {
-  const parts = to.slice(path.win32.parse(to).root.length).split(/[\\/]/u), own = fold(path.basename(topOf(root)));
-  const i = parts.findLastIndex(n => fold(n) === own);
-  if (i < 0) return false;
-  at.length = 0;
-  left.unshift(...parts.slice(i + 1));
-  via.push(`\0back in by its name\0${parts.slice(0, i + 1).join("/")}`);
-  return true;
-}
 // The link on the way of `at`, read as Windows reads it, whose text is a whole path on a Windows drive this machine
-// cannot follow (onDrive()), as [the link, its text]; null where there is none.
+// cannot follow, as [the link, its text]; null where there is none. Where such a path leads on that machine, the checkout
+// or elsewhere, cannot be read here, and a folder's name is no proof of it, so one the base held is reported, never
+// failed, whatever changes in the checkout, and a new one fails.
 function driveCut(root, rev, at) {
   const via = [];
   if (walk(root, rev, at, via, true, [], true, WAYS_READ[1]) !== null) return null;
