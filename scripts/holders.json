@@ -200,6 +200,7 @@
     "floor/topics/dependencies.md: 15. Dependencies": [76, 252],
     "floor/topics/dependencies.md: A new one is looked up in its registry": [252],
     "floor/topics/dependencies.md: A new one is taken in an order": [252],
+    "floor/topics/dependencies.md: Code of another publisher is named in a lock file": [257],
     "floor/topics/dependencies.md: 17. Dependabot's own PRs": [34],
     "floor/topics/dependencies.md: An agent's own tools are code with its sign-ins": [225],
     "floor/topics/input.md: A failure refuses": [227],
@@ -401,6 +402,7 @@
     "tasks/cleaning.md: The state report leads with the outcomes": "correction: does not work; outcome: robust",
     "floor/topics/dependencies.md: A new one is looked up in its registry": "check fires; outcome: robust; rare harm",
     "floor/topics/dependencies.md: A new one is taken in an order": "findings; outcome: robust",
+    "floor/topics/dependencies.md: Code of another publisher is named in a lock file": "correction: rule missing; outcome: robust; rare harm",
     "floor/topics/what-ships.md: A package found bad goes at once": "correction: rule missing; outcome: robust; rare harm"
   }
 }

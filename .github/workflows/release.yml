@@ -41,7 +41,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
-      - name: The core's packages, installed from its lock file (#654)
+      - name: The core's packages, installed from its lock file for the release (#654)
         run: node scripts/install.mjs
       - name: The release, cut where every check on main's newest commit has passed
         env:

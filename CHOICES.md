@@ -287,7 +287,8 @@ adds this record.
   project from the starter kit of release-4 and one of release-5 each synced straight to the second pull request's
   commit, passed every check unchanged. A release cut between the two would have stopped the batch's queue for nothing.
 - **Reopened on 18 November 2026 by the owner's decision (#654):** other publishers' code is registered, never
-  carried. One sign here had tripped first: a carried file raised the core's own code scanning's alerts, on #605 (the
+  carried, in a project too (point 9). It corrects what #601 brought in (Brought in by: #601; Correction: rule missing;
+  #302). One sign here had tripped first: a carried file raised the core's own code scanning's alerts, on #605 (the
   parser's runtime), and its pull request waited a night on the owner; #637 was what was done about it, and once
   nothing is carried its points 1, 2 and 4 have nothing to act on and are not built. Whether that alone met the sign is
   moot, the owner having decided: what was not weighed when step 3 was argued is the registry's own lock file,

@@ -116,7 +116,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ${{ inputs.root }}/.node-version # the one exact Node ("Node" in tasks/updates.md)
-      - name: The core's packages, installed from the default branch's lock file, where it holds one (#654)
+      - name: The core's packages, installed from the default branch's lock file for the security-review check, where it holds one (#654)
         env:
           ROOT: ${{ inputs.root }}
         run: if [ -f "$ROOT/scripts/install.mjs" ]; then node "$ROOT/scripts/install.mjs"; fi
