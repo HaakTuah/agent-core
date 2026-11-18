@@ -514,7 +514,8 @@ function commitReader(root, rev) {
     return d?.type === "tree" ? [...(listing(root, rev).children.get(d.f) ?? [])] : [];
   };
   // (what a name holds, as a fingerprint reads it: what the walk reaches, by its kind and git's object, a file's or a
-  // submodule's commit, and each link it passes on the way, by its object, which is its target)
+  // submodule's commit, and each link it passes on the way, by its object, which is its target, so a link filled in,
+  // moved or leading on to what changed is seen)
   const holds = f => {
     const via = [], r = walk(root, rev, f, via), { ids } = listing(root, rev);
     return [r?.type ?? "nothing", ids.get(r?.f) ?? "", ...via.map(at => `${at}\0${ids.get(at)}`)].join("\0");
