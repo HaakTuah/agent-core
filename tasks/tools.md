@@ -73,18 +73,19 @@ claims no more than the tool's documentation until the tool has passed the stage
 tools or their models are equal, that a project must use more than one tool (which tool takes which role stays its
 preference: `tasks/roles.md`), or that a `not yet` goes ahead of a project's own work: each is an ordinary task. Reason:
 the core grew up with one tool, and a project whose owner has another got less of it for no reason a rule gives. Held by
-`scripts/tools-offer.mjs`, which fails an empty cell, a `cannot` with no page and day, a `not yet` with no issue (where
-gh answers, one that is not open), a map with no day, a tool of the list with no column and a file of a tool's own that
-no row names.
+`scripts/tools-offer.mjs`, which fails an empty cell, a `cannot` with no page and day, a `not yet` with no issue, a map
+with no day, a tool of the list with no column and a file of a tool's own that no row names; that the issue is still
+open, only where it is run with `--open` and gh answers.
 
 | What the core offers | Claude Code (`tools/claude.md`) | Codex (`tools/codex.md`) | Kiro (`tools/kiro.md`) | Antigravity (`tools/antigravity.md`) | GitHub Copilot (`tools/copilot.md`) |
 | --- | --- | --- | --- | --- | --- |
 | The entry file | carried: `setup/template/CLAUDE.md.tmpl` | carried: it reads `AGENTS.md` itself | carried: `setup/template/kiro-steering.md.tmpl` | carried: `setup/template/antigravity-rule.md.tmpl` | carried: it reads `AGENTS.md` itself |
 | What to read at a task's start | carried: `tools/claude.md`, which the entry file pulls in | carried: `tools/other-builders.md` | carried: `tools/other-builders.md` | carried: `tools/other-builders.md` | carried: `tools/other-builders.md` |
-| The work-saved hook at a session's start and stop | carried: `setup/template/claude-settings.json.tmpl`, running `scripts/work-saved.sh` | carried: `setup/template/codex-hooks.json.tmpl` | carried: `setup/template/kiro-hook.json.tmpl` | cannot: antigravity.google, its page on rules, read 15 November 2026 | not yet |
+| The work-saved hook at a session's start and stop | carried: `setup/template/claude-settings.json.tmpl`, running `scripts/work-saved.sh` | carried: `setup/template/codex-hooks.json.tmpl` | carried: `setup/template/kiro-hook.json.tmpl` | not yet | not yet |
 | Helpers, and the hook that holds their model and effort | carried: `tasks/helpers.md`, `scripts/helper-call.mjs` | not yet | not yet | not yet | not yet |
 | The map of the tiers to its models | carried: `tools/claude.md` | not yet | not yet | not yet | not yet |
-| How a task is handed over and a review asked | carried: `roles/orchestrator.md`, `tasks/reviews.md` | carried: `tools/codex.md` | carried: `tools/kiro.md` | carried: `tools/antigravity.md` | carried: `tools/copilot.md` |
+| How a task is handed over | carried: `roles/orchestrator.md`, a session or helper it starts | carried: `tools/codex.md`, its plug-in's subagent or its command line | carried: `tools/kiro.md`, its editor or `kiro-cli chat` | carried: `tools/antigravity.md`, a conversation in its editor | carried: `tools/copilot.md`, a conversation on GitHub |
+| How a review is asked | carried: `tasks/reviews.md`, the fallback reviewer | carried: `tools/codex.md`, its app on GitHub | carried: `tools/kiro.md`, a fresh session given the review's brief | carried: `tools/antigravity.md`, a fresh session of it with that brief | carried: `tools/copilot.md`, its code review |
 | The orchestrator | carried: `roles/orchestrator.md` | not yet | not yet | not yet | not yet |
 | The staged run | carried: `reports/staged-cases.json` | not yet | not yet: #400 | not yet | not yet |
 | Its issue for what is not yet carried | none | #679 | #680 | #681 | #682 |

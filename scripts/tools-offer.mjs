@@ -90,7 +90,10 @@ export function wrong({ root = ROOT, text = fs.readFileSync(path.join(root, TABL
 }
 
 const gitFiles = root => execFileSync("git", ["-C", root, "ls-files", "-z"], { encoding: "utf8" }).split("\0").filter(Boolean);
-const ghOpen = n => { try { return execFileSync("gh", ["api", `repos/{owner}/{repo}/issues/${n}`, "--jq", ".state"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 20000 }).trim() === "open"; } catch { return null; } };
+// What GitHub's API answers of an issue's state (floor rule 5): true for "open", false for "closed", and null, read as
+// not answered, for anything else, a long, empty or other text among it.
+export const openFrom = answer => { const a = typeof answer === "string" && answer.length <= 20 ? answer.trim() : null; return a === "open" ? true : a === "closed" ? false : null; };
+const ghOpen = n => { try { return openFrom(execFileSync("gh", ["api", `repos/{owner}/{repo}/issues/${n}`, "--jq", ".state"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 20000 })); } catch { return null; } };
 
 if (started(import.meta.url)) {
   const tools = JSON.parse(fs.readFileSync(path.join(ROOT, "scripts/staged-tools.json"), "utf8")).tools;

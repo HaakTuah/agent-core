@@ -56,7 +56,7 @@ nothing yet: builder and reviewer post under one login (#187).
 | Tier | Its jobs | Effort |
 | --- | --- | --- |
 | Strongest | the main lane, design readings and the *hard work*, the orchestrator, the fallback reviewer, the design and leanness checks, the stand-in, a choice's challenger, blind picker and judge, escalation's first step, a helper that needs design judgement | high |
-| Middle | routine lanes (polish, docs, splits, tests) and parallel helpers (`tasks/helpers.md`) | medium; high for the hard work |
+| Middle | routine lanes (polish, docs, splits, tests) and parallel helpers (`tasks/helpers.md`) | high for a builder; a helper medium, high for the hard work |
 | Light | search | low |
 | Scarce top | planning design, escalation's last step, work the owner gives it by name | high |
 
