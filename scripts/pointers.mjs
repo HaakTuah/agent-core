@@ -1,7 +1,8 @@
 // The pointer check ("One fact, one place" in roles/shared/how-to-work.md), for every project that takes the core: every
 // pointer in the project's rule files (rule-files.mjs, beside this file) to a file, a section or a numbered point must
 // lead to one that exists, or it fails, saying which. A pointer is read from the forms below; a form it cannot read is
-// listed, never guessed. Node's own modules only. It checks the project it lies in (core/scripts/ there), whatever the
+// listed, never guessed. It reads Markdown with the package carried in third-party/ (markdown.mjs), and Node's own
+// modules besides. It checks the project it lies in (core/scripts/ there), whatever the
 // directory it is started from; the copies workflow (.github/workflows/copies.yml) runs it on every PR.
 //
 //   `path`                     a tracked file or folder (a bare name, such as `net.js`, if exactly one file has it)
@@ -36,6 +37,7 @@ import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { corePath, projectAt } from "./core-path.mjs";
 import { logged } from "./guards.mjs";
+import { readMarkdown } from "./markdown.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -72,20 +74,18 @@ const HOME = CORE ? "" : corePath(".") || "core/";
 const FLOOR = tracked.filter(f => f.startsWith(`${HOME}floor/`) && f.endsWith(".md"));
 const ITEMS = tracked.filter(f => new RegExp(`^${HOME}archive/instructions/items-\\d+\\.md$`).test(f));
 
-// A file's anchors: its headings and bold lead-ins, each with the lines it spans (to the next heading of its level or
-// above), and its numbered points by line (a list item, or a paragraph led by its bold number, as the core's floor
-// writes its rules).
+// A file's anchors: its headings and bold lead-ins, as Markdown reads them (markdown.mjs), each with the lines it spans
+// (to the next heading of its level or above), its blocks, and its lines, where its numbered points are read (a list
+// item, or a paragraph led by its bold number, as the core's floor writes its rules).
 const parsed = new Map();
 function parse(file) {
   if (parsed.has(file)) return parsed.get(file);
-  const lines = text(file).split(/\r?\n/), anchors = [], heads = []; // (a Windows checkout's line endings too)
-  lines.forEach((l, i) => {
-    const h = /^(#+)\s+(.*)$/.exec(l);
-    if (h) { heads.push({ level: h[1].length, i }); anchors.push({ title: plain(h[2]), level: h[1].length, from: i }); }
-    for (const b of l.matchAll(/\*\*([^*]+?)[.:,]?\*\*/g)) anchors.push({ title: plain(b[1]), level: 9, from: i });
-  });
+  const lines = text(file).split(/\r?\n/), md = readMarkdown(text(file)); // (a Windows checkout's line endings too)
+  const heads = md.heads.map(h => ({ level: h.level, i: h.i }));
+  const anchors = [...md.heads.map(h => ({ title: plain(h.text), level: h.level, from: h.i })), ...md.bolds.map(b => ({ title: plain(b.text.replace(/[.:,]$/u, "")), level: 9, from: b.i }))]
+    .sort((a, b) => a.from - b.from || a.level - b.level);
   for (const a of anchors) a.to = (heads.find(h => h.i > a.from && h.level <= a.level) || { i: lines.length }).i;
-  const p = { lines, anchors, heads };
+  const p = { lines, anchors, heads, blocks: md.blocks };
   parsed.set(file, p);
   return p;
 }
@@ -150,16 +150,8 @@ for (const rf of RULES) {
     count++;
     if (!files.has(posix.normalize(posix.join(posix.dirname(rf), to)))) (CORE ? broken : unread).push(`${rf}:${i + 1}: the import line @${to} leads to no tracked file`);
   });
-  // blocks: list items and paragraphs, outside code fences
-  const blocks = [];
-  let fence = false, cur = null;
-  lines.forEach((l, i) => {
-    if (/^\s*```/.test(l)) { fence = !fence; cur = null; return; }
-    if (fence || !l.trim() || /^#/.test(l) || /^\|/.test(l)) { cur = null; if (/^[#|]/.test(l)) blocks.push({ i, text: l }); return; }
-    if (!cur || /^\s*([-*]|\d+\.)\s/.test(l)) { cur = { i, text: '' }; blocks.push(cur); }
-    cur.text += ' ' + l.trim();
-  });
-  for (const b of blocks) {
+  // blocks: list items, paragraphs, headings and table rows, outside code and HTML (markdown.mjs)
+  for (const b of parse(rf).blocks) {
     const own = parse(rf).heads.filter(h => h.i <= b.i).pop();
     // a link's destination, when it is in this repository, must be a tracked file or folder too
     for (const m of b.text.matchAll(/\]\(([^)\s]+)\)/g)) {

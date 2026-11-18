@@ -9,3 +9,11 @@ whose text travels in its folder, and not under the core's: the core's `LICENSE`
 ISC, its text in `yaml/LICENSE`.
 
 Copyright Eemeli Aro <eemeli@gmail.com>
+
+## marked 18.2.0
+
+MIT, and for what it takes from Markdown a BSD licence of three clauses, both in `marked/LICENSE`.
+
+Copyright (c) 2018+, MarkedJS (https://github.com/markedjs/)
+Copyright (c) 2011-2018, Christopher Jeffrey (https://github.com/chjj/)
+Copyright © 2004, John Gruber

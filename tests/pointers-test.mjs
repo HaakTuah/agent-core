@@ -13,6 +13,12 @@ import { mended } from "../scripts/mend.mjs";
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
 const here = fileURLToPath(new URL("../scripts/", import.meta.url));
+// (the check's scripts, and the package its Markdown is read with, as a copy of the core holds them: third-party/)
+const carry = core => {
+  fs.mkdirSync(path.join(core, "scripts"), { recursive: true });
+  for (const f of ["pointers.mjs", "markdown.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(core, "scripts", f));
+  fs.cpSync(path.join(here, "../third-party"), path.join(core, "third-party"), { recursive: true });
+};
 const FILES = {
   "AGENTS.md": "# A project\n\n## Where things are\n\nIts rules: `SECURITY.md`, rule 3, and \"Running it\" in `docs/developing.md`.\n",
   "SECURITY.md": "# Security\n\n**3. The protected files,** here, **the rule files:** `docs/developing.md`;\n",
@@ -22,8 +28,7 @@ function run(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pointers-test-"));
   try {
     for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
-    fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-    for (const f of ["pointers.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
+    carry(path.join(dir, "core"));
     for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: dir, stdio: "ignore" });
     const r = spawnSync(process.execPath, [path.join(dir, "core/scripts/pointers.mjs")], { cwd: dir, encoding: "utf8" });
     return { code: r.status, out: r.stdout + r.stderr };
@@ -68,8 +73,7 @@ try {
   const put = (f, body) => { fs.mkdirSync(path.join(tools, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(tools, f), body); };
   const g = (...args) => execFileSync("git", args, { cwd: tools, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   for (const [f, body] of Object.entries(FILES)) put(f, body);
-  fs.mkdirSync(path.join(tools, "core/scripts"), { recursive: true });
-  for (const f of ["pointers.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(tools, "core/scripts", f));
+  carry(path.join(tools, "core"));
   const OLD = "# Steering\n\nAs \"Shipping it\" in `docs/developing.md` says.\n";
   put(".kiro/steering/own.md", OLD);
   g("init", "-q"); g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "base");
@@ -139,8 +143,7 @@ try {
   put("floor/threat-model.md", "# The threat model\n\n19. A list item, no rule.\n");
   put("tasks/a.md", "# A module\n\nAs floor rule 19 says (core archive 999).\n");
   put("archive/instructions/items-001.md", "# Items\n\n1. **1 November 2026**. Words.\n");
-  fs.mkdirSync(path.join(coreDir, "scripts"));
-  for (const f of ["pointers.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(coreDir, "scripts", f));
+  carry(coreDir);
   for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: coreDir, stdio: "ignore" });
   const c = spawnSync(process.execPath, [path.join(coreDir, "scripts/pointers.mjs"), "--core"], { cwd: coreDir, encoding: "utf8" });
   ok(c.status === 1 && mended(c.stdout + c.stderr) && /FAIL: a broken pointer: tasks\/a\.md:3: floor rule 19/.test(c.stdout + c.stderr) && /core archive 999/.test(c.stdout + c.stderr) && !/floor\/security\.md/.test(c.stderr), "in the core's own run it fails, a list item numbered 19 is no rule, and a lone rule in the floor's own file is the floor's, wherever in the floor it stands", c.stdout + c.stderr);
