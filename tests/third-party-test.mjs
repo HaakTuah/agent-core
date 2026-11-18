@@ -24,7 +24,7 @@ const copy = () => {
   const dir = path.join(tmp, `c${++n}`);
   fs.cpSync(path.join(root, "third-party"), path.join(dir, "third-party"), { recursive: true });
   fs.mkdirSync(path.join(dir, "scripts"));
-  fs.copyFileSync(path.join(root, "scripts/yaml-keys.mjs"), path.join(dir, "scripts/yaml-keys.mjs"));
+  for (const used of new Set(list(root).packages.flatMap(p => p.used))) fs.copyFileSync(path.join(root, used), path.join(dir, used));
   return dir;
 };
 const list = dir => JSON.parse(fs.readFileSync(path.join(dir, "third-party/list.json"), "utf8"));

@@ -211,8 +211,8 @@ passes `root: .` and `advisory: false`. Kinds: E9 (for this caller), E12, R4. Fi
 
 **Task S3. A case for each of four kinds of posted review.**
 What to test: "Security review: none needed" naming the head passes, and naming an earlier commit after a push of the
-pull request's own waits (F20); a review posted before Codex's review began or before its finding,
-and edited after, does not end the wait (F25); an organisation's repository (owner of type
+pull request's own waits (F20); a review edited after it was posted (F25), which #630 since holds with a case of
+its own, an edited review counting no longer; an organisation's repository (owner of type
 Organization) counts an owner's review only through its rights (W11, R5); an app's account named in `reviewers`, its
 comment of association NONE and of COLLABORATOR, counts only in the second (W13). File: `tests/security-review-test.mjs`.
 
