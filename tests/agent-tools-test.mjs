@@ -421,6 +421,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     fails(run(pr(project({ ...script, ...listing() }), { ".codex/config.toml": `[model_providers.p.${key}]\ncommand = "bash"\nargs = ["scripts/format.sh"]\n`, ...listing({ kind: "hook", name: `Codex model_providers.p.${key}: bash scripts/format.sh`, publisher: "this project" }) })), `Codex's "model_providers.p.${key}" not in the kit's form fails as a hook does`, NOT_KIT);
   fails(run(pr(project({ ...script, ...listing() }), withSetting("statusLine", { type: "command", command: KIT_HOOK }))), "and fails unlisted", 'the hook "statusLine: ');
   fails(run(pr(project({ ...script, ...listing() }), withSetting("apiKeyHelper", ["bash", "x"]))), "a setting of another shape is refused", '"apiKeyHelper" is neither a command nor');
+  // (#633's fallback security review of b0f654f: a hook the base held under an event of a setting's name, which never ran,
+  // moved into that setting, is new)
+  const asEvent = { ...JSON.parse(KIT), hooks: { ...JSON.parse(KIT).hooks, statusLine: [{ hooks: [{ type: "command", command: TREE_HOOK }] }] } };
+  fails(run(pr(project({ ...script, ".claude/settings.json": asEvent }), withSetting("statusLine", { type: "command", command: TREE_HOOK }))), "a hook the base held under a setting's name, moved into the setting, is new", NOT_KIT);
   const helperStood = project({ ...script, ...withSetting("apiKeyHelper", TREE_HOOK) });
   const helperKept = run(pr(helperStood, { "README.md": "a change of its own\n" }));
   ok(helperKept.status === 0 && helperKept.out.includes(`the hook "apiKeyHelper: ${TREE_HOOK}"`), "one the base held is noted, not failed", helperKept.out);
@@ -897,6 +901,17 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     const lockKept = run(pr(viaPackage(), { "package-lock.json": JSON.stringify({ ...JSON.parse(lockAt("1.0.0")), packages: { ...JSON.parse(lockAt("1.0.0")).packages, "node_modules/other": { version: "2.0.0" } } }) }));
     ok(lockKept.status === 0 && lockKept.out.includes("as the base held it"), "a link the base held into an installed package is noted while the lock file holds that package as it was", lockKept.out);
     fails(run(pr(viaPackage(), { "package-lock.json": lockAt("2.0.0") })), "but not once the pull request locks the package anew", '".claude" is a link that leads out of the checkout');
+    // (#633's fallback security review of b0f654f: an entry too deep to write back fails with the mend, not a crash; and of
+    // a yarn or pnpm lock, only the package's own entries are read, so another package's update leaves the link noted)
+    fails(run(pr(viaPackage(), { "package-lock.json": `{"lockfileVersion":3,"packages":{"node_modules/pkg":${"[".repeat(200000)}${"]".repeat(200000)}}}` })), "and an entry too deep to read back fails with its mend", '".claude" is a link that leads out of the checkout', "Mend:");
+    const yarnAt = (pkg, other) => `# yarn lockfile v1\n\n\nother@^1.0.0:\n  version "${other}"\n  resolved "https://registry.yarnpkg.com/other/-/other-${other}.tgz"\n\npkg@^1.0.0, "pkg@npm:^1.0.0":\n  version "${pkg}"\n  resolved "https://registry.yarnpkg.com/pkg/-/pkg-${pkg}.tgz"\n  dependencies:\n    other "^1.0.0"\n`;
+    const pnpmAt = (pkg, other) => `lockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    dependencies:\n      other:\n        specifier: ^1.0.0\n        version: ${other}\n      pkg:\n        specifier: ^1.0.0\n        version: ${pkg}\n\npackages:\n\n  other@${other}:\n    resolution: {integrity: sha512-o}\n\n  pkg@${pkg}:\n    resolution: {integrity: sha512-p}\n`;
+    for (const [lock, at] of [["yarn.lock", yarnAt], ["pnpm-lock.yaml", pnpmAt]]) {
+      const viaLock = () => { const dir = project({ ".gitignore": "node_modules/\n", [lock]: at("1.0.0", "1.0.0"), ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync("node_modules/pkg/.claude", path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link into an installed package"); return dir; };
+      const otherMoved = run(pr(viaLock(), { [lock]: at("1.0.0", "1.2.0") }));
+      ok(otherMoved.status === 0 && otherMoved.out.includes("as the base held it"), `with ${lock}, another package locked anew leaves it noted`, otherMoved.out);
+      fails(run(pr(viaLock(), { [lock]: at("2.0.0", "1.0.0") })), `but the package it passes through, locked anew in ${lock}, fails`, '".claude" is a link that leads out of the checkout');
+    }
   }
 }
 

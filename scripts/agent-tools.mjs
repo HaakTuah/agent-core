@@ -204,7 +204,7 @@ function readCodex(state, json, read) {
       if (part?.command === undefined) continue;
       const words = [part.command, ...(Array.isArray(part.args) ? part.args : [])];
       if (!words.every(w => typeof w === "string")) { state.flag(`.codex/config.toml: "model_providers.${id}.${key}" holds a command or arguments that are no text. Mend: write them as Codex takes them`, ".codex/config.toml"); continue; }
-      addHook(state, ".codex/config.toml", { tool: "Codex", event: `model_providers.${id}.${key}`, matcher: "", hook: part, runs: true, text: words.join(" "), commands: [shellWords(words)] });
+      addHook(state, ".codex/config.toml", { tool: "Codex", event: `model_providers.${id}.${key}`, matcher: "", hook: part, runs: true, text: words.join(" "), commands: [shellWords(words)], setting: true });
     }
   }
   addServers(state, ".codex/config.toml", state.entries(".codex/config.toml", "mcp_servers", config.mcp_servers, SERVERS), "Codex ");
@@ -287,10 +287,11 @@ function readHooks(state, file, settings, tool = "") {
 }
 // One hook, into configured()'s `state`: its name, as the list writes it, `tool`, `event`, `matcher` and `text`; its
 // id, all of it; and the files of the project its `commands` take from the working tree.
-function addHook(state, file, { tool, event, matcher, given = matcher, hook, runs, text, commands }) {
+function addHook(state, file, { tool, event, matcher, given = matcher, hook, runs, text, commands, setting = false }) {
   const name = `hook ${tool ? `${tool} ` : ""}${event}${matcher ? ` ${matcher}` : ""}: ${text}`;
-  // (Claude Code's hooks keep the id they had before other tools were read, so a base read by an older copy is the same)
-  const id = canonical(tool ? ["hook", tool, event, given ?? "", hook] : ["hook", event, given ?? "", hook]);
+  // (Claude Code's hooks keep the id they had before other tools were read, so a base read by an older copy is the same;
+  // a setting's is of its own kind, so a hook under an event of a setting's name is never read as the setting it names)
+  const id = canonical(setting ? ["setting", tool, event, hook] : tool ? ["hook", tool, event, given ?? "", hook] : ["hook", event, given ?? "", hook]);
   // (a hook's name is its event, matcher and command, split at the first ": ": a matcher holding one would let two
   // hooks share a name)
   if (matcher.includes(": ") && !state.clashed.has(`matcher ${file} ${event} ${matcher}`)) {
@@ -318,7 +319,7 @@ function readCommands(state, file, settings) {
     if (value === undefined || value === null) continue;
     const command = typeof value === "string" ? value : value?.type === "command" && typeof value.command === "string" ? value.command : null;
     if (command === null) { state.flag(`${file}: "${key}" is neither a command nor { "type": "command", "command" }. Mend: write it as Claude Code takes it`, file); continue; }
-    addHook(state, file, { tool: "", event: key, matcher: "", hook: value, runs: true, text: command, commands: [command] });
+    addHook(state, file, { tool: "", event: key, matcher: "", hook: value, runs: true, text: command, commands: [command], setting: true });
   }
 }
 
@@ -721,10 +722,38 @@ const targets = new Map(), PATH_MAX = 4096;
 function target(root, rev, at) {
   const key = `${root}\0${rev}\0${at}`;
   if (!targets.has(key)) {
-    const to = textAt(root, rev, at) ?? "/";
+    const l = listing(root, rev), read = l.linked.has(at) ? linkTexts(root, rev).get(l.ids.get(at)) : undefined;
+    const to = read === undefined ? textAt(root, rev, at) ?? "/" : read ?? "/";
     targets.set(key, path.posix.isAbsolute(to) || to.length > PATH_MAX ? null : to);
   }
   return targets.get(key);
+}
+// The text of each link a commit's listing holds, by its object, asked of git in two processes for them all, not one a
+// link: their sizes, then the text of those no longer than PATH_MAX, the rest null; a link git does not answer for is
+// left out, and read on its own.
+const linkTextsOf = new Map();
+function linkTexts(root, rev) {
+  const key = `${root}\0${rev}`;
+  if (linkTextsOf.has(key)) return linkTextsOf.get(key);
+  const l = listing(root, rev), out = new Map(), ids = [...new Set(l.links.map(at => l.ids.get(at)))];
+  const ask = (how, list) => execFileSync("git", ["--no-replace-objects", "cat-file", how], { cwd: root, input: `${list.join("\n")}\n`, stdio: ["pipe", "pipe", "ignore"], maxBuffer: LISTING_MAX });
+  try {
+    const small = [];
+    for (const line of ids.length ? ask("--batch-check", ids).toString("utf8").split("\n") : []) {
+      const [id, type, size] = line.split(" ");
+      if (type === "blob" && Number(size) <= PATH_MAX) small.push(id);
+      else if (type === "blob") out.set(id, null);
+    }
+    const all = small.length ? ask("--batch", small) : Buffer.alloc(0);
+    for (let at = 0; at < all.length;) {
+      const end = all.indexOf(10, at), [id, type, size] = all.subarray(at, end).toString("utf8").split(" "), n = Number(size);
+      if (type !== "blob" || !(n >= 0)) break;
+      out.set(id, all.subarray(end + 1, end + 1 + n).toString("utf8"));
+      at = end + 2 + n;
+    }
+  } catch { /* (each read on its own) */ }
+  linkTextsOf.set(key, out);
+  return out;
 }
 function walk(root, rev, f, via = [], lenient = false, misses = [], follow = false) {
   const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
@@ -750,19 +779,30 @@ function walk(root, rev, f, via = [], lenient = false, misses = [], follow = fal
 }
 // The name a file system that ignores case finds for `name` in the folder `at`: `name` where the commit holds it, else
 // one of the folder's names that folds to it.
-function folded({ blobs, dirs, others, linked, children }, at, name) {
+function folded(l, at, name) {
   const here = [...at, name].join("/");
-  if (dirs.has(here) || blobs.has(here) || others.has(here) || linked.has(here)) return name;
-  return [...(children.get(at.join("/") || ".") ?? [])].find(n => fold(n) === fold(name)) ?? name;
+  if (l.dirs.has(here) || l.blobs.has(here) || l.others.has(here) || l.linked.has(here)) return name;
+  return foldsIn(l, at.join("/") || ".").get(fold(name))?.[0] ?? name;
+}
+// The names a listing's folder `dir` holds, by their folded form, each list sorted; built once a folder, so a walk's
+// every step does not fold every name beside it again.
+function foldsIn(l, dir) {
+  l.folds ??= new Map();
+  if (!l.folds.has(dir)) {
+    const by = new Map();
+    for (const n of [...(l.children.get(dir) ?? [])].sort()) by.set(fold(n), [...(by.get(fold(n)) ?? []), n]);
+    l.folds.set(dir, by);
+  }
+  return l.folds.get(dir);
 }
 // Where a walk meets a name the commit holds nothing at, while its folder holds that name in another case, which a
 // file system that ignores case finds in its place, that name, said in `misses` as { at }; and, past a link, where it
 // meets a name its folder holds beside another that folds alike, which such a file system keeps one of, so which the
 // tool reads is not plain, those names, as { at, several, rest }, `rest` the path the walk had left there.
-function noteMiss({ blobs, dirs, others, linked, children }, at, name, misses, rest) {
+function noteMiss(l, at, name, misses, rest) {
   const here = [...at, name].join("/"), dir = at.join("/") || ".", path = n => (dir === "." ? n : `${dir}/${n}`);
-  const same = [...(children.get(dir) ?? [])].filter(n => fold(n) === fold(name)).sort();
-  if (dirs.has(here) || blobs.has(here) || others.has(here) || linked.has(here)) {
+  const same = foldsIn(l, dir).get(fold(name)) ?? [];
+  if (l.dirs.has(here) || l.blobs.has(here) || l.others.has(here) || l.linked.has(here)) {
     if (rest !== false && same.length > 1) misses.push({ at: here, several: same.map(path), rest });
     return;
   }
@@ -912,12 +952,33 @@ function lockOf(root, rev, at) {
     const dir = v.slice(0, cut) ? `${v.slice(0, cut)}/` : "", key = v.slice(dir.length);
     for (const lock of ["package-lock.json", "npm-shrinkwrap.json"]) {
       let entry;
-      try { entry = JSON.parse(textAt(root, rev, `${dir}${lock}`) ?? "null")?.packages?.[key] ?? null; } catch { entry = "unreadable"; }
-      out.push(`${dir}${lock}\0${key}\0${JSON.stringify(entry)}`);
+      // (an entry too deep to write back is read as one that cannot be read, as one too deep to parse is)
+      try { entry = JSON.stringify(JSON.parse(textAt(root, rev, `${dir}${lock}`) ?? "null")?.packages?.[key] ?? null); } catch { entry = "unreadable"; }
+      out.push(`${dir}${lock}\0${key}\0${entry}`);
     }
-    for (const lock of ["yarn.lock", "pnpm-lock.yaml"]) out.push(`${dir}${lock}\0${textAt(root, rev, `${dir}${lock}`)}`);
+    const name = key.slice(key.lastIndexOf("node_modules/") + "node_modules/".length);
+    for (const lock of ["yarn.lock", "pnpm-lock.yaml"]) out.push(`${dir}${lock}\0${name}\0${entriesOf(textAt(root, rev, `${dir}${lock}`), name)}`);
   }
   return out.join("\0\0");
+}
+// Of a yarn or pnpm lock's text, the entries that name the package `name`, each its line and the lines indented under
+// it, so a change to another package's entry leaves them as they were; a key names it where, unquoted and past a leading
+// "/", it is the name, or starts with the name and "@" or "/" (a yarn header's every key, split at ", ", is read so).
+function entriesOf(text, name) {
+  if (text === null) return null;
+  const lines = text.split(/\r?\n/u), out = [], indent = l => l.length - l.trimStart().length;
+  const names = key => key.split(/,\s*/u).some(k => {
+    const bare = k.trim().replace(/^["']|["']$/gu, "").replace(/^\//u, "");
+    return bare === name || bare.startsWith(`${name}@`) || bare.startsWith(`${name}/`);
+  });
+  for (let i = 0; i < lines.length; i++) {
+    const colon = lines[i].search(/:(?:\s|$)/u);
+    if (colon < 0 || !lines[i].trim() || !names(lines[i].slice(0, colon))) continue;
+    const at = indent(lines[i]);
+    out.push(lines[i]);
+    while (i + 1 < lines.length && (!lines[i + 1].trim() || indent(lines[i + 1]) > at)) out.push(lines[++i]);
+  }
+  return out.join("\n");
 }
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {
