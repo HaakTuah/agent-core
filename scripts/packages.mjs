@@ -43,8 +43,7 @@ function entry(name) {
 function found(name) {
   const file = entry(name);
   if (!file) {
-    const script = path.relative(process.cwd(), process.argv[1] ?? "") || "this check";
-    console.error(`FAIL: ${script} did not run: the package ${name} is not installed in ${path.relative(process.cwd(), root) || "."}${path.sep}node_modules. Mend: run node ${path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"))}, which installs the core's packages from its lock file, then run the check again`);
+    console.error(`FAIL: the check did not run: the package ${name} is not installed in ${path.relative(process.cwd(), root) || "."}${path.sep}node_modules. Mend: run node ${path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"))}, which installs the core's packages from its lock file, then run the check again`);
     process.exit(1);
   }
   return file;
