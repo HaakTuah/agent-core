@@ -232,15 +232,18 @@ export function argued(head, base) {
 export const LINK = Symbol("a link");
 
 // A file's text at a commit, read from git, or null where the commit does not hold it as a file of at most MOST bytes;
-// undefined where `commit` is no commit here, or a name git would read as an option; LINK where the file is a link there.
+// undefined where `commit` is no commit here, or a name git would read as an option; LINK where the file, or a folder
+// on its way, is a link there.
 export function atCommit(commit, file, root = ".") {
   const git = args => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: MOST * 2 });
   // (a name that opens with "-" would be read by git as an option: it is no commit)
   if (String(commit).startsWith("-")) return undefined;
   try { git(["rev-parse", "--verify", "-q", `${commit}^{commit}`]); } catch { return undefined; }
   try {
-    // (a link at the base is no file the records were read from there, as records() reads none at the head)
-    if (/^120000 /u.test(git(["ls-tree", commit, "--", file]))) return LINK;
+    // (a link at the base is no file the records were read from there, as records() reads none at the head, where a link
+    // on the file's way is read so too)
+    const parts = String(file).split("/");
+    for (let i = 1; i <= parts.length; i++) if (/^120000 /u.test(git(["ls-tree", commit, "--", parts.slice(0, i).join("/")]))) return LINK;
     if (git(["cat-file", "-t", `${commit}:${file}`]).trim() !== "blob" || Number(git(["cat-file", "-s", `${commit}:${file}`])) > MOST) return null;
     return git(["show", `${commit}:${file}`]);
   } catch { return null; }
@@ -248,13 +251,14 @@ export function atCommit(commit, file, root = ".") {
 
 // The records at the base, by the path the base's own rules name (its manifest's row, or the core's AGENTS.md), so a
 // pull request that moves them reads the records they held: their text, null where the base held none, undefined where
-// `base` is no commit here, and LINK where the records, or the file that names them, were a link there.
+// `base` is no commit here, and LINK where the records, or the manifest that names them, were a link there. The core's
+// AGENTS.md, read where the base holds no manifest, is read as naming none where it was a link, so the records are
+// read at the starter kit's path, as before (#541).
 export function baseRecords(base, root = ".") {
   const manifest = atCommit(base, "core-manifest.md", root);
   if (manifest === undefined || manifest === LINK) return manifest;
   const rules = manifest ?? atCommit(base, "AGENTS.md", root);
-  if (rules === LINK) return LINK;
-  const file = where(rules ?? "");
+  const file = where(rules === LINK ? "" : rules ?? "");
   return file ? atCommit(base, file, root) : null;
 }
 

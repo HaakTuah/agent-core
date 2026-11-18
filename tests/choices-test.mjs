@@ -221,6 +221,29 @@ fs.renameSync(path.join(hist, "core-manifest.md"), path.join(hist, "manifest-tar
 h("add", "-A"); h("commit", "-q", "-m", "a linked manifest"); const manifestLinked = h("rev-parse", "HEAD").trim();
 ok(baseRecords(manifestLinked, hist) === LINK && /^The base held the records as a link/.test(checkOf({ file: "records.md", text: half }, manifestLinked, hist)[0][0]), "and so do records named by a manifest that was a link at the base");
 fs.rmSync(hist, { recursive: true, force: true });
+// the two cases a link must not reach (#541's review): an AGENTS.md that is a link, where no manifest names the records,
+// still has them read at the kit's path, so an unargued record the change adds fails; and records under a folder that
+// was a link at the base read as a link, so the records that stood there are listed, not failed
+const repo = (files, links = {}) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "choices-link-"));
+  const g = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  g("init", "-q", "-b", "main");
+  for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
+  for (const [f, to] of Object.entries(links)) fs.symlinkSync(to, path.join(dir, f));
+  g("add", "-A"); g("commit", "-q", "-m", "base");
+  return { dir, at: g("rev-parse", "HEAD").trim() };
+};
+if (link) {
+  const agents = repo({ "CLAUDE.md": "# rules\n", "docs/choices.md": old }, { "AGENTS.md": "CLAUDE.md" });
+  const added = checkOf({ file: "docs/choices.md", text: `${old}\n${half}` }, agents.at, agents.dir);
+  ok(baseRecords(agents.at, agents.dir) === old && added[1] === true && /FAIL: `docs\/choices\.md`: the record "half", which this change adds/.test(added[0].join("\n")),
+    "an AGENTS.md that is a link at the base, with no manifest, leaves the records read at the kit's path, and an unargued record the change adds fails", added[0].join("\n"));
+  const folder = repo({ "real/choices.md": old }, { docs: "real" });
+  const moved = checkOf({ file: "docs/choices.md", text: old }, folder.at, folder.dir);
+  ok(atCommit(folder.at, "docs/choices.md", folder.dir) === LINK && moved[1] === false && /^The base held the records as a link/.test(moved[0][0]) && /listed, not failed: "old"/.test(moved[0].join("\n")),
+    "records under a folder that was a link at the base read as a link, and those that stood there are listed, not failed", moved[0].join("\n"));
+  for (const r of [agents, folder]) fs.rmSync(r.dir, { recursive: true, force: true });
+}
 
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${count - failed} of ${count} passed`);
