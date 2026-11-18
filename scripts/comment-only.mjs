@@ -234,6 +234,19 @@ function fixedOf(rows, i, { from, keep }, lines) {
   return i;
 }
 
+// The lines read into `lines` and `comments`, a block scalar's text as such, or what is unread of them.
+function readRows(rows, lines, comments, unread) {
+  for (let i = 0; i < rows.length;) {
+    if (rows[i].content) { i = contentOf(rows, i, lines, unread); continue; }
+    // (a line within a token that began on a line before, a value that runs on, is refused here too: its first line may be
+    // one the proof reads as a block scalar's text)
+    if (rows[i].within && rows[i].indent < rows[i].line.length) unread.push(`line ${rows[i].n}: a value on a line of its own, or one that runs on from the line before`);
+    const block = rows[i].indent < rows[i].line.length && !rows[i].within ? entryOf(rows[i], lines, comments, unread) : null;
+    i = block?.fixed ? fixedOf(rows, i + 1, block, lines) : i + 1;
+    if (block?.keep && !block.fixed) i = keptBlanks(rows, rows[i]?.content ? contentOf(rows, i, lines, unread) : i, lines);
+  }
+}
+
 /** How YAML reads `text`, line by line: { lines, unread }. Each line kept is either a block scalar's ("content", as it
  *  stands) or one with its entries (items, the "- " before its key or value; key; value); comment lines and blank lines
  *  between entries are left out, a line's own comment cut off. `unread` says, by line, what this proof cannot read.
@@ -244,16 +257,7 @@ export function readYaml(text) {
   if (bad) return { lines, comments, unread: [`line ${text.slice(0, bad.index).split("\n").length}: a tab, carriage return, byte order mark, another control character or line break, or a character YAML refuses`] };
   const raw = text.split("\n"), broken = text.endsWith("\n");
   if (broken) raw.pop(); // (what follows the last line break is no line)
-  const rows = linesOf(text, raw, broken);
-  for (let i = 0; i < rows.length;) {
-    if (rows[i].content) { i = contentOf(rows, i, lines, unread); continue; }
-    // (a line within a token that began on a line before, a value that runs on, is refused here too: its first line may be
-    // one the proof reads as a block scalar's text)
-    if (rows[i].within && rows[i].indent < rows[i].line.length) unread.push(`line ${rows[i].n}: a value on a line of its own, or one that runs on from the line before`);
-    const block = rows[i].indent < rows[i].line.length && !rows[i].within ? entryOf(rows[i], lines, comments, unread) : null;
-    i = block?.fixed ? fixedOf(rows, i + 1, block, lines) : i + 1;
-    if (block?.keep && !block.fixed) i = keptBlanks(rows, rows[i]?.content ? contentOf(rows, i, lines, unread) : i, lines);
-  }
+  readRows(linesOf(text, raw, broken), lines, comments, unread);
   // one entry a line: a line that is no key and no item continues a value, or stands alone where YAML would read it so;
   // and nothing deeper may follow a line that holds its value, where YAML would read it as that value running on
   const entries = lines.filter(l => !l.content);
