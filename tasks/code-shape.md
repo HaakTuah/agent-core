@@ -127,7 +127,7 @@ one declared entrance.
   that nothing saw. Held by the copies check's report.
 - **A part whose gaps repeat is read for its whole input** (#593). By default a bug is mended at its cause, its fix
   adding the test of its case. The trigger is the third bug filed against one part that was a kind of input, of project
-  or of platform the part did not read (the count as the inventory keeps it, where the project keeps one): the builder
+  or of platform the part did not read, counted from the issues labelled `bug` that name the part's files: the builder
   that mends it lists every kind the part's job covers, from the source that defines them (the project's kinds and its
   manifest's slots, the platforms it builds and tests on, a format a standard or the host defines), and gives each a
   test, in that pull request or, where that is large, as a task it files, the pull request holding the list. Where an
