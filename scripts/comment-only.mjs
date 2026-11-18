@@ -145,7 +145,7 @@ function flow(rest, toks, k) {
 function quoted(rest, toks, k) {
   const t = toks[k], q = t.src[0], body = t.src.slice(1);
   const trail = (q === '"' ? /\\*"$/u : /'+$/u).exec(body)?.[0] ?? "";
-  const closed = !t.runs && (q === '"' ? trail.length % 2 === 1 : trail.length % 2 === 1);
+  const closed = !t.runs && trail.length % 2 === 1; // (an odd run: the last quote one no backslash escapes, or past the pairs of quotes)
   if (!closed) return { why: "a quoted value that runs on to the next line" };
   return after(rest, toks, k + 1, t.col, t.col + t.src.length, "quoted");
 }
@@ -221,10 +221,13 @@ function entryOf(r, lines, comments, unread) {
 // A block scalar whose header gives its indentation (`|2`): its text read as more than YAML may, never less, every line
 // past the column its key or its last "- " stands at, and the blank lines among them, those after its last kept only
 // where its header keeps them. Returns the line after it.
-function fixedOf(rows, i, { from, keep }, lines) {
+function fixedOf(rows, i, { from, keep }, lines, unread) {
   let held = [];
   for (; i < rows.length; i++) {
     const r = rows[i], text = { n: r.n, content: true, text: r.line, last: r.last };
+    // (a line past the column that the lexer reads as YAML, no text of a block scalar and no comment alone: the two
+    // readings part there, and what follows cannot be read for sure)
+    if (r.indent >= from + 1 && r.indent < r.line.length && !r.content && !(r.toks.length === 1 && r.toks[0].src[0] === "#")) unread.push(`line ${r.n}: a line YAML reads outside the block scalar whose header gives its indentation`);
     if (r.indent === r.line.length && r.indent <= from + 1) { held.push(text); continue; }
     if (r.indent < from + 1) break;
     for (const h of [...held, text]) lines.push(h);
@@ -242,7 +245,7 @@ function readRows(rows, lines, comments, unread) {
     // one the proof reads as a block scalar's text)
     if (rows[i].within && rows[i].indent < rows[i].line.length) unread.push(`line ${rows[i].n}: a value on a line of its own, or one that runs on from the line before`);
     const block = rows[i].indent < rows[i].line.length && !rows[i].within ? entryOf(rows[i], lines, comments, unread) : null;
-    i = block?.fixed ? fixedOf(rows, i + 1, block, lines) : i + 1;
+    i = block?.fixed ? fixedOf(rows, i + 1, block, lines, unread) : i + 1;
     if (block?.keep && !block.fixed) i = keptBlanks(rows, rows[i]?.content ? contentOf(rows, i, lines, unread) : i, lines);
   }
 }
