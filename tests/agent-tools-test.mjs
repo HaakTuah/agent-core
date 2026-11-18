@@ -458,45 +458,57 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ["one too long to read", ".claude/agents/rev.md", `---\nname: rev\ndescription: ${"x".repeat(70000)}\n---\n`],
   ]) fails(run(pr(project({ ...script, ...listing() }), { [file]: text })), `a frontmatter, ${what}, fails as a setting of no kit's form does`, "is of a kind no starter kit writes", "Mend: take it out of the project's files");
   passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/sub/rev.md": "---\nname: rev\ndescription: \"reviews: hooks and all\"\ntools: [Read, Grep]\nmodel: opus\n---\n# rev\n" })), "a plain frontmatter of simple keys passes, at any depth");
-  // (a link below a folder of agents or commands fails, and is held by all it leads to; links back to their own folder
-  // are read once, not followed)
-  const LINKED = "is a link below a folder of Claude Code's agents or commands";
-  const looped = () => { const dir = project({ ...script, ".claude/agents/rev.md": "---\nname: rev\n---\n", "elsewhere/x.md": "---\nname: x\n---\n", ...listing() }); for (let i = 0; i < 6; i++) fs.symlinkSync(".", path.join(dir, `.claude/agents/l${i}`)); fs.symlinkSync("../../elsewhere", path.join(dir, ".claude/agents/out")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "links below agents"); return dir; };
-  const started = Date.now(), loopedNew = run(looped(), "--core");
-  ok(loopedNew.status === 1 && loopedNew.out.includes(LINKED) && Date.now() - started < 30000, "links below a folder of agents fail, read once each, in seconds", loopedNew.out);
-  const loopedKept = run(pr(looped(), { "README.md": "x\n" }));
-  ok(loopedKept.status === 0 && loopedKept.out.includes(LINKED), "one the base held is noted", loopedKept.out);
-  fails(run(pr(looped(), { "elsewhere/x.md": `---\nname: x\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n` })), "but not once what it leads to changes", LINKED);
-  // (#647's fallback security review of e5a319d: a link reached through another link is read and failed as well, a loop
-  // reached so is walked once, and a link below agents into an installed package is held by what an install reads)
-  const viaDocs = () => { const dir = project({ ...script, "docs/a.md": "---\nname: a\n---\n", "evil/x.md": `---\nname: x\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`, ...listing() }); fs.symlinkSync("../docs", path.join(dir, ".claude/agents")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents through a link"); return dir; };
-  const subAdded = viaDocs();
-  git(subAdded, "checkout", "-q", "-B", "change"); fs.symlinkSync("../evil", path.join(subAdded, "docs/sub"));
-  git(subAdded, "add", "-A"); git(subAdded, "commit", "-q", "-m", "a link"); git(subAdded, "checkout", "-q", "main"); git(subAdded, "merge", "-q", "--no-ff", "-m", "merge", "change");
-  const WAY = "is a link on the way to a folder of Claude Code's agents or commands";
-  fails(run(subAdded), "a link added in the folder agents lead to through a link fails, as that link is held by all it leads to", WAY);
-  const loops = viaDocs();
-  for (let i = 0; i < 6; i++) fs.symlinkSync(".", path.join(loops, `docs/l${i}`));
-  git(loops, "add", "-A"); git(loops, "commit", "-q", "-m", "loops behind a link");
-  const loopsStarted = Date.now(), loopsKept = run(pr(loops, { "README.md": "x\n" }));
-  ok(loopsKept.status === 0 && loopsKept.out.includes(WAY) && Date.now() - loopsStarted < 30000, "loops of links behind a link are never walked, and the link the base held is noted", loopsKept.out);
-  const agentPkg = () => { const dir = project({ ...script, ".gitignore": "node_modules/\n", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "1.0.0" } } }), ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../node_modules/pkg/agents", path.join(dir, ".claude/agents/pkg")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents from a package"); return dir; };
-  fails(run(pr(agentPkg(), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "6.6.6" } } }) })), "a link the base held below agents into an installed package fails once its lock changes", LINKED);
-  // (#647's fallback security review of 90bcf1a: a folder of agents or commands that is a link out of the checkout fails
-  // as any such link does; a folder in another case a link reaches first is still read for its case; and a hook is named
-  // by the path Claude Code reads it at)
-  const linkAdded = (target, at) => { const dir = project({ ...script, ".gitignore": "node_modules/\n", ...listing() }); git(dir, "checkout", "-q", "-B", "change"); fs.mkdirSync(path.dirname(path.join(dir, at)), { recursive: true }); fs.symlinkSync(target, path.join(dir, at)); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link"); git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change"); return dir; };
-  fails(run(linkAdded("../node_modules/pkg/agents", ".claude/agents")), "a folder of agents that is a link into an installed package fails", '".claude/agents" is a link that leads out of the checkout');
-  fails(run(linkAdded("../../outside-commands", ".claude/commands")), "and so does a folder of commands that is a link out of the checkout", '".claude/commands" is a link that leads out of the checkout');
-  const hooksDir = project({ ...script, ".kiro/Hooks/x.json": JSON.stringify({ hooks: [{ name: "x", trigger: "Stop", action: { type: "command", command: "bash x.sh" } }] }), ...listing() });
-  fs.symlinkSync("../.kiro/Hooks", path.join(hooksDir, ".claude/agents")); git(hooksDir, "add", "-A"); git(hooksDir, "commit", "-q", "-m", "agents to a folder in another case");
-  fails(run(hooksDir, "--core"), "a tool's folder in another case is read for its case, though a link below agents reaches it first", ".kiro/Hooks is .kiro/hooks in another case");
-  const namedAt = project({ ...script, "docs/x.md": `---\nname: x\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`, ...listing() });
-  fs.symlinkSync("../docs", path.join(namedAt, ".claude/agents")); git(namedAt, "add", "-A"); git(namedAt, "commit", "-q", "-m", "agents through a link");
-  fails(run(namedAt, "--core"), "a folder of agents that is a link inside the checkout fails, nothing read through it", WAY, "Mend: replace it with the folder itself");
-  const claudeLinked = project({ "cfg/settings.json": KIT, "cfg/agents/x.md": "---\nname: x\n---\n", ...listing() });
-  fs.rmSync(path.join(claudeLinked, ".claude"), { recursive: true, force: true }); fs.symlinkSync("cfg", path.join(claudeLinked, ".claude")); git(claudeLinked, "add", "-A"); git(claudeLinked, "commit", "-q", "-m", "a .claude through a link");
-  fails(run(claudeLinked, "--core"), "and so does .claude as a link, where the agents are reached through it", '.claude is a link on the way to a folder');
+  if (LINKS) {
+    // (a link below a folder of agents or commands fails, and is held by all it leads to; links back to their own folder
+    // are read once, not followed)
+    const LINKED = "is a link below a folder of Claude Code's agents or commands";
+    const looped = () => { const dir = project({ ...script, ".claude/agents/rev.md": "---\nname: rev\n---\n", "elsewhere/x.md": "---\nname: x\n---\n", ...listing() }); for (let i = 0; i < 6; i++) fs.symlinkSync(".", path.join(dir, `.claude/agents/l${i}`)); fs.symlinkSync("../../elsewhere", path.join(dir, ".claude/agents/out")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "links below agents"); return dir; };
+    const started = Date.now(), loopedNew = run(looped(), "--core");
+    ok(loopedNew.status === 1 && loopedNew.out.includes(LINKED) && Date.now() - started < 30000, "links below a folder of agents fail, read once each, in seconds", loopedNew.out);
+    const loopedKept = run(pr(looped(), { "README.md": "x\n" }));
+    ok(loopedKept.status === 0 && loopedKept.out.includes(LINKED), "one the base held is noted", loopedKept.out);
+    fails(run(pr(looped(), { "elsewhere/x.md": `---\nname: x\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n` })), "but not once what it leads to changes", LINKED);
+    // (#647's fallback security review of e5a319d: a link reached through another link is read and failed as well, a loop
+    // reached so is walked once, and a link below agents into an installed package is held by what an install reads)
+    const viaDocs = () => { const dir = project({ ...script, "docs/a.md": "---\nname: a\n---\n", "evil/x.md": `---\nname: x\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`, ...listing() }); fs.symlinkSync("../docs", path.join(dir, ".claude/agents")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents through a link"); return dir; };
+    const subAdded = viaDocs();
+    git(subAdded, "checkout", "-q", "-B", "change"); fs.symlinkSync("../evil", path.join(subAdded, "docs/sub"));
+    git(subAdded, "add", "-A"); git(subAdded, "commit", "-q", "-m", "a link"); git(subAdded, "checkout", "-q", "main"); git(subAdded, "merge", "-q", "--no-ff", "-m", "merge", "change");
+    const WAY = "is a link on the way to a folder of Claude Code's agents or commands";
+    fails(run(subAdded), "a link added in the folder agents lead to through a link fails, as that link is held by all it leads to", WAY);
+    const loops = viaDocs();
+    for (let i = 0; i < 6; i++) fs.symlinkSync(".", path.join(loops, `docs/l${i}`));
+    git(loops, "add", "-A"); git(loops, "commit", "-q", "-m", "loops behind a link");
+    const loopsStarted = Date.now(), loopsKept = run(pr(loops, { "README.md": "x\n" }));
+    ok(loopsKept.status === 0 && loopsKept.out.includes(WAY) && Date.now() - loopsStarted < 30000, "loops of links behind a link are never walked, and the link the base held is noted", loopsKept.out);
+    const agentPkg = () => { const dir = project({ ...script, ".gitignore": "node_modules/\n", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "1.0.0" } } }), ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../node_modules/pkg/agents", path.join(dir, ".claude/agents/pkg")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents from a package"); return dir; };
+    fails(run(pr(agentPkg(), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "6.6.6" } } }) })), "a link the base held below agents into an installed package fails once its lock changes", LINKED);
+    // (#647's fallback security review of 90bcf1a: a folder of agents or commands that is a link out of the checkout fails
+    // as any such link does; a folder in another case a link reaches first is still read for its case; and a hook is named
+    // by the path Claude Code reads it at)
+    const linkAdded = (target, at) => { const dir = project({ ...script, ".gitignore": "node_modules/\n", ...listing() }); git(dir, "checkout", "-q", "-B", "change"); fs.mkdirSync(path.dirname(path.join(dir, at)), { recursive: true }); fs.symlinkSync(target, path.join(dir, at)); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link"); git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change"); return dir; };
+    fails(run(linkAdded("../node_modules/pkg/agents", ".claude/agents")), "a folder of agents that is a link into an installed package fails", '".claude/agents" is a link that leads out of the checkout');
+    fails(run(linkAdded("../../outside-commands", ".claude/commands")), "and so does a folder of commands that is a link out of the checkout", '".claude/commands" is a link that leads out of the checkout');
+    const hooksDir = project({ ...script, ".kiro/Hooks/x.json": JSON.stringify({ hooks: [{ name: "x", trigger: "Stop", action: { type: "command", command: "bash x.sh" } }] }), ...listing() });
+    fs.symlinkSync("../.kiro/Hooks", path.join(hooksDir, ".claude/agents")); git(hooksDir, "add", "-A"); git(hooksDir, "commit", "-q", "-m", "agents to a folder in another case");
+    fails(run(hooksDir, "--core"), "a tool's folder in another case is read for its case, though a link below agents reaches it first", ".kiro/Hooks is .kiro/hooks in another case");
+    const namedAt = project({ ...script, "docs/x.md": `---\nname: x\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`, ...listing() });
+    fs.symlinkSync("../docs", path.join(namedAt, ".claude/agents")); git(namedAt, "add", "-A"); git(namedAt, "commit", "-q", "-m", "agents through a link");
+    fails(run(namedAt, "--core"), "a folder of agents that is a link inside the checkout fails, nothing read through it", WAY, "Mend: replace it with the folder itself");
+    const claudeLinked = project({ "cfg/settings.json": KIT, "cfg/agents/x.md": "---\nname: x\n---\n", ...listing() });
+    fs.rmSync(path.join(claudeLinked, ".claude"), { recursive: true, force: true }); fs.symlinkSync("cfg", path.join(claudeLinked, ".claude")); git(claudeLinked, "add", "-A"); git(claudeLinked, "commit", "-q", "-m", "a .claude through a link");
+    fails(run(claudeLinked, "--core"), "and so does .claude as a link, where the agents are reached through it", '.claude is a link on the way to a folder');
+    // (#647's fallback security review of 8922450: a chain of links too long for recursion is read, and fails with
+    // its mend)
+    const chain = project({ ...script, ...listing() });
+    for (let i = 1; i <= 2500; i++) { fs.mkdirSync(path.join(chain, `d/${i}`), { recursive: true }); fs.symlinkSync(`../${i + 1}`, path.join(chain, `d/${i}/next`)); }
+    fs.mkdirSync(path.join(chain, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../d/1", path.join(chain, ".claude/agents/c"));
+    git(chain, "add", "-A"); git(chain, "commit", "-q", "-m", "a long chain of links");
+    fails(run(chain, "--core"), "a link below agents into a long chain of links fails with its mend", LINKED);
+    const deep = project({ ...script, [`.claude/agents/${"a/".repeat(1000)}x.md`]: "---\nname: x\n---\n", ...listing() });
+    const deepStarted = Date.now(), deepRun = run(deep, "--core");
+    ok(deepRun.status === 0 && Date.now() - deepStarted < 30000, "a plain folder a thousand deep below agents is read in seconds", deepRun.out);
+  }
   for (const at of [".claude/Agents/rev.md", ".claude/agents/rev.MD", ".claude/Commands/rev.md"]) fails(run(pr(project({ ...script, ...listing() }), { [at]: "---\nname: rev\n---\n" })), `a subagent's file in another letter case, ${at}, fails`, "in another case");
   passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": "---\nname: rev\ndescription: reviews hooks\n---\n# rev\n" })), "a subagent with no hooks in its frontmatter passes");
   const frontStood = project({ ...script, ".claude/agents/rev.md": front("hooks") });

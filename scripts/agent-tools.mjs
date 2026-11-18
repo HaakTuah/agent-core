@@ -632,9 +632,9 @@ function commitReader(root, rev, lenient = false, follow = false) {
 // what it is held by, so a path a tool may reach there is seen, which only ever makes the check stricter)
 function caseProblems(root, rev) {
   const { resolve, names, holds } = commitReader(root, rev, true), typeOf = f => resolve(f)?.type;
-  const isDir = p => listing(root, rev).dirs.has(p);
-  return misnamed(toolPaths(names, typeOf, isDir)).map(([at, want]) =>
-    [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, holds, names, typeOf, isDir)]);
+  const below = p => belowDir(root, rev, p);
+  return misnamed(toolPaths(names, typeOf, below)).map(([at, want]) =>
+    [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, holds, names, typeOf, below)]);
 }
 
 // Each submodule where an agent tool reads its files, in whatever case, as [its problem, the commit it names]: git gives
@@ -646,7 +646,7 @@ function submodules(root, rev) {
   for (const [at, id] of l.gitlinks) if (WAYS.has(fold(at)) || TOOL_FOLDERS.some(d => fold(at).startsWith(d))) out.set(at, [`${at} is a submodule where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${id}`]);
   // (the submodule a walk reaches, or one it stops at with more of the path left, a link leading into its folder: from
   // each tool's path, and from each link anywhere under a tool's folder, a skill's own folders among them)
-  for (const at of new Set([...toolPaths(names, f => resolve(f)?.type, p => l.dirs.has(p)), ...toolLinks(l)])) {
+  for (const at of new Set([...toolPaths(names, f => resolve(f)?.type, p => belowDir(root, rev, p)), ...toolLinks(l)])) {
     const via = [], r = walk(root, rev, at, via), sub = r?.type === "commit" ? r.f : via.find(v => l.gitlinks.has(v));
     if (sub && !out.has(at) && !out.has(sub)) out.set(at, [`${at} leads, through a link, to the submodule ${sub}, where an agent tool reads its files, and this check reads none of what it holds. Mend: put those files in the project itself, or take the submodule out, in this pull request`, `${at}\0${sub}\0${l.ids.get(sub)}`]);
   }
@@ -656,13 +656,25 @@ function submodules(root, rev) {
 // Everything a name holds at a commit, as a fingerprint: what it leads to, each entry the commit lists under that, by its
 // path and object, and, for each link among them, everything it holds in turn, each folder read once; so a name held
 // twice is held by all a tool may read under either, never by one path through it.
-function everything(root, rev, at, seen = new Set()) {
-  const l = listing(root, rev), via = [], r = walk(root, rev, at, via, true, [], true);
-  const top = [r?.type ?? "nothing", r?.f ?? "", l.ids.get(r?.f) ?? "", ...via.map(v => `${v}\0${l.ids.get(v)}`)].join("\0");
-  if (r?.type !== "tree" || seen.has(r.f)) return top;
-  seen.add(r.f);
-  const prefix = r.f === "." ? "" : `${r.f}/`, under = [...l.ids.keys()].filter(p => p.startsWith(prefix)).sort();
-  return [top, ...under.map(p => `${p}\0${l.ids.get(p)}`), ...under.filter(p => l.linked.has(p)).map(p => everything(root, rev, p, seen))].join("\0\0");
+function everything(root, rev, at) {
+  const l = listing(root, rev), seen = new Set(), out = [], todo = [at];
+  // (walked a link at a time from a list, never by recursion, so no chain of links is too long for it)
+  for (let i = 0; i < todo.length; i++) {
+    const via = [], r = walk(root, rev, todo[i], via, true, [], true);
+    out.push([r?.type ?? "nothing", r?.f ?? "", l.ids.get(r?.f) ?? "", ...via.map(v => `${v}\0${l.ids.get(v)}`)].join("\0"));
+    if (r?.type !== "tree" || seen.has(r.f)) continue;
+    seen.add(r.f);
+    const prefix = r.f === "." ? "" : `${r.f}/`, under = [...l.ids.keys()].filter(p => p.startsWith(prefix)).sort();
+    out.push(...under.map(p => `${p}\0${l.ids.get(p)}`));
+    todo.push(...under.filter(p => l.linked.has(p)));
+  }
+  return out.join("\0\0");
+}
+// What the commit holds below the folder `p`, each entry but a folder, from its one listing, where `p` is a folder the
+// commit holds; else null.
+function belowDir(root, rev, p) {
+  const l = listing(root, rev);
+  return l.dirs.has(p) ? [...l.ids.keys()].filter(q => q.startsWith(`${p}/`)).sort() : null;
 }
 // Each link below a folder of Claude Code's agents or commands, in whatever case, as [its problem, all it leads to]:
 // Claude Code reads the Markdown files wherever such a link leads, and this check reads none of them there, so one the
@@ -682,7 +694,7 @@ function caseLinks(root, rev) {
   const l = listing(root, rev), { resolve, names } = commitReader(root, rev), out = [];
   // (from each tool's path, and from each link on a tool's way or under its folder, so a link to a folder held twice is
   // seen where no tool's file stands under the name git keeps)
-  for (const at of new Set([...toolPaths(names, f => resolve(f)?.type, p => l.dirs.has(p)), ...toolLinks(l)])) {
+  for (const at of new Set([...toolPaths(names, f => resolve(f)?.type, p => belowDir(root, rev, p)), ...toolLinks(l)])) {
     const via = [], misses = [], r = walk(root, rev, at, via, false, misses);
     if (!via.some(v => l.linked.has(v))) continue;
     // (held by what the tool reads there, found as a file system that ignores case finds it, and nothing else there)
@@ -745,7 +757,7 @@ function misnamed(paths) {
 // of a tool folder under it with its text (and a skill's SKILL.md), so one the base held is noted only while that stands.
 // Each step below `at` is found among its folder's own names, in whatever case they stand, as a file system that
 // ignores case finds it, every one that matches.
-function through(at, want, holds, names, typeOf, isDir = () => true) {
+function through(at, want, holds, names, typeOf, below = () => null) {
   const under = f => f === want || f.startsWith(`${want}/`);
   // (an entry on the way that is neither a folder nor a file, a link out or a submodule's among them, stops the walk
   // there and is held by what stands there, as a tool's file is)
@@ -766,8 +778,9 @@ function through(at, want, holds, names, typeOf, isDir = () => true) {
   // submodule's commit)
   const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => found(at, d.slice(want.length, -1)).flatMap(dir => typeOf(dir) !== "tree" ? text(d, dir) : names(dir).sort().flatMap(n => {
     // (a Markdown file of Claude Code's agents or commands at any depth, as it finds them)
-    // (below agents or commands, only through a folder the commit holds, a link being held by what stands there)
-    const md = p => (typeOf(p) !== "tree" ? (/\.md$/iu.test(p) ? [p] : []) : isDir(p) ? names(p).sort().flatMap(m => md(`${p}/${m}`)) : [p]);
+    // (below agents or commands, each Markdown file and link a folder the commit holds holds, from its listing, a link
+    // being held by what stands there; a folder reached otherwise, by what stands there)
+    const md = p => (typeOf(p) !== "tree" ? (/\.md$/iu.test(p) ? [p] : []) : (below(p) ?? [p]).filter(q => q === p || /\.md$/iu.test(q) || typeOf(q) !== "blob"));
     const reads = d === ".kiro/hooks/" ? (/\.json$/iu.test(n) ? [`${dir}/${n}`] : []) : d !== ".claude/skills/" ? md(`${dir}/${n}`, 0) : [...(["blob", "tree"].includes(typeOf(`${dir}/${n}`)) ? [] : [`${dir}/${n}`]), ...found(`${dir}/${n}`, "SKILL.md")];
     return reads.flatMap(a => text(`${d}${n}`, a));
   })));
@@ -781,7 +794,7 @@ const READS = /^(?:\.kiro\/hooks\/[^/]+\.json|\.claude\/(?:agents|commands)\/(?:
 // Whether a path, folded, is looked at: a step of WAYS, and, in a tool folder, only what the tool reads there, a skill's
 // folder on its way, or a folder of agents or commands at any depth.
 const looked = (low, inFolder) => (inFolder ? READS.test(low) || SKILL_DIR.test(low) || MD_DIR.test(low) : WAYS.has(low));
-function toolPaths(names, typeOf, isDir = () => true) {
+function toolPaths(names, typeOf, below = () => null) {
   const out = [], folders = TOOL_FOLDERS.map(d => d.slice(0, -1));
   const visit = (at, depth) => {
     for (const n of names(at || ".")) {
@@ -792,9 +805,10 @@ function toolPaths(names, typeOf, isDir = () => true) {
       // that is neither a folder nor a file, through which the tool may read a SKILL.md this check cannot)
       const type = typeOf(p), folder = type === "tree";
       if (!folder && (!inFolder || READS.test(low) || (SKILL_DIR.test(low) && type !== "blob"))) out.push(p);
-      // (below a folder of agents or commands at any depth, only through a folder the commit holds, a link there failing
-      // of its own (mdLinks()); any other way a few deep)
-      if (folder && (MD_DIR.test(low) ? isDir(p) : depth < 10)) visit(p, depth + 1);
+      // (below a folder of agents or commands, each Markdown file a folder the commit holds holds, at any depth, from its
+      // listing, a link there failing of its own (mdLinks()); any other way a few deep)
+      if (folder && MD_DIR.test(low)) out.push(...(below(p) ?? []).filter(q => READS.test(fold(q))));
+      else if (folder && depth < 10) visit(p, depth + 1);
     }
   };
   visit("", 0);
@@ -1023,7 +1037,7 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 function reaches(root, rev, at, follow = false) {
   const posix = at.split(path.sep).join("/"), want = fold(posix), { holds, names, resolve } = commitReader(root, rev, true, follow);
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
-  return [through(posix, want, holds, names, f => resolve(f)?.type, p => listing(root, rev).dirs.has(p)), ...skill].join("\0\0");
+  return [through(posix, want, holds, names, f => resolve(f)?.type, p => belowDir(root, rev, p)), ...skill].join("\0\0");
 }
 // What an install reads for each path a link passes through with a node_modules folder on it, which an install fills
 // whatever the commit holds there: the whole text of each file of INSTALL_READS in the folder that holds that
