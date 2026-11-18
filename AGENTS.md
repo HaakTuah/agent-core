@@ -249,20 +249,20 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   (`tests/mend-test.mjs`).
 - **A tool that only runs is fetched at set-up, as its own program** (#534). By default a check of the core is a script
   of its own. Where a part gives way to a tool that only runs, whoever builds the replacement has the tool fetched at
-  set-up, never while a check runs: one exact version, its digest in a list a test reads, an entry for each platform a
-  check runs on, fetched to a place outside the repository when a session is set up and in the set-up step of the job on
-  the host's runners, as `scripts/node.sh` fetches Node. The check then runs wherever the tool is, in a cloud session,
-  on the owner's own computer or on the runners; where the tool is not there and cannot be fetched, the check says that
-  it did not run and why, and decides nothing. The tool runs as its own program, never through a vendor's action for the
-  host, a hosted service or a feature of the host's paid plans, and passes floor rules 7, 10 and 15 and the lookup
-  (`floor/topics/dependencies.md`). It adds no job: what adds minutes, mutation testing above all, stays on the lines a
-  change touches. It does not mean a check that exists on the host's runners alone. Reason: a private repository on the
-  host's free plan stops its jobs once the month's minutes are spent, a project built on its owner's own computer gets
-  least from a check it cannot run there, and a wrapper or a hosted feature brings terms of its own (a licence key for
-  an organisation's repositories, a price for each committer) and may send data out of the repository. Held, for the
-  pin, by the licence scan's check that a program a file downloads is pinned by version and checksum
-  (`scripts/licence-scan.mjs`; #488); that no workflow runs such a tool through another's action, by no check yet
-  (#639).
+  set-up, never while a check runs: one exact version, its digest in a list a test reads (a registry's own lock file
+  first, for a tool a registry carries; #654), an entry for each platform a check runs on, fetched to a place outside
+  the repository when a session is set up and in the set-up step of the job on the host's runners, as `scripts/node.sh`
+  fetches Node. The check then runs wherever the tool is, in a cloud session, on the owner's own computer or on the
+  runners; where the tool is not there and cannot be fetched, the check says that it did not run and why, and decides
+  nothing. The tool runs as its own program, never through a vendor's action for the host, a hosted service or a feature
+  of the host's paid plans, and passes floor rules 7, 10 and 15 and the lookup (`floor/topics/dependencies.md`). It adds
+  no job: what adds minutes, mutation testing above all, stays on the lines a change touches. It does not mean a check
+  that exists on the host's runners alone. Reason: a private repository on the host's free plan stops its jobs once the
+  month's minutes are spent, a project built on its owner's own computer gets least from a check it cannot run there,
+  and a wrapper or a hosted feature brings terms of its own (a licence key for an organisation's repositories, a price
+  for each committer) and may send data out of the repository. Held, for the pin, by the licence scan's check that a
+  program a file downloads is pinned by version and checksum (`scripts/licence-scan.mjs`; #488); that no workflow runs
+  such a tool through another's action, by no check yet (#639).
 - **A part is asked again** (#534). By default the pass twice a year over the choice records (`tasks/choices.md`) asks
   of each part the inventory marks keep or try whether something maintained now does it, and writes the day on the
   inventory's line `Weighed whole:`. The trigger that asks sooner: a bug filed that names such a part, or a pull request
