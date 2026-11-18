@@ -18,8 +18,13 @@
 // one written to look so (unsigned, signed by another key, or with a certificate made to look like GitHub's) fails, and so does every merge's author where the key
 // cannot be fetched; only in a commit of the base's, though the event
 // names an older base; a term only in the copyright lines of LICENSE and NOTICE of their shape, at the root and in the
-// core's copy (#257); and a repository without the secret. The terms are invented, built from pieces as the test
-// runs, so no file holds them. On Linux and on Windows. Git, bash and Node's own modules.
+// core's copy (#257); and a repository without the secret. What Betterleaks, which matches the terms (#579), would read
+// otherwise fails all the same: a file of text that begins as an archive or a PDF does, a line marked for it to pass
+// over, a term beside its ignore and config files, a term holding a pattern's characters, matched as listed; a term in
+// base64 passes, as before; and where Betterleaks cannot be built (no Go, no sum for the machine's system) it passes
+// with a note that nothing was checked, while a build that fails, or a kept copy that differs from its sum, fails, that
+// copy never run. The terms are invented, built from pieces as the test runs, so no file holds them. On Linux and on
+// Windows. Git, bash, Go and Node's own modules.
 //
 //   node tests/personal-terms-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";

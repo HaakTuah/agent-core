@@ -119,6 +119,13 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   **Replace** the matching with gitleaks or its successor, which also brings the scan for secrets that floor rule 1 has
   no check for in a private project (the host's own is paid there); **keep** what is read (each commit's names and
   addresses, the title, the description, the branch) and the exception for commits the host made.
+  *Tried:* Betterleaks 1.10.1, the successor, as the matching (#579), built by Go from its source and checked by its
+  sums: on one pull request of the core's own, the whole history this checkout held (69 merged pull requests, 574
+  commits), five terms that stand in its files and commits, the old and the new check failed alike, naming the same
+  238 lines of files and the same commits (492 by their message, 574 by their author, 63 by a line they add, 45 by a
+  file's name they write), in 42.2 s against 49.6 s, its build kept; all 81 cases of `tests/personal-terms-test.mjs`
+  passed as they stood, beside 9 new ones for what the tool would read otherwise. *Replayed:* #261 read (its fix's
+  cases, a term inside a session link's id and beside one, each as before).
 - `scripts/licences.mjs`, `scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`, `scripts/licence-yes.mjs`,
   `.github/workflows/licences.yml`: hold every package the lock files install, and every entry of the audit, to floor
   rule 10's list, with the owner's yes for what is off it. *Runs:* any session and the runners. *Else:* npm's own `npm
