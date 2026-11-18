@@ -601,9 +601,10 @@ function through(at, want, holds, names, typeOf) {
   const text = (name, a) => [`${name}\0${a}\0${holds(a)}`];
   const files = TOOL_FILES.filter(under).flatMap(f => found(at, f.slice(want.length)).flatMap(a => text(f, a)));
   // (of a tool folder's entries, only what the tool reads there: a hook file of Kiro's, a skill's SKILL.md, and the
-  // skill's folder itself where it is no file, by what stands there, a link's target or a submodule's commit)
+  // skill's folder itself where it is neither a file nor a folder, by what stands there, a link's target or a
+  // submodule's commit)
   const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => found(at, d.slice(want.length, -1)).flatMap(dir => names(dir).sort().flatMap(n => {
-    const reads = d === ".kiro/hooks/" ? (/\.json$/iu.test(n) ? [`${dir}/${n}`] : []) : [...(typeOf(`${dir}/${n}`) === "blob" ? [] : [`${dir}/${n}`]), ...found(`${dir}/${n}`, "SKILL.md")];
+    const reads = d === ".kiro/hooks/" ? (/\.json$/iu.test(n) ? [`${dir}/${n}`] : []) : [...(["blob", "tree"].includes(typeOf(`${dir}/${n}`)) ? [] : [`${dir}/${n}`]), ...found(`${dir}/${n}`, "SKILL.md")];
     return reads.flatMap(a => text(`${d}${n}`, a));
   })));
   return [at, holds(at), ...files, ...folders].join("\0\0");
