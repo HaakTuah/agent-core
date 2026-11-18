@@ -116,3 +116,13 @@ The index, and how an item is written: `archive/instructions.md`.
      package, and the cost comes later as upkeep and as bugs in readers written by hand; point 6 gained its search on 17
      November. It stands behind "A job a maintained package does is done by it" in `tasks/code-shape.md` and its
      pointers in `roles/shared/how-to-work.md` and the review guidelines.
+
+256. **17 November 2026**, #593, points 1 to 3. Where an issue asks something of every or all of a kind, a sweep, its
+     writer names the source a script counts that kind from, and the check that holds the sweep reads its coverage
+     there, each thing it holds having its line or a path left out with the reason, the core's inventory reading every
+     tracked file first; and an inventory or an audit is challenged once, by a fresh session that wrote no part of it,
+     for what it missed: a scope written as a list is as complete as its writer's memory, an inventory of the core's
+     parts had missed what the starter kit holds because the issue's list had, and nothing in the flow read an issue
+     against what stands. It stands behind "A sweep's scope is read, not listed" and "An inventory or an audit is
+     challenged once for what it missed" in `tasks/cleaning.md`, the line of the idea form that asks for the source, and
+     the inventory's check in `tests/mend-test.mjs`.
