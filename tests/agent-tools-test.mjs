@@ -963,6 +963,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ok(twiceDoc.status === 0 && twiceDoc.out.includes(SEVERAL), "one the base held is noted while what no tool reads under either name changes", twiceDoc.out);
     fails(run(pr(twice(), { "Cfg/settings/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what the tool may read under the name git keeps changes", SEVERAL);
     fails(run(pr(twice(), { "Cfg/hooks/lint.json": JSON.stringify({ version: "v1", hooks: [] }) })), "nor once a hook file is added under the name git keeps", SEVERAL);
+    // (its fallback security review of f8559d9: and under each spelling of each name past the first held twice)
+    const twiceDeep = () => { const dir = project({ "A/b/settings/mcp.json": "{}\n", "a/b/settings/mcp.json": "{}\n", "A/B/hooks/n.txt": "x\n", "A/B/settings/mcp.json": "{}\n", ...listing() }); fs.symlinkSync("A/b", path.join(dir, ".kiro")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through names held twice"); return dir; };
+    fails(run(pr(twiceDeep(), { "A/B/hooks/new.json": JSON.stringify({ version: "v1", hooks: [] }) })), "a hook file added under another spelling of a name past the first held twice fails", SEVERAL);
+    fails(run(pr(twiceDeep(), { "A/B/settings/mcp.json": "{ \"mcpServers\": {} }\n" })), "and so does a tool's file changed there", SEVERAL);
     const kiroHook = command => ({ version: "v1", hooks: [{ name: "lint", trigger: "Stop", action: { type: "command", command } }] });
     // (a hook file added under the other name, where no tool's path the walk takes passes, is held all the same; and a
     // link to a folder held twice is seen where no tool's file stands under the name git keeps, or where the name it

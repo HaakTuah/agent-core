@@ -716,11 +716,20 @@ function caseLinks(root, rev) {
     // (held by what the tool reads there, found as a file system that ignores case finds it, and nothing else there)
     const miss = r === null ? misses.find(m => !m.several) : undefined, several = misses.find(m => m.several), links = via.map(v => `${v}\0${l.ids.get(v)}`);
     if (miss) out.push([`${at} leads, through a link, to ${miss.at} in another case, which an agent tool reads there where the file system ignores case, as macOS's and Windows' do, while this check reads nothing there. Mend: write the link's target as ${miss.at} stands, in this pull request`, [at, ...links, reaches(root, rev, at, true)].join("\0\0")]);
-    else if (several) out.push([`${at} leads, through a link, to ${several.at}, which the commit holds under more than one name a file system that ignores case reads as one (${several.several.join(", ")}), as macOS's and Windows' do, keeping one of them, so which an agent tool reads is not plain. Mend: keep one of those names, in this pull request`, [at, ...links, ...several.several.map(n => reaches(root, rev, at, true, several.rest ? `${n}/${several.rest}` : n))].join("\0\0")]);
+    else if (several) out.push([`${at} leads, through a link, to ${several.at}, which the commit holds under more than one name a file system that ignores case reads as one (${several.several.join(", ")}), as macOS's and Windows' do, keeping one of them, so which an agent tool reads is not plain. Mend: keep one of those names, in this pull request`, [at, ...links, ...several.several.flatMap(n => spellings(root, rev, n, several.rest).map(p => reaches(root, rev, at, true, p)))].join("\0\0")]);
   }
   return out;
 }
 
+// Each path `rest` names below `n`, every step in each case its folder holds it in, as a file system that ignores case
+// may give any of them; a step no folder holds, as it stands.
+function spellings(root, rev, n, rest) {
+  const { names } = commitReader(root, rev, true, true);
+  return rest.split("/").filter(Boolean).reduce((dirs, step) => dirs.flatMap(d => {
+    const found = names(d).filter(m => fold(m) === fold(step)).sort().map(m => `${d}/${m}`);
+    return found.length ? found : [`${d}/${step}`];
+  }), [n]);
+}
 // Whether a commit's listing holds `at` as anything but a plain file: a link, a folder or a submodule's entry.
 const notFile = (l, at) => l.linked.has(at) || l.dirs.has(at) || l.others.has(at);
 // Whether what git shows at `rev:at` is no plain file, asked of git for that path alone, so one broken entry elsewhere
