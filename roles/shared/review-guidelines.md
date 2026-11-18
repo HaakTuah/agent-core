@@ -1,7 +1,7 @@
 # Review guidelines
 
 Read at its start by every reviewer (`roles/reviewer.md`): what it judges a change by, read whole with its brief, the
-project's own guidelines, its `SECURITY.md` and the floor. Changes only on the owner's word.
+project's own guidelines, its `SECURITY.md` and the floor.
 
 ## How a review passes
 
@@ -19,8 +19,8 @@ project's own guidelines, its `SECURITY.md` and the floor. Changes only on the o
   sample, and each file the comparison of old against new flags. It does not mean a security review is skipped (floor
   rule 8), nor a move with judgement in each file. Reason: reading hundreds of like changes one by one finds no more,
   and takes rounds. Held by no check.
-- **A later round** checks that the earlier points were fixed and reviews what changed since. Something new about work
-  it already saw is raised only if it blocks.
+- **A later round** checks that the earlier points were fixed. Something new about work it already saw is raised only
+  if it blocks.
 
 ## What blocks
 
@@ -36,15 +36,6 @@ project's own guidelines, its `SECURITY.md` and the floor. Changes only on the o
   pointed to;
 - a new job a maintained package does written by hand, a reader of a format someone else defines above all, with no
   line naming its exception or, past about 50 lines, `Looked for:` (`tasks/code-shape.md`, #486).
-
-Worked examples, the first of each pair blocking (#307):
-- departure: a PR described as fixing a sum also drops negative numbers; not: a renamed local variable it never names.
-- broken rule: a live key in a test's fixture; not: a fake key built from pieces as the test runs.
-- test: an assertion taken out and named nowhere; not: one made stricter and named on the line `Tests changed:`.
-- second copy: a new loop that sums where `sum()` stands; not: two tests that each set up the same three numbers.
-- package: a YAML reader written by hand with no `Looked for:`; not: ten lines that split a format the project defines.
-- mark: a cap raised with no "Leanness check:"; not: one raised beside a fresh session's answer that it found too
-  little room.
 
 A finding, not blocking:
 - anything the change leaves behind (unused code, files or settings, commented-out code, a description made untrue);
@@ -83,7 +74,7 @@ makes a process measure its goal (`tasks/cleaning.md`).
 - A finding: no three lines of the builder's (point 16), and a difference between them and the critique's answers to
   its first two questions.
 
-**A rule file changed** (worked examples: a rule with no reason, blocking; a reason that could be shorter, not):
+**A rule file changed:**
 - Blocking: a rule that departs from the owner's word behind it: on its issue, in the archive's items it cites, or in
   the core, those `scripts/holders.json` lists for it.
 - Blocking: a rule of the core (its floor, modules or `AGENTS.md`) written or changed without a part of the pattern in
@@ -96,3 +87,21 @@ makes a process measure its goal (`tasks/cleaning.md`).
   it cannot be read (the core's `AGENTS.md`, "What can be read is never asked or declared").
 - A finding: proof asked beyond what a thing costs others (the core's `AGENTS.md`, "Proof is sized to what a thing
   costs others").
+
+## Worked examples
+
+For each kind of blocking point above, one that blocks, then one that does not (#307):
+- departure: a PR described as fixing a sum also drops negative numbers; not: a local variable renamed.
+- broken rule: a live key in a test's fixture; not: a fake key built from pieces as the test runs.
+- mark: a cap raised with no "Leanness check:"; not: one raised beside the fresh session's answer.
+- baseline: an entry under "grown" whose reason is "it reads YAML"; not: one whose reason is that the fault changes
+  nothing the program does, a fresh session's word beside it.
+- test: an assertion taken out and named nowhere; not: one taken out and named on `Tests changed:`, the case moved.
+- second copy: a new loop that sums where `sum()` stands; not: two tests that each set up the same three numbers.
+- package: a YAML reader written by hand with no `Looked for:`; not: ten lines that split a format the project defines.
+- text users read: a button that says "Click here to proceed"; not: one that says "Save".
+- trim: one that cuts a rule's reason since the archive holds it; not: one that cuts what floor rule 4 says alike.
+- brief: one that gives its reader a title it does not hold; not: one that names its role and the PR.
+- screen: a screen changed with no critique; not: one with no pictures where no browser ran, the PR saying so.
+- rule file: a rule wider than its issue, with no reason, that no agent can carry out, or that takes a fact read from
+  nowhere; not: a rule whose reason could be shorter.

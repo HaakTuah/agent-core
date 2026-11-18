@@ -38,7 +38,7 @@ export const CAPS = {
   builder: 29 * 1024,
   design: 30 * 1024,
   orchestrator: 43 * 1024,
-  reviewer: 24 * 1024,
+  reviewer: 25 * 1024,
   "stand-in": 20 * 1024,
 };
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a

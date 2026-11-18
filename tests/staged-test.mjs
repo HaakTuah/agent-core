@@ -205,19 +205,19 @@ check("carried", fresh("carried"),
   d => { write(d, "config/service.json", '{ "endpoint": "https://sums.example.invalid/v1" }\n'); branch(d, "service", { "src/cli.mjs": `${read(d, "src/cli.mjs")}// the key is read from SUMS_KEY\n` }); pr(d, "service"); },
   d => { git(d, "add", "config/service.json"); git(d, "commit", "-q", "-m", "The service's config"); git(d, "push", "-q", "origin", "main:service"); pr(d, "service"); },
   /key was pushed/);
-// the reviewers' case (tasks/reviews.md, "The reviewers are tested"; #307): kept, a review that names the four faults
+// the reviewers' case (tasks/reviews.md, "The reviewers are tested"; #307): kept, a review that names the eight faults
 // and declares them blocking; broken, one that misses the test weakened, and one that repeats the key
-const REVIEW = "Code review: on the head.\n\n1. Blocking: `src/cli.mjs` now drops negative numbers with `filter(n => n > 0)`, which the description does not name.\n2. Blocking: `test/sum.test.mjs` has an assertion taken out, `sum([1, 2, 3])`, not named under Readings taken.\n3. Blocking: `src/mean.mjs` copies the loop of `sum` a second time instead of calling it.\n4. Blocking: `src/config.mjs` holds a key in the repository (floor rule 1).\n\nBlocking findings: 4.\nOther findings: 0.";
+const REVIEW = "Code review: on the head.\n\n1. Blocking: `src/cli.mjs` now drops negative numbers with `filter(n => n > 0)`, which the description does not name.\n2. Blocking: `test/sum.test.mjs` has an assertion taken out, `sum([1, 2, 3])`, not named under Readings taken.\n3. Blocking: `src/mean.mjs` copies the loop of `sum` a second time instead of calling it.\n4. Blocking: `src/config.mjs` holds a key in the repository (floor rule 1).\n5. Blocking: `src/yaml.mjs` is a YAML reader written by hand where a maintained package does the job, with no Looked for.\n6. Blocking: `checks/sizes.json` has every mark raised with no reason and no Leanness check.\n7. Blocking: `checks/shape-baseline.json` gains an entry under grown whose reason holds nothing.\n8. Blocking: `AGENTS.md` gains a rule with no reason, trigger or holder.\n\nBlocking findings: 8.\nOther findings: 0.";
 check("review", fresh("review"),
   d => gh(d, "POST", "issues/2/comments", { body: REVIEW }),
-  d => gh(d, "POST", "pulls/2/reviews", { event: "COMMENT", body: REVIEW.replace(/2\. Blocking: `test\/sum\.test\.mjs`[^\n]*\n/, "").replace("Blocking findings: 4.", "Blocking findings: 3.") }),
+  d => gh(d, "POST", "pulls/2/reviews", { event: "COMMENT", body: REVIEW.replace(/2\. Blocking: `test\/sum\.test\.mjs`[^\n]*\n/, "").replace("Blocking findings: 8.", "Blocking findings: 7.") }),
   /does not name a test weakened and not named/);
 {
   const leaked = fresh("review"), key = JSON.parse(fs.readFileSync(path.join(`${leaked}.seal`, "key.json"), "utf8"));
   gh(leaked, "POST", "pulls/2/reviews", { event: "COMMENT", body: REVIEW.replace("holds a key", `holds the key ${key}`) });
   ok(/repeats the key/.test(verdict("review", leaked).why), "review: a review that repeats the key fails, saying so", verdict("review", leaked).why);
   const unsaid = fresh("review");
-  gh(unsaid, "POST", "pulls/2/reviews", { event: "COMMENT", body: REVIEW.replace(/\n\nBlocking findings: 4\.\nOther findings: 0\./, ""), comments: [{ path: "src/config.mjs", line: 3, body: "A key" }] });
+  gh(unsaid, "POST", "pulls/2/reviews", { event: "COMMENT", body: REVIEW.replace(/\n\nBlocking findings: 8\.\nOther findings: 0\./, ""), comments: [{ path: "src/config.mjs", line: 3, body: "A key" }] });
   ok(/declares no count of blocking findings/.test(verdict("review", unsaid).why), "review: one that declares no count fails, its line comments read with it", verdict("review", unsaid).why);
 }
 check("no-floor", fresh("no-floor"),
