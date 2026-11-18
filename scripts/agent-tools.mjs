@@ -613,12 +613,16 @@ const commitProblems = (root, rev) => [...caseProblems(root, rev), ...submodules
 // all below it; each link below it; and each link on its way through which the folder is reached. Claude Code follows
 // a link there and this check does not: each such link fails (mdLinks()), and nothing is read through it.
 const AGENT_DIRS = [".claude/agents", ".claude/commands"];
+// The ways a link is read where it is on a tool's way: as Linux follows it, out of the checkout and back in, and as Windows
+// reads it (walk()'s `how`).
+const WAYS_READ = [{}, { win: true }];
 function agentFolders(root, rev) {
   const l = listing(root, rev), out = [];
   for (const dir of AGENT_DIRS) {
     const folders = [...l.dirs].filter(d => fold(d) === fold(dir)), below = at => folders.some(f => at.startsWith(`${f}/`));
-    // (the folder itself as a link, or .claude as one where the folder is reached through it)
-    const ways = l.links.filter(at => fold(at) === fold(dir) || (fold(at) === ".claude" && walk(root, rev, `${at}/${dir.split("/")[1]}`, [], true, [], true) !== null));
+    // (the folder itself as a link, or .claude as one where the folder is reached through it, by any of the ways a link is
+    // read, one that leaves the checkout and comes back in among them)
+    const ways = l.links.filter(at => fold(at) === fold(dir) || (fold(at) === ".claude" && WAYS_READ.some(how => walk(root, rev, `${at}/${dir.split("/")[1]}`, [], true, [], true, how) !== null)));
     out.push({ markdown: [...l.blobs].filter(at => below(at) && /\.md$/iu.test(at)).sort(), links: l.links.filter(below).sort(), ways });
   }
   return out;
@@ -673,14 +677,14 @@ function submodules(root, rev) {
 // Everything a name holds at a commit, as a fingerprint: what it leads to, each entry the commit lists under that, by its
 // path and object, and, for each link among them, everything it holds in turn, each folder read once; so a name held
 // twice is held by all a tool may read under either, never by one path through it. With `keep`, only the entries it
-// keeps are held (each link is walked all the same). Each name walked, `at` and each link reached under it, is said in
-// `walked`.
-function everything(root, rev, at, keep = () => true, walked = []) {
+// keeps are held (each link is walked all the same); with `how`, each walk reads a link as walk() says. Each name walked,
+// `at` and each link reached under it, is said in `walked`.
+function everything(root, rev, at, keep = () => true, how = null, walked = []) {
   const l = listing(root, rev), seen = new Set(), tops = [], entries = new Set(), todo = [at];
   // (walked a link at a time from a list, never by recursion, so no chain of links is too long for it; each entry named
   // once, however many links reach the folders it stands in)
   for (let i = 0; i < todo.length; i++) {
-    const via = [], r = walk(root, rev, todo[i], via, true, [], true);
+    const via = [], r = walk(root, rev, todo[i], via, true, [], true, how);
     tops.push([r?.type ?? "nothing", r?.f ?? "", l.ids.get(r?.f) ?? "", ...via.map(v => `${v}\0${l.ids.get(v)}`)].join("\0"));
     if (r?.type !== "tree" || seen.has(r.f)) continue;
     seen.add(r.f);
@@ -715,8 +719,9 @@ function belowDir(root, rev, p) {
 // a file of another kind there changes freely.
 function mdLinks(root, rev) {
   const l = listing(root, rev), read = p => !l.blobs.has(p) || /\.md$/iu.test(p);
-  // (and by what the lock files say exactly of the package each link walked leads into: pkgLock())
-  const held = at => { const walked = [], all = everything(root, rev, at, read, walked); return [at, all, ...walked.map(w => pkgLock(root, rev, w).exact)].join("\0"); };
+  // (each read as a link's way is, where it leaves the checkout and comes back in, and as Windows reads a link: WAYS_READ;
+  // and by what the lock files say exactly of the package each link walked leads into: pkgLock())
+  const held = at => { const walked = [], all = WAYS_READ.map(how => everything(root, rev, at, read, how, walked)); return [at, ...all, ...[...new Set(walked)].map(w => pkgLock(root, rev, w).exact)].join("\0"); };
   // (.claude as a link on the way, by what stands at its agents and commands alone, as Claude Code reads nothing else
   // there for them)
   const way = at => (fold(at) === ".claude" ? AGENT_DIRS.map(d => held(`${at}/${d.split("/")[1]}`)).join("\0\0") : held(at));
@@ -1172,13 +1177,13 @@ function reaches(root, rev, at, follow = false, from = at) {
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
   return [through(posix, want, holds, names, f => resolve(f)?.type, p => belowDir(root, rev, p)), ...skill].join("\0\0");
 }
+// The way a link's path takes at a commit, as a fingerprint: what it reaches, and each link it passes, by its target,
+// read where it leaves the checkout and comes back in, and read again as Windows reads a link.
+const wayOf = (root, rev, at) => WAYS_READ.map(how => commitReader(root, rev, true, true, how).holds(at.split(path.sep).join("/"))).join("\0\0");
 // Whether a link leads to what the commit does not hold: a target outside the checkout, or one beyond a name the
 // commit holds nothing at, as a folder an install fills (node_modules, a virtual environment and the like). This check
 // cannot read what stands there, so such a link is new where the pull request adds or changes it, and one the base held
 // is reported, never failed, whatever else changes (core archive 207).
-// The way a link's path takes at a commit, as a fingerprint: what it reaches, and each link it passes, by its target,
-// read where it leaves the checkout and comes back in, and read again as Windows reads a link.
-const wayOf = (root, rev, at) => [{}, { win: true }].map(how => commitReader(root, rev, true, true, how).holds(at.split(path.sep).join("/"))).join("\0\0");
 function away(root, rev, at) {
   const l = listing(root, rev), r = walk(root, rev, at.split(path.sep).join("/"), [], true, [], true);
   return !r || !(r.f === "." || l.dirs.has(r.f) || l.ids.has(r.f));
@@ -1255,7 +1260,7 @@ function npmRead(root, rev, f, text, key, up, out, depth = 0) {
   if (entry?.inBundle && parent > 0) out.exact.add(`${f} bundled in\0${JSON.stringify(ENTRY_SAYS.map(k => npmEntry(text, key.slice(0, parent))?.[k] ?? null))}`);
   if (!entry?.link || typeof entry.resolved !== "string") return;
   const walked = [];
-  out.exact.add(`${f} links to\0${everything(root, rev, path.posix.normalize(path.posix.join(up || ".", entry.resolved)), undefined, walked)}`);
+  out.exact.add(`${f} links to\0${everything(root, rev, path.posix.normalize(path.posix.join(up || ".", entry.resolved)), undefined, null, walked)}`);
   // (a link walked there that leads into node_modules in turn, read as pkgLock() reads it, a few links deep at most)
   for (const w of walked) {
     const more = pkgLock(root, rev, w, depth + 1);
@@ -1294,14 +1299,15 @@ function looseNotes(root, base, notes) {
     if (mayHaveChanged(pkgLock(root, base, at), pkgLock(root, "HEAD", at))) notes.push(`${show(at)}, a link to Claude Code's agents or commands, leads into a package that a lock file this check cannot read the entry of may have changed, so what Claude Code reads there may have changed unread: reported, never failed. Replace the link with the files themselves, committed in the project, or take it out`);
   }
 }
-function sortLinks(root, base, links, fail, notes) {
+// In the core's own repository none may stand, one the base held among them (#259).
+function sortLinks(root, base, links, fail, notes, core = false) {
   for (const at of links) {
     let to = null;
     try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
     // (held only where it takes the way the base's took, by the same links, there and back again where it leaves the
     // checkout: one the pull request makes lead elsewhere, by a link it adds or changes further along, is new)
-    const held = base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && wayOf(root, base, at) === wayOf(root, "HEAD", at);
+    const held = !core && base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && wayOf(root, base, at) === wayOf(root, "HEAD", at);
     const out = to !== null && away(root, "HEAD", at), stood = held && out && away(root, base, at);
     const there = "to what the commit does not hold (outside the checkout, or in a folder an install fills, as node_modules or a virtual environment), which this check cannot read";
     if (stood) sortStood(root, base, at, said, there, fail, notes);
@@ -1338,7 +1344,7 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   const notes = [...[...stood].map(p => `as the base held it, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`), ...[...unread].map(p => `with no base to read against, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`)];
   sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes);
   sortSources(checked, { head, baseProject, baseList, core, file }, fail, notes);
-  sortLinks(root, base, head.links, fail, notes);
+  sortLinks(root, base, head.links, fail, notes, core);
   if (base) looseNotes(root, base, notes);
   sortUnlisted(unlisted, { head, base, held, file }, fail, notes);
   return { fail, notes };

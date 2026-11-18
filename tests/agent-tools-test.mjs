@@ -492,6 +492,18 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ok(readmeKept.status === 0 && readmeKept.out.includes(WAY), "a .claude link the base held is noted while only Markdown outside its agents and commands changes", readmeKept.out);
     fails(run(pr(viaCfg(), { "cfg/agents/a.md": "---\nname: a\ndescription: changed\n---\n" })), "but not once an agent there changes", WAY);
     fails(run(pr(viaCfg(), { "cfg/commands/c.md": "# c\n" })), "nor once a command is added there", WAY);
+    // (and where its way leaves the checkout and comes back in, or reads as Windows reads it: a new one fails, and one the
+    // base held is held by what it reaches so)
+    const real = dir => fs.realpathSync(dir), self = dir => path.basename(real(dir));
+    const cfgOut = to => { const dir = project({ ...script, ...listing() }); fs.renameSync(path.join(dir, ".claude"), path.join(dir, "cfg")); fs.mkdirSync(path.join(dir, "cfg/agents"), { recursive: true }); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "cfg"); git(dir, "checkout", "-q", "-B", "change"); fs.writeFileSync(path.join(dir, "cfg/agents/a.md"), "---\nname: a\npermissionMode: default\n---\n"); fs.symlinkSync(to(dir), path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link"); git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change"); return dir; };
+    fails(run(cfgOut(dir => `../${self(dir)}/cfg`)), "a .claude link added that leaves the checkout and comes back in to agents fails", WAY);
+    fails(run(cfgOut(dir => `${real(dir)}/cfg`)), "and so does one to a whole path into the checkout", WAY);
+    const libOut = to => { const dir = project({ ...script, "lib/agents/a.md": "---\nname: a\n---\n", ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync(to(dir), path.join(dir, ".claude/agents/x")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents through a link out and back"); return dir; };
+    for (const [what, to] of [["out of the checkout and back in", dir => `../../../${self(dir)}/lib/agents`], ["by a backslash, as Windows reads it", () => "..\\..\\lib\\agents"]]) {
+      fails(run(pr(libOut(to), { "lib/agents/a.md": "---\nname: a\npermissionMode: default\n---\n" })), `a link the base held below agents, ${what}, fails once what it leads to changes`, LINKED);
+      const outKept = run(pr(libOut(to), { "README.md": "x\n" }));
+      ok(outKept.status === 0 && outKept.out.includes(LINKED), `and is noted while nothing it leads to changes (${what})`, outKept.out);
+    }
     const loops = viaDocs();
     for (let i = 0; i < 6; i++) fs.symlinkSync(".", path.join(loops, `docs/l${i}`));
     git(loops, "add", "-A"); git(loops, "commit", "-q", "-m", "loops behind a link");
@@ -1004,6 +1016,10 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ok(caseKept.status === 0 && caseKept.out.includes(LINK_SAYS), "one the base held is noted, not failed", caseKept.out);
     fails(run(pr(caseHeld, { "inner/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what stands under its target changes", LINK_SAYS);
     passes(run(pr(project({ "Inner/mcp.json": "{}\n", ...listing() }), { "README.md": "x\n" })), "a folder in another case that no link leads to is none of this");
+    // (#633's fallback security review of acf5691: where a link's target stands in no case but folds alike to a folder
+    // and a link beside it, the one the listing gives first is read, as before the names were folded once a folder)
+    const order = () => { const dir = project({ "CONF/settings.json": KIT, "other/settings.json": KIT, ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync("conf", path.join(dir, ".claude")); fs.symlinkSync("other", path.join(dir, "Conf")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link to a name in no case"); return dir; };
+    fails(run(pr(order(), { "other/settings.json": JSON.stringify({ ...JSON.parse(KIT), hooks: { ...JSON.parse(KIT).hooks, SessionStart: [{ hooks: [{ type: "command", command: "bash scripts/x.sh" }] }] } }) })), "a hook added where a link to a name in no case leads, through a link beside a folder of that name, fails", ".claude");
     // (a target the commit holds under two names that fold alike, which a file system that ignores case keeps one of)
     const SEVERAL = "under more than one name a file system that ignores case reads as one";
     const twice = () => { const dir = project({ "Cfg/settings/mcp.json": "{}\n", "cfg/settings/mcp.json": "{}\n", ...listing() }); fs.symlinkSync("Cfg", path.join(dir, ".kiro")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link to a name held twice"); return dir; };
@@ -1168,6 +1184,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     git(moved, "checkout", "-q", "-B", "change"); fs.unlinkSync(path.join(moved, ".claude")); fs.symlinkSync("node_modules/other/.claude", path.join(moved, ".claude"));
     git(moved, "add", "-A"); git(moved, "commit", "-q", "-m", "moved"); git(moved, "checkout", "-q", "main"); git(moved, "merge", "-q", "--no-ff", "-m", "merge", "change");
     fails(run(moved), "but a link the base held, moved, is new", UNHELD);
+    fails(run(pr(linkTo("node_modules/pkg/.claude"), { "README.md": "x\n" }), "--core"), "and in the core's own repository one the base held fails as well", UNHELD);
     // (#693's fallback security review of 5fe85c6: one the base held to what the commit holds, made by the pull request
     // to lead away by a link further along, or one whose link further along the pull request moves, is new)
     const swap = (build, change) => { const dir = project({ ".gitignore": "node_modules/\n", ...listing() }); build(dir); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "base"); git(dir, "checkout", "-q", "-B", "change"); change(dir); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "change"); git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change"); return dir; };
