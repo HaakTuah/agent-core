@@ -250,6 +250,9 @@ export function shippedPaths(packages, workspaces, manifest) {
   return seen;
 }
 
+// The lines of an `.npmrc` as npm reads them: split at each line feed and each carriage return, alone or together.
+const npmrcLines = (npmrc) => npmrc.split(/[\r\n]+/u);
+
 /**
  * The lines of an `.npmrc` that are not one of a few settings known to leave where npm fetches from alone: npm reads
  * keys in many spellings (quoted, scoped, from variables), so anything else, a registry or `replace-registry-host` above
@@ -257,18 +260,18 @@ export function shippedPaths(packages, workspaces, manifest) {
  */
 export function registryOverrides(npmrc) {
   const harmless = /^((fund|audit|update-notifier|engine-strict|save-exact|progress|loglevel)\s*=\s*[\w.-]*|ignore-scripts\s*=\s*true|min-release-age\s*=\s*\d{1,5})$/u;
-  return npmrc.split(/\r?\n/u).map((l) => l.trim()).filter((l) => l && !/^[#;]/u.test(l) && !harmless.test(l));
+  return npmrcLines(npmrc).map((l) => l.trim()).filter((l) => l && !/^[#;]/u.test(l) && !harmless.test(l));
 }
 
 /** Whether an `.npmrc` keeps packages' own install scripts off (floor rule 15): `ignore-scripts=true`, never undone. */
 export function scriptsOff(npmrc) {
-  return npmrc.split(/\r?\n/u).some((l) => /^ignore-scripts\s*=\s*true$/u.test(l.trim()));
+  return npmrcLines(npmrc).some((l) => /^ignore-scripts\s*=\s*true$/u.test(l.trim()));
 }
 
 /** The week's wait an `.npmrc` sets (floor rule 7: a new release is taken once it is WAIT days old): the days its last
  *  `min-release-age` line gives, which npm reads from version 11.10 on, or null where it gives none. */
 export function releaseAge(npmrc) {
-  const days = npmrc.split(/\r?\n/u).map((l) => /^min-release-age\s*=\s*(\d{1,5})$/u.exec(l.trim())?.[1]).filter(Boolean).at(-1);
+  const days = npmrcLines(npmrc).map((l) => /^min-release-age\s*=\s*(\d{1,5})$/u.exec(l.trim())?.[1]).filter(Boolean).at(-1);
   return days === undefined ? null : Number(days);
 }
 export const WAIT = 7;
