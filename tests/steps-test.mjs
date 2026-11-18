@@ -682,7 +682,7 @@ ok(copiesOf({ "a.yml": { jobs: { j: { env: bigEnv, steps: Array.from({ length: 2
   "a large env: given to many calls of an action is read once", `${Date.now() - givenStarted} ms`);
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
-ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));
+ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn).split("\n\nChecks that read nothing")[0]), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));
 ok(!missedOwn.some(m => m.lead === "16 November 2026, an agent's own tools listed"), "the agent-tools step reads the config the project passes, not the word after a comment that names the licence script", report(missedOwn));
 const foundOwn = differences(ownP, fresh(ownP));
 ok(!foundOwn.some(d => /^checks\//.test(d)) && JSON.stringify(foundOwn.filter(d => /^config\//.test(d))) === JSON.stringify(['config/licences.json: lacks the key "nuget"']),
@@ -836,6 +836,22 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
   const left = of(wf("core.yml", "core.yml", "    with:\n      description: true\n")), twice = of(wf("core.yml", "core.yml", all), wf("s.yml", "signatures.yml")), bare = of(wf("core.yml", "core.yml", "    with:\n      copies: c.json\n      description: true\n"));
   ok(/pass it `copies: checks\/copies\.json`/.test(left ?? "") && /`signatures\.yml`, which its `signatures:` runs too/.test(twice ?? "") && /`sizes: checks\/sizes\.json` beside its `copies:`/.test(bare ?? ""),
     "one that leaves the copies checks out, runs the signature check twice, or passes copies without its marks is reported, each with its mend", [left, twice, bare].join("\n"));
+}
+
+// the checks that read nothing here (#459, point 2): the shape check and the selection where "code" names no file of
+// their languages, the strength where the manifest names no mutation tool; said in the report, failing nothing
+{
+  const bare = path.join(tmp, "no-code");
+  fs.cpSync(dirs["an-npm-project"], bare, { recursive: true });
+  const before = notDone(bare), was = before.nothing.map(n => n.check);
+  const codeAt = JSON.parse(fs.readFileSync(path.join(bare, "checks/shape.json"), "utf8")).code.find(c => !c.startsWith(":"));
+  fs.mkdirSync(path.join(bare, codeAt), { recursive: true });
+  fs.writeFileSync(path.join(bare, codeAt, "a.js"), "export const a = 1;\n");
+  execFileSync("git", ["add", "-A"], { cwd: bare });
+  const now = notDone(bare).nothing.map(n => n.check);
+  ok(was.includes("core/scripts/shape.mjs") && was.includes("core/scripts/select.mjs") && report(before).includes("Checks that read nothing here") && before.nothing.every(n => n.holds.length && n.why.length > 20)
+    && !now.includes("core/scripts/shape.mjs") && !now.includes("core/scripts/select.mjs"),
+    "a project whose code holds no file the shape check's readers know is said to have the shape check and the selection read nothing, with the rules they hold; a file of code there makes them read", report(before));
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);

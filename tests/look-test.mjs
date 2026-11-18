@@ -135,6 +135,13 @@ ok(body({ core: false, month: "2026-11", measures: null, previous: null, overdue
   "a count that could not be read says so");
 ok(JSON.stringify(share([{ branch: "dependabot/npm/x", files: ["package.json"], ours: true }, { branch: "sync", files: ["core/a.md", "core-manifest.md"], ours: true }, { branch: "a", files: ["AGENTS.md"], ours: true }, { branch: "b", files: ["src/a.js"], ours: true }], ["AGENTS.md"])) === JSON.stringify({ all: 4, sync: 1, upkeep: 1, update: 1, own: 1 }),
   "the merged pull requests are sorted as core-cost.mjs sorts them");
+// the share of rules a check holds there (#459, point 3): written by the project's report, carried by the core's as
+// numbers alone, and said where it could not be read
+const held = { own: { counts: { all: 10, check: 2, test: 1, review: 4, describes: 3 } }, there: { held: 12, all: 315 } };
+const heldBody = c => body({ core: false, month: "2026-11", measures: null, previous: null, overdue: [], counts: { pin: null, behind: null, steps: null, merged: null, held: c }, scripts: "core/scripts" });
+ok(heldBody(held).includes("- rules held by a check: the project's own 3 of 10, the core's 12 of 315.") && heldBody(null).includes("- rules held by a check: not read.")
+  && countsFrom(`**Counts for the core**\n${heldBody(held).split("\n").find(l => l.startsWith("- rules held"))}\n- rules held by a check: <b>12</b> of all.\n`, false, new Set()) === "rules held by a check: its own 3 of 10, the core's 12 of 315",
+  "a project's report says how many of its own rules and of the core's a check holds there, and the core's report carries the numbers alone", heldBody(held));
 ok(SHARES.test("| *shares its counts* | `yes` |") && !SHARES.test("| *shares its counts* | `no` |"), "a project shares its counts only by its row saying yes");
 // what the core's report carries of a project: numbers and fixed words alone, from its look's own report
 const sha = "b".repeat(40);

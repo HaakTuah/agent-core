@@ -114,6 +114,23 @@ player can choose to use.
   hold a player (daily rewards, streaks, timers that punish leaving), or a model's verdict on whether it is fun, which
   stays the owner's own play. Reason: a feature that serves none of the aims the owner set is still built, and the owner
   finds it only in play. The design check reads it; no check holds it yet.
+- **A game takes each kind that is true of it** (#484). By default a game is sorted by what it is made of, never by a
+  genre, and takes every kind that is true of it: a game the project designs, an emergent simulation, a traditional
+  game, a game with model players, a game played in real time, a game played online, a show for a room; one game takes
+  several. The trigger is a game's first stage, or a change that makes another kind true of it: its builder reads which
+  kinds stand where they can be read (#481) and writes the rest on the *game page*. It does not mean a list of genres,
+  nor that a kind binds before it is true of the game. Reason: a game that is two kinds at once was held to the rules
+  of one. The design check reads the page; no check holds it yet.
+- **A game's own rule says whom it is about** (#484). By default each rule a game writes for itself is asked one
+  question, whether it is about this game, its kind, or every game, and the answer stands beside it in the project's
+  list of its own rules (`tasks/cleaning.md`, "A project's own rules name what holds them"). The trigger is the audit,
+  whose session answers it as it lists the rules and files a rule about a kind or about every game to the core as an
+  idea, the kind named; such a rule moves to the core once a second game needs it, one that stands or one the owner
+  has planned, written for the kind and not for the game it came from, that game pointing to it and dropping its own
+  copy in the same sync ("One fact, one place"). It does not mean a game's rule is taken from it before the owner's
+  word, nor that a kind with one game gets a part in the core. Reason: two games each held rules true of their kind (on
+  what a request to a model may imply, on how fast a computer player may react), and a new game of that kind would
+  have to find them again. Held by the audit, through that list; the copies check, once a rule stands in both places.
 - **Every stage is a game.** A game built in stages ends each stage in one someone can play from
   start to finish and enjoy; a feature that makes sense only once later ones exist waits for them.
 - **The first stage is the loop alone.** By default a game built in stages has as its first stage

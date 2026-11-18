@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { inStep } from "../scripts/archive.mjs";
-import { counts, holders, report } from "../scripts/holders.mjs";
+import { counts, heldThere, holders, ownRules, report } from "../scripts/holders.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { fingerprint, rules, rulesOf } from "../scripts/rules.mjs";
 
@@ -118,6 +118,23 @@ fs.writeFileSync(path.join(failing, "scripts", "staged.mjs"), "export const CASE
 fs.writeFileSync(path.join(failing, "scripts", "outcomes.mjs"), "export const NUMBER = /^$/u;\n");
 const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.mjs")], { encoding: "utf8" });
 ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`), "where holders.json is wrong the check fails, each failure saying its mend", `${run.stdout}${run.stderr}`);
+
+// a project's own rules (#459, point 1; #484, points 9 and 10): each by its list's holder and what it is about; those
+// the list leaves out, entries that are wrong, and rules about a kind or every project, which go to the core as ideas
+const ownFiles = { "AGENTS.md": "# P\n\n- **Saves are atomic.** By default x.\n- **Players see their own hand.** By default y.\n- **Models answer in time.** By default z.\n- **Untold.** By default w.\n", "core/tasks/x.md": "- **Not ours.** x\n", "tests/save.test.js": "" };
+const list = JSON.stringify({ rules: {
+  "AGENTS.md: Saves are atomic": { held: "test: tests/save.test.js", about: "this project" },
+  "AGENTS.md: Players see their own hand": { held: "review", about: "its kind: a card game" },
+  "AGENTS.md: Models answer in time": { held: "check: scripts/missing.mjs", about: "every project" },
+  "AGENTS.md: Gone": { held: "review", about: "this project" } } });
+const o = ownRules(["AGENTS.md", "core/tasks/x.md"], f => ownFiles[f] ?? null, list);
+ok(o.counts.all === 4 && o.counts.test === 1 && o.counts.review === 1 && o.counts.check === 1 && o.none.join() === "AGENTS.md: Untold"
+  && o.toCore.length === 2 && o.toCore[0].includes("its kind: a card game") && o.wrong.some(w => /missing\.mjs, which is not there/.test(w)) && o.wrong.some(w => /"AGENTS\.md: Gone" names no rule/.test(w)) && o.wrong.every(w => /Mend:/.test(w)),
+  "a project's own rules are listed by what holds them and what they are about: the copy of the core aside, one the list leaves out, a check not there and a rule gone said, a rule of a kind or every project marked for the core", JSON.stringify(o));
+const unlisted = ownRules(["AGENTS.md"], f => ownFiles[f] ?? null, null), unread = ownRules(["AGENTS.md"], f => ownFiles[f] ?? null, "{");
+ok(unlisted.none.length === 4 && unlisted.wrong.length === 0 && unread.wrong.some(w => /cannot be read as JSON/.test(w)), "with no list every rule is said as not listed, and a list that cannot be read is said, nothing failing");
+const allHeld = heldThere(root, []), less = heldThere(root, ["core/scripts/shape.mjs"]);
+ok(allHeld.all > 0 && allHeld.held > 0 && less.held < allHeld.held, "of the core's rules, one held only by a check that read nothing is not held there", JSON.stringify({ allHeld, less }));
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);

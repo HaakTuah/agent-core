@@ -125,3 +125,20 @@ The index, and how an item is written: `archive/instructions.md`.
      and copies checks, the parts the first trials would replace. The owner agreed to it, with the issue's other points,
      after asking what the core lacked that let an inventory's check miss a part. It stands behind "A trial of a
      maintained tool replays the part's past bugs" in `tasks/choices.md`, and the inventory's line `Replayed:`.
+
+257. **16 November 2026**, #459, with #484, points 9 and 10. A project's own rules name what holds them, in a list the
+     audit writes and reads, each with whether it is about the project, its kind or every project, so that a rule of
+     a kind goes to the core as an idea; a check of the core's that read nothing in a project says so at the sync, and
+     the state report gives the share of rules a check holds there, counting none whose check read nothing. A check
+     that passes on nothing makes its rule look held: in a project of another owner a check held 10 of the 75 of the
+     core's rules that applied there, and nothing told its owner which. The owner agreed to it with the other points
+     read from an evaluation's counts, on the test of taking what is good for every development cycle and no brake
+     that would slow the owner's own projects. It stands behind "A project's own rules name what holds them" in
+     `tasks/cleaning.md` and "A game's own rule says whom it is about" in `tasks/game-design.md`.
+
+258. **16 November 2026**, #484, points 8 to 10. A game is sorted by what it is made of, taking each kind that is true
+     of it, never by a genre; and a rule a game writes for itself that is true of its kind moves to the core once a
+     second game needs it, written for the kind, the game pointing to it. Two games each held rules true of their kind,
+     which a new game would have had to find again; the owner agreed to these points as they were added to #484. It
+     stands behind "A game takes each kind that is true of it" and "A game's own rule says whom it is about" in
+     `tasks/game-design.md`.

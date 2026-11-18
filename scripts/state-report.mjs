@@ -28,10 +28,11 @@ import { pinOf } from "./core-moved.mjs";
 import { reading, rulesOf } from "./dose.mjs";
 import { baselineOf } from "./strength.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
-import { report as holdersReport } from "./holders.mjs";
+import { OWN, heldThere, ownRules, report as holdersReport, shareLine } from "./holders.mjs";
+import { readNothing } from "./read-nothing.mjs";
 import { said as pruningSaid } from "./pruning.mjs";
 import { ruleFiles } from "./rule-files.mjs";
-import { rules } from "./rules.mjs";
+import { ROOT, rules } from "./rules.mjs";
 import { started } from "./started.mjs";
 import { line as waitLine, measure as measureWait } from "./wait.mjs";
 
@@ -138,7 +139,8 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
     `- copy: ${counts.pin ?? "not read"}${counts.behind === null ? "" : `, ${counts.behind} commits behind the core's main`}.`,
     `- steps not done: ${counts.steps ?? "not read"}.`,
     counts.merged ? `- merged in ${before(month)}: ${counts.merged.all}, the core's share ${pct(counts.merged.sync + counts.merged.upkeep, counts.merged.all)} (sync ${counts.merged.sync}, upkeep ${counts.merged.upkeep}, update ${counts.merged.update}, own ${counts.merged.own}).`
-      : `- merged in ${before(month)}: not read (the token here may not read pull requests).`);
+      : `- merged in ${before(month)}: not read (the token here may not read pull requests).`,
+    counts.held ? shareLine(counts.held.own, counts.held.there) : "- rules held by a check: not read.");
   return lines.join("\n");
 }
 
@@ -155,7 +157,17 @@ export function readCounts({ repo, manifest, month, steps, gh = ghApi }) {
     for (const p of pulls) p.files = pagesOf(`repos/${repo}/pulls/${p.number}/files`, gh).map(f => f.filename);
     merged = share(pulls, ruleFiles(undefined, undefined, { tools: true }));
   } catch { /* (not read) */ }
-  return { pin, behind, steps, merged };
+  return { pin, behind, steps, merged, held: heldHere(manifest) };
+}
+
+// Of a project's rules, those a check holds (#459, point 3): its own, by its list (holders.mjs, --project), and the
+// core's, none whose every check read nothing here (read-nothing.mjs); null where they cannot be read.
+function heldHere(manifest) {
+  try {
+    const read = f => { try { return fs.readFileSync(f, "utf8"); } catch { return null; } };
+    const nothing = readNothing(process.cwd(), manifest ?? "", read).map(n => n.check);
+    return { own: ownRules(ruleFiles(), read, read(OWN)), there: heldThere(ROOT, nothing) };
+  } catch { return null; }
 }
 
 // A project's counts for the core, from its state report's text, as one line: each count of its own heading read by a
@@ -174,6 +186,8 @@ export function countsFrom(text, named, known = new Set(rules().map(r => r.key))
     else if ((m = /^- merged in (\d{4}-\d\d): (\d{1,6}), the core's share (\d{1,3}%|none merged) \(sync (\d{1,6}), upkeep (\d{1,6}), update (\d{1,6}), own (\d{1,6})\)\.$/.exec(line)))
       out.push(`merged in ${m[1]}: ${m[2]}, the core's share ${m[3]} (sync ${m[4]}, upkeep ${m[5]}, update ${m[6]}, own ${m[7]})`);
     else if ((m = /^- merged in (\d{4}-\d\d): not read /.exec(line))) out.push(`merged in ${m[1]}: not read`);
+    else if ((m = /^- rules held by a check: the project's own (\d{1,6}) of (\d{1,6}), the core's (\d{1,6}) of (\d{1,6})\.$/.exec(line))) out.push(`rules held by a check: its own ${m[1]} of ${m[2]}, the core's ${m[3]} of ${m[4]}`);
+    else if (/^- rules held by a check: not read\.$/.test(line)) out.push("rules held by a check: not read");
   }
   const cited = citedFrom(text, known);
   if (cited) out.push(cited);
