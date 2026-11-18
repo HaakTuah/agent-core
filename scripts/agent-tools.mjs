@@ -128,7 +128,8 @@ export function configured(read, skills, files = () => [], linked = () => false)
   // of a marketplace of the "settings" kind, its own fields and this plug-in's entries alone, as pluginPin() reads it)
   for (const name of plugins) add(`plugin ${name}`, canonical(["plugin", name, marketOf(name, markets)]));
   addServers(state, ".mcp.json", entries(".mcp.json", "mcpServers", json(".mcp.json")?.mcpServers, SERVERS), "");
-  for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
+  for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); readFrontmatter(state, `.claude/skills/${name}/SKILL.md`, read(`.claude/skills/${name}/SKILL.md`)); }
+  for (const name of files(".claude/agents").filter(n => n.endsWith(".md")).sort()) readFrontmatter(state, `.claude/agents/${name}`, read(`.claude/agents/${name}`));
   readKiro(state, json, files);
   readCodex(state, json, read);
   return { tools, ids, problems, texts, baselined, sources, pins: pinsOf(plugins, markets, servers) };
@@ -681,7 +682,7 @@ function shownNotBlob(root, rev, at) {
 const fold = name => name.normalize("NFC").toUpperCase().toLowerCase().normalize("NFC");
 // The tools' files this check reads, and their folders, as each tool names them.
 const TOOL_FILES = [".claude/settings.json", ".claude/settings.local.json", ".mcp.json", ".kiro/settings/mcp.json", ".codex/hooks.json", ".codex/config.toml"];
-const TOOL_FOLDERS = [".claude/skills/", ".kiro/hooks/"];
+const TOOL_FOLDERS = [".claude/skills/", ".claude/agents/", ".kiro/hooks/"];
 // Each step on the way to a tool's file or folder (.codex, .kiro/settings, .claude/skills and the files themselves).
 const WAYS = new Set([...TOOL_FILES, ...TOOL_FOLDERS.map(d => d.slice(0, -1))].flatMap(f => f.split("/").map((_, i, parts) => parts.slice(0, i + 1).join("/"))));
 // Each path of `paths`, or step on its way, a folder or a link among them, that names one of those in another case, and
@@ -696,6 +697,7 @@ function misnamed(paths) {
       if (WAYS.has(low) && step !== low) { out.set(step, low); break; }
     }
     if (path.posix.dirname(at) === ".kiro/hooks" && /\.json$/iu.test(at) && !at.endsWith(".json")) out.set(at, at.replace(/\.json$/iu, ".json"));
+    if (path.posix.dirname(at) === ".claude/agents" && /\.md$/iu.test(at) && !at.endsWith(".md")) out.set(at, at.replace(/\.md$/iu, ".md"));
     if (parts.length === 4 && at.startsWith(".claude/skills/") && fold(parts[3]) === "skill.md" && parts[3] !== "SKILL.md") out.set(at, `${parts.slice(0, 3).join("/")}/SKILL.md`);
   }
   return [...out];
@@ -724,7 +726,7 @@ function through(at, want, holds, names, typeOf) {
   // skill's folder itself where it is neither a file nor a folder, by what stands there, a link's target or a
   // submodule's commit)
   const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => found(at, d.slice(want.length, -1)).flatMap(dir => typeOf(dir) !== "tree" ? text(d, dir) : names(dir).sort().flatMap(n => {
-    const reads = d === ".kiro/hooks/" ? (/\.json$/iu.test(n) ? [`${dir}/${n}`] : []) : [...(["blob", "tree"].includes(typeOf(`${dir}/${n}`)) ? [] : [`${dir}/${n}`]), ...found(`${dir}/${n}`, "SKILL.md")];
+    const reads = d !== ".claude/skills/" ? ((d === ".kiro/hooks/" ? /\.json$/iu : /\.md$/iu).test(n) ? [`${dir}/${n}`] : []) : [...(["blob", "tree"].includes(typeOf(`${dir}/${n}`)) ? [] : [`${dir}/${n}`]), ...found(`${dir}/${n}`, "SKILL.md")];
     return reads.flatMap(a => text(`${d}${n}`, a));
   })));
   return [at, holds(at), ...files, ...folders, ...[...stops].sort().flatMap(a => text("on the way", a)), ...[...plain].sort().map(a => `a file on the way\0${a}`)].join("\0\0");
@@ -732,7 +734,7 @@ function through(at, want, holds, names, typeOf) {
 // The entries on the way to a tool's file, in whatever case they stand: each one the walk reaches as no folder, whose
 // name folded is a step of WAYS or lies in a tool folder, a few deep, found through `names`, so a link inside the
 // checkout is followed as the rest of the check follows it.
-const READS = /^(?:\.kiro\/hooks\/[^/]+\.json|\.claude\/skills\/[^/]+\/skill\.md)$/u, SKILL_DIR = /^\.claude\/skills\/[^/]+$/u;
+const READS = /^(?:\.kiro\/hooks\/[^/]+\.json|\.claude\/agents\/[^/]+\.md|\.claude\/skills\/[^/]+\/skill\.md)$/u, SKILL_DIR = /^\.claude\/skills\/[^/]+$/u;
 function toolPaths(names, typeOf) {
   const out = [], folders = TOOL_FOLDERS.map(d => d.slice(0, -1));
   const visit = (at, depth) => {
@@ -811,7 +813,7 @@ function walk(root, rev, f, via = [], lenient = false, misses = [], follow = fal
       left.unshift(...to.split("/"));
       continue;
     }
-    noteMiss(listing(root, rev), at, name, misses, hops > 0 && left.join("/"));
+    noteMiss(listing(root, rev), at, name, misses, hops > 0);
     if (!goesOn(listing(root, rev), here, left.length > 0, via, lenient)) return null;
     at.push(name);
   }
@@ -824,13 +826,13 @@ function folded(l, at, name) {
   if (l.dirs.has(here) || l.blobs.has(here) || l.others.has(here) || l.linked.has(here)) return name;
   return foldsIn(l, at.join("/") || ".").get(fold(name))?.[0] ?? name;
 }
-// The names a listing's folder `dir` holds, by their folded form, each list sorted; built once a folder, so a walk's
+// The names a listing's folder `dir` holds, by their folded form, each list in the listing's order; built once a folder, so a walk's
 // every step does not fold every name beside it again.
 function foldsIn(l, dir) {
   l.folds ??= new Map();
   if (!l.folds.has(dir)) {
     const by = new Map();
-    for (const n of [...(l.children.get(dir) ?? [])].sort()) by.set(fold(n), [...(by.get(fold(n)) ?? []), n]);
+    for (const n of l.children.get(dir) ?? []) by.set(fold(n), [...(by.get(fold(n)) ?? []), n]);
     l.folds.set(dir, by);
   }
   return l.folds.get(dir);
@@ -838,16 +840,17 @@ function foldsIn(l, dir) {
 // Where a walk meets a name the commit holds nothing at, while its folder holds that name in another case, which a
 // file system that ignores case finds in its place, that name, said in `misses` as { at }; and, past a link, where it
 // meets a name its folder holds beside another that folds alike, which such a file system keeps one of, so which the
-// tool reads is not plain, those names, as { at, several, rest }, `rest` the path the walk had left there.
-function noteMiss(l, at, name, misses, rest) {
+// tool reads is not plain, those names, as { at, several }; `linked`, whether the walk had passed a link.
+function noteMiss(l, at, name, misses, linked) {
   const here = [...at, name].join("/"), dir = at.join("/") || ".", path = n => (dir === "." ? n : `${dir}/${n}`);
-  const same = foldsIn(l, dir).get(fold(name)) ?? [];
+  const same = [...(foldsIn(l, dir).get(fold(name)) ?? [])].sort();
   if (l.dirs.has(here) || l.blobs.has(here) || l.others.has(here) || l.linked.has(here)) {
-    if (rest !== false && same.length > 1) misses.push({ at: here, several: same.map(path), rest });
+    if (linked && same.length > 1) misses.push({ at: here, several: same.map(path) });
     return;
   }
-  const other = same.find(n => n !== name);
-  if (other !== undefined) misses.push({ at: path(other) });
+  // (and where it holds none of that name but several in other cases, those, as which is read is not plain either)
+  if (same.length > 1) misses.push({ at: here, several: same.map(path) });
+  else if (same.length) misses.push({ at: path(same[0]) });
 }
 // Whether a walk goes on past `here`, `more` of the path after it: the last name may be anything the commit holds; one
 // with more after it, a folder the commit holds, or a folder every clone holds beside what the commit lists, a
@@ -975,55 +978,41 @@ function reaches(root, rev, at, follow = false) {
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
   return [through(posix, want, holds, names, f => resolve(f)?.type), ...skill].join("\0\0");
 }
-// What the lock files say of each name a link's path passes through where the commit holds nothing but an install puts
-// a package, as an ignored node_modules folder: an npm lock file's entry for that path, beside the node_modules folder
-// it lies in, and a yarn or pnpm lock file there whole; so a link the base held, through a package the pull request
-// locks at another version or source, is held by that too.
+// What the lock files say of each package a link's path passes through, a path with a node_modules folder on it, which
+// an install fills whatever the commit holds there: an npm lock file's entry for the package, beside the node_modules
+// folder it lies in or in a folder above, as a workspace's root holds one (or, where the entry cannot be read back, that
+// file's whole text), and a yarn or pnpm lock file there whole; so a link the base held, through a package the pull
+// request locks at another version or source, is held by that too. Null where no lock file read here holds the package,
+// or one says it is taken from the project's own files or a patch of them, or bun's stands beside: none of that is read.
+const FROM_PROJECT = /(?:link|file|portal|workspace):|patch:(?![^\n]*~builtin<)|patchedDependencies/u;
 function lockOf(root, rev, at) {
-  const via = [], l = listing(root, rev), out = new Set();
-  walk(root, rev, at.split(path.sep).join("/"), via, true, [], true);
-  for (const v of via) {
+  const via = [], out = new Set(), r = walk(root, rev, at.split(path.sep).join("/"), via, true, [], true);
+  for (const v of new Set([...via, ...(r ? [r.f] : [])])) {
     const cut = `/${v}`.lastIndexOf("/node_modules/");
-    if (l.ids.has(v) || cut < 0) continue;
-    // (the installed package's folder, a scope's name and the package's, and the folder that holds its node_modules)
+    if (cut < 0) continue;
+    // (the installed package's folder, a scope's name and the package's)
     const parts = v.slice(cut + "node_modules/".length).split("/"), name = parts.slice(0, parts[0].startsWith("@") ? 2 : 1).join("/");
     const pkg = `${v.slice(0, cut + "node_modules/".length)}${name}`, entries = [];
-    // (each lock file in that folder or one above it, as a workspace's root holds one for every package under it)
     for (let dir = v.slice(0, cut); ; dir = dir.includes("/") ? dir.slice(0, dir.lastIndexOf("/")) : "") {
-      const at = f => (dir ? `${dir}/${f}` : f), key = dir ? pkg.slice(dir.length + 1) : pkg;
+      const there = f => (dir ? `${dir}/${f}` : f), key = dir ? pkg.slice(dir.length + 1) : pkg;
+      if (["bun.lock", "bun.lockb"].some(f => textAt(root, rev, there(f)) !== null)) return null;
       for (const lock of ["package-lock.json", "npm-shrinkwrap.json"]) {
+        const text = textAt(root, rev, there(lock));
         let entry = null;
-        try { entry = JSON.parse(textAt(root, rev, at(lock)) ?? "null")?.packages?.[key] ?? null; if (entry !== null) entry = JSON.stringify(entry); } catch { entry = "unreadable"; }
-        if (entry !== null) entries.push(`${at(lock)}\0${key}\0${entry}`);
+        try { entry = JSON.parse(text ?? "null")?.packages?.[key] ?? null; if (entry?.link) return null; if (entry !== null) entry = JSON.stringify(entry); } catch { entry = `unreadable\0${text}`; }
+        if (entry !== null) entries.push(`${there(lock)}\0${key}\0${entry}`);
       }
-      for (const lock of ["yarn.lock", "pnpm-lock.yaml"]) { const e = entriesOf(textAt(root, rev, at(lock)), name); if (e) entries.push(`${at(lock)}\0${name}\0${e}`); }
+      for (const lock of ["yarn.lock", "pnpm-lock.yaml"]) {
+        const text = textAt(root, rev, there(lock));
+        if (text !== null && FROM_PROJECT.test(text)) return null;
+        if (text !== null) entries.push(`${there(lock)}\0${text}`);
+      }
       if (!dir) break;
     }
-    // (a package no lock file read here names, or one that names it in a form no check reads, as an npm lock file
-    // before its seventh version or bun's, is no package held: the link is read as new)
-    if (!entries.length || entries.some(e => e.endsWith("\0unreadable"))) return null;
+    if (!entries.length) return null;
     entries.forEach(e => out.add(e));
   }
   return [...out].sort().join("\0\0");
-}
-// Of a yarn or pnpm lock's text, the entries that name the package `name`, each its line and the lines indented under
-// it, so a change to another package's entry leaves them as they were; a key names it where, unquoted and past a leading
-// "/", it is the name, or starts with the name and "@" or "/" (a yarn header's every key, split at ", ", is read so).
-function entriesOf(text, name) {
-  if (text === null) return null;
-  const lines = text.split(/\r?\n/u), out = [], indent = l => l.length - l.trimStart().length;
-  const names = key => key.split(/,\s*/u).some(k => {
-    const bare = k.trim().replace(/^["']|["']$/gu, "").replace(/^\//u, "");
-    return bare === name || bare.startsWith(`${name}@`) || bare.startsWith(`${name}/`);
-  });
-  for (let i = 0; i < lines.length; i++) {
-    const colon = lines[i].search(/:(?:\s|$)/u);
-    if (colon < 0 || !lines[i].trim() || !names(lines[i].slice(0, colon))) continue;
-    const at = indent(lines[i]);
-    out.push(lines[i]);
-    while (i + 1 < lines.length && (!lines[i + 1].trim() || indent(lines[i + 1]) > at)) out.push(lines[++i]);
-  }
-  return out.join("\n");
 }
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {
