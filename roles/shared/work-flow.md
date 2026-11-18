@@ -37,9 +37,9 @@ owner creates from any device to stop its agents and deletes to let them go on.
   work needs is pushed, what you started is stopped, and your own worktree or clone, scratch files and local branches
   go, save what holds anything uncommitted or unpushed, which you push or leave and name in the message.
 - A session runs the *quick check* before its first change; a failure there is a bug outside its task ("Bugs don't
-  wait"), and the task goes on with what does not hang on it. It does not mean the whole suite, nor that the task mends
-  what it inherited. Reason: one that starts on a broken `main` cannot tell its own faults from those it inherited.
-- One that stops mid-task commits and writes its hand-off note (`tasks/tools.md`).
+  wait"), and the task goes on with what does not hang on it. It does not mean the whole suite. Reason: one that
+  starts on a broken `main` cannot tell its own faults from those it inherited.
+- A session that stops mid-task commits and writes its hand-off note (`tasks/tools.md`).
 - A builder session that no orchestrator started, and the orchestrator on every wake, first checks whether the core
   has moved (`core/scripts/core-moved.mjs --dry`) and syncs it if so (`core/scripts/sync.mjs`, then each step and
   difference it reports), between tasks, a floor change at once (`tasks/planning.md`); where checks cost money, not on a day a sync PR was already opened. Then both read what reviews left after a merge (`tasks/reviews.md`, point 2).
@@ -57,8 +57,7 @@ The calls from a cloud session: `tasks/github-calls.md`.
   PRs, and nothing told one left out by the rule from one forgotten.
 - **Nothing waits silently:** above that line stands one that says what the PR waits on, `Waits on:`
   `nothing`, `a review`, `checks`, `#<n>` or `the owner: <the question, in one sentence>?`, with the label
-  `needs-owner` on the PR where it is the owner; its builder edits it whenever that changes. It does not mean a PR waits on the owner for
-  more than floor rule 14 names. Reason: a finished draft stood still and no one was shown it.
+  `needs-owner` on the PR where it is the owner; its builder edits it whenever that changes. Reason: a finished draft stood still and no one was shown it.
 - **Push after every commit,** even before the PR opens (a draft if not ready).
   - Before pushing to a branch whose PR you opened earlier, check whether it merged; if it did, start a new branch and
     PR.

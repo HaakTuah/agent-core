@@ -65,8 +65,7 @@ Read at the start of every task.
   4). Reason: a session can write "the owner said yes" as easily as quote it.
 - **The owner's words are kept once** (floor rule 11).
   - A session the owner works with quotes an instruction in the issue, PR or report that acts on it, and records
-    nothing more: never a bare yes, which it records as the owner's agreement to what it names, nor words addressed to
-    a session.
+    nothing more.
   - The design session (where the owner writes the rules; in a project with none, the session the owner gives a
     standing rule to) keeps those that become standing rules, dated, in the project's archive, or, where one holds for
     every project, as an item of the core's that names the issue holding them, and writes each rule where it applies;
