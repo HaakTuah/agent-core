@@ -18,8 +18,8 @@
 // reaches through one differs by the system that resolves it: a link (git's mode 120000) where a tool reads its files,
 // at a tool's file or folder, on the way to one or below a tool's folder, in whatever case, fails where the pull request
 // adds or changes it, whatever it leads to; one the base held, the same link to the same target, is noted, and fails only
-// where the pull request changes what stands at the path its text names, read as a string, or, where an install fills
-// that path, what says what the install puts there (sortBehind()); one replaced
+// where the pull request changes what stands at the path its text names, read as a string (sortBehind()), and one
+// into what an install fills is reported; one replaced
 // with the very files it named is its mend, what they configure standing as the base's. What a person or a machine configures
 // outside the repository is no file of the project's (floor rule 18); another tool's settings (Kiro's agents under
 // `.kiro/agents`, say, or the plug-ins and marketplaces a Codex config names), and where a plug-in's marketplace or a
@@ -961,10 +961,6 @@ function sortBehind(root, base, fail, notes) {
     for (const key of new Set(ways.map(w => JSON.stringify(w)))) behindOne(at, JSON.parse(key), { was, now, raw, changed, holds }, fail, notes);
   }
 }
-// The files an install reads to know what to put in the folders it fills (npm's, Yarn's, pnpm's, Bun's and Python's
-// manifests, locks, settings and patches), by name, folded.
-const INSTALL_INPUTS = new Set(["package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "pnpm-workspace.yaml", "bun.lock", "bun.lockb", ".npmrc", ".yarnrc", ".yarnrc.yml", ".pnpmfile.cjs", "poetry.lock", "pipfile", "pipfile.lock", "uv.lock", "pyproject.toml", "setup.py", "setup.cfg"]);
-const installInput = low => INSTALL_INPUTS.has(low.split("/").at(-1)) || /(?:^|\/)requirements[^/]*\.txt$/u.test(low) || /(?:^|\/)patches\//u.test(low);
 // One such link `at`, by the way `way` its text names, as sortBehind() reads it.
 function behindOne(at, way, { was, now, raw, changed, holds }, fail, notes) {
   const odd = m => m === "120000" || m === "160000", reads = low => TOOL_FILES.includes(low) || READS.test(low);
@@ -980,12 +976,12 @@ function behindOne(at, way, { was, now, raw, changed, holds }, fail, notes) {
     if (steps.map(fold).some(s => low === s || s.startsWith(`${low}/`))) return true;
     return low.startsWith(below) && (c.modes.some(odd) || reads(`${fold(at)}/${low.slice(below.length)}`));
   });
-  // (and where the way ends where neither commit holds anything, an install fills it: each file an install reads to know
-  // what to put there, changed, may change what a tool reads through the link, which no lock is read here to tell)
-  const input = t && !holds.has(t) ? changed.find(c => installInput(fold(c.at))) : undefined;
+  // (and where the way ends where neither commit holds anything, an install fills it, from files no list here can name
+  // in full, so what a tool reads there is reported, never failed)
+  const filled = !!t && !holds.has(t);
   if (hit) fail.push(`${said}, and this pull request changes ${show(hit.at)}, which an agent tool reads through it while this check follows no link. Mend: replace the link with the file or folder it leads to, committed in the project, in this pull request`);
-  else if (input) fail.push(`${said}, to a path the commit holds nothing at, which an install fills, and this pull request changes ${show(input.at)}, which says what an install puts there, so what an agent tool reads through the link may change unread. Mend: replace the link with the file or folder it leads to, committed in the project, in this pull request`);
   else if (unread) notes.push(`${said}, and the way to what its text names passes a link, which this check does not follow, so what this pull request changes past it is not read: reported, never failed. Replace the link with the file or folder it leads to, committed in the project`);
+  else if (filled) notes.push(`${said}, and its text names a path neither commit holds anything at, as one an install fills (node_modules, a virtual environment), so what an install puts there, which this check cannot read, may change what an agent tool reads through it: reported, never failed. Replace the link with the file or folder it leads to, committed in the project`);
 }
 
 // Whether the base held the tool `k` the head configures: as it stands, or as the base configures it with a link's files

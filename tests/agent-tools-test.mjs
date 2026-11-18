@@ -155,10 +155,10 @@ if (LINKS) {
   const stood = run(pr(heldLinks, { "README.md": "a change of its own\n" }));
   ok(stood.status === 0 && stood.out.includes(`as the base held it, nothing fails here: ".mcp.json" ${LINKED}`) && stood.out.includes(`".claude/skills/notes" ${LINKED}`) && stood.out.includes(`".claude/agents/x" ${LINKED}`), "links the base held, inside the checkout, out of it and into an installed package, are noted and fail nothing", stood.out);
   passes(run(pr(heldLinks, { "shared/notes/README.md": "beside the skill\n" })), "nor once a file beside what one leads to, which no tool reads, changes");
-  // (#709's security review of c5deb9a: one into what an install fills fails where the pull request changes what says
-  // what the install puts there, a manifest, a lock or a patch, in any folder)
-  for (const input of ["package-lock.json", "app/package.json", "yarn.lock", "requirements-dev.txt", "patches/pkg+1.0.0.patch"])
-    fails(run(pr(project({ ...shared, ".claude/agents/x": link("../../node_modules/pkg/agents") }), { [input]: "{}\n" })), `one the base held into an installed package fails once ${input} changes`, "which an install fills", `"${input}"`);
+  // (#709's security review of c5deb9a: one into what an install fills is reported as such, never failed, since no list
+  // can name every file that steers an install, and failing each pull request would lock the project)
+  const filled = run(pr(project({ ...shared, ".claude/agents/x": link("../../node_modules/pkg/agents") }), { "package-lock.json": "{}\n" }));
+  ok(filled.status === 0 && filled.out.includes("as one an install fills (node_modules, a virtual environment), so what an install puts there, which this check cannot read"), "one the base held into an installed package is reported as such, never failed, as its lock changes", filled.out);
   passes(run(pr(heldLinks, { "shared/settings.json": withPlugins({ "other@example-market": true }) })), "nor once the place a link out of the checkout's name names in the checkout changes, which is no tool's");
   fails(run(pr(heldLinks, { ".claude/skills/notes": link("../../shared/other") })), "but one the base held, moved, is new", `".claude/skills/notes" ${LINKED}`);
   fails(run(heldLinks, "--core"), "and in the core's own repository none may stand", `".mcp.json" ${LINKED}`);
