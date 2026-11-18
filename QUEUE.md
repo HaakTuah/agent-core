@@ -53,7 +53,6 @@ it merges last.
 | #469 | rule builder; it changes what every role reads at its start | |
 | #484, points 1 to 5 | rule builder | |
 | #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged; the file stays whole where #469's measure finds no kind of task reads less | #469 |
-| #471 | rule builder; it changes what the orchestrator reads at its start | |
 | #355 | builder | #530: the readers left go on the parser #529 brings |
 | #391 | builder; it overlaps #355 | #530, as #355 |
 | #542 | rule builder; it changes what the orchestrator reads at its start | #457 |

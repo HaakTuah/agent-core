@@ -53,7 +53,8 @@ import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from
 import { WAITS, waitsOn } from "./pr-description.mjs";
 import { pathIn } from "./reading.mjs";
 import { ownerOf } from "./releases.mjs";
-import { HOURS, openPulls, stalled } from "./stalled.mjs";
+import { progressOf } from "./done-when.mjs";
+import { HOURS, NOTICE, openPulls, stalled, standingStill } from "./stalled.mjs";
 import { started } from "./started.mjs";
 import { timeOf } from "./moment.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
@@ -71,6 +72,7 @@ export const TITLES = {
   labels: "Labels and openers to mend",
   missed: "The scheduled look missed a run",
   stale: "Packages gone stale",
+  still: "The work stands still",
 };
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
 // issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over
@@ -237,11 +239,27 @@ function reachOf(repo) {
   return got && typeof got === "object" && got.permissions ? asked(repo, got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
 }
 
-// The idle pull requests, through `add`: each lane with its checks, or why the pull requests could not be read.
-function idleFinding(repo, add) {
+// The work standing still (stalled.mjs's standingStill; #471): the *progress file* as the manifest's slot names it (the
+// core's AGENTS.md here), read from the checkout, and the open issues titled as the orchestrator's notice.
+function stillFinding(repo, manifest, pulls, add) {
+  try {
+    const slot = manifest ?? fs.readFileSync("AGENTS.md", "utf8"), file = progressOf(slot);
+    const queue = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+    const notices = ghApi(`search/issues?q=${encodeURIComponent(`repo:${repo} is:issue is:open in:title "${NOTICE}"`)}`, "--jq", ".items[].title").split("\n").filter(Boolean);
+    const free = standingStill({ queue, pulls, notices, now: Date.now() });
+    add(TITLES.still, free ? `The *progress file* (\`${file}\`) holds lines a session could take (${free.map(n => `#${n}`).join(", ")}), no pull request of this repository's own was pushed in the last day, and no issue titled "${NOTICE}" is open. Where builders are held back for usage, the orchestrator opens that issue, saying what is left, when the window opens again, which lines wait and the words that change it (\`roles/orchestrator.md\`, "Never held back in silence"); otherwise start a builder on the first of them. Close this issue once work goes on.` : null);
+  } catch {
+    add(TITLES.still, null, "the progress file or the open issues could not be read");
+  }
+}
+
+// The idle pull requests, through `add`: each lane with its checks, or why the pull requests could not be read; and
+// the work standing still, from the same pull requests.
+function idleFinding(repo, add, manifest = null) {
   try {
     const api = (route, jq) => ghApi(route, "--jq", jq);
-    const lanes = stalled(openPulls(repo, api), Date.now(), HOURS);
+    const pulls = openPulls(repo, api), lanes = stalled(pulls, Date.now(), HOURS);
+    stillFinding(repo, manifest, pulls, add);
     for (const l of lanes) {
       try { l.checks = checksOf(pagesOf(`repos/${repo}/commits/${l.sha}/check-runs`, (...a) => JSON.stringify(JSON.parse(ghApi(...a)).check_runs ?? [])), JSON.parse(ghApi(`repos/${repo}/commits/${l.sha}/status`))); }
       catch { l.checks = "not read (the token may not read checks and statuses)"; }
@@ -266,7 +284,7 @@ function findingsOf({ repo, manifest, owner, at }, reach, last) {
   const findings = [];
   const add = (title, what, unread = null) => findings.push({ title, what, unread });
   // pull requests that stand idle
-  idleFinding(repo, add);
+  idleFinding(repo, add, manifest);
   // steps of a release not done, in a project
   let stepsLeft = null;
   if (manifest !== null) {

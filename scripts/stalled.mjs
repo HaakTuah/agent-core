@@ -37,6 +37,19 @@ export function print(lanes, open, hours) {
 // The open pull requests of `repo`, through `api` (gh api's route and --jq, as main gives it), page by page, since a
 // cloud session's gh cannot follow pages by itself: each { number, title, ref, sha, own, draft, body, labels, at }, `at`
 // the time of its newest commit where its branch is in this repository. Also read by the scheduled look (look.mjs).
+// The work standing still (roles/orchestrator.md, "Never held back in silence"; #471): the lines of the *progress file*
+// a session could take (a row of a table that names an issue, waits on nothing, and is not the owner's or on hold),
+// where no pull request of the repository's own was pushed in the last `hours` (a day by default) and no issue titled
+// NOTICE is open, the orchestrator's word to the owner that it holds builders back. [issue numbers], or null where the
+// work goes on, a notice says why it does not, or no line could be taken.
+export const NOTICE = "Builders held back for usage";
+export function standingStill({ queue, pulls, notices, now, hours = 24 }) {
+  if (notices.some(t => String(t).startsWith(NOTICE))) return null;
+  if (pulls.some(p => p.own && p.at && now - Date.parse(p.at) < hours * 3600 * 1000)) return null;
+  const free = String(queue ?? "").split(/\r?\n/u).map(l => /^\|\s*#(\d{1,7})\b[^|]*\|([^|]*)\|\s*\|\s*$/u.exec(l)).filter(m => m && !/\bthe owner\b|\bon hold\b/iu.test(m[2])).map(m => Number(m[1]));
+  return free.length ? [...new Set(free)] : null;
+}
+
 export function openPulls(repo, api) {
   const pulls = [];
   for (let page = 1; page <= 50; page++) {

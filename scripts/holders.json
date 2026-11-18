@@ -27,6 +27,7 @@
       "check: scripts/versions.mjs, in part"
     ],
     "floor/topics/licences.md: 10. Licences: free to use, kept that way": "check: scripts/licences.mjs, in part",
+    "roles/orchestrator.md: Never held back in silence": "check: scripts/stalled.mjs, in part",
     "floor/topics/dependencies.md: 15. Dependencies": [
       "check: scripts/licences.mjs, in part",
       "check: scripts/agent-tools.mjs, in part"
@@ -205,6 +206,7 @@
     "floor/topics/input.md: A failure refuses": [227],
     "floor/topics/input.md: Every named input has hostile tests": [227],
     "floor/topics/licences.md: 10. Licences: free to use, kept that way": [41, 198, 201],
+    "roles/orchestrator.md: Never held back in silence": [257],
     "floor/topics/weaknesses.md": [164],
     "floor/topics/weaknesses.md: 9. Security alerts and reported weaknesses": [35],
     "floor/topics/weaknesses.md: In a PR's own change": [130],
@@ -220,8 +222,8 @@
     "roles/orchestrator.md: It asks the owner nothing": [133, 134, 137],
     "roles/orchestrator.md: It builds nothing itself": [27],
     "roles/orchestrator.md: On every wake": [42, 44, 124, 200],
-    "roles/orchestrator.md: The builders": [122, 154, 158, 162, 163, 169, 232, 248],
-    "roles/orchestrator.md: The pace is the owner's": [232],
+    "roles/orchestrator.md: The builders": [122, 154, 158, 162, 163, 169, 232, 248, 257],
+    "roles/orchestrator.md: The pace is the owner's": [232, 257],
     "roles/orchestrator.md: The scheduled look": [218],
     "roles/reviewer.md: It judges by what the change calls for": [234],
     "roles/shared/how-to-work.md": [17, 57],
@@ -376,6 +378,7 @@
     "tools/codex.md: On GitHub": [169]
   },
   "numbers": {
+    "roles/orchestrator.md: Never held back in silence": "correction: does not work; outcome: asked",
     "tasks/code-shape.md: A job a maintained package does is done by it": "findings; outcome: robust",
     "tasks/updates.md: Node": "correction: does not work; outcome: robust",
     "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",
