@@ -982,46 +982,79 @@ function reaches(root, rev, at, follow = false) {
 // an install fills whatever the commit holds there: an npm lock file's entry for the package, beside the node_modules
 // folder it lies in or in a folder above, as a workspace's root holds one (or, where the entry cannot be read back, that
 // file's whole text), and a yarn or pnpm lock file there whole; so a link the base held, through a package the pull
-// request locks at another version or source, is held by that too. Null where no lock file read here holds the package,
-// or one says it is taken from the project's own files or a patch of them, or bun's stands beside: none of that is read.
+// request locks at another version or source, is held by that too. Where no lock file read here holds the package, or
+// one takes it from the project's own files or a patch of them, or bun's stands beside, it is "unread": held instead by
+// the whole text of every file in those folders an install reads, and by all that each path of the project that lock
+// file names holds.
 const FROM_PROJECT = /(?:link|file|portal|workspace):|patch:(?![^\n]*~builtin<)|patchedDependencies/u;
+const INSTALL_READS = ["package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".yarnrc.yml", ".npmrc", ".pnpmfile.cjs", "bun.lock", "bun.lockb"];
 function lockOf(root, rev, at) {
-  const via = [], out = new Set(), r = walk(root, rev, at.split(path.sep).join("/"), via, true, [], true);
-  for (const v of new Set([...via, ...(r ? [r.f] : [])])) {
-    const cut = `/${v}`.lastIndexOf("/node_modules/");
-    if (cut < 0) continue;
+  const posix = at.split(path.sep).join("/"), via = [], out = new Set(), r = walk(root, rev, posix, via, true, [], true);
+  // (each name the walk passed beyond the commit, where it ended, and the link's own target read as a path, which a walk
+  // that meets a name the commit does not hold leaves unsaid)
+  const to = textAt(root, rev, posix), target = to === null ? [] : [path.posix.normalize(path.posix.join(path.posix.dirname(posix), to))];
+  for (const v of new Set([...via, ...(r ? [r.f] : []), ...target])) {
+    // (the last node_modules folder on the path, in whatever case, as a file system that ignores case reaches it)
+    const cut = [...`/${v}/`.matchAll(/\/node_modules\//giu)].at(-1)?.index ?? -1, rest = cut < 0 ? "" : v.slice(cut + "node_modules/".length);
+    if (!rest) continue;
     // (the installed package's folder, a scope's name and the package's)
-    const parts = v.slice(cut + "node_modules/".length).split("/"), name = parts.slice(0, parts[0].startsWith("@") ? 2 : 1).join("/");
-    const pkg = `${v.slice(0, cut + "node_modules/".length)}${name}`, entries = [];
-    for (let dir = v.slice(0, cut); ; dir = dir.includes("/") ? dir.slice(0, dir.lastIndexOf("/")) : "") {
-      const there = f => (dir ? `${dir}/${f}` : f), key = dir ? pkg.slice(dir.length + 1) : pkg;
-      if (["bun.lock", "bun.lockb"].some(f => textAt(root, rev, there(f)) !== null)) return null;
-      for (const lock of ["package-lock.json", "npm-shrinkwrap.json"]) {
-        const text = textAt(root, rev, there(lock));
-        let entry = null;
-        try { entry = JSON.parse(text ?? "null")?.packages?.[key] ?? null; if (entry?.link) return null; if (entry !== null) entry = JSON.stringify(entry); } catch { entry = `unreadable\0${text}`; }
-        if (entry !== null) entries.push(`${there(lock)}\0${key}\0${entry}`);
-      }
-      for (const lock of ["yarn.lock", "pnpm-lock.yaml"]) {
-        const text = textAt(root, rev, there(lock));
-        if (text !== null && FROM_PROJECT.test(text)) return null;
-        if (text !== null) entries.push(`${there(lock)}\0${text}`);
-      }
-      if (!dir) break;
-    }
-    if (!entries.length) return null;
-    entries.forEach(e => out.add(e));
+    const parts = rest.split("/"), pkg = `${v.slice(0, cut + "node_modules/".length)}${parts.slice(0, parts[0].startsWith("@") ? 2 : 1).join("/")}`;
+    const dirs = [];
+    for (let dir = v.slice(0, cut).replace(/\/$/u, ""); ; dir = dir.slice(0, Math.max(dir.lastIndexOf("/"), 0))) { dirs.push(dir); if (!dir) break; }
+    const found = dirs.map(dir => locksIn(root, rev, dir, dir ? pkg.slice(dir.length + 1) : pkg));
+    if (found.some(f => f.unread) || !found.some(f => f.entries.length)) {
+      const there = dir => f => (dir ? `${dir}/${f}` : f);
+      out.add(["unread", ...dirs.flatMap(dir => INSTALL_READS.map(there(dir)).map(f => `${f}\0${notFile(listing(root, rev), f) ? everything(root, rev, f) : textAt(root, rev, f)}`)), ...found.flatMap(f => f.from ?? []).map(f => everything(root, rev, f))].join("\0"));
+    } else found.forEach(f => f.entries.forEach(e => out.add(e)));
   }
   return [...out].sort().join("\0\0");
+}
+// The lock files in one folder, `dir`, as lockOf() reads them for the package at `key` below it: { entries }, or
+// { unread } where one is read as none here (bun's, one the commit holds as no plain file, one that takes the package
+// from the project's own files), with `from`, the paths of the project that lock file names.
+function locksIn(root, rev, dir, key) {
+  const l = listing(root, rev), there = f => (dir ? `${dir}/${f}` : f), entries = [];
+  if (["bun.lock", "bun.lockb"].some(f => textAt(root, rev, there(f)) !== null)) return { unread: true, entries };
+  // (a lock file the commit holds as a link gives git its target's name, not what the package manager reads)
+  if (["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml"].some(f => notFile(l, there(f)))) return { unread: true, entries };
+  for (const lock of ["package-lock.json", "npm-shrinkwrap.json"]) {
+    const entry = npmEntry(textAt(root, rev, there(lock)), key);
+    if (entry === undefined) return { unread: true, entries, from: named(root, rev, dir, textAt(root, rev, there(lock))) };
+    if (entry !== null) entries.push(`${there(lock)}\0${key}\0${entry}`);
+  }
+  for (const lock of ["yarn.lock", "pnpm-lock.yaml"]) {
+    const text = textAt(root, rev, there(lock));
+    if (text !== null && FROM_PROJECT.test(text)) return { unread: true, entries, from: named(root, rev, dir, text) };
+    if (text !== null) entries.push(`${there(lock)}\0${text}`);
+  }
+  return { entries };
+}
+// Each path of the project, from the folder `dir`, that a lock file's text names as a word, a folder, file or link the
+// commit holds, never the folder itself: every place an install may take a package from among them, and more.
+function named(root, rev, dir, text) {
+  const l = listing(root, rev), out = new Set();
+  for (const word of new Set(text.match(/[\w.@~+-][\w./@~+-]*/gu) ?? [])) {
+    const p = path.posix.normalize(path.posix.join(dir || ".", word)).replace(/\/$/u, "");
+    if (p !== "." && !p.startsWith("../") && p !== ".." && (l.dirs.has(p) || l.blobs.has(p) || l.linked.has(p))) out.add(p);
+  }
+  return [...out].sort();
+}
+// An npm lock file's entry for the package at `key`, written back; null where it holds none; undefined where it takes
+// the package from the project's own files; and where it cannot be read or written back, the file's whole text.
+function npmEntry(text, key) {
+  try {
+    const entry = JSON.parse(text ?? "null")?.packages?.[key] ?? null;
+    return entry?.link ? undefined : entry === null ? null : `entry\0${JSON.stringify(entry)}`;
+  } catch { return `unreadable\0${text}`; }
 }
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {
     let to = null;
     try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
-    const lock = base && to !== null ? lockOf(root, "HEAD", at) : "";
-    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at, true) === reaches(root, "HEAD", at, true) && lock !== null && lockOf(root, base, at) === lock) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
-    else if (lock === null) fail.push(`${said}, through an installed package that no lock file this check reads holds (package-lock.json or npm-shrinkwrap.json of npm 7 or later, yarn.lock, pnpm-lock.yaml, beside its node_modules or in a folder above). Mend: replace it with the file or folder itself, committed in the project, in this pull request; or lock the package in one of those files`);
+    const lock = to !== null ? lockOf(root, "HEAD", at) : "";
+    if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at, true) === reaches(root, "HEAD", at, true) && lockOf(root, base, at) === lock) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
+    else if (/(?:^|\0)unread\0/u.test(lock)) fail.push(`${said}, through an installed package that no lock file this check reads holds (package-lock.json or npm-shrinkwrap.json of npm 7 or later, yarn.lock, pnpm-lock.yaml, beside its node_modules or in a folder above). Mend: replace it with the file or folder itself, committed in the project, in this pull request; or lock the package in one of those files`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
   }
 }
