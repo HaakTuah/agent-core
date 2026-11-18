@@ -1,8 +1,8 @@
 # How code is put together
 
 Read when a system is designed, added or named, when code is ported or rewritten, when a pull
-request deletes a test or weakens one (#253), and before a session writes more than about 50 lines for one job (#486):
-the kinds `system`, `port` and `test`. How what already stands is brought
+request deletes a test or weakens one (#253), before a session writes more than about 50 lines for one job (#486),
+and when a bug is mended (#593): the kinds `system`, `port`, `test` and `bug`. How what already stands is brought
 to it: `tasks/cleaning.md`. What the tests cost, their time marks among it: `tasks/tests.md`.
 
 A **system** is a part of the code that someone can describe in a sentence: what it offers the others. A project names
@@ -138,10 +138,10 @@ one declared entrance.
   input itself, and its tests hold the kinds its writer listed. Where an authority can say the whole of what the part
   should have read (a build tool for what a build brings in, git for a rename, the host for a pull request's reviews),
   whoever makes the list above, or writes such a part anew, has the part's test run the part and the authority on the
-  same projects (in the core, those its upgrade test builds) and fail on any difference; where the authority can do the
-  reading itself, the part gives way to it as to any maintained tool (#534). It does not mean a comparison where nothing
-  defines the full set, which no check can read, nor one run on a project of another owner. Reason: kinds listed by
-  hand are as complete as their writer's memory.
+  same inputs (in the core, the projects its upgrade test builds) and fail on any difference; where the authority can
+  do the reading itself, whether the part gives way to it is weighed as for any maintained tool (#534). It does not
+  mean a comparison where nothing defines the full set, which no check can read, nor one run on a project of another
+  owner. Reason: kinds listed by hand are as complete as their writer's memory.
 
 **What has no mark here.** A hub, a file most others import: one that holds one small fact is as it should be, and
 the audit's reader judges the others. The time a user waits on gets its own measure as its rule comes (#318).
