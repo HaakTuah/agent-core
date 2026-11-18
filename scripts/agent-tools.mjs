@@ -129,7 +129,7 @@ export function configured(read, skills, files = () => [], linked = () => false)
   for (const name of plugins) add(`plugin ${name}`, canonical(["plugin", name, marketOf(name, markets)]));
   addServers(state, ".mcp.json", entries(".mcp.json", "mcpServers", json(".mcp.json")?.mcpServers, SERVERS), "");
   for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); readFrontmatter(state, `.claude/skills/${name}/SKILL.md`, read(`.claude/skills/${name}/SKILL.md`)); }
-  for (const name of files(".claude/agents").filter(n => n.endsWith(".md")).sort()) readFrontmatter(state, `.claude/agents/${name}`, read(`.claude/agents/${name}`));
+  for (const file of [...markdownUnder(files, ".claude/agents"), ...markdownUnder(files, ".claude/commands")]) readFrontmatter(state, file, read(file));
   readKiro(state, json, files);
   readCodex(state, json, read);
   return { tools, ids, problems, texts, baselined, sources, pins: pinsOf(plugins, markets, servers) };
@@ -319,8 +319,9 @@ function readHelper(state, file, key, value) {
   if (typeof value !== "string") return void state.flag(`${file}: "${key}" is no command. Mend: write it as one text, as Claude Code takes it`, file);
   addHook(state, file, { tool: "", event: key, matcher: "", hook: value, runs: true, text: value, commands: [value], setting: true });
 }
-// What no starter kit writes, given as a command so it is never read as the kit's form.
-const NO_KIT = "(no form of the starter kit's)";
+// What no starter kit writes, given as a command so it is never read as the kit's form, and its failure's mend.
+const NO_KIT = "(no form of the starter kit's)", NO_KIT_WHY = "is of a kind no starter kit writes";
+const NO_KIT_HOW = "take it out of the project's files, the owner setting it in the tool's own configuration on the machine where it is wanted; or move what it runs into a hook of .claude/settings.json in the starter kit's form";
 // A marketplace that runs a command by itself, to print the headers it is fetched with, or as a plug-in's source: read
 // whole, as a setting no starter kit writes, so one the pull request adds or changes is new.
 function readMarkets(state, file, settings) {
@@ -329,15 +330,22 @@ function readMarkets(state, file, settings) {
   const runs = v => Array.isArray(v) ? v.some(runs) : v && typeof v === "object" && Object.entries(v).some(([k, w]) => fold(k) === "headershelper" || (k === "source" && w === "command") || runs(w));
   for (const [name, m] of Object.entries(declared)) if (runs(m)) addHook(state, file, { tool: "", event: `extraKnownMarketplaces.${name}`, matcher: "", hook: m, runs: true, text: "a command it runs", commands: [NO_KIT], setting: true });
 }
-// The hooks a skill's or a subagent's frontmatter holds, which Claude Code runs while it runs: the whole frontmatter
-// read as a setting no starter kit writes, where any key in it is "hooks" in any case or written in a form this does not
-// read (a key quoted with an escape, a complex key), so one the pull request adds or changes is new.
+// What a skill's, a subagent's or a command's frontmatter may have Claude Code run: its hooks, and a subagent's tool
+// servers. The frontmatter is split from the file as Claude Code splits it, and held whole, as a setting no starter kit
+// writes, unless it is a plain mapping of simple keys at its top, none of them "hooks" or "mcpServers" in any case or
+// spelling, and no longer than FRONT_MAX: one in any other form may hold them in a way this check does not read.
+const FRONT = /^\uFEFF?---\s*\n([\s\S]*?)---\s*\n?/u, FRONT_MAX = 1 << 16, SIMPLE = /^([A-Za-z0-9_-]+):(?:[ \t].*)?$/u;
 function readFrontmatter(state, file, text) {
-  const front = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/u.exec(text ?? "")?.[1];
+  const front = FRONT.exec(text ?? "")?.[1];
   if (front === undefined) return;
-  const keys = [...front.matchAll(/(?:^|[\n{,[])[ \t]*(?:-[ \t]+)*("(?:[^"\\\n]|\\.)*"|'[^'\n]*'|[^\s:#{}[\],"'?][^:#{}[\],\n]*?)[ \t]*:(?=\s|$)/gu)].map(m => m[1]);
-  const hooks = keys.some(k => fold(k.replace(/^["']|["']$/gu, "").trim()) === "hooks" || (k.startsWith('"') && k.includes("\\"))) || /^[ \t]*\?(?:\s|$)/mu.test(front);
-  if (hooks) addHook(state, file, { tool: "", event: `${file} frontmatter`, matcher: "", hook: front, runs: true, text: "its hooks", commands: [NO_KIT], setting: true });
+  const lines = front.split(/\r?\n/u), top = lines.filter(l => l.trim() && !/^\s*#/u.test(l) && !/^\s/u.test(l));
+  const plain = front.length <= FRONT_MAX && !/^\s+\S/u.test(lines.find(l => l.trim() && !/^\s*#/u.test(l)) ?? "") && top.every(l => SIMPLE.test(l));
+  const runs = top.some(l => ["hooks", "mcpservers"].includes(fold(SIMPLE.exec(l)?.[1] ?? "").replace(/[_-]/gu, "")));
+  if (!plain || runs) addHook(state, file, { tool: "", event: `${file} frontmatter`, matcher: "", hook: front, runs: true, text: "what it may run", commands: [NO_KIT], setting: true });
+}
+// The Markdown files under a folder of Claude Code's, its subfolders' among them, a few deep, as it finds them.
+function markdownUnder(files, dir, depth = 0) {
+  return files(dir).sort().flatMap(n => (/\.md$/iu.test(n) ? [`${dir}/${n}`] : depth < 8 ? markdownUnder(files, `${dir}/${n}`, depth + 1) : []));
 }
 function readCommands(state, file, settings) {
   for (const key of COMMANDS) {
@@ -355,6 +363,7 @@ function readCommands(state, file, settings) {
 function readSource(state, name, commands) {
   for (const command of commands) {
     const at = fetchedBy(command);
+    if (command === NO_KIT) return void state.sources.set(name, NO_KIT_WHY);
     if (at === null) return void state.sources.set(name, "is not in the starter kit's form");
     if (state.linked(at)) return void state.sources.set(name, `fetches ${show(at)} from main, which the project holds as no plain file (a link, a folder or a submodule), so main gives no script but what git prints of it`);
   }
@@ -520,7 +529,7 @@ function sourcesOf(head, list, file, problems) {
   for (const [k, why] of head.sources ?? []) {
     const said = `${describe(k)}, configured in ${head.tools.get(k)}, ${why}, so nothing shows that it runs its copy on main, where floor rule 3 has what an agent tool starts by itself run from its copy on main, and not the working tree's, which the branch it runs on can change`;
     if (list?.from?.has(k)) marked.push([k, said]);
-    else sources.push([k, `${said}. Mend: ${HOW}, in this pull request`]);
+    else sources.push([k, `${said}. Mend: ${why === NO_KIT_WHY ? NO_KIT_HOW : HOW}, in this pull request`]);
   }
   for (const k of list?.from ?? []) if (head.tools.has(k) && !head.sources?.has(k)) problems.push(`${file}: "agentTools" says of ${describe(k)} "from": ${show(TREE)}, but its command is the starter kit's form, which runs its copy on main. Mend: take "from" out of its entry, in this pull request`);
   return { sources, marked };
@@ -682,7 +691,7 @@ function shownNotBlob(root, rev, at) {
 const fold = name => name.normalize("NFC").toUpperCase().toLowerCase().normalize("NFC");
 // The tools' files this check reads, and their folders, as each tool names them.
 const TOOL_FILES = [".claude/settings.json", ".claude/settings.local.json", ".mcp.json", ".kiro/settings/mcp.json", ".codex/hooks.json", ".codex/config.toml"];
-const TOOL_FOLDERS = [".claude/skills/", ".claude/agents/", ".kiro/hooks/"];
+const TOOL_FOLDERS = [".claude/skills/", ".claude/agents/", ".claude/commands/", ".kiro/hooks/"];
 // Each step on the way to a tool's file or folder (.codex, .kiro/settings, .claude/skills and the files themselves).
 const WAYS = new Set([...TOOL_FILES, ...TOOL_FOLDERS.map(d => d.slice(0, -1))].flatMap(f => f.split("/").map((_, i, parts) => parts.slice(0, i + 1).join("/"))));
 // Each path of `paths`, or step on its way, a folder or a link among them, that names one of those in another case, and
@@ -697,7 +706,7 @@ function misnamed(paths) {
       if (WAYS.has(low) && step !== low) { out.set(step, low); break; }
     }
     if (path.posix.dirname(at) === ".kiro/hooks" && /\.json$/iu.test(at) && !at.endsWith(".json")) out.set(at, at.replace(/\.json$/iu, ".json"));
-    if (path.posix.dirname(at) === ".claude/agents" && /\.md$/iu.test(at) && !at.endsWith(".md")) out.set(at, at.replace(/\.md$/iu, ".md"));
+    if (/^\.claude\/(?:agents|commands)\//u.test(at) && /\.md$/iu.test(at) && !at.endsWith(".md")) out.set(at, at.replace(/\.md$/iu, ".md"));
     if (parts.length === 4 && at.startsWith(".claude/skills/") && fold(parts[3]) === "skill.md" && parts[3] !== "SKILL.md") out.set(at, `${parts.slice(0, 3).join("/")}/SKILL.md`);
   }
   return [...out];
@@ -726,7 +735,9 @@ function through(at, want, holds, names, typeOf) {
   // skill's folder itself where it is neither a file nor a folder, by what stands there, a link's target or a
   // submodule's commit)
   const folders = TOOL_FOLDERS.filter(d => under(d.slice(0, -1))).flatMap(d => found(at, d.slice(want.length, -1)).flatMap(dir => typeOf(dir) !== "tree" ? text(d, dir) : names(dir).sort().flatMap(n => {
-    const reads = d !== ".claude/skills/" ? ((d === ".kiro/hooks/" ? /\.json$/iu : /\.md$/iu).test(n) ? [`${dir}/${n}`] : []) : [...(["blob", "tree"].includes(typeOf(`${dir}/${n}`)) ? [] : [`${dir}/${n}`]), ...found(`${dir}/${n}`, "SKILL.md")];
+    // (a Markdown file of Claude Code's agents or commands at any depth, as it finds them)
+    const md = (p, depth) => (typeOf(p) === "tree" && depth < 8 ? names(p).sort().flatMap(m => md(`${p}/${m}`, depth + 1)) : /\.md$/iu.test(p) ? [p] : []);
+    const reads = d === ".kiro/hooks/" ? (/\.json$/iu.test(n) ? [`${dir}/${n}`] : []) : d !== ".claude/skills/" ? md(`${dir}/${n}`, 0) : [...(["blob", "tree"].includes(typeOf(`${dir}/${n}`)) ? [] : [`${dir}/${n}`]), ...found(`${dir}/${n}`, "SKILL.md")];
     return reads.flatMap(a => text(`${d}${n}`, a));
   })));
   return [at, holds(at), ...files, ...folders, ...[...stops].sort().flatMap(a => text("on the way", a)), ...[...plain].sort().map(a => `a file on the way\0${a}`)].join("\0\0");
@@ -734,20 +745,23 @@ function through(at, want, holds, names, typeOf) {
 // The entries on the way to a tool's file, in whatever case they stand: each one the walk reaches as no folder, whose
 // name folded is a step of WAYS or lies in a tool folder, a few deep, found through `names`, so a link inside the
 // checkout is followed as the rest of the check follows it.
-const READS = /^(?:\.kiro\/hooks\/[^/]+\.json|\.claude\/agents\/[^/]+\.md|\.claude\/skills\/[^/]+\/skill\.md)$/u, SKILL_DIR = /^\.claude\/skills\/[^/]+$/u;
+const MD_DIR = /^\.claude\/(?:agents|commands)\//u;
+const READS = /^(?:\.kiro\/hooks\/[^/]+\.json|\.claude\/(?:agents|commands)\/(?:[^/]+\/)*[^/]+\.md|\.claude\/skills\/[^/]+\/skill\.md)$/u, SKILL_DIR = /^\.claude\/skills\/[^/]+$/u;
+// Whether a path, folded, is looked at: a step of WAYS, and, in a tool folder, only what the tool reads there, a skill's
+// folder on its way, or a folder of agents or commands at any depth.
+const looked = (low, inFolder) => (inFolder ? READS.test(low) || SKILL_DIR.test(low) || MD_DIR.test(low) : WAYS.has(low));
 function toolPaths(names, typeOf) {
   const out = [], folders = TOOL_FOLDERS.map(d => d.slice(0, -1));
   const visit = (at, depth) => {
     for (const n of names(at || ".")) {
       const p = at ? `${at}/${n}` : n, low = fold(p), inFolder = folders.some(d => low.startsWith(`${d}/`));
-      // (nor, in a tool folder, a path that is neither what the tool reads nor a skill's folder on its way: never looked at)
-      if ((!WAYS.has(low) && !inFolder) || (inFolder && !READS.test(low) && !SKILL_DIR.test(low))) continue;
+      if (!looked(low, inFolder)) continue;
       // (whatever the walk reaches that is no folder is named, a file, a link that leads nowhere or out, a submodule's
       // entry; in a tool folder, only what the tool reads there, a hook file, a skill's SKILL.md, and a skill's folder
       // that is neither a folder nor a file, through which the tool may read a SKILL.md this check cannot)
       const type = typeOf(p), folder = type === "tree";
       if (!folder && (!inFolder || READS.test(low) || (SKILL_DIR.test(low) && type !== "blob"))) out.push(p);
-      if (folder && depth < 4) visit(p, depth + 1);
+      if (folder && depth < 10) visit(p, depth + 1);
     }
   };
   visit("", 0);
@@ -978,16 +992,14 @@ function reaches(root, rev, at, follow = false) {
   const skill = SKILL_DIR.test(want) ? names(posix).filter(n => fold(n) === "skill.md").sort().map(n => holds(`${posix}/${n}`)) : [];
   return [through(posix, want, holds, names, f => resolve(f)?.type), ...skill].join("\0\0");
 }
-// What the lock files say of each package a link's path passes through, a path with a node_modules folder on it, which
-// an install fills whatever the commit holds there: an npm lock file's entry for the package, beside the node_modules
-// folder it lies in or in a folder above, as a workspace's root holds one (or, where the entry cannot be read back, that
-// file's whole text), and a yarn or pnpm lock file there whole; so a link the base held, through a package the pull
-// request locks at another version or source, is held by that too. Where no lock file read here holds the package, or
-// one takes it from the project's own files or a patch of them, or bun's stands beside, it is "unread": held instead by
-// the whole text of every file in those folders an install reads, and by all that each path of the project that lock
-// file names holds.
-const FROM_PROJECT = /(?:link|file|portal|workspace):|patch:(?![^\n]*~builtin<)|patchedDependencies/u;
-const INSTALL_READS = ["package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".yarnrc.yml", ".npmrc", ".pnpmfile.cjs", "bun.lock", "bun.lockb"];
+// What an install reads for each path a link passes through with a node_modules folder on it, which an install fills
+// whatever the commit holds there: the whole text of each file of INSTALL_READS in the folder that holds that
+// node_modules and in each folder above it, as a workspace's root holds them, and all that each folder of the project
+// they take a package from holds (FROM, and an npm lock file's "link" entries, by their "resolved"; the root itself is
+// never one, nor a path outside it), and a folder of patches; so a link the base held is noted only while all of that
+// stands. "" where no node_modules folder is on its way.
+const INSTALL_READS = ["package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".yarnrc.yml", ".yarnrc", ".npmrc", ".pnpmfile.cjs", "bun.lock", "bun.lockb"];
+const FROM = /(?:link|file|portal|workspace):([^"'\n,}\]#]+)/gu, PATCHES = ["patches", ".yarn/patches"];
 function lockOf(root, rev, at) {
   const posix = at.split(path.sep).join("/"), via = [], out = new Set(), r = walk(root, rev, posix, via, true, [], true);
   // (each name the walk passed beyond the commit, where it ended, and the link's own target read as a path, which a walk
@@ -995,57 +1007,34 @@ function lockOf(root, rev, at) {
   const to = textAt(root, rev, posix), target = to === null ? [] : [path.posix.normalize(path.posix.join(path.posix.dirname(posix), to))];
   for (const v of new Set([...via, ...(r ? [r.f] : []), ...target])) {
     // (the last node_modules folder on the path, in whatever case, as a file system that ignores case reaches it)
-    const cut = [...`/${v}/`.matchAll(/\/node_modules\//giu)].at(-1)?.index ?? -1, rest = cut < 0 ? "" : v.slice(cut + "node_modules/".length);
-    if (!rest) continue;
-    // (the installed package's folder, a scope's name and the package's)
-    const parts = rest.split("/"), pkg = `${v.slice(0, cut + "node_modules/".length)}${parts.slice(0, parts[0].startsWith("@") ? 2 : 1).join("/")}`;
-    const dirs = [];
-    for (let dir = v.slice(0, cut).replace(/\/$/u, ""); ; dir = dir.slice(0, Math.max(dir.lastIndexOf("/"), 0))) { dirs.push(dir); if (!dir) break; }
-    const found = dirs.map(dir => locksIn(root, rev, dir, dir ? pkg.slice(dir.length + 1) : pkg));
-    if (found.some(f => f.unread) || !found.some(f => f.entries.length)) {
-      const there = dir => f => (dir ? `${dir}/${f}` : f);
-      out.add(["unread", ...dirs.flatMap(dir => INSTALL_READS.map(there(dir)).map(f => `${f}\0${notFile(listing(root, rev), f) ? everything(root, rev, f) : textAt(root, rev, f)}`)), ...found.flatMap(f => f.from ?? []).map(f => everything(root, rev, f))].join("\0"));
-    } else found.forEach(f => f.entries.forEach(e => out.add(e)));
+    const cut = [...`/${v}/`.matchAll(/\/node_modules\//giu)].at(-1)?.index ?? -1;
+    if (cut < 0) continue;
+    for (let dir = v.slice(0, cut).replace(/\/$/u, ""); ; dir = dir.slice(0, Math.max(dir.lastIndexOf("/"), 0))) {
+      installRead(root, rev, dir).forEach(e => out.add(e));
+      if (!dir) break;
+    }
   }
   return [...out].sort().join("\0\0");
 }
-// The lock files in one folder, `dir`, as lockOf() reads them for the package at `key` below it: { entries }, or
-// { unread } where one is read as none here (bun's, one the commit holds as no plain file, one that takes the package
-// from the project's own files), with `from`, the paths of the project that lock file names.
-function locksIn(root, rev, dir, key) {
-  const l = listing(root, rev), there = f => (dir ? `${dir}/${f}` : f), entries = [];
-  if (["bun.lock", "bun.lockb"].some(f => textAt(root, rev, there(f)) !== null)) return { unread: true, entries };
-  // (a lock file the commit holds as a link gives git its target's name, not what the package manager reads)
-  if (["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml"].some(f => notFile(l, there(f)))) return { unread: true, entries };
-  for (const lock of ["package-lock.json", "npm-shrinkwrap.json"]) {
-    const entry = npmEntry(textAt(root, rev, there(lock)), key);
-    if (entry === undefined) return { unread: true, entries, from: named(root, rev, dir, textAt(root, rev, there(lock))) };
-    if (entry !== null) entries.push(`${there(lock)}\0${key}\0${entry}`);
+// What an install reads in one folder, `dir`, for lockOf(): each file of INSTALL_READS whole, or all a path holds where
+// the commit holds it as no plain file, and all that each folder of the project its files take a package from holds.
+function installRead(root, rev, dir) {
+  const l = listing(root, rev), there = f => (dir ? `${dir}/${f}` : f), out = [];
+  const held = f => (notFile(l, f) ? `${f}\0${everything(root, rev, f)}` : `${f}\0${textAt(root, rev, f)}`);
+  const from = new Set(PATCHES.map(there));
+  for (const f of INSTALL_READS) {
+    out.push(held(there(f)));
+    const text = textAt(root, rev, there(f)) ?? "";
+    for (const m of text.matchAll(FROM)) from.add(path.posix.normalize(path.posix.join(dir || ".", m[1].trim())));
+    if (/^(?:package-lock|npm-shrinkwrap)\.json$/u.test(f)) for (const resolved of npmLinks(text)) from.add(path.posix.normalize(path.posix.join(dir || ".", resolved)));
   }
-  for (const lock of ["yarn.lock", "pnpm-lock.yaml"]) {
-    const text = textAt(root, rev, there(lock));
-    if (text !== null && FROM_PROJECT.test(text)) return { unread: true, entries, from: named(root, rev, dir, text) };
-    if (text !== null) entries.push(`${there(lock)}\0${text}`);
-  }
-  return { entries };
+  for (const p of [...from].sort()) if (p !== "." && p !== ".." && !p.startsWith("../") && !path.posix.isAbsolute(p)) out.push(`from ${p}\0${everything(root, rev, p)}`);
+  return out;
 }
-// Each path of the project, from the folder `dir`, that a lock file's text names as a word, a folder, file or link the
-// commit holds, never the folder itself: every place an install may take a package from among them, and more.
-function named(root, rev, dir, text) {
-  const l = listing(root, rev), out = new Set();
-  for (const word of new Set(text.match(/[\w.@~+-][\w./@~+-]*/gu) ?? [])) {
-    const p = path.posix.normalize(path.posix.join(dir || ".", word)).replace(/\/$/u, "");
-    if (p !== "." && !p.startsWith("../") && p !== ".." && (l.dirs.has(p) || l.blobs.has(p) || l.linked.has(p))) out.add(p);
-  }
-  return [...out].sort();
-}
-// An npm lock file's entry for the package at `key`, written back; null where it holds none; undefined where it takes
-// the package from the project's own files; and where it cannot be read or written back, the file's whole text.
-function npmEntry(text, key) {
-  try {
-    const entry = JSON.parse(text ?? "null")?.packages?.[key] ?? null;
-    return entry?.link ? undefined : entry === null ? null : `entry\0${JSON.stringify(entry)}`;
-  } catch { return `unreadable\0${text}`; }
+// The "resolved" of each entry an npm lock file's text marks as a link to a folder of the project; none where it
+// cannot be read, its whole text being held all the same.
+function npmLinks(text) {
+  try { return Object.values(JSON.parse(text)?.packages ?? {}).filter(e => e?.link && typeof e.resolved === "string").map(e => e.resolved); } catch { return []; }
 }
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {
@@ -1054,7 +1043,7 @@ function sortLinks(root, base, links, fail, notes) {
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
     const lock = to !== null ? lockOf(root, "HEAD", at) : "";
     if (base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && reaches(root, base, at, true) === reaches(root, "HEAD", at, true) && lockOf(root, base, at) === lock) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
-    else if (/(?:^|\0)unread\0/u.test(lock)) fail.push(`${said}, through an installed package that no lock file this check reads holds (package-lock.json or npm-shrinkwrap.json of npm 7 or later, yarn.lock, pnpm-lock.yaml, beside its node_modules or in a folder above). Mend: replace it with the file or folder itself, committed in the project, in this pull request; or lock the package in one of those files`);
+    else if (lock) fail.push(`${said}, through a node_modules folder an install fills, whose files this check does not read. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
     else fail.push(`${said}. Mend: replace it with the file or folder itself, committed in the project, in this pull request`);
   }
 }
