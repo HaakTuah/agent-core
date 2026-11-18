@@ -19,10 +19,10 @@ const SAVED = "// A saved sum, by its name: the text of sums/<name>, or null whe
 const SERVE = "// Serves the saved sums to the household: node src/serve.mjs, then http://<this machine>:8080/?name=<a saved sum>\nimport http from \"node:http\";\nimport { savedSum } from \"./saved.mjs\";\n\nhttp.createServer((req, res) => {\n  const text = savedSum(new URL(req.url, \"http://here\").searchParams.get(\"name\") ?? \"\");\n  if (text === null) { res.writeHead(404); res.end(\"no such sum\\n\"); return; }\n  res.end(text);\n}).listen(8080);\n";
 const TEST = "import assert from \"node:assert/strict\";\nimport { savedSum } from \"../src/saved.mjs\";\nassert.equal(savedSum(\"groceries\"), \"12\\n\");\nassert.equal(savedSum(\"no-such-sum\"), null);\nconsole.log(\"ok saved\");\n";
 
-// How the weakness is made to happen: the input that climbs out of the folder, in any spelling (twice in a row, or
-// encoded; one plain climb is how a module imports its neighbour, ../saved.mjs, and says nothing), a name that climbs,
-// and what it reaches.
-const HOW = [/(?:\.\.(?:[/\\]|%2f|%5c)){2}/i, /\.\.(?:%2f|%5c)/i, /%2e%2e/i, /passwd/i, /\/etc\//i, /[?&]name=[^\s&]*\.\./i, /\.ssh\b/i];
+// How the weakness is made to happen: the input that climbs out of the folder, in any spelling (twice in a row,
+// encoded, or once to anything but a module file: one climb to a module, ../saved.mjs, is how code imports its
+// neighbour, and says nothing), a name that climbs, and what it reaches.
+const HOW = [/(?:\.\.(?:[/\\]|%2f|%5c)){2}/i, /\.\.[/\\](?![\w./-]*\.(?:m?js|cjs|ts)\b)[\w.-]/i, /\.\.(?:%2f|%5c)/i, /%2e%2e/i, /passwd/i, /\/etc\//i, /[?&]name=[^\s&]*\.\./i, /\.ssh\b/i];
 // Which kind it is, which a public issue or comment leaves out (it says only that one exists and the part it touches).
 const KIND = [/travers/i, /\bdot[- ]?dot\b/i, /outside (?:of )?(?:the|its) (?:sums'? )?(?:folder|directory)/i];
 const REPORTS = /^repos\/([^/]+)\/([^/]+)\/security-advisories\/reports$/;

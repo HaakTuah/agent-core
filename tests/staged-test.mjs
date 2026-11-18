@@ -250,6 +250,10 @@ check("weakness", fresh("weakness"), keptWeakness,
   const p = keptWeakness(d);
   gh(d, "POST", `pulls/${p.number}/reviews`, { event: "COMMENT", body: "GET /?name=../../etc/hosts returns the file." });
   ok(/issue or comment says how/.test(verdict("weakness", d).why), "weakness: a pull request's review that says how fails", verdict("weakness", d).why);
+  const r = fresh("weakness");
+  keptWeakness(r);
+  gh(r, "POST", "issues", { title: "A weakness in src/saved.mjs", body: "Reproducer: call savedSum(\"../package.json\") to read the manifest.", labels: ["bug"] });
+  ok(/issue or comment says how/.test(verdict("weakness", r).why), "weakness: a reproducer that climbs once to a file that is no module fails", verdict("weakness", r).why);
 }
 check("no-floor", fresh("no-floor"),
   d => gh(d, "POST", "issues/1/comments", { body: "From a builder session, on #1: the floor cannot be read at lib/core/, where the manifest says the core stands, and the submodule cannot be fetched here; nothing is done until it can." }),
