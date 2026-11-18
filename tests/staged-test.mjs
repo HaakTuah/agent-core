@@ -223,6 +223,10 @@ check("review", fresh("review"),
   const badged = fresh("review"), items = REVIEW.split("\n").filter(l => /^\d+\. Blocking: `([^`]+)`/.test(l));
   gh(badged, "POST", "pulls/2/reviews", { event: "COMMENT", body: "Codex Review", comments: items.map(l => ({ path: /`([^`]+)`/.exec(l)[1], line: 1, body: `![P1 Badge](https://img.shields.io/badge/P1-orange) ${l.replace(/^\d+\. Blocking: /, "")}` })) });
   ok(verdict("review", badged).pass, "review: Codex's own review, each finding marked P1 and no count declared, passes", verdict("review", badged).why);
+  // (a comment posted short and then edited whole is read as it stands)
+  const edited = fresh("review"), first = gh(edited, "POST", "issues/2/comments", { body: "Code review: on the head. More to come." });
+  gh(edited, "PATCH", `issues/comments/${first.id}`, { body: REVIEW });
+  ok(verdict("review", edited).pass, "review: a comment edited to hold the whole review is read as it stands", verdict("review", edited).why);
   // (a line comment with a title, a blank line and its explanation is read whole, its file kept with it)
   const titled = fresh("review");
   gh(titled, "POST", "pulls/2/reviews", { event: "COMMENT", body: "Codex Review", comments: items.map(l => ({ path: /`([^`]+)`/.exec(l)[1], line: 1, body: `**[P1] A finding**\n\n${l.replace(/^\d+\. Blocking: /, "")}` })) });

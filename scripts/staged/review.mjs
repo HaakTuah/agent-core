@@ -127,15 +127,19 @@ export function set(dir, opts = {}) {
   return paths;
 }
 
-// All the session wrote on pull request #2, as the calls hold them, in the units a finding is read in: each paragraph or
-// item of a comment's or a review's body, and each line comment whole, its file before it, whatever paragraphs it has.
+// All the session wrote on pull request #2, in the units a finding is read in: each paragraph or item of a comment's
+// or a review's body, and each line comment whole, its file before it, whatever paragraphs it has. Its comments are
+// read as they stand now, an edit included; its reviews and line comments, which the stand-in keeps only in its calls,
+// from every call that wrote one.
 export function posted(dir) {
-  const calls = github(dir).calls.filter(c => c.method !== "GET" && /^(?:repos\/[^/]+\/[^/]+\/)?(?:issues\/2\/comments|pulls\/2\/(?:reviews|comments)(?:\/.*)?)$/.test(String(c.route ?? "").replace(/^\/+/, "")));
+  const g = github(dir);
+  const calls = g.calls.filter(c => c.method !== "GET" && /^(?:repos\/[^/]+\/[^/]+\/)?pulls\/2\/(?:reviews|comments)(?:\/.*)?$/.test(String(c.route ?? "").replace(/^\/+/, "")));
   const split = text => String(text ?? "").split(/\n\s*\n|\n(?=\s*(?:[-*]|\d+\.)\s)/).filter(p => p.trim());
-  return calls.flatMap(c => [
+  const comments = g.comments.filter(c => c.issue === 2 && c.user?.login === OWNER && c.created_at > at0);
+  return [...comments.flatMap(c => split(c.body)), ...calls.flatMap(c => [
     ...(c.body?.path ? [`${c.body.path}: ${c.body?.body ?? ""}`] : split(c.body?.body)),
     ...(Array.isArray(c.body?.comments) ? c.body.comments.map(x => `${x.path ?? ""}: ${x.body ?? ""}`) : []),
-  ]);
+  ])];
 }
 
 export function read(dir) {
