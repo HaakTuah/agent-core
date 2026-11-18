@@ -1,7 +1,7 @@
 // The state report (roles/orchestrator.md, "The scheduled look"; core archive 218): once a month the scheduled look
 // (look.mjs, beside this file) opens it, in the core and in every project that takes it. It reports and asks nothing
 // (floor rule 14): led by the five outcomes and what the work cost (outcomes.mjs, beside this file; #302), each measure that keeps a baseline against the last report, in the core the rules of the floor and
-// the modules by what holds them, those with none listed (holders.mjs, beside this file), whether the rules' pruning is
+// the modules by what holds them, and in a project its own rules (#662), those with none listed (holders.mjs, beside this file), whether the rules' pruning is
 // due (pruning.mjs, beside this file; #303), which rules each role cited in
 // the month before (cited.mjs, beside this file), what the look keeps open past a week, and the step that files a check
 // for each rule the reviews found twice and the step that adds the rounds of review the pull requests took (#477), both
@@ -103,8 +103,8 @@ const heldNow = () => { try { return holdersReport(); } catch { return null; } }
 
 // The report's text. `core`: whether this is the core's own repository; `previous`: the last report's text, or null;
 // `overdue`: [{ number, title, since }]; `counts` (a project): { pin, behind, steps, merged } as readCounts gives them;
-// `holders` (the core): the lines holders.mjs gives, the rules of the floor and the modules by what holds them, read
-// here where left out, and null where they could not be read; `cited`: the lines cited.mjs gives for the month before,
+// `holders`: the lines holders.mjs gives, in the core the rules of the floor and the modules by what holds them, read
+// here where left out, and in a project its own rules (--own; #662), and null where they could not be read; `cited`: the lines cited.mjs gives for the month before,
 // null where they were not counted; `outcomes`: the lines outcomes-read.mjs gives for the month before, which the report
 // leads with (#302), null where they were not read; `pruning` (the core): the lines pruning.mjs gives for `month`.
 export function body({ core, month, measures, shape: shaped = null, wait = null, previous, overdue, counts = null, holders = core ? heldNow() : null, cited = null, outcomes = null, pruning = core ? pruningSaid({ month }) : null, scripts }) {
@@ -119,7 +119,7 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
     "",
     "**The rules, by what holds them**",
     ...(holders ?? [core ? "- Not read: `scripts/holders.mjs` could not read them, so the report leaves them out rather than guess."
-      : "- The core's rules, in the core's own report; this project's own rules are not counted."]),
+      : `- Not read: \`${scripts}/holders.mjs --own\` could not read this project's own rules, so the report leaves them out rather than guess.`]),
     ...(pruning ? ["", "**The pruning of the rules**", ...pruning] : []),
     "",
     `**${CITED}**`,

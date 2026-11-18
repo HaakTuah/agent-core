@@ -118,6 +118,8 @@ ok([core, proj0()].every(r => r.includes("**The rounds of review**\n- Not read b
   "each report names the step that adds the rounds of review, the median beside the last report's and the five that took the most (#477)", core);
 ok(core.includes("**The pruning of the rules**\n- ") && /node scripts\/pruning\.mjs/.test(core) && !proj0().includes("pruning") && body({ core: true, month: "2026-11", measures: null, previous: null, overdue: [], pruning: ["- Not due: x."], scripts: "scripts" }).includes("**The pruning of the rules**\n- Not due: x."),
   "the core's report, and only the core's, says whether the rules' pruning is due (#303)", core);
+ok(/- Not read: `core\/scripts\/holders\.mjs --own` could not read this project's own rules/.test(proj0()) && body({ core: false, month: "2026-11", measures: null, previous: null, overdue: [], holders: ["- Of 2 rules of the project's own: x.", "- No holder, worst first: y."], scripts: "core/scripts" }).includes("**The rules, by what holds them**\n- Of 2 rules of the project's own: x.\n- No holder, worst first: y."),
+  "a project's report lists its own rules by what holds them, those with none, and says where they could not be read (#662)");
 function proj0() { return body({ core: false, month: "2026-11", measures: null, previous: null, overdue: [], counts: null, scripts: "core/scripts" }); }
 const proj = body({ core: false, month: "2026-11", measures: { at: "checks/copies-baseline.json", count: 4 }, previous: "**x**\n- copies: 6 old copies", overdue: [{ number: 7, title: "Steps of a release not done", since: "2026-11-01T05:41:00Z" }],
   counts: { pin: "a".repeat(40), behind: 3, steps: 2, merged: { all: 4, sync: 1, upkeep: 1, update: 0, own: 2 } }, scripts: "core/scripts" });

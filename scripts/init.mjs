@@ -82,7 +82,7 @@ export const FILES = [
   ["workflows/nuget.yml.tmpl", ".github/workflows/nuget.yml", o => o.nuget !== undefined && !o.private],
 ];
 // What the script makes itself, beside the templates' files: none of these may exist either.
-const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "core"];
+const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "checks/holders.json", "core"];
 // What a builder's session reads at its start in a project the kit writes at any commit, as the kit's own entry files
 // there name it: the files of READ that are the project's own, each file of the core its AGENTS.md and CLAUDE.md pull
 // in on a line of its own, and the part for every tool but Claude beside Claude's: the reading-size check's marks. For
@@ -240,12 +240,14 @@ export function licences(o, has) {
 }
 
 // The first baselines of the copies check and the shape check: what stands today, which each reads from the files git
-// knows of, so the kit's own are added first.
+// knows of, so the kit's own are added first; and the first list of what holds the project's own rules (#662).
 function firstBaselines(here) {
   for (const check of ["copies", "shape"]) {
     execFileSync(process.execPath, [`core/scripts/${check}.mjs`, `checks/${check}.json`, "--first"], { cwd: here, env: guarded(), stdio: ["ignore", "ignore", "inherit"] });
     git(["add", "--", `checks/${check}-baseline.json`], here, guarded());
   }
+  execFileSync(process.execPath, ["core/scripts/holders.mjs", "--own", "--write"], { cwd: here, env: guarded(), stdio: ["ignore", "ignore", "inherit"] });
+  git(["add", "--", "checks/holders.json"], here, guarded());
 }
 
 // The project the kit is run in, held to what the kit writes into: the root of its git repository, not the core, a
@@ -303,7 +305,7 @@ function writeKit(o, here, pin, out) {
 
 // What the kit wrote, and what it leaves for the project and for the owner.
 function sayLeft(o, pin, out) {
-  console.log(`The starter kit is written: ${out.length + 4} files (the last four checks/sizes.json, checks/licences.json, checks/copies-baseline.json and checks/shape-baseline.json), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
+  console.log(`The starter kit is written: ${out.length + 5} files (the last five checks/sizes.json, checks/licences.json, checks/copies-baseline.json, checks/shape-baseline.json and checks/holders.json), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
   const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
   console.log(`\nLeft for the project, each marked FILL IN:\n${open.join("\n")}`);
   console.log(`  checks/copies.json: "code", the project's own code as git pathspecs, once it has any`);

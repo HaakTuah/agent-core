@@ -57,6 +57,7 @@ import { HOURS, openPulls, stalled } from "./stalled.mjs";
 import { started } from "./started.mjs";
 import { timeOf } from "./moment.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
+import { ownReport } from "./holders.mjs";
 import { before as monthBefore, copies, monthOf, pushWait, readCounts, shape, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
 import { notDone, report as stepsReport } from "./steps.mjs";
 
@@ -72,6 +73,9 @@ export const TITLES = {
   missed: "The scheduled look missed a run",
   stale: "Packages gone stale",
 };
+// A project's own rules by what holds them, as holders.mjs --own reads them (#662); null where it cannot.
+const ownHeld = scripts => { try { return ownReport(process.cwd(), scripts); } catch { return null; } };
+
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
 // issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over
 // the choices that are hard to undo and a sign of theirs that has tripped (choices.mjs); and the cleaning and the audit
@@ -300,7 +304,7 @@ function monthlyOf({ repo, manifest, at, scripts }, reach, kept, stepsLeft) {
     const overdue = [...kept.entries()].filter(([t, i]) => i.state === "open" && t !== RECORD && !t.startsWith(`${REPORT}, `) && hoursBetween(i.created_at, at) > 7 * 24)
       .map(([t, i]) => ({ number: i.number, title: t, since: reopenedSince(repo, i) })).filter(o => hoursBetween(o.since, at) > 7 * 24);
     const counts = manifest === null ? null : readCounts({ repo, manifest, month, steps: stepsLeft }), last = previous?.body ?? null;
-    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: last, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), outcomes: outcomesReport({ repo, month: monthBefore(month), manifest, previous: last }), scripts });
+    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: last, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), outcomes: outcomesReport({ repo, month: monthBefore(month), manifest, previous: last }), ...(manifest === null ? {} : { holders: ownHeld(scripts) }), scripts });
   }
   return { reportTitle, reportFile, monthly };
 }

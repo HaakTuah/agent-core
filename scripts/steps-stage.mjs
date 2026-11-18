@@ -319,6 +319,15 @@ export const STAGES = {
       write(dir, file, `${(fs.existsSync(at(dir, file)) ? read(dir, file) : "# Choices\n").replace(/\n*$/, "\n")}\n## Choice: the project's foundations, judged again as if written today\n\n- Looked for: none the list lacked, in the registry and on the web.\n- The blind pick: the same stack.\n- The judgment: it stands; staying is the answer.\n- The suggestion: #1\n- Reopens it: a need in numbers the stack misses.\n`);
     },
   },
+  "18 November 2026, a project's own rules and what holds them": {
+    asked: true,
+    // (a project with no list of what holds its own rules; the mend runs the command the step words, which writes it)
+    stage: dir => fs.rmSync(at(dir, "checks/holders.json"), { force: true }),
+    mend: dir => {
+      const r = spawnSync(process.execPath, ["core/scripts/holders.mjs", "--own", "--write"], { cwd: dir, encoding: "utf8" });
+      if (r.status !== 0) throw new Error(`holders.mjs --own --write: ${r.stderr}`);
+    },
+  },
   "17 November 2026, the packages the copy carries": {
     // (a suite of the project's own that runs on a change to its code or to the core's scripts, and not on one to the
     // packages they run; the mend adds that folder to its filter)

@@ -1,5 +1,5 @@
 // Tests rules.mjs (what counts as a rule, and its text), holders.mjs (what holds each, the archive's items behind each,
-// and what it fails) and archive.mjs (the archive's two forms in step), on
+// and what it fails; and, with --own, a project's own rules, which fail nothing: #662) and archive.mjs (the archive's two forms in step), on
 // rule files and holders written in a scratch folder, and on the core's own. Its tests workflow runs it on every pull
 // request here. Node's own modules.
 //
@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { inStep } from "../scripts/archive.mjs";
-import { counts, holders, report } from "../scripts/holders.mjs";
+import { OWN, counts, holders, ownHolders, ownReport, report } from "../scripts/holders.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { fingerprint, rules, rulesOf } from "../scripts/rules.mjs";
 
@@ -113,11 +113,44 @@ ok(numbersBad.wrong.length === 2 && numbersBad.wrong.some(w => w.includes("\"num
 ok(own.status === 0 && !own.stderr, "the core's own holders.json names only rules that stand, and checks that are there", own.stderr);
 const failing = project({ "tasks/x.md: Gone": "audit" });
 fs.mkdirSync(path.join(failing, "scripts", "staged"));
-for (const f of ["archive.mjs", "holders.mjs", "rules.mjs", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
+for (const f of ["archive.mjs", "guards.mjs", "holders.mjs", "rule-files.mjs", "rules.mjs", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
 fs.writeFileSync(path.join(failing, "scripts", "staged.mjs"), "export const CASES = [];\n");
 fs.writeFileSync(path.join(failing, "scripts", "outcomes.mjs"), "export const NUMBER = /^$/u;\n");
 const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.mjs")], { encoding: "utf8" });
 ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`), "where holders.json is wrong the check fails, each failure saying its mend", `${run.stdout}${run.stderr}`);
+
+// ---- a project's own rules (#662) ----
+// (a scratch project: its AGENTS.md with one rule held and one not, the file it pulls in, its SECURITY.md with the rule
+// file it adds, and a copy of the core whose rules are none of its own)
+const proj = fs.mkdtempSync(path.join(tmp, "own-"));
+const put = (f, t) => { fs.mkdirSync(path.dirname(path.join(proj, f)), { recursive: true }); fs.writeFileSync(path.join(proj, f), t); };
+put("AGENTS.md", "# A game\n\n@core/floor/security.md\n@docs/play.md\n\n- **Each computer player keeps its style.** A test plays each.\n- **Name things plainly.** Words.\n");
+put("docs/play.md", "# Play\n\n- **A turn ends on a move.** Rules of play.\n");
+put("SECURITY.md", "# Security\n\n3. **The protected files,** besides:\n   - **the rule files:** `docs/design.md`;\n");
+put("docs/design.md", "# Design\n\n**Saves are small.** Read on need.\n");
+put("core/floor/security.md", "# The floor\n\n**1. Nothing secret.** The core's.\n");
+put("tests/style.test.js", "");
+const ownCli = (...a) => spawnSync(process.execPath, [path.join(root, "scripts", "holders.mjs"), "--own", ...a], { cwd: proj, encoding: "utf8" });
+const unlisted = ownHolders(proj);
+ok(JSON.stringify(unlisted.rules.map(r => r.key).sort()) === JSON.stringify(["AGENTS.md: Each computer player keeps its style", "AGENTS.md: Name things plainly", "SECURITY.md: The protected files", "SECURITY.md: the rule files", "docs/design.md: Saves are small", "docs/play.md: A turn ends on a move"]) && !unlisted.list
+  && unlisted.start.has("docs/play.md: A turn ends on a move") && !unlisted.start.has("docs/design.md: Saves are small"),
+  "a project's own rules are those of its rule files, what its AGENTS.md pulls in and what its SECURITY.md adds, none of the core's copy; those pulled in are read at the start", unlisted.rules.map(r => r.key).join("; "));
+let r2 = ownCli("--write");
+const written = JSON.parse(fs.readFileSync(path.join(proj, OWN), "utf8")).holders;
+ok(r2.status === 0 && Object.keys(written).length === 6 && Object.values(written).every(v => v === "none") && /6 have no holder/.test(r2.stdout),
+  "--write writes the first list, each rule named as held by none, and fails nothing", `${r2.stdout}${r2.stderr}`);
+fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { ...written, "AGENTS.md: Each computer player keeps its style": "check: tests/style.test.js", "docs/design.md: Saves are small": "check: tests/saves.test.js", "AGENTS.md: Gone": "audit" } }));
+const held = ownHolders(proj), lines = ownReport(proj);
+ok(counts(held).check === 1 && counts(held).none.length === 5 && held.wrong.length === 2 && held.wrong.every(w => /Mend: /.test(w)),
+  "the list names one rule's check, which is there; one that is not there, and a rule that is gone, are wrong, each with its mend", held.wrong.join("\n"));
+const listed = lines.find(l => l.startsWith("- No holder")) ?? "";
+ok(/^- Of 6 rules of the project's own .*: 1 held whole by a check, .* 5 have no holder/.test(lines[0]) && listed.indexOf("docs/play.md: A turn ends on a move") < listed.indexOf("docs/design.md: Saves are small") && !listed.includes("Each computer player") && lines.filter(l => /Mend: /.test(l)).length === 2,
+  "the report's lines: the counts, the rules with no holder, those read at a session's start first, and each wrong line of the list", lines.join("\n"));
+r2 = ownCli();
+ok(r2.status === 0 && /No holder/.test(r2.stdout), "--own fails nothing, a wrong list included", `${r2.stdout}${r2.stderr}`);
+r2 = ownCli("--write");
+const kept = JSON.parse(fs.readFileSync(path.join(proj, OWN), "utf8")).holders;
+ok(r2.status === 0 && kept["AGENTS.md: Each computer player keeps its style"] === "check: tests/style.test.js" && kept["AGENTS.md: Name things plainly"] === "none", "--write again keeps what the list names", JSON.stringify(kept));
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);

@@ -9,15 +9,25 @@
 // rule file, an item that is not in the archive, a pointer to the archive ("core archive N") written in a rule file
 // itself, and the archive's two forms out of step (archive.mjs, beside this file). And the number each rule names
 // ("numbers" in holders.json; #303): it fails a key that is no rule, and a number in no form outcomes.mjs's NUMBER reads.
-// The core's own repository alone; its tests workflow runs it on every pull request here. Node's own modules only.
+// The core's own repository alone; its tests workflow runs it on every pull request here. In a project, --own reads the
+// project's own rules the same way (#662): those of the rule files its sessions read, as the project's own files name
+// them (floor rule 3's, with what its SECURITY.md adds, and the files its AGENTS.md and CLAUDE.md pull in by an "@" line,
+// none of the core's copy), against its list OWN, which names for each its check, test, simulation or script, "audit",
+// "describes" or "none". It fails nothing there, a wrong entry of the list included: the project's monthly state report
+// lists each rule with no holder, those read at a session's start first, and its sessions work them down as tasks.
+// Node's own modules only.
 //
-//   node scripts/holders.mjs          the counts, and each wrong entry with its mend
-//   node scripts/holders.mjs --list   the counts, and each rule with no holder
+//   node scripts/holders.mjs                     the counts, and each wrong entry with its mend
+//   node scripts/holders.mjs --list              the counts, and each rule with no holder
+//   node core/scripts/holders.mjs --own          from a project's root: its own rules' counts, and each with no holder
+//   node core/scripts/holders.mjs --own --write  the same, after writing OWN: each rule it does not name added as "none"
 import fs from "node:fs";
 import path from "node:path";
 import { inStep, items } from "./archive.mjs";
+import { inProject, leadsOut } from "./guards.mjs";
 import { NUMBER } from "./outcomes.mjs";
-import { FOLDERS, ROOT, rules } from "./rules.mjs";
+import { FLOOR, ruleFiles } from "./rule-files.mjs";
+import { FOLDERS, ROOT, rules, rulesOf } from "./rules.mjs";
 import { started } from "./started.mjs";
 import { CASES } from "./staged.mjs";
 
@@ -28,11 +38,12 @@ export const HOOKS = new Set(["scripts/work-saved.sh", "scripts/helper-call.mjs"
 const hook = x => x.kind === "check" && HOOKS.has(x.by);
 
 // One holder as holders.json names it for the rule `key`: { kind, by, part }, or the line of what is wrong, with its mend.
-function holderOf(key, value, root) {
+// `file` and `paths`: the list it stands in, and the names of a check that are paths to read as there or not.
+function holderOf(key, value, root, file = FILE, paths = /^(?:scripts|\.github|setup|floor|roles|tasks|tools)\//u) {
   const m = FORM.exec(String(value));
-  if (!m) return `${FILE}: "${key}" has the holder "${value}", in no form it reads. Mend: write "check: <its script, workflow or GitHub's setting>", "audit" or "describes", each with ", in part" where it holds only some of the rule; a staged case names its rules in its own file`;
+  if (!m) return `${file}: "${key}" has the holder "${value}", in no form it reads. Mend: write "check: <its script, workflow or GitHub's setting>", "audit" or "describes", each with ", in part" where it holds only some of the rule${file === FILE ? "; a staged case names its rules in its own file" : ', or "none" where nothing holds it'}`;
   const kind = m[1] ?? m[3] ?? m[4], what = m[2] ?? "";
-  if (kind === "check" && /^(?:scripts|\.github|setup|floor|roles|tasks|tools)\//u.test(what) && !fs.existsSync(path.join(root, what))) return `${FILE}: "${key}" is held by ${what}, which is not there. Mend: name the check as it now stands, or take the holder out`;
+  if (kind === "check" && paths.test(what) && (!inProject(what) || !fs.existsSync(path.join(root, what)))) return `${file}: "${key}" is held by ${what}, which is not there. Mend: name the check as it now stands, or take the holder out`;
   return { kind, by: what, part: Boolean(m[5]) };
 }
 
@@ -120,7 +131,74 @@ export function report(root = ROOT) {
   ];
 }
 
-if (started(import.meta.url)) {
+// ---- a project's own rules (#662) ----
+export const OWN = "checks/holders.json";
+// (a check's name that is a path of the project: a file name with its extension, or one with a folder)
+const OWN_PATHS = /^(?:[\w.@-]+\/)+[\w.@-]+$|^[\w-]+\.\w+$/u;
+
+// The project's own rule files under `root`: [{ file, start }], `start` where a session reads it at its start (its
+// AGENTS.md and CLAUDE.md, and the files they pull in by an "@" line); and `read`, a file's text or null.
+export function ownFiles(root) {
+  const read = f => { try { const at = path.join(root, f); return inProject(f) && !leadsOut(root, at) && fs.statSync(at).isFile() ? fs.readFileSync(at, "utf8") : null; } catch { return null; } };
+  const mine = f => !/^core(?:\/|$)/u.test(path.posix.normalize(f)) && read(f) !== null;
+  const pulled = ["AGENTS.md", "CLAUDE.md"].flatMap(f => [...(read(f) ?? "").matchAll(/^@(\S+\.md)[ \t]*\r?$/gmu)].map(m => path.posix.normalize(m[1])));
+  let listed;
+  try { listed = ruleFiles(read, () => []); } catch { listed = FLOOR; }
+  const start = new Set(["AGENTS.md", "CLAUDE.md", ...pulled]);
+  return { files: [...new Set([...listed, ...pulled])].filter(mine).map(file => ({ file, start: start.has(file) })), read };
+}
+
+// The project's own rules and what its list names for each, as holders() gives the core's: { rules, by, wrong, start,
+// list }, `start` the keys of the rules read at a session's start, `list` whether OWN stands, `wrong` each line of the
+// list that is wrong, with its mend.
+export function ownHolders(root = process.cwd()) {
+  const { files, read } = ownFiles(root), all = files.flatMap(f => rulesOf(f.file, read(f.file)));
+  const start = new Set(all.filter(r => files.find(f => f.file === r.file).start).map(r => r.key));
+  const by = new Map(all.map(r => [r.key, []])), wrong = [], text = read(OWN);
+  let named = {};
+  if (text !== null) {
+    try { named = JSON.parse(text).holders ?? {}; if (typeof named !== "object" || Array.isArray(named)) throw new Error('its "holders" is no object'); }
+    catch (e) { named = {}; wrong.push(`${OWN} cannot be read (${String(e.message).split("\n")[0]}). Mend: write it as JSON, its "holders" an object keyed by each rule's file and lead`); }
+  }
+  for (const [key, value] of Object.entries(named)) {
+    if (!by.has(key)) { wrong.push(`${OWN} names "${key}", which is no rule of the project's own rule files as they stand. Mend: write the key as the rule's file and bold lead now read, or take it out where the rule has gone`); continue; }
+    for (const v of (Array.isArray(value) ? value : [value]).filter(v => v !== "none")) {
+      const h = holderOf(key, v, root, OWN, OWN_PATHS);
+      if (typeof h === "string") wrong.push(h); else by.get(key).push(h);
+    }
+  }
+  return { rules: all, by, wrong, start, list: text !== null };
+}
+
+// The lines a project's state report carries: its own rules by what holds them, those with none worst first (read at a
+// session's start before those read on need), and each wrong line of its list; `scripts`: where the core's scripts are.
+export function ownReport(root = process.cwd(), scripts = "core/scripts") {
+  const h = ownHolders(root), c = counts(h), files = [...new Set(h.rules.map(r => r.file))];
+  if (!h.rules.length) return ["- The project's own rule files hold no rule with a bold lead, so none is counted."];
+  const none = [...c.none.filter(k => h.start.has(k)), ...c.none.filter(k => !h.start.has(k))];
+  return [
+    `- Of ${c.all} rules of the project's own (${files.map(f => `\`${f}\``).join(", ")}): ${c.check} held whole by a check, ${c.audit} by the audit, ${c.part} in part; ${c.describes} describe and bind no one; ${c.none.length} have no holder (\`node ${scripts}/holders.mjs --own\`, its list \`${OWN}\`${h.list ? "" : ", not written yet"}).`,
+    ...(none.length ? [`- No holder, worst first (read at a session's start, then on need), each a task at the dose: a check where one can read its breach exactly, named in \`${OWN}\`; a move to where it is read on need; or a proposal that it goes, which is the owner's to decide. Where its file is a copy made from elsewhere, the change goes to whoever writes that source. Nothing fails meanwhile: ${none.join("; ")}.`] : []),
+    ...h.wrong.map(w => `- ${w}.`),
+  ];
+}
+
+// Writes OWN: each rule of the project's own it does not name yet added as "none", what it names kept.
+export function writeOwn(root = process.cwd()) {
+  const h = ownHolders(root), at = path.join(root, OWN);
+  if (leadsOut(root, at)) throw new Error(`${OWN} leads out of the project. Mend: take out the link on its way, then run it again`);
+  let j = {};
+  if (fs.existsSync(at)) { try { j = JSON.parse(fs.readFileSync(at, "utf8")); } catch (e) { throw new Error(`${OWN} cannot be read (${String(e.message).split("\n")[0]}). Mend: write it as JSON, or take it out and run this again`); } }
+  const named = j.holders && typeof j.holders === "object" && !Array.isArray(j.holders) ? j.holders : {};
+  for (const r of h.rules) named[r.key] ??= "none";
+  fs.mkdirSync(path.dirname(at), { recursive: true });
+  fs.writeFileSync(at, `${JSON.stringify({ ...j, holders: named }, null, 2)}\n`);
+}
+
+if (started(import.meta.url) && process.argv.includes("--own")) {
+  if (process.argv.includes("--write")) { try { writeOwn(); } catch (e) { console.error(`FAIL ${e.message}`); process.exitCode = 1; } }
+  console.log(ownReport().map(l => l.slice(2)).join("\n"));
+} else if (started(import.meta.url)) {
   const h = holders();
   const lines = report().map(l => l.slice(2));
   console.log(process.argv.includes("--list") ? lines.join("\n") : lines[0]);
