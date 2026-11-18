@@ -14,6 +14,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { npmrcOthers } from "./packages.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const windows = process.platform === "win32";
@@ -28,7 +29,7 @@ export const REGISTRIES = {
 };
 
 // What keeps an install from running where it could reach past the core's own files: for npm's registry, a shrinkwrap
-// beside the lock file, which its program reads first; an .npmrc that names another registry, or a host's settings; and an install folder
+// beside the lock file, which its program reads first; an .npmrc with any line but the core's own two settings; and an install folder
 // that is a link, or holds what git tracks, which the install would empty. Each as the failure's words with its mend; null
 // where none stands.
 function refusal(lock, into) {
@@ -37,7 +38,8 @@ function refusal(lock, into) {
   if (fs.existsSync(at("npm-shrinkwrap.json"))) return `${at("npm-shrinkwrap.json")} stands beside the lock file, and would be installed from in its place. Mend: take it out; the core's packages are named in package-lock.json alone`;
   let npmrc = "";
   try { npmrc = fs.readFileSync(at(".npmrc"), "utf8"); } catch { /* (none: npm's own registry) */ }
-  if (/^\s*(?:(?:@[^\s:=]+:)?registry|\/\/[^\s=]*:[^\s=]+)\s*=/mu.test(npmrc)) return `${at(".npmrc")} names a registry, or a registry host's settings, so the install would fetch from another registry than the lock file names. Mend: take that line out`;
+  const others = npmrcOthers(npmrc);
+  if (others.length) return `${at(".npmrc")} holds ${others.length === 1 ? "a line" : `${others.length} lines`} beside the core's own two settings (the first: ${JSON.stringify(others[0].slice(0, 80))}), which npm would read: a registry, a host's token, a proxy or a certificate would send the install elsewhere. Mend: take ${others.length === 1 ? "that line" : "those lines"} out; the core's .npmrc holds ignore-scripts=true and min-release-age alone`;
   const folder = at(into.replace(/\/$/u, "")); // (no "/" after it, which would read the link's target)
   if (fs.lstatSync(folder, { throwIfNoEntry: false })?.isSymbolicLink()) return `${folder} is a link, which the install would empty. Mend: remove the link, then run this again`;
   let tracked = "";

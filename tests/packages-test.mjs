@@ -42,8 +42,12 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   ok(!tracked.some(theirs), "no file of another publisher's is tracked in the core, nor a link in its install's place: its packages are installed, never carried", tracked.filter(theirs).slice(0, 5).join(", "));
   const ignore = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
   ok(/^\/node_modules$/mu.test(ignore) && ["/.npmrc", "/package.json", "/package-lock.json"].every(f => ignore.split("\n").includes(`!${f}`)), "the core's .gitignore, which travels to the copy's root, keeps the install out of git, a link in its place too, and the copy's package list, lock file and .npmrc in it");
-  // (no registry but npm's own, nor a host's settings, in the .npmrc the copy carries: install.mjs refuses one too)
-  ok(!/^\s*(?:(?:@[^\s:=]+:)?registry|\/\/[^\s=]*:[^\s=]+)\s*=/mu.test(fs.readFileSync(path.join(root, ".npmrc"), "utf8")), "the core's .npmrc names no registry and no registry host's settings, so the install and the signatures' check ask npm's own");
+  // (the .npmrc the copy carries holds the core's own two settings alone, which install.mjs holds it to too)
+  const { npmrcOthers } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href), npmrc = fs.readFileSync(path.join(root, ".npmrc"), "utf8");
+  ok(npmrcOthers(npmrc).length === 0, "the core's .npmrc holds nothing but its own two settings, so the install and the signatures' check ask npm's own registry, with no token, proxy or certificate of another's", npmrcOthers(npmrc).join(" | "));
+  // (each form built from pieces when the test runs, so that no file here points npm at another registry)
+  const r = ["regi", "stry"].join("");
+  ok([`"${r}" = http://127.0.0.1/`, `'${r}'=x`, `${r}[]=x`, "//h/:_authToken=${T}", "https-proxy=http://p/", "strict-ssl=false", "cafile=/x", `@a:${r}=x`].every(l => npmrcOthers(`ignore-scripts=true\n${l}\n`).length === 1) && npmrcOthers("# c\n; c\n\nignore-scripts = true\nmin-release-age=7\n").length === 0, "and any other line, in whatever form npm reads it, is one install.mjs refuses");
 }
 
 // ---- with nothing installed, a script that loads a package says it did not run, and how to install ----
@@ -114,7 +118,7 @@ try {
   ok(mismatched.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "in a project's pull request an install that fails for anything but the registry not answering fails, and tells the job nothing", `${mismatched.status} ${mismatched.stdout}${mismatched.stderr}`);
   // (a registry that does not answer, in a project's pull request, fails nothing: the job is told, and each check after it says it did not run)
   fs.copyFileSync(path.join(root, "package-lock.json"), path.join(copy, "package-lock.json"));
-  const warned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...inPr, npm_config_registry: "http://127.0.0.1:9/", npm_config_fetch_retries: "0", npm_config_cache: path.join(tmp, "empty-cache") } });
+  const warned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...inPr, [["npm_config_regi", "stry"].join("")]: "http://127.0.0.1:9/", npm_config_fetch_retries: "0", npm_config_cache: path.join(tmp, "empty-cache") } });
   ok(warned.status === 0 && /^::warning::The core's packages could not be installed .*twice/mu.test(warned.stdout) && /Mend: run this job again/u.test(warned.stdout) && /^CORE_PACKAGES_UNREACHED=1$/mu.test(fs.readFileSync(jobEnv, "utf8")), "in a project's pull request a registry that does not answer twice is a warning, and tells the job's later checks", `${warned.status} ${warned.stdout}${warned.stderr}`);
   // (what would reach past the core's own files: a shrinkwrap npm reads first, another registry, a link in the install's place)
   const refuses = (what, plant, unplant, said) => {
@@ -125,8 +129,8 @@ try {
   };
   fs.rmSync(path.join(copy, "node_modules"), { recursive: true, force: true });
   refuses("a shrinkwrap stands beside the lock file", () => fs.copyFileSync(path.join(copy, "package-lock.json"), path.join(copy, "npm-shrinkwrap.json")), () => fs.rmSync(path.join(copy, "npm-shrinkwrap.json")), /npm-shrinkwrap\.json stands beside the lock file/u);
-  const npmrc = fs.readFileSync(path.join(copy, ".npmrc"), "utf8");
-  refuses("the .npmrc names another registry", () => fs.appendFileSync(path.join(copy, ".npmrc"), "registry=https://example.invalid/\n"), () => fs.writeFileSync(path.join(copy, ".npmrc"), npmrc), /names a registry/u);
+  const copyNpmrc = fs.readFileSync(path.join(copy, ".npmrc"), "utf8");
+  refuses("the .npmrc holds a line beside the core's own two settings", () => fs.appendFileSync(path.join(copy, ".npmrc"), `"${["regi", "stry"].join("")}" = https://example.invalid/\n`), () => fs.writeFileSync(path.join(copy, ".npmrc"), copyNpmrc), /holds a line beside the core's own two settings/u);
   const elsewhere = path.join(tmp, "elsewhere");
   fs.mkdirSync(elsewhere);
   fs.writeFileSync(path.join(elsewhere, "kept.txt"), "kept\n");

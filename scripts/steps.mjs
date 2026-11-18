@@ -542,6 +542,8 @@ const plainAction = (st, job, w) => Object.keys(st.env).length === 0 && visible(
 // Whether a job runs in a container of its own, or beside service containers, which may mount its folder: it runs as
 // they are given, their env and options too, so nothing counts there.
 const boxedJob = job => job?.container !== undefined || job?.services !== undefined;
+// Whether a step runs whenever its job reaches it: no `if:` and no continue-on-error of its own.
+const unconditioned = st => st?.if === undefined && !st?.["continue-on-error"];
 // A step of a job as the step reads it: its commands, whether its one lookup counts, its action and its env.
 function stepOf(st, job, w, started) {
   const cmds = typeof st?.run === "string" ? commands(st.run) : [];
@@ -551,7 +553,7 @@ function stepOf(st, job, w, started) {
   const counts = started && cmds.length === 1 && alone && stops && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"];
   const env = st?.env && typeof st.env === "object" ? st.env : {};
   const boxed = boxedJob(job);
-  return { cmds, counts, unconditioned: st?.if === undefined && !st?.["continue-on-error"], hidden: boxed || hides(st, env, job, w), plain: !boxed && typeof st?.uses === "string" && plainAction({ ...st, env }, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
+  return { cmds, counts, unconditioned: unconditioned(st), hidden: boxed || hides(st, env, job, w), plain: !boxed && typeof st?.uses === "string" && plainAction({ ...st, env }, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
 }
 
 // Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads
