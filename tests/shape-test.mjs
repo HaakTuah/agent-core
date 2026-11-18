@@ -131,6 +131,12 @@ ok(same(changes, ["change: src/a.js: /^\\s*Ticket:\\x20[A-Z]+-\\d+/", "change: s
   && marked.entries.get("change: src/a.js: a change's heading").n.count === 2 && marked.entries.get("change: src/a.js: the task that changed it").n.count === 1 && marked.entries.get("change: src/a.js: a change's date").n.count === 1 && readerOf("change: src/a.js: a change's date", marked.readers) === "changes" && fileOf("change: src/a.js: what the code was") === "src/a.js"
   && groupOf("change: src/a.js: /^\\s*Ticket:\\x20[A-Z]+-\\d+/").group === "/^\\s*Ticket:\\x20[A-Z]+-\\d+/",
   "a comment line that marks a change is an entry of the reader \"changes\", counted by file and mark, in JavaScript, C# and Python, a mark of the config's too; a string, a line going on in small letters, a reason and a pointer to an issue are none", changes.join("\n"));
+// (a block comment of 300,000 lines, in JavaScript and C#, read whole and overflowing nothing; a file whose JSX the
+// reader cannot follow gives no marks, since what it would take for a comment may be the element's text)
+const tall = `/*\n * Changed: x\n${" * a line\n".repeat(300000)} */\nconst t = 1;\n`;
+const longMarked = survey({ "src/t.js": tall, "src/t.cs": `${tall.replace("const t = 1;", "class T {}")}`, "src/l.jsx": "const cast = <T>(x: T) => x;\nconst p = <p>// Changed: the text</p>;\n" }, cfg({}));
+ok(longMarked.entries.get("change: src/t.js: a change's heading")?.n.count === 1 && longMarked.entries.get("change: src/t.cs: a change's heading")?.n.count === 1 && !ids(longMarked).some(id => id.startsWith("change: src/l.jsx")),
+  "a block comment of 300,000 lines is read whole in JavaScript and C#, and a file whose JSX the reader cannot follow gives no marks", ids(longMarked).join("\n"));
 const changeSaid = verdict({ config: changeCfg, at: "c.json", self: "s", found: marked, baselineText: JSON.stringify({ reads: ["javascript", "jsx", "csharp", "python", "scripts", "screens", "changes"], listed: {} }) }).fail.flat().join("\n");
 ok(mended(changeSaid) && /comment lines? marks? what changed/.test(changeSaid) && /commit's message/.test(changeSaid), "a new comment that marks a change fails, its mend saying where the words go", changeSaid);
 const unread = verdict({ config: changeCfg, at: "c.json", self: "s", found: marked, baselineText: JSON.stringify({ reads: ["javascript", "jsx", "csharp", "python", "scripts", "screens"], listed: {} }) });

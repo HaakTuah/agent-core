@@ -10,7 +10,7 @@
 // An import is read with where it stands: in a def, it runs when the function is called (as a dynamic import does in
 // JavaScript), and under `if TYPE_CHECKING:` it takes types alone; neither makes a cycle.
 import path from "node:path";
-import { NEST } from "./code-shape.mjs";
+import { NEST, COMMENT_READ } from "./code-shape.mjs";
 
 // The standard library's modules, which lead to no file of the project and no package: Python 3.13's, with those that
 // earlier versions still hold.
@@ -101,7 +101,7 @@ class Lexer {
     if (c !== "#") return false;
     const from = this.i + 1;
     while (this.i < this.n && this.src[this.i] !== "\n") this.i++;
-    this.comments.push({ line: this.line, text: this.src.slice(from, this.i) });
+    this.comments.push({ line: this.line, text: this.src.slice(from, Math.min(this.i, from + COMMENT_READ)) });
     return true;
   }
 

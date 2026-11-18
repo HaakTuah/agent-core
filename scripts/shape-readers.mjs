@@ -65,7 +65,7 @@ function javascript(file, text) {
   const jsx = jsxIn(file), toks = tokens(text, jsx);
   const held = JSX_FILES.includes(path.posix.extname(file)) || toks.some(t => t.t === "jsx");
   const read = toks.lost ? tokens(text) : toks;
-  return { reader: held ? "jsx" : "javascript", toks: read, functions: toks.lost ? null : functions(toks), imports: imports(read), own: JS_OWN, lang: "javascript", comments: read.comments };
+  return { reader: held ? "jsx" : "javascript", toks: read, functions: toks.lost ? null : functions(toks), imports: imports(read), own: JS_OWN, lang: "javascript", comments: toks.lost ? [] : toks.comments };
 }
 
 // Each file of code as its reader reads it: { reader, toks, functions (null where they cannot be told), imports, own,

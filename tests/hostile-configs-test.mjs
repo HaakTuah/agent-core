@@ -87,6 +87,11 @@ const SHAPE = { baseline: "checks/shape-baseline.json", code: ["src/"] };
 for (const [c, what] of [["null", "null"], ["[]", "a list"], ["5", "a number"], ['"x"', "a string"], [{ ...SHAPE, code: "src/" }, "code that is no list"], [{ ...SHAPE, systems: [] }, "systems that is a list"],
   [{ ...SHAPE, select: { proof: "x" } }, "select.proof that is no list"]]) ok(mended(shape(c)), `shape.mjs: parseConfig refuses with its mend a config of the wrong type: ${what}`);
 ok(mended(shape("")) && mended(shape("{}")), "shape.mjs: parseConfig refuses with its mend an empty config, and one with no baseline");
+// (the marks of a change a project adds, #458: none whose work a comment could make slow, and none too long or too many)
+for (const [changes, what] of [[["^(a+)+$"], "a quantified group"], [["(a|a)*b"], "an alternation repeated"], [["(\\w)\\1+"], "a backreference"], [["a*b*c*d*e"], "four quantifiers"],
+  [["x".repeat(121)], "a pattern too long"], [Array.from({ length: 21 }, (_, i) => `Mark${i}:`), "too many patterns"], [["<b>Changed</b>:", "("], "markup beside a pattern that cannot be read"], [[7], "a pattern of the wrong type"]])
+  ok(mended(shape({ ...SHAPE, changes })), `shape.mjs: parseConfig refuses with its mend the marks of a change with ${what}`);
+ok(!shape({ ...SHAPE, changes: ["^\\s*Ticket: [A-Z]+-\\d+", "<b>Changed</b>:"] }), "shape.mjs: parseConfig takes the marks of a change of the form it reads, markup in one only text to match");
 for (const b of ["../x.json", "/etc/x.json", "C:\\x.json", "a/../../x.json", "<b>x</b>.json"]) ok(mended(shape({ ...SHAPE, baseline: b })), `shape.mjs: parseConfig refuses with its mend a baseline at ${b}`);
 ok(mended(shape({ ...SHAPE, aliases: { "@/": "../src/" } })) && mended(shape({ ...SHAPE, systems: { a: { paths: ["/etc/"] } } })), "shape.mjs: parseConfig refuses with its mend an alias or a system's path that leaves the project");
 ok(mended(shape({ ...SHAPE, systems: { "<script>": { paths: ["src/"] } } })), "shape.mjs: parseConfig refuses with its mend a system named with markup");

@@ -97,12 +97,24 @@ const optional = (v, test) => v === undefined || test(v);
 const isName = v => typeof v === "string" && /^[a-z][a-z0-9-]*$/u.test(v);
 const plainPath = s => typeof s === "string" && /^[\w@.-][\w@. -]*(\/[\w@.-][\w@. -]*)*\/?$/u.test(s) && !s.split("/").includes("..");
 const wholeNumbers = o => Object.values(o).every(n => Number.isInteger(n) && n > 0);
-const pattern = s => { try { new RegExp(s, "u"); return true; } catch { return false; } };
+// A pattern of a change's mark the project adds ("changes"), held to a form no line can make slow: at most 120
+// characters, three quantifiers, no quantified group and no backreference, so that its work on a comment's first 400
+// characters stays bounded; at most 20 of them.
+export const CHANGES_MOST = 20;
+const pattern = s => {
+  if (s.length > 120 || /\)[*+?{]|\\[1-9]|\\k</u.test(s) || (s.replace(/\\./gu, "").replace(/\(\?/gu, "(").match(/[*+?]|\{\d/gu) ?? []).length > 3) return false;
+  try { new RegExp(s, "u"); return true; } catch { return false; }
+};
 const aSecond = n => Number.isFinite(n) && n > 0;
 const seconds = v => aSecond(v) || (isObject(v) && Object.keys(v).length > 0 && Object.values(v).every(aSecond));
 const KIT_FORM = "write it as the starter kit does (core/setup/template/shape.json.tmpl): a JSON object with \"baseline\", the baseline's path, and \"code\", git pathspecs of the code to read";
 
 // ---- the config ----
+
+// The patterns of a change's mark the config adds ("changes"), each of the form `pattern` reads, at most CHANGES_MOST.
+function readChanges(changes, at) {
+  if (!optional(changes, v => strings(v) && v.length <= CHANGES_MOST && v.every(pattern))) refuse(`"changes" in ${at} is not a list of at most ${CHANGES_MOST} patterns of the form the check reads`, "list there each pattern of a change's mark in a comment the project adds, as a regular expression JavaScript reads (with its u flag), of at most 120 characters and three quantifiers (*, +, ? or {n}), with no quantifier after a group and no backreference, or take it out");
+}
 
 function readLists(c, at) {
   const unknown = Object.keys(c).filter(k => !KEYS.includes(k));
@@ -111,7 +123,7 @@ function readLists(c, at) {
   for (const k of ["code", "tests"]) if (!optional(c[k], strings)) refuse(`"${k}" in ${at} is not a list of words`, "list git pathspecs there (\":!\" leaves a path out)");
   if (!optional(c.platform, strings)) refuse(`"platform" in ${at} is not a list of words`, "list there each package or module of Node's that binds code to one platform, by the name it is imported under");
   if (!optional(c.screens, strings)) refuse(`"screens" in ${at} is not a list of words`, "list there each package or module a test imports that opens a screen, a window or a device, by the name it is imported under");
-  if (!optional(c.changes, v => strings(v) && v.every(pattern))) refuse(`"changes" in ${at} is not a list of patterns`, "list there each pattern of a change's mark in a comment the project adds, as a regular expression JavaScript reads (with its u flag), or take it out");
+  readChanges(c.changes, at);
   if (!optional(c.select, v => isObject(v) && Object.keys(v).every(k => SELECT_KEYS.includes(k)) && Object.values(v).every(strings))) refuse(`"select" in ${at} is not in the form the check reads`, `give it ${SELECT_KEYS.map(k => `"${k}"`).join(", ")} alone, each a list of git pathspecs`);
   for (const k of ["wait", "long"]) if (!optional(c[k], aSecond)) refuse(`"${k}" in ${at} is not a number of seconds`, `give it a number of seconds above 0, or take it out`);
   if (!c.code?.length) refuse(`${at} names no "code" to read`, "list the code's folders in \"code\", as git pathspecs (\":!\" leaves a path out)");
@@ -215,15 +227,19 @@ function markedFunctions(ctx, file, fns) {
   }
 }
 
-// The comments that mark a change, by the config's marks ("changes"): for each mark, how many lines of the file's
-// comments hold it, a line counted under the first it holds.
-function changeMarks(ctx, file, comments) {
+// The comments that mark a change, by the config's marks ("changes"): for each mark, how many lines of a file's
+// comments hold it, a line counted under the first it holds; counted as each file is read, so that no file's comments
+// are held past its reading.
+function marksOf(config, comments) {
   const counts = new Map();
   for (const { text } of comments ?? []) {
-    const mark = ctx.config.changes.find(([, re]) => re.test(text));
+    const mark = config.changes.find(([, re]) => re.test(text));
     if (mark) counts.set(mark[0], (counts.get(mark[0]) ?? 0) + 1);
   }
-  for (const [mark, count] of counts) add(ctx, "change", `${file}: ${mark}`, mark, { count });
+  return counts;
+}
+function changeMarks(ctx, file, counts) {
+  for (const [mark, count] of counts ?? []) add(ctx, "change", `${file}: ${mark}`, mark, { count });
 }
 
 // The clock and randomness of a file's own, by the runs of tokens its reader names (`own`).
@@ -321,7 +337,7 @@ function oneFile(ctx, file, r) {
   if (!r.functions) { ctx.read.jsx++; add(ctx, "lost", file, file); }
   else if (!ctx.tests.has(file)) markedFunctions(ctx, file, r.functions);
   if (domain === "rules") ownClock(ctx, file, r);
-  changeMarks(ctx, file, r.comments);
+  changeMarks(ctx, file, r.marks);
   for (const imp of r.imports) { if (r.lang === "javascript") oneImport(ctx, from, imp); else foreign(ctx, from, imp, r); }
   const names = ctx.tests.has(file) ? null : shared(file, r, ctx.idx);
   if (names) ctx.scripts.set(file, names);
@@ -362,7 +378,7 @@ function wrappedOnce(ctx) {
 export function survey(texts, config, tests = new Set()) {
   const code = Object.keys(texts).filter(isCode).sort();
   const read = { files: code.length, functions: 0, imports: 0, jsx: 0, nowhere: 0, unnamed: 0, systems: Object.keys(config.systems).length, noEntrance: Object.values(config.systems).filter(s => !s.entrance).length };
-  const readings = code.map(file => [file, reading(file, texts[file])]);
+  const readings = code.map(file => { const r = reading(file, texts[file]); r.marks = marksOf(config, r.comments); delete r.comments; return [file, r]; });
   const idx = index(readings, texts), js = manifests(texts);
   const ctx = { config, tests, texts, unsure: new Set(), files: new Set(Object.keys(texts)), idx, packages: js.packages, ships: new Set([...js.ships, ...idx.ships]), declared: new Set([...js.declared, ...idx.declared]),
     entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map() };

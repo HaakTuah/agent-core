@@ -67,8 +67,18 @@ export function tokens(src, jsx = false) {
   return lex.out;
 }
 
-// Each line of a comment, from `a` (where its text starts) to `b`, as { line, text }, from the line `line` on.
-export const commentLines = (src, a, b, line) => src.slice(a, b).split("\n").map((text, k) => ({ line: line + k, text }));
+// Each line of a comment, from `a` (where its text starts) to `b`, as { line, text }, from the line `line` on, added to
+// `to` one at a time, so that a comment of any length overflows nothing; of each line its first COMMENT_READ characters
+// alone, all a mark is read in.
+export const COMMENT_READ = 400;
+export function commentLines(to, src, a, b, line) {
+  let k = 0;
+  for (let at = a; at <= b; k++) {
+    const end = src.indexOf("\n", at), stop = end < 0 || end > b ? b : end;
+    to.push({ line: line + k, text: src.slice(at, Math.min(stop, at + COMMENT_READ)) });
+    at = stop + 1;
+  }
+}
 
 // Whether a file's tokens are read with JSX: a file of .jsx or .tsx, and one of JavaScript, where no expression may
 // start with a < (in TypeScript one may: a cast, <T>x, which a file of .tsx cannot hold).
@@ -119,10 +129,10 @@ class Lexer {
     const { src, i, n } = this;
     if (c === "\n") { this.line++; this.i++; return true; }
     if (c === " " || c === "\t" || c === "\r" || c === "\f" || c === "\v" || c === "\ufeff") { this.i++; return true; }
-    if (c === "/" && src[i + 1] === "/") { while (this.i < n && src[this.i] !== "\n") this.i++; this.comments.push(...commentLines(src, i + 2, this.i, this.line)); return true; }
+    if (c === "/" && src[i + 1] === "/") { while (this.i < n && src[this.i] !== "\n") this.i++; commentLines(this.comments, src, i + 2, this.i, this.line); return true; }
     if (c !== "/" || src[i + 1] !== "*") return false;
     const e = src.indexOf("*/", i + 2), end = e < 0 ? n : e + 2;
-    this.comments.push(...commentLines(src, i + 2, e < 0 ? n : e, this.line));
+    commentLines(this.comments, src, i + 2, e < 0 ? n : e, this.line);
     this.lines(i, end);
     this.i = end;
     return true;

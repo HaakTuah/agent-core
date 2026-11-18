@@ -60,12 +60,12 @@ class Lexer {
     const preprocessor = c === "#" && this.fresh;
     if (preprocessor || (c === "/" && src[i + 1] === "/")) {
       while (this.i < n && src[this.i] !== "\n") this.i++;
-      if (!preprocessor) this.comments.push(...commentLines(src, i + 2, this.i, this.line));
+      if (!preprocessor) commentLines(this.comments, src, i + 2, this.i, this.line);
       return (this.gap = true);
     }
     if (c !== "/" || src[i + 1] !== "*") return false;
     const e = src.indexOf("*/", i + 2), end = e < 0 ? n : e + 2;
-    this.comments.push(...commentLines(src, i + 2, e < 0 ? n : e, this.line));
+    commentLines(this.comments, src, i + 2, e < 0 ? n : e, this.line);
     this.lines(i, end);
     this.i = end;
     return (this.gap = true);
