@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tools.mjs";
 import { parse as parseChoices, where as choicesAt } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
-import { corePath } from "./core-path.mjs";
+import { THIRD_PARTY, corePath } from "./core-path.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
 import { progressOf } from "./done-when.mjs";
 import { leadsOut } from "./guards.mjs";
@@ -264,6 +264,20 @@ function suitesOnPins(p) {
     return by.length ? [`\`.github/workflows/${shown(f)}\` (${by.map(shown).join(", ")})`] : [];
   });
   return started.length ? `A sync that only moves the pin of a call to the core's workflows starts no suite of the project's own: each workflow named lists in its \`paths-ignore\`, beside \`core/**\` and \`core-manifest.md\`, each file that holds only such calls by its exact path, or, where it filters with \`paths\`, takes each out with \`!<its path>\` after its patterns (\`core.yml\` checks those pins on every pull request). Started by such a file alone: ${started.join("; ")}.` : null;
+}
+
+// Where a workflow of the project's filters its pull requests by their paths and runs on a change to a script of the
+// copy, each file of the packages the copy carries for them (its own files, as the project holds them), a change to it
+// let through alike; null where each workflow does.
+function scriptsWithPackages(p) {
+  const copy = corePath(p.root) || "core/", scripts = p.files.filter(f => f.startsWith(`${copy}scripts/`)), packages = p.files.filter(f => f.startsWith(`${copy}${THIRD_PARTY}`));
+  readable(p, text => /paths(-ignore)?\s*:/.test(text));
+  const wrong = Object.entries(p.workflows).filter(([, w]) => {
+    const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];
+    const through = f => (Array.isArray(only) ? pathsLetThrough(only, [f]) : Array.isArray(ignore) ? !pathsLetThrough(ignore, [f]) : true);
+    return scripts.some(through) && packages.some(f => !through(f));
+  }).map(([f]) => `\`.github/workflows/${shown(f)}\``);
+  return wrong.length ? `In one small pull request, let a change under \`${copy}${THIRD_PARTY}\` through wherever a change to a script under \`${copy}scripts/\` is, in the \`paths:\` (add \`'${copy}${THIRD_PARTY}**'\`) or \`paths-ignore:\` of ${wrong.join(", ")}: those scripts run the packages the copy carries in that folder.` : null;
 }
 
 // Where the project's call to the NuGet check starts only on the paths it names, each build file a build reads by
@@ -859,6 +873,8 @@ export const STEPS = [
     } },
   { lead: "17 November 2026, packages from the registry, the week's wait and pinned downloads", cost: COST.check, check: packagesHeld },
   { lead: "17 November 2026, held packages looked up again", cost: COST.read, unread: "whether a package has gone stale is its registry's answer on the day, and GitHub's, not a file's: the session that syncs runs `node core/scripts/held.mjs` once and puts what it prints in the sync pull request's description, each package gone stale a task; the scheduled look runs it again each month" },
+  { lead: "17 November 2026, the packages the copy carries", cost: COST.workflow, check: scriptsWithPackages,
+    partly: "which suites read the core's scripts is the project's own logic, read by the review" },
   { lead: "17 November 2026, a private project's code scanned", cost: COST.line, unread: "whether a cloud environment's set-up script runs `node core/scripts/code-scan.mjs --fetch` is the environment's setting, not a file's: the session that syncs reads it (its environment's own tool where it has one) and proposes the line where it is missing, in a project no workflow of which calls `codeql.yml`; a step of `core.yml` fetches the engine on the runners by itself" },
 ];
 

@@ -1,4 +1,4 @@
-// Tests the shape check's readers of C# and Python (shape-csharp.mjs and scripts/shape-python.mjs) on files
+// Tests the shape check's readers of C# and Python (scripts/shape-csharp.mjs and scripts/shape-python.mjs) on files
 // made for them: the functions each finds, with their lines, depth and branch points; what a brace or a keyword in a
 // string or a comment is; what each file imports and where it leads; and the packages a project declares. The check's
 // own use of them, and of the readers of JSX and of the shared space: shape-test.mjs. Run by the core's tests workflow

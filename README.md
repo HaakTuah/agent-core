@@ -230,11 +230,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      project of each of the last two releases synced to the change (`AGENTS.md`, "Nothing locks a
      project"): so the project's own suites run on one only for what they take from the copy (all of them where they run
      on its Node version and `core/.node-version` changed; those that read its scripts for a change under
-     `core/scripts/`), never for the rest of the copy, which `core.yml` checks, nor for a workflow in which only such a
-     pin moved (`tasks/tests.md`, "A pull request runs the tests its change can reach"; core archive 167). A path filter
-     sees which files changed, not what changed in them, so a suite filtered by `paths-ignore` names there each file
-     that holds only calls to the core's workflows by its exact path (`core/scripts/steps.mjs` reports one that does
-     not).
+     `core/scripts/` or `core/third-party/`, whose packages those scripts run), never for the rest of the copy, which
+     `core.yml` checks, nor for a workflow in which only such a pin moved (`tasks/tests.md`, "A pull request runs the
+     tests its change can reach"; core archive 167). A path filter sees which files changed, not what changed in them,
+     so a suite filtered by `paths-ignore` names there each file that holds only calls to the core's workflows by its
+     exact path (`core/scripts/steps.mjs` reports one that does not).
    - **Dependabot:** its `.github/dependabot.yml` ignores `HaakTuah/agent-core*`.
    - **Every action a workflow uses,** GitHub's own included, is pinned to a full commit SHA with its version in a
      comment after it, which Dependabot keeps current: a security fix in an action reaches a workflow by that weekly
@@ -558,7 +558,9 @@ changed or not, passes on with it, marking the files they changed (#257; core ar
 repository, the floor, the modules, the scripts and workflows, the starter kit and the rule files, but `archive/`,
 `words/` and `reports/`: the owner's decisions, own words and records, all rights reserved. Both files travel in each
 project's copy under `core/`, and they license the core alone: a project keeps the terms its own owner gives its own work, and nothing here
-adds or changes them (floor rule 10). Nothing of the core ships, so no project's audit or notices file asks for it.
+adds or changes them (floor rule 10). Nor do they cover `third-party/`, the packages of other publishers the scripts
+run, each under its own licence, whose text travels in its folder (`third-party/NOTICES.md`; `scripts/third-party.mjs`
+says how one is carried). Nothing of the core ships, so no project's audit or notices file asks for it.
 `NOTICE` names the work, with its other name, which renames nothing, and as the holder the account in the core's
 address, until the core's owner types another name there by hand (floor rule 11).
 

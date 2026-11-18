@@ -148,6 +148,10 @@ ok(lines.every((line) => KEPT.some((name) => line === `/${name} export-ignore`))
 const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
 const astray = tracked.filter((file) => /-test\.mjs$/.test(file) && !file.startsWith("tests/"));
 ok(lines.includes("/tests export-ignore") && astray.length === 0, "every test of the core's own scripts is under tests/, which the copy leaves out (#527)", astray.join(" "));
+// (and the other way round: a file of another name under tests/, which a script a project runs might import, would be
+// missing from every copy, #614)
+const strays = tracked.filter((file) => file.startsWith("tests/") && !/^tests\/[^/]+-test\.mjs$/.test(file));
+ok(strays.length === 0, "tests/ holds the core's tests alone, so nothing a project runs can lean on a file the copy leaves out (#614)", strays.join(" "));
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);

@@ -108,7 +108,25 @@ The index, and how an item is written: `archive/instructions.md`.
      rules were held by being read alone, the kind a study found followed at more cost with no gain. It stands behind
      the order of the pruning's list and `reports/unheld.json`.
 
-255. **17 November 2026**, #546. A private project gets a scan of its code in place of the host's CodeQL, paid there:
+255. **16 November 2026**, #486, points 6 to 8 and 11. A job a maintained package does is done by it, in all code, a job
+     on a format or language someone else defines first; a session searches before it writes more than about 50 lines
+     for one job, names what it looked for, and writes by hand only where the job is small and stable, no package fits,
+     fitting costs more than the job, or the package brings too much, the package passing the floor and what the
+     platform brings coming first: for a session code is cheap to write, so it writes where a person would reach for a
+     package, and the cost comes later as upkeep and as bugs in readers written by hand; point 6 gained its search on 17
+     November. It stands behind "A job a maintained package does is done by it" in `tasks/code-shape.md` and its
+     pointers in `roles/shared/how-to-work.md` and the review guidelines.
+
+256. **17 November 2026**, #593, point 7. A trial of a maintained tool in the place of a part of the project's own runs
+     the tool on the case of each bug filed against that part, taken from the test cases its merged fix added or
+     changed and never from an issue's text, which may carry outside text, and its record says by number which the tool
+     reads and which it does not, so that the cases a part was mended for are the first evidence of whether the move pays: of the
+     30 bugs filed on the core by that day that were a case a check's writer had not thought of, 11 stood on the NuGet
+     and copies checks, the parts the first trials would replace. The owner agreed to it, with the issue's other points,
+     after asking what the core lacked that let an inventory's check miss a part. It stands behind "A trial of a
+     maintained tool replays the part's past bugs" in `tasks/choices.md`, and the inventory's line `Replayed:`.
+
+257. **17 November 2026**, #546. A private project gets a scan of its code in place of the host's CodeQL, paid there:
      Semgrep's engine, a program that only runs, fetched at set-up by its digest from PyPI and run with no Python, reads
      what a pull request adds or alters with rules the core writes, since no maintained rule set carries a licence the
      floor allows, and a finding is handled as floor rule 9 handles CodeQL's, so a private project has the same check as
