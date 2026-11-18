@@ -634,6 +634,9 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     fails(run(skillAdded), "one a pull request adds under a folder the base held in another case fails", "Mend: rename it to .claude/skills");
     const noteAdded = run(pr(project({ ".claude/Skills/bar/SKILL.md": "# bar\n", ...listing() }), { ".claude/Skills/notes.md": "# notes\n" }));
     ok(noteAdded.status === 0, "while a file there the tool does not read changes nothing the base held", noteAdded.out);
+    // (#600's code review of 33315a2: nor does a folder added there with no SKILL.md in it)
+    const docAdded = run(pr(project({ ".Claude/skills/bar/SKILL.md": "# bar\n", ...listing() }), { ".Claude/skills/notes/README.md": "# notes\n" }));
+    ok(docAdded.status === 0, "and a folder added there that holds no SKILL.md changes nothing either", docAdded.out);
     // (a folder or a link in another case on the way to a tool's file)
     const aliased = project({ "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n", ...listing() });
     fs.symlinkSync("config", path.join(aliased, ".Codex"));
