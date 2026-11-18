@@ -26,7 +26,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { inStep, items } from "./archive.mjs";
 import { copyOf } from "./core-path.mjs";
-import { inProject, leadsOut } from "./guards.mjs";
+import { inProject, leadsOut, oneLine } from "./guards.mjs";
 import { NUMBER } from "./outcomes.mjs";
 import { FLOOR, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { FOLDERS, ROOT, rules, rulesOf } from "./rules.mjs";
@@ -41,11 +41,12 @@ const hook = x => x.kind === "check" && HOOKS.has(x.by);
 
 // One holder as holders.json names it for the rule `key`: { kind, by, part }, or the line of what is wrong, with its mend.
 // `file` and `paths`: the list it stands in, and the names of a check that are paths to read as there or not.
-function holderOf(key, value, root, file = FILE, paths = /^(?:scripts|\.github|setup|floor|roles|tasks|tools)\//u) {
+// `show`: how a key or value is written into a line, which a project's list writes as a code span on one line.
+function holderOf(key, value, root, file = FILE, paths = /^(?:scripts|\.github|setup|floor|roles|tasks|tools)\//u, show = t => `"${t}"`) {
   const m = FORM.exec(String(value));
-  if (!m) return `${file}: "${key}" has the holder "${value}", in no form it reads. Mend: write "check: <its script, workflow or GitHub's setting>", "audit" or "describes", each with ", in part" where it holds only some of the rule${file === FILE ? "; a staged case names its rules in its own file" : ', or "none" where nothing holds it'}`;
+  if (!m) return `${file}: ${show(key)} has the holder ${show(value)}, in no form it reads. Mend: write "check: <its script, workflow or GitHub's setting>", "audit" or "describes", each with ", in part" where it holds only some of the rule${file === FILE ? "; a staged case names its rules in its own file" : ', or "none" where nothing holds it'}`;
   const kind = m[1] ?? m[3] ?? m[4], what = m[2] ?? "";
-  if (kind === "check" && paths.test(what) && (!inProject(what) || !fs.existsSync(path.join(root, what)))) return `${file}: "${key}" is held by ${what}, which is not there. Mend: name the check as it now stands, or take the holder out`;
+  if (kind === "check" && paths.test(what) && (!inProject(what) || !fs.existsSync(path.join(root, what)))) return `${file}: ${show(key)} is held by ${show(what)}, which is not there. Mend: name the check as it now stands, or take the holder out`;
   return { kind, by: what, part: Boolean(m[5]) };
 }
 
@@ -135,6 +136,9 @@ export function report(root = ROOT) {
 
 // ---- a project's own rules (#662) ----
 export const OWN = "checks/holders.json";
+// (text from a project's files as the report and the log carry it: on one line, in a code span, so that no line break,
+// workflow command or mention in it acts: floor rule 5)
+const span = t => `\`${oneLine(t).replace(/`/gu, "'")}\``;
 // (a check's name that is a path of the project: a file name with its extension, or one with a folder)
 const OWN_PATHS = /^(?:[\w.@-]+\/)+[\w.@-]+$|^[\w-]+\.\w+$/u;
 
@@ -165,11 +169,11 @@ export function ownHolders(root = process.cwd()) {
     catch (e) { named = {}; wrong.push(`${OWN} cannot be read (${String(e.message).split("\n")[0]}). Mend: write it as JSON, its "holders" an object keyed by each rule's file and lead`); }
   }
   for (const [key, value] of Object.entries(named)) {
-    if (!by.has(key)) { wrong.push(`${OWN} names "${key}", which is no rule of the project's own rule files as they stand. Mend: write the key as the rule's file and bold lead now read, or take it out where the rule has gone`); continue; }
+    if (!by.has(key)) { wrong.push(`${OWN} names ${span(key)}, which is no rule of the project's own rule files as they stand. Mend: write the key as the rule's file and bold lead now read, or take it out where the rule has gone`); continue; }
     for (const v of (Array.isArray(value) ? value : [value]).filter(v => v !== "none")) {
-      const h = holderOf(key, v, root, OWN, OWN_PATHS);
+      const h = holderOf(key, v, root, OWN, OWN_PATHS, span);
       // (a review reads what a session judged, and fails nothing by itself: it holds no rule)
-      if (typeof h !== "string" && h.kind === "check" && /\breview/iu.test(h.by)) wrong.push(`${OWN}: "${key}" is held by "${h.by}", a review, which holds no rule. Mend: name the test, check, simulation or script that fails where the rule is broken, or write "none"`);
+      if (typeof h !== "string" && h.kind === "check" && /\breview/iu.test(h.by)) wrong.push(`${OWN}: ${span(key)} is held by ${span(h.by)}, a review, which holds no rule. Mend: name the test, check, simulation or script that fails where the rule is broken, or write "none"`);
       else if (typeof h === "string") wrong.push(h); else by.get(key).push(h);
     }
   }
@@ -184,7 +188,7 @@ export function ownReport(root = process.cwd(), scripts = "core/scripts") {
   const none = [...c.none.filter(k => h.start.has(k)), ...c.none.filter(k => !h.start.has(k))];
   return [
     `- Of ${c.all} rules of the project's own (${files.map(f => `\`${f}\``).join(", ")}): ${c.check} held whole by a check, ${c.audit} by the audit, ${c.part} in part; ${c.describes} describe and bind no one; ${c.none.length} have no holder (\`node ${scripts}/holders.mjs --own\`, its list \`${OWN}\`${h.list ? "" : ", not written yet"}).`,
-    ...(none.length ? [`- No holder, worst first (read at a session's start, then on need): the session that takes this report files each as a task at the project's pace, a check where one can read its breach exactly, named in \`${OWN}\`; a move to where it is read on need; or a proposal that it goes, which is the owner's to decide. Where its file is a copy made from elsewhere, the change goes to whoever writes that source. Nothing fails meanwhile: ${none.join("; ")}.`] : []),
+    ...(none.length ? [`- No holder, worst first (read at a session's start, then on need): the session that takes this report files each as a task at the project's pace, a check where one can read its breach exactly, named in \`${OWN}\`; a move to where it is read on need; or a proposal that it goes, which is the owner's to decide. Where its file is a copy made from elsewhere, the change goes to whoever writes that source. Nothing fails meanwhile: ${none.map(span).join("; ")}.`] : []),
     ...h.wrong.map(w => `- ${w}.`),
   ];
 }

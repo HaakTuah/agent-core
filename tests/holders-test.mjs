@@ -160,6 +160,15 @@ ok(counts(held).check === 1 && counts(held).none.length === 5 && held.wrong.leng
 const listed = lines.find(l => l.startsWith("- No holder")) ?? "";
 ok(/^- Of 6 rules of the project's own .*: 1 held whole by a check, .* 5 have no holder/.test(lines[0]) && listed.indexOf("docs/play.md: A turn ends on a move") < listed.indexOf("docs/design.md: Saves are small") && !listed.includes("Each computer player") && lines.filter(l => /Mend: /.test(l)).length === 3,
   "the report's lines: the counts, the rules with no holder, those read at a session's start first, and each wrong line of the list", lines.join("\n"));
+// (a key and a value of the list, and a rule's lead, holding a line break, a workflow command and a mention: each goes
+// into the report on one line, in a code span)
+fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { "x\n::error::key @ghost": "audit", "AGENTS.md: Name things plainly": "weird\n::warning::v" } }));
+put("docs/play.md", "# Play\n\n- **A turn ends on a move.** Rules of play.\n- **Ask `@octocat` first.** Words.\n");
+const hostile = ownReport(proj);
+ok(hostile.every(l => !l.includes("\n")) && !hostile.some(l => /(?:^|[^`'])@(?:ghost|octocat)/u.test(l.replace(/`[^`]*`/gu, ""))) && hostile.some(l => l.includes("`x?::error::key @ghost`")),
+  "text from the project's files goes into the report on one line, in code spans, so no workflow command or mention acts (floor rule 5)", hostile.join("\n"));
+put("docs/play.md", "# Play\n\n- **A turn ends on a move.** Rules of play.\n");
+fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { ...written, "AGENTS.md: Each computer player keeps its style": "check: tests/style.test.js", "docs/design.md: Saves are small": "check: tests/saves.test.js", "AGENTS.md: Gone": "audit", "docs/play.md: A turn ends on a move": "check: the code review" } }));
 r2 = ownCli();
 ok(r2.status === 0 && /No holder/.test(r2.stdout), "--own fails nothing, a wrong list included", `${r2.stdout}${r2.stderr}`);
 r2 = ownCli("--write");
