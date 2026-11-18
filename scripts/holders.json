@@ -84,7 +84,7 @@
     "tasks/choices.md: the case against": "check: scripts/choices.mjs, in part",
     "tasks/choices.md: the judgment": "check: scripts/choices.mjs, in part",
     "tasks/choices.md: What the project would be built on today": "check: scripts/steps.mjs, in part",
-    "tasks/choices.md: A trial of a maintained tool replays the part's past bugs": "check: tests/mend-test.mjs, in part",
+    "tasks/choices.md: A trial of a maintained tool replays the part's past bugs": "check: .github/workflows/tests.yml, in part",
     "tasks/screens.md: One system": "check: scripts/screens.mjs, in part",
     "tasks/screens.md: Real content and every state": "check: scripts/screens.mjs, in part",
     "tasks/screens.md: Motion with a purpose": "check: scripts/screens.mjs, in part",
