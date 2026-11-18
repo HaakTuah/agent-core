@@ -1234,7 +1234,11 @@ const ENTRY_SAYS = ["version", "resolved", "integrity", "link"];
 function npmRead(root, rev, f, text, key, up, out, depth = 0) {
   const entry = key ? npmEntry(text, key) : undefined;
   if (entry === undefined) return void out.loose.add(`${f}\0${text}`);
-  out.exact.add(`${f}\0${JSON.stringify(ENTRY_SAYS.map(k => entry?.[k] ?? null))}`);
+  // (where the entry gives the content's integrity, by that: a resolved that alone changes, a registry's host moved,
+  // names the same content, and is read loosely)
+  const says = entry?.integrity ? ENTRY_SAYS.filter(k => k !== "resolved") : ENTRY_SAYS;
+  out.exact.add(`${f}\0${JSON.stringify(says.map(k => entry?.[k] ?? null))}`);
+  if (entry?.integrity) out.loose.add(`${f} resolved\0${entry.resolved ?? ""}`);
   // (a package bundled in its parent's, which comes in the parent's own tarball, by the parent's entry too)
   const parent = key.lastIndexOf("/node_modules/");
   if (entry?.inBundle && parent > 0) out.exact.add(`${f} bundled in\0${JSON.stringify(ENTRY_SAYS.map(k => npmEntry(text, key.slice(0, parent))?.[k] ?? null))}`);
@@ -1254,18 +1258,30 @@ function npmEntry(text, key) {
   let packages;
   try { packages = JSON.parse(text ?? "")?.packages; } catch { return undefined; }
   if (!packages || typeof packages !== "object") return undefined;
-  if (Object.hasOwn(packages, key)) return packages[key];
-  const found = Object.keys(packages).find(k => fold(k) === fold(key));
-  return found === undefined ? undefined : packages[found];
+  // (two keys that fold alike, which a file system that ignores case reads as one folder: which is installed is not plain)
+  const found = Object.keys(packages).filter(k => fold(k) === fold(key));
+  if (found.length > 1) return undefined;
+  return Object.hasOwn(packages, key) ? packages[key] : found.length ? packages[found[0]] : undefined;
 }
+// Whether what the lock files say of a link's package, read loosely, changed, or could not be read to its end (a loop of
+// links, or one too deep), so the package may have changed unread.
+const UNREAD = new RegExp(`${READING.loose}|${TOO_DEEP.loose}`, "u");
+const mayHaveChanged = (was, now) => was.loose !== now.loose || UNREAD.test(now.loose);
 // A link the base held to what the commit does not hold, as it stood: failed where the pull request locks the package
 // it leads into anew by an entry read exactly (pkgLock()), reported as one whose package may have changed where only what
 // cannot be read exactly changed, and reported otherwise.
 function sortStood(root, base, at, said, there, fail, notes) {
   const was = pkgLock(root, base, at), now = pkgLock(root, "HEAD", at);
   if (was.exact !== now.exact) fail.push(`${said}, ${there}, and this pull request locks the package it leads into anew, which changes what an agent tool runs there unread. Mend: replace the link with the file or folder itself, committed in the project, or take it out, in this pull request`);
-  else if (was.loose !== now.loose) notes.push(`${said}, ${there}, as the base held it, and a lock file this check cannot read the package's entry of changes beside it, so the package it leads into may have changed what an agent tool runs there: reported, never failed. Replace the link with the file or folder itself, committed in the project, or take it out`);
+  else if (mayHaveChanged(was, now)) notes.push(`${said}, ${there}, as the base held it, and a lock file this check cannot read the package's entry of changes beside it, so the package it leads into may have changed what an agent tool runs there: reported, never failed. Replace the link with the file or folder itself, committed in the project, or take it out`);
   else notes.push(`${said}, ${there}, as the base held it: reported, never failed while the package it leads into is locked as before. Replace it with the file or folder itself, committed in the project`);
+}
+// Each link on the way to or below a folder of Claude Code's agents or commands whose package may have changed unread
+// (mayHaveChanged()), as a note: mdLinks() holds such a link by what is read exactly alone.
+function looseNotes(root, base, notes) {
+  for (const at of new Set(agentFolders(root, "HEAD").flatMap(f => [...f.ways, ...f.links]))) {
+    if (mayHaveChanged(pkgLock(root, base, at), pkgLock(root, "HEAD", at))) notes.push(`${show(at)}, a link to Claude Code's agents or commands, leads into a package that a lock file this check cannot read the entry of may have changed, so what Claude Code reads there may have changed unread: reported, never failed. Replace the link with the files themselves, committed in the project, or take it out`);
+  }
 }
 function sortLinks(root, base, links, fail, notes) {
   for (const at of links) {
@@ -1312,6 +1328,7 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes);
   sortSources(checked, { head, baseProject, baseList, core, file }, fail, notes);
   sortLinks(root, base, head.links, fail, notes);
+  if (base) looseNotes(root, base, notes);
   sortUnlisted(unlisted, { head, base, held, file }, fail, notes);
   return { fail, notes };
 }
