@@ -30,12 +30,21 @@ project's own guidelines, its `SECURITY.md` and the floor. Changes only on the o
 - a size mark raised without its reason in the PR (one on what every session reads: below);
 - an entry that joins the shape check's or the strength check's baseline under "grown" without its reason in the PR
   and a fresh session's word there that it found no other way (`tasks/code-shape.md`, "Never worse");
-- a test weakened, skipped or deleted beyond what the task forces, or one the PR does not name under "Readings taken"
-  with a reason that holds (`tasks/code-shape.md`, #253);
+- a test weakened, skipped or deleted beyond what the task forces, or one the PR does not name with a reason that
+  holds (`tasks/code-shape.md`, #253);
 - against the pillars of `roles/shared/how-to-work.md`, a fact, rule or piece of logic written a second time instead of
   pointed to;
 - a new job a maintained package does written by hand, a reader of a format someone else defines above all, with no
   line naming its exception or, past about 50 lines, `Looked for:` (`tasks/code-shape.md`, #486).
+
+Worked examples, the first of each pair blocking (#307):
+- departure: a PR described as fixing a sum also drops negative numbers; not: a renamed local variable it never names.
+- broken rule: a live key in a test's fixture; not: a fake key built from pieces as the test runs.
+- test: an assertion taken out and named nowhere; not: one made stricter and named on the line `Tests changed:`.
+- second copy: a new loop that sums where `sum()` stands; not: two tests that each set up the same three numbers.
+- package: a YAML reader written by hand with no `Looked for:`; not: ten lines that split a format the project defines.
+- mark: a cap raised with no "Leanness check:"; not: one raised beside a fresh session's answer that it found too
+  little room.
 
 A finding, not blocking:
 - anything the change leaves behind (unused code, files or settings, commented-out code, a description made untrue);
@@ -74,7 +83,7 @@ makes a process measure its goal (`tasks/cleaning.md`).
 - A finding: no three lines of the builder's (point 16), and a difference between them and the critique's answers to
   its first two questions.
 
-**A rule file changed:**
+**A rule file changed** (worked examples: a rule with no reason, blocking; a reason that could be shorter, not):
 - Blocking: a rule that departs from the owner's word behind it: on its issue, in the archive's items it cites, or in
   the core, those `scripts/holders.json` lists for it.
 - Blocking: a rule of the core (its floor, modules or `AGENTS.md`) written or changed without a part of the pattern in

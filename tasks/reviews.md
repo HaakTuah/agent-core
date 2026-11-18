@@ -1,7 +1,7 @@
 # Reviews
 
-Read when a PR is reviewed, by its builder before it is marked ready (`roles/builder.md`), and by the session that takes
-the monthly state report, for point 8: the kind `review`. What
+Read when a PR is reviewed, by its builder before it is marked ready (`roles/builder.md`), by the session that takes
+the monthly state report, for point 8, and by the one that runs the staged cases, for point 9: the kind `review`. What
 reviewers judge by: `roles/shared/review-guidelines.md`.
 
 **Which:**
@@ -107,3 +107,12 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    check says it at the moment it matters, to any tool. Held by `core/scripts/review-record.mjs`, which lists exactly
    the rules two pull requests' findings name, and by the monthly state report the scheduled look opens; no check
    reads that the issues are filed.
+9. **The reviewers are tested** (#307). By default each reviewer in the order (`tasks/roles.md`, "Tools are
+   preferences") is given the staged case `review`, a pull request with a fault of four blocking kinds planted in it,
+   with the staged cases each month, and again once the review guidelines change or a reviewer's model does. The
+   trigger is a verdict of that case that fails: the session that records it adds to the review guidelines' worked
+   examples one for each kind the reviewer missed, or, where the kind already has one, files the issue that moves that
+   reviewer down the order. It does not mean that a pull request waits for a case to pass, nor that a reviewer leaves
+   the order. Reason: every pull request rests on its reviews, and a judge no one tests leans kind. Held by the staged
+   case `review` and the look's issue "Staged cases to run", which `scripts/staged.mjs` keeps due on the guidelines'
+   change; a model's change, by no check.

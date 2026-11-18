@@ -33,7 +33,9 @@
 // be told from one forgotten ("An exemption leaves a mark" in roles/shared/work-flow.md; #302). And where the part
 // "What holds it" is asked and holds more than "None", of a pull request opened since the copy on its base held
 // NUMBER_SINCE, a line under it that names a rule's number in its form ("Number: findings; outcome: robust";
-// outcomes.mjs's NUMBER; #303).
+// outcomes.mjs's NUMBER; #303). And, of one opened since the copy on its base held CHANGED_SINCE, each test file whose
+// assertions it takes out or changes, or in which it skips a case, named on the line weakened.mjs, beside this file,
+// asks (#307).
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
 //
@@ -45,6 +47,7 @@ import { isPart, milestoneMends } from "./milestones.mjs";
 import { NUMBER } from "./outcomes.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, pathIn, taken, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
+import { changedMend, testsChanged } from "./weakened.mjs";
 
 // The line a description ends with, saying what the pull request waits on: nothing (its builder goes on), a review, its
 // checks, another item ("#241"), or the owner, with the question in one sentence after a colon.
@@ -63,6 +66,10 @@ export const NO_COST = "No cost line: the script printed none.";
 // rule says what holds it"; #303), as the lines above are.
 export const NUMBER_SINCE = "2026-11-17T00:00:00Z";
 export const HOLDS = "What holds it";
+// The day from which a description names, on weakened.mjs's line, each test file whose assertions the pull request takes
+// out or changes, or in which it skips a case (tasks/code-shape.md, "A test taken out or weakened is said"; #307), as
+// the lines above are.
+export const CHANGED_SINCE = "2026-11-18T00:00:00Z";
 
 // The mend where the part HOLDS holds more than "None" and no line "Number: <the count>; outcome: <the outcome>" in
 // NUMBER's form; null where it does, or where the part is not there (missing() names that).
@@ -209,6 +216,11 @@ if (started(import.meta.url)) {
     } else console.log(`ok   the milestones are not asked here: ${planAsked(created, then) ? "the change could not be read against its base" : why}`);
     if (created >= COST_SINCE && then?.includes("export const COST_SINCE")) { const mend = costMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log("ok   the description has its cost line, or the mark that the script printed none"); }
     else console.log(`ok   the cost line or its mark is not asked here: ${why}`);
+    if (created >= CHANGED_SINCE && then?.includes("export const CHANGED_SINCE")) {
+      const found = testsChanged(process.cwd());
+      if (found === null) console.log("ok   the tests this pull request edits are not asked here: the change, or the shape check's config at its base, could not be read");
+      else { const mend = changedMend(process.env.PR_BODY, found, `node ${coreAt(process.cwd()) ?? ""}scripts/weakened.mjs`); if (mend) mends.push(mend); else console.log(`ok   the description names each test file whose assertions this pull request takes out or changes, or in which it skips a case (${found.length})`); }
+    } else console.log(`ok   the tests this pull request edits are not asked here: ${why}`);
     // (asked only where the part is, which is where the rules change)
     if (parts.includes(HOLDS) && created >= NUMBER_SINCE && then?.includes("export const NUMBER_SINCE")) { const mend = numberMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log(`ok   the part "${HOLDS}" names a rule's number, or "None"`); }
     else if (parts.includes(HOLDS)) console.log(`ok   the number under "${HOLDS}" is not asked here: ${why}`);

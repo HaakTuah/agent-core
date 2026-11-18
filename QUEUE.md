@@ -36,7 +36,6 @@ it merges last.
 | #546 | rule builder; two security reviews | |
 | #587 | rule builder; it may change the floor's topics and what every role reads at its start | #530 |
 | #306 | rule builder | |
-| #307 | rule builder | |
 | #308 | rule builder | |
 | #309 | rule builder | |
 | #318 | rule builder | |

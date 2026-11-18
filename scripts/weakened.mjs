@@ -1,0 +1,81 @@
+// The tests a pull request edits (tasks/code-shape.md, "A test taken out or weakened is said"; #307): in each test file
+// it changes, each line that asserts (ASSERT) that it takes out or changes, and each line that skips a case or runs
+// one alone (SKIP) that it adds, read from git as the merge commit against its first parent, the base. A test file is
+// one the *shape check*'s config names under "tests", the manifest and the config read as the base holds them, so
+// that a pull request does not set either for itself. It lists each such line, and the description check
+// (pr-description.mjs, beside this file) asks that the description name each such file on its line LINE, with why, so
+// that the reviewer rules on each. It never judges whether a test was weakened: an assertion changed may be made
+// stricter, and a line matched may be no assertion at all; what it reads is exact, a line taken out or added, and the
+// judgement stays the reviewer's. Git and Node's own modules.
+//
+//   node core/scripts/weakened.mjs        in a checkout of a pull request's merge commit: each line, by its file
+import { spawnSync } from "node:child_process";
+import { parseConfig, where } from "./shape.mjs";
+import { started } from "./started.mjs";
+
+export const LINE = "Tests changed:";
+// A line that asserts, in the test frameworks and languages the projects use: node's assert and the core's ok(),
+// expect(...), xUnit's and NUnit's Assert, Python's assert and self.assert..., Go's t.Error and t.Fatal, testify's
+// require., XCTest's XCTAssert, FluentAssertions' .Should().
+export const ASSERT = /\b(?:assert\w*|expect|ok|equal|deepEqual|deepStrictEqual|strictEqual|notEqual|notStrictEqual|throws|doesNotThrow|rejects|Assert|CollectionAssert|StringAssert|XCTAssert\w*|self\.assert\w*)(?:\.\w+)*\s*\(|\brequire\.\w+\s*\(|\bt\.(?:Errorf?|Fatalf?|Fail|FailNow)\s*\(|^\s*assert\s|\.Should\(\)|\.should\b/u;
+// A line that skips a case, or runs one alone and so skips the rest: .skip, .todo and .only, xit, [Ignore] and
+// Skip =, pytest's and unittest's skip, Go's t.Skip, JUnit's @Disabled, node:test's { skip: ... }, mocha's this.skip().
+export const SKIP = /\b(?:it|test|describe|context|suite)\.(?:skip|todo|only)\b|\b(?:xit|xtest|xdescribe|xcontext|fit|fdescribe)\s*\(|\[(?:Ignore|Skip)\b|\bSkip\s*=|@pytest\.mark\.(?:skip|xfail)\w*|@unittest\.skip\w*|@(?:Disabled|Ignore)\b|\bt\.Skip\w*\s*\(|\{\s*(?:skip|todo|only)\s*:(?!\s*false\b)|\bthis\.skip\s*\(/u;
+
+// What a diff (git diff -U0) does to the tests: [{ file, asserts, skips }], each a list of the lines' text, a file
+// named only where it holds one.
+export function weakened(diff) {
+  const files = [];
+  let at = null;
+  for (const line of String(diff ?? "").split("\n")) {
+    // (a file's name from its header, "diff --git a/<it> b/<it>" with no rename, so a file deleted is named too)
+    const header = /^diff --git a\/(.+?) b\/(.+)$/u.exec(line);
+    if (header) { at = { file: header[1] === header[2] ? header[1] : header[2], gone: [], added: [] }; files.push(at); continue; }
+    if (!at || /^(?:---|\+\+\+) /u.test(line)) continue;
+    if (line.startsWith("-")) at.gone.push(line.slice(1));
+    else if (line.startsWith("+")) at.added.push(line.slice(1));
+  }
+  return files.map(f => {
+    // (a line taken out and added again as it was, moved, is neither)
+    const added = new Set(f.added.map(l => l.trim())), gone = new Set(f.gone.map(l => l.trim()));
+    return { file: f.file, asserts: f.gone.filter(l => ASSERT.test(l) && !added.has(l.trim())), skips: f.added.filter(l => SKIP.test(l) && !gone.has(l.trim())) };
+  }).filter(f => f.asserts.length || f.skips.length);
+}
+
+// The mend where the description does not name each file `found` lists on its line LINE (that line and the lines
+// right after it, to the next blank line); null where it does, or where nothing was found.
+export function changedMend(body, found, list = "node core/scripts/weakened.mjs") {
+  if (!found.length) return null;
+  const lines = String(body ?? "").split(/\r\n|\r|\n/u), start = lines.findIndex(l => l.replace(/^[\s>*_-]+/u, "").startsWith(LINE));
+  let said = "";
+  if (start >= 0) for (let i = start; i < lines.length && (i === start || lines[i].trim()); i++) said += `${lines[i]}\n`;
+  const unnamed = found.filter(f => !said.includes(`\`${f.file}\``));
+  if (!unnamed.length) return null;
+  return `the description does not name, on its line "${LINE}", each test file in which this pull request takes out or changes an assertion, or skips a case: ${unnamed.map(f => `\`${f.file}\` (${[f.asserts.length && `${f.asserts.length} assertion line${f.asserts.length === 1 ? "" : "s"} out or changed`, f.skips.length && `${f.skips.length} skip${f.skips.length === 1 ? "" : "s"} added`].filter(Boolean).join(", ")})`).join(", ")}. Mend: add the line "${LINE}" naming each file in backticks with why (the case proved nothing, the assertion was made stricter, the case moved), so that the reviewer rules on each; ${list} lists the lines`;
+}
+
+// What the pull request in the checkout at `dir` does to its tests, as weakened() gives it; null where it cannot be
+// read (no base, no config at the base).
+export function testsChanged(dir = ".") {
+  const git = (...args) => { const r = spawnSync("git", args, { cwd: dir, encoding: "utf8", maxBuffer: 1 << 28 }); return r.status === 0 ? r.stdout : null; };
+  const manifest = git("show", "HEAD^1:core-manifest.md") ?? git("show", "HEAD^1:AGENTS.md");
+  if (manifest === null) return null;
+  const at = where(manifest), text = git("show", `HEAD^1:${at}`);
+  if (text === null) return null;
+  let tests;
+  try { tests = parseConfig(text, at).tests ?? []; } catch { return null; }
+  if (!tests.length) return [];
+  const diff = git("-c", "core.quotePath=false", "diff", "-U0", "--no-renames", "--no-ext-diff", "--no-textconv", "--no-color", "HEAD^1", "HEAD", "--", ...tests);
+  return diff === null ? null : weakened(diff);
+}
+
+if (started(import.meta.url)) {
+  const found = testsChanged(".");
+  if (found === null) console.log("Not read: the change could not be read against its base, or the base holds no shape check config naming the tests.");
+  else if (!found.length) console.log("No test file of this pull request's has an assertion taken out or changed, or a case skipped.");
+  else for (const f of found) {
+    console.log(`${f.file}:`);
+    for (const l of f.asserts) console.log(`  out or changed: ${l.trim().slice(0, 160)}`);
+    for (const l of f.skips) console.log(`  skip added: ${l.trim().slice(0, 160)}`);
+  }
+}
