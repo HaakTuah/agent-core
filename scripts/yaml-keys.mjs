@@ -1,14 +1,33 @@
 // A key given twice in one mapping of a YAML file, which GitHub's workflow reader refuses, running none of the file's
 // jobs (#393). The workflow check (workflows.mjs, beside this file) fails each with its line. It reads the file with the
 // YAML package the core carries (third-party/yaml, as third-party.mjs says; #528), every document of it, each mapping,
-// block or flow, and throws nothing, its errors read plainly so that a text full of them is read in linear time (one
-// text built to stop Node in the package's reading still does: #610). A key is read as YAML spells it and GitHub reads
-// it, as text: quoted or plain, with its escapes, so "if" and if are one key, and so are 1 and "1" (the failsafe
-// schema, which reads every scalar as text). A key that is no scalar (a mapping or a list) or an alias is passed over,
-// and each line break, \r\n, \r or \n, is one, as GitHub reads it. What it does not read: mappings nested about a
-// thousand deep, far past what GitHub reads, where the package stops; and text that is no YAML past where the package
-// can read it, which GitHub refuses all the same.
-import { LineCounter, isScalar, parseAllDocuments, visit } from "../third-party/yaml/dist/index.js";
+// block or flow, and throws nothing, its errors read plainly so that a text full of them is read in linear time. A key
+// is read as YAML spells it and GitHub reads it, as text: quoted or plain, with its escapes, so "if" and if are one
+// key, and so are 1 and "1" (the failsafe schema, which reads every scalar as text). A key that is no scalar (a mapping
+// or a list) or an alias is passed over, and each line break, \r\n, \r or \n, is one, as GitHub reads it. What it
+// does not read: a list or mapping nested more than DEEPEST deep, far past what a workflow holds, which it reads as an
+// empty value, the rest of the text read still, since Node stops by itself where the package builds one some 800 deep
+// (#610); and text that is no YAML past where the package can read it, which GitHub refuses all the same.
+import { Composer, LineCounter, Parser, isScalar, visit } from "../third-party/yaml/dist/index.js";
+
+export const DEEPEST = 128;
+
+// A text's tokens with each list or mapping nested past DEEPEST, a document counted as one, made an empty value, read
+// without recursion so that a text nested past any stack is read; the offsets of those made so, which hold no key.
+function pruned(tokens) {
+  const nests = new Set(["document", "block-map", "block-seq", "flow-collection"]), cut = new Set(), todo = [[tokens, 0]];
+  while (todo.length) {
+    const [holder, depth] = todo.pop();
+    for (const part of Array.isArray(holder) ? holder.keys() : ["start", "key", "sep", "value", "items", "end"]) {
+      const token = holder[part];
+      if (!token || typeof token !== "object") continue;
+      const own = nests.has(token.type) ? depth + 1 : depth;
+      if (own > DEEPEST) { holder[part] = { type: "scalar", offset: token.offset, indent: token.indent, source: "" }; cut.add(token.offset); }
+      else todo.push([token, own]);
+    }
+  }
+  return cut;
+}
 
 // A line without its comment (" #" outside quotes, or "#" at its start).
 export function uncommented(line) {
@@ -27,11 +46,12 @@ export function uncommented(line) {
 export function twice(text) {
   const found = [], lines = new LineCounter();
   try {
-    const docs = parseAllDocuments(String(text).replace(/^\ufeff/u, "").replace(/\r\n?/gu, "\n"), { lineCounter: lines, schema: "failsafe", uniqueKeys: false, prettyErrors: false });
-    for (const doc of Array.isArray(docs) ? docs : [docs]) visit(doc, { Map(_, map) {
+    const tokens = Array.from(new Parser(lines.addNewLine).parse(String(text).replace(/^\ufeff/u, "").replace(/\r\n?/gu, "\n")));
+    const cut = pruned(tokens);
+    for (const doc of new Composer({ schema: "failsafe", uniqueKeys: false }).compose(tokens)) visit(doc, { Map(_, map) {
       const seen = new Map();
       for (const { key } of map.items) {
-        if (!isScalar(key) || !key.range) continue;
+        if (!isScalar(key) || !key.range || cut.has(key.range[0])) continue;
         const name = String(key.value), at = key.range[0];
         if (seen.has(name)) found.push({ at, line: lines.linePos(at).line, key: name, first: lines.linePos(seen.get(name)).line });
         else seen.set(name, at);
