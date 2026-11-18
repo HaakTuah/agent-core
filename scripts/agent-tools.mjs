@@ -18,11 +18,11 @@
 // that leads out of it is not, and fails, save one the base held as it stands. What a person or a machine configures
 // outside the repository is no file of the project's (floor rule 18); another tool's settings (Kiro's agents under
 // `.kiro/agents`, say, or the plug-ins and marketplaces a Codex config names), and where a plug-in's marketplace or a
-// tool server's command points, are the review's. A tool's file, or a folder on its way, in another letter case fails,
-// as the tool may read it, save one the base held while what the tool reads through it stands; so does a submodule
-// where a tool reads its files, save one the base held at that commit. So does a variable a tool's settings set
-// (Claude Code's "env", Codex's shell environment policy) that changes how the programs a hook runs start, save one the
-// base held while its entry stands.
+// tool server's command points, are the review's. A tool's file, or a folder on its way, in another letter case, as the
+// commit holds it, fails, as the tool may read it, save one the base held while what the tool reads through it stands;
+// so does a submodule where a tool reads its files, save one the base held at that commit. So does a variable a tool's
+// settings set (Claude Code's "env", Codex's shell environment policy) that changes how the programs a hook runs start,
+// save one the base held while its entry stands.
 //
 // Where each hook's command comes from (#407; floor rule 3, what an agent tool starts by itself runs from its copy on
 // `main`): a hook of any tool read here runs its copy on main only where each command it may run, Codex's for Windows
@@ -58,7 +58,7 @@
 //   node scripts/agent-tools.mjs .github/licences.json --core          in the core's own repository
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
@@ -471,11 +471,11 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
     }
     return false;
   };
-  const resolve = f => walk(root, rev, f);
+  const commit = rev ? commitReader(root, rev) : null;
   // (in the working tree, a file git ignores is a person's or a machine's own, as a .claude/settings.local.json mostly
   // is, and no file of the project's: floor rule 18)
   const ignored = f => { try { execFileSync("git", ["check-ignore", "-q", "--", f], { cwd: root, stdio: "ignore" }); return true; } catch { return false; } };
-  const read = rev ? f => { const r = resolve(f); return r?.type === "blob" ? textAt(root, rev, r.f) : null; }
+  const read = rev ? commit.read
     : f => {
       // (a file that is not there is known without asking git, so a hook's command, read word by word, costs no process)
       if (outside(f)) return null;
@@ -485,12 +485,7 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
     };
   // (the names in a folder of the project, at the commit or in the working tree, a link out of the checkout not followed)
   const names = dir => {
-    if (rev) {
-      const d = resolve(dir);
-      if (d?.type !== "tree") return [];
-      const { blobs, links, dirs, others } = listing(root, rev), under = d.f === "." ? "" : `${d.f}/`;
-      return [...new Set([...blobs, ...links, ...dirs, ...others].filter(at => at.startsWith(under)).map(at => at.slice(under.length).split("/")[0]))];
-    }
+    if (rev) return commit.names(dir);
     if (outside(dir)) return [];
     try { return fs.readdirSync(path.join(root, dir)); } catch { return []; }
   };
@@ -502,18 +497,32 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   const own = at => notFile(listing(root, rev ?? "HEAD"), at) || shownNotBlob(root, rev ?? "HEAD", at) || (!rev && (() => { try { const st = fs.lstatSync(path.join(root, at)); return st.isSymbolicLink() || st.isDirectory(); } catch { return false; } })());
   const linked = at => own(at) || linkedOnMain(at);
   const project = configured(read, skills, names, linked);
-  // (found through `names`, which follows a link inside the checkout at the commit as in the working tree: toolPaths)
-  const isFile = rev ? at => resolve(at)?.type === "blob" : at => !outside(at) && (() => { try { return fs.statSync(path.join(root, at)).isFile(); } catch { return false; } })();
-  const isLink = rev ? at => listing(root, rev).linked.has(at) : at => { try { return fs.lstatSync(path.join(root, at)).isSymbolicLink(); } catch { return false; } };
-  const paths = toolPaths(names, isFile, isLink);
-  for (const [at, want] of misnamed(rev ? paths : unignored(root, paths))) {
-    const problem = `${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`;
-    project.problems.push(problem);
-    // (with what the tool reads through it, so one the base held is noted only while that stands letter for letter)
-    project.texts.set(problem, through(at, want, read, names));
-  }
-  for (const [problem, text] of submodules(listing(root, rev ?? "HEAD"))) { project.problems.push(problem); project.texts.set(problem, text); }
+  // (read at the commit, the working tree's at HEAD, the pull request's head: a file not committed, ignored or not, is
+  // no file of the project's, and the base is read the same way)
+  for (const [problem, text] of [...caseProblems(root, rev ?? "HEAD"), ...submodules(listing(root, rev ?? "HEAD"))]) { project.problems.push(problem); project.texts.set(problem, text); }
   return { ...project, links };
+}
+
+// A commit's files as an agent tool reads them: a path walked as the file system walks it, a link inside the checkout
+// followed (walk), a file's text, and the names in a folder.
+function commitReader(root, rev) {
+  const resolve = f => walk(root, rev, f);
+  const read = f => { const r = resolve(f); return r?.type === "blob" ? textAt(root, rev, r.f) : null; };
+  const names = dir => {
+    const d = resolve(dir);
+    if (d?.type !== "tree") return [];
+    const { blobs, links, dirs, others } = listing(root, rev), under = d.f === "." ? "" : `${d.f}/`;
+    return [...new Set([...blobs, ...links, ...dirs, ...others].filter(at => at.startsWith(under)).map(at => at.slice(under.length).split("/")[0]))];
+  };
+  return { resolve, read, names };
+}
+
+// Each path on the way to a tool's file that stands in another case at the commit `rev`, as [its problem, what the tool
+// reads through it], so one the base held is noted only while that stands letter for letter.
+function caseProblems(root, rev) {
+  const { resolve, read, names } = commitReader(root, rev);
+  return misnamed(toolPaths(names, at => resolve(at)?.type === "blob", at => listing(root, rev).linked.has(at))).map(([at, want]) =>
+    [`${at} is ${want} in another case, which an agent tool reads in its place where the file system ignores case, as macOS's and Windows' do, while this check reads ${want} alone. Mend: rename it to ${want}, in this pull request`, through(at, want, read, names)]);
 }
 
 // Each submodule where an agent tool reads its files, in whatever case, as [its problem, the commit it names]: git gives
@@ -577,7 +586,7 @@ function misnamed(paths) {
 function through(at, want, read, names) {
   const under = f => f === want || f.startsWith(`${want}/`);
   const found = (from, rest) => rest.split("/").filter(Boolean).reduce((dirs, step) => dirs.flatMap(d => names(d).filter(n => fold(n) === fold(step)).sort().map(n => `${d}/${n}`)), [from]);
-  // (a file read as nothing, ignored or no file, is left out, so the working tree's reading and the base's name the same)
+  // (a file read as nothing, no file there, is left out, so the head's reading and the base's name the same)
   const text = (name, a) => { const t = read(a); return t === null ? [] : [`${name}\0${a}\0${t}`]; };
   const files = TOOL_FILES.filter(under).flatMap(f => found(at, f.slice(want.length)).flatMap(a => text(f, a)));
   // (of a tool folder's entries, only what the tool reads there: a hook file of Kiro's, a skill's SKILL.md)
@@ -607,19 +616,6 @@ function toolPaths(names, isFile, isLink) {
   visit("", 0);
   return out;
 }
-// Of those files, the ones git does not ignore, as `read` has it: one ignored is no file of the project's, so a folder
-// whose files are all ignored holds none. Git is asked once, and only where one stands in another case.
-function unignored(root, paths) {
-  if (!misnamed(paths).length) return paths;
-  // (a path beyond a link is none git can say is ignored, and would stop its answer for every other: kept, not asked)
-  const beyond = p => p.split("/").slice(0, -1).some((_, i, parts) => { try { return fs.lstatSync(path.join(root, ...parts.slice(0, i + 1))).isSymbolicLink(); } catch { return false; } });
-  const asked = paths.filter(p => !beyond(p)), ask = list => spawnSync("git", ["check-ignore", "--stdin", "-z"], { cwd: root, input: list.join("\0"), encoding: "utf8" });
-  const answer = ask(asked);
-  // (git answers 0, some are ignored, or 1, none is; any other answer is no answer, so each is asked alone)
-  const out = answer.status === 0 || answer.status === 1 ? String(answer.stdout ?? "").split("\0").filter(Boolean) : asked.filter(p => ask([p]).status === 0);
-  return paths.filter(p => !new Set(out).has(p));
-}
-
 // At the commit `rev`, git's own tree is walked as the working tree is, a name at a time as the file system walks it:
 // a link inside the repository is followed (forty hops at most, as Linux follows them), its target put before what is
 // left of the path, so a ".." in it steps back from the folder the links before it led to; one that leads out of the
