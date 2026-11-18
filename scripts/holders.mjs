@@ -149,8 +149,9 @@ export function ownRules(files, read, listText) {
     const e = Object.hasOwn(list, r.key) ? list[r.key] : null, m = OWN_HELD.exec(String(e?.held ?? ""));
     if (!e || !m) { none.push(r.key); if (e) wrong.push(`${OWN}: "${r.key}" is held by "${e.held}", in no form it reads. Mend: write "check: <path>", "test: <path>", "review" or "describes"`); continue; }
     const kind = m[1] ?? m[3] ?? m[4];
-    counts[kind]++;
+    // (a check or test that is not there holds nothing: its entry is said, and the rule is counted as held by none)
     if (m[2] && !/^[a-z]+:/iu.test(m[2]) && read(m[2]) === null) wrong.push(`${OWN}: "${r.key}" is held by ${m[2]}, which is not there. Mend: name the check or test that holds it, or what holds it now`);
+    else counts[kind]++;
     if (!ABOUT.test(String(e.about ?? ""))) wrong.push(`${OWN}: "${r.key}" says no "about" the check reads. Mend: write "this project", "its kind: <kind>" or "every project"`);
     else if (e.about !== "this project") toCore.push(`${r.key} (${e.about})`);
   }
@@ -174,7 +175,13 @@ if (started(import.meta.url) && process.argv.includes("--project")) {
   // (each file read only where it lies inside the project and is a file: a path that leads out, a link to a device or a
   // folder, reads as not there)
   const { readHere: read, ruleFiles } = await import("./rule-files.mjs");
-  const o = ownRules(ruleFiles(), read, read(OWN));
+  let files;
+  try { files = ruleFiles(); } catch (e) {
+    // (in the core's own repository, whose SECURITY.md names no rule files of a project's, the rules are its own list's)
+    console.log(fs.existsSync(path.join(process.cwd(), FILE)) && !fs.existsSync(path.join(process.cwd(), "core")) ? "FAIL this is the core's own repository, whose rules holders.json lists. Mend: run node scripts/holders.mjs --list here" : `FAIL ${e.message}`);
+    process.exit(1);
+  }
+  const o = ownRules(files, read, read(OWN));
   const c = o.counts;
   console.log(`Of the project's own ${c.all} rules: ${c.check} held by a check, ${c.test} by a test, ${c.review} by the review, ${c.describes} describe; ${o.none.length} not in ${OWN}${o.none.length ? `: ${o.none.join("; ")}` : ""}.`);
   if (o.toCore.length) console.log(`About a kind or every project, each to file to the core as an idea where none is filed yet, written for the kind and holding nothing of this project, no file's name and no rule's own words ("Reporting to the core"): ${o.toCore.join("; ")}.`);
