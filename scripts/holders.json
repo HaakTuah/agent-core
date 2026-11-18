@@ -155,7 +155,36 @@
     "roles/reviewer.md: Reads at its start": "check: scripts/reading.mjs, in part",
     "roles/reviewer.md: Hands over, gets back": "describes",
     "roles/stand-in.md: Reads at its start": "check: scripts/reading.mjs, in part",
-    "roles/stand-in.md: Hands over, gets back": "describes"
+    "roles/stand-in.md: Hands over, gets back": "describes",
+    "floor/security.md: 18. Where agents hold sign-ins": "check: .github/workflows/personal-terms.yml, in part",
+    "floor/topics/dependencies.md: An agent's own tools are code with its sign-ins": "check: scripts/agent-tools.mjs, in part",
+    "floor/topics/input.md: Every named input has hostile tests": "check: scripts/steps.mjs, in part",
+    "floor/topics/weaknesses.md: In a PR's own change": [
+      "check: scripts/security-review.mjs, in part",
+      "check: GitHub's ruleset on the default branch, in part"
+    ],
+    "roles/orchestrator.md: The scheduled look": "check: scripts/look.mjs, in part",
+    "tasks/choices.md: What reopens a choice": "check: scripts/look.mjs, in part",
+    "tasks/choices.md: its sign trips": "check: scripts/look.mjs, in part",
+    "tasks/choices.md: the pass twice a year": "check: scripts/look.mjs, in part",
+    "tasks/cleaning.md: The state of a codebase sets the dose": "check: scripts/look.mjs, in part",
+    "tasks/cleaning.md: How cleaning is done": "check: scripts/shape.mjs, in part",
+    "tasks/code-shape.md: Never worse": "check: scripts/shape.mjs, in part",
+    "tasks/code-shape.md: Each project names its systems, under the same domains": "check: scripts/shape.mjs, in part",
+    "tasks/code-shape.md: Between systems, absolute for new code": "check: scripts/shape.mjs, in part",
+    "tasks/code-shape.md: Portable by default": "check: scripts/shape.mjs, in part",
+    "tasks/code-shape.md: A function is held to three marks": "check: scripts/shape.mjs",
+    "tasks/code-shape.md: A new project starts as rules with no screen": "check: scripts/shape.mjs, in part",
+    "tasks/code-shape.md: Near-copies are reported": "check: scripts/copies.mjs, in part",
+    "tasks/reviews.md: Which": [
+      "check: scripts/security-review.mjs, in part",
+      "check: GitHub's ruleset on the default branch, in part"
+    ],
+    "tasks/reviews.md: When a PR passes": [
+      "check: scripts/security-review.mjs, in part",
+      "check: GitHub's ruleset on the default branch, in part"
+    ],
+    "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part"
   },
   "behind": {
     "AGENTS.md": [208, 209, 213],
