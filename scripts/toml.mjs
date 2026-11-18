@@ -13,9 +13,19 @@ import { DEEPEST, tooDeep } from "./guards.mjs";
 // (a key set as a plain property, never through a setter: "__proto__" is a key like any other)
 const put = (table, key, value) => Object.defineProperty(table, key, { value, enumerable: true, writable: true, configurable: true });
 
+// A line-ending backslash in a multi-line basic string whose closing """ holds one or two quotes of the string's own
+// ("""x\ then """""), which the package reads without those quotes (smol-toml 1.9.1; #634's search for differences):
+// refused, so no command is listed other than the one Codex runs. A backslash escaped by another ends no line, so the
+// run of backslashes is odd.
+const QUOTES_LOST = /(?<!\\)(?:\\\\)*\\[ \t]*\n[ \t\n]*"{4}/u;
+
 export function parseToml(text) {
+  // (a CRLF line end is read as LF, inside a string of several lines too, as the reader before the package read it;
+  // where a CR stands alone anywhere, the text is left as it is, for the package to refuse: "\r\r\n" never becomes CRLF)
+  const raw = String(text), s = /\r(?!\n)/u.test(raw) ? raw : raw.replace(/\r\n/gu, "\n"), lost = QUOTES_LOST.exec(s);
+  if (lost) throw new SyntaxError(`line ${s.slice(0, lost.index).split("\n").length}: a string's line-ending backslash runs into its closing quotes, which the TOML package reads wrong`);
   let read;
-  try { read = parse(String(text), { integersAsBigInt: true, maxDepth: DEEPEST }); } catch (e) {
+  try { read = parse(s, { integersAsBigInt: true, maxDepth: DEEPEST }); } catch (e) {
     if (!(e instanceof TomlError)) throw new SyntaxError(`the file cannot be read as TOML (${String(e?.message ?? e).split("\n")[0]})`);
     const what = e.message.split("\n")[0].replace(/^Invalid TOML document: /u, "");
     throw new SyntaxError(`line ${e.line}: ${/excessively nested/u.test(what) ? `a value nests deeper than ${DEEPEST}` : what}`);

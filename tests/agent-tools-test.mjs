@@ -776,6 +776,20 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     try { parseToml(bad); } catch (e) { message = e.message; }
     ok(message.includes(says), `TOML that is no TOML is refused: ${says}`, message);
   }
+  // (#634's search for differences: the package drops the quotes a string holds before its closing """ where a
+  // line-ending backslash runs into them, so such a string is refused; a CRLF inside a string of several lines is LF)
+  for (const lost of ["notify = [\"python3\", \"\"\"notify.py\\\n\"\"\"\"\"]\n", "command = \"\"\"x \\\r\n  \"\"\"\"\n", "a = \"\"\"x\\\\\\\n\"\"\"\"\n"]) {
+    let message = "";
+    try { parseToml(lost); } catch (e) { message = e.message; }
+    ok(message.startsWith("line 1: a string's line-ending backslash runs into its closing quotes"), `a string whose quotes the package would drop is refused: ${JSON.stringify(lost)}`, message);
+  }
+  ok(parseToml("a = \"\"\"x\\\\\n\"\"\"\"\"\nb = \"\"\"x\\\n\"\"\"\n").a === "x\\\n\"\"", "a backslash escaped by another ends no line, and one with no quote of the string's own before the close is read", JSON.stringify(parseToml("a = \"\"\"x\\\\\n\"\"\"\"\"\n")));
+  ok(parseToml("a = '''x\r\ny'''\r\nb = \"\"\"p\r\nq\"\"\"\r\n").a === "x\ny" && parseToml("b = \"\"\"p\r\nq\"\"\"\r\n").b === "p\nq", "a CRLF inside a string of several lines is read as LF");
+  for (const bare of ["a = 1\r\r\nb = 2\r\n", "a = '''x\ry'''\n"]) {
+    let refused = false;
+    try { parseToml(bare); } catch { refused = true; }
+    ok(refused, `a CR standing alone is refused, before a CRLF too: ${JSON.stringify(bare)}`);
+  }
   // (#476's code review of fd9135b: each [[...]] header appends without reading the entries before it again)
   const began = Date.now(), many = parseToml("[[x]]\n".repeat(200000));
   ok(many.x.length === 200000 && Date.now() - began < 3000, "an array of 200,000 tables is read at once", `${Date.now() - began} ms`);
