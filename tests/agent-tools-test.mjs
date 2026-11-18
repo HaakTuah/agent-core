@@ -614,6 +614,12 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     held(linkIn, dir => sub(dir, "inner", git(dir, "rev-parse", "HEAD")), "a broken link the base held, filled in with a submodule, fails");
     held(linkIn, dir => { fs.symlinkSync(os.tmpdir(), path.join(dir, "inner")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "filled in"); }, "and filled in with a link out");
     held(dir => { fs.symlinkSync(os.tmpdir(), path.join(dir, "inner")); linkIn(dir); }, dir => { fs.unlinkSync(path.join(dir, "inner")); fs.symlinkSync(path.dirname(os.tmpdir()), path.join(dir, "inner")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "moved"); }, "a link on the way the pull request moves fails");
+    // (#600's fallback security review of b333c75: a link into a submodule's folder, the submodule moved)
+    held(dir => { fs.symlinkSync("../sub/cfg", path.join(dir, ".Kiro/settings")); git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", "a link in"); sub(dir, "sub", git(dir, "rev-parse", "HEAD")); }, dir => sub(dir, "sub", git(dir, "rev-parse", "HEAD~2")), "a link into a submodule the base held, the submodule moved, fails");
+    // (and a plain file on the way, which gives the tool nothing to read, is not held)
+    const plainOnWay = project({ ".Kiro/hooks/x.json": "{}\n", ".Kiro/settings": "a\n", ...listing() });
+    const plainRun = run(pr(plainOnWay, { ".Kiro/settings": "b\n" }));
+    ok(plainRun.status === 0, "a plain file on the way to a tool's file, changed, changes nothing the base held", plainRun.out);
     // (#600's fallback security review of 27d9d98: a file is held by its kind too, so none reads as a link it names)
     const asLink = project({ ".Codex/hooks.json": "{}\n", ...listing() });
     fs.symlinkSync(os.tmpdir(), path.join(asLink, ".Codex/config.toml"));
