@@ -4,7 +4,7 @@
 # and says in a line where Node is not on the path, so the helper hook is off, what the branch's changed paths call
 # for (core archive 234), and whether the owner's stop switch is set (core archive 201);
 # stop keeps the reply from ending while any is, once: a second stop in a row goes through, so a push that cannot be
-# made never traps a session. At the start it installs the core's packages from main's lock file where what is installed is not what it names (below); else it only reads the repository, with the git settings that run commands (fsmonitor, hooks)
+# made never traps a session. At the start it installs the core's packages from main's own npm files where what is installed is not what they name (below); else it only reads the repository, with the git settings that run commands (fsmonitor, hooks)
 # turned off; the start asks origin for the switch with the user's own SSH and sign-in setup, never a prompt, and with
 # origin's settings that run commands set aside. Claude Code runs the copy merged into main (the project's
 # .claude/settings.json; floor rule 3), never the working tree's, so an edit runs once it is reviewed.
@@ -29,26 +29,36 @@ if [ "$mode" = start ]; then
     echo "The floor's own copy under $copy differs from the floor under ${at}floor/, the core's that the library carries. Mend: copy ${at}floor/ over it, whole, in a pull request of its own."
   fi
 fi
-# The core's packages (#654): at the start, where the copy holds a lock file and what is installed beside it is not what
-# it names, npm installs them from it, as the copy's scripts/install.mjs does, and only where the package list, the lock
-# file and the .npmrc are main's own (each on main, the working tree's unchanged), so nothing of the branch's is read: no
-# install script runs, no git, web or file address is taken, and it gives up after 20 seconds, inside the hook's 30. A
+# The core's packages (#654): at the start, where main's copy holds a lock file and what is installed beside the copy
+# is not what it names, npm installs them from main's package list, lock file and .npmrc alone, written into a folder of
+# its own outside the checkout, so that nothing of the branch's is read or run (a shrinkwrap, a config, a link); then the
+# folder it installed takes the place of the copy's node_modules/, only where that is a folder of the checkout's own,
+# no link and nothing git tracks. No install script runs, and it gives up after 20 seconds, inside the hook's 30. A
 # note, never a block: a check that needs a package says so, with its mend.
-if [ "$mode" = start ] && [ -f "${at}package-lock.json" ] && command -v npm >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
-  # (whether the folder holds what the lock file names, by each entry's version, address and integrity: node reads the
-  # two files as data, and runs nothing of either)
-  if ! node -e 'const fs=require("fs");const read=f=>{try{return JSON.parse(fs.readFileSync(f,"utf8")).packages||{}}catch{return null}};const [w,h]=process.argv.slice(1).map(read);process.exit(w&&h&&Object.keys(w).filter(k=>k&&!w[k].dev).every(k=>h[k]&&["version","resolved","integrity"].every(f=>w[k][f]===h[k][f]))?0:1)' "${at}package-lock.json" "${at}node_modules/.package-lock.json" 2>/dev/null; then
-    mains=1
-    for f in package.json package-lock.json .npmrc; do g cat-file -e "refs/remotes/origin/main:${at}$f" 2>/dev/null && [ -f "${at}$f" ] || mains=0; done
-    omit=--omit=dev; [ -d tests ] && [ -z "$at" ] && omit= # (a copy installs no package only the core's own tests run)
-    if [ "$mains" = 1 ] && g diff --quiet --no-ext-diff --no-textconv refs/remotes/origin/main -- "${at}package.json" "${at}package-lock.json" "${at}.npmrc" 2>/dev/null; then
-      if ! (cd "./${at}" && timeout 20 npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none --workspaces=false $omit >/dev/null 2>&1); then
-        echo "The core's packages are not installed: npm could not install them from ${at}package-lock.json. Mend: run node ${at}scripts/install.mjs before running a check."
+if [ "$mode" = start ] && command -v npm >/dev/null 2>&1 && command -v node >/dev/null 2>&1 \
+  && g cat-file -e "refs/remotes/origin/main:${at}package-lock.json" 2>/dev/null; then
+  w=$(mktemp -d 2>/dev/null) || w=""
+  if [ -n "$w" ] && (for f in package.json package-lock.json .npmrc; do g --no-replace-objects show "refs/remotes/origin/main:${at}$f" >"$w/$f" 2>/dev/null || exit 1; done); then
+    # (whether the folder holds what main's lock file names, by each entry's version, address and integrity: node reads
+    # the two files as data, and runs nothing of either)
+    if ! node -e 'const fs=require("fs");const read=f=>{try{return JSON.parse(fs.readFileSync(f,"utf8")).packages||{}}catch{return null}};const [w,h]=process.argv.slice(1).map(read);process.exit(w&&h&&Object.keys(w).filter(k=>k&&!w[k].dev).every(k=>h[k]&&["version","resolved","integrity"].every(f=>w[k][f]===h[k][f]))?0:1)' "$w/package-lock.json" "${at}node_modules/.package-lock.json" 2>/dev/null; then
+      dest="${at}node_modules"
+      here=$(pwd -P)
+      if [ -n "$at" ] && [ "$(cd "./$at" 2>/dev/null && pwd -P)" != "$here/${at%/}" ]; then
+        echo "The core's packages are not installed: ${at} is not a folder of this checkout's own. Mend: put the core's files there in place of the link, then run node ${at}scripts/install.mjs."
+      # (a link as the shell sees one, or as Node does, which reads a Windows junction as one too)
+      elif [ -L "$dest" ] || node -e 'process.exit(require("fs").lstatSync(process.argv[1],{throwIfNoEntry:false})?.isSymbolicLink()?0:1)' "$dest" 2>/dev/null \
+        || [ -n "$(g ls-files -- "$dest" 2>/dev/null | head -n 1)" ]; then
+        echo "The core's packages are not installed: ${dest} is a link or holds files git tracks, which the install would replace. Mend: take it out of git and remove the link, then run node ${at}scripts/install.mjs."
+      else
+        omit=--omit=dev; [ -z "$at" ] && [ -d tests ] && omit= # (a copy installs no package only the core's own tests run)
+        if (cd "$w" && timeout 20 npm ci --ignore-scripts --no-audit --no-fund --workspaces=false $omit >/dev/null 2>&1) && rm -rf "$dest" && mv "$w/node_modules" "$dest"; then :; else
+          echo "The core's packages are not installed: npm could not install them from main's ${at}package-lock.json. Mend: run node ${at}scripts/install.mjs before running a check."
+        fi
       fi
-    else
-      echo "The core's packages are not installed: this branch's ${at}package.json, ${at}package-lock.json or ${at}.npmrc is not main's, and the start installs only from main's. Mend: once the branch's are reviewed, run node ${at}scripts/install.mjs before running a check."
     fi
   fi
+  [ -n "$w" ] && rm -rf "$w"
 fi
 # (a note, never a block: the helper hook is started by node, so without it there the hook stops nothing)
 if [ "$mode" = start ] && ! command -v node >/dev/null 2>&1; then

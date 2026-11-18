@@ -3,8 +3,8 @@
 // file names, each entry by its version, address and integrity (npm's own record of the install, node_modules/
 // .package-lock.json, read against package-lock.json), so a folder an earlier install of another lock file left is
 // never run. Where it is not so, the check that needs it did not run, and says so with the command that installs it
-// (#254, #457); it never passes, and fails, save in a project's pull request whose install could not reach the
-// registry, where it says so as a warning (#654, point 4).
+// (#254, #457); it never passes. In a project's pull request whose install could not reach the registry, a script asks
+// unreached() first, and says that part did not run as a warning (#654, point 4).
 //
 //   import { load, loadSync } from "./packages.mjs";   const { Lexer } = await load("yaml");
 //                                                     loadSync("yaml"): the same, at once, for a package of CommonJS,
@@ -57,19 +57,20 @@ function entry(name) {
   } catch { return null; }
 }
 
-// The package's entry file; where it is not installed, the failure. Where the job's install could not reach the
-// registry, in a project's pull request (install.mjs), a warning that the check did not run, failing nothing (#654,
-// point 4); in a job of a workflow, the mend is the install step the job lacks, in a pull request of its own, so that a
-// sync pull request stays pure.
+// Whether the package could not be installed because the registry did not answer, in a project's pull request
+// (install.mjs): a script that reads it checks this first and says that part did not run, as a warning, keeping every
+// failure it found without the package (#654, point 4).
+export function unreached(name) {
+  return process.env.CORE_PACKAGES_UNREACHED === "1" && !installed(name);
+}
+
+// The package's entry file; where it is not installed, the failure, which never passes: in a job of a workflow, the
+// mend is the install step the job lacks, in a pull request of its own, so that a sync pull request stays pure.
 function found(name) {
   const file = entry(name);
   if (!file) {
     const install = path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"));
     const at = `${path.relative(process.cwd(), root) || "."}${path.sep}node_modules`;
-    if (process.env.CORE_PACKAGES_UNREACHED === "1") {
-      console.log(`::warning::The check did not run: the package ${name} could not be installed in ${at}, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`);
-      process.exit(0);
-    }
     const mend = process.env.GITHUB_ACTIONS === "true"
       ? `in a pull request of its own, never a sync pull request, add the step if [ -f ${install} ]; then node ${install}; fi to this job before the step that runs this check, then run the job again; where the job has such a step, run the job again`
       : `run node ${install}, which installs the core's packages from its lock file, then run the check again`;

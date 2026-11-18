@@ -27,6 +27,29 @@ export const REGISTRIES = {
   npm: { lock: "package-lock.json", into: "node_modules/", run: () => spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none", "--workspaces=false", ...(own ? [] : ["--omit=dev"])], { cwd: root, encoding: "utf8", shell: windows }) },
 };
 
+// What keeps an install from running where it could reach past the core's own files: for npm's registry, a shrinkwrap
+// beside the lock file, which its program reads first; an .npmrc that names another registry, or a host's settings; and an install folder
+// that is a link, or holds what git tracks, which the install would empty. Each as the failure's words with its mend; null
+// where none stands.
+function refusal(lock, into) {
+  if (lock !== "package-lock.json") return null;
+  const at = f => path.join(root, f);
+  if (fs.existsSync(at("npm-shrinkwrap.json"))) return `${at("npm-shrinkwrap.json")} stands beside the lock file, and would be installed from in its place. Mend: take it out; the core's packages are named in package-lock.json alone`;
+  let npmrc = "";
+  try { npmrc = fs.readFileSync(at(".npmrc"), "utf8"); } catch { /* (none: npm's own registry) */ }
+  if (/^\s*(?:(?:@[^\s:=]+:)?registry|\/\/[^\s=]*:[^\s=]+)\s*=/mu.test(npmrc)) return `${at(".npmrc")} names a registry, or a registry host's settings, so the install would fetch from another registry than the lock file names. Mend: take that line out`;
+  const folder = at(into.replace(/\/$/u, "")); // (no "/" after it, which would read the link's target)
+  if (fs.lstatSync(folder, { throwIfNoEntry: false })?.isSymbolicLink()) return `${folder} is a link, which the install would empty. Mend: remove the link, then run this again`;
+  let tracked = "";
+  try { tracked = spawnSync("git", ["ls-files", "--", into], { cwd: root, encoding: "utf8" }).stdout ?? ""; } catch { /* (no git: nothing tracked) */ }
+  if (tracked.trim()) return `${folder} holds files git tracks, which the install would replace. Mend: take them out of git (git rm -r --cached ${into}), then run this again`;
+  return null;
+}
+
+// Whether the install's failure is a registry that did not answer: a network error, or a server's own error, never another
+// (a lock file npm cannot read, an integrity that does not match), which a pull request could bring about.
+const unanswered = text => /\b(?:ETIMEDOUT|ESOCKETTIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|E5\d\d)\b/u.test(String(text ?? ""));
+
 const named = process.argv.slice(2);
 const unknown = named.filter(n => !Object.hasOwn(REGISTRIES, n));
 if (unknown.length) {
@@ -37,6 +60,8 @@ const first = Object.keys(REGISTRIES)[0]; // (npm's, where none is named)
 for (const name of named.length ? named : [first]) {
   const { lock, into, run } = REGISTRIES[name];
   if (!fs.existsSync(path.join(root, lock))) continue; // (a copy whose core holds no lock file of this registry)
+  const refused = refusal(lock, into);
+  if (refused) { console.error(`FAIL: the core's packages were not installed: ${refused}`); process.exit(1); }
   const began = Date.now();
   let r = run();
   if (r.status !== 0) {
@@ -47,7 +72,7 @@ for (const name of named.length ? named : [first]) {
     const why = (r.stderr || r.error?.message || "").trim().split("\n").slice(-3).join(" ");
     // (in a project's pull request, a registry that did not answer fails nothing by that alone (#654, point 4): each
     // check that needs a package says it did not run, and the job is run again before the merge)
-    if (!own && /^pull_request/u.test(process.env.GITHUB_EVENT_NAME ?? "") && process.env.GITHUB_ENV) {
+    if (!own && unanswered(r.stderr) && /^pull_request/u.test(process.env.GITHUB_EVENT_NAME ?? "") && process.env.GITHUB_ENV) {
       fs.appendFileSync(process.env.GITHUB_ENV, "CORE_PACKAGES_UNREACHED=1\n");
       const said = `The core's packages could not be installed from ${lock}, twice, so each check that needs one did not run: ${why}. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`;
       console.log(`::warning::${said}`);

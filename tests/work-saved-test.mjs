@@ -211,8 +211,9 @@ ok(!/STOP|floor's own copy/.test(hook("start", project).stdout), "a project whos
   ok(/floor's own copy under floor-copy\/ differs from the floor under lib\/core\/floor\/.*Mend: /.test(said) && !/STOP/.test(said), "a floor's own copy that differs from the carried floor is named, with its mend", said);
 }
 
-// The core's packages (#654): at the start, installed from the copy's lock file only where it, the package list and the
-// .npmrc are main's own; a branch's own .npmrc or lock file installs nothing, and says so with the mend.
+// The core's packages (#654): at the start, installed from main's npm files alone, in a folder of their own, so that
+// nothing of the branch's is read or run; and never where the copy's node_modules is a link or tracked, which the
+// install would replace.
 {
   const pkg = path.join(tmp, "packages"), origin = path.join(tmp, "packages.git");
   fs.mkdirSync(path.join(pkg, "core", "scripts"), { recursive: true });
@@ -226,12 +227,23 @@ ok(!/STOP|floor's own copy/.test(hook("start", project).stdout), "a project whos
   git(pkg, "remote", "add", "origin", origin);
   git(pkg, "push", "-q", "-u", "origin", "main");
   const installed = () => fs.existsSync(path.join(pkg, "core", "node_modules", "yaml", "package.json"));
+  // (a branch whose own npm files would run its own script: a config naming it, a shrinkwrap that npm reads first)
+  const ran = path.join(tmp, "ran");
+  fs.writeFileSync(path.join(pkg, "core", "run-me.sh"), `#!/bin/sh\ntouch "${ran.split(path.sep).join("/")}"\n`, { mode: 0o755 });
   fs.appendFileSync(path.join(pkg, "core", ".npmrc"), "git=./run-me.sh\n");
+  const lock = JSON.parse(fs.readFileSync(path.join(pkg, "core", "package-lock.json"), "utf8"));
+  lock.packages["node_modules/yaml"] = { version: "2.9.1", resolved: "git+ssh://git@example.invalid/x.git#0000000000000000000000000000000000000000" };
+  fs.writeFileSync(path.join(pkg, "core", "npm-shrinkwrap.json"), JSON.stringify(lock));
   let said = hook("start", pkg).stdout;
-  ok(!installed() && /packages are not installed: this branch's core\/package\.json, core\/package-lock\.json or core\/\.npmrc is not main's.*Mend: /.test(said), "a branch whose .npmrc is not main's installs nothing at the start, and says the mend", said);
-  git(pkg, "checkout", "-q", "--", "core/.npmrc");
+  ok(installed() && !fs.existsSync(ran) && !/packages are not installed/.test(said), "a branch's own .npmrc and shrinkwrap are never read: the start installs main's", said);
+  // (a copy's node_modules that is a link, tracked, is left as it is, and what it points at untouched)
+  const kept = path.join(tmp, "kept");
+  fs.mkdirSync(kept);
+  fs.writeFileSync(path.join(kept, "unpushed.txt"), "work\n");
+  fs.rmSync(path.join(pkg, "core", "node_modules"), { recursive: true, force: true });
+  fs.symlinkSync(kept, path.join(pkg, "core", "node_modules"), "junction");
   said = hook("start", pkg).stdout;
-  ok(installed() && !/packages are not installed/.test(said), "where the copy's lock file, package list and .npmrc are main's, the start installs from them", said);
+  ok(fs.existsSync(path.join(kept, "unpushed.txt")) && /packages are not installed: core\/node_modules is a link.*Mend: /.test(said), "a copy's node_modules that is a link is never replaced, and what it points at is kept", said);
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the work-saved hook`);

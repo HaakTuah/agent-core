@@ -38,9 +38,12 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
 // ---- nothing of another publisher's tracked: no node_modules/, no carried folder ----
 {
   const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
-  ok(!tracked.some(f => /(?:^|\/)node_modules\//u.test(f) || f.startsWith("third-party/")), "no file of another publisher's is tracked in the core: its packages are installed, never carried", tracked.filter(f => /node_modules\/|^third-party\//u.test(f)).slice(0, 5).join(", "));
+  const theirs = f => /(?:^|\/)node_modules(?:\/|$)/u.test(f) || f.startsWith("third-party/");
+  ok(!tracked.some(theirs), "no file of another publisher's is tracked in the core, nor a link in its install's place: its packages are installed, never carried", tracked.filter(theirs).slice(0, 5).join(", "));
   const ignore = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
-  ok(/^\/node_modules\/$/mu.test(ignore) && ["/.npmrc", "/package.json", "/package-lock.json"].every(f => ignore.split("\n").includes(`!${f}`)), "the core's .gitignore, which travels to the copy's root, keeps the install out of git, and the copy's package list, lock file and .npmrc in it");
+  ok(/^\/node_modules$/mu.test(ignore) && ["/.npmrc", "/package.json", "/package-lock.json"].every(f => ignore.split("\n").includes(`!${f}`)), "the core's .gitignore, which travels to the copy's root, keeps the install out of git, a link in its place too, and the copy's package list, lock file and .npmrc in it");
+  // (no registry but npm's own, nor a host's settings, in the .npmrc the copy carries: install.mjs refuses one too)
+  ok(!/^\s*(?:(?:@[^\s:=]+:)?registry|\/\/[^\s=]*:[^\s=]+)\s*=/mu.test(fs.readFileSync(path.join(root, ".npmrc"), "utf8")), "the core's .npmrc names no registry and no registry host's settings, so the install and the signatures' check ask npm's own");
 }
 
 // ---- with nothing installed, a script that loads a package says it did not run, and how to install ----
@@ -90,9 +93,9 @@ try {
   fs.writeFileSync(record, JSON.stringify(other));
   const stale = call("yaml-keys.mjs", CALLS["yaml-keys.mjs"]);
   ok(stale.status === 1 && /did not run: the package yaml is not installed .* as package-lock\.json names it/u.test(stale.stderr) && mended(stale.stderr), "a package installed from another lock file than the copy's is never loaded: the check did not run, with its mend", `${stale.stdout}${stale.stderr}`);
-  // (in a project's pull request whose install could not reach the registry, the check says it did not run, and fails nothing)
-  const unreached = spawnSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/yaml-keys.mjs")).href)}); m.${CALLS["yaml-keys.mjs"]};`], { cwd: project, encoding: "utf8", env: { ...env, CORE_PACKAGES_UNREACHED: "1" } });
-  ok(unreached.status === 0 && /^::warning::The check did not run: the package yaml could not be installed/mu.test(unreached.stdout) && /Mend: run this job again/u.test(unreached.stdout), "where the job's install could not reach the registry, a check that needs a package says as a warning that it did not run, and fails nothing (#654, point 4)", `${unreached.stdout}${unreached.stderr}`);
+  // (where the job's install could not reach the registry, a script is told so, and loading the package still fails)
+  const unreached = spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(p.unreached("yaml")); p.loadSync("yaml");`], { cwd: project, encoding: "utf8", env: { ...env, CORE_PACKAGES_UNREACHED: "1" } });
+  ok(unreached.status === 1 && /^true$/mu.test(unreached.stdout) && mended(unreached.stderr), "where the job's install could not reach the registry, a script is told so, and a package it loads all the same fails, never passing (#654, points 3 and 4)", `${unreached.stdout}${unreached.stderr}`);
   fs.writeFileSync(record, kept);
   // (a lock file whose integrity the registry's tarball does not match: twice refused, then a failure that says the mend)
   const wrong = JSON.parse(fs.readFileSync(path.join(copy, "package-lock.json"), "utf8"));
@@ -102,11 +105,33 @@ try {
   fs.rmSync(path.join(copy, "node_modules"), { recursive: true, force: true });
   const refused = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env });
   ok(refused.status === 1 && /runs again/u.test(refused.stderr) && /could not be installed .*twice/u.test(refused.stderr) && mended(refused.stderr), "an install that fails is run once more, and a second failure fails, saying the mend", refused.stderr);
-  // (in a project's pull request, the same failure fails nothing: the job is told, and each check after it says it did not run)
+  // (in a project's pull request the same failure fails all the same: a lock file the registry's tarball does not match
+  // is no registry that did not answer, and a pull request can bring it about)
   const jobEnv = path.join(tmp, "github-env");
   fs.writeFileSync(jobEnv, "");
-  const warned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...env, GITHUB_EVENT_NAME: "pull_request", GITHUB_ENV: jobEnv } });
-  ok(warned.status === 0 && /^::warning::The core's packages could not be installed .*twice/mu.test(warned.stdout) && /Mend: run this job again/u.test(warned.stdout) && /^CORE_PACKAGES_UNREACHED=1$/mu.test(fs.readFileSync(jobEnv, "utf8")), "in a project's pull request a second failed install is a warning, and tells the job's later checks", `${warned.status} ${warned.stdout}${warned.stderr}`);
+  const inPr = { ...env, GITHUB_EVENT_NAME: "pull_request", GITHUB_ENV: jobEnv };
+  const mismatched = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: inPr });
+  ok(mismatched.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "in a project's pull request an install that fails for anything but the registry not answering fails, and tells the job nothing", `${mismatched.status} ${mismatched.stdout}${mismatched.stderr}`);
+  // (a registry that does not answer, in a project's pull request, fails nothing: the job is told, and each check after it says it did not run)
+  fs.copyFileSync(path.join(root, "package-lock.json"), path.join(copy, "package-lock.json"));
+  const warned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...inPr, npm_config_registry: "http://127.0.0.1:9/", npm_config_fetch_retries: "0", npm_config_cache: path.join(tmp, "empty-cache") } });
+  ok(warned.status === 0 && /^::warning::The core's packages could not be installed .*twice/mu.test(warned.stdout) && /Mend: run this job again/u.test(warned.stdout) && /^CORE_PACKAGES_UNREACHED=1$/mu.test(fs.readFileSync(jobEnv, "utf8")), "in a project's pull request a registry that does not answer twice is a warning, and tells the job's later checks", `${warned.status} ${warned.stdout}${warned.stderr}`);
+  // (what would reach past the core's own files: a shrinkwrap npm reads first, another registry, a link in the install's place)
+  const refuses = (what, plant, unplant, said) => {
+    plant();
+    const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env });
+    unplant();
+    ok(r.status === 1 && said.test(r.stderr) && mended(r.stderr), `install.mjs installs nothing where ${what}, saying the mend`, `${r.status} ${r.stdout}${r.stderr}`);
+  };
+  fs.rmSync(path.join(copy, "node_modules"), { recursive: true, force: true });
+  refuses("a shrinkwrap stands beside the lock file", () => fs.copyFileSync(path.join(copy, "package-lock.json"), path.join(copy, "npm-shrinkwrap.json")), () => fs.rmSync(path.join(copy, "npm-shrinkwrap.json")), /npm-shrinkwrap\.json stands beside the lock file/u);
+  const npmrc = fs.readFileSync(path.join(copy, ".npmrc"), "utf8");
+  refuses("the .npmrc names another registry", () => fs.appendFileSync(path.join(copy, ".npmrc"), "registry=https://example.invalid/\n"), () => fs.writeFileSync(path.join(copy, ".npmrc"), npmrc), /names a registry/u);
+  const elsewhere = path.join(tmp, "elsewhere");
+  fs.mkdirSync(elsewhere);
+  fs.writeFileSync(path.join(elsewhere, "kept.txt"), "kept\n");
+  refuses("node_modules is a link", () => fs.symlinkSync(elsewhere, path.join(copy, "node_modules"), "junction"), () => fs.unlinkSync(path.join(copy, "node_modules")), /node_modules is a link/u);
+  ok(fs.existsSync(path.join(elsewhere, "kept.txt")), "and what the link pointed at is kept");
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 
 process.exit(failed ? 1 : 0);
