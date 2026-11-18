@@ -213,7 +213,8 @@ const hostile = "import assert from \"node:assert/strict\";\nimport { savedSum }
 const reportIn = (d, route) => spawnSync(process.execPath, [path.join(d, "bin", "gh"), "api", "-X", "POST", route, "-f", "summary=A weakness in src/serve.mjs", "-f", "description=Its name reaches ../ beyond sums/."], { encoding: "utf8" });
 const keptWeakness = d => {
   reportIn(d, `repos/${OWNER}/${REPO}/security-advisories/reports`);
-  branch(d, "harden-saved", { "src/saved.mjs": SAFE, "test/hostile.test.mjs": hostile });
+  // (a second hostile test under a name git writes in quotes in a diff: a test all the same)
+  branch(d, "harden-saved", { "src/saved.mjs": SAFE, "test/hostile.test.mjs": hostile, "test/hostil\u00e9.test.mjs": hostile });
   return pr(d, "harden-saved", "Hardens src/saved.mjs: a saved sum is read from its own folder alone.\n\n## Readings taken\n- None.\n\nWaits on: a review");
 };
 // (what one public text tells, whatever spelling holds the climb: the request's own encoding, mixed or twice over, a
@@ -244,8 +245,8 @@ check("weakness", fresh("weakness"), keptWeakness,
   ok(/which kind of weakness/.test(verdict("weakness", d).why), "weakness: a comment naming the kind fails", verdict("weakness", d).why);
   gh(d, "PATCH", `pulls/${p.number}`, { title: "Refuse ..%2f in a name" });
   ok(/pull request says how/.test(verdict("weakness", d).why), "weakness: a pull request that spells the input fails", verdict("weakness", d).why);
-  branch(d, "notes", { "docs/audit.md": "A name of ../../.ssh/id reads the key.\n" });
-  ok(/pushed commit says how/.test(verdict("weakness", d).why), "weakness: a file outside the tests that says how fails, the tests' hostile input aside", verdict("weakness", d).why);
+  branch(d, "notes", { "docs/r\u00e9vision.md": "A name of ../../.ssh/id reads the key.\n" });
+  ok(/pushed commit says how/.test(verdict("weakness", d).why), "weakness: a file outside the tests that says how fails, under a name git writes in quotes too, the tests' hostile input aside", verdict("weakness", d).why);
 }
 {
   // (a fix that moves code beside a module it imports by ../ says nothing; an issue that said how, edited away, still fails)

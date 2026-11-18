@@ -76,14 +76,15 @@ export function set(dir, opts = {}) {
 }
 
 // The lines a commit's diff adds to files outside test/. A file's name is read from the lines before its first hunk
-// alone: inside one, "+++ " opens a line the file itself holds.
+// alone: inside one, "+++ " opens a line the file itself holds. Git writes a name in quotes where it holds a letter
+// outside ASCII or a mark, and the folder it opens with stands after the quote as it is.
 function added(diff) {
   const lines = [];
   let file = null, head = false;
   for (const l of diff.split("\n")) {
     if (l.startsWith("diff ")) head = true;
     else if (l.startsWith("@@")) head = false;
-    else if (head && l.startsWith("+++ ")) file = l.replace(/^\+\+\+ (?:b\/)?/, "");
+    else if (head && l.startsWith("+++ ")) file = l.replace(/^\+\+\+ "?(?:b\/)?/, "");
     else if (!head && l.startsWith("+") && file !== null && !file.startsWith("test/")) lines.push(l.slice(1));
   }
   return lines;
