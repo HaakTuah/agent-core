@@ -1067,6 +1067,18 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       dir => { fs.rmSync(path.join(dir, "cfg"), { recursive: true, force: true }); fs.symlinkSync("node_modules/evil", path.join(dir, "cfg")); })), "a link the base held to what the commit holds, made to lead away by a link further along, is new", UNHELD);
     fails(run(swap(dir => { fs.mkdirSync(path.join(dir, "conf"), { recursive: true }); fs.rmSync(path.join(dir, ".claude/settings.json")); fs.symlinkSync("../conf/settings.json", path.join(dir, ".claude/settings.json")); fs.rmSync(path.join(dir, "conf"), { recursive: true }); fs.symlinkSync("node_modules/a", path.join(dir, "conf")); },
       dir => { fs.unlinkSync(path.join(dir, "conf")); fs.symlinkSync("node_modules/evil", path.join(dir, "conf")); })), "and so is one whose link further along the pull request moves", UNHELD);
+    // (#693's fallback security review of d10aea8: one whose way leaves the checkout and comes back in, by ".." or a whole
+    // path, or that Windows reads otherwise, by a backslash or past forty links, is held by all of that way)
+    const self = dir => path.basename(fs.realpathSync(dir));
+    const intoCfg = to => dir => { fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.mkdirSync(path.join(dir, "cfg"), { recursive: true }); fs.writeFileSync(path.join(dir, "cfg/settings.json"), KIT); fs.symlinkSync(to(dir), path.join(dir, ".claude")); };
+    const cfgAway = dir => { fs.rmSync(path.join(dir, "cfg"), { recursive: true, force: true }); fs.symlinkSync("node_modules/evil", path.join(dir, "cfg")); };
+    fails(run(swap(intoCfg(dir => `../${self(dir)}/cfg`), cfgAway)), "a link the base held that leaves the checkout and comes back in, made to lead away further along, is new", UNHELD);
+    fails(run(swap(intoCfg(dir => path.join(fs.realpathSync(dir), "cfg")), cfgAway)), "and so is one to a whole path into the checkout", UNHELD);
+    fails(run(swap(dir => { intoCfg(() => "cfg\\x")(dir); fs.mkdirSync(path.join(dir, "cfg/x")); fs.renameSync(path.join(dir, "cfg/settings.json"), path.join(dir, "cfg/x/settings.json")); }, cfgAway)), "and so is one whose way Windows reads by a backslash", UNHELD);
+    fails(run(swap(dir => { intoCfg(() => "l1")(dir); for (let i = 1; i <= 45; i++) fs.symlinkSync(i < 45 ? `l${i + 1}` : "cfg", path.join(dir, `l${i}`)); },
+      dir => { fs.unlinkSync(path.join(dir, "l45")); fs.symlinkSync("node_modules/evil", path.join(dir, "l45")); })), "and so is one past forty links, as Windows follows them", UNHELD);
+    const roundKept = run(swap(dir => { fs.rmSync(path.join(dir, ".claude"), { recursive: true, force: true }); fs.symlinkSync(`../${self(dir)}/node_modules/pkg/.claude`, path.join(dir, ".claude")); }, dir => fs.writeFileSync(path.join(dir, "README.md"), "x\n")));
+    ok(roundKept.status === 0 && roundKept.out.includes("reported, never failed"), "while one the base held that leaves and comes back in, as it stood, is still reported, never failed", roundKept.out);
 
   }
 }

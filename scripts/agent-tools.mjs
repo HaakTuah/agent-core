@@ -625,8 +625,8 @@ function agentFolders(root, rev) {
 
 // A commit's files as an agent tool reads them: a path walked as the file system walks it, a link inside the checkout
 // followed (walk), a file's text, and the names in a folder.
-function commitReader(root, rev, lenient = false, follow = false) {
-  const resolve = f => walk(root, rev, f, [], lenient, [], follow);
+function commitReader(root, rev, lenient = false, follow = false, how = null) {
+  const resolve = f => walk(root, rev, f, [], lenient, [], follow, how);
   const read = f => { const r = resolve(f); return r?.type === "blob" ? textAt(root, rev, r.f) : null; };
   const names = dir => {
     const d = resolve(dir);
@@ -636,7 +636,7 @@ function commitReader(root, rev, lenient = false, follow = false) {
   // submodule's commit, and each link it passes on the way, by its object, which is its target, so a link filled in,
   // moved or leading on to what changed is seen)
   const holds = f => {
-    const via = [], r = walk(root, rev, f, via, lenient, [], follow), { ids } = listing(root, rev);
+    const via = [], r = walk(root, rev, f, via, lenient, [], follow, how), { ids } = listing(root, rev);
     return [r?.type ?? "nothing", ids.get(r?.f) ?? "", ...via.map(at => `${at}\0${ids.get(at)}`)].join("\0");
   };
   return { resolve, read, names, holds };
@@ -866,11 +866,15 @@ const targets = new Map(), PATH_MAX = 4096;
 function target(root, rev, at) {
   const key = `${root}\0${rev}\0${at}`;
   if (!targets.has(key)) {
-    const l = listing(root, rev), read = l.linked.has(at) ? linkTexts(root, rev).get(l.ids.get(at)) : undefined;
-    const to = read === undefined ? textAt(root, rev, at) ?? "/" : read ?? "/";
+    const to = linkText(root, rev, at) ?? "/";
     targets.set(key, path.posix.isAbsolute(to) || to.length > PATH_MAX ? null : to);
   }
   return targets.get(key);
+}
+// A link's text at a commit as git holds it; null where git gives none, or none no longer than PATH_MAX.
+function linkText(root, rev, at) {
+  const l = listing(root, rev), read = l.linked.has(at) ? linkTexts(root, rev).get(l.ids.get(at)) : undefined;
+  return read === undefined ? textAt(root, rev, at) ?? null : read;
 }
 // The text of each link a commit's listing holds, by its object, asked of git in two processes for them all, not one a
 // link: their sizes, then the text of those no longer than PATH_MAX, the rest null; a link git does not answer for is
@@ -899,17 +903,26 @@ function linkTexts(root, rev) {
   linkTextsOf.set(key, out);
   return out;
 }
-function walk(root, rev, f, via = [], lenient = false, misses = [], follow = false) {
+// With `how` (a link's way, as sortLinks() reads it): a way out of the repository, by ".." or a link to a whole path, is
+// followed on the file system around the checkout, and the walk goes on in the commit where it comes back in (backIn());
+// with `how.win`, a link's text is read as Windows reads it, either slash a separator, and 63 links followed, as Windows
+// follows them.
+function walk(root, rev, f, via = [], lenient = false, misses = [], follow = false, how = null) {
   const { blobs, linked, dirs, others } = listing(root, rev), left = f.split("/"), at = [];
   let hops = 0;
   while (left.length) {
     let name = left.shift();
     if (name === "" || name === ".") continue;
-    if (name === "..") { if (!at.length) return null; at.pop(); continue; }
+    if (name === "..") {
+      if (!at.length && !(how && backIn(root, path.dirname(topOf(root)), left, at, via))) return null;
+      at.pop();
+      continue;
+    }
     if (follow) name = folded(listing(root, rev), at, name);
     const here = [...at, name].join("/");
     if (linked.has(here)) {
       via.push(here);
+      if (how) { if (!onward(root, rev, here, how, left, at, via, ++hops)) return null; continue; }
       const to = target(root, rev, here);
       if (++hops > 40 || to === null) return null;
       left.unshift(...to.split("/"));
@@ -920,6 +933,49 @@ function walk(root, rev, f, via = [], lenient = false, misses = [], follow = fal
     at.push(name);
   }
   return reached(at.join("/") || ".", blobs, dirs, others);
+}
+// The checkout's own path on the file system, every link in it resolved, read once a root.
+const checkouts = new Map();
+const topOf = root => { if (!checkouts.has(root)) checkouts.set(root, fs.realpathSync(root)); return checkouts.get(root); };
+// The link `here`, the walk's `hops`th, its text put before what is left of a walk's path, read as `how` says: false
+// where it leads nowhere this machine can follow (past the links followed, no text, or a whole path on a drive this
+// machine has none of), and a whole path walked from its start by backIn().
+function onward(root, rev, here, how, left, at, via, hops) {
+  const to = linkText(root, rev, here), names = t => t.split(how.win ? /[\\/]/u : "/");
+  if (hops > (how.win ? 63 : 40) || to === null) return false;
+  if (!path.posix.isAbsolute(to) && !(how.win && path.win32.isAbsolute(to))) { left.unshift(...names(to)); return true; }
+  if (!path.isAbsolute(to)) return false;
+  const start = path.parse(to).root || path.sep;
+  left.unshift(...names(to.slice(start.length)));
+  return backIn(root, start, left, at, via);
+}
+// A way that left the checkout, walked from `start` on the file system around it, a name of `left` at a time, each link
+// there followed (63 at most): true where it comes back into the checkout, the walk then going on from the checkout's
+// root by the rest of the way, said in `via` so the fingerprint holds it; false where it ends outside.
+function backIn(root, start, left, at, via) {
+  const top = topOf(root), names = t => t.split(path.sep === "\\" ? /[\\/]/u : "/");
+  const within = p => { const r = path.relative(top, p); return !(r === ".." || r.startsWith(`..${path.sep}`) || path.isAbsolute(r)); };
+  let cur = start, hops = 0;
+  for (;;) {
+    if (within(cur)) {
+      const r = path.relative(top, cur).split(path.sep).filter(Boolean);
+      at.length = 0;
+      left.unshift(...r);
+      via.push(`\0back in\0${r.join("/")}`);
+      return true;
+    }
+    if (!left.length) return false;
+    const name = left.shift();
+    if (name === "" || name === ".") continue;
+    if (name === "..") { cur = path.dirname(cur); continue; }
+    const next = path.join(cur, name);
+    let to = null;
+    try { if (fs.lstatSync(next).isSymbolicLink()) to = fs.readlinkSync(next); } catch { /* (nothing there: the name stands as it is) */ }
+    if (to === null) { cur = next; continue; }
+    if (++hops > 63) return false;
+    if (path.isAbsolute(to)) { cur = path.parse(to).root || path.sep; left.unshift(...names(to.slice(cur.length))); }
+    else left.unshift(...names(to));
+  }
 }
 // The name a file system that ignores case finds for `name` in the folder `at`: `name` where the commit holds it, else
 // one of the folder's names that folds to it.
@@ -1084,8 +1140,9 @@ function reaches(root, rev, at, follow = false) {
 // commit holds nothing at, as a folder an install fills (node_modules, a virtual environment and the like). This check
 // cannot read what stands there, so such a link is new where the pull request adds or changes it, and one the base held
 // is reported, never failed, whatever else changes (core archive 207).
-// The way a link's path takes at a commit, as a fingerprint: what it reaches, and each link it passes, by its target.
-const wayOf = (root, rev, at) => commitReader(root, rev, true, true).holds(at.split(path.sep).join("/"));
+// The way a link's path takes at a commit, as a fingerprint: what it reaches, and each link it passes, by its target,
+// read where it leaves the checkout and comes back in, and read again as Windows reads a link.
+const wayOf = (root, rev, at) => [{}, { win: true }].map(how => commitReader(root, rev, true, true, how).holds(at.split(path.sep).join("/"))).join("\0\0");
 function away(root, rev, at) {
   const l = listing(root, rev), r = walk(root, rev, at.split(path.sep).join("/"), [], true, [], true);
   return !r || !(r.f === "." || l.dirs.has(r.f) || l.ids.has(r.f));
@@ -1095,10 +1152,10 @@ function sortLinks(root, base, links, fail, notes) {
     let to = null;
     try { to = fs.readlinkSync(path.join(root, at)); } catch { /* (read as new) */ }
     const said = `${show(at)} is a link that leads out of the checkout, so what it holds is not read`;
-    const held = base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to, out = to !== null && away(root, "HEAD", at);
-    // (reported only where the base's link led away too, by the same links on its way: one the pull request makes lead
-    // away, by a link it adds or changes further along, is new)
-    const stood = held && out && away(root, base, at) && wayOf(root, base, at) === wayOf(root, "HEAD", at);
+    // (held only where it takes the way the base's took, by the same links, there and back again where it leaves the
+    // checkout: one the pull request makes lead elsewhere, by a link it adds or changes further along, is new)
+    const held = base && to !== null && linkAt(root, base, at) && textAt(root, base, at) === to && wayOf(root, base, at) === wayOf(root, "HEAD", at);
+    const out = to !== null && away(root, "HEAD", at), stood = held && out && away(root, base, at);
     const there = "to what the commit does not hold (outside the checkout, or in a folder an install fills, as node_modules or a virtual environment), which this check cannot read";
     if (stood) notes.push(`${said}, ${there}, as the base held it: reported, never failed. Replace it with the file or folder itself, committed in the project`);
     else if (held && reaches(root, base, at, true) === reaches(root, "HEAD", at, true)) notes.push(`${said}, as the base held it. Replace it with the file or folder itself`);
