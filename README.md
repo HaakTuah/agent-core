@@ -18,11 +18,11 @@ best point within reach, and refined again as the tools change (core archive 257
 
 This README is the core's settling reference, so this is also the purpose a session follows where a rule's letter
 would defeat it (`roles/shared/how-to-work.md`, "Principles over rules"). Each month a blind sample measures it: with
-the state report, the scheduled look draws ten of the month before's merged changes at random and lays each out by
-its diff alone, with no word of who built it, why, or what its reviews found, in one issue labelled `needs-owner`
-(`scripts/blind-sample.mjs`). The owner answers each "yes" or "no" with a correction's kind, and the next report gives
-the share approved beside the other outcomes. Nothing waits on it: a month not answered is said as not read, and each
-"no" is a correction, built as any is.
+the state report, the scheduled look draws ten of the month before's merged changes at random, Dependabot's left out,
+and lays each out by its diff alone, with no word of who built it, why, or what its reviews found, in one issue
+labelled `needs-owner` (`scripts/blind-sample.mjs`). The owner answers each "yes" or "no" with a correction's kind, and
+the next report gives the share approved beside the other outcomes. Nothing waits on it: a month not answered is said
+as not read, and each "no" is a correction, built as any is.
 
 A person who owns a project that takes the core reads `setup/owner-guide.md` first: one plain page on what it does for
 the project, the yeses it asks, the stop switch, what it costs and the settings that are theirs.

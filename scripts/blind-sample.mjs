@@ -12,15 +12,15 @@
 //
 //   import { reader, shareOf, line } from "./blind-sample.mjs";
 import crypto from "node:crypto";
-import { mergedIn } from "./cited.mjs";
+import { after, mergedIn } from "./cited.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
-import { BLIND as LABEL, KINDS } from "./outcomes.mjs";
+import { BLIND as LABEL, KINDS, counted } from "./outcomes.mjs";
 import { byAgent } from "./stand-in-record.mjs";
 
 export const TITLE = "The blind sample";
 export const COUNT = 10, LINES = 60;
 const MARK = /<!-- blind-sample (\d{4}-\d\d) drawn (\d{4}-\d\d-\d\dT[\d:]+Z) pulls ([\d ]*) -->/u;
-const ANSWER = new RegExp(`^\\s*(\\d{1,2})\\s*[:.)]\\s*(yes|no)\\b(?:\\s*[,;:-]\\s*(${KINDS.join("|")}))?`, "iu");
+const ANSWER = new RegExp(`^\\s*(?:(\\d{4}-\\d\\d)\\s+)?(\\d{1,2})\\s*[:.)]\\s*(yes|no)\\b(?:\\s*[,;:-]\\s*(${KINDS.join("|")}))?`, "iu");
 
 // The month before a month ("2026-01" gives "2025-12").
 export const before = month => { const [y, m] = month.split("-").map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`; };
@@ -49,7 +49,7 @@ export function laidOut(files, lines = LINES) {
 export function bodyOf(month, drawn, numbers, filesOf) {
   const parts = [`The blind sample of the work merged in ${month}: ${numbers.length} changes drawn at random, each shown by what it changed alone, with no word of who built it, why, or what its reviews found (README.md, "What the core is for"; \`scripts/blind-sample.mjs\`). Would you approve each, shown it so?`,
     "",
-    `Answer in a comment, a line each: \`3: yes\`, or \`3: no, <kind>\`, the kind one of ${KINDS.map(k => `\`${k}\``).join(", ")}. Nothing waits on it: next month's state report gives the share approved, or says the month was not answered, and a session files each "no" as a correction.`];
+    `Answer in a comment, a line each: \`3: yes\`, or \`3: no, <kind>\`, the kind one of ${KINDS.map(k => `\`${k}\``).join(", ")}; \`${month} 3: yes\` names this draw, so an answer given once the next is drawn still counts for it alone. Nothing waits on it: next month's state report gives the share approved, or says the month was not answered, and a session files each "no" as a correction.`];
   if (!numbers.length) parts.push("", `Nothing was merged in ${month}, so nothing is drawn.`);
   numbers.forEach((n, i) => parts.push("", `### ${i + 1}`, "", laidOut(filesOf(n))));
   parts.push("", `<!-- blind-sample ${month} drawn ${drawn} pulls ${numbers.join(" ")} -->`);
@@ -62,16 +62,18 @@ export function drawOf(body) {
   return m ? { month: m[1], drawn: m[2], pulls: m[3].trim() ? m[3].trim().split(" ").map(Number) : [] } : null;
 }
 
-// The owner's answers to a draw: the owner's own comments (no agent's), made since it was drawn, a line each; the last
-// answer to a place wins. { place: { yes, kind } }.
+// The owner's answers to a draw: the owner's own comments (no agent's), made since it was drawn, a line each, its place
+// alone or after the draw's month ("2026-10 3: yes"), one naming another month left out; the last answer to a place
+// wins. { place: { yes, kind, pull } }.
 export function answersOf(draw, comments, owner) {
   const out = {};
   const own = comments.filter(c => String(c.user?.login ?? "").toLowerCase() === String(owner).toLowerCase() && !byAgent(c.body ?? "") && String(c.created_at) >= draw.drawn)
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
   for (const c of own) for (const l of String(c.body ?? "").split(/\r?\n/u)) {
     const m = ANSWER.exec(l);
-    if (!m || Number(m[1]) < 1 || Number(m[1]) > draw.pulls.length) continue;
-    out[Number(m[1])] = { yes: m[2].toLowerCase() === "yes", kind: m[3] ? m[3].toLowerCase() : null, pull: draw.pulls[Number(m[1]) - 1] };
+    // (an answer that names another month's draw is to that one, never to this)
+    if (!m || (m[1] && m[1] !== draw.month) || Number(m[2]) < 1 || Number(m[2]) > draw.pulls.length) continue;
+    out[Number(m[2])] = { yes: m[3].toLowerCase() === "yes", kind: m[4] ? m[4].toLowerCase() : null, pull: draw.pulls[Number(m[2]) - 1] };
   }
   return out;
 }
@@ -88,7 +90,7 @@ export function shareOf(issue, comments, owner) {
 export function line(s) {
   if (!s) return `- ${LABEL}: not read, none drawn yet.`;
   if (!s.answered) return `- ${LABEL}: not read, none of ${s.drawn} drawn from ${s.month} answered.`;
-  return `- ${LABEL}: ${s.approved} of ${s.answered} answered, ${Math.round((100 * s.approved) / s.answered)}%, of ${s.drawn} drawn from ${s.month}.`;
+  return `- ${LABEL}: ${counted(s.approved)} of ${s.answered} answered, ${Math.round((100 * s.approved) / s.answered)}%, of ${s.drawn} drawn from ${s.month}.`;
 }
 
 // The share of the draw the issue held before this run, read through gh: the look's state report calls it with the issue
@@ -110,7 +112,7 @@ export function reader({ repo, at, gh = ghApi }) {
   const month = before(String(at).slice(0, 7)), drawn = String(at).replace(/\.\d+Z$/u, "Z");
   try {
     if (drawOf(keptIssue(repo, gh)?.body)?.month === month) return { title: TITLE, unread: `the draw of ${month} stands`, owner: true };
-    const numbers = draw(mergedIn(repo, `${month}-01T00:00:00Z`, drawn, gh), repo, month);
+    const numbers = draw(mergedIn(repo, `${month}-01T00:00:00Z`, `${after(month)}-01T00:00:00Z`, gh), repo, month);
     const files = n => pagesOf(`repos/${repo}/pulls/${n}/files`, gh);
     return { title: TITLE, body: bodyOf(month, drawn, numbers, files), owner: true };
   } catch { return { title: TITLE, unread: "GitHub did not answer for the month's merged pull requests and their files", owner: true }; }

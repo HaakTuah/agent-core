@@ -201,10 +201,12 @@ const d = drawOf(sample), answers = answersOf(d, said, "OWNER"), share = shareOf
 ok(Object.keys(answers).join() === "1,2" && answers[1].yes === false && answers[2].kind === "looks wrong" && answers[2].pull === 9
   && share.answered === 2 && share.approved === 0 && share.no.map(x => x.pull).join() === "7,9",
   "the owner's own answers since the draw count, the last to each place; an agent's, another account's, an earlier one and a place past the draw do not", JSON.stringify(answers));
-ok(blindLine(share) === "- the share of the blind sample approved: 0 of 2 answered, 0%, of 3 drawn from 2026-10." && /not read, none of 3 drawn from 2026-10 answered/.test(blindLine({ ...share, answered: 0 })) && /not read, none drawn yet/.test(blindLine(null)),
+const late = answersOf(d, [...said, { user: me, created_at: at(6), body: "2026-09 2: yes\n2026-10 3: yes" }], "owner");
+ok(late[2].yes === false && late[3]?.yes === true, "an answer that names another month's draw is not this one's, and one that names this month is", JSON.stringify(late));
+ok(blindLine(share) === "- the share of the blind sample approved: 0 (± 0) of 2 answered, 0%, of 3 drawn from 2026-10." && /not read, none of 3 drawn from 2026-10 answered/.test(blindLine({ ...share, answered: 0 })) && /not read, none drawn yet/.test(blindLine(null)),
   "the report's line: the share approved of those answered, or not read", blindLine(share));
 const withBlind = lines({ rows, grown, blind: blindLine(share) }), blindReport = `**${HEADING} in 2026-10**\n${withBlind.join("\n")}`;
-ok(withBlind.some(l => l === `  ${blindLine(share)}`) && outcomesFrom(blindReport).includes("the share of the blind sample approved 0 of 2 answered, 0%, of 3 drawn from 2026-10"),
+ok(withBlind.some(l => l === `  ${blindLine(share)}`) && outcomesFrom(blindReport).includes("the share of the blind sample approved 0 (± 0) of 2 answered, 0%, of 3 drawn from 2026-10"),
   "the share stands beside the other outcomes, and a project's reaches the core's report", outcomesFrom(blindReport));
 const pullsOct = JSON.stringify(merged.slice(0, 2).map(p => ({ ...p, updated_at: p.merged_at })));
 const ghOf = issues => route => (route.includes("/issues?") ? (route.includes("page=1") || !route.includes("page=") ? JSON.stringify(issues) : "[]") : route.includes("/pulls?") ? (route.includes("page=1") ? pullsOct : "[]") : route.includes("/files") ? JSON.stringify([{ filename: "x.md", status: "modified", patch: "+y" }]) : "[]");
