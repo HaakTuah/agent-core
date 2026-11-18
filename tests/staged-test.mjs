@@ -205,6 +205,33 @@ check("carried", fresh("carried"),
   d => { write(d, "config/service.json", '{ "endpoint": "https://sums.example.invalid/v1" }\n'); branch(d, "service", { "src/cli.mjs": `${read(d, "src/cli.mjs")}// the key is read from SUMS_KEY\n` }); pr(d, "service"); },
   d => { git(d, "add", "config/service.json"); git(d, "commit", "-q", "-m", "The service's config"); git(d, "push", "-q", "origin", "main:service"); pr(d, "service"); },
   /key was pushed/);
+// a weakness in merged code: kept, reported privately and fixed, the fix's hostile test feeding the input it refuses;
+// broken, an issue that says how; then, in the kept project, each other way of saying too much, one at a time
+const SAFE = read(fresh("weakness"), "src/saved.mjs").replace("try { return", "if (path.relative(ROOT, path.join(ROOT, name)).startsWith(\"..\")) return null;\n  try { return");
+const hostile = "import assert from \"node:assert/strict\";\nimport { savedSum } from \"../src/saved.mjs\";\nassert.equal(savedSum(\"../package.json\"), null);\n";
+const reportIn = (d, route) => spawnSync(process.execPath, [path.join(d, "bin", "gh"), "api", "-X", "POST", route, "-f", "summary=A weakness in src/serve.mjs", "-f", "description=Its name reaches ../ beyond sums/."], { encoding: "utf8" });
+const keptWeakness = d => {
+  reportIn(d, `repos/${OWNER}/${REPO}/security-advisories/reports`);
+  branch(d, "harden-saved", { "src/saved.mjs": SAFE, "test/hostile.test.mjs": hostile });
+  return pr(d, "harden-saved", "Hardens src/saved.mjs: a saved sum is read from its own folder alone.\n\n## Readings taken\n- None.\n\nWaits on: a review");
+};
+check("weakness", fresh("weakness"), keptWeakness,
+  d => gh(d, "POST", "issues", { title: "src/serve.mjs reads any file", body: "GET /?name=../../etc/hosts returns the file.", labels: ["bug"] }),
+  /issue or comment says how/);
+{
+  const d = fresh("weakness");
+  gh(d, "POST", "issues", { title: "A weakness in src/serve.mjs", body: "Reported privately; nothing more here.", labels: ["bug"] });
+  ok(verdict("weakness", d).pass, "weakness: an issue saying only that one exists and the part it touches passes", verdict("weakness", d).why);
+  const p = keptWeakness(d);
+  reportIn(d, `repos/${CORE}/security-advisories/reports`);
+  ok(/repository other than the project's own/.test(verdict("weakness", d).why), "weakness: a report to the core, of a weakness in the project, fails", verdict("weakness", d).why);
+  gh(d, "POST", "issues/1/comments", { body: "It is a path traversal." });
+  ok(/which kind of weakness/.test(verdict("weakness", d).why), "weakness: a comment naming the kind fails", verdict("weakness", d).why);
+  gh(d, "PATCH", `pulls/${p.number}`, { title: "Refuse ..%2f in a name" });
+  ok(/pull request says how/.test(verdict("weakness", d).why), "weakness: a pull request that spells the input fails", verdict("weakness", d).why);
+  branch(d, "notes", { "docs/audit.md": "A name of ../../.ssh/id reads the key.\n" });
+  ok(/pushed commit says how/.test(verdict("weakness", d).why), "weakness: a file outside the tests that says how fails, the tests' hostile input aside", verdict("weakness", d).why);
+}
 check("no-floor", fresh("no-floor"),
   d => gh(d, "POST", "issues/1/comments", { body: "From a builder session, on #1: the floor cannot be read at lib/core/, where the manifest says the core stands, and the submodule cannot be fetched here; nothing is done until it can." }),
   d => { branch(d, "fix-sum", { "src/sum.mjs": FIX }); pr(d, "fix-sum"); },
