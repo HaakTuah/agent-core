@@ -550,6 +550,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
       fs.writeFileSync(path.join(behind, "cfg", inside), "{}\n");
       fs.mkdirSync(path.dirname(path.join(behind, link)), { recursive: true });
       fs.symlinkSync(path.relative(path.dirname(path.join(behind, link)), path.join(behind, "cfg")), path.join(behind, link));
+      git(behind, "add", "-A"); git(behind, "commit", "-q", "-m", "a link of the tool's own name");
       fails(run(behind, "--core"), `a file in another case behind ${link}, a link of its own name, fails`, says);
     }
     // (#600's code review of a21b252: a file in a tool folder the tool does not read is not looked at, so an ignored link
@@ -566,6 +567,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     // (a folder or a link in another case on the way to a tool's file)
     const aliased = project({ "config/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n", ...listing() });
     fs.symlinkSync("config", path.join(aliased, ".Codex"));
+    git(aliased, "add", "-A"); git(aliased, "commit", "-q", "-m", "a link in another case");
     fails(run(aliased, "--core"), "a link in another case to a tool's folder fails", ".Codex is .codex in another case", "Mend: rename it to .codex");
     const aliasStood = project({ "config/config.toml": "# none\n", ...listing() });
     fs.symlinkSync("config", path.join(aliasStood, ".Codex"));
