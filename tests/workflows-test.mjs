@@ -74,6 +74,7 @@ try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
   for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
   fs.cpSync(fileURLToPath(new URL("../node_modules", import.meta.url)), path.join(tmp, "core/node_modules"), { recursive: true });
+  fs.copyFileSync(fileURLToPath(new URL("../package-lock.json", import.meta.url)), path.join(tmp, "core/package-lock.json")); // (what the install is read against)
   fs.writeFileSync(path.join(tmp, "core/.gitignore"), "/node_modules/\n"); // (as the copy holds it)
   fs.mkdirSync(path.join(tmp, ".github/workflows"), { recursive: true });
   fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), `on:\n${"  pull_request_target:\n".repeat(7)}`);
