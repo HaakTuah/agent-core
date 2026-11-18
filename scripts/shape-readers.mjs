@@ -1,8 +1,9 @@
 // The shape check's readers (shape.mjs, beside this file; tasks/code-shape.md, "What the check reads"; #354): which
 // files it reads, and each file as its reader reads it, in one form whatever its language. JavaScript and TypeScript,
-// JSX among them, by the reader of the measures (code-shape.mjs); C# by shape-csharp.mjs; Python by shape-python.mjs;
-// and the scripts that share one global space, those of JavaScript or TypeScript with no import or export, by the
-// names their top level declares. None runs the code it reads. Node's own modules only.
+// JSX among them, by the reader of the measures (code-shape.mjs); C# by shape-csharp.mjs, its functions on the parser
+// the core installs (csharp-functions.mjs); Python by shape-python.mjs; and the scripts that share one global space,
+// those of JavaScript or TypeScript with no import or export, by the names their top level declares. None runs the code
+// it reads. Node's own modules, and the parser's installed packages.
 //
 // Each reader has a name, which a baseline lists under "reads" once it lists what that reader finds: a baseline written
 // before a reader came lists none of it, and what the pull request's base held of it is reported, never failed, until
@@ -10,17 +11,25 @@
 import path from "node:path";
 import { CODE, functions, globals, imports, isModule, isP, jsxIn, tokens } from "./code-shape.mjs";
 import { OWN as CS_OWN, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "./shape-csharp.mjs";
+import { unreachedFor } from "./parser.mjs";
 import { OWN as PY_OWN, STDLIB, normal, pythonPackages, readPython, resolvePython } from "./shape-python.mjs";
 
 // Each reader by its name, with what it reads, as a note says it.
 export const READERS = {
   javascript: "JavaScript and TypeScript",
   jsx: "files that hold JSX",
-  csharp: "C#",
+  // (C# as its functions were read by a lexer written here, until #529: no file is read so now, and a baseline that
+  // names it stays one the check reads)
+  csharp: "C#, its functions by the lexer",
+  "csharp-tree": "C#, its functions by the parser",
   python: "Python",
   scripts: "scripts that share one global space",
   screens: "the tests that open a screen, a window or a device",
 };
+// The readers that read on the parser and could not run, its packages not installed for the registry not answering in
+// a project's pull request (parser.mjs, unreachedFor): the check reads their finds as a reader's the baseline does not
+// name, reported and never failed, and says so (#654, point 4).
+export const unreachedReaders = () => (unreachedFor("csharp") ? ["csharp-tree"] : []);
 // What a baseline that names no reader was written with: the check as #246 built it.
 export const FIRST_READS = ["javascript"];
 
@@ -51,7 +60,7 @@ function javascript(file, text) {
 // lang }, and of C# its namespaces and types.
 export function reading(file, text) {
   const ext = path.posix.extname(file);
-  if (ext === ".cs") { const r = readCsharp(text); return { ...r, reader: "csharp", imports: r.usings, own: CS_OWN, lang: "csharp" }; }
+  if (ext === ".cs") { const r = readCsharp(text); return { ...r, reader: "csharp-tree", imports: r.usings, own: CS_OWN, lang: "csharp" }; }
   if (ext === ".py") return { ...readPython(text), reader: "python", own: PY_OWN, lang: "python" };
   return javascript(file, text);
 }

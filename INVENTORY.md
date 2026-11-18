@@ -88,7 +88,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   ESLint's `complexity` and `max-lines-per-function`, dropped on fact: JavaScript alone; dependency-cruiser (MIT, 18
   packages) and madge, for cycles and boundaries, dropped on fact: JavaScript and TypeScript alone, where the check
   reads C# and Python too. *Bugs:* 3. **Keep:** fitting costs more than keeping, each tool knowing one language or
-  fixing its definitions; its readers go to the parser, as #486's group 3 and #519's path say.
+  fixing its definitions; its readers go to the parser, as #486's group 3 and #519's path say, C#'s functions the
+  first (`scripts/csharp-functions.mjs`, #529).
 - `scripts/choices.mjs`: fails a choice record a pull request adds without its lines, says when the pass is due, and
   reads each sign written in a measure. *Runs:* any session and the runners. *Else:* none found; the decision records'
   tools (adr-tools, log4brains) write records and check no form. *Bugs:* 1. **Keep:** nothing fits; the form is the
