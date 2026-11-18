@@ -35,13 +35,14 @@ export function installed(name) {
 }
 
 // Whether node_modules/ holds what package-lock.json names: each entry of the lock file in npm's record of the install,
-// at the same version, from the same address, with the same integrity.
+// at the same version, from the same address, with the same integrity; all but those only the core's tests run, which
+// no script loads and a copy does not install.
 let current;
 function matches() {
   if (current === undefined) {
     const read = f => { try { return JSON.parse(fs.readFileSync(path.join(root, f), "utf8")).packages ?? {}; } catch { return null; } };
     const wanted = read("package-lock.json"), had = read("node_modules/.package-lock.json");
-    current = Boolean(wanted && had) && Object.keys(wanted).filter(k => k).every(k => had[k] && ["version", "resolved", "integrity"].every(f => wanted[k][f] === had[k][f]));
+    current = Boolean(wanted && had) && Object.keys(wanted).filter(k => k && !wanted[k].dev).every(k => had[k] && ["version", "resolved", "integrity"].every(f => wanted[k][f] === had[k][f]));
   }
   return current;
 }

@@ -75,8 +75,10 @@ try {
   fs.rmSync(path.join(project, ".git"), { recursive: true, force: true });
   const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env });
   const lock = JSON.parse(fs.readFileSync(path.join(copy, "package-lock.json"), "utf8"));
-  const installed = Object.keys(lock.packages).filter(k => k).every(k => fs.existsSync(path.join(copy, k, "package.json")));
-  ok(r.status === 0 && installed, "install.mjs installs each package of the lock file into the copy's node_modules", `${r.stdout}${r.stderr}`);
+  const installed = Object.entries(lock.packages).filter(([k, e]) => k && !e.dev).every(([k]) => fs.existsSync(path.join(copy, k, "package.json")));
+  const tests = Object.entries(lock.packages).filter(([k, e]) => k && e.dev);
+  ok(r.status === 0 && installed, "install.mjs installs each package of the lock file a script loads into the copy's node_modules", `${r.stdout}${r.stderr}`);
+  ok(tests.length > 0 && !tests.some(([k]) => fs.existsSync(path.join(copy, k))), "and none that only the core's own tests run: a copy holds no tests", tests.map(([k]) => k).join(", "));
   const loaded = spawnSync(process.execPath, ["--input-type=module", "-e", `const { load } = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); const m = await load("yaml"); console.log(m.project ? "project" : typeof m.Lexer);`], { cwd: project, encoding: "utf8", env });
   ok(loaded.status === 0 && loaded.stdout.trim() === "function", "and load() takes the copy's own, never the project's", `${loaded.stdout}${loaded.stderr}`);
   // (an install npm recorded for another lock file is no install of this one: the package did not run)
@@ -92,7 +94,7 @@ try {
   fs.writeFileSync(record, kept);
   // (a lock file whose integrity the registry's tarball does not match: twice refused, then a failure that says the mend)
   const wrong = JSON.parse(fs.readFileSync(path.join(copy, "package-lock.json"), "utf8"));
-  const first = Object.keys(wrong.packages).find(k => k);
+  const first = Object.keys(wrong.packages).find(k => k && !wrong.packages[k].dev);
   wrong.packages[first].integrity = `sha512-${Buffer.alloc(64, 7).toString("base64")}`;
   fs.writeFileSync(path.join(copy, "package-lock.json"), JSON.stringify(wrong, null, 2));
   fs.rmSync(path.join(copy, "node_modules"), { recursive: true, force: true });

@@ -1,55 +1,32 @@
 // The core's hand-written readers, held to readers others wrote and many use (core archive 201): the SPDX expression
 // readers (licenceOk in licences.mjs, readable in licence-yes.mjs) to SPDX's own parser, spdx-expression-parse, and the
 // NuGet manifest reader (manifestLicence in nuget.mjs) to an XML parser, @xmldom/xmldom. Each reader may refuse more than
-// its reference reads, for the reasons it states; none may read more, or read it otherwise. The references are pinned
-// here, fetched with `npm pack` (which runs nothing it fetches), checked by their integrity before they are unpacked,
-// and only run by this test: in the core's own tests workflow, never in a project, which runs none of the core's tests.
+// its reference reads, for the reasons it states; none may read more, or read it otherwise. The references are the
+// devDependencies of the core's lock file, each at one exact version with the registry's integrity, installed by
+// scripts/install.mjs in the core's own repository alone (a copy installs without them, #654), and only run by this
+// test: in the core's own tests workflow, never in a project, which runs none of the core's tests.
 // Each case is made from a fixed seed, so a failure prints what reproduces it.
-import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { readable } from "../scripts/licence-yes.mjs";
 import { licenceOk } from "../scripts/licences.mjs";
 import { cut } from "../scripts/nuget-fetch.mjs";
 import { manifestLicence } from "../scripts/nuget.mjs";
 
-// what the call below fetches, each by its sha512 as the registry gives it (npm pack's array is the one place each
-// version is named, which the licence scan reads, and .github/licences-audit.json audits at that version)
-const INTEGRITY = {
-  "spdx-expression-parse@4.0.0": "sha512-Clya5JIij/7C6bRR22+tnGXbc4VKlibKSVj2iHvVeX5iMW7s1SIQlqu699JkODJJIhh/pUu8L0/VLh8xflD+LQ==",
-  "spdx-license-ids@3.0.24": "sha512-cLS9TtWkIQFyLkJ3/5aFQAOHOSKTlOs/7WDut/XPSdjom1fJhUdkepeJAKXa9Y05+FabHd0sti+Et559vDtkpQ==",
-  "spdx-exceptions@2.5.0": "sha512-PiU42r+xO4UbUS1buo3LPJkjlO7430Xn5SVAhdpzzsPHsjbYVflnnFdATgabnLude+Cqu25p6N+g2lw/PFsa4w==",
-  "@xmldom/xmldom@0.9.12": "sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==",
-};
 const CASES = 20000;
 
 let failed = 0, passed = 0;
 const ok = (cond, what, detail = "") => { if (cond) passed++; else failed++; console.log(`${cond ? "ok  " : "FAIL"} ${what}${cond ? "" : `\n     ${detail}`}`); };
 
-const dir = mkdtempSync(join(tmpdir(), "readers-"));
-try {
-  // the references: each tarball's sha512 is computed here, not taken from npm, and must be the pinned one
-  const packs = join(dir, "packs");
-  mkdirSync(packs);
-  execFileSync("npm", ["pack", "--ignore-scripts", "--silent", "spdx-expression-parse@4.0.0", "spdx-license-ids@3.0.24", "spdx-exceptions@2.5.0", "@xmldom/xmldom@0.9.12"], { cwd: packs, stdio: ["ignore", "ignore", "inherit"] });
-  const fetched = readdirSync(packs);
-  if (fetched.length !== Object.keys(INTEGRITY).length) throw new Error(`fetched ${fetched.join(", ")}, not one of each that is pinned`);
-  for (const [spec, integrity] of Object.entries(INTEGRITY)) {
-    const [, name, version] = /^(.+)@([^@]+)$/u.exec(spec);
-    const file = `${name.replace(/^@/u, "").replace("/", "-")}-${version}.tgz`;
-    const got = fetched.includes(file) ? `sha512-${createHash("sha512").update(readFileSync(join(packs, file))).digest("base64")}` : undefined;
-    if (got !== integrity) throw new Error(`${spec}: fetched ${got ?? "nothing"}, pinned ${integrity}`);
-    const into = join(dir, "node_modules", name);
-    mkdirSync(into, { recursive: true });
-    execFileSync("tar", ["-xzf", join(packs, file), "-C", into, "--strip-components=1"]);
-  }
-  const require = createRequire(join(dir, "node_modules", "index.js"));
-  const parse = require("spdx-expression-parse");
-  const { DOMParser } = require("@xmldom/xmldom");
-  console.log(`references fetched and checked: ${Object.keys(INTEGRITY).join(", ")}`);
+{
+  // the references, from the core's own lock file, as its tests' job installs them (scripts/install.mjs; #654)
+  const require = createRequire(fileURLToPath(new URL("../package.json", import.meta.url)));
+  const dev = Object.keys(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).devDependencies);
+  let parse, DOMParser;
+  try { parse = require("spdx-expression-parse"); ({ DOMParser } = require("@xmldom/xmldom")); }
+  catch (e) { console.error(`FAIL: the references are not installed (${e.code ?? e.message}). Mend: run node scripts/install.mjs in the core's own repository, which installs them from package-lock.json, then run this again`); process.exit(1); }
+  console.log(`references installed from the lock file: ${dev.join(", ")}`);
 
   // a fixed sequence of numbers, so each run makes the same cases
   const prng = (seed) => (n) => { seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff; return seed % n; };
@@ -212,8 +189,6 @@ try {
   }
   ok(!differ.length && read > CASES / 20, `manifestLicence reads no licence the XML parser does not read the same (${CASES} manifests, ${read} read by it)`, differ.slice(0, 3).join("\n     "));
   ok(!refused.length, "manifestLicence refuses what the XML parser reads only for a reason it states", refused.slice(0, 5).join("\n     "));
-} finally {
-  rmSync(dir, { recursive: true, force: true });
 }
 console.log(`${passed} of ${passed + failed} on the hand-written readers`);
 process.exit(failed ? 1 : 0);
