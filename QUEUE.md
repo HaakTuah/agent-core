@@ -22,14 +22,14 @@ it merges last.
 | #628 | builder | #577 |
 | #629 | builder | #624 and #577 |
 | #593, points 6, 10 and 11 | rule builder | #593's points 1 to 3 |
-| #580 | builder | |
+| #580 | builder | blocked: #654 |
 | #581 | rule builder; it changes `AGENTS.md`'s *mutation tool* | |
-| #582 | builder | |
-| #583 | builder | |
+| #582 | builder | blocked: #654 |
+| #583 | builder | blocked: #654 |
 | #584 | rule builder | |
-| #589 | builder | |
-| #590 | builder | #580 |
-| #591 | builder | #589 |
+| #589 | builder | blocked: #654 |
+| #590 | builder | #580; blocked: #654 |
+| #591 | builder | #589; blocked: #654 |
 | #585 | builder | |
 | #586 | builder | |
 | #546 | rule builder; two security reviews | |

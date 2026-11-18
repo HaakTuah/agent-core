@@ -94,15 +94,18 @@ function pull(commits, onMain = []) {
 }
 // The check's verdict, with the pull request checked out as GitHub merges it into the base's tip; the event names
 // `eventBase`, the tip itself unless an older base is given.
-function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", branch = "change", stale = false, key = keyFile, isPrivate = false, opener = null, locale = null, go = null, store = null } = {}) {
+function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", branch = "change", stale = false, key = keyFile, isPrivate = false, opener = null, locale = null, go = null, store = null, noGo = false } = {}) {
   const tip = git(dir, ["rev-parse", "main"]);
   git(dir, ["checkout", "-q", "--detach", "main"]);
   git(dir, ["merge", "-q", "--no-ff", "--no-edit", "change"], { ...GITHUB, ...(opener ? { GIT_AUTHOR_NAME: opener } : {}) });
   const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, head: { ref: branch }, base: { sha: stale ? first : tip } }, repository: { private: isPrivate } } };
-  const base = { ...env, ...ME, ...(locale ? { LC_ALL: locale } : {}), ...(store ? { TMPDIR: store } : {}), STAND_IN_KEY: key, PATH: `${go ? `${go}${path.delimiter}` : ""}${stubs}${path.delimiter}${env.PATH ?? env.Path ?? ""}` };
+  const PATH = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(d => !noGo || !goDirs.includes(d)).join(path.delimiter);
+  const base = { ...env, ...ME, ...(locale ? { LC_ALL: locale } : {}), ...(store ? { TMPDIR: store } : {}), STAND_IN_KEY: key, PATH: `${go ? `${go}${path.delimiter}` : ""}${stubs}${path.delimiter}${PATH}` };
   const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {}, "actions/cache": () => {} }, temp: tmp });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
+// (the folders of the PATH that hold Go, which a run with no Go leaves out)
+const goDirs = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(d => d && ["go", "go.exe"].some(g => fs.existsSync(path.join(d, g))));
 // (never printed in any case: GitHub's masking of the secret matches its case exactly)
 const fails = (what, repo, opts) => { const r = check(repo, opts); ok(!r.passed && mended(r.out) && ![term, other, wide].some(t => r.out.toLowerCase().includes(t.toLowerCase())), `${what} fails, and the term is never printed`, r.out); };
 const passes = (what, repo, opts) => { const r = check(repo, opts); ok(r.passed, `${what} passes`, r.out); };
@@ -300,7 +303,14 @@ passes("a term holding a dot, where only a pattern's dot would match it", pull([
 // runs (a go of the test's own stands in for Go)
 const goStub = (name, script) => { const d = path.join(tmp, `go-${name}`); fs.mkdirSync(d); fs.writeFileSync(path.join(d, "go"), `#!/bin/sh\n${script}\n`, { mode: 0o755 }); return d; };
 const unbuilt = (what, go, words) => { const r = check(pull([[{ "b.md": `${term}\n` }]]), { go }); ok(r.passed && r.out.includes(words) && r.out.includes("so nothing was checked"), `${what}: it passes with a note that nothing was checked`, r.out); };
-unbuilt("where no Go answers", goStub("none", "exit 127"), "no Go is at hand");
+// (where a folder that holds Go holds git or bash too, no run can leave Go out alone, and the case is not tried)
+const besideGo = ["git", "git.exe", "bash", "bash.exe"];
+if (goDirs.some(d => besideGo.some(b => fs.existsSync(path.join(d, b))))) console.log("note Go stands beside git or bash here, so a run with no Go is not tried");
+else { const r = check(pull([[{ "b.md": `${term}\n` }]]), { noGo: true }); ok(r.passed && r.out.includes("no Go is at hand") && r.out.includes("so nothing was checked"), "where no Go is at hand: it passes with a note that nothing was checked", r.out); }
+const mute = check(pull([[{ "b.md": `${term}\n` }]]), { go: goStub("mute", "exit 1") });
+ok(!mute.passed && mended(mute.out) && mute.out.includes("could not say the machine's system"), "where Go is there and cannot say the machine's system, the check fails saying the mend, never passing", mute.out);
+// a go.mod of the pull request's own that asks for a toolchain no one has changes nothing (Codex's finding on #656)
+fails("a term beside a go.mod that asks for a toolchain that does not exist", pull([[{ "go.mod": "module example.invalid/x\n\ngo 1.999.0\n", "b.md": `x ${term}\n` }]]));
 unbuilt("where no sum stands for the machine's system", goStub("plan9", 'case "$1" in env) printf "plan9\\n386\\n" ;; *) exit 1 ;; esac'), "no sum stands in this check for a build on plan9/386");
 const failing = goStub("failing", 'case "$1" in env) printf "linux\\namd64\\n" ;; *) echo "go: no network here" >&2; exit 1 ;; esac');
 const sum = /linux\/amd64\/\) sum=([0-9a-f]{64})/.exec(workflow)?.[1], version = /version=(\S+)/.exec(workflow)?.[1];

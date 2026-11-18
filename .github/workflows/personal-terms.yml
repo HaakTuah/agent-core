@@ -94,7 +94,17 @@ jobs:
           # without the secret. A new pin moves the version, the toolchain, every sum and the cache's key above at once)
           version=1.10.1 module=github.com/betterleaks/betterleaks toolchain=go1.26.11
           source='h1:w7AL/I3ygUzxoPTvTniTtMMWDAnZRTrIiBebc/L+E2o='
-          system=$(go env GOHOSTOS GOHOSTARCH 2> /dev/null | tr -d '\r' | tr '\n' /)
+          # (the machine's system, as Go names it, asked outside the checkout and of the machine's own Go alone, so that
+          # nothing the pull request holds, a go.mod asking for another toolchain among it, changes the answer; a Go that
+          # is there and cannot say fails the check, never passes it)
+          system=
+          if command -v go > /dev/null 2>&1; then
+            system=$(cd "$work/none" && GOTOOLCHAIN=local GOENV=off GOFLAGS= GOWORK=off go env GOHOSTOS GOHOSTARCH 2> /dev/null | tr -d '\r' | tr '\n' /)
+            case $system in */*/) ;; *)
+              echo "FAIL Go is here but could not say the machine's system, so Betterleaks, which matches the terms, was not built and nothing was read. Mend: run the check again; where it fails again, see what \"go env GOHOSTOS GOHOSTARCH\" says outside the checkout, and report it to the core (core/README.md, \"Reporting to the core\")."
+              rm -rf "$work"; exit 1 ;;
+            esac
+          fi
           case $system in
             linux/amd64/) sum=5fbada3035618b380df0d07e1b766f31b2692df2fb1fb9eabbbf1bed6e3ef0e9 ;;
             linux/arm64/) sum=ea4f1d6bf2b89858dc8d6f0d8cfba172f7031559a67c0205258ea6fef4bcb485 ;;
