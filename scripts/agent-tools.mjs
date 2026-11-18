@@ -526,7 +526,7 @@ function sourcesOf(head, list, file, problems) {
   const sources = [], marked = [];
   for (const [k, why] of head.sources ?? []) {
     const said = `${describe(k)}, configured in ${head.tools.get(k)}, ${why}, so nothing shows that it runs its copy on main, where floor rule 3 has what an agent tool starts by itself run from its copy on main, and not the working tree's, which the branch it runs on can change`;
-    if (list?.from?.has(k)) marked.push([k, said]);
+    if (list?.from?.has(k)) marked.push([k, said, why === NO_KIT_WHY ? NO_KIT_HOW : HOW]);
     else sources.push([k, `${said}. Mend: ${why === NO_KIT_WHY ? NO_KIT_HOW : HOW}, in this pull request`]);
   }
   for (const k of list?.from ?? []) if (head.tools.has(k) && !head.sources?.has(k)) problems.push(`${file}: "agentTools" says of ${describe(k)} "from": ${show(TREE)}, but its command is the starter kit's form, which runs its copy on main. Mend: take "from" out of its entry, in this pull request`);
@@ -1047,13 +1047,13 @@ function sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes
 function sortSources({ sources, marked }, { head, baseProject, baseList, core, file }, fail, notes) {
   const before = new Set(baseProject ? [...baseProject.ids.values()].flatMap(set => [...set]) : []);
   const stood = k => !!baseProject && [...head.ids.get(k)].every(id => before.has(id)) && baseProject.sources.has(k);
-  const how = HOW;
   for (const [k, problem] of sources) {
     if (!core && !baseProject) notes.push(`with no base to read against, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}`);
     else if (!core && stood(k) && !baseList?.from.has(k)) notes.push(`as the base held it, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}; or, to list it in the baseline, give its entry in ${file} "from": ${show(TREE)}`);
     else fail.push(problem);
   }
-  for (const [k, said] of marked) {
+  // (each with its own mend: a setting no starter kit writes is taken out or moved, a hook rewritten in the kit's form)
+  for (const [k, said, how] of marked) {
     if (core) fail.push(`${said}, and in the core's own repository none may stand. Mend: ${how}, and take "from" out of its entry, in this pull request`);
     else if (!baseProject || stood(k)) notes.push(`${said}: its entry lists it in the baseline ("from": ${show(TREE)}), to be worked down`);
     else fail.push(`${said}, and its entry says "from": ${show(TREE)}, but the base held no such hook, and the baseline lists only what stood before. Mend: ${how}, and take "from" out of its entry, in this pull request`);
