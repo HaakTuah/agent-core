@@ -24,7 +24,7 @@ const own = fs.existsSync(path.join(root, "tests"));
 // (each command written out, so the licence check reads what it runs; npm on Windows is a .cmd file, which Node starts
 // only through the shell, and each argument is the script's own)
 export const REGISTRIES = {
-  npm: { lock: "package-lock.json", into: "node_modules/", run: () => spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none", ...(own ? [] : ["--omit=dev"])], { cwd: root, encoding: "utf8", shell: windows }) },
+  npm: { lock: "package-lock.json", into: "node_modules/", run: () => spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none", "--workspaces=false", ...(own ? [] : ["--omit=dev"])], { cwd: root, encoding: "utf8", shell: windows }) },
 };
 
 const named = process.argv.slice(2);

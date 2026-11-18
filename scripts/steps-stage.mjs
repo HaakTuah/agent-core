@@ -320,9 +320,10 @@ export const STAGES = {
     },
   },
   "18 November 2026, the core's packages installed from its lock file": {
-    // (a job of the project's own that runs a script of the copy with nothing installed; the mend installs first)
-    stage: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: node core/scripts/steps.mjs\n")),
+    // (a job of the project's own that runs a script of the copy with nothing installed, before it only a step that names
+    // the install and one that never runs; the mend installs first, guarded, as it can go in ahead of the sync)
+    stage: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: echo core/scripts/install.mjs\n      - if: false\n        run: node core/scripts/install.mjs\n      - run: node core/scripts/steps.mjs\n")),
     after: dir => fs.rmSync(at(dir, ".github/workflows/scripts-staged.yml"), { force: true }),
-    mend: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: node core/scripts/install.mjs\n      - run: node core/scripts/steps.mjs\n")),
+    mend: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\n      - run: node core/scripts/steps.mjs\n")),
   },
 };

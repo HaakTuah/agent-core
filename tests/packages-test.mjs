@@ -51,6 +51,8 @@ try {
   fs.mkdirSync(path.join(project, "node_modules/yaml"), { recursive: true });
   fs.writeFileSync(path.join(project, "node_modules/yaml/package.json"), JSON.stringify({ name: "yaml", version: "0.0.1", main: "index.js" }));
   fs.writeFileSync(path.join(project, "node_modules/yaml/index.js"), "module.exports = { Lexer: class {}, project: true };\n");
+  // (and whose own package.json takes the copy's folder in as a workspace: the copy installs on its own all the same)
+  fs.writeFileSync(path.join(project, "package.json"), JSON.stringify({ name: "project", private: true, workspaces: ["core"] }));
   fs.cpSync(path.join(root, "scripts"), path.join(copy, "scripts"), { recursive: true });
   for (const f of ["package.json", "package-lock.json", ".gitignore", ".npmrc"]) fs.copyFileSync(path.join(root, f), path.join(copy, f));
   // (each script that loads a package, by the call that loads it; a script that loads one and has no case here fails)
@@ -77,7 +79,7 @@ try {
   const lock = JSON.parse(fs.readFileSync(path.join(copy, "package-lock.json"), "utf8"));
   const installed = Object.entries(lock.packages).filter(([k, e]) => k && !e.dev).every(([k]) => fs.existsSync(path.join(copy, k, "package.json")));
   const tests = Object.entries(lock.packages).filter(([k, e]) => k && e.dev);
-  ok(r.status === 0 && installed, "install.mjs installs each package of the lock file a script loads into the copy's node_modules", `${r.stdout}${r.stderr}`);
+  ok(r.status === 0 && installed, "install.mjs installs each package of the lock file a script loads into the copy's node_modules, in a project whose workspaces name the copy's folder too", `${r.stdout}${r.stderr}`);
   ok(tests.length > 0 && !tests.some(([k]) => fs.existsSync(path.join(copy, k))), "and none that only the core's own tests run: a copy holds no tests", tests.map(([k]) => k).join(", "));
   const loaded = spawnSync(process.execPath, ["--input-type=module", "-e", `const { load } = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); const m = await load("yaml"); console.log(m.project ? "project" : typeof m.Lexer);`], { cwd: project, encoding: "utf8", env });
   ok(loaded.status === 0 && loaded.stdout.trim() === "function", "and load() takes the copy's own, never the project's", `${loaded.stdout}${loaded.stderr}`);

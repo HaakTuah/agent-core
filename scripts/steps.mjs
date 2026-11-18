@@ -272,14 +272,21 @@ function suitesOnPins(p) {
 
 // Where a job of the project's own workflows runs a script of the copy before the core's packages are installed from its
 // lock file (#654): each such workflow, with the mend; null where each installs first. A call to the core's own
-// workflows installs by itself, and holds no step to read.
+// workflows installs by itself, and holds no step to read. The install counts only as a step that runs it, node and the
+// copy's install.mjs as a command's first words (after a shell's then, else or do), with no `if:` or
+// continue-on-error of its own; a command that only names the path, as echo does, installs nothing.
 function installsFirst(p) {
   const copy = corePath(p.root) || "core/", script = `${copy}scripts/`, install = `${copy}scripts/install.mjs`;
+  const bare = t => t.replace(/^\.\//u, "");
   // (a command, as check-configs.mjs reads it: its words; one runs a script of the copy where a word is one's path)
-  const runs = (st, file) => st.cmds.some(c => c.some(w => file(w.text.replace(/^\.\//u, ""))));
+  const runs = (st, file) => st.cmds.some(c => c.some(w => file(bare(w.text))));
+  const installs = st => st.unconditioned && st.cmds.some(c => {
+    const w = c.map(x => x.text); while (["then", "else", "do"].includes(w[0])) w.shift();
+    return /(?:^|[\\/])node(?:\.exe)?$/u.test(w[0] ?? "") && bare(w[1] ?? "") === install;
+  });
   const wrong = Object.entries(p.workflows).filter(([, w]) => jobsOf(w).some(job => {
     const at = job.steps.findIndex(st => runs(st, t => t.startsWith(script) && t.endsWith(".mjs") && t !== install));
-    return at >= 0 && !job.steps.slice(0, at).some(st => runs(st, t => t === install));
+    return at >= 0 && !job.steps.slice(0, at).some(installs);
   })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
   return wrong.length ? `In one small pull request, add a step \`node ${install}\` before the first step that runs a .mjs script under \`${script}\` in each such job of ${wrong.join(", ")}: the core's scripts load the packages it installs from its lock file, and without them a check says it did not run.` : null;
 }
@@ -544,7 +551,7 @@ function stepOf(st, job, w, started) {
   const counts = started && cmds.length === 1 && alone && stops && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"];
   const env = st?.env && typeof st.env === "object" ? st.env : {};
   const boxed = boxedJob(job);
-  return { cmds, counts, hidden: boxed || hides(st, env, job, w), plain: !boxed && typeof st?.uses === "string" && plainAction({ ...st, env }, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
+  return { cmds, counts, unconditioned: st?.if === undefined && !st?.["continue-on-error"], hidden: boxed || hides(st, env, job, w), plain: !boxed && typeof st?.uses === "string" && plainAction({ ...st, env }, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
 }
 
 // Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads

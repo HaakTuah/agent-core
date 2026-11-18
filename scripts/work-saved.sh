@@ -42,7 +42,7 @@ if [ "$mode" = start ] && [ -f "${at}package-lock.json" ] && command -v npm >/de
     for f in package.json package-lock.json .npmrc; do g cat-file -e "refs/remotes/origin/main:${at}$f" 2>/dev/null && [ -f "${at}$f" ] || mains=0; done
     omit=--omit=dev; [ -d tests ] && [ -z "$at" ] && omit= # (a copy installs no package only the core's own tests run)
     if [ "$mains" = 1 ] && g diff --quiet --no-ext-diff --no-textconv refs/remotes/origin/main -- "${at}package.json" "${at}package-lock.json" "${at}.npmrc" 2>/dev/null; then
-      if ! (cd "./${at}" && timeout 20 npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none $omit >/dev/null 2>&1); then
+      if ! (cd "./${at}" && timeout 20 npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none --workspaces=false $omit >/dev/null 2>&1); then
         echo "The core's packages are not installed: npm could not install them from ${at}package-lock.json. Mend: run node ${at}scripts/install.mjs before running a check."
       fi
     else
