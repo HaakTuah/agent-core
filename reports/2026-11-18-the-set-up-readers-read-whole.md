@@ -209,8 +209,9 @@ The kind of project: any; only its own tracked files cause it. Size: small; fits
 **C. Every kit option round-tripped.** Run the round-trip assertion of steps-test.mjs:59-70 inside `kit()`, at
 creation, so the six kits made later (a-bare, a-plain `{}`, a-root-nuget `{nuget: ".", private}`, another-npm,
 own-configs, mixed `{packages: ".", nuget: "src"}`) are each held too: every value of every option then has one, at no
-new kit. Add three kits for the pairs no kit holds: `{packages: ".", private}`, `{private, game}`, `{nuget: "src",
-game}` (about 1.6 s each on Linux; the Windows `suites-kit` mark is 600 s, .github/shape.json:18). Kinds: init.mjs:11-25.
+new kit. Add kits for the pairs no kit holds: `{packages: ".", private}`, `{private, game}`, `{nuget: "src",
+game}` (built in #624 as two kits, the first two pairs in one, and the round trip left out of kits whose options another
+kit holds, to keep the suite within its time mark) (about 1.6 s each on Linux; the Windows `suites-kit` mark is 600 s, .github/shape.json:18). Kinds: init.mjs:11-25.
 
 **D. The slots the part reads, at a path not the kit's:** *shape check*, *choice records*, *progress file*, each a row
 naming another file, the step reading that file and its mend naming it. Kinds: README.md:382, 389, 400.
