@@ -14,6 +14,9 @@ import { parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
 export const LINE = "Tests changed:";
+// A name or a line as it may be printed: a fork's pull request writes them, so no control, bidirectional or separating
+// character of theirs reaches a log.
+export const plain = text => String(text ?? "").replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, "?");
 // A line that asserts, in the test frameworks and languages the projects use: node's assert and the core's ok(),
 // expect(...), xUnit's and NUnit's Assert, Python's assert and self.assert..., Go's t.Error and t.Fatal, testify's
 // require., XCTest's XCTAssert, FluentAssertions' .Should().
@@ -51,7 +54,7 @@ export function changedMend(body, found, list = "node core/scripts/weakened.mjs"
   if (start >= 0) for (let i = start; i < lines.length && (i === start || lines[i].trim()); i++) said += `${lines[i]}\n`;
   const unnamed = found.filter(f => !said.includes(`\`${f.file}\``));
   if (!unnamed.length) return null;
-  return `the description does not name, on its line "${LINE}", each test file in which this pull request takes out or changes an assertion, or skips a case: ${unnamed.map(f => `\`${f.file}\` (${[f.asserts.length && `${f.asserts.length} assertion line${f.asserts.length === 1 ? "" : "s"} out or changed`, f.skips.length && `${f.skips.length} skip${f.skips.length === 1 ? "" : "s"} added`].filter(Boolean).join(", ")})`).join(", ")}. Mend: add the line "${LINE}" naming each file in backticks with why (the case proved nothing, the assertion was made stricter, the case moved), so that the reviewer rules on each; ${list} lists the lines`;
+  return `the description does not name, on its line "${LINE}", each test file in which this pull request takes out or changes an assertion, or skips a case: ${unnamed.map(f => `\`${plain(f.file)}\` (${[f.asserts.length && `${f.asserts.length} assertion line${f.asserts.length === 1 ? "" : "s"} out or changed`, f.skips.length && `${f.skips.length} skip${f.skips.length === 1 ? "" : "s"} added`].filter(Boolean).join(", ")})`).join(", ")}. Mend: add the line "${LINE}" naming each file in backticks with why (the case proved nothing, the assertion was made stricter, the case moved), so that the reviewer rules on each; ${list} lists the lines`;
 }
 
 // What the pull request in the checkout at `dir` does to its tests, as weakened() gives it; null where it cannot be
@@ -74,8 +77,8 @@ if (started(import.meta.url)) {
   if (found === null) console.log("Not read: the change could not be read against its base, or the base holds no shape check config naming the tests.");
   else if (!found.length) console.log("No test file of this pull request's has an assertion taken out or changed, or a case skipped.");
   else for (const f of found) {
-    console.log(`${f.file}:`);
-    for (const l of f.asserts) console.log(`  out or changed: ${l.trim().slice(0, 160)}`);
-    for (const l of f.skips) console.log(`  skip added: ${l.trim().slice(0, 160)}`);
+    console.log(`${plain(f.file)}:`);
+    for (const l of f.asserts) console.log(`  out or changed: ${plain(l.trim().slice(0, 160))}`);
+    for (const l of f.skips) console.log(`  skip added: ${plain(l.trim().slice(0, 160))}`);
   }
 }

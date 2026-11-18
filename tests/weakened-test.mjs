@@ -47,6 +47,7 @@ ok(mended(`FAIL ${mend}`) && mend.includes("`test/sum.test.mjs` (2 assertion lin
 ok(changedMend(`Readings…\n\n${LINE} \`test/sum.test.mjs\` (the case moved to sum-cases); \`test/gone.test.mjs\` (it proved nothing)\n- \`test/new.test.mjs\`: skipped until #9 lands\n\nWaits on: a review`, found) === null, "the line and the lines right after it, to a blank line, name each: no mend");
 ok(/`test\/new\.test\.mjs`/.test(changedMend(`${LINE} \`test/sum.test.mjs\`, \`test/gone.test.mjs\`\n\n\`test/new.test.mjs\``, found) ?? ""), "a file named only past the blank line is not named on the line");
 ok(changedMend("no line", []) === null, "nothing found asks nothing");
+ok(changedMend("", [{ file: "test/a\u001b[2J\u202e.mjs", asserts: ["x"], skips: [] }]).includes("`test/a?[2J?.mjs`"), "a file's name is printed with no control or bidirectional character");
 
 // ---- a merge commit against its base, in a scratch repository ----
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "weakened-test-"));
