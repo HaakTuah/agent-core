@@ -45,12 +45,19 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   const WEEK = 7 * 86400000;
   const { registryName, registryVersion } = await import(pathToFileURL(path.join(root, "scripts/licences.mjs")).href);
   const { fetched } = await import(pathToFileURL(path.join(root, "scripts/lookup.mjs")).href);
-  const same = (a, b) => Boolean(a) && ["version", "resolved", "integrity"].every(f => a[f] === b[f]);
+  // (an entry as a whole, its keys in order, so that a change of any field is seen; and the fields an entry fetched from
+  // the registry carries: one that links a folder, or is bundled in another, or carries any other field, is refused)
+  const whole = e => JSON.stringify(Object.keys(e ?? {}).sort().map(k => [k, e[k]]));
+  const same = (a, b) => Boolean(a) && whole(a) === whole(b);
+  const FIELDS = new Set(["version", "resolved", "integrity", "license", "dev", "optional", "devOptional", "peer", "engines", "bin", "funding",
+    "dependencies", "optionalDependencies", "peerDependencies", "peerDependenciesMeta", "os", "cpu", "libc", "deprecated", "hasInstallScript"]);
   // (each entry that fails, with what is wrong; `ask(name)` gives the registry's document of a package, as fetched does)
   const tooYoung = async (packages, base, ask, now = Date.now()) => {
     const out = [];
     for (const [k, e] of Object.entries(packages ?? {})) {
       if (!k || same(base[k], e)) continue;
+      const odd = Object.keys(e).filter(f => !FIELDS.has(f));
+      if (!/^(?:node_modules\/(?:@[^/]+\/)?[^/@]+\/)*node_modules\/(?:@[^/]+\/)?[^/@]+$/u.test(k) || odd.length) { out.push(`${k}: ${odd.length ? `its field${odd.length === 1 ? "" : "s"} ${odd.join(", ")}, which no package fetched from the registry carries` : "a key that names no installed package's folder"}`); continue; }
       const name = registryName(e.resolved), version = registryVersion(e.resolved);
       // (an address in its one plain form alone, a name as npm spells one: never one a URL parser reads otherwise)
       const plainAddress = (() => { try { return new URL(e.resolved).href === e.resolved; } catch { return false; } })();
@@ -87,6 +94,8 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
     [{ "node_modules/yaml": { version: "2.9.2", resolved: tgz("2.9.2"), integrity: "sha512-e" } }, /yaml@2\.9\.2: published 2026-11-17/u],
     [{ "node_modules/yaml": { version: "2.9.1", resolved: "https://registry.npmjs.org/@s\\../z\\..\\yaml/-/z\\..\\yaml-2.9.1.tgz", integrity: "sha512-a" } }, /in no plain form/u],
     [{ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-z" } }, /another address or integrity/u],
+    [{ "node_modules/yaml": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a", link: true } }, /its field link/u],
+    [{ ...held, "https:/registry.npmjs.org/yaml/-/yaml-2.9.1.tgz": { version: "2.9.1", resolved: tgz("2.9.1"), integrity: "sha512-a" } }, /names no installed package's folder/u],
   ];
   const results = await Promise.all(cases.map(([lock]) => tooYoung(lock, held, ask, now)));
   ok(cases.every(([, said], i) => results[i].length === 1 && said.test(results[i][0])) && (await tooYoung(held, held, ask, now)).length === 0
