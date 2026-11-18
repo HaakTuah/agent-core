@@ -24,6 +24,8 @@ const PIN = "0".repeat(40);
 const folds = (dir, key) => fs.existsSync(at(dir, ".github/workflows/core.yml")) && new RegExp(`^ {6}${key}: `, "m").test(read(dir, ".github/workflows/core.yml"));
 const NUGET = `name: nuget\n\non:\n  pull_request:\n\njobs:\n  nuget:\n    uses: ${CORE}/.github/workflows/nuget.yml@${PIN}\n    with:\n      config: checks/licences.json\n`;
 
+// (a suite of the project's own that reads the core's scripts, run on a change to them and to its own code)
+const SCRIPTS = "name: scripts-staged\n\non:\n  pull_request:\n    paths:\n      - 'src/**'\n      - 'core/scripts/**'\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n";
 // (a suite of the project's own whose path filter leaves the copy and the manifest out, as it was told, and not the
 // files that hold only calls to the core's workflows, whose pins a sync moves)
 const SUITE = "name: suites-staged\n\non:\n  pull_request:\n    paths-ignore:\n      - 'core/**'\n      - 'core-manifest.md'\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo the suite\n";
@@ -316,5 +318,12 @@ export const STAGES = {
       const file = where(read(dir, "core-manifest.md"));
       write(dir, file, `${(fs.existsSync(at(dir, file)) ? read(dir, file) : "# Choices\n").replace(/\n*$/, "\n")}\n## Choice: the project's foundations, judged again as if written today\n\n- Looked for: none the list lacked, in the registry and on the web.\n- The blind pick: the same stack.\n- The judgment: it stands; staying is the answer.\n- The suggestion: #1\n- Reopens it: a need in numbers the stack misses.\n`);
     },
+  },
+  "17 November 2026, the packages the copy carries": {
+    // (a suite of the project's own that runs on a change to its code or to the core's scripts, and not on one to the
+    // packages they run; the mend adds that folder to its filter)
+    stage: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS),
+    after: dir => fs.rmSync(at(dir, ".github/workflows/scripts-staged.yml"), { force: true }),
+    mend: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - 'core/scripts/**'\n", "      - 'core/scripts/**'\n      - 'core/third-party/**'\n")),
   },
 };

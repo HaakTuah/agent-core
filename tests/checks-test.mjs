@@ -28,7 +28,7 @@ let n = 0;
 function project(files = {}) {
   const dir = path.join(tmp, `p${++n}`);
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of ["checks.mjs", "core-address.mjs", "mend.mjs", "started.mjs", "workflow-run.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
+  for (const f of ["checks.mjs", "core-address.mjs", "core-path.mjs", "mend.mjs", "started.mjs", "workflow-run.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
   for (const [, script] of COPIES) fs.writeFileSync(path.join(dir, "core/scripts", script), STAND_IN(script));
   for (const s of ["pr-description.mjs", "licence-installed.mjs", "nuget.mjs", "nuget-fetch.mjs", "lookup.mjs"]) fs.writeFileSync(path.join(dir, "core/scripts", s), STAND_IN(s));
   fs.writeFileSync(path.join(dir, "core/scripts/nuget-look.sh"), 'echo "ran nuget-look.sh BASE=$BASE CONFIG=$CONFIG"\necho "run=false" >> "$GITHUB_OUTPUT"\n');
@@ -105,6 +105,13 @@ const run = (dir, args, extra = {}) => {
   git(dir, "commit", "-q", "-am", "a doc");
   const npm = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base });
   ok(npm.status === 0 && /nothing to verify/.test(npm.out) && !/^== Install/m.test(npm.out), "signatures: a change to a doc alone installs nothing", npm.out);
+  fs.mkdirSync(path.join(dir, "core/third-party/a"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "core/third-party/package.json"), "{\"type\": \"commonjs\"}\n");
+  fs.writeFileSync(path.join(dir, "core/third-party/a/package.json"), "{}\n");
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "the packages the copy carries");
+  const carried = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base });
+  ok(carried.status === 0 && /nothing to verify/.test(carried.out) && !/^== Install/m.test(carried.out), "and so does a package.json in the folder of packages the core's copy carries, which is no list of the project's", carried.out);
   fs.mkdirSync(path.join(dir, ".github/workflows"), { recursive: true });
   fs.writeFileSync(path.join(dir, ".github/workflows/core.yml"), "name: core\n");
   git(dir, "add", "-A");
