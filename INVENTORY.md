@@ -16,19 +16,19 @@ Weighed whole: 2026-11-17
 Challenged whole: 2026-11-17, by a session that wrote no part of it ("The challenge", below; #534, point 13)
 
 **How a line reads.** The part's files, then what it does. *Runs:* where it must run: in a session's hook, in any
-session, on the host's runners, on the owner's own computer; a check that may decide a pull request runs in all three
-places that hold a session or a runner (#534, point 5). *Else:* what else does the job, found on the web and in the
-registries on 17 November 2026, each kept or dropped in a few words, a drop marked as a fact, as a measure, or as an
-assumption to measure (`tasks/choices.md`, "a drop says whether it rests on a fact"). A verdict or a candidate the
-challenge changed says "proposed" and waits on the owner's word ("What waits on the owner", below). *Bugs:* the issues
-labelled `bug` that name the part's files, of the 61 so labelled. A trial of a tool in its place run from 18 November
-2026 on is recorded on the line as *Tried:*, with *Replayed:* saying by number which of the part's bugs the tool reads
-and which it does not (`tasks/choices.md`, "A trial of a maintained tool replays the part's past bugs"; #593, point 7);
-the trials of 17 November below came before that rule and replayed none. Then the verdict: **replace** where a
-maintained tool does the job at the same level or better, the comparison to be shown when it is made; **try** where only
-a trial can tell; **keep**, with the exception of #486, point 6, it rests on: small and stable, nothing fits, fitting
-costs more than keeping, or it brings too much. A part that gives way keeps the core's glue (#534, point 10): its lists
-and baseline, the failure that says the mend, the word that it could read nothing, and "Nothing locks a project".
+session, on the host's runners, on the owner's own computer; where a check that may decide a pull request runs is
+`AGENTS.md`'s "A tool that only runs is fetched at set-up, as its own program". *Else:* what else does the job, found on
+the web and in the registries on 17 November 2026, each kept or dropped in a few words, a drop marked as a fact, as a
+measure, or as an assumption to measure (`tasks/choices.md`, "a drop says whether it rests on a fact"). A verdict or a
+candidate the challenge changed says "proposed" and waits on the owner's word ("What waits on the owner", below).
+*Bugs:* the issues labelled `bug` that name the part's files, of the 61 so labelled. A trial of a tool in its place run
+from 18 November 2026 on is recorded on the line as *Tried:*, with *Replayed:* saying by number which of the part's bugs
+the tool reads and which it does not (`tasks/choices.md`, "A trial of a maintained tool replays the part's past bugs";
+#593, point 7); the trials of 17 November below came before that rule and replayed none. Then the verdict: **replace**
+where a maintained tool does the job at the same level or better, the comparison to be shown when it is made; **try**
+where only a trial can tell; **keep**, with the exception of #486, point 6, it rests on: small and stable, nothing fits,
+fitting costs more than keeping, or it brings too much. A part that gives way keeps what `AGENTS.md`, "A part of the
+core gives way to what is maintained", keeps the core's own.
 
 **Trials of 17 November 2026,** each in a scratch folder outside the repository, at one exact version, with install
 scripts off, nothing committed, as the owner allowed for #486's trial on 16 November:

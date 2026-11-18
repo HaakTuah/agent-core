@@ -229,21 +229,24 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   the part's own fixtures), and the pull request states what each found that the other did not, as `tasks/choices.md`
   asks of a trial. Where the tool defines the thing otherwise than the core (what a copy is, what counts as a branch),
   its definition is taken unless the comparison shows it worse for what the rule is for, and the pull request says
-  which; a project's list for that check is written anew at the sync that brings the replacement, the pull request's
-  base counting as the list until then. A part rests on one of the exceptions of `tasks/code-shape.md`, "A job a
-  maintained package does is done by it", to stay. The order: the inventory, then the tools that only run, which hand
-  over the most upkeep for the least work, then the packages carried in the copy, then the form the rules are delivered
-  in, each replacement a line and a pull request of its own, none before the package guards of #488. Whatever gives way,
-  the core keeps: the floor and the policy a check applies (what is allowed, its lists); the content of the rule text,
-  which another's text never replaces, though its form and delivery may change, the text that describes a check that
-  gave way shrinks to a pointer to the tool's own documentation, and what others do may be written anew as the core's
-  own, joining as any rule does; and the glue around every check: a baseline that may only shrink, a failure that says
-  the mend, the word that it could read nothing (#459), and "Nothing locks a project". It does not mean a part is
-  replaced for the sake of it, nor that a sync asks a project to replace anything of its own. Reason: what the core
-  writes itself, the core alone maintains, in every project that takes it; and rule text breaks on no update, holds the
-  owner's decisions with their reasons, and another's rules would run with the agents' rights (floor rule 4). Held by no
-  check: the comparison and the definition taken are stated in each replacement's pull request, which the reviews read,
-  and the inventory is held by its own check (`tests/mend-test.mjs`).
+  which; and that pull request adds a sync note whose step has a project's list for that check written anew at the sync
+  that brings the replacement, the pull request's base counting as the list until then. A part rests on one of the
+  exceptions of `tasks/code-shape.md`, "A job a maintained package does is done by it", to stay. The writer of
+  `QUEUE.md` queues the replacements in one order: the inventory, then the tools that only run, which hand over the most
+  upkeep for the least work (secrets and personal terms, then the workflow checks, then mutation testing, then links),
+  then the packages carried in the copy, then the form the rules are delivered in, each replacement a line and a pull
+  request of its own. Whatever gives way, the core keeps: the floor and the policy a check applies (what is allowed, its
+  lists); the content of the rule text, which another's text never replaces, though its form and delivery may change,
+  the text that describes a check that gave way shrinks to a pointer to the tool's own documentation, and what others do
+  may be written anew as the core's own, joining as any rule does; and the glue around every check: a baseline that may
+  only shrink, a failure that says the mend, the word that it could read nothing (#459), and "Nothing locks a project";
+  the tool finds, and the core decides and words the failure. It does not mean a part is replaced for the sake of it,
+  nor that a sync asks a project to replace anything of its own. Reason: what the core writes itself, the core alone
+  maintains, in every project that takes it; and rule text breaks on no update, holds the owner's decisions with their
+  reasons, would run with the agents' rights where another's (floor rule 4), and cannot be shown "the same level or
+  better" without trials of behaviour. Held by no check: the comparison and the definition taken are stated in each
+  replacement's pull request, which the reviews read, and the inventory is held by its own check
+  (`tests/mend-test.mjs`).
 - **A tool that only runs is fetched at set-up, as its own program** (#534). By default a check of the core is a script
   of its own. Where a part gives way to a tool that only runs, whoever builds the replacement has the tool fetched at
   set-up, never while a check runs: one exact version, its digest in a list a test reads, an entry for each platform a
@@ -252,11 +255,11 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   on the owner's own computer or on the runners; where the tool is not there and cannot be fetched, the check says that
   it did not run and why, and decides nothing. The tool runs as its own program, never through a vendor's action for the
   host, a hosted service or a feature of the host's paid plans, and passes floor rules 7, 10 and 15 and the lookup
-  (`floor/topics/dependencies.md`). It does not mean a check that exists on the host's runners alone, nor a job added:
-  what adds minutes, mutation testing above all, stays on the lines a change touches. Reason: a private repository on
-  the host's free plan stops its jobs once the month's minutes are spent, a project built on its owner's own computer
-  gets least from a check it cannot run there, and a wrapper or a hosted feature brings terms of its own (a licence key
-  for an organisation's repositories, a price for each committer) and may send data out of the repository. Held, for the
+  (`floor/topics/dependencies.md`). It adds no job: what adds minutes, mutation testing above all, stays on the lines a
+  change touches. It does not mean a check that exists on the host's runners alone. Reason: a private repository on the
+  host's free plan stops its jobs once the month's minutes are spent, a project built on its owner's own computer gets
+  least from a check it cannot run there, and a wrapper or a hosted feature brings terms of its own (a licence key for
+  an organisation's repositories, a price for each committer) and may send data out of the repository. Held, for the
   pin, by the licence scan's check that a program a file downloads is pinned by version and checksum
   (`scripts/licence-scan.mjs`; #488); that no workflow runs such a tool through another's action, by no check yet
   (#639).

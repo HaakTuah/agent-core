@@ -67,6 +67,8 @@ const core = project("core", { "AGENTS.md": "the *choice records*: `CHOICES.md`;
 const ofCore = look({ manifest: null, at: at("2027-06-01"), root: core }).body ?? "";
 ok(/`CHOICES\.md`/.test(ofCore) && /`node scripts\/choices\.mjs`/.test(ofCore) && /`tasks\/choices\.md`/.test(ofCore), "in the core, its AGENTS.md names the file and the paths are the core's own", ofCore);
 ok(!/INVENTORY\.md/.test(ofCore) && !/INVENTORY\.md/.test(body), "where no inventory stands, the pass asks nothing of one");
+fs.writeFileSync(path.join(kit, "INVENTORY.md"), "# A project's own list\n");
+ok(!/INVENTORY\.md/.test(look({ manifest: "", at: at("2027-06-01"), root: kit }).body ?? ""), "a project with a file of that name is asked nothing of it: the question is the core's own");
 fs.writeFileSync(path.join(core, "INVENTORY.md"), "# The core's parts\n\nWeighed whole: 2026-11-17\n");
 const withInventory = look({ manifest: null, at: at("2027-06-01"), root: core }).body ?? "";
 ok(/`INVENTORY\.md` marks keep or try/.test(withInventory) && /"Weighed whole:"/.test(withInventory) && /A part is asked again/.test(withInventory),
