@@ -845,23 +845,25 @@ function configAtBase(root, base, file) {
 // What stood before the check read more, which is noted, not failed, where a list stands and a base is read (never in
 // the core's own repository): a tool the base held as it stands, which its list did not name either, and a tool's
 // file's problem the base held, the file's text the same letter for letter (Kiro's and Codex's files are read since #407).
-function heldBefore(checked, { head, baseProject, baseList, held, core }) {
+function heldBefore(checked, { head, baseProject, baseList, held, core, mended = null }) {
   if (core || !baseProject) return new Set();
-  const sameUnread = p => head.texts.has(p) && head.texts.get(p) === baseProject.texts.get(p);
+  // (a file's problem as the base held it, or as it held it with a link's files read in the link's place: mendedBase())
+  const sameUnread = p => head.texts.has(p) && [baseProject, mended].some(b => b?.texts.get(p) === head.texts.get(p));
   // (and an entry nothing configures where the base, read alike, configured nothing of that name either: a tool behind a
   // link the base held, which no reading here follows, among them)
   const unseen = checked.unconfigured.filter(([k]) => baseList?.keys.has(k) && !baseProject.tools.has(k));
   return new Set([...checked.missing.filter(([k]) => held(k) && !baseList?.keys.has(k)).map(([, problem]) => problem), ...unseen.map(([, problem]) => problem), ...head.problems.filter(sameUnread)]);
 }
 
-// Each pin breach into `fail` or `notes`: one the base held as it stands, the tool's whole configuration (its source or
+// Each pin breach into `fail` or `notes`: one the base held as it stands (or with a link's files in its place), the tool's whole configuration (its source or
 // package, not only its pin) and its entry both unchanged, is noted, and so is each where there is no base, as on a
 // push; in the core's own repository none may stand. A list written for the first time is held to an exact pin at once,
 // its entry being the pull request's own text, while a tool its base fetched at no fixed version is noted.
-function sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes) {
+function sortPins(pins, { head, list, baseProject, baseList, core, mended = null }, fail, notes) {
   for (const [k, problem] of pins) {
     const entry = baseList ? baseList.versions.get(k) === list.versions.get(k) : !head.pins.get(k).pin;
-    const same = baseProject && canonical(baseProject.pins.get(k) ?? null) === canonical(head.pins.get(k)) && entry;
+    // (as the base pinned it, or as it pinned it with a link's files read in the link's place: mendedBase())
+    const same = baseProject && [baseProject, mended].some(b => b && canonical(b.pins.get(k) ?? null) === canonical(head.pins.get(k))) && entry;
     if (core || (baseProject && !same)) fail.push(problem);
     else notes.push(`${baseProject ? "as the base held it" : "with no base to read against"}, nothing fails here: ${problem.replace(". Mend: ", ". To mend: ")}`);
   }
@@ -1013,11 +1015,11 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   const checked = check(head, list, kit, file), { problems, unlisted, pins } = checked;
   const baseProject = base ? readProject(root, base) : null, baseList = base ? listed(baseConfig, file) : null;
   const mended = mendedBase(root, base), held = heldBy(head, baseProject, mended);
-  const stood = heldBefore(checked, { head, baseProject, baseList, held, core });
+  const stood = heldBefore(checked, { head, baseProject, baseList, held, core, mended });
   const unread = unreadOf(head, baseProject, core);
   const fail = [...head.problems, ...problems].filter(p => !stood.has(p) && !unread.has(p));
   const notes = [...[...stood].map(p => `as the base held it, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`), ...[...unread].map(p => `with no base to read against, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`)];
-  sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes);
+  sortPins(pins, { head, list, baseProject, baseList, core, mended }, fail, notes);
   sortSources(checked, { head, baseProject, baseList, core, file, mended }, fail, notes);
   if (base && !core) sortBehind(root, base, fail, notes);
   sortUnlisted(unlisted, { head, base, held, file }, fail, notes);

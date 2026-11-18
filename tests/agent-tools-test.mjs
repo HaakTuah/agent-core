@@ -218,6 +218,11 @@ if (LINKS) {
     const text = JSON.stringify(hooked, null, 2), hookBase = project({ ".claude/settings.json": link("../conf/settings.json"), "conf/settings.json": text, "scripts/format.sh": "echo\n" });
     const hookMend = run(pr(hookBase, { ".claude/settings.json": text }));
     ok(hookMend.status === 0 && hookMend.out.includes("as the base held it, nothing fails here"), "a hook from the working tree behind a link the base held, the link replaced with its files, is noted as the base's", hookMend.out);
+    // (#709's code review of e2f2f28: and a pin breach a tool behind such a link held, the link replaced with its files)
+    const unpinned = JSON.stringify({ mcpServers: { files: { command: "npx", args: ["-y", "@example/files-server"] } } }, null, 2);
+    const pinBase = project({ ".mcp.json": link("conf/mcp.json"), "conf/mcp.json": unpinned, ...listing({ kind: "server", name: "files", publisher: "Example Tools", version: "2.0.0" }) });
+    const pinMend = run(pr(pinBase, { ".mcp.json": unpinned }));
+    ok(pinMend.status === 0 && pinMend.out.includes("as the base held it, nothing fails here: the tool server") && pinMend.out.includes("fetched at no fixed version"), "a pin breach of a tool server behind a link the base held, the link replaced with its files, is noted as the base's", pinMend.out);
     const plain = project({ ...shared, ".claude/skills/notes/SKILL.md": link("../../../shared/notes/SKILL.md") });
     git(plain, "config", "core.symlinks", "false");
     fs.rmSync(path.join(plain, ".claude/skills/notes/SKILL.md")); fs.writeFileSync(path.join(plain, ".claude/skills/notes/SKILL.md"), "../../../shared/notes/SKILL.md");
