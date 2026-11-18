@@ -194,6 +194,14 @@ function keyAndValue(rest, toks, at, indent) {
   return { key: first.text, keyCol: indent + at, value, why };
 }
 
+// The blank lines after the text of a block scalar whose header keeps them (`|+`), its text too, as the proof read
+// them: every blank line up to the next that is not, a last one with no line break after it among them, which the
+// lexer leaves out. Returns the line after them.
+function keptBlanks(rows, i, lines) {
+  for (; i < rows.length && rows[i].indent === rows[i].line.length && !rows[i].within; i++) lines.push({ n: rows[i].n, content: true, text: rows[i].line, last: rows[i].last });
+  return i;
+}
+
 // One line of YAML that is no block scalar's text, read into `lines` and `comments`, or what is unread of it.
 function entryOf(r, lines, comments, unread) {
   const { line, n, indent } = r, rest = line.slice(indent);
@@ -207,7 +215,7 @@ function entryOf(r, lines, comments, unread) {
   const note = rest.slice(cut);
   if (note) comments.push({ text: note, at: lines.length, own: false });
   lines.push({ n, indent, items, key, keyCol, kind: value.kind, value: value.text, valueAt: value.kind === "empty" ? null : indent + value.start, note, text: line.slice(0, indent + cut).replace(/ +$/u, "") });
-  return value.fixed ? { from: key !== null ? keyCol : dash, keep: value.text.includes("+") } : null;
+  return value.kind === "block" ? { from: key !== null ? keyCol : dash, keep: value.text.includes("+"), fixed: value.fixed } : null;
 }
 
 // A block scalar whose header gives its indentation (`|2`): its text read as more than YAML may, never less, every line
@@ -242,8 +250,9 @@ export function readYaml(text) {
     // (a line within a token that began on a line before, a value that runs on, is refused here too: its first line may be
     // one the proof reads as a block scalar's text)
     if (rows[i].within && rows[i].indent < rows[i].line.length) unread.push(`line ${rows[i].n}: a value on a line of its own, or one that runs on from the line before`);
-    const fixed = rows[i].indent < rows[i].line.length && !rows[i].within ? entryOf(rows[i], lines, comments, unread) : null;
-    i = fixed ? fixedOf(rows, i + 1, fixed, lines) : i + 1;
+    const block = rows[i].indent < rows[i].line.length && !rows[i].within ? entryOf(rows[i], lines, comments, unread) : null;
+    i = block?.fixed ? fixedOf(rows, i + 1, block, lines) : i + 1;
+    if (block?.keep && !block.fixed) i = keptBlanks(rows, rows[i]?.content ? contentOf(rows, i, lines, unread) : i, lines);
   }
   // one entry a line: a line that is no key and no item continues a value, or stands alone where YAML would read it so;
   // and nothing deeper may follow a line that holds its value, where YAML would read it as that value running on
