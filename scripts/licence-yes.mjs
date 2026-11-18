@@ -55,7 +55,7 @@ function entryYes(a) {
 
 /** Whether a licence is named so that a machine can read it: a whole SPDX expression, each licence in it one of `ids`
  *  or LicenseRef-<name>, an exception's id after WITH, its brackets closed and nothing left over, its words parted by
- *  spaces alone (scripts/readers-test.mjs, in the core's own tests, holds it to SPDX's own parser). */
+ *  spaces alone (tests/readers-test.mjs, in the core's own tests, holds it to SPDX's own parser). */
 export function readable(licence, ids) {
   const words = typeof licence === "string" && !/[^\x20-\x7e]/u.test(licence) ? licence.match(/\(|\)|[^ ()]+/gu) ?? [] : [];
   const joins = ["AND", "OR", "WITH"];
