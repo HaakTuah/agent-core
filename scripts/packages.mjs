@@ -59,9 +59,10 @@ function entry(name) {
 
 // The lines of an .npmrc the core's install takes: none but a blank line, a comment, and the core's own two settings,
 // install scripts off and the week's wait (floor rules 7 and 15). Every other line is returned, since npm reads far
-// more than any list of forbidden forms could name (a registry, a host's token, a proxy, a certificate).
+// more than any list of forbidden forms could name (a registry, a host's token, a proxy, a certificate). Its lines are
+// split as npm splits them, at each carriage return too.
 export function npmrcOthers(text) {
-  return String(text ?? "").split(/\r?\n/u).filter(l => !/^\s*(?:[#;].*)?$/u.test(l) && !/^\s*(?:ignore-scripts\s*=\s*true|min-release-age\s*=\s*\d+)\s*$/u.test(l));
+  return String(text ?? "").split(/[\r\n]+/u).filter(l => !/^\s*(?:[#;].*)?$/u.test(l) && !/^\s*(?:ignore-scripts\s*=\s*true|min-release-age\s*=\s*\d+)\s*$/u.test(l));
 }
 
 // Whether the package could not be installed because the registry did not answer, in a project's pull request

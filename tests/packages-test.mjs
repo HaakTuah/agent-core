@@ -47,7 +47,7 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   ok(npmrcOthers(npmrc).length === 0, "the core's .npmrc holds nothing but its own two settings, so the install and the signatures' check ask npm's own registry, with no token, proxy or certificate of another's", npmrcOthers(npmrc).join(" | "));
   // (each form built from pieces when the test runs, so that no file here points npm at another registry)
   const r = ["regi", "stry"].join("");
-  ok([`"${r}" = http://127.0.0.1/`, `'${r}'=x`, `${r}[]=x`, "//h/:_authToken=${T}", "https-proxy=http://p/", "strict-ssl=false", "cafile=/x", `@a:${r}=x`].every(l => npmrcOthers(`ignore-scripts=true\n${l}\n`).length === 1) && npmrcOthers("# c\n; c\n\nignore-scripts = true\nmin-release-age=7\n").length === 0, "and any other line, in whatever form npm reads it, is one install.mjs refuses");
+  ok([`"${r}" = http://127.0.0.1/`, `'${r}'=x`, `${r}[]=x`, "//h/:_authToken=${T}", "https-proxy=http://p/", "strict-ssl=false", "cafile=/x", `@a:${r}=x`, "min-release-age=\r7"].every(l => npmrcOthers(`ignore-scripts=true\n${l}\n`).length >= 1) && npmrcOthers("# c\n; c\n\nignore-scripts = true\nmin-release-age=7\n").length === 0, "and any other line, in whatever form npm reads it, is one install.mjs refuses");
 }
 
 // ---- with nothing installed, a script that loads a package says it did not run, and how to install ----
