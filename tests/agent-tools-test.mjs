@@ -737,6 +737,34 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   ok(Date.now() - began < 5000, "and a command a megabyte long is told from the kit's form at once", `${Date.now() - began} ms`);
 }
 
+// ---- what the tools' settings set in the environment of the programs they start ----
+{
+  const withEnv = (env, file = ".claude/settings.json") => ({ [file]: JSON.stringify({ ...JSON.parse(KIT), env }, null, 2) });
+  const SAYS = 'sets the variable "BASH_ENV"';
+  passes(run(pr(project({ ...listing() }), withEnv({ ANTHROPIC_MODEL: "x", CLAUDE_CODE_MAX_OUTPUT_TOKENS: "1", DISABLE_TELEMETRY: "1", MAX_THINKING_TOKENS: "1", CI: "1" }))), "a setting's \"env\" of the variables kept passes");
+  fails(run(pr(project({ ...listing() }), withEnv({ BASH_ENV: "scripts/x.sh" }))), "one that sets a variable a shell reads as it starts fails", SAYS, '.claude/settings.json: "env"', "Mend: take it out");
+  // (each name in one run, a project being costly to set up where git is slow, as on Windows)
+  // (any variable but those kept, named whole, of plain letters: #603's fallback security reviews of f021c25, 66d3f04 and
+  // 2cc401d found names a list left out, and a prefix kept let others in)
+  const names = ["ENV", "PATH", "Path", "NODE_OPTIONS", "GIT_DIR", "GIT_CONFIG_COUNT", "LD_PRELOAD", "BASH_FUNC_x", "HOME", "XDG_CONFIG_HOME", "SSH_ASKPASS", "CLAUDE_CODE_SHELL_PREFIX", "CLAUDE_PROJECT_DIR", "ComSpec", "SHELL", "GCONV_PATH", "LOCPATH", "GCM_GITHUB_HELPER", "EDITOR", "DEBUG", "CLAUDE_CONFIG_DIR", "CLAUDE_CODE_GIT_BASH_PATH", "CLAUDE_CODE_AUTOMOUNT_ROOTS", "CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS", "CLAUDE_CODE_PLUGIN_DIRS", "CLAUDE_CODE_PROCESS_WRAPPER", "CLAUDE_CODE_SAFE_MODE", "ANTHROPIC_BASE_URL", "ANTHROPIC_CUSTOM_HEADERS", "DISABLE_X", "CLAUDE_CODE_MAX_OUTPUT_TOKENſ"];
+  fails(run(pr(project({ ...listing() }), withEnv(Object.fromEntries(names.map(n => [n, "x"]))))), `and so does one that sets ${names.join(", ")}`, ...names.map(n => `sets the variable "${n}"`));
+  fails(run(pr(project({ ...listing() }), withEnv({ BASH_ENV: "x" }, ".claude/settings.local.json"))), "in settings.local.json too", '.claude/settings.local.json: "env"');
+  fails(run(pr(project({ ...listing() }), { ".codex/config.toml": "[profiles.fast.shell_environment_policy.set]\nHOME = \"cfg\"\n" })), "and in a Codex profile's, which replaces it where the profile is chosen", '.codex/config.toml: "profiles.fast.shell_environment_policy.set"', 'sets the variable "HOME"');
+  fails(run(pr(project({ ...listing() }), { ".codex/config.toml": "[shell_environment_policy]\nset = { NODE_OPTIONS = \"x\" }\n" })), "and in Codex's config, the environment its commands are given", '.codex/config.toml: "shell_environment_policy.set"', 'sets the variable "NODE_OPTIONS"');
+  fails(run(pr(project({ ...listing() }), withEnv(["BASH_ENV"]))), "an \"env\" that is no object is refused as the wrong shape", '"env" is not a JSON object');
+  const held = project({ ...withEnv({ BASH_ENV: "scripts/x.sh" }), ...listing() });
+  const heldRun = run(pr(held, { "README.md": "a change of its own\n" }));
+  ok(heldRun.status === 0 && heldRun.out.includes(SAYS), "one the base held is noted, not failed", heldRun.out);
+  const heldHook = run(pr(held, { ".claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), env: { BASH_ENV: "scripts/x.sh" }, model: "opus" }, null, 2) }));
+  ok(heldHook.status === 0 && heldHook.out.includes(SAYS), "and stays noted while the file changes around it", heldHook.out);
+  fails(run(pr(held, withEnv({ BASH_ENV: "scripts/y.sh" }))), "but not once the pull request changes its value", SAYS);
+  fails(run(project(withEnv({ BASH_ENV: "x" })), "--core"), "in the core's own repository none may stand", SAYS);
+  // (#603's code review of c08aa8e: with no base to read against, one that stands is noted, as a pin or a hook's source is)
+  const noBase = run(project({ ...withEnv({ BASH_ENV: "scripts/x.sh" }), ".Codex/hooks.json": "{}\n", ...listing() }));
+  ok(noBase.status === 0 && noBase.out.includes("with no base to read against") && noBase.out.includes(SAYS) && noBase.out.includes(".Codex is .codex in another case"), "with no base, one that stands is noted, and so is a tool's file in another case", noBase.out);
+  ok(notDone(held, STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed"))[0]?.mend.includes(SAYS), "the sync note's step reads not done while one stands");
+}
+
 // ---- the TOML reader Codex's config is read with ----
 {
   const t = parseToml("# c\n__proto__ = 'p'\na.b = 1 # n\ns = \"\\u00e9\\n\"\nm = \"\"\"\nx \\\n   y\"\"\"\nl = '''z'''\n[t]\nd = 1979-05-27T07:32:00Z\ni = { k = [1, 'two', [true]] }\n[[r]]\nn = 1\n[[r]]\nn = 2\n");

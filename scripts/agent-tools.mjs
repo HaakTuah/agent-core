@@ -20,6 +20,8 @@
 // `.kiro/agents`, say, or the plug-ins and marketplaces a Codex config names), and where a plug-in's marketplace or a
 // tool server's command points, are the review's. A tool's file, or a folder on its way, in another letter case, as the
 // commit holds it, fails, as the tool may read it, save one the base held while what the tool reads through it stands.
+// So does a variable a tool's settings set (Claude Code's "env", Codex's shell environment policy) but those KEPT lists,
+// any other of which may change how the programs a hook runs start, save one the base held while its entry stands.
 //
 // Where each hook's command comes from (#407; floor rule 3, what an agent tool starts by itself runs from its copy on
 // `main`): a hook of any tool read here runs its copy on main only where each command it may run, Codex's for Windows
@@ -88,10 +90,11 @@ export function configured(read, skills, files = () => [], linked = () => false)
   // (each tool's name, as the list writes it, and what it is: for a hook its tool, event, matcher and the whole hook,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
   // (`texts`: each problem met reading a file, with that file's text, so one the base held as it stands can be told)
-  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map();
+  // (`baselined`: those a project may hold, noted where there is no base to read against, as a pin is)
+  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map(), baselined = new Set();
   const flag = (problem, file, text = read(file)) => { problems.push(problem); texts.set(problem, `${file}\0${text}`); };
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
-  const state = { tools, problems, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, linked };
+  const state = { tools, problems, texts, baselined, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, linked };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -114,6 +117,7 @@ export function configured(read, skills, files = () => [], linked = () => false)
     const settings = json(file);
     declaredMarkets(settings, file, markets);
     readHooks(state, file, settings);
+    readEnv(state, file, "env", settings?.env);
     for (const [name, on] of Object.entries(entries(file, "enabledPlugins", settings?.enabledPlugins, "each plug-in's \"name@marketplace\" to true"))) if (on) { tools.set(`plugin ${name}`, file); plugins.push(name); }
   }
   // (a plug-in is what its name and its marketplace's declared source make it, so one fetched from elsewhere is another;
@@ -123,7 +127,7 @@ export function configured(read, skills, files = () => [], linked = () => false)
   for (const name of skills()) { tools.set(`skill ${name}`, `.claude/skills/${name}/SKILL.md`); add(`skill ${name}`, `skill ${name}`); }
   readKiro(state, json, files);
   readCodex(state, json, read);
-  return { tools, ids, problems, texts, sources, pins: pinsOf(plugins, markets, servers) };
+  return { tools, ids, problems, texts, baselined, sources, pins: pinsOf(plugins, markets, servers) };
 }
 
 const SERVERS = "each tool server's name to its settings";
@@ -190,6 +194,41 @@ function readCodex(state, json, read) {
     addHook(state, ".codex/config.toml", { tool: "Codex", event: "notify", matcher: "", hook: notify, runs: true, text: notify.join(" "), commands: [command] });
   }
   addServers(state, ".codex/config.toml", state.entries(".codex/config.toml", "mcp_servers", config.mcp_servers, SERVERS), "Codex ");
+  const policy = state.entries(".codex/config.toml", "shell_environment_policy", config.shell_environment_policy, "its settings");
+  readEnv(state, ".codex/config.toml", "shell_environment_policy.set", policy.set);
+  // (and each profile's, which replaces it where the profile is chosen)
+  for (const [name, profile] of Object.entries(state.entries(".codex/config.toml", "profiles", config.profiles, "each profile's name to its settings"))) {
+    const its = state.entries(".codex/config.toml", `profiles.${name}`, profile, "its settings");
+    readEnv(state, ".codex/config.toml", `profiles.${name}.shell_environment_policy.set`, state.entries(".codex/config.toml", `profiles.${name}.shell_environment_policy`, its.shell_environment_policy, "its settings").set);
+  }
+}
+
+// The variables a tool's settings may set for the programs it starts, each named whole and kept for its reason: any
+// other may change how a program a hook runs starts (a shell, git, ssh, Node, the system's loader) or where the tool
+// itself finds what it runs (its plug-ins, its shell), so that main's copy is not all it runs (floor rule 3), or where
+// it sends the owner's sign-in (floor rule 18), and no list of such names can be shown whole, so the variables kept are
+// listed instead, as plain names; a name of other letters is none of them.
+const KEPT = [
+  // (the models Claude Code asks for, by name: it alone reads them; not where it sends its requests or with what)
+  /^(?:ANTHROPIC_MODEL|ANTHROPIC_SMALL_FAST_MODEL|ANTHROPIC_DEFAULT_(?:OPUS|SONNET|HAIKU|FABLE)_MODEL)$/iu,
+  // (Claude Code's limits, timeouts and effort: how long or how much, never what runs)
+  /^(?:MAX_THINKING_TOKENS|MCP_TIMEOUT|MCP_TOOL_TIMEOUT|API_TIMEOUT_MS|BASH_DEFAULT_TIMEOUT_MS|BASH_MAX_TIMEOUT_MS|BASH_MAX_OUTPUT_LENGTH|CLAUDE_CODE_MAX_OUTPUT_TOKENS|CLAUDE_CODE_EFFORT_LEVEL)$/iu,
+  // (switches that turn a report or a call that is not needed off)
+  /^(?:DISABLE_TELEMETRY|DISABLE_ERROR_REPORTING|CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC|DO_NOT_TRACK)$/iu,
+  // (switches programs read for their output or time zone, never to find what to run)
+  /^(?:CI|TZ|NO_COLOR|FORCE_COLOR)$/iu,
+];
+const kept = name => /^[A-Za-z_][A-Za-z0-9_]*$/u.test(name) && KEPT.some(k => k.test(name));
+// Each such variable a tool's setting `key` in `file` sets, as a problem with the entry's own text, so one the base held
+// is noted while that entry stands, whatever else of the file changes.
+function readEnv(state, file, key, env) {
+  for (const [name, value] of Object.entries(state.entries(file, key, env, "each variable's name to its value"))) {
+    if (kept(name)) continue;
+    const problem = `${file}: "${key}" sets the variable "${name}", which is none of those a tool's settings may set (the agent-tools check's KEPT): another may change how the programs a hook runs start, so nothing shows a hook runs main's copy alone (floor rule 3). Mend: take it out of "${key}", in this pull request; where a tool needs it, the owner sets it on the machine, or, where it is a tool's own setting that no program a hook runs reads, its name joins KEPT with its reason`;
+    state.problems.push(problem);
+    state.texts.set(problem, `${file}\0${key}\0${name}\0${JSON.stringify(value)}`);
+    state.baselined.add(problem);
+  }
 }
 
 // What a plug-in's marketplace declares of it, for its id: the source, or of a "settings" source its own fields and the
@@ -478,7 +517,7 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   const project = configured(read, skills, names, linked);
   // (read at the commit, the working tree's at HEAD, the pull request's head: a file not committed, ignored or not, is
   // no file of the project's, and the base is read the same way)
-  for (const [problem, text] of caseProblems(root, rev ?? "HEAD")) { project.problems.push(problem); project.texts.set(problem, text); }
+  for (const [problem, text] of caseProblems(root, rev ?? "HEAD")) { project.problems.push(problem); project.texts.set(problem, text); project.baselined.add(problem); }
   if (!rev && listing(root, "HEAD").failed) project.problems.push(`the commit HEAD cannot be listed by git (an error, or names past ${LISTING_MAX} bytes), so this check cannot read the tools' files there. Mend: run the check again; where it fails the same way, take out of this pull request what makes its tree too large to list`);
   return { ...project, links };
 }
@@ -791,13 +830,20 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   const baseProject = base ? readProject(root, base) : null, baseList = base ? listed(baseConfig, file) : null;
   const before = new Set(baseProject ? [...baseProject.ids.values()].flatMap(set => [...set]) : []), held = k => [...head.ids.get(k)].every(id => before.has(id));
   const stood = heldBefore(checked, { head, baseProject, baseList, held, core });
-  const fail = [...head.problems, ...problems].filter(p => !stood.has(p));
-  const notes = [...stood].map(p => `as the base held it, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`);
+  const unread = unreadOf(head, baseProject, core);
+  const fail = [...head.problems, ...problems].filter(p => !stood.has(p) && !unread.has(p));
+  const notes = [...[...stood].map(p => `as the base held it, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`), ...[...unread].map(p => `with no base to read against, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`)];
   sortPins(pins, { head, list, baseProject, baseList, core }, fail, notes);
   sortSources(checked, { head, baseProject, baseList, core, file }, fail, notes);
   sortLinks(root, base, head.links, fail, notes);
   sortUnlisted(unlisted, { head, base, held, file }, fail, notes);
   return { fail, notes };
+}
+
+// With no base to read against, as before a commit or on a push, each problem a project may hold, noted as sortSources
+// notes its own; in the core's own repository none may stand.
+function unreadOf(head, baseProject, core) {
+  return new Set(!core && !baseProject ? head.problems.filter(p => head.baselined.has(p)) : []);
 }
 
 // Each tool configured where no list is written yet, into `fail` or `notes`: the base counts as the list, so one it
