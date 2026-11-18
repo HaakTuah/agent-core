@@ -558,8 +558,8 @@ function sourcesOf(head, list, file, problems) {
 // The project at `root`, at its working tree or at a commit `rev`: configured()'s answer. Nothing is read through a
 // link, at a commit (where git lists nothing below one) or in the working tree: each link where a tool reads its files
 // is a problem of its own (linkProblems()), so what it leads to is never read, and the head and the base read alike.
-export function readProject(root, rev = null, linkedOnMain = () => false) {
-  const commit = rev ? commitReader(root, rev) : null;
+export function readProject(root, rev = null, linkedOnMain = () => false, alias = f => f) {
+  const commit = rev ? commitReader(root, rev, alias) : null;
   // (in the working tree, a path with a link anywhere on its way is read as holding nothing)
   const viaLink = f => f.split("/").some((_, i, parts) => { try { return fs.lstatSync(path.join(root, ...parts.slice(0, i + 1))).isSymbolicLink(); } catch { return false; } });
   // (in the working tree, a file git ignores is a person's or a machine's own, as a .claude/settings.local.json mostly
@@ -586,7 +586,8 @@ export function readProject(root, rev = null, linkedOnMain = () => false) {
   const own = at => notFile(listing(root, rev ?? "HEAD"), at) || shownNotBlob(root, rev ?? "HEAD", at) || (!rev && (() => { try { const st = fs.lstatSync(path.join(root, at)); return st.isSymbolicLink() || st.isDirectory(); } catch { return false; } })());
   const linked = at => own(at) || linkedOnMain(at);
   const commitRev = rev ?? "HEAD";
-  const project = configured(read, skills, names, linked, () => agentMarkdown(root, commitRev));
+  // (with `alias`, each path read from another, as mendedIds() reads a link's files in its place: its Markdown files too)
+  const project = configured(read, skills, names, linked, () => [...agentMarkdown(root, commitRev), ...(alias.markdown ?? [])]);
   // (read at the commit, the working tree's at HEAD, the pull request's head: a file not committed, ignored or not, is
   // no file of the project's, and the base is read the same way)
   for (const [problem, text] of commitProblems(root, commitRev)) { project.problems.push(problem); project.texts.set(problem, text); project.baselined.add(problem); }
@@ -613,17 +614,17 @@ function linkProblems(root, rev) {
 // Claude Code's folders of agents and commands, and each Markdown file the commit `rev` holds below one, in whatever case
 // the folder stands, which Claude Code reads.
 const AGENT_DIRS = [".claude/agents", ".claude/commands"];
+const agentFile = at => { const parts = at.split("/"); return parts.length > 2 && AGENT_DIRS.includes(fold(parts.slice(0, 2).join("/"))) && /\.md$/iu.test(at); };
 function agentMarkdown(root, rev) {
-  const inFolder = at => { const parts = at.split("/"); return parts.length > 2 && AGENT_DIRS.includes(fold(parts.slice(0, 2).join("/"))); };
-  return [...listing(root, rev).blobs].filter(at => inFolder(at) && /\.md$/iu.test(at)).sort();
+  return [...listing(root, rev).blobs].filter(agentFile).sort();
 }
 
 // A commit's files as its one listing holds them, nothing followed: what a path is (reached()), a file's text, the names
 // in a folder, and what a name holds, by its kind and git's object (a file's text, a link's target, a submodule's commit).
-function commitReader(root, rev) {
-  const l = listing(root, rev), resolve = f => reached(f, l.blobs, l.dirs, l.others);
-  const read = f => (l.blobs.has(f) ? textAt(root, rev, f) : null);
-  const names = dir => (dir === "." || l.dirs.has(dir) ? [...(l.children.get(dir) ?? [])] : []);
+function commitReader(root, rev, alias = f => f) {
+  const l = listing(root, rev), resolve = f => reached(alias(f), l.blobs, l.dirs, l.others);
+  const read = f => (l.blobs.has(alias(f)) ? textAt(root, rev, alias(f)) : null);
+  const names = dir => (dir === "." || l.dirs.has(alias(dir)) ? [...(l.children.get(alias(dir)) ?? [])] : []);
   const holds = f => `${resolve(f)?.type ?? (l.linked.has(f) ? "link" : "nothing")}\0${l.ids.get(f) ?? ""}`;
   return { resolve, read, names, holds };
 }
@@ -886,73 +887,94 @@ function sortSources({ sources, marked }, { head, baseProject, baseList, core, f
 }
 
 
-// The path the text `to` of the link `at` names from the checkout's root, read as a string and nothing followed: as
-// Linux reads it, a backslash part of a name, and with `win`, as Windows does, either slash a separator; null where it
-// names the checkout's root, a place outside it or a whole path.
-function namedTarget(at, to, win = false) {
-  if (to === null || path.posix.isAbsolute(to) || path.win32.isAbsolute(to) || /^[A-Za-z]:/u.test(to)) return null;
-  const p = path.posix.normalize(path.posix.join(path.posix.dirname(at), win ? to.replace(/\\/gu, "/") : to)).replace(/\/$/u, "");
-  return p === "." || p === ".." || p.startsWith("../") ? null : p;
+// The way the text `text` of the link `at` names from the checkout's root, read as a string and nothing followed: as
+// Linux reads it, a backslash part of a name, and with `win`, as Windows does, either slash a separator; as { to, via },
+// `to` the path it ends at ("." the checkout's root) and `via` each path a ".." steps back out of on the way, which Linux
+// reads as what stands there, a link among them; null where it leaves the checkout or is a whole path.
+function namedWay(at, text, win = false) {
+  if (text === null || path.posix.isAbsolute(text) || path.win32.isAbsolute(text) || /^[A-Za-z]:/u.test(text)) return null;
+  const here = path.posix.dirname(at).split("/").filter(n => n && n !== "."), via = [];
+  for (const n of (win ? text.replace(/\\/gu, "/") : text).split("/")) {
+    if (n === "" || n === ".") continue;
+    if (n !== "..") { here.push(n); continue; }
+    if (!here.length) return null;
+    via.push(here.join("/"));
+    here.pop();
+  }
+  return { to: here.join("/") || ".", via };
 }
 // The object git holds at `rev:at`, a folder's or a file's; null where it holds none there.
 function objectAt(root, rev, at) {
   try { return execFileSync("git", ["--no-replace-objects", "rev-parse", "-q", "--verify", `${rev}:${at}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || null; } catch { return null; }
 }
 // Each link the base held where a tool reads its files that the pull request replaced with the very file or folder it
-// named: what HEAD holds at its path is git's same object as what the base held at the path its text names.
+// named, as [the link's path, the path its text names]: what HEAD holds at its path is git's same object as what the
+// base held at that path.
 function replaced(root, base) {
-  const was = listing(root, base), now = listing(root, "HEAD");
-  return was.links.filter(at => whereToolsRead(at) && !now.linked.has(at)).filter(at => {
+  const was = listing(root, base), now = listing(root, "HEAD"), out = [];
+  for (const at of was.links.filter(p => whereToolsRead(p) && !now.linked.has(p))) {
     const text = textAt(root, base, at) ?? null, here = objectAt(root, "HEAD", at);
-    return !!here && [false, true].some(win => { const to = namedTarget(at, text, win); return !!to && objectAt(root, base, to) === here; });
-  });
+    const to = here && [false, true].map(win => namedWay(at, text, win)?.to).find(p => p && p !== "." && objectAt(root, base, p) === here);
+    if (to) out.push([at, to]);
+  }
+  return out;
+}
+// What the base configures with each such link's files read in its place (replaced()), each tool by its id: a tool the
+// pull request configures there is the base's only where it is the same tool, read with all the base's other files, so
+// a file of the pull request's that makes it another (a plug-in's marketplace, say) is new.
+function mendedIds(root, base) {
+  const mended = replaced(root, base);
+  if (!mended.length) return new Set();
+  const alias = f => { const m = mended.find(([at]) => f === at || f.startsWith(`${at}/`)); return m ? `${m[1]}${f.slice(m[0].length)}` : f; };
+  const { blobs } = listing(root, base);
+  alias.markdown = mended.flatMap(([at, to]) => [...blobs].filter(b => b === to || b.startsWith(`${to}/`)).map(b => `${at}${b.slice(to.length)}`)).filter(agentFile);
+  return new Set([...readProject(root, base, () => false, alias).ids.values()].flatMap(set => [...set]));
 }
 // Each link the base held where a tool reads its files, standing as it stood (noted, never failed), into `fail` where the
-// pull request changes what stands at the path its text names, read as a string as Linux reads it and again as Windows
-// does, nothing followed: an entry on that
-// path's way, a link or submodule below it, or a file below it whose path through the link is one a tool reads. A path
-// that names the checkout's root or leaves it, or whose way the commit holds a link on, cannot be read so, and stays a
-// note.
+// pull request changes what stands where its text leads, read as a string as Linux reads it and again as Windows does,
+// nothing followed (namedWay()): an entry on that way, a link or submodule below where it ends, or a file there whose path
+// through the link is one a tool reads. One whose way the commit holds a link on is reported past it, and one that leaves
+// the checkout or names a whole path is reported, never failed.
 function sortBehind(root, base, fail, notes) {
   const was = listing(root, base), now = listing(root, "HEAD");
   const standing = now.links.filter(at => whereToolsRead(at) && was.linked.has(at) && was.ids.get(at) === now.ids.get(at));
   if (!standing.length) return;
   // (each entry the pull request changes, by its path and its modes before and after: `git diff --raw`, renames as an
-  // entry taken out and one put in)
+  // entry taken out and one put in, and every submodule's change shown whatever the project's .gitmodules says)
   let raw = "";
-  try { raw = execFileSync("git", ["--no-replace-objects", "diff", "--raw", "--no-renames", "-z", base, "HEAD"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: LISTING_MAX }); } catch { raw = null; }
+  try { raw = execFileSync("git", ["--no-replace-objects", "diff", "--raw", "--no-renames", "--ignore-submodules=none", "-z", base, "HEAD"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: LISTING_MAX }); } catch { raw = null; }
   const parts = raw?.split("\0") ?? [], changed = [];
   for (let i = 0; i + 1 < parts.length; i += 2) changed.push({ modes: parts[i].slice(1).split(" ").slice(0, 2), at: parts[i + 1] });
   for (const at of standing) {
-    const text = textAt(root, "HEAD", at) ?? null;
-    for (const to of new Set([false, true].map(win => namedTarget(at, text, win)))) behindOne(at, to, { was, now, raw, changed }, fail, notes);
+    const text = textAt(root, "HEAD", at) ?? null, ways = [false, true].map(win => namedWay(at, text, win));
+    for (const key of new Set(ways.map(w => JSON.stringify(w)))) behindOne(at, JSON.parse(key), { was, now, raw, changed }, fail, notes);
   }
 }
-// One such link `at`, by the path `to` its text names, as sortBehind() reads it.
-function behindOne(at, to, { was, now, raw, changed }, fail, notes) {
+// One such link `at`, by the way `way` its text names, as sortBehind() reads it.
+function behindOne(at, way, { was, now, raw, changed }, fail, notes) {
   const odd = m => m === "120000" || m === "160000", reads = low => TOOL_FILES.includes(low) || READS.test(low);
   const said = `${show(at)} is a link where an agent tool reads its files, which the base held`;
-  if (!to) return;
+  if (!way) { notes.push(`${said}, and its text leaves the checkout or names a whole path, so what this pull request changes where it leads is not read: reported, never failed. Replace the link with the file or folder it leads to, committed in the project`); return; }
   if (raw === null) { fail.push(`${said}, and git cannot say what this pull request changes, so what changes behind the link is not read. Mend: run the check again; where it fails the same way, replace the link with the file or folder it leads to, committed in the project, in this pull request`); return; }
-  const t = fold(to), unread = to.split("/").some((_, i, steps) => { const p = steps.slice(0, i + 1).join("/"); return was.linked.has(p) || now.linked.has(p); });
-  // (an entry changed on the way to what the text names, a link further along among them, fails; where a link stands on
-  // that way, what lies past it cannot be read without following it, and is reported)
+  const t = way.to === "." ? "" : fold(way.to), below = t ? `${t}/` : "", steps = [...way.via, ...(t ? t.split("/").map((_, i, s) => s.slice(0, i + 1).join("/")) : [])];
+  const unread = steps.some(p => was.linked.has(p) || now.linked.has(p));
+  // (an entry changed on the way, at a step a ".." steps back out of, or where the way ends, a link put there among them,
+  // fails; and below where it ends, a link or submodule, or a file a tool reads there through the link)
   const hit = changed.find(c => {
     const low = fold(c.at);
-    if (low === t || t.startsWith(`${low}/`)) return true;
-    return low.startsWith(`${t}/`) && (c.modes.some(odd) || reads(fold(`${at}${c.at.slice(to.length)}`)));
+    if (steps.map(fold).some(s => low === s || s.startsWith(`${low}/`))) return true;
+    return low.startsWith(below) && (c.modes.some(odd) || reads(`${fold(at)}/${low.slice(below.length)}`));
   });
   if (hit) fail.push(`${said}, and this pull request changes ${show(hit.at)}, which an agent tool reads through it while this check follows no link. Mend: replace the link with the file or folder it leads to, committed in the project, in this pull request`);
   else if (unread) notes.push(`${said}, and the way to what its text names passes a link, which this check does not follow, so what this pull request changes past it is not read: reported, never failed. Replace the link with the file or folder it leads to, committed in the project`);
 }
 
-// Whether the base held the tool `k` the head configures: as it stands, or configured where the pull request put in a
-// link's place the very files it named (replaced()), since replacing such a link is its mend, and what was behind it stood
-// before.
+// Whether the base held the tool `k` the head configures: as it stands, or as the base configures it with a link's files
+// read in its place, where the pull request put in that link's place the very files it named (mendedIds()), since
+// replacing such a link is its mend, and what was behind it stood before.
 function heldBy(root, base, head, baseProject) {
-  const before = new Set(baseProject ? [...baseProject.ids.values()].flatMap(set => [...set]) : []), mended = base ? replaced(root, base) : [];
-  const under = (f, p) => f === p || f.startsWith(`${p}/`);
-  return k => [...head.ids.get(k)].every(id => before.has(id)) || mended.some(p => under(head.tools.get(k), p));
+  const before = new Set(baseProject ? [...baseProject.ids.values()].flatMap(set => [...set]) : []), mended = base ? mendedIds(root, base) : new Set();
+  return k => [...head.ids.get(k)].every(id => before.has(id) || mended.has(id));
 }
 
 // The whole check, from the project's root: { fail, notes }.

@@ -55,7 +55,7 @@ function change(dir, files) {
   for (const [file, text] of Object.entries(files)) {
     if (text === null) fs.rmSync(path.join(dir, file), { force: true, recursive: true });
     else if (text?.[LINK] !== undefined) { fs.rmSync(path.join(dir, file), { force: true, recursive: true }); fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.symlinkSync(text[LINK], path.join(dir, file)); }
-    else write(dir, file, typeof text === "string" ? text : JSON.stringify(text, null, 2));
+    else { try { if (fs.lstatSync(path.join(dir, file)).isSymbolicLink()) fs.rmSync(path.join(dir, file)); } catch { /* (nothing there) */ } write(dir, file, typeof text === "string" ? text : JSON.stringify(text, null, 2)); }
   }
 }
 // The pull request: the change committed on a branch and merged into main with --no-ff, as GitHub's merge checkout has
@@ -184,6 +184,27 @@ if (LINKS) {
   const past = run(pr(passing, { "shared/skills/evil/SKILL.md": "# evil\n" }));
   ok(past.status === 0 && past.out.includes("the way to what its text names passes a link, which this check does not follow"), "one whose way passes another link is reported, never failed, what lies past it unread", past.out);
 
+  // (#709's fallback security review of c5deb9a: what a link's text names is read as Linux reads it, a ".." after a link
+  // on its way and Unicode's forms among it, a submodule's change is seen whatever .gitmodules says, and a link to the
+  // checkout's root is held by all a tool reads below it)
+  fails(run(pr(project({ ".claude/skills": link("../x/../y"), "x/k": "x\n", "a/b/y/.keep": "", "y/notes/SKILL.md": "# notes\n" }), { x: link("a/b"), "a/b/y/evil/SKILL.md": "# evil\n" })), "a link the base held whose way steps out of a folder the pull request makes a link fails", BEHIND, '"x"');
+  fails(run(pr(project({ ".claude/skills": link("../caf\u00e9"), "caf\u00e9/notes/SKILL.md": "# notes\n" }), { "cafe\u0301/evil/SKILL.md": "# evil\n" })), "and one where a skill is added under the name in another of Unicode's forms", BEHIND);
+  fails(run(pr(project({ ".claude/skills": link(".."), "README.md": "x\n" }), { "evil/SKILL.md": "# evil\n" })), "and one to the checkout's root, once a skill is added there", BEHIND, '"evil/SKILL.md"');
+  {
+    const ignored = project({ ".claude/skills": link("../stash"), "stash/notes/SKILL.md": "# notes\n", ".gitmodules": "" });
+    fs.mkdirSync(path.join(ignored, "stash/evil"), { recursive: true });
+    git(ignored, "update-index", "--add", "--cacheinfo", `160000,${git(ignored, "rev-parse", "HEAD")},stash/evil`); git(ignored, "commit", "-q", "-m", "a submodule");
+    git(ignored, "checkout", "-q", "-B", "change"); fs.writeFileSync(path.join(ignored, ".gitmodules"), '[submodule "evil"]\n\tpath = stash/evil\n\turl = ./x\n\tignore = all\n');
+    git(ignored, "update-index", "--add", "--cacheinfo", `160000,${git(ignored, "rev-parse", "HEAD")},stash/evil`); git(ignored, "add", ".gitmodules"); git(ignored, "commit", "-q", "-m", "moved, its change ignored");
+    git(ignored, "checkout", "-q", "main"); git(ignored, "merge", "-q", "--no-ff", "-m", "merge", "change");
+    fails(run(ignored), "and one whose submodule behind it moves, though .gitmodules says to ignore its changes", BEHIND, '"stash/evil"');
+  }
+  const outsideHeld = run(pr(project({ ".claude/skills": link(away) }), { "README.md": "x\n" }));
+  ok(outsideHeld.status === 0 && outsideHeld.out.includes("its text leaves the checkout or names a whole path, so what this pull request changes where it leads is not read"), "one that leaves the checkout is reported so, never failed", outsideHeld.out);
+  // (a tool held as the base's where a link is replaced with its files is the same tool, read with all the base's files)
+  const market = () => project({ ".claude/settings.json": link("../conf/settings.json"), "conf/settings.json": withPlugins({ "foo@m": true }) });
+  fails(run(pr(market(), { ".claude/settings.json": withPlugins({ "foo@m": true }), ".claude/settings.local.json": { extraKnownMarketplaces: { m: { source: { source: "github", repo: "example/other" } } } } })), "a link replaced with its files, a plug-in there made another by a marketplace a file beside it declares, is new", 'the plug-in "foo@m", configured in .claude/settings.json, is new');
+  passes(run(pr(market(), { ".claude/settings.json": withPlugins({ "foo@m": true }) })), "while the same plug-in, its files the link's alone, stands as the base's");
   // (the mend: a link the base held replaced with the very files it named stands as the base's, a pull request that
   // turns a link into files adds no link, and an entry the base listed behind its link stays a note until then)
   const mendable = project({ ...shared, ".claude/skills/notes": link("../../shared/notes") });
