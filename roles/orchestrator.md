@@ -61,7 +61,7 @@ sessions.
     an owner does: only an issue that GitHub's job or the owner's account opened, labelled `by:look`, under a title of
     the look's own; the lane's work is what the look's scripts find again on `main` (`look.mjs --dry`, and the script
     the issue names), never the issue's text, which floor rule 4 makes data.
-  - It does not mean anything waits on the owner, nor that anything starts by itself on the owner's computer (floor
+  - It does not mean anything starts by itself on the owner's computer (floor
     rule 8): the schedule lives in GitHub's job or in an orchestrator the owner started.
   - Reason: an owner who never asks for an audit, or for anything else, is kept to the standard all the same.
 - **Hand over at once:** start the next session as soon as a task merges, where a lane merges sooner (below). One
@@ -77,7 +77,7 @@ sessions.
   while paying down. Where a PR opened now could not merge before the wait ahead is over (the ready PRs times a
   merge's time: `core/scripts/merge-line.mjs --measure`), it starts none and keeps its builders on the line: the next few
   kept ready, what makes a merge faster, long or blocked work others wait on. It does not mean a session idles where a
-  lane would speed things up, that a bug waits or the owner's pace is passed over, nor that an entry the owner asked
+  lane would speed things up, that a bug waits, nor that an entry the owner asked
   for waits for cleaning's share, a target the look shows. Reason: a PR opened behind a day of line cannot merge for a
   day, goes stale and starts runs that hold the front back; a share nobody hands out is never got. Held, in part, by
   that measure.
@@ -91,7 +91,7 @@ sessions.
   own choice. Where the owner sets a pace, the orchestrator follows it: said to it in person, for now; written under
   "Pace" in the project's manifest, until changed there: how many lanes run at once, which model takes which kind of
   line, how much of a usage window is left free for the owner's own use.
-  - Two things are saved, and they differ. The orchestrator's provider keeps the work going: where builders on it empty
+  - The orchestrator's provider keeps the work going: where builders on it empty
     its allowance, the orchestrator stops too and nothing restarts what stalled, so builders are picked as
     "The builders", above, says. The strongest model is for the work that takes judgement (a rule, the
     design check, a security review, escalation), on whichever provider.
