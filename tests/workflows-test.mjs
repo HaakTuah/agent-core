@@ -57,13 +57,18 @@ const nest = k => `x: ${"[".repeat(k)}{a: 1, a: 2}${"]".repeat(k)}\ny: 1\ny: 2\n
 ok(["? ", "[", "{", "- ", "? - "].every(form => dup(`${form.repeat(12500)}\n`) === "null@1<null" && dup(`${form.repeat(12500)}\n`) === "null@1<null") && dup(nest(125)) === "a@1<1,y@3<2" && dup(nest(126)) === "y@3<2,null@1<null" && Date.now() - deep < 5000,
   `a list or mapping nested past 128 deep, a document counted as one, is read as an empty value, the rest of the text read still and the cut said so, and twelve thousand marks of any nesting, read twice, stop nothing (#610; ${Date.now() - deep} ms)`);
 // (block nesting some thousands deep, closed by a line at a lower indent, which the package's parser cannot close: the
-// text is said to be read only in part, whether the parser gives out first or the depth mark cuts it, so the case holds
-// wherever a Node's stack ends; and the check fails it with its mend, never passing it as holding no key)
+// text is said to be read only in part, whether the parser gives out first, naming line 1, or the depth mark cuts it,
+// naming the cut's line, so the case holds wherever a Node's stack ends; and the check fails it with its mend, never
+// passing it as holding no key)
 let indented = "x:\n"; for (let i = 1; i < 2500; i++) indented += `${" ".repeat(i)}k:\n`;
 const past = [`on: push\non: pull_request\nx:\n  ${"? ".repeat(2500)}a\nz: 1\n`, `on: push\non: pull_request\nx:\n  ${"- ".repeat(5000)}a\nz: 1\n`, `on: a\non: b\n${indented}z: 1\n`];
 const unreadDeep = repeated(past.map((text, i) => ({ file: `deep${i}.yml`, text })), () => null);
-ok(past.every(t => dup(t).endsWith("null@1<null")) && unreadDeep.fails.length === 3 && unreadDeep.fails.every(l => /^FAIL deep\d\.yml:1: the file nests its lists or mappings more than 128 deep, past what this check reads/.test(l)) && mended(unreadDeep.fails.join("\n")),
+ok(past.every(t => /(?:^|,)null@\d+<null$/u.test(dup(t))) && unreadDeep.fails.length === 3 && unreadDeep.fails.every(l => /^FAIL deep\d\.yml:\d+: the file nests its lists or mappings more than 128 deep, past what this check reads/.test(l)) && mended(unreadDeep.fails.join("\n")),
   "a text nested some thousands deep in block form, past what the parser can close, is read as unread, and the check fails it with its mend (#610)", unreadDeep.fails.join("\n"));
+const lower = `on: push\n${Array.from({ length: 37 }, (_, i) => `k${i}: 1\n`).join("")}z: ${"[".repeat(200)}${"]".repeat(200)}\n`;
+const lowerFails = repeated([{ file: "lower.yml", text: lower }], () => null).fails;
+ok(dup(lower) === "null@39<null" && lowerFails.length === 1 && lowerFails[0].startsWith("FAIL lower.yml:39: the file nests") && mended(lowerFails[0]),
+  "a part cut past 128 deep is named on its own line, not line 1, so the session is sent where the deep part is", lowerFails.join("\n"));
 ok(dup("env: &defaults { FOO: one, FOO: two }\nx:\n- !t [ {c: 1, c: 2} ]\n") === "FOO@1<1,c@3<3" && dup("a: {x: &y {b: 1, b: 2}, z: !t 1, z: 2}\n") === "b@1<1,z@1<1" && dup("a: {!t b: 1, &c b: 2}\n") === "b@1<1" && dup("env: { A: 'it''s # text', A: two }\n") === "A@1<1",
   "a flow value behind an anchor or a tag is read, a node in it behind one too, and a doubled quote inside single quotes ends neither the quote nor the line");
 ok(dup("matrix: { include: [{ os: ubuntu-latest, }], os: [windows-latest] }\n") === "" && dup("jobs: { build: { runs-on: x, }, build: { runs-on: y } }\n") === "build@1<1", "a blank between a last comma and the bracket that closes a flow value closes it there");

@@ -47,8 +47,8 @@ export function uncommented(line) {
 
 // The keys given twice in one mapping of a YAML text, each as { line, key, first }: the line of the second, the key as
 // YAML reads it and the line of the first, numbered from 1, in the order of the seconds in the text; and, where part of
-// the text was not read (nested past DEEPEST, or past what the parser closes), { line: 1, key: null, first: null } after
-// them.
+// the text was not read (nested past DEEPEST, or past what the parser closes), { line, key: null, first: null } after
+// them, on the line of the first part cut, or line 1 where the parser gave out with nothing cut.
 export function twice(text) {
   // (the package, loaded here alone: a script that imports this file for `uncommented` needs nothing installed)
   const { Composer, LineCounter, Parser, isScalar, visit } = loadSync("yaml");
@@ -74,5 +74,9 @@ export function twice(text) {
     for (const doc of composer.end()) read(doc);
   } catch { whole = false; } // (a text that runs the package's parser out of its stack: what was read before stands)
   const out = found.sort((a, b) => a.at - b.at).map(({ line, key, first }) => ({ line, key, first }));
-  return whole && !cut.size ? out : [...out, { line: 1, key: null, first: null }];
+  if (whole && !cut.size) return out;
+  // (the line of the first part cut, where one was; where the parser gave out alone, no line is known, and 1 is named)
+  let first = Infinity;
+  for (const offset of cut) if (offset < first) first = offset;
+  return [...out, { line: Number.isFinite(first) ? lines.linePos(first).line : 1, key: null, first: null }];
 }
