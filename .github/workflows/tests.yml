@@ -63,8 +63,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 jobs:
-  # (the hourly run tests main's newest commit on Windows only where main moved: where an hourly run already finished on
-  # this commit, passed or failed, nothing runs again; where that cannot be read, it runs; #733, point 6)
+  # (the hourly run tests main's newest commit on Windows only where main moved: where the newest full run on this
+  # commit, hourly or by hand, passed, nothing runs again; where it failed or none ran, it runs, so a skipped run only
+  # ever follows a pass, and the newest full run, which the release reads (release.mjs, fullRun), never hides a
+  # failure; where that cannot be read, it runs; #733, point 6)
   moved:
     if: ${{ github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
@@ -74,14 +76,14 @@ jobs:
     outputs:
       run: ${{ steps.moved.outputs.run }}
     steps:
-      - name: Whether main moved since an hourly run last finished on it
+      - name: Whether main moved since the tests last passed on it in full
         id: moved
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          done=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$GITHUB_SHA" -f event=schedule -f status=completed -F per_page=100 --jq '[.workflow_runs[] | select(.conclusion == "success" or .conclusion == "failure")] | length' || true)
-          echo "hourly runs finished on $GITHUB_SHA: ${done:-not read}"
-          if [ "$done" = 0 ] || [ -z "$done" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; else echo "run=false" >> "$GITHUB_OUTPUT"; fi
+          done=$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$GITHUB_SHA" -f status=completed -F per_page=100 --jq '[.workflow_runs[] | select(.event == "schedule" or .event == "workflow_dispatch")] | sort_by(.run_started_at) | last | .conclusion // "none"' || true)
+          echo "the newest full run on $GITHUB_SHA, hourly or by hand: ${done:-not read}"
+          if [ "$done" = success ]; then echo "run=false" >> "$GITHUB_OUTPUT"; else echo "run=true" >> "$GITHUB_OUTPUT"; fi
 
   # (the suites are split in parts that run side by side, each under a time mark of its own: the core's checks from
   # plain git on whole scratch projects, with the hostile tests of the core's inputs (projects); the sync and its proof

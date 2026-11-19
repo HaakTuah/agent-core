@@ -86,22 +86,42 @@ export function workflowsIn(dir, parse = loadSync("yaml").parse) {
   const out = { onHost: false, testRunners: [], selfHosted: false, unknown: false, unread: [] };
   let files = [];
   try { files = fs.readdirSync(dir).filter(f => /\.ya?ml$/u.test(f)); } catch { return out; }
+  const read = {};
   for (const f of files) {
-    try {
-      const wf = parse(fs.readFileSync(path.join(dir, f), "utf8"));
-      if (!triggers(wf?.on ?? wf?.true).some(t => ON.includes(t))) continue;
-      const jobs = wf?.jobs && typeof wf.jobs === "object" ? Object.values(wf.jobs) : [];
-      // (a job that calls a workflow takes no runner of its own: the called workflow's jobs do, read where it stands here)
-      for (const job of jobs.filter(j => typeof j?.uses !== "string")) {
+    try { read[f] = parse(fs.readFileSync(path.join(dir, f), "utf8")); } catch { out.unread.push(f); }
+  }
+  const seen = reached(read);
+  try {
+    for (const f of seen) {
+      // (a job that calls a workflow takes no runner of its own: the called workflow's jobs do, followed above where it
+      // stands here)
+      for (const job of jobsOf(read[f]).filter(j => typeof j?.uses !== "string")) {
         const runner = runnerOf(job);
         out.selfHosted ||= runner === "own";
         out.unknown ||= runner === null;
         if (startsSuite(job)) { out.onHost = true; out.testRunners.push(runner); }
       }
-    } catch { out.unread.push(f); }
-  }
+    }
+  } catch { out.unread.push(...[...seen].filter(f => !out.unread.includes(f))); }
   return out;
 }
+
+// The workflows a pull request or a push starts, and those of this folder they call, `uses: ./.github/workflows/<f>`,
+// followed to a depth, each once: their jobs run on the pull request or the push too.
+const LOCAL = /^\.\/\.github\/workflows\/([^/]+\.ya?ml)$/u;
+function reached(read) {
+  const started = Object.keys(read).filter(f => triggers(read[f]?.on ?? read[f]?.true).some(t => ON.includes(t)));
+  const seen = new Set(started), queue = started.map(f => [f, 0]);
+  for (let k = 0; k < queue.length; k++) {
+    const [f, depth] = queue[k];
+    const calls = depth < 4 ? jobsOf(read[f]).map(j => LOCAL.exec(typeof j?.uses === "string" ? j.uses.trim() : "")?.[1]) : [];
+    for (const c of calls.filter(c => c && c in read && !seen.has(c))) { seen.add(c); queue.push([c, depth + 1]); }
+  }
+  return seen;
+}
+
+// A workflow's jobs, as a list; none where it holds no mapping of them.
+const jobsOf = wf => (wf?.jobs && typeof wf.jobs === "object" ? Object.values(wf.jobs) : []);
 
 // The manifest's row *test runners*, or undefined where none holds a value it takes.
 export function runnersRow(manifest) {
