@@ -10,7 +10,7 @@
 // on a push to main, it reads every tracked file of the kinds it reads and reports what it finds.
 //   The engine is a tool that only runs, installed before the check and never while it runs (#534, point 5; #654):
 // `--install` runs `install.mjs pypi`, which installs the wheel of Semgrep 1.185.0 for this system from the core's
-// `requirements.txt`, PyPI's own lock form, by its SHA-256, into the core's `pypi/` folder, with pip and no package
+// `.packages/requirements.txt`, PyPI's own lock form, by its SHA-256, into the core's `.packages/pypi/` folder, with pip and no package
 // code run; it does so only where the host's CodeQL does not scan the project and, with a base, the change adds or
 // alters a file of the kinds the scan reads. The scan runs `semgrep-core` from there under the name `osemgrep`, by which
 // it runs as a whole command with no Python. Where the engine is not installed, the scan fails, saying so and how to
@@ -26,7 +26,7 @@
 //
 //   node core/scripts/code-scan.mjs --install [--base <commit>]     before the check, in its job: a step of core.yml
 //   node core/scripts/code-scan.mjs [--base <commit>] [--description <file>]
-//        (the description from the file, or else from PR_BODY; the engine from the core's pypi/semgrep/bin)
+//        (the description from the file, or else from PR_BODY; the engine from the core's .packages/pypi/semgrep/bin)
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -37,12 +37,12 @@ import { copyOf } from "./core-path.mjs";
 import { leadsOut, logged } from "./guards.mjs";
 import { MEND } from "./mend.mjs";
 import { started } from "./started.mjs";
-import { pypiFile } from "./packages.mjs";
+import { pypiFile, pypiUnreached } from "./packages.mjs";
 import { parseYaml } from "./workflow-run.mjs";
 
-// The engine's version, as the core's requirements.txt names it: the one place it is written.
+// The engine's version, as the core's .packages/requirements.txt names it: the one place it is written.
 const VERSION = (() => {
-  try { return /^semgrep==(\S+)/mu.exec(fs.readFileSync(new URL("../requirements.txt", import.meta.url), "utf8"))?.[1]; } catch { return undefined; }
+  try { return /^semgrep==(\S+)/mu.exec(fs.readFileSync(new URL("../.packages/requirements.txt", import.meta.url), "utf8"))?.[1]; } catch { return undefined; }
 })() ?? "(no version named)";
 const KINDS = /\.(?:[cm]?js|jsx|ts|tsx|cs|py)$/u;
 const RULES = fileURLToPath(new URL("code-scan.yml", import.meta.url));
@@ -254,7 +254,11 @@ export function scan(root, { base = null, description = "", dir = null } = {}) {
   if (hostScans(root, base)) return { lines: ["code scan: not run: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project"], failed: false };
   const files = targets(root, base);
   if (!files.length) return { lines: [`code scan: no file of the kinds it reads ${base ? "changed" : "tracked"}`], failed: false };
-  dir ??= path.dirname(pypiFile(`semgrep/bin/semgrep-core${exe()}`));
+  // (where the job's install could not reach the registry, in a project's pull request, the scan did not run, said as a
+  // warning, neither failed nor passed: #654, point 4)
+  const engine = `semgrep/bin/semgrep-core${exe()}`;
+  if (!dir && pypiUnreached(engine)) return { lines: [`::warning::The code scan did not run: Semgrep's engine could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`], failed: false };
+  dir ??= path.dirname(pypiFile(engine));
   const listed = base ? unreadListed(description) : new Set();
   const { got, held, read } = answer(dir, root, files, listed);
   if (got.failed) return base

@@ -23,7 +23,7 @@
 # those workflows run it. They run only where every step of its own check passed, so a copy not proved the core runs
 # nothing here; then each runs even where one of them before it failed, so every failure is said; the code scan of a
 # project the host's CodeQL does not scan follows them, with any of those inputs and none of its own, its engine
-# installed from the core's requirements.txt by its hashes in a step before it (scripts/code-scan.mjs; #546, #654); the
+# installed from the core's .packages/requirements.txt by its hashes in a step before it (scripts/code-scan.mjs; #546, #654); the
 # package checks go last, each in a step of its own, and the NuGet check, which runs the pull request's build files,
 # after all.
 # One job bills one runner's minutes where four or five did (#377); with no such input it runs its own check alone, as
@@ -324,6 +324,7 @@ jobs:
         with:
           node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: The core's packages, installed from its lock file for the core's checks (#654)
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' }}
         run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then node "${CORE_AT}scripts/install.mjs"; fi
       - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.copies != '' }}
@@ -344,7 +345,7 @@ jobs:
           PARTS: ${{ inputs.parts }}
         run: node "$CORE_AT"scripts/checks.mjs description --parts "$PARTS"
       # (the code scan of a private project, #546: where no workflow of the base calls the core's codeql.yml, Semgrep's
-      # engine is installed from the core's requirements.txt by its wheels' hashes, with the runner's pip, before the scan
+      # engine is installed from the core's .packages/requirements.txt by its wheels' hashes, with the runner's pip, before the scan
       # runs and only where the change adds or alters a file the scan reads (#654), and reads those files with the core's
       # rules, failing a finding the base did not hold; an engine not installed fails the scan, saying how to install it)
       - name: The code scan, which a call with no input does not run

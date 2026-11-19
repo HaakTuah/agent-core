@@ -40,7 +40,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
      lookup (`scripts/lookup.mjs`) and its lookup again of what a project holds (`scripts/held.mjs`, through the
      lookup's readers); Node itself is checked against its SHA-256 by `scripts/node.sh`, and the code scan's wheel by
-     its own, which pip checks against `requirements.txt` (`scripts/install.mjs pypi`); hostile tests:
+     its own, which pip checks against `.packages/requirements.txt` (`scripts/install.mjs pypi`); hostile tests:
      `tests/hostile-packages-test.mjs`, and for the scan `tests/code-scan-test.mjs`.
    - the code a pull request adds or alters, and its description's lines "Scan false alarm:" and "Scan unread:": read
      by the code scan (`scripts/code-scan.mjs`), which hands the files by name to Semgrep's engine, installed from its
@@ -53,11 +53,11 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    machine whose own Node is below the least long-term line in `.node-least`, or that has none, with
    `npm pack --ignore-scripts`, or with no npm by curl from the registry's own address over HTTPS, never installing it,
    and checks against its SHA-256 before it runs; and Semgrep's engine (`semgrep-core` from the `semgrep` wheel on PyPI
-   at the version and hashes in `requirements.txt`), which `scripts/install.mjs pypi` installs with pip in the code
+   at the version and hashes in `.packages/requirements.txt`), which `scripts/install.mjs pypi` installs with pip in the code
    scan's own step for a project the host's CodeQL does not scan, the wheel checked by its SHA-256, no dependency
    taken and none of its code run, and which the scan runs with no Python.
 17. **Dependabot** updates the workflows' GitHub actions and the packages of the core's lock files, `package-lock.json`
-    and `requirements.txt` (`.github/dependabot.yml`), each a week after its release.
+    and `.packages/requirements.txt` (`.github/dependabot.yml`), each a week after its release.
 
 The threat model's part: the core has no users of its own; what an attacker would want of it is a rule loosened here
 that every project then takes, so a change reaches a project only through a sync PR there: a pure sync gets no review

@@ -294,7 +294,7 @@ function writeKit(o, here, pin, out) {
   fs.mkdirSync(path.join(here, "core"));
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
   execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: here, input: execFileSync("git", ["archive", pin], { cwd: ROOT, env: plainEnv(), maxBuffer: 1 << 28 }) });
-  // (and its packages, installed from its lock file as the sync installs them, into core/node_modules/, which the copy's
+  // (and its packages, installed from its lock file as the sync installs them, into core/.packages/node_modules/, which the copy's
   // own .gitignore keeps out of the commit; a failure leaves the kit written and says the mend: #654)
   const installer = path.join(here, "core", "scripts", "install.mjs");
   if (fs.existsSync(installer)) {

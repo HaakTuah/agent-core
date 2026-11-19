@@ -1,7 +1,8 @@
 {
-  "lockfiles": ["package-lock.json"],
-  "ignoreScriptsIn": [".npmrc"],
+  "lockfiles": [".packages/package-lock.json"],
+  "ignoreScriptsIn": [".packages/.npmrc"],
   "ships": [],
+  "data": ["spdx-exceptions"],
   "audit": ".github/licences-audit.json",
   "scan": {
     "served": [],

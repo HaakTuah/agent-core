@@ -126,7 +126,16 @@ The index, and how an item is written: `archive/instructions.md`.
      after asking what the core lacked that let an inventory's check miss a part. It stands behind "A trial of a
      maintained tool replays the part's past bugs" in `tasks/choices.md`, and the inventory's line `Replayed:`.
 
-257. **18 November 2026**, #654, the owner's decision. Other publishers' code is registered, never carried: each package
+257. **18 November 2026**, #457, points 2, 4 and 5. A test that needs time has it handed in and asserts no duration on
+     a real clock, a measure of speed excepted with room above its floor; a push that merges an up-to-date pull request
+     whose whole suite passed on the same tree runs no test again; and the audit's seventh question asks where the tests
+     of portable code run and what that costs, since in another owner's suite counted for #426 the one failure at random
+     in 26,518 runs came from a duration asserted on a real clock, and every push to its default branch ran the whole
+     suite again after its pull request had. The owner agreed to the issue's points, and to point 4's skip being built in
+     the core's own job of tests and listed for projects as a step with its cost, the starter kit holding none. It stands
+     behind "A test asserts no time measured on a real clock" and "A tree that passed is not run again" in
+     `tasks/tests.md`, and the seventh question in `tasks/cleaning.md`.
+258. **18 November 2026**, #654, the owner's decision. Other publishers' code is registered, never carried: each package
      the core's scripts run is named in a lock file in its registry's own form, at one exact version, and installed
      from it by the sync, at a session's start and in each job before a check, into a folder git does not track; the
      folder the core carried them in goes (#528, #601). In a project too, what it ships or runs of another publisher
@@ -136,7 +145,7 @@ The index, and how an item is written: `archive/instructions.md`.
      what #601 brought in (Brought in by: #601; Correction: rule missing; #302). It stands behind "Code of another
      publisher is named in a lock file" in `floor/topics/dependencies.md`, and the dated entries of `CHOICES.md`.
 
-258. **17 November 2026**, #546. A private project gets a scan of its code in place of the host's CodeQL, paid there:
+259. **17 November 2026**, #546. A private project gets a scan of its code in place of the host's CodeQL, paid there:
      Semgrep's engine, a program that only runs, installed in the scan's own step from PyPI's lock form by its hashes
      (#654) and run with no Python, reads what a pull request adds or alters with rules the core writes, since no
      maintained rule set carries a licence the floor allows, and a finding is handled as floor rule 9 handles CodeQL's,

@@ -1,5 +1,5 @@
 // Tests of the code scan (code-scan.mjs): whether a change needs the engine installed; and, where the engine installs
-// from the core's requirements.txt (`install.mjs pypi`, with Python's pip and PyPI reachable), the engine itself, on
+// from the core's .packages/requirements.txt (`install.mjs pypi`, with Python's pip and PyPI reachable), the engine itself, on
 // samples written here, each line a planted weakness (BAD) or a safe look-alike (SAFE), in JavaScript, TypeScript, C#
 // and Python: every planted one found and no look-alike, by the core's own rules (code-scan.yml); then the scan of a
 // pull request in a scratch repository, failing a finding on a line it adds with its mend, passing one its description
@@ -71,15 +71,15 @@ ok([...falseAlarms("Scan false alarm: `src/a.js:12`, a fixed list\n- Scan false 
   ok(/a workflow calls the core's codeql\.yml/u.test(installNot(p) ?? ""), "where the host's CodeQL scans the project, no engine is installed");
 }
 
-// the engine itself, installed from the core's requirements.txt as the scan's own step installs it
+// the engine itself, installed from the core's .packages/requirements.txt as the scan's own step installs it
 const installed = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/install.mjs", import.meta.url)), "pypi"], { encoding: "utf8" });
-const dir = fileURLToPath(new URL("../pypi/semgrep/bin/", import.meta.url));
+const dir = fileURLToPath(new URL("../.packages/pypi/semgrep/bin/", import.meta.url));
 const engineHere = fs.existsSync(path.join(dir, `semgrep-core${process.platform === "win32" ? ".exe" : ""}`));
 if (installed.status !== 0 || !engineHere) {
   console.log(`skip the engine's own cases: ${(installed.stderr || installed.stdout).trim().split("\n").pop()}`);
   ok(installed.status !== 0 && /Mend: /u.test(installed.stderr), "where the engine cannot be installed, the install says why, and its mend", installed.stderr);
 } else {
-  ok(/installed from requirements\.txt into pypi\//u.test(installed.stdout), `the engine is installed and runs here, on ${process.platform}-${process.arch}`, installed.stdout);
+  ok(/installed from \.packages\/requirements\.txt into \.packages\/pypi\//u.test(installed.stdout), `the engine is installed and runs here, on ${process.platform}-${process.arch}`, installed.stdout);
   const SAMPLES = {
     "web.js": `const { exec, execFile } = require("child_process");
 const fs = require("fs");
