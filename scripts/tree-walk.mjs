@@ -1,5 +1,5 @@
-// The walk over a parsed file's tree that the shape check's readers on the parser share (csharp-functions.mjs and
-// javascript-functions.mjs, beside this file): each function found with its name, its body's line and lines, the
+// The walk over a parsed file's tree that the shape check's readers on the parser share (csharp-functions.mjs,
+// javascript-functions.mjs and python-functions.mjs, beside this file): each function found with its name, its body's line and lines, the
 // depth its control blocks reach and its branch points, by the reader's own parts. Node's own modules only: none.
 
 /** The largest file a reader gives its grammar, in characters: a tree takes memory in step with its nodes, a 4 MB array
@@ -9,17 +9,20 @@ export const LARGEST = 2_000_000;
 
 /** The functions under `root`, in the order their bodies open, as a baseline numbers functions of one name. `parts`
  *  are the reader's: `functionBody(node)`, the body of a node that is a function, else null; `nameOf(node, parent)`;
- *  `branches(node)`, the branch points a node adds; and `isControl(node, parent)`, whether it opens a control block.
+ *  `branches(node)`, the branch points a node adds; `isControl(node, parent)`, whether it opens a control block; and,
+ *  where a function's lines are not its body's, `rowsOf(node, body)`, its first and last rows (from 0).
  *  The walk keeps a stack of its own so that no nesting runs out of the call stack: each item a node, its parent, the
  *  function it counts toward (null outside any) and the level of control blocks it stands at. (The parent is carried,
  *  not asked of the node: the parser finds it from the file's root, at a cost that grows with how deep it lies.) */
-export function walkFunctions(root, { functionBody, nameOf, branches, isControl }) {
+const bodyRows = (node, body) => [body.startPosition.row, body.endPosition.row];
+export function walkFunctions(root, { functionBody, nameOf, branches, isControl, rowsOf = bodyRows }) {
   const found = [], stack = [{ node: root, parent: null, fn: null, level: 0 }];
   while (stack.length) {
     const { node, parent, fn, level } = stack.pop();
     const body = functionBody(node);
     if (body) {
-      const own = { name: nameOf(node, parent), line: body.startPosition.row + 1, lines: body.endPosition.row - body.startPosition.row + 1, depth: 0, branches: 0 };
+      const [first, last] = rowsOf(node, body);
+      const own = { name: nameOf(node, parent), line: first + 1, lines: last - first + 1, depth: 0, branches: 0 };
       found.push([body.startIndex, own]);
       // (what stands outside its body, a parameter's default or a lambda passed to C#'s : base(...), counts where the
       // function itself stands, as the lexer read it)

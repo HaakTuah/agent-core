@@ -212,7 +212,7 @@ found = survey({
   "game/host/io.py": "import winreg\nfrom typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from game.view.board import later\n",
 }, cfg({ ...layered, platform: ["winreg"] }));
 ok(same(ids(found), ["clock: game/rules/dice.py: datetime.datetime.now", "clock: game/rules/dice.py: random.", "crossing: rules -> view: game/rules/dice.py -> game/view/board.py", "crossing: view -> host: game/view/board.py -> game/host/io.py", "cycle: game/rules/dice.py -> game/view/board.py", "cycle: game/view/board.py -> game/rules/dice.py",
-  "function: game/rules/dice.py#roll", "package: game/rules/dice.py -> requests", "package: game/view/board.py -> requests", "platform: game/view/board.py -> winreg"]) && found.read.nowhere === 1 && found.readers.get("game/host/io.py") === "python",
+  "function: game/rules/dice.py#roll", "package: game/rules/dice.py -> requests", "package: game/view/board.py -> requests", "platform: game/view/board.py -> winreg"]) && found.read.nowhere === 1 && found.readers.get("game/host/io.py") === "python-tree",
   "Python: the same, relative imports too; an import in a def crosses but makes no cycle, nor one of types alone; a package of development alone and the standard library are not found, and an undeclared one is counted", ids(found));
 found = survey({
   "web/a.js": "var App = {};\nfunction helper() {}\n",
@@ -305,7 +305,7 @@ ok(parseBaseline(JSON.stringify({ audited: { day: "2026-11-15", listed: 3, read:
 // a reader the baseline does not name yet: what the base held of it is said, never failed (a sync turns nothing red)
 const csBig = { "src/A.cs": `namespace N;\nclass A {\n${csLong("Big", 70)}}\n` }, allReads = { reads: Object.keys(READERS) };
 v = judge({ now: csBig, baseline: listed([]), base: baseOf(listed([]), csBig) });
-ok(v.fail.length === 0 && v.notes.some(n => /written before the check read files that hold JSX, C#, its functions by the lexer, C#, its functions by the parser, Python, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process: 1 breach that stood before is not listed yet/.test(n) && /--write/.test(n)),
+ok(v.fail.length === 0 && v.notes.some(n => /written before the check read files that hold JSX, C#, its functions by the lexer, C#, its functions by the parser, Python, its functions by the lexer, Python, its functions by the parser, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process: 1 breach that stood before is not listed yet/.test(n) && /--write/.test(n)),
   "a baseline written before a reader came: what the base held of it is said, not failed", JSON.stringify(v));
 v = judge({ now: { ...csBig, "src/B.cs": `namespace N;\nclass B {\n${csLong("New", 70)}}\n` }, baseline: listed([]), base: baseOf(listed([]), csBig) });
 ok(mended(said(v)) && v.fail.length === 1 && /1 function passes/.test(said(v)) && /B\.cs#New/.test(said(v)) && !/A\.cs/.test(said(v)), "and what is new of it fails, from the sync on", said(v));
@@ -320,7 +320,7 @@ ok(mended(said(v)) && /src\/b\.tsx/.test(said(v)) && /cannot follow/.test(said(v
 const refusedReads = reads => { try { parseBaseline(JSON.stringify({ reads, listed: {} }), "b.json", ""); return ""; } catch (e) { return `FAIL: ${e.message}`; } };
 ok(mended(refusedReads("all")) && mended(refusedReads(["javascript", "cobol"])), "readers that are no list, or a name no reader has, are refused, with their mend");
 v = judge({ now: csBig, baseline: JSON.stringify({ reads: ["javascript"], listed: {} }), base: baseOf(JSON.stringify({ ...allReads, listed: { "function: src/A.cs#Big": { lines: 70, depth: 0, branches: 0 } } }), csBig) });
-ok(mended(said(v)) && /no longer names 9 readers that origin\/main's names: jsx, javascript-tree, csharp, csharp-tree, python, scripts, screens, clocks, processes/.test(said(v)), "a baseline that drops a reader its base named fails, so that what it lists cannot go unlisted while it stands", said(v));
+ok(mended(said(v)) && /no longer names 10 readers that origin\/main's names: jsx, javascript-tree, csharp, csharp-tree, python, python-tree, scripts, screens, clocks, processes/.test(said(v)), "a baseline that drops a reader its base named fails, so that what it lists cannot go unlisted while it stands", said(v));
 
 // ---- whole runs, in a scratch repository ----
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shape-test-"));
@@ -432,14 +432,14 @@ git("checkout", "-q", "--", ".");
 put("checks/shape.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"checks/shape-baseline.json"', '"checks/moved.json"'));
 put("checks/moved.json", JSON.stringify({ reads: ["javascript"], listed: {} }));
 r = run([], { SHAPE_BASE: "base" });
-ok(r.status === 1 && mended(r.out) && /no longer names 9 readers/.test(r.out), "a baseline moved to a new path is compared with the one the base's config names: its readers too only grow", r.out);
+ok(r.status === 1 && mended(r.out) && /no longer names 10 readers/.test(r.out), "a baseline moved to a new path is compared with the one the base's config names: its readers too only grow", r.out);
 fs.rmSync(path.join(dir, "checks/moved.json"));
 git("checkout", "-q", "--", ".");
 put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/other.json` |\n");
 put("checks/other.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"checks/shape-baseline.json"', '"checks/moved.json"'));
 put("checks/moved.json", JSON.stringify({ reads: ["javascript"], listed: {} }));
 r = run([], { SHAPE_BASE: "base" });
-ok(r.status === 1 && mended(r.out) && /no longer names 9 readers/.test(r.out), "a config moved by the manifest is compared with the one the base's own manifest names, its baseline too", r.out);
+ok(r.status === 1 && mended(r.out) && /no longer names 10 readers/.test(r.out), "a config moved by the manifest is compared with the one the base's own manifest names, its baseline too", r.out);
 for (const f of ["core-manifest.md", "checks/other.json", "checks/moved.json"]) fs.rmSync(path.join(dir, f));
 git("checkout", "-q", "--", ".");
 put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/gone.json` |\n");
