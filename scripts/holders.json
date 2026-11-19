@@ -87,6 +87,7 @@
       "check: scripts/size.mjs, in part",
       "check: .github/workflows/size.yml, in part"
     ],
+    "tasks/code-shape.md: A test taken out or weakened is said": "check: scripts/pr-description.mjs, in part",
     "tasks/reviews.md: A review already running is waited for": "check: scripts/code-review-wait.mjs, in part",
     "tasks/reviews.md: Security": "check: scripts/security-review.mjs, in part",
     "tasks/reviews.md: What a posted review stands for": ["check: scripts/security-review.mjs, in part", "check: scripts/clean-merges.mjs, in part"],
@@ -353,7 +354,7 @@
     "roles/shared/review-guidelines.md: A rule file changed": [134, 214, 246, 248, 249],
     "roles/shared/review-guidelines.md: A screen changed": [230],
     "roles/shared/review-guidelines.md: Every reviewer": [155],
-    "roles/shared/review-guidelines.md: For every reviewer": [36, 255],
+    "roles/shared/review-guidelines.md: For every reviewer": [36, 255, "#307"],
     "roles/shared/review-guidelines.md: Text users read": [49, 141],
     "roles/shared/teams.md: A person's approval follows the host": [236],
     "roles/shared/teams.md: An employer's rules come first": [236],
@@ -402,6 +403,7 @@
     "tasks/code-shape.md: Never worse": ["#750.5"],
     "tasks/code-shape.md: A part whose gaps repeat is read for its whole input": ["#593.8"],
     "AGENTS.md: A record pull requests add to is a folder of one file per entry": ["#750.1"],
+    "tasks/code-shape.md: A test taken out or weakened is said": ["#307"],
     "tasks/done-when.md": [240],
     "tasks/game-design.md: A loss explains itself": [242],
     "tasks/game-design.md: Chance comes before the choice where it can": [242],
@@ -464,6 +466,7 @@
     "tasks/reviews.md: It goes down the lines": [240],
     "tasks/reviews.md: No sign in about 5 minutes, no finished review in about 20, or an answer that is not a review": [19, 20],
     "tasks/reviews.md: Security": [47, 48, 49, 50, 51, 174, 177, 227],
+    "tasks/reviews.md: The reviewers are tested": ["#307"],
     "tasks/reviews.md: The design check": [22],
     "tasks/reviews.md: What a posted review declares": [155, 235],
     "tasks/reviews.md: What a posted review stands for": [220, 250, "#750.3"],
@@ -613,6 +616,8 @@
     "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": "check fires; outcome: fast",
     "tasks/reviews.md: What a posted review declares": "check fires; outcome: readable",
     "roles/shared/work-flow.md: Sessions": "correction: does not work; outcome: fast",
-    "tasks/tools.md: A change of tool loses nothing": "correction: does not work; outcome: fast"
+    "tasks/tools.md: A change of tool loses nothing": "correction: does not work; outcome: fast",
+    "tasks/reviews.md: The reviewers are tested": "correction: does not work; outcome: robust",
+    "tasks/code-shape.md: A test taken out or weakened is said": "correction: does not work; outcome: robust"
   }
 }

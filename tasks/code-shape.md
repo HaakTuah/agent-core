@@ -117,12 +117,15 @@ one declared entrance.
   check, which counts each kind of fault a file holds against what the baseline lists of it and fails a survivor past
   it, an entry that joins with no reason, and one dropped while its fault survives, and by the reviews of that reason.
 - **A test taken out or weakened is said.** By default a pull request keeps its tests and what they assert. The
-  trigger is a pull request that deletes a test or weakens what one asserts (an assertion loosened or taken out, a
-  case skipped): its builder says so under "Readings taken", with why, and the reviewer checks that the reason holds.
-  It does not mean that a test which proves nothing must stay. Reason: a measure on changed lines cannot see a test
-  weakened elsewhere, and a test made to pass is the cheapest way to green. No check holds it yet, since none can
-  tell a weakened assertion without guessing: the reviews read it (`roles/shared/review-guidelines.md`), the strength check
-  names each test file a pull request deletes, and `core/scripts/holders.mjs` lists it until something holds it.
+  trigger is a pull request that leaves a test file with fewer lines that assert, deletes it, or skips a case in it:
+  its builder names that file on the description's line `Tests changed:`, with why, and the reviewer rules on it,
+  checking that the reason holds (#307). It does not mean that a test which proves nothing must stay, nor that an
+  assertion only changed is named: it may be made stricter, and the check lists it for the reviewer, who rules on it.
+  Reason: a measure on changed lines cannot see a test weakened elsewhere, and a test made to pass is the cheapest way
+  to green. Held, in part, by the description check (`core/scripts/weakened.mjs` lists the lines, in the test files the
+  *shape check*'s config names), which fails a description that leaves such a file off the line; an assertion loosened
+  in place, or on a line of a call spread over several, no check tells without guessing, and the reviews read it
+  (`roles/shared/review-guidelines.md`).
 - **Near-copies are reported.** By default code that only looks like other code fails nothing. The trigger is a run
   of code that matches another once names and numbers are set aside: the copies check lists it on every run, and the
   audit's reader judges whether one function should serve both. It does not mean that such code is joined by rule:
