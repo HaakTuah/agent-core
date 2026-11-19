@@ -22,6 +22,10 @@
 // pull request is marked ready, the call runs on no head, and a ruleset counts the draft's skip as passed. As with a key
 // twice, a call the base's same file already held so is noted, each is noted with no base, and the sync's step "16
 // November 2026, checks once a pull request is ready" (steps.mjs, which reads it by draftHoles() below) names it.
+// And a line break that YAML 1.1 reads and the YAML package does not (U+0085, U+2028, U+2029: #872): a key given twice,
+// or a call left without ready_for_review, placed after one is not found by the package's reader, while a YAML 1.1
+// reader (YamlDotNet) reads it as a line end, so such a file fails where it is new or changed, and is noted where it is
+// unchanged from the base or no base is told, as a key given twice is (foreignBreaks() below).
 // What it does not chase: a value given as binary (a YAML tag) holds a word no search can see, and a tag can itself be
 // spelled in more ways than a search can follow. GitHub's own workflow reader refuses a binary value where a trigger
 // belongs, so that is no way to write one; the reviews hold it, as they hold any odd tag in a workflow.
@@ -79,6 +83,33 @@ export function lines(text) {
 // Whether the text is one the search can trust: UTF-8 with no character that marks another encoding or bytes that are
 // no text (a workflow in UTF-16 reads as letters with a zero byte between them, and the word is not found).
 export const readable = text => !/[\0\ufffd]/u.test(text);
+
+// The first line break of YAML 1.1 beyond LF, CR and CRLF in a text (U+0085, U+2028, U+2029), the YAML package not
+// reading it as one: { line, code, count } with the line as an editor counts it (by LF), the character's code and how
+// many there are in all; null where there is none (#872).
+export function foreignBreaks(text) {
+  let line = 1, first = null, count = 0;
+  for (const m of String(text).matchAll(/\n|[\u0085\u2028\u2029]/gu)) {
+    if (m[0] === "\n") { line++; continue; }
+    count++;
+    first ??= { line, code: `U+${m[0].codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}` };
+  }
+  return first && { ...first, count };
+}
+
+// The files, each { file, text }, that hold such a break, as { fails, notes } (as repeated() gives them): `before` gives
+// a file's text on the base, or is null where there is no base, when each is a note; a file the same as the base's is
+// noted, one changed or new fails, since a count cannot show a change made nothing worse (#752).
+export function foreignBroken(files, before) {
+  const fails = [], notes = [];
+  for (const { file, text } of files) {
+    const found = foreignBreaks(text);
+    if (!found) continue;
+    const old = !before || before(file) === text;
+    (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}:${found.line}: the file holds the line break ${found.code}${found.count > 1 ? ` and ${found.count - 1} more` : ""}, which YAML 1.1 reads as a line end and the YAML package this check reads with does not, so a key given twice or a call left without ready_for_review after it would go unseen${old && before ? ", as on the base" : ""}. Mend: replace each with an ordinary line feed, or, inside a double-quoted string, with the escape of its own code (\\u0085, \\u2028 or \\u2029)`);
+  }
+  return { fails, notes };
+}
 
 // The files the check reads, of those git tracks.
 export const reads = files => files.filter(f => !f.startsWith("core/") && !f.split("/").includes("node_modules") &&
@@ -224,9 +255,10 @@ if (started(import.meta.url)) {
   if (skipped) console.log("::warning::The check for a key given twice did not run, nor the one for a call a draft skips: the package yaml could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault");
   const against = core ? () => null : base ? show : null;
   const keys = skipped ? { fails: [], notes: [] } : repeated(texts, against), ready = skipped ? { fails: [], notes: [] } : unreadied(texts, against);
-  for (const line of [...keys.notes, ...ready.notes, ...keys.fails, ...ready.fails]) console.log(logged(line));
-  failed += keys.fails.length + ready.fails.length;
-  keys.notes.push(...ready.notes);
+  const odd = foreignBroken(texts, against); // (no package is read for it, so it runs where the install did not)
+  for (const line of [...keys.notes, ...ready.notes, ...odd.notes, ...keys.fails, ...ready.fails, ...odd.fails]) console.log(logged(line));
+  failed += keys.fails.length + ready.fails.length + odd.fails.length;
+  keys.notes.push(...ready.notes, ...odd.notes);
   console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} failing${keys.notes.length ? `, ${keys.notes.length} noted` : ""}${failed ? ". Mend: mend each line above as it says" : ""}`);
   process.exit(failed ? 1 : 0);
 }

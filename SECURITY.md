@@ -76,8 +76,12 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      workflow for the move of the pins, past which it is reported unread, and none on a file for the reader of where the
      tests run, a project's own, read whole, whose walk of a job's labels stops at 500 and 8 deep, lists and mappings
      nested 128 deep at most for the workflow check's two readers of a workflow (what is nested past it is said with its
-     mend, and no list or mapping used as a key is read), and NuGet's lock file version 2, a newer refused (npm's lock
-     file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`.
+     mend, and no list or mapping used as a key is read), no line break of YAML 1.1 beyond LF, CR and CRLF for the same
+     two readers (U+0085, U+2028 and U+2029, which the package does not read as one, fail a file that is new or changed,
+     with their mend, and are only noted in one unchanged from the base or where a project's run is told no base, so a
+     key given twice or a call left without ready_for_review behind such a break in an unchanged file goes unseen until
+     the file is changed; in the core's own run each fails), and NuGet's lock file version 2, a newer refused (npm's
+     lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`.
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
