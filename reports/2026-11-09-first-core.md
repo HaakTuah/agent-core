@@ -169,7 +169,7 @@ question.
 | 5 | Find next item/entry in progress file; its text is the brief; read the sections it names via grep | both | stays in each game; "read only the sections it names" in `modules/how-to-work.md` ("Read little") |
 | 6 | Check for changes in the design copy (A) | A | A |
 | 7 | Read "The game in one page" before every item (A) | A | A |
-| 8 | Check weekly usage with `scripts/usage.sh` at start and after every commit; "unknown" → say so in first line of each PR, owner pauses at ~90% | both | `modules/usage.md` |
+| 8 | Check weekly usage with `scripts/usage.sh` at start and after every commit; "unknown" → say so in first line of each PR, a stop at ~90% | both | `modules/usage.md` |
 | 9 | Before opening the PR, re-read the spec (A: the live design document, builder rules; B: its entry and question issues): build what changed, or if large say so in the PR and queue it (A: start of the next item touching it; B: its own entry right after) | both | `modules/work-flow.md`, point 5 (re-read, build what changed, a large change said in the PR and queued); what is re-read and where a large change is queued stay in each game ([#7](https://github.com/HaakTuah/agent-rules/issues/7), point 3) |
 | 10 | Every rule says what it is for; the aim (max finished work of full quality per week's usage, lowest cost now and later); four pillars; reviews enforce first three; workshop check measures reading | both | `modules/how-to-work.md` |
 | 11 | A question is a question | both | `modules/how-to-work.md` |
@@ -197,7 +197,7 @@ question.
 | 33 | Sessions: started task by task → stop when merged, say what's next; else carry on (A: + its milestone PR merged; a long item may end at a passed gate with commit and note) | both | `modules/work-flow.md` ("Sessions"); A's extras stay in A ([#7](https://github.com/HaakTuah/agent-rules/issues/7), point 4) |
 | 34 | One place for the owner: issues | both | `modules/inbox.md` |
 | 35 | Readings: settled by the project's references (A: The game in one page + item's sections; B: rules that stand / design section); listed under "Readings taken" (A: report; B: PR) with the principle; only open or taste → owner | both | `modules/inbox.md`, slots *settling references* and *report* |
-| 36 | One inbox: issues assigned to `HaakTuah`; `question` (with reading and alternative), `enhancement`, `bug`; template headings copied into body via API; search first; whole, phone-answerable, plain words, project's own names | both | `modules/inbox.md` |
+| 36 | One inbox: issues assigned to `HaakTuah`; `question` (with reading and alternative), `enhancement`, `bug`; template headings copied into body via API; search first; whole, answerable on any device, plain words, project's own names | both | `modules/inbox.md` |
 | 37 | Everywhere else only a pointer: "Questions for the owner" lists issues opened or touched, one line + link, "none" | both | `modules/inbox.md` |
 | 38 | Only the owner's comments answer; agents posting under his login end with their tool's attribution line; unsigned from `HaakTuah` is his | both | floor rule 4 |
 | 39 | Acting on his answer: quote in archive, write the decision where it belongs (A: design decision to design session), close with link; open = needs him | both | `modules/inbox.md` (A's "a design decision goes to the design session" stays in A) |
@@ -211,7 +211,7 @@ question.
 | 47 | Lanes: what runs one at a time (A: numbered items, one lane; B: AI and engine-rules changes, online messages); A's list of side lanes; A: draft PR title names the entry | both | slot *one at a time*; A's list of side lanes and "its title naming the entry" stay in A |
 | 48 | The brake: from ~85% no new side lane, open ones finish; from ~90% only small things in main lane; only measured share counts; a session that cannot read it carries on | both | `modules/usage.md` (as a floor rule: [#6](https://github.com/HaakTuah/agent-rules/issues/6), point 3) |
 | 49 | Rules that stand (B: rivals never treat a person differently, no ability only people use, clever rivals human reactions, every new move tested both ways, cue and lesson, trademarks, optimizations, conditional goods, everything belongs, online in step, never rename storage keys / no repo named `snake-game`) | B | B |
-| 50 | Usage (B section; A in builder rules): work continuously; from ~90% no bigger task: finish if nearly done, or clean commit + draft PR saying how to test and what's left; then only small things, progress file up to date; the two games share the limit; only measured share counts | both | `modules/usage.md` |
+| 50 | Usage (B section; A in builder rules): work continuously; from ~90% no bigger task: finish if nearly done, or clean commit + draft PR saying how to test and what's left; then only small things, progress file up to date; the limit is shared; only measured share counts | both | `modules/usage.md` |
 | 51 | `main` is the owner's and the live site: never push to it, never force-push | A: builder rules; B: yes | floor rule 12 |
 | 52 | Branch from develop per task, PR into develop, merge yourself when suites and reviews pass | both | `modules/git.md` |
 | 53 | Push after every commit, even before the PR (a draft), so nothing is lost if a session dies | both | `modules/git.md` |
@@ -262,7 +262,7 @@ question.
 | 83 | Read by Codex's security review as its threat model; rules close each way in | floor |
 | 84 | Everything public; no defence rests on not being known; committed is public for good | floor |
 | 85 | Who: anyone; issues, fork PRs, packages/actions, planted text; + per game (saves/links, model replies; room codes, shared records) | floor + A / B |
-| 86 | Protected: the owner's accounts (GitHub and tokens, ChatGPT and Claude logins; via workflows, checks, work handed to Codex), his machine runs nothing; branches and site (main, develop, deploy workflows, Pages); users (per game) | floor + A / B |
+| 86 | Protected: the owner's accounts (GitHub and tokens; via workflows, checks, work handed to Codex), the owner's machine runs nothing; branches and site (main, develop, deploy workflows, Pages); users (per game) | floor + A / B |
 | 87 | Ways in: workflows, dependencies and actions, outsiders' text reaching an agent; + per game | floor + A / B |
 | 88 | Lower stakes (per game) | floor (`floor/threat-model.md`: the shared principle) + stays in each game (their examples) |
 
@@ -270,7 +270,7 @@ question.
 
 | # | Rule | Went to |
 |---|---|---|
-| 89 | Two builders, each on its own subscription, review each other: different blind spots | `modules/codex.md` |
+| 89 | Two builders, each from a different provider, review each other: different blind spots | `modules/codex.md` |
 | 90 | Status: Codex reviews, Claude builds (no legacy environment); no lane to Codex until the owner says; nothing on the owner's machine starts Codex (started from the PR); dormant list | `modules/codex.md` (machine part: F rule 8) |
 | 91 | Every rule names a role, never a model; this is the one place that says who fills each | `modules/roles.md` |
 | 92 | Orchestrator, builders, trusted builder, code reviewer = the other company's model, fallback reviewer (holds the picture of the finished game), security reviewer, design checker (A: on build-order items), planning design (A: script kings'; B: rivals'), the hard work (A: hardest problems, competing approaches; B: AI planning, engine rules, online sync; a big-file split is not) | `modules/roles.md` + slots *design-checked PRs*, *planning design*, *hard work* |
@@ -291,7 +291,7 @@ question.
 | 107 | 5 slop check monthly (A: against "Text a player reads", fixed in Follow-ups, formula test every code PR; B: scored as every review, fixed in the polish lane, chatter suite runs the formula test) | `modules/reviews.md`, slot *slop bar* |
 | 108 | 7 briefs: fallback reviewer (diff, task's text, A: + "The game in one page", the guidelines whole); design checker (A: + dossier passages, checks against the page first, a fact without source blocks; B: same brief, until it meets the task); later round; escalation | `modules/reviews.md`, slot *review reference*; A's dossier passages and "a fact without a source blocks" stay in A's review guidelines |
 | 109 | For Codex: AGENTS.md applies (A: + builder rules); helpers = its subagents; build only what the brief gives; tests are the contract; run the test (and sim) scripts before finishing (commands differ); push to the PR's branch only, open no PR, never protected files, never a secret; setup script, say what's missing; questions to issues or report; review findings by priority | `modules/codex.md`, slot *Codex's checks* |
-| 110 | Setup: own subscription, app on the owner's repositories, code review automatic off; security review settings; environment (B only); default model; B: agent may reach the internet | `modules/codex.md`, slot *Codex environment* (B's internet note in its value) |
+| 110 | Setup: app on the owner's repositories, code review automatic off; security review settings; environment (B only); default model; B: agent may reach the internet | `modules/codex.md`, slot *Codex environment* (B's internet note in its value) |
 | 111 | What reaches Codex: only the owner's own work (PR he opened from the repository, never main/develop); never protected files (marked failed, compare call, never merged) | `modules/codex.md` (restates F rules 3-4) |
 
 ### docs/orchestrating.md
@@ -350,7 +350,7 @@ question.
 | 146 | Unattended work: don't stop to ask; most reasonable reading, written down, carry on; readings with their principle; design session checks them (A); taste → question when taken; stop only before anything irreversible | `modules/inbox.md` (don't stop to ask; readings with their principle; taste goes to the owner when taken); A (the design session's check; "stop only before anything irreversible": [#6](https://github.com/HaakTuah/agent-rules/issues/6), point 1) |
 | 147 | Progress: progress file, one line per item; report path | A |
 | 148 | The workshop check (six points; "at every milestone", now weekly) | `modules/workshop-check.md` |
-| 149 | Usage: be economical (the reviews an item calls for, no extra analyst workflows); work continuously; check after every commit; both games keep working to ~90%, then the bulk is the owner's; from 90% no bigger task... | `modules/usage.md`; "be economical" dropped: "match effort to the task" and "no agent workflows" say it ([#7](https://github.com/HaakTuah/agent-rules/issues/7), point 6) |
+| 149 | Usage: be economical (the reviews an item calls for, no extra analyst workflows); work continuously; check after every commit; both games keep working to ~90%, then the work narrows; from 90% no bigger task... | `modules/usage.md`; "be economical" dropped: "match effort to the task" and "no agent workflows" say it ([#7](https://github.com/HaakTuah/agent-rules/issues/7), point 6) |
 | 150 | Review points do not stop the build; "Stop for review" items | A |
 | 151 | No stopgaps | A |
 
@@ -607,14 +607,14 @@ lines at the source.
 | `SECURITY.md` | 121, in part; what stays: "The audit of every licence, with which list each is held to, is `tools/licences.json`." | the rest: the core, as the done table says |
 | `docs/review-guidelines.md` | 30, in part; what stays: "A mark in `tools/sizes.json` raised without its reason in the PR blocks." | the rest: the core, as the done table says |
 
-## The owner's answers, and what changed (9 November 2026, evening)
+## The owner's answers, and what changed (9 November 2026)
 
 The owner answered the three questions and the design session's evaluation in one message (core archive 76): yes to
-everything it advised, and Claude alone keeps a reserve. Made in this PR by the design session:
+everything it advised. Made in this PR by the design session:
 
 - **#6, three safety rules into the floor:** rule 14 (stop before what cannot be undone, and at a failed safety check;
   nothing spends the owner's money without his yes), rule 15 (dependencies, where a project takes packages) and rule 16
-  (the owner's share of Claude). Each game's own lists drop them at adoption: Amarna's "spending" among its own safety
+  (usage). Each game's own lists drop them at adoption: Amarna's "spending" among its own safety
   rules, its `SECURITY.md` dependency line.
 - **#7, where the games differ:** each keeps its own, as the maps already say; the core keeps the workshop check's newer
   wording, and the design session updates Amarna's design document so its builder rules match.
@@ -625,10 +625,9 @@ everything it advised, and Claude alone keeps a reserve. Made in this PR by the 
   update rules; every other number is unchanged. Rules are written as paragraphs ("**3. ...**"), so each file shows
   the floor's own numbers. Each game's `AGENTS.md` section above names `core/floor/topics.md` among the files read when
   needed.
-- **Usage by provider** (`modules/usage.md`, floor rule 16): only Claude keeps a reserve, from about 90% of its weekly
-  limit; Codex and any other provider kept for the projects is spent to its end, and where an environment can read
-  every provider's usage the orchestrator spreads the work so each is spent by its reset before Claude reaches 90%;
-  where usage cannot be read, one check at the start and nothing said about it. Both games took the same change at
+- **Usage by provider** (`modules/usage.md`, floor rule 16): one provider keeps a reserve, from about 90% of its
+  weekly limit; any other provider is spent to its end, and where an environment can read every provider's usage the
+  orchestrator spreads the work to match; where usage cannot be read, one check at the start and nothing said about it. Both games took the same change at
   once in their own rule files, since the core is not adopted yet.
 - **`.github/dependabot.yml`** now updates the workflow's GitHub actions weekly, a week after each release (it was
   GitHub's empty template, which fails); this repository's `SECURITY.md` says so under rule 17.

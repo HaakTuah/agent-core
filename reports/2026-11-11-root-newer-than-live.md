@@ -7,7 +7,7 @@ rule of the same day that published only main's newest commit.
 **Why:** under that rule, a passing build that main had already moved past was skipped, so when the newer commit's
 build then failed, the live game stayed on the version before both until main built green again. Now a passing build
 goes live whenever it is newer than what is live; a re-run of an older build is still skipped, so the live game never
-goes back. Asked for by the owner in the design session ("Do that.", on this proposal, 11 November 2026).
+goes back. Asked for by the owner in the design session: the owner agreed to this proposal on 11 November 2026.
 
 **What it changes in every project:** nothing to do but take the sync. The first publish after it has no record to
 compare with and publishes as before; from then on the record decides.

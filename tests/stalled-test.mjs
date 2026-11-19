@@ -3,7 +3,7 @@
 // here.
 //
 //   node tests/stalled-test.mjs
-import { print, stalled } from "../scripts/stalled.mjs";
+import { handedOff, print, stalled } from "../scripts/stalled.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -22,7 +22,14 @@ ok(s.map(l => l.number).join() === "3,1", "only lanes past the hours count, olde
 ok(Math.abs(s[1].waited - 9.1667) < 0.001 && s[0].waited === 24, "the wait is the hours since the newest commit");
 ok(stalled([p(1, "a", "2026-11-13T16:19:00Z")], now, 3).length === 0 && stalled([p(1, "a", "2026-11-13T16:18:59Z")], now, 3).length === 1, "a lane counts only once it is past the hours");
 ok(print([], 4, 3) === "No lane stalled: 4 open, none without a push for over 3 h.", "nothing stalled is one line");
-ok(print(stalled([p(9, "item/x\u001b[2J", "2026-11-13T10:19:00Z")], now, 3), 2, 3) === "Stalled, no push for over 3 h: 1 of 2 open\n  #9 item/x [2J: 9.0 h since 2026-11-13T10:19:00Z (t9)", "a stalled lane's line, with its control characters taken out", print(stalled([p(9, "item/x\u001b[2J", "2026-11-13T10:19:00Z")], now, 3), 2, 3));
+ok(print(stalled([p(9, "item/x\u001b[2J", "2026-11-13T10:19:00Z")], now, 3), 2, 3) === "Stalled, no push for over 3 h: 1 of 2 open\n  #9 item/x [2J: 9.0 h since 2026-11-13T10:19:00Z (t9); no hand-off note", "a stalled lane's line, with its control characters taken out", print(stalled([p(9, "item/x\u001b[2J", "2026-11-13T10:19:00Z")], now, 3), 2, 3));
+
+// The hand-off note (tasks/tools.md, "A change of tool loses nothing"; #306): a lane whose description holds one is not
+// marked, in each form a line may open it; one that only names it in a sentence, or holds no description, is.
+const noted = body => print(stalled([{ ...p(7, "lane/noted", "2026-11-13T10:19:00Z"), body }], now, 3), 1, 3);
+for (const body of ["Hand-off: done a; next b", "x\n**Hand-off:** done a", "## Hand-off: done", "- Hand-off: done"]) ok(!noted(body).includes("no hand-off note"), `a lane with a hand-off note is not marked: ${JSON.stringify(body)}`, noted(body));
+for (const body of ["It has no Hand-off: here", "", undefined, 42]) ok(noted(body).endsWith("(t7); no hand-off note"), `a lane with none is marked: ${JSON.stringify(body)}`, noted(body));
+ok(handedOff("a\nHand-off: b") && !handedOff("hand-off: b"), "the note's line is \"Hand-off:\", as written");
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);

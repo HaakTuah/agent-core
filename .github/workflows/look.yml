@@ -8,12 +8,19 @@
 # look.yml has it
 # (core/setup/template/workflows/look.yml.tmpl). It runs the project's own scripts on the core's one exact Node; Node's
 # own modules only, no package installed. Nothing is checked out but the calling repository's default branch, and no
-# text of a pull request or an issue reaches a command: the scripts read them through gh's answers alone. It may write
-# issues, and read pull requests, checks and statuses; nothing else.
+# text of a pull request or an issue reaches a command: the scripts read them through gh's answers alone. Its last step
+# takes the personal terms out of issues and comments (core/scripts/issue-terms.mjs; #783), where the call passes the
+# secret PERSONAL_TERMS, as the starter kit's does. It may write issues, and read pull requests, checks and statuses;
+# nothing else, so a pull request's own text or a review's it counts and leaves to the owner's run of the script.
 name: look
 
 on:
   workflow_call:
+    secrets:
+      # (the personal-terms check's list, for the step that reads issues and comments; a call that passes none leaves
+      # that step reading nothing, saying so)
+      PERSONAL_TERMS:
+        required: false
 
 permissions:
   contents: read
@@ -44,6 +51,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
+      - name: The core's packages, installed from its lock files for the daily look (#654; the parser's too, since the dose reads C#'s functions on it, #719)
+        run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then if [ -f "${CORE_AT}.packages/parser/package.json" ]; then node "${CORE_AT}scripts/install.mjs" all; else node "${CORE_AT}scripts/install.mjs"; fi; fi
       - name: One issue while the core is ahead of the project's copy
         env:
           GH_TOKEN: ${{ github.token }}
@@ -53,3 +62,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node "$CORE_AT"scripts/look.mjs
+      - name: Personal terms taken out of issues and comments (floor rule 11; counts alone, never a term or where one stood)
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TERMS: ${{ secrets.PERSONAL_TERMS }}
+        run: if [ -f "${CORE_AT}scripts/issue-terms.mjs" ]; then node "$CORE_AT"scripts/issue-terms.mjs; fi

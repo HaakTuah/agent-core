@@ -89,7 +89,7 @@ The stand-in's predictions (Opus, high), each built on:
   as it returned them but for the archive pointers added.
 - A search helper (Sonnet), once: the owner's words behind each principle in both games' archives. Each quote was then
   checked by script against the games' archives (all match). It found no founding words for the first two principles
-  in either archive (they predate the archives); item 87 ("Remember, everyone plays the same game!") is the nearest.
+  in either archive (they predate the archives); item 87 ("Everyone plays the same game") is the nearest.
 - The stand-in (Opus, high), once, on the four choices below.
 
 ## Questions for the owner
