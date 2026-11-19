@@ -125,6 +125,7 @@
       "check: .github/workflows/tests.yml, in part"
     ],
     "tasks/updates.md: CodeQL": "check: .github/workflows/codeql.yml",
+    "tasks/updates.md: A question or difference about a rule of the core starts from its reasons": "check: scripts/pr-description.mjs, in part",
     "roles/shared/work-flow.md: Review in the background": "check: GitHub's ruleset on the default branch, in part",
     "roles/shared/work-flow.md: Sessions": "check: scripts/work-saved.sh, in part",
     "tasks/roles.md: The roles, by what they do": "describes",
@@ -188,7 +189,9 @@
       "check: scripts/security-review.mjs, in part",
       "check: GitHub's ruleset on the default branch, in part"
     ],
-    "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part"
+    "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part",
+    "floor/security.md: The owner's yes in the PR": "check: scripts/pr-description.mjs, in part",
+    "roles/shared/teams.md: The higher right gives the floor's yeses": "check: scripts/pr-description.mjs, in part"
   },
   "behind": {
     "AGENTS.md": [208, 209, 213],
@@ -315,6 +318,7 @@
     "tasks/choices.md": [222, 231],
     "tasks/choices.md: a long list before the options": [251],
     "tasks/choices.md: a drop says whether it rests on a fact": [251],
+    "tasks/choices.md: what a standard mechanism gave": [263],
     "tasks/choices.md: the same trial for each option kept": [251],
     "tasks/choices.md: the blind pick": [251],
     "tasks/choices.md: the case against": [251],
@@ -411,6 +415,7 @@
     "tasks/tools.md: Proven by the staged cases, tool by tool": [232],
     "tasks/updates.md: Node": [39, 253],
     "tasks/updates.md: The newest stable version, unless there is a reason": [37, 65],
+    "tasks/updates.md: A question or difference about a rule of the core starts from its reasons": [264],
     "tools/claude.md: Name models by family alone": [80, 81],
     "tools/claude.md: Pass both model and effort": [128],
     "tools/claude.md: Who to call": [70, 71, 73],
@@ -422,6 +427,7 @@
   "numbers": {
     "tasks/code-shape.md: A job a maintained package does is done by it": "findings; outcome: robust",
     "tasks/updates.md: Node": "correction: does not work; outcome: robust",
+    "tasks/updates.md: A question or difference about a rule of the core starts from its reasons": "findings; outcome: asked",
     "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",
     "AGENTS.md: Every rule says what holds it": "findings; outcome: robust",
     "AGENTS.md: Rules are pruned by their numbers": "correction: misread; outcome: asked",
@@ -430,6 +436,7 @@
     "tasks/reviews.md: What a posted review stands for": "check fires; outcome: robust; rare harm",
     "tasks/choices.md: a long list before the options": "correction: misread; outcome: asked",
     "tasks/choices.md: a drop says whether it rests on a fact": "correction: misread; outcome: asked",
+    "tasks/choices.md: what a standard mechanism gave": "correction: rule missing; outcome: robust",
     "tasks/choices.md: the same trial for each option kept": "correction: misread; outcome: asked",
     "tasks/choices.md: the blind pick": "correction: misread; outcome: asked",
     "tasks/choices.md: the case against": "correction: misread; outcome: asked",

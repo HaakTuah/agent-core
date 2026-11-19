@@ -33,8 +33,9 @@
 // be told from one forgotten ("An exemption leaves a mark" in roles/shared/work-flow.md; #302). And where the part
 // "What holds it" is asked and holds more than "None", of a pull request opened since the copy on its base held
 // NUMBER_SINCE, a line under it that names a rule's number in its form ("Number: findings; outcome: robust";
-// outcomes.mjs's NUMBER; #303). And, of one opened since the copy on its base held REASONS_SINCE that adds a line
-// under the manifest's "Differences" (read from git, the merge commit against its base), the line "Reasons read:"
+// outcomes.mjs's NUMBER; #303). And, since YES_SINCE, the owner's yes where the core's floor or review guidelines change
+// (owner-yes.mjs, beside this file; #549). And, of one opened since the copy on its base held REASONS_SINCE that adds a
+// line under the manifest's "Differences" (read from git, the merge commit against its base), the line "Reasons read:"
 // (tasks/updates.md, "A question or difference about a rule of the core starts from its reasons"; #756).
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
@@ -46,6 +47,7 @@ import { doneMends, ownerAt, queueAt, readItem, takesIt } from "./done-when.mjs"
 import { isPart, milestoneMends } from "./milestones.mjs";
 import { differencesOf } from "./manifest-reads.mjs";
 import { NUMBER } from "./outcomes.mjs";
+import { asking, coreAtBase, issuesOf, textsOf, yesOf } from "./owner-yes.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, pathIn, taken, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
 
@@ -87,6 +89,10 @@ export function reasonsMend(body, added) {
   if (textOf(body).split(/\r\n|\r|\n/u).some(l => l.trim().startsWith(REASONS) && l.trim().length > REASONS.length)) return null;
   return `it adds ${added.length === 1 ? "a line" : `${added.length} lines`} under the manifest's "Differences" ("${added[0].slice(0, 80)}"), and the description has no line "${REASONS}". Mend: for each rule of the core it departs from, run \`node core/scripts/reasons.mjs "<the rule's file and lead>"\`, read the archive items and the issues it prints, and add a line "${REASONS} <those items and issues>, and which of their reasons does not hold for this project, and why"; where a line departs from no rule of the core (a step of the sync notes, a file the starter kit writes), say so on that line`;
 }
+
+// The day from which the owner's yes is asked of a pull request that changes the floor or the review guidelines
+// (owner-yes.mjs, beside this file; #549), as the lines above are.
+export const YES_SINCE = "2026-11-18T00:00:00Z";
 
 // The mend where the part HOLDS holds more than "None" and no line "Number: <the count>; outcome: <the outcome>" in
 // NUMBER's form; null where it does, or where the part is not there (missing() names that).
@@ -241,6 +247,17 @@ if (started(import.meta.url)) {
       if (mend) mends.push(mend);
       else console.log(added === null ? `ok   the line "${REASONS}" is not asked here: the change could not be read against its base` : added.length ? `ok   the description says the reasons read for the difference it adds` : `ok   the line "${REASONS}" is not asked here: no line is added under the manifest's "Differences"`);
     } else console.log(`ok   the line "${REASONS}" is not asked here: ${why}`);
+    if (created >= YES_SINCE && then?.includes("export const YES_SINCE")) {
+      const diff = spawnSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
+      // (where the core lies is read from the base's manifest, never the head's, which the pull request could bring)
+      const at = coreAtBase(process.cwd()), paths = diff.status === 0 && at !== null ? asking(diff.stdout.split("\0").filter(Boolean), at) : null;
+      if (paths === null) console.log("ok   the owner's yes is not asked here: the change could not be read against its base");
+      else {
+        const issues = issuesOf(process.env.PR_BODY), got = paths.length && issues.length ? textsOf(repo, issues) : { texts: [], read: true };
+        const yes = yesOf({ paths, body: process.env.PR_BODY, ...got });
+        if (yes.mend) mends.push(yes.mend); else console.log(`ok   ${yes.note}`);
+      }
+    } else console.log(`ok   the owner's yes is not asked here: ${why}`);
   }
   for (const mend of mends) console.log(`FAIL ${mend}`);
   process.exit(absent.length || mends.length ? 1 : 0);
