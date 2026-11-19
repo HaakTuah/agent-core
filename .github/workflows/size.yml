@@ -12,7 +12,8 @@
 # first parent, the base, and of the pull request's comments only who wrote each and how it opens is used, in a file
 # the script reads, with the host's rights of each who posted a "Leanness check:", at most twenty, their login, checked
 # as one, all that goes into a request's route (an answer counts only from the owner or a person the host lets write);
-# no text of a comment reaches a command.
+# no text of a comment reaches a command. The steps that read the host with the token, and the raise as the base's own
+# script judges it, the head's script read as text, all come before any step that runs the pull request's own code.
 name: size
 
 on:
@@ -43,16 +44,11 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
-      - name: The core's packages and the parser's, installed from their lock files for the size and shape checks (#654, #719)
-        run: node scripts/install.mjs all
-      - name: What each role reads at its start stays under its cap
-        env:
-          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
-        run: if [ -n "$BASE" ]; then node scripts/size.mjs --base "$BASE"; else node scripts/size.mjs; fi
-      # (two steps, so the token reaches gh alone and never the pull request's own script; a base or a list of
-      # comments that cannot be read fails its step: the check is never waived; a right that cannot be read, within
-      # ten seconds each and thirty in all, lets no one write, and the owner's answer still counts)
-      - name: The cap at the base, the pull request's comments, and the rights of those who answered
+      # (the token's step comes before every step that runs code of the pull request's, so that none of it runs while
+      # the token is in reach; a base, a head or a list of comments that cannot be read fails its step: the check is
+      # never waived; a right that cannot be read, within ten seconds each and thirty in all, lets no one write, and the
+      # owner's answer still counts)
+      - name: The cap at the base and at the head, the base's scripts, the pull request's comments, and the rights of those who answered
         if: ${{ github.event_name == 'pull_request' }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -60,8 +56,11 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         run: |
           d="$RUNNER_TEMP/raise"
-          mkdir "$d"
+          mkdir -p "$d/base"
           git show HEAD^1:scripts/size.mjs > "$d/base.mjs"
+          git show HEAD:scripts/size.mjs > "$d/head.mjs"
+          git archive -o "$d/base.tar" HEAD^1 scripts
+          tar -x -f "$d/base.tar" -C "$d/base"
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/issues/$NUMBER/comments?per_page=100" > "$d/comments.json"
           : > "$d/rights.txt"
           until=$((SECONDS + 30))
@@ -78,7 +77,18 @@ jobs:
             else echo "The host's rights of $login could not be read: an answer of theirs does not count."; fi
           done
           jq -s '.' "$d/rights.txt" > "$d/rights.json"
-      - name: A raise of a role's cap is one step, and has its leanness check
+      - name: A raise of a role's cap is one step, and has its leanness check, as the base's own script reads the head's
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: node "$RUNNER_TEMP/raise/base/scripts/size.mjs" --raise "$RUNNER_TEMP/raise/base.mjs" "$RUNNER_TEMP/raise/comments.json" "$RUNNER_TEMP/raise/rights.json" "$RUNNER_TEMP/raise/head.mjs"
+      - name: The core's packages and the parser's, installed from their lock files for the size and shape checks (#654, #719)
+        run: node scripts/install.mjs all
+      - name: What each role reads at its start stays under its cap
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
+        run: if [ -n "$BASE" ]; then node scripts/size.mjs --base "$BASE"; else node scripts/size.mjs; fi
+      - name: A raise of a role's cap is one step, and its caps are those the pull request's script runs with
         if: ${{ github.event_name == 'pull_request' }}
         env:
           OWNER: ${{ github.repository_owner }}
