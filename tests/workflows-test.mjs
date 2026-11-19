@@ -147,6 +147,14 @@ ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] =
     "no run on a draft: a pull request's run starts when it is marked ready, and each job of tests skips a draft and an hourly run where main did not move (point 2)");
   ok(!String(gate.if).includes("draft") && String(gate.if).startsWith("${{ always()") && String(gate.if).includes(MOVED) && /github\.event\.pull_request\.draft/.test(gateStep.env.DRAFT) && /if \[ -n "\$DRAFT" \]; then[\s\S]*Mend:[\s\S]*exit 1/.test(gateStep.run),
     "but the gate the ruleset requires runs on a draft and fails there, saying its mend, since a required check whose job is skipped passes");
+  // (the gate's step run in a shell, as the runner runs it: each of its failures says its mend, its pass none)
+  if (process.platform !== "win32") {
+    const gateRun = env => spawnSync("bash", ["-e", "-c", gateStep.run], { encoding: "utf8", env: { PATH: process.env.PATH, ...env } });
+    const said = r => `${r.stdout}${r.stderr}`.replace(/::error::/g, "FAIL: ").replace(/" \\\n\s*"/g, " ");
+    const runs = [gateRun({ DRAFT: "yes", SUITES: "skipped", UPGRADE: "skipped" }), gateRun({ SUITES: "cancelled", UPGRADE: "success" }), gateRun({ SUITES: "success", UPGRADE: "failure" })];
+    const passes = gateRun({ SUITES: "success", UPGRADE: "success" });
+    ok(runs.every(r => r.status === 1 && mended(said(r))) && passes.status === 0, "the gate fails a draft, a cancelled job and a failed one, each with its mend, and passes where all passed", runs.map(said).join(" | "));
+  }
   // (each matrix is set whole for each event: GitHub adds back an entry of `include` that no combination left after
   // `exclude` matches, so the jobs are read from the lists the expression holds: a pull request's and a push's, the
   // hourly run's, and all the others')

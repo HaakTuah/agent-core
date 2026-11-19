@@ -544,6 +544,11 @@ jobs:
           echo "the suites: $SUITES; the upgrade test and the staged cases: $UPGRADE"
           if [ "$SUITES" = cancelled ] || [ "$UPGRADE" = cancelled ]; then
             echo "::error::a job was cancelled: it ran out of its time (timeout-minutes) or was stopped, which is no" \
-              "failing test; its log shows the step it stood in, and re-running it is the first thing to try"
+              "failing test. Mend: read its log for the step it stood in, and re-run the job once"
+            exit 1
           fi
-          [ "$SUITES" = success ] && [ "$UPGRADE" = success ]
+          if [ "$SUITES" != success ] || [ "$UPGRADE" != success ]; then
+            echo "::error::a suite, the upgrade test or a staged case failed. Mend: read the failing job above, whose" \
+              "failing line says its own mend, and fix that in this pull request"
+            exit 1
+          fi

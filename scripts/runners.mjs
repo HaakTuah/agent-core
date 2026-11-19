@@ -9,7 +9,8 @@
 // - once an hour on the host's free runners;
 // - once a night where minutes are billed or the runner is a machine of the owner's;
 // - only before a release where the tests run on a computer alone;
-// - and in full before each release in every case.
+// - and in full before each release in every case;
+// and where every merge goes live (the manifest's *users get*, `merges` where no row says), on each pull request.
 // Where a public repository runs a job on a pull request or a push on a runner of its own, or on one it cannot read, it
 // prints the advice: keep forks off that job at once, and file one issue for the owner, labelled needs-owner, since a
 // stranger's pull request would run its code on that machine (floor rule 18). It fails nothing ("Nothing locks a project").
@@ -30,9 +31,10 @@ const ON = ["pull_request", "pull_request_target", "push", "merge_group"];
 // A workflow's triggers, as GitHub reads `on`: a name, a list of names, or a mapping keyed by them.
 const triggers = on => typeof on === "string" ? [on] : Array.isArray(on) ? on.filter(x => typeof x === "string") : on && typeof on === "object" ? Object.keys(on) : [];
 
-// The labels a job's runner is named by: its runs-on (a name, a list, or a group's), and where runs-on is an expression
-// that takes a matrix value, that matrix's values too. Read to a depth and a count, and each object once, so a file
-// whose anchors refer to themselves reads as far as it goes and no further.
+// The labels a job's runner is named by: its runs-on (a name, a list, or a group's), and where runs-on is
+// `${{ matrix.<key> }}`, the values that key takes: its list, and that key in each `include` entry, a list written as
+// `${{ fromJSON('...') }}` read from the lists its literals hold. Read to a depth and a count, and each object once, so a
+// file whose anchors refer to themselves reads as far as it goes and no further.
 function labelsOf(job) {
   const out = [], seen = new Set();
   const walk = (v, depth) => {
@@ -43,9 +45,22 @@ function labelsOf(job) {
     for (const x of Array.isArray(v) ? v : Object.values(v)) walk(x, depth + 1);
   };
   const on = job?.["runs-on"];
-  walk(on, 0);
-  if (typeof on === "string" && /\$\{\{\s*matrix\./u.test(on)) walk(job?.strategy?.matrix, 0);
+  const key = typeof on === "string" ? /^\$\{\{\s*matrix\.([\w-]+)\s*\}\}$/u.exec(on.trim())?.[1] : undefined;
+  if (key === undefined) walk(on, 0);
+  else {
+    const matrix = job?.strategy?.matrix;
+    walk(matrix?.[key], 0);
+    for (const entry of entriesOf(matrix?.include)) walk(entry?.[key], 0);
+    if (!out.length) out.push(on); // (no value read for the key: the expression stands, and is not read)
+  }
   return { labels: out, group: !!on && typeof on === "object" && !Array.isArray(on) && "group" in on };
+}
+
+// A matrix's `include`: a list, or `${{ fromJSON('...') }}` whose literal lists are read where they parse; [] otherwise.
+function entriesOf(include) {
+  if (Array.isArray(include)) return include;
+  if (typeof include !== "string") return [];
+  return [...include.slice(0, 200000).matchAll(/'(\[[^']*\])'/gu)].flatMap(m => { try { const v = JSON.parse(m[1]); return Array.isArray(v) ? v : []; } catch { return []; } });
 }
 
 // What a job's runner is: "own" (the label self-hosted, or a runner group), "hosted" (only the host's own labels:
@@ -56,7 +71,7 @@ function runnerOf(job) {
   const { labels, group } = labelsOf(job);
   if (group || labels.some(l => /(^|[\s,'"[])self-hosted($|[\s,'"\]])/u.test(l))) return "own";
   const plain = labels.filter(l => !/\$\{\{/u.test(l));
-  if (plain.length && plain.every(l => HOSTED.test(l)) && labels.every(l => HOSTED.test(l) || /^\$\{\{\s*matrix\.[\w-]+\s*\}\}$/u.test(l))) return "hosted";
+  if (plain.length && plain.length === labels.length && plain.every(l => HOSTED.test(l))) return "hosted";
   return null;
 }
 
@@ -76,7 +91,8 @@ export function workflowsIn(dir, parse = loadSync("yaml").parse) {
       const wf = parse(fs.readFileSync(path.join(dir, f), "utf8"));
       if (!triggers(wf?.on ?? wf?.true).some(t => ON.includes(t))) continue;
       const jobs = wf?.jobs && typeof wf.jobs === "object" ? Object.values(wf.jobs) : [];
-      for (const job of jobs) {
+      // (a job that calls a workflow takes no runner of its own: the called workflow's jobs do, read where it stands here)
+      for (const job of jobs.filter(j => typeof j?.uses !== "string")) {
         const runner = runnerOf(job);
         out.selfHosted ||= runner === "own";
         out.unknown ||= runner === null;
@@ -113,7 +129,7 @@ function settled(w, priv, manifest) {
 }
 
 const PLACES = { hosted: "the host's runners", "self-hosted": "a runner of the owner's own", local: "a session's or the owner's computer alone, no job on a pull request or a push starting a suite through the shape check" };
-const WHEN = { hourly: "once an hour, where it moved", nightly: "once a night, where it moved", release: "before each release, on that computer" };
+const WHEN = { merge: "on each pull request, before its merge, every merge going live (the manifest's *users get*, `merges` where no row says)", hourly: "once an hour, where it moved", nightly: "once a night, where it moved", release: "before each release, on that computer" };
 
 // The lines that say what was read, and from where.
 function saidOf(s, priv, unread) {
@@ -127,7 +143,9 @@ function saidOf(s, priv, unread) {
 // Where the tests run, who pays and how often the slow suites run: { where, billed, cadence, said, when, advice }.
 export function read({ repo, dir = ".github/workflows", manifest = null, gh = ghApi, parse }) {
   const w = workflowsIn(dir, parse), priv = privateOf(repo, gh), s = settled(w, priv, manifest);
-  const cadence = s.where === "local" ? "release" : s.where === "self-hosted" || s.billed ? "nightly" : "hourly";
+  // (where every merge goes live, each merge is a release: the slow suites run before it, on its pull request)
+  const users = override(manifest, "users get", ["merges", "releases"]) ?? "merges";
+  const cadence = users === "merges" ? "merge" : s.where === "local" ? "release" : s.where === "self-hosted" || s.billed ? "nightly" : "hourly";
   const advice = (w.selfHosted || w.unknown) && priv === false
     ? `A public repository runs a job on ${w.selfHosted ? "a runner of the owner's own" : "a runner that could not be read, perhaps the owner's own"}, where a stranger's pull request would run its code (floor rule 18): keep pull requests from forks off that job at once (an \`if:\` that its head repository is this one), and, where no open issue names it, file one for the owner, labelled needs-owner, to move that job to the host's runners or have every outside contributor's run approved first; nothing else waits on it.`
     : null;
@@ -140,7 +158,8 @@ export function main(argv, { gh = ghApi, say = console.log } = {}) {
   const manifest = fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null;
   const r = read({ repo, manifest, gh });
   say([`Where ${repo}'s tests run and who pays:`, ...r.said.map(s => `- ${s}`),
-    `A pull request runs the fast suites its change reaches; the slow and platform suites run at the default branch's newest commit ${r.when}, and in full before each release (the core's tasks/tests.md).`,
+    r.cadence === "merge" ? `The slow and platform suites run ${r.when}, and in full before each release (the core's tasks/tests.md).`
+      : `A pull request runs the fast suites its change reaches; the slow and platform suites run at the default branch's newest commit ${r.when}, and in full before each release (the core's tasks/tests.md).`,
     ...r.advice ? [r.advice] : []].join("\n"));
   return 0;
 }

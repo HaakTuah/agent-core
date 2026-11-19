@@ -80,19 +80,22 @@ reads is the *shape check*'s config.
   there for their time run at the default branch's newest commit, where it moved since their last run, as often as their
   cost allows: once an hour on the host's free runners, once a night where minutes are billed or the runner is a machine
   of the owner's, and only before a release where the tests run on a computer alone; in full before each release in
-  every case. Where the tests run and who pays is read, never asked: `core/scripts/runners.mjs --repo <owner>/<name>`
-  prints both and the schedule, and the manifest's rows *test runners* and *billed minutes* only override them. Nothing
-  changes it. The trigger is a workflow that runs the tests on a pull request: whoever writes or changes it moves the
-  platform suites, and any it moves for their time, to that schedule. In the core, the Linux suites run after every
-  merge and the Windows suites once an hour (`.github/workflows/tests.yml`). It does not mean a public repository takes
-  a runner on a machine of the owner's, where a stranger's pull request would run its code (the script prints the
-  advice: forks kept off that job at once, and one issue filed for the owner, labelled `needs-owner`), nor that a suite
-  runs less than once before each release, nor that a project changes its workflow for this before its builders take it
-  up. Reason: a full run on the default branch after every merge holds most of the host's jobs at once and leaves the
-  pull requests waiting, and a slow suite run once per change costs most where it is paid for, in money or in a
-  machine's hours; in the core Windows took 69% of the pull requests' job-minutes, where about three of its bugs were
-  found by Windows alone. Held by `tests/runners-test.mjs`, for what is read, and in the core by its workflow's schedule
-  and matrix, which the workflows test reads.
+  every case. The one condition that changes it: where every merge goes live (the *users get* slot, `merges` where no
+  row says), each merge is a release, so the slow suites run before each merge, on its pull request. Where the tests run
+  and who pays is read, never asked: `core/scripts/runners.mjs --repo <owner>/<name>` prints both and the schedule, and
+  the manifest's rows *test runners* and *billed minutes* only override them. The trigger is a workflow that runs the
+  tests on a pull request: whoever writes or changes it moves the platform suites, and any it moves for their time, to
+  that schedule. In the core, the Linux suites run after every merge and the Windows suites once an hour
+  (`.github/workflows/tests.yml`). It does not mean a public repository takes a runner on a machine of the owner's,
+  where a stranger's pull request would run its code (the script prints the advice: forks kept off that job at once, and
+  one issue filed for the owner, labelled `needs-owner`), nor that a suite runs less than once before each release, nor
+  that a project changes its workflow for this before its builders take it up. Reason: a full run on the default branch
+  after every merge holds most of the host's jobs at once and leaves the pull requests waiting, and a slow suite run
+  once per change costs most where it is paid for, in money or in a machine's hours; in the core Windows took 69% of the
+  pull requests' job-minutes, where about three of its bugs were found by Windows alone. Held by
+  `tests/runners-test.mjs`, for what is read, and in the core by its workflow's schedule and matrix, which the workflows
+  test reads.
+
 - **A test that fails for no reason is mended or removed, never retried in silence.** By default a test passes or
   fails the same way each time it runs on the same commit. The trigger is a test that failed and then passed on the
   same commit in the same job, which the record names: the session that meets it, or the audit's next cleaning task,
