@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { kitHooks, listed } from "../scripts/agent-tools.mjs";
+import { kitHooks, listed, printed } from "../scripts/agent-tools.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { kitForm } from "../scripts/hook-source.mjs";
 import { mended } from "../scripts/mend.mjs";
@@ -70,7 +70,14 @@ function pr(dir, files) {
   git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change");
   return dir;
 }
-const run = (dir, ...args) => { const r = spawnSync(process.execPath, [SCRIPT, "checks/licences.json", ...args], { cwd: dir, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
+// (the check is called here, as its command calls it, and what it prints read as a run of it would give it: its output,
+// then its errors; the command itself, run as a program, by cli, where that is what a case reads; #715)
+const run = (dir, ...args) => {
+  const { lines, status } = printed(dir, "checks/licences.json", { core: args.includes("--core") });
+  const of = stream => lines.filter(([s]) => s === stream).map(([, l]) => `${l}\n`).join("");
+  return { status, out: `${of("out")}${of("err")}` };
+};
+const cli = (dir, ...args) => { const r = spawnSync(process.execPath, [SCRIPT, "checks/licences.json", ...args], { cwd: dir, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 const passes = (r, what) => ok(r.status === 0 && !/FAIL/.test(r.out), what, r.out);
 const fails = (r, what, ...says) => ok(r.status === 1 && mended(r.out) && says.every(s => r.out.includes(s)), `${what}, and says the mend`, r.out);
 
@@ -92,6 +99,12 @@ fails(run(project({ ".claude/settings.json": JSON.stringify(slower), "checks/lic
 passes(run(project()), "a project as the starter kit writes it, with no list, passes");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } })), "and with an empty list");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } }), "--core"), "in the core's own repository too");
+// (the command prints what the check gives, and exits as it says, as the cases here read it)
+for (const [dir, what] of [[project(), "passes"], [project({ ".claude/settings.json": JSON.stringify(slower), "checks/licences.json": { lockfiles: [], agentTools: [] } }), "fails"]]) {
+  const asRun = cli(dir), asCalled = run(dir);
+  ok(asRun.status === asCalled.status && asRun.out === asCalled.out, `the command, on a project that ${what}, prints what the check gives and exits ${asCalled.status}`, `${asRun.status}\n${asRun.out}\n----\n${asCalled.out}`);
+}
+{ const r = spawnSync(process.execPath, [SCRIPT], { cwd: project(), encoding: "utf8" }); ok(r.status === 2 && r.stderr.includes("usage: "), "the command with no config says how it is run and exits 2", `${r.status}\n${r.stderr}`); }
 
 // ---- with a list ----
 const listing = (...entries) => ({ "checks/licences.json": { lockfiles: [], agentTools: entries } });
@@ -685,7 +698,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   passes(run(unread), "a file there the tool does not read, beside its ignored hooks, is no tool's file");
   // (#600's fallback security review of 8dfe536: a commit git cannot list is no commit with nothing in it)
   process.env.AGENT_TOOLS_LISTING_MAX = "16";
-  const unlisted = run(pr(project({ ...listing() }), { "README.md": "a change of its own\n" }));
+  const unlisted = cli(pr(project({ ...listing() }), { "README.md": "a change of its own\n" }));
   delete process.env.AGENT_TOOLS_LISTING_MAX;
   fails(unlisted, "a head git cannot list fails", "cannot be listed", "Mend: ");
   // (#600's fallback security review of 72e6450: names are compared as a file system that folds case does)
