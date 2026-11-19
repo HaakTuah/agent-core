@@ -16,12 +16,12 @@
 # jobs of the same name with nothing before it (#508).
 # A third runs the reference parsers the hand-written readers are held to, tools that only run, the devDependencies of
 # the core's lock file, which its own jobs install and a copy does not (tests/readers-test.mjs, on Linux).
-# Each job first installs the core's own packages from its lock file in .packages/, from npm's registry, running no
-# install script (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
+# Each job first installs the core's own packages from its lock files in .packages/, the parser's in .packages/parser/
+# among them (#719), from npm's registry, running no install script (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
 # tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
-# Once, on Linux, the core's own lock file is held as a project's is: each package it brings looked up in npm's
+# Once, on Linux, the core's own lock files are held as a project's are: each package it brings looked up in npm's
 # registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures).
-# Each job of the suites, two on Linux and eight on Windows on each Node, and the upgrade test, are each held to a time
+# Each job of the suites, three on Linux and eight on Windows on each Node, and the upgrade test, are each held to a time
 # mark (the "suites" of .github/shape.json, by scripts/shape.mjs; tasks/tests.md, "The tests have a time mark").
 # On a pull request each job runs only the suites its change can reach, against the merge's first parent, its base, and
 # says on its summary what it ran; a push to main, and a re-run, runs every suite (scripts/select.mjs; tasks/tests.md,
@@ -61,10 +61,10 @@ jobs:
   # outgrew the licences' mark there (#603) and then, beside the rest, the rest's (#647); and the rest (rest). Each
   # step's condition names its part in the job's list "parts", read by substring: no name holds another, but that core
   # is named beside its half. On Windows, where a suite that starts many processes runs several times slower, a job
-  # takes kit with steps, the second half with terms, and each other part alone; on Linux two jobs
-  # take them, kit, core, licences, terms and tools in one, projects, sync, rest and steps,
-  # with the steps run once on Linux, in the other, which keeps the name of the suite that was whole and so its mark,
-  # lowered. Each part is sized by its steps' times on the slow runner, which takes half as long again as another, so
+  # takes kit with steps, the second half with terms, and each other part alone; on Linux three jobs
+  # take them, kit, core, licences, terms and tools in one, projects and sync in the second, which keeps the name of the
+  # suite that was whole and so its mark, lowered, and rest and steps, the steps run once on Linux, in the third, since
+  # with the parser reading C# the second passed its mark (#529). Each part is sized by its steps' times on the slow runner, which takes half as long again as another, so
   # that it ends within its mark there too, no mark raised: on Windows, by #506's run on 02b9c4e, about 375 of 600, 320
   # of 600, 135 and 265 of 450, 300 of 450 and 240 of 480 seconds; on Linux, by that run, about 160 and 160 of 240
   # (#504). The sync left projects in #540, when projects took 583 of its 600 seconds on a slow runner, its two longest
@@ -78,10 +78,11 @@ jobs:
       # Windows on the pin alone, the least's there kept for a push to main; #526)
       matrix:
         node: [.node-version, .node-least]
-        suite: [suites-kit-core-licences, suites, suites-projects, suites-sync, suites-kit, suites-core, suites-core-places, suites-licences, suites-rest, suites-tools]
+        suite: [suites-kit-core-licences, suites, suites-rest-steps, suites-projects, suites-sync, suites-kit, suites-core, suites-core-places, suites-licences, suites-rest, suites-tools]
         include:
           - { suite: suites-kit-core-licences, os: ubuntu-latest, parts: kit core licences terms tools }
-          - { suite: suites, os: ubuntu-latest, parts: projects sync rest steps }
+          - { suite: suites, os: ubuntu-latest, parts: projects sync }
+          - { suite: suites-rest-steps, os: ubuntu-latest, parts: rest steps }
           - { suite: suites-projects, os: windows-latest, parts: projects }
           - { suite: suites-sync, os: windows-latest, parts: sync }
           - { suite: suites-kit, os: windows-latest, parts: kit steps }
@@ -108,9 +109,9 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ${{ matrix.node }}
-      - name: The core's packages, installed from its lock file for the suites (#654)
+      - name: The core's packages, installed from its lock files for the suites, the parser's among them (#654, #719)
         id: install
-        run: node scripts/install.mjs
+        run: node scripts/install.mjs all
       - name: The suites this change can reach (on main, and in a re-run, every one, but none where the merged head passed this tree whole)
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
@@ -409,7 +410,9 @@ jobs:
       - name: The registry's signature on each of the core's own installed packages (floor rule 7; once, on Linux)
         if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }} # (only where the install passed)
         working-directory: .packages
-        run: npm audit signatures --prefix=. # (the folder's own settings and every package of its lock, never a workspace root above it)
+        # (in each install's folder, with its own settings and every package of its lock, never a workspace root above it;
+        # an install whose lock names no package has no node_modules/, and nothing to verify)
+        run: for d in . parser; do if [ -d "$d/node_modules" ]; then (cd "$d" && npm audit signatures --prefix=.); fi; done # (bash -e: the first that fails fails the step)
       - name: Every tool the core's own agents load is listed (floor topic 15)
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
         run: node scripts/agent-tools.mjs .github/licences.json --core
@@ -469,8 +472,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
-      - name: The core's packages, installed from its lock file for the upgrade test (#654)
-        run: node scripts/install.mjs
+      - name: The core's packages, installed from its lock files for the upgrade test, the parser's among them (#654, #719)
+        run: node scripts/install.mjs all
       - name: The tests this change can reach (on main, and in a re-run, every one)
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}

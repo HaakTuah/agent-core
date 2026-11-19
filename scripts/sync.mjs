@@ -25,6 +25,7 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
+import { everyInstall } from "./packages.mjs";
 import { NOTES, asksBetween, fetchCore, followsOf, hostSaid, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
@@ -179,7 +180,8 @@ function sync(tmp) {
 function install(dir) {
   const script = path.join(dir, "scripts", "install.mjs");
   if (!fs.existsSync(script)) return;
-  const r = spawnSync(process.execPath, [script], { encoding: "utf8" });
+  // (every install of the copy's, the parser's too, for the session that works in the project: #719)
+  const r = spawnSync(process.execPath, [script, ...everyInstall(dir)], { encoding: "utf8" });
   process.stdout.write(r.stdout ?? "");
   if (r.status !== 0) console.log(`note the copy is written, but its packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node ${path.relative(process.cwd(), script)} before running a check`);
 }

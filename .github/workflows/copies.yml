@@ -59,8 +59,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
-      - name: The core's packages, installed from its lock file for the copies check (#654)
-        run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then node "${CORE_AT}scripts/install.mjs"; fi
+      - name: The core's packages, installed from its lock files for the copies check, the parser's for the shape check (#654, #719)
+        run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then if [ -f "${CORE_AT}.packages/parser/package.json" ]; then node "${CORE_AT}scripts/install.mjs" all; else node "${CORE_AT}scripts/install.mjs"; fi; fi
       - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks (each its own script's, run through scripts/checks.mjs, which holds their steps)
         env:
           BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}

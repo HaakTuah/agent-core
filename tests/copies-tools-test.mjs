@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
+import { parserLeftOut } from "../scripts/packages.mjs";
 
 let failed = 0;
 const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) { failed++; if (detail) console.log(`     ${detail.replaceAll("\n", "\n     ")}`); } };
@@ -24,8 +25,8 @@ try {
   const commit = what => { g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", what); return g("rev-parse", "HEAD").trim(); };
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
   for (const f of ["copies.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
-  fs.cpSync(path.join(here, "..", ".packages"), path.join(dir, "core/.packages"), { recursive: true });
-  put("core/.gitignore", "/.packages/node_modules/\n"); // (as the copy holds it: the installed packages are no file of the project's)
+  fs.cpSync(path.join(here, "..", ".packages"), path.join(dir, "core/.packages"), { recursive: true, filter: parserLeftOut });
+  fs.copyFileSync(path.join(here, "..", ".gitignore"), path.join(dir, "core/.gitignore")); // (the copy's own: the installed packages, each install's, are no file of the project's)
   put("AGENTS.md", `# A project\n\n${SAID}.\n`);
   put("SECURITY.md", "# Security\n\n**3. The protected files,** here, **the rule files:** `docs/a.md`;\n");
   put("docs/a.md", `# Developing\n\n${OTHER}.\n`);

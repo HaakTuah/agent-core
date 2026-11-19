@@ -492,6 +492,26 @@ counter and its commands are in the pull request that adds this record (#487).
 - Judged again on 17 November 2026 (#519): it stands, carried and never fetched while a check runs. A grammar comes
   with the reader that needs it, never all at once, and Microsoft's `@vscode/tree-sitter-wasm` (one publisher's runtime
   and grammars) is weighed as their source when the first arrives (the path's third and fourth steps).
+- **The first grammar arrived** on 17 November 2026 (#529), with the reader that needs it: C#'s, the queued .NET
+  lines' language and one the owner's projects use, where Rust is a language no project has picked yet (#486, "What
+  stays out"). Its first reader is the port of the shape check's functions of C# onto it (`scripts/csharp-functions.mjs`),
+  the first of #530's ports, its definition kept: on 5,516 files of C# from a public NuGet package (560 distinct, 2,361
+  functions), the parser read every function the lexer did the same, but where the lexer misread by its own
+  definition (C# 14's `extension(...)` blocks taken for functions, 228; a method with two `where` clauses missed, 1),
+  and a held-out file a fresh session wrote and counted by hand from the frozen definition, 22 functions, came out
+  exact in every function. The grammar predates C# 14's extension blocks, whose headers the reader reads as a type's;
+  both sides of an `#if` are read as code, as the lexer read them; a file it still cannot read whole (C#'s
+  null-conditional assignment, newer than it; 1 of the 560 files) has no functions told and is counted, as the sign
+  below reads it. Its source, weighed as the judgment asked: the
+  tree-sitter organisation's own packages, `web-tree-sitter` 0.27.2 (with provenance) and `tree-sitter-c-sharp`
+  0.23.5, taken; Microsoft's `@vscode/tree-sitter-wasm` 0.3.1, dropped on fact: its runtime is the older 0.25, it names
+  the source version of none of its grammars (its `cgmanifest.json` names only the runtime's), so floor rule 7's
+  reading of a diff against the release notes has nothing to read against, it has no provenance, and its C# grammar
+  reads C# 14's extension blocks no better. Registered, as the owner decided on 18 November 2026 (#654): both in the
+  parser's own lock file (`.packages/parser/`, #719) at one exact version, installed from the registry into
+  `.packages/parser/node_modules/`, only where a job names it, with no script run, the runtime's CommonJS build and WebAssembly (378 KB) and the grammar's WebAssembly (5.4 MB) read from there;
+  the grammar's package brings two more, `node-addon-api` and `node-gyp-build` (MIT), which only its native build,
+  never run, uses. Nothing of them is in the repository's history.
 - Reopens it: the counts of a reader built this way differ from a count by hand on code it was not written against,
   or from real code of a project's, beyond a mend of its definition; a grammar a project of the owner's needs is
   missing, or fails to parse more than 1 file in 100 of that project's code; a runtime update leaves a grammar the

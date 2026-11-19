@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { copiesConfig, licenceConfig } from "./check-configs.mjs";
 import { where } from "./choices.mjs";
+import { READERS } from "./shape-readers.mjs";
 import { MOVED_GLOB, MOVED_GLOBS, callers, moved, project } from "./steps.mjs";
 
 const at = (dir, f) => path.join(dir, f);
@@ -147,9 +148,10 @@ export const STAGES = {
   "16 November 2026, how code is put together": {
     asked: true,
     stage: dir => { for (const f of ["checks/shape.json", "checks/shape-baseline.json"]) fs.rmSync(at(dir, f), { force: true }); },
-    // (as the step words it: the config as the starter kit writes it, then its first baseline)
+    // (as the step words it: the config as the starter kit writes it, every install, then its first baseline)
     mend: dir => {
       write(dir, "checks/shape.json", read(dir, "core/setup/template/shape.json.tmpl"));
+      spawnSync(process.execPath, ["core/scripts/install.mjs", "all"], { cwd: dir, encoding: "utf8", env: process.env });
       spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--first"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });
     },
   },
@@ -336,5 +338,25 @@ export const STAGES = {
     stage: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: echo core/scripts/install.mjs\n      - if: false\n        run: node core/scripts/install.mjs\n      - run: node core/scripts/steps.mjs\n")),
     after: dir => fs.rmSync(at(dir, ".github/workflows/scripts-staged.yml"), { force: true }),
     mend: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\n      - run: node core/scripts/steps.mjs\n")),
+  },
+  "19 November 2026, the parser's packages installed where the shape check runs": {
+    // (a job of the project's own that runs the shape check after an install that names no lock but the first; the mend
+    // names every one, as the copies check's job does)
+    stage: dir => write(dir, ".github/workflows/shape-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\n      - run: node core/scripts/shape.mjs\n")),
+    after: dir => fs.rmSync(at(dir, ".github/workflows/shape-staged.yml"), { force: true }),
+    mend: dir => write(dir, ".github/workflows/shape-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs all; fi\n      - run: node core/scripts/shape.mjs\n")),
+  },
+
+  "18 November 2026, the shape check reads C#'s functions on the parser": {
+    asked: true,
+    // (a baseline written before the check read C# on the parser: that reader's name taken out of "reads")
+    // (where the step of 16 November has taken the config and the baseline out, a baseline that names every reader but
+    // that one, which that step's mend then keeps)
+    stage: dir => {
+      const baseline = fs.existsSync(at(dir, "checks/shape-baseline.json")) ? JSON.parse(read(dir, "checks/shape-baseline.json")) : { reads: Object.keys(READERS), listed: {} };
+      write(dir, "checks/shape-baseline.json", `${JSON.stringify({ ...baseline, reads: (baseline.reads ?? []).filter(r => r !== "csharp-tree") }, null, 2)}\n`);
+    },
+    // (as the step words it: the baseline written again)
+    mend: dir => spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } }),
   },
 };
