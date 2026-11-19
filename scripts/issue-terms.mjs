@@ -131,14 +131,31 @@ function repository() {
   return origin.status === 0 ? repoOf(origin.stdout) : null;
 }
 
-export function main(argv, { env = process.env, gh = ghApi, edit = editGh, now = new Date(), repo = undefined, say = console.log } = {}) {
+// The options, or the failure that says its mend.
+export function optionsOf(argv, env) {
   const known = new Set(["--private", "--dry", "--days"]);
   const days = argv.includes("--days") ? Number(argv[argv.indexOf("--days") + 1]) : DAYS;
   const bad = argv.filter((a, i) => !known.has(a) && argv[i - 1] !== "--days");
-  if (bad.length || !Number.isSafeInteger(days) || days < 1) { console.error("FAIL issue-terms.mjs was given an option it does not know. Mend: run it with --private, --dry or --days N (a whole number of days), or none."); return 1; }
-  const job = env.GITHUB_ACTIONS === "true", own = argv.includes("--private"), dry = argv.includes("--dry");
-  if (own && job) { console.error("FAIL issue-terms.mjs --private names where a term stood, and a job's log is as public as its repository. Mend: run --private only in a session the owner works with; in a job, run it with no option."); return 1; }
-  const terms = termsOf(env.TERMS);
+  if (bad.length || !Number.isSafeInteger(days) || days < 1) return { refused: "FAIL issue-terms.mjs was given an option it does not know. Mend: run it with --private, --dry or --days N (a whole number of days), or none." };
+  const own = argv.includes("--private");
+  if (own && env.GITHUB_ACTIONS === "true") return { refused: "FAIL issue-terms.mjs --private names where a term stood, and a job's log is as public as its repository. Mend: run --private only in a session the owner works with; in a job, run it with no option." };
+  return { days, own, dry: argv.includes("--dry") };
+}
+
+// For a session the owner works with alone: where each text stood, and which keep earlier versions holding a term.
+function named({ all, changed, refused, terms, dry, gh, say }) {
+  const title = t => "title" in t.fields && holds(t.fields.title, terms) ? "; its old title stays in its timeline, which no one can delete" : "";
+  for (const t of changed) say(`${dry ? "would change" : "changed"}: ${t.url} (${t.kind})${title(t)}`);
+  for (const t of refused) say(`could not change: ${t.url} (${t.kind}); edit it by hand`);
+  const { held, unread } = versions(all.map(t => t.node).filter(Boolean), terms, gh);
+  for (const t of all.filter(x => held.has(x.node))) say(`earlier versions hold a term: ${t.url} (${t.kind}); delete them in its "edited" menu`);
+  if (unread.size) say(`the earlier versions of ${unread.size} texts could not be read; look at their "edited" menus by hand`);
+}
+
+export function main(argv, { env = process.env, gh = ghApi, edit = editGh, now = new Date(), repo = undefined, say = console.log } = {}) {
+  const options = optionsOf(argv, env);
+  if (options.refused) { console.error(options.refused); return 1; }
+  const { days, own, dry } = options, terms = termsOf(env.TERMS);
   if (!terms.length) { say("Personal terms in issues and comments: TERMS is not set here (the Actions secret PERSONAL_TERMS, passed to the daily job), so nothing was read."); return 0; }
   const at = repo === undefined ? repository() : repo;
   if (!at) { console.error("FAIL issue-terms.mjs found no GitHub repository to read here. Mend: run it from a clone whose origin is on GitHub, or in GitHub's job."); return 1; }
@@ -146,18 +163,9 @@ export function main(argv, { env = process.env, gh = ghApi, edit = editGh, now =
   let all;
   try { all = texts(at, since, gh); } catch { say("Personal terms in issues and comments: GitHub's issues and comments could not be read here, so nothing was read. Mend: run it again where gh answers for an account that may read them."); return 0; }
   const { changed, refused } = clean(all, terms, { edit, dry });
-  const verb = dry ? "would take a term out of" : "took a term out of";
-  say(`Personal terms in issues and comments: read ${all.length} texts written or edited in the last ${days} days; ${verb} ${changed.length}${refused.length ? `; ${refused.length} that hold one this account may not edit` : ""}.`);
-  if (!own) {
-    if (changed.length || refused.length) say(`GitHub keeps each earlier version of a text edited, shown to every reader. Mend: a session the owner works with runs \`TERMS=<the list> node ${env.CORE_AT ?? "core/"}scripts/issue-terms.mjs --private --days ${days}\` there, signed in to gh as the owner, which takes out what this could not and names, in its own chat alone, each text whose earlier versions hold a term; the owner deletes those versions by hand (the text's "edited" menu).`);
-    return 0;
-  }
-  // (in a session the owner works with: where, for the owner's eyes alone)
-  for (const t of changed) say(`${dry ? "would change" : "changed"}: ${t.url} (${t.kind})${"title" in t.fields && holds(t.fields.title, terms) ? "; its old title stays in its timeline, which no one can delete" : ""}`);
-  for (const t of refused) say(`could not change: ${t.url} (${t.kind}); edit it by hand`);
-  const { held, unread } = versions(all.map(t => t.node).filter(Boolean), terms, gh);
-  for (const t of all.filter(x => held.has(x.node))) say(`earlier versions hold a term: ${t.url} (${t.kind}); delete them in its "edited" menu`);
-  if (unread.size) say(`the earlier versions of ${unread.size} texts could not be read; look at their "edited" menus by hand`);
+  say(`Personal terms in issues and comments: read ${all.length} texts written or edited in the last ${days} days; ${dry ? "would take a term out of" : "took a term out of"} ${changed.length}${refused.length ? `; ${refused.length} that hold one this account may not edit` : ""}.`);
+  if (own) named({ all, changed, refused, terms, dry, gh, say });
+  else if (changed.length || refused.length) say(`GitHub keeps each earlier version of a text edited, shown to every reader. Mend: a session the owner works with runs \`TERMS=<the list> node ${env.CORE_AT ?? "core/"}scripts/issue-terms.mjs --private --days ${days}\` there, signed in to gh as the owner, which takes out what this could not and names, in its own chat alone, each text whose earlier versions hold a term; the owner deletes those versions by hand (the text's "edited" menu).`);
   return 0;
 }
 

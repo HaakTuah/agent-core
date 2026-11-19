@@ -15,6 +15,9 @@
     "clocks",
     "processes"
   ],
+  "grown": {
+    "process: tests/issue-terms-test.mjs -> node:child_process": "It runs the personal-terms check's own shell lines (its link and unlinked) in bash on each text, which is what holds the two matchers in step (#783)."
+  },
   "listed": {
     "function: scripts/licence-commands.mjs#atCommand": {
       "lines": 43,
@@ -85,6 +88,7 @@
     "process: tests/inbox-test.mjs -> node:child_process": true,
     "process: tests/init-dotnet-test.mjs -> node:child_process": true,
     "process: tests/init-test.mjs -> node:child_process": true,
+    "process: tests/issue-terms-test.mjs -> node:child_process": true,
     "process: tests/labels-test.mjs -> node:child_process": true,
     "process: tests/licence-installed-test.mjs -> node:child_process": true,
     "process: tests/licence-scan-test.mjs -> node:child_process": true,
