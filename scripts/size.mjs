@@ -202,7 +202,7 @@ export function judged(over, base = null, caps = {}) {
   const fail = [], task = [];
   for (const m of over) {
     const was = base?.[m.what] ?? 0, by = m.total - m.cap, had = caps[m.what];
-    if (base && had !== undefined && m.cap < had) fail.push(`${m.said} is ${by} bytes over its ${m.kind === "queue" ? "mark" : "cap"}, which this change lowers from ${had / 1024} KB to ${m.cap / 1024} KB. Mend: set it back to ${had / 1024} * 1024, the base's cap, in scripts/size.mjs, or trim what stands to fit under the lower one in the same pull request`);
+    if (base && had !== undefined && m.cap < had) fail.push(`${m.said} is ${by} bytes over its ${m.kind === "queue" ? "mark" : "cap"}, which this change lowers from ${had / 1024} KB to ${m.cap / 1024} KB. Mend: set it back to ${had / 1024} * 1024, the base's ${m.kind === "queue" ? "mark" : "cap"}, in scripts/size.mjs, or trim what stands to fit under the lower one in the same pull request`);
     else if (base && m.total > was) fail.push(`${m.said} is ${by} bytes over its cap${was > m.cap ? `, ${m.total - was} of them this change's own` : ""}. Mend: ${TRIM[m.kind]}`);
     else task.push(`${m.said} is ${by} bytes over its cap${base ? ", as it stood before this change, which does not grow it" : ""}`);
   }
