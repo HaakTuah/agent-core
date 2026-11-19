@@ -1380,12 +1380,6 @@ function sortLinks(root, base, links, fail, notes, core = false) {
 
 // The whole check, from the project's root: { fail, notes }.
 export function run(root, file, { core = false, base = baseOf(root) } = {}) {
-  // (where the job's install could not reach the registry, in a project's pull request, a project with a Codex config,
-  // which the TOML package reads, is not checked, said as a warning, neither failed nor passed: #654, point 4)
-  const codex = ".codex/config.toml";
-  if (unreached("smol-toml") && (fs.existsSync(path.join(root, codex)) || (base && textAt(root, base, codex) !== null))) {
-    return { fail: [], notes: [], skipped: `The agent-tools check did not run: ${codex} is read by the package smol-toml, which could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault` };
-  }
   let config;
   try { config = parseBounded(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
     return { fail: [`${file} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`], notes: [] };
@@ -1417,6 +1411,15 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   return { fail, notes };
 }
 
+// Why the check does not run, or null: where the job's install could not reach the registry, in a project's pull
+// request, a project with a Codex config, which the TOML package reads, is not checked, said as a warning, neither
+// failed nor passed (#654, point 4), since a config left unread would fail each tool it configures as listed for nothing.
+function standsDown(root, base = baseOf(root)) {
+  const codex = ".codex/config.toml";
+  const held = () => fs.existsSync(path.join(root, codex)) || (!!base && textAt(root, base, codex) !== null);
+  return unreached("smol-toml") && held() ? `The agent-tools check did not run: ${codex} is read by the package smol-toml, which could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault` : null;
+}
+
 // With no base to read against, as before a commit or on a push, each problem a project may hold, noted as sortSources
 // notes its own; in the core's own repository none may stand.
 function unreadOf(head, baseProject, core) {
@@ -1441,8 +1444,9 @@ function sortUnlisted(unlisted, { head, base, held, file }, fail, notes) {
 if (started(import.meta.url)) {
   const args = process.argv.slice(2), file = args.find(a => !a.startsWith("--"));
   if (!file) { console.error("usage: node core/scripts/agent-tools.mjs <the licence check's config> [--core]"); process.exit(2); }
-  const { fail, notes, skipped } = run(process.cwd(), file, { core: args.includes("--core") });
+  const skipped = standsDown(process.cwd());
   if (skipped) { console.log(`::warning::${skipped}`); process.exit(0); }
+  const { fail, notes } = run(process.cwd(), file, { core: args.includes("--core") });
   for (const n of notes) console.log(`note ${logged(n)}`);
   for (const f of fail) console.error(`FAIL: ${logged(f)}`);
   console.log(fail.length ? `${fail.length} of the agent's own tools not as floor topic 15 asks` : "ok   every tool the project configures for its agents is listed");
