@@ -41,7 +41,7 @@ const TWICE = "name: twice-staged\n\non:\n  push:\n\npermissions:\n  contents: r
 // A job of the tests on a pull request and on a push, which selects them; PASSED is where --passed stands (#457). It
 // names no SELECT_BASE, which the step of the tests a change can reach reads, so that staging this one leaves that
 // one's reading as it was.
-const PUSHED = "name: tests-pushed\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      checks: read\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/install.mjs\n      - run: node core/scripts/select.mjs --env RUNPASSED\n        env:\n          SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}\n          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}\n      - run: if [ \"$RUN\" = all ]; then node --test; elif [ \"$RUN\" != none ]; then node --test $RUN; fi\n";
+const PUSHED = "name: tests-pushed\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      checks: read\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/install.mjs all\n      - run: node core/scripts/select.mjs --env RUNPASSED\n        env:\n          SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}\n          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}\n      - run: if [ \"$RUN\" = all ]; then node --test; elif [ \"$RUN\" != none ]; then node --test $RUN; fi\n";
 
 // A job of the project's own that starts a suite through the shape check (#733, point 7): TYPES, its trigger's types,
 // and IF, its job's condition, filled in by the stage and the mend.
@@ -175,7 +175,7 @@ export const STAGES = {
       write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/^(\| \*mutation tool\* \| `none`): no tests yet[^|\n]*\|/m, "$1: no mutation tool is named for this project's language yet |"));
     },
     // (as the step words it: a step that selects, with its base, before the tests, which run what it names)
-    mend: dir => write(dir, ".github/workflows/tests-selected.yml", "name: tests-selected\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/install.mjs\n      - run: node core/scripts/select.mjs --env RUN\n        env:\n          SELECT_BASE: HEAD^1\n      - run: if [ \"$RUN\" = all ]; then node --test; else node --test $RUN; fi\n"),
+    mend: dir => write(dir, ".github/workflows/tests-selected.yml", "name: tests-selected\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/install.mjs all\n      - run: node core/scripts/select.mjs --env RUN\n        env:\n          SELECT_BASE: HEAD^1\n      - run: if [ \"$RUN\" = all ]; then node --test; else node --test $RUN; fi\n"),
   },
   "18 November 2026, a tree that passed is not run again": {
     // (a job of the tests that selects on a pull request and on a push alike, with nothing for the push)
@@ -402,5 +402,15 @@ export const STAGES = {
       write(dir, "checks/shape-baseline.json", `${JSON.stringify({ ...baseline, reads: (baseline.reads ?? []).filter(r => r !== "python-tree") }, null, 2)}\n`);
     },
     mend: dir => spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } }),
+  },
+
+  "19 November 2026, a project's own rules and what holds them": {
+    asked: true,
+    // (a project with no list of what holds its own rules; the mend runs the command the step words, which writes it)
+    stage: dir => fs.rmSync(at(dir, "checks/holders.json"), { force: true }),
+    mend: dir => {
+      const r = spawnSync(process.execPath, ["core/scripts/holders.mjs", "--own", "--write"], { cwd: dir, encoding: "utf8" });
+      if (r.status !== 0) throw new Error(`holders.mjs --own --write: ${r.stderr}`);
+    },
   },
 };

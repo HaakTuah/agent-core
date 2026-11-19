@@ -529,7 +529,14 @@ counter and its commands are in the pull request that adds this record (#487).
   and, or or if after `...`, taken for a name's dots; `case` used as a name at a line's start, counted as a branch);
   every case of the lexer's tests reads as written. 6 generated files past 2 MB are not read, and the grammar takes a
   format's fill of `=` (`f"{t:=^80}"`) for `:=`: an error in an f-string's `{ }` that is signs alone leaves the
-  functions around it told. The imports and the tokens the clock's runs are read from stay on the lexer.
+  functions around it told. The imports and the tokens the clock's runs are read from moved the same day (#530's item
+  6), and the lexer of Python went: on 30,811 files of Python, every file read the same 180,814 imports, with where each
+  stands (in a def, under `TYPE_CHECKING`), and the same runs of the clock and of a test's reach; the tokens of 173
+  differ, each a misread of the lexer's mended (a number's exponent split from it, 165; a hole after `\` in a raw
+  f-string taken for text, 6; a t-string's `t` taken for a name, 2), and the grammar's fill of `=` is mended to the
+  code before it, as the lexer read it. Where the parser is not installed, nothing of a file of Python is read: the shape check keeps what its
+  baseline lists there, and the selection of tests runs a test of Python as one that reaches every file. 6 generated
+  files past 2 MB have no imports told, where the lexer read theirs.
 - Reopens it: the counts of a reader built this way differ from a count by hand on code it was not written against,
   or from real code of a project's, beyond a mend of its definition; a grammar a project of the owner's needs is
   missing, or fails to parse more than 1 file in 100 of that project's code; a runtime update leaves a grammar the
@@ -800,15 +807,25 @@ and its commands are in the pull request that adds this record.
   run: the same samples, the engine alone, on the host's Windows x64 and macOS arm64 runners, before the first project
   takes the check; where it fails there, those runners take the documented command, and the pick stands.
 - **The pick: A, Semgrep's engine, its rules the core's own.** It alone found every planted case on samples its rules
-  were not written for. The build (#546) takes the engine and its libraries from the PyPI wheel of one exact version
-  a week old, by the wheel's SHA-256 in the core's list, unzipped outside the repository at set-up (a cloud session's
+  were not written for. The build (#546) takes the engine and its libraries from the PyPI wheel of one exact version a
+  week old, by the wheel's SHA-256 in the core's list, unzipped outside the repository at set-up (a cloud session's
   set-up, and a set-up step of the job a private project already runs), never while the check runs; the check reads a
-  pull request's changed files with the core's rules, each rule with a planted and a safe sample in its test, and
-  treats a finding as floor rule 9 treats CodeQL's (`floor/topics/weaknesses.md`): one the pull request brings is
-  shown for its security review to weigh, a false alarm explained in it, and what stood before is reported. No package comes in but through #488's lookup, and the trial owed above runs first.
+  pull request's changed files with the core's rules, each rule with a planted and a safe sample in its test, and treats
+  a finding as floor rule 9 treats CodeQL's (`floor/topics/weaknesses.md`): one the pull request brings, which its base
+  did not hold, fails until the code is mended or the description lists it as a false alarm for its security review to
+  confirm, and what stood before is reported. Built in `scripts/code-scan.mjs`; the trial owed above passed on the
+  host's Windows x64 and macOS arm64 runners, 30 of 30 found and no false alarm on each. No package comes in but through
+  #488's lookup, and the trial owed above runs first.
 - **What a sync asks of a project:** for this record, nothing; the build says what its sync asks.
 - Reopens it: a Semgrep release whose engine is not under a licence the Open Source Initiative approves, or that drops
   the engine's mode without Python or the build for a system the check runs on; the samples' test failing after an
   update of the engine; a whole scan with the core's rules taking more than 30 seconds on 100,000 lines on 4 cores;
   no Semgrep release for 90 days; Opengrep publishing its engine on npm or PyPI under LGPL with no Commons Clause; or
   a project of the owner's in Python, or the owner's computer an Intel Mac.
+- **Reopened on 18 November 2026 by the owner's decision (#654):** other publishers' code is registered, never
+  carried, and the fetchers written by hand give way where a registry's lock file does their job, this engine's named.
+  The engine now comes from `.packages/requirements.txt`, PyPI's own lock form, each wheel by its SHA-256, which
+  `scripts/install.mjs pypi` installs with pip in the scan's own step, no dependency taken and none of its code run;
+  the scan runs it from there, still with no Python. The fetch written for it, its unzip and the digests of the engine
+  go, and Dependabot proposes its updates. Python 3.10 or later is now needed where the engine is installed, which every
+  host's runner holds; the pick stands.

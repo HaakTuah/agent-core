@@ -27,6 +27,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
+import { FOLDER, NOTICE } from "./sync-notes.mjs";
 import { NOTES, OWN, RELEASE, asksBetween, fetchCore, held, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
 import { atRelease } from "./staged.mjs";
 import { started } from "./started.mjs";
@@ -50,10 +51,12 @@ export function next(dir, at = null) {
   return { name, sha: tip, before: before ?? null, asks: before ? asksBetween(before.sha, tip, dir) : [] };
 }
 
-// An entry the release asks, with its step's cost (steps.mjs) on the line below it; an entry with no step says so.
+// An entry the release asks, with its step's cost (steps.mjs) on the line below it; an entry with no step says so, and
+// the notes' notice to a sync from a copy older than the folder (sync-notes.mjs) costs what the entries it sends to do.
 export const costed = entry => {
+  if (entry.startsWith(NOTICE)) return `${entry}\n  Cost: that of each entry it sends the session to, as its step says.`;
   const step = STEPS.find(s => entry.startsWith(`- **${s.lead}.**`));
-  return `${entry}\n  Cost: ${step ? `${step.cost}${step.owner ? " (the owner's)" : ""}` : "unknown: the entry has no step in scripts/steps.mjs"}.`;
+  return `${entry}\n  Cost: ${step ? `${step.cost}${step.owner ? " (the owner's)" : ""}` : "unknown: the entry has no step in scripts/steps/"}.`;
 };
 
 // What the core's owner tells a project whose copy is older than release-1 when handing a release on (#365): its own
@@ -131,7 +134,7 @@ function main(argv) {
     const { name, sha, before, asks } = release;
     console.log(`${name} at ${sha}${before ? `, after ${before.name} at ${before.sha.slice(0, 7)}: https://github.com/${CORE}/compare/${before.name}...${sha}` : ", the first release"}`);
     console.log(asks === null
-      ? `What it asks of a project beyond the copy could not be read: read ${NOTES} for the entries newer than ${before.name}.`
+      ? `What it asks of a project beyond the copy could not be read: read the entries of ${FOLDER}/ newer than ${before.name}.`
       : asks.length
         ? `It asks more of a project than the copy (${NOTES}), each with roughly what it costs a project where it is not done yet:\n${asks.map(costed).join("\n")}`
         : before ? `It asks nothing of a project beyond the copy (${NOTES}).` : `The first release: a project reads ${NOTES} whole against where it stands.`);

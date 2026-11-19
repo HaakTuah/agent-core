@@ -29,9 +29,12 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      answer (256 MB for the comments proof and the selection, 16 MB for the manifest, past which it is reported
      unread), and none in count, since every changed path is read; hostile tests: `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
-     GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`); limits: 1 MB of the file, past
-     which it is refused unread; 64 MB of an answer and 100 pages of 100 for the open issues, past which it stops;
-     hostile tests: `tests/queue-test.mjs`.
+     GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
+     of the work standing still (`scripts/look.mjs`, through `queue.mjs`'s placing and reading), with the open issues
+     titled as the orchestrator's notice and their authors' rights; limits: 1 MB of the file, past which it is refused
+     unread; 64 MB of an answer (256 MB to the look) and 100 pages of 100 for the open issues, past which it stops; for
+     the look, the search's first page and five authors' rights; hostile tests: `tests/queue-test.mjs`, and for the
+     look `tests/look-test.mjs`.
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the reviews'
      records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look (`scripts/look.mjs`), the
      inbox (`scripts/inbox.mjs`) and the personal terms' take-out (`scripts/issue-terms.mjs`, which edits only an
@@ -41,7 +44,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository (the
      workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`, `scripts/releases.mjs`,
      `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`, `scripts/clean-merges.mjs`,
-     `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs` and `scripts/tools-offer.mjs`, and
+     `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs`, `scripts/tools-offer.mjs` and the
+     scheduled look's reader of the default branch's newest commit, read as a time alone (`scripts/look.mjs`), and
      an account's rights by the code-review wait (`scripts/code-review-wait.mjs`), the scheduled look
      (`scripts/look.mjs`) and the size check (`scripts/size.mjs`, from `size.yml`) through `security-review.mjs`'s
      reader; limits: 1 MB of an answer to `core-moved.mjs`, `releases.mjs` and `tools-offer.mjs`, 64 MB or 256 MB to the
@@ -70,18 +74,30 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
      lookup (`scripts/lookup.mjs`) and its lookup again of what a project holds (`scripts/held.mjs`, through the
-     lookup's readers); Node itself is checked against its SHA-256 by `scripts/node.sh`; limits: 16 MB of a NuGet
-     package's manifest, 100 pages of NuGet's registry, 20 lookups on GitHub in a run, 30 s for an answer (60 s for a
-     NuGet package), 120 s for the whole look again; hostile tests: `tests/hostile-packages-test.mjs`.
+     lookup's readers); Node itself is checked against its SHA-256 by `scripts/node.sh`, and the code scan's wheel by
+     its own, which pip checks against `.packages/requirements.txt` (`scripts/install.mjs pypi`); limits: 16 MB of a
+     NuGet package's manifest, 100 pages of NuGet's registry, 20 lookups on GitHub in a run, 30 s for an answer (60 s
+     for a NuGet package), 120 s for the whole look again; hostile tests: `tests/hostile-packages-test.mjs`, and for the
+     scan `tests/code-scan-test.mjs`.
+   - the code a pull request adds or alters, and its description's lines "Scan false alarm:" and "Scan unread:": read
+     by the code scan (`scripts/code-scan.mjs`), which hands the files by name to Semgrep's engine, installed from its
+     wheel's pinned hash, with no variable that holds a token, fails a file it could not read, and silences no finding a
+     comment in the code asks it to; limits: no size of a file, a file the engine did not scan or stopped on failing
+     and one it parsed in part passing, said as read in part, 200 files to a run of the engine, 30 s for a rule on a
+     file, 900 s for a run, 256 MB of git's diff of a file, 1 GB of the engine's answer, and the description whole as
+     the host gives it, at most 65,536 characters; hostile tests: `tests/code-scan-test.mjs`.
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
    (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are
    tools that only run, each with its licence in its audit (`.github/licences-audit.json`). Among them is Node
    (`node-linux-<arch>` at the exact version in `.node-version`), which `scripts/node.sh` fetches for a project's cloud
    machine whose own Node is below the least long-term line in `.node-least`, or that has none, with
    `npm pack --ignore-scripts`, or with no npm by curl from the registry's own address over HTTPS, never installing it,
-   and checks against its SHA-256 before it runs.
-17. **Dependabot** updates only the workflows' GitHub actions (`.github/dependabot.yml`); this repository names no
-    manifest or lock file, so no other PR of Dependabot's meets it.
+   and checks against its SHA-256 before it runs; and Semgrep's engine (`semgrep-core` from the `semgrep` wheel on PyPI
+   at the version and hashes in `.packages/requirements.txt`), which `scripts/install.mjs pypi` installs with pip in the code
+   scan's own step for a project the host's CodeQL does not scan, the wheel checked by its SHA-256, no dependency
+   taken and none of its code run, and which the scan runs with no Python.
+17. **Dependabot** updates the workflows' GitHub actions and the packages of the core's lock files, `package-lock.json`
+    and `.packages/requirements.txt` (`.github/dependabot.yml`), each a week after its release.
 
 The threat model's part: the core has no users of its own; what an attacker would want of it is a rule loosened here
 that every project then takes, so a change reaches a project only through a sync PR there: a pure sync gets no review
