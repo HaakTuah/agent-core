@@ -3,8 +3,11 @@
 // that pull request while it stands; a project's progress file, a list, read the same way. Node's own modules only; GitHub and the file stand in as functions.
 //
 //   node tests/queue-test.mjs
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
-import { LARGEST, cleared, command, fileAt, linesOf, read, statesOf } from "../scripts/queue.mjs";
+import { LARGEST, cleared, command, fileAt, linesOf, read, statesOf, unplaced } from "../scripts/queue.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -44,7 +47,7 @@ ok(read(held, n => n === 29).next?.issues[0] === 31, "a line held for the owner 
 const holds = "| #40 | builder | on hold, after #39 |\n| #41 | builder | #593's points 1 to 3 |\n| #42 | builder | #39 and #593 |\n";
 ok(read(holds, n => [39, 593].includes(n)).next?.issues[0] === 41 && read(holds.replace(/^.*#41.*\n/mu, ""), n => [39, 593].includes(n)).next?.issues[0] === 42, "a line whose wait names only issues, or points of one, is free once they have closed (Codex's finding on #757)");
 ok(read("| #40 | builder | on hold, after #39 |\n", n => n === 39).next === null, "a line that waits on a hold besides an issue stays waiting once the issue has closed");
-ok(linesOf("| #679 to #682 | builder | |\n")[0].issues.join() === "679,680,681,682" && linesOf("| #1 to #500 | builder | |\n")[0].issues.join() === "1,500" && read("| #679 to #682 | builder | |\n", n => n !== 681).gone.length === 0, "a range of issues is read whole, and its line stays while one of them is open; one past a hundred wide names its two ends");
+ok(linesOf("| #679 to #682 | builder | |\n")[0].issues.join() === "679,680,681,682" && linesOf("| #1 to #500 | builder | |\n")[0].kept && read("| #679 to #682 | builder | |\n", n => n !== 681).gone.length === 0, "a range of issues is read whole, and its line stays while one of them is open; one past a hundred wide is kept, never cleared by its two ends");
 ok(linesOf(held)[2].issues.join() === "32,33,34" && read(held, n => n === 32).gone.length === 0 && read(held, n => [32, 33, 34].includes(n)).gone.map(l => l.issues[0]).join() === "32" && cleared(held, n => n === 35) === held,
   "a line that names several issues goes only once all of them have closed");
 
@@ -65,6 +68,11 @@ ok(seen.map(l => l.issues.join("+")).join() === "0,7,11" && seen[2].waits.join()
 const slot = at => `| *progress file* | \`${at}\` |\n`;
 ok(["../../.ssh/authorized_keys", "/etc/passwd", ".git/config", "docs/../../x.md", "core/QUEUE.md", "notes.txt", "C:/x.md"].every(at => fileAt(slot(at)) === null) && fileAt(slot("docs/./PLAN.md")) === "docs/PLAN.md",
   "a progress file the manifest names outside the project, in .git or core/, or not Markdown, is refused (the fallback reviewer's finding on #757)");
+ok(["AGENTS.md", "docs/CLAUDE.md", "SECURITY.md", "core-manifest.md", ".github/workflows/x.md", ".claude/x.md", ".kiro/x.md", ".agents/x.md", "REVIEW.md", "GEMINI.md"].every(at => fileAt(slot(at)) === null) && fileAt(slot("docs/AGENTS-NOTES.md")) === "docs/AGENTS-NOTES.md",
+  "a progress file the manifest names that is a protected file, which --clear would rewrite, is refused (the fallback reviewer's finding on #757's fixes)");
+const open13 = n => n !== 13 && n !== 250, packed = "| #12-#13 | builder | |\n| #12/#13 | builder | |\n| #1 to #500 | builder | |\n| #12 | builder | |\n";
+ok(cleared(packed, open13) === "| #12-#13 | builder | |\n| #12/#13 | builder | |\n| #1 to #500 | builder | |\n" && linesOf(packed)[0].issues.join() === "12,13",
+  "the first cell's every issue is read, one after a dash or a slash too, and a range too wide to read is kept: --clear takes out no line of an open issue (the fallback reviewer's finding on #757's fixes)");
 ok(linesOf("| #50 | builder | agent-core#740 and a/b#7 and x-#8 |\n")[0].waits.length === 0 && linesOf("| other#51 | builder | |\n").length === 0, "a number another repository's name stands before is no issue of this one's");
 ok(command("--clear", { file: "Q.md", read: () => queue, write: () => { throw new Error("written"); }, closed: () => () => true }).status === 1 && mended(command("--check", { file: "Q.md", read: () => queue, closed: () => () => true }).out),
   "where GitHub's list names none of the file's lines open, as another repository's would, it refuses and writes nothing");
@@ -85,6 +93,17 @@ answer = null;
 r = command("--check", at);
 ok(r.status === 1 && mended(r.out) && /could not be read: no answer/u.test(r.out), "where an issue cannot be read, the check fails, saying the mend", r.out);
 for (const bad of [command("--other", at), command(undefined, { ...at, read: () => null })]) ok(bad.status === 1 && mended(bad.out), "an option it does not know, or no queue where it runs, fails, saying the mend", bad.out);
+
+// a queue that leads outside through a link: in the core, the mend names the core's own file, not a manifest it lacks
+const here = process.cwd(), scratch = fs.mkdtempSync(path.join(os.tmpdir(), "queue-"));
+fs.writeFileSync(path.join(scratch, "elsewhere.md"), "| #1 | builder | |\n");
+fs.mkdirSync(path.join(scratch, "repo"));
+fs.symlinkSync(path.join(scratch, "elsewhere.md"), path.join(scratch, "repo", "QUEUE.md"));
+process.chdir(path.join(scratch, "repo"));
+try {
+  const core = unplaced(false, "QUEUE.md"), project = unplaced(true, "QUEUE.md");
+  ok(mended(core) && /make QUEUE\.md a plain file/u.test(core) && !/manifest/u.test(core) && mended(project) && /manifest/u.test(project), "a queue reached through a link fails, its mend in the core naming QUEUE.md and in a project the manifest's row (the fallback reviewer's finding on #757's fixes)", core);
+} finally { process.chdir(here); fs.rmSync(scratch, { recursive: true, force: true }); }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the queue's reader`);
 process.exit(failed ? 1 : 0);

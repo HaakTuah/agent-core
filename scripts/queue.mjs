@@ -21,34 +21,41 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { progressOf } from "./done-when.mjs";
-import { leadsOut, inProject } from "./guards.mjs";
+import { aRepository, leadsOut, inProject } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { started } from "./started.mjs";
 
 export const FILE = "QUEUE.md";
 export const LARGEST = 1 << 20; // (bytes: a progress file past it is refused, never read; SECURITY.md, rule 5)
 const ROW = /^\|([^|]*)\|/u, ITEM = /^\s*[-*]\s+(?:\[[ xX]\]\s+)?#(\d{1,9})\b/u;
-// The numbers a text names, a range "#a to #b" (at most a hundred wide) named whole.
-const numbers = text => [...String(text).matchAll(/(?<![\w/-])#(\d{1,9})\b(?:\s+to\s+#(\d{1,9})\b)?/gu)].flatMap(m => {
-  const [from, to] = [Number(m[1]), m[2] === undefined ? null : Number(m[2])];
-  return to !== null && to > from && to - from <= 100 ? Array.from({ length: to - from + 1 }, (_, i) => from + i) : to === null ? [from] : [from, to];
-});
+// The numbers a text names, a range "#a to #b" (at most a hundred wide) named whole. What a line waits on skips a
+// number another repository's name leads (`owner/name#n`); the issues a line names first are read every one, since a
+// number read too many keeps a line a little longer and one missed loses it, and a range too wide to read is null.
+const numbers = (text, first = false) => {
+  const all = [...String(text).matchAll(first ? /#(\d{1,9})\b(?:\s+to\s+#(\d{1,9})\b)?/gu : /(?<![\w/-])#(\d{1,9})\b(?:\s+to\s+#(\d{1,9})\b)?/gu)].map(m => {
+    const [from, to] = [Number(m[1]), m[2] === undefined ? null : Number(m[2])];
+    return to !== null && to > from && to - from <= 100 ? Array.from({ length: to - from + 1 }, (_, i) => from + i) : to === null || !first ? (to === null ? [from] : [from, to]) : null;
+  });
+  return all.includes(null) ? null : all.flat();
+};
 // What a line waits on beyond the issues it names: its words with each reference ("#n", "#n's points 1 to 3") and the
 // words that join them taken out; a line whose words keep anything else (a hold, the owner's word) still waits.
 const beyond = words => String(words).replace(/#\d{1,9}(?:'s\s+points?\s+[\d\s,]+(?:(?:to|and)\s+\d+)?)?/gu, " ").replace(/\b(?:and|after|then|or)\b|[,;.]/gu, " ").trim();
 
 // The lines of a progress file's text, in order: { at, text, issues, waits, words, owner }: `at` its index among the
-// text's lines; `issues` the issues it names first (a row's first cell, all it names there; an item's first);
+// text's lines; `issues` the issues it names first (a row's first cell, all it names there; an item's first); `kept`
+// whether that cell names a range too wide to read, a line that never goes by itself;
 // `waits` the numbers what it waits on names (a row's last cell, or what an item names after "waits on"), `words`
 // that text; `owner` whether a row's second cell holds it for the owner ("the owner", AGENTS.md, "The queue").
 export function linesOf(text) {
   return String(text ?? "").split("\n").map((line, at) => {
     const plain = line.replace(/\r$/u, ""), row = ROW.exec(plain), item = row ? null : ITEM.exec(plain);
-    const issues = row ? (/^\s*#\d/u.test(row[1]) ? numbers(row[1]) : []) : item ? [Number(item[1])] : [];
+    const named = row ? (/^\s*#\d/u.test(row[1]) ? numbers(row[1], true) : []) : item ? [Number(item[1])] : [];
+    const issues = named ?? numbers(row[1]).filter((n, i, all) => all.indexOf(n) === i);
     if (!issues.length) return null;
     const cells = row ? plain.split("|").slice(1, -1) : [];
     const words = (row ? cells.at(-1) ?? "" : /\bwaits on\b(.*)$/iu.exec(plain)?.[1] ?? "").trim();
-    return { at, text: line, issues, waits: numbers(words), words, owner: row !== null && /^\s*the owner\b/iu.test(cells[1] ?? "") };
+    return { at, text: line, issues, kept: named === null, waits: numbers(words), words, owner: row !== null && /^\s*the owner\b/iu.test(cells[1] ?? "") };
   }).filter(Boolean);
 }
 
@@ -57,7 +64,7 @@ export function linesOf(text) {
 // one holds for the owner and that waits on nothing open (what it waits on empty, or naming only what has closed and
 // nothing else, such as a hold), or null.
 export function read(text, closed) {
-  const lines = linesOf(text), done = l => l.issues.every(closed);
+  const lines = linesOf(text), done = l => !l.kept && l.issues.every(closed);
   const gone = lines.filter(done), open = lines.filter(l => !done(l));
   const free = l => !l.owner && l.waits.every(closed) && beyond(l.words) === "";
   return { open, gone, next: open.find(free) ?? null };
@@ -65,7 +72,7 @@ export function read(text, closed) {
 
 // The text with each line all of whose issues have closed taken out, and nothing else changed.
 export function cleared(text, closed) {
-  const out = new Set(linesOf(text).filter(l => l.issues.every(closed)).map(l => l.at));
+  const out = new Set(read(text, closed).gone.map(l => l.at));
   return String(text).split("\n").filter((_, at) => !out.has(at)).join("\n");
 }
 
@@ -127,24 +134,34 @@ export function command(flag, at) {
 
 // The progress file where the command runs: a project's, as its manifest names it; the core's own where none stands.
 // A project's slot is input (SECURITY.md, rule 5): a path taken only where it is a plain Markdown file inside the
-// project, out of .git and core/, and that leads nowhere outside it through a link; else null, which fails.
+// project, out of .git and core/, no protected file (floor rule 3: .github/, an agent tool's folder, a file a tool takes
+// its instructions from, SECURITY.md, the manifest), and that leads nowhere outside it through a link; else null.
+const PROTECTED = /^(?:\.git|core|\.github|\.claude|\.codex|\.kiro|\.agents?)(?:\/|$)|(?:^|\/)(?:AGENTS|CLAUDE|GEMINI|REVIEW|SECURITY|core-manifest)\.md$/iu;
 export const fileAt = manifest => {
   if (manifest === null) return FILE;
   const at = progressOf(manifest), plain = path.posix.normalize(String(at).replace(/\\/gu, "/"));
-  return inProject(at) && /\.md$/iu.test(plain) && !/^(?:\.git|core)(?:\/|$)/iu.test(plain) ? plain : null;
+  return inProject(at) && /\.md$/iu.test(plain) && !PROTECTED.test(plain) ? plain : null;
 };
 // Whether this runs from a project's copy of the core (core/scripts/queue.mjs), not from the core itself, read from
 // where this file lies, never from a file a pull request could add.
 const inCopy = () => path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/") === "core/scripts/queue.mjs";
 
+// Why the progress file where the command runs cannot be read, with its mend, or null.
+export function unplaced(copy, file) {
+  const out = file !== null && fs.existsSync(file) && leadsOut(process.cwd(), file);
+  if (!copy && out) return `FAIL: ${FILE} leads outside the repository through a link. Mend: make ${FILE} a plain file at the repository's root, the queue's lines in it`;
+  if (file === null || out) return "FAIL: the progress file core-manifest.md names is no plain Markdown file inside the project (outside .git and core/, no protected file, reached through no link). Mend: name the progress file in the manifest's row *progress file* as a path such as docs/PROGRESS.md";
+  if (fs.existsSync(file) && fs.statSync(file).size > LARGEST) return `FAIL: ${file} is ${fs.statSync(file).size} bytes, past the ${LARGEST} the reader takes. Mend: take out the lines of finished work and any notes, which belong in the pull requests' descriptions`;
+  return null;
+}
+
 // Where the command runs: { copy, file, repo } or { fail }, the failure with its mend.
 function placed() {
   const copy = inCopy(), manifest = copy && fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null;
-  const file = copy ? fileAt(manifest ?? "") : FILE;
-  if (file === null || (fs.existsSync(file) && leadsOut(process.cwd(), file))) return { fail: "FAIL: the progress file core-manifest.md names is no plain Markdown file inside the project (outside .git and core/, reached through no link). Mend: name the progress file in the manifest's row *progress file* as a path such as docs/PROGRESS.md" };
-  if (fs.existsSync(file) && fs.statSync(file).size > LARGEST) return { fail: `FAIL: ${file} is ${fs.statSync(file).size} bytes, past the ${LARGEST} the reader takes. Mend: take out the lines of finished work and any notes, which belong in the pull requests' descriptions` };
+  const file = copy ? fileAt(manifest ?? "") : FILE, fail = unplaced(copy, file);
+  if (fail) return { fail };
   const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout;
-  const repo = /^[\w.-]+\/[\w.-]+$/u.test(process.env.GITHUB_REPOSITORY ?? "") ? process.env.GITHUB_REPOSITORY : repoOf(origin) ?? (copy ? null : CORE);
+  const repo = aRepository(process.env.GITHUB_REPOSITORY) ? process.env.GITHUB_REPOSITORY : repoOf(origin) ?? (copy ? null : CORE);
   if (repo === null) return { fail: "FAIL: which repository on GitHub this is cannot be told: its origin is no address on github.com. Mend: set GITHUB_REPOSITORY to its owner/name, and run it again" };
   return { copy, file, repo };
 }
