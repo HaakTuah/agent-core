@@ -247,7 +247,7 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
 - `scripts/own-modules.mjs`, `scripts/holders.mjs`, `scripts/archive.mjs`, `scripts/rules.mjs`, `scripts/holders.json`:
   fail a module the core's `AGENTS.md` neither takes nor gives a reason for, and a rule's holder that is not there.
   *Runs:* any session and the runners. *Else:* none. *Bugs:* 0. **Keep:** nothing fits; both read the core's own rule
-  files.
+  files. The list's form is held by a schema and ajv (`scripts/schemas/holders.json`; #530, item 7).
 - `.github/workflows/codeql.yml`: runs the host's CodeQL on a public project's pull requests, its pushes and weekly.
   *Runs:* the runners. *Else:* it is the host's maintained tool already. On a private repository it is paid, so a
   private project does not call it (`README.md`, "A private repository") and has no scan of its code; Semgrep's

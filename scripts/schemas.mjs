@@ -18,7 +18,8 @@ const schemaOf = name => JSON.parse(fs.readFileSync(new URL(`./schemas/${name}.j
 const checkers = new Map();
 function checker(name) {
   if (!checkers.has(name)) {
-    const Ajv = loadSync("ajv"), ajv = new Ajv({ allErrors: true, strict: true });
+    // (a union of types, such as a key that is a number or a string, gives one failure where "anyOf" gives one a branch)
+    const Ajv = loadSync("ajv"), ajv = new Ajv({ allErrors: true, strict: true, allowUnionTypes: true });
     ajv.addKeyword({ keyword: "mend", schemaType: "string" });
     ajv.addKeyword({ keyword: "mendFor", schemaType: "object" });
     const schema = schemaOf(name);
