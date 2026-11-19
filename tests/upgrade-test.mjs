@@ -45,6 +45,7 @@ import { scratchEnv } from "../scripts/scratch-core.mjs";
 import { where } from "../scripts/shape.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { STEPS, callers, leads, notDone, project as read, report } from "../scripts/steps.mjs";
+import { FOLDER, NOTICE, notesAt } from "../scripts/sync-notes.mjs";
 import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
 
 const STEP_LEADS = STEPS.map(s => s.lead);
@@ -294,8 +295,12 @@ function upgrade(p, from, ownChanges, expect) {
 
   // the sync, as the project's own copy of the release's sync.mjs makes it
   git(p.dir, "checkout", "-q", "-B", "sync", main0);
+  const hadFolder = fs.existsSync(path.join(p.dir, "core", FOLDER));
   const s = node(p.dir, "core/scripts/sync.mjs");
   ok(s.status === 0 && s.out.includes(carrying), `${p.name}: its own sync script takes the release that carries the change, ${carrying}`, s.out);
+  // (a copy that held no folder of the notes reads its asks from their file alone: across the move it prints the notice,
+  // which sends the session to the folder; #750, point 1)
+  ok(hadFolder || s.out.includes(NOTICE), `${p.name}: its own sync script, which reads the notes' file alone, prints the notice that sends the session to the notes' folder`, s.out);
   git(p.dir, "add", "-A");
   git(p.dir, "commit", "-q", "-m", `Sync the core to ${carrying}`);
   git(p.dir, "push", "-q", "origin", "sync");
@@ -384,7 +389,7 @@ function upgrade(p, from, ownChanges, expect) {
   const steps = () => node(p.dir, "core/scripts/steps.mjs");
   const reported = out => out.split("\n").filter(l => l.startsWith("- ")).map(l => STEP_LEADS.find(lead => l.startsWith(`- ${lead}:`) || l.startsWith(`- ${lead} (`))).filter(Boolean);
   const clean = () => { git(p.dir, "reset", "-q", "--hard"); git(p.dir, "clean", "-qfd"); };
-  const before = leads(git(theCore, "show", `${from.sha}:setup/sync-notes.md`));
+  const before = leads(notesAt(from.sha, args => git(theCore, ...args))); // (in the file, or in its folder: #750, point 1)
   const added = STEP_LEADS.filter(lead => !before.includes(lead) && STAGES[lead]);
   // (a step the commit under test adds that asks something of every project, a check's own list to write, the sync
   // alone does not do: it is reported, it alone, and its mend as written, merged as the project's own pull request

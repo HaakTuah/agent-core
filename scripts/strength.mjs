@@ -465,7 +465,7 @@ function main(argv) {
   const known = (option === "--whole" && argv.length === 1) || (option === "--lower" && argv.length === 2) || !argv.length;
   if (!known) refuse(`the check does not know ${argv.join(" ")}`, "run it with no option on a pull request, with --whole for the audit's whole run, or with --lower <file>[,<file>...] in a cleaning task");
   const p = project();
-  if (!p.tool) { console.log(`The project names no mutation tool: its manifest has no row ${ROW}. The measure waits for that step (${p.home}setup/sync-notes.md, "how strong the tests are").`); return 0; }
+  if (!p.tool) { console.log(`The project names no mutation tool: its manifest has no row ${ROW}. The measure waits for that step (${p.home}setup/sync-notes/, "how strong the tests are").`); return 0; }
   if (p.tool.none !== undefined) { console.log(`The measure is left out: the project names no mutation tool${p.tool.none ? ` (${p.tool.none})` : ""}.`); return 0; }
   if (!p.config) { console.log("The measure waits for the shape check's config, whose \"code\" and \"tests\" it reads."); return 0; }
   if (option === "--whole") return whole(p);

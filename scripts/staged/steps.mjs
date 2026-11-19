@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "../core-address.mjs";
+import { entries, notes as notesWhole } from "../sync-notes.mjs";
 import { LABELS, build, git, github, originGit, pushed, show, verdict } from "./scratch.mjs";
 
 export const name = "steps";
@@ -129,7 +130,7 @@ export function set(dir, opts = {}) {
   git(project, "commit", "-q", "-m", "The project's own setup");
   git(project, "push", "-q", "origin", "main");
   // (what the sync printed: every entry of the notes, as from a pin before them, and what the copy's scripts find)
-  const notes = read("core/setup/sync-notes.md").split("\n").filter(l => /^- \*\*\d/.test(l));
+  const notes = entries(notesWhole(path.join(project, "core"))).filter(l => /^- \*\*\d/.test(l));
   const said = script => { const r = spawnSync(process.execPath, [path.join("core", "scripts", script)], { cwd: project, encoding: "utf8" }); return `${r.stdout ?? ""}`.trim(); };
   const body = [
     `core/ 0a1b2c3 -> ${pin.slice(0, 7)} (the copy written anew); core-manifest.md moved.`,

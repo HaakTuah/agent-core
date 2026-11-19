@@ -431,4 +431,14 @@ export const STAGES = {
     },
     mend: dir => spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } }),
   },
+
+  "19 November 2026, a project's own rules and what holds them": {
+    asked: true,
+    // (a project with no list of what holds its own rules; the mend runs the command the step words, which writes it)
+    stage: dir => fs.rmSync(at(dir, "checks/holders.json"), { force: true }),
+    mend: dir => {
+      const r = spawnSync(process.execPath, ["core/scripts/holders.mjs", "--own", "--write"], { cwd: dir, encoding: "utf8" });
+      if (r.status !== 0) throw new Error(`holders.mjs --own --write: ${r.stderr}`);
+    },
+  },
 };
