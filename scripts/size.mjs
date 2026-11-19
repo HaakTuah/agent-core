@@ -71,11 +71,15 @@ function startIn(lib, role) {
 }
 
 // What each role reads at its start and the queue come to at a revision of this repository, read from git: { role:
-// bytes }, with the queue under QUEUE.file. Null where git cannot read the revision, so that the caller fails.
+// bytes }, with the queue under QUEUE.file. Null where the revision is not named as one or git cannot read it, so that
+// the caller fails.
+const SAFE = ["-c", "core.fsmonitor=false"]; // (no command of git's settings runs as it reads)
+const BASE_FORM = /^\w[\w./^~-]*$/u; // (a revision's name, never an option)
 export function sizesAt(revision) {
-  const show = f => { try { return execFileSync("git", ["show", `${revision}:${f}`], { stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }); } catch { return null; } };
-  try { execFileSync("git", ["rev-parse", "--verify", "--quiet", `${revision}^{commit}`], { stdio: "ignore" }); } catch { return null; }
-  const list = folder => { try { return execFileSync("git", ["ls-tree", "--name-only", `${revision}:${folder}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\n").filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`); } catch { return []; } };
+  if (!BASE_FORM.test(String(revision ?? ""))) return null;
+  const show = f => { try { return execFileSync("git", [...SAFE, "show", `${revision}:${f}`], { stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }); } catch { return null; } };
+  try { execFileSync("git", [...SAFE, "rev-parse", "--verify", "--quiet", `${revision}^{commit}`], { stdio: "ignore" }); } catch { return null; }
+  const list = folder => { try { return execFileSync("git", [...SAFE, "ls-tree", "--name-only", `${revision}:${folder}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\n").filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`); } catch { return []; } };
   const lib = gather(f => show(f)?.toString("utf8") ?? null, list), size = f => { const b = show(f); return b === null ? 0 : bytesOf(b); };
   const sizes = { [QUEUE.file]: size(QUEUE.file) };
   for (const role of Object.values(lib.roles).map(r => r.name)) sizes[role] = (startIn(lib, role) ?? []).reduce((sum, f) => sum + size(f), 0);

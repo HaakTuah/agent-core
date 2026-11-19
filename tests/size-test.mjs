@@ -122,7 +122,7 @@ fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), "one line more\n");
 r = at2("--base", "HEAD");
 ok(r.status === 1 && /over its cap, 14 of them this change's own\. Mend:/.test(r.out) && mended(r.out), "one that grows it further fails, saying how much is its own", r.out);
 git("checkout", "-q", "--", "roles/stand-in.md");
-for (const bad of [at2("--base", "no-such-revision"), at2("--base"), at2("--other")]) ok(bad.status === 1 && mended(bad.out), "a base git cannot read, or an option it does not know, fails, saying the mend", bad.out);
+for (const bad of [at2("--base", "no-such-revision"), at2("--base"), at2("--other"), at2("--base", "--output=x"), at2("--base", "HEAD:roles")]) ok(bad.status === 1 && mended(bad.out), "a base git cannot read, or an option it does not know, fails, saying the mend", bad.out);
 fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), `\n${"x".repeat(CAPS["stand-in"])}\n`);
 fs.writeFileSync(path.join(tmp, "roles", "planner.md"), "# The planner\n\nRead at its start by the role `planner`.\n\n**Reads at its start:** `roles/shared/git.md`.\n");
 ok(/the role planner has no cap\. Mend: give it a line in CAPS/.test(at2().out) && mended(at2().out), "a role with a file and no cap fails, saying the line to add", at2().out);
