@@ -1,0 +1,117 @@
+// Checks the check of issue and comment text for the personal terms (scripts/issue-terms.mjs; #783): it reads the
+// terms as the personal-terms check does, its matcher deciding as that check's own shell does on the same texts (run
+// from .github/workflows/personal-terms.yml itself, so the two stay in step), a session's link id left out; it takes
+// each term out of an issue, a closed pull request and each kind of comment, never an open pull request's own text; in
+// a job it prints counts and the mend alone, never a term, a text or where one stood; a text it may not edit is
+// counted; --private names each place, and refuses to run in a job; without TERMS it reads nothing. All on GitHub's
+// answers made up here: no network. Terms built from pieces as the test runs (floor rule 8).
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { holds, main, MARK, places, takeOut, termsOf } from "../scripts/issue-terms.mjs";
+import { mended } from "../scripts/mend.mjs";
+import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+
+const { ok, done } = tally();
+const [term, other] = [["qz", "vk", "wy"], ["xj", "qq", "zf"]].map(t => t.join(""));
+const TERMS = ` ${term}\r\n\n${other}\n`;
+const terms = termsOf(TERMS);
+ok(terms.length === 2 && terms[0] === term && terms[1] === other, "the terms are read one a line, the blanks around each and the empty lines no part of them");
+
+// the matcher, beside the personal-terms check's own shell: its list made as that check makes it, and its `link` and
+// `unlinked` lines taken from the workflow itself
+const workflow = fs.readFileSync(path.join(root, ".github/workflows/personal-terms.yml"), "utf8");
+const line = name => workflow.split("\n").find(l => l.trimStart().startsWith(name))?.trim();
+const tmp = scratchDir("issue-terms-test-");
+const list = path.join(tmp, "terms");
+fs.writeFileSync(list, `${terms.join("\n")}\n`);
+const shell = text => spawnSync("bash", ["-c", `${line("link=")}\n${line("unlinked()")}\nprintf '%s\\n' "$TEXT" | unlinked | grep -q -i -F -f "$LIST"`], { env: { PATH: process.env.PATH, TEXT: text, LIST: list }, encoding: "utf8" }).status === 0;
+ok(line("link=") && line("unlinked()"), "the personal-terms check's link and unlinked lines are found in its workflow");
+const id = inside => `01${`A${inside}BCDEFGHJKMNPQRSTUVWXYZabc`.slice(0, 22)}`;
+const link = (inside, host = "claude.ai/code/session_") => `https://${host}${id(inside)}`;
+const cases = [
+  ["a term alone", term], ["a term in another case", `Words ${term.toUpperCase()} words`], ["none", "Plain words."],
+  ["a term only in a session's link id", `Session: ${link(term)}`], ["such a link ended by a mark", `(${link(term)}).`],
+  ["two such links side by side", `${link(term)} ${link(other)}`], ["a link of another host", link(term, "example.com/code/session_")],
+  ["a link inside another address", `x${link(term)}`], ["a term after such a link", `${link("x")} ${other}`],
+  ["a term on a later line", `one\ntwo ${term}\nthree`], ["a term inside a word", `ab${other}cd`],
+];
+for (const [what, text] of cases) ok(holds(text, terms) === shell(text), `${what}: the matcher decides as the personal-terms check's shell does`, `${holds(text, terms)} against ${shell(text)}`);
+
+// taking out
+ok(takeOut(`A ${term} and ${term.toUpperCase()}.`, terms) === `A ${MARK} and ${MARK}.`, "each term is taken out, in any case, the mark in its place");
+ok(takeOut(`Session: ${link(term)}`, terms) === `Session: ${link(term)}`, "a session's link id is left as it is");
+ok(!holds(takeOut(`${term.slice(0, 3)}${other}${term.slice(3)}`, terms), terms), "a cut that joins two parts into a term is taken again");
+ok(places(`${term}${term}`, terms).length === 2, "two terms side by side are each found");
+
+// GitHub, made up: issues (one a closed pull request, one an open one), comments of each kind and a review
+const repo = "o/r";
+const issue = { number: 1, html_url: "https://github.com/o/r/issues/1", node_id: "I1", title: `About ${term}`, body: `See ${other}.`, state: "open" };
+const clean = { number: 2, html_url: "https://github.com/o/r/issues/2", node_id: "I2", title: "Plain", body: "Plain.", state: "open" };
+const closed = { number: 3, html_url: "https://github.com/o/r/pull/3", node_id: "P3", title: "A change", body: `Words ${term}`, state: "closed", pull_request: {} };
+const open = { number: 4, html_url: "https://github.com/o/r/pull/4", node_id: "P4", title: `Open ${term}`, body: "x", state: "open", pull_request: {} };
+const comment = { id: 11, html_url: "https://github.com/o/r/issues/1#issuecomment-11", node_id: "C11", body: `A note ${other}` };
+const inline = { id: 12, html_url: "https://github.com/o/r/pull/3#discussion_r12", node_id: "R12", body: `Here ${term}` };
+const review = { id: 13, html_url: "https://github.com/o/r/pull/3#pullrequestreview-13", node_id: "V13", body: `Review ${term}`, submitted_at: "2026-11-18T00:00:00Z" };
+const old = { id: 14, html_url: "https://github.com/o/r/pull/3#pullrequestreview-14", node_id: "V14", body: `Old ${term}`, submitted_at: "2026-01-01T00:00:00Z" };
+const NOW = new Date("2026-11-19T12:00:00Z");
+function github({ versions = {} } = {}) {
+  const asked = [];
+  const gh = (...args) => {
+    asked.push(args.join(" "));
+    if (args[0] === "graphql") return JSON.stringify({ data: { nodes: args.filter(a => a.startsWith("ids[]=")).map(a => a.slice(6)).map(id => ({ id, userContentEdits: { nodes: (versions[id] ?? []).map(diff => ({ diff })) } })) } });
+    const route = args[0], first = /[?&]page=1$/.test(route);
+    if (route.startsWith(`repos/${repo}/issues?`)) return JSON.stringify(first ? [issue, clean, closed, open] : []);
+    if (route.startsWith(`repos/${repo}/issues/comments?`)) return JSON.stringify(first ? [comment] : []);
+    if (route.startsWith(`repos/${repo}/pulls/comments?`)) return JSON.stringify(first ? [inline] : []);
+    if (route.startsWith(`repos/${repo}/pulls/3/reviews`)) return JSON.stringify(first ? [review, old] : []);
+    if (/^repos\/o\/r\/pulls\/\d+\/reviews/.test(route)) return "[]";
+    throw new Error(`not made up: ${route}`);
+  };
+  return { gh, asked };
+}
+const run = (argv, { env = { TERMS, GITHUB_ACTIONS: "true" }, refuse = () => false, versions } = {}) => {
+  const { gh, asked } = github({ versions });
+  const edits = [], lines = [], errors = [];
+  const error = console.error; console.error = m => errors.push(m);
+  try {
+    const status = main(argv, { env, gh, now: NOW, repo, say: m => lines.push(m), edit: (method, route, payload) => { edits.push({ method, route, payload }); return !refuse(route); } });
+    return { status, edits, asked, out: [...lines, ...errors].join("\n") };
+  } finally { console.error = error; }
+};
+const leaks = out => [term, other].some(t => out.toLowerCase().includes(t)) || /github\.com\/o\/r\/(issues|pull)\//.test(out) || /#\d|\/\d+\b/.test(out.replace(/\d+ (texts|days)|--days \d+/g, ""));
+
+const job = run([]);
+const edited = route => job.edits.find(e => e.route === route)?.payload;
+ok(job.status === 0, "in a job it fails nothing", job.out);
+ok(edited("repos/o/r/issues/1")?.title === `About ${MARK}` && edited("repos/o/r/issues/1")?.body === `See ${MARK}.`, "an issue's title and description have the terms taken out", JSON.stringify(job.edits));
+ok(edited("repos/o/r/issues/3")?.body === `Words ${MARK}` && !("title" in edited("repos/o/r/issues/3")), "a closed pull request's description has them taken out, and only what held one is sent");
+ok(!job.edits.some(e => e.route === "repos/o/r/issues/4"), "an open pull request's own text is left to the personal-terms check");
+ok(!job.edits.some(e => e.route === "repos/o/r/issues/2"), "a text with no term is not edited");
+ok(edited("repos/o/r/issues/comments/11")?.body === `A note ${MARK}` && edited("repos/o/r/pulls/comments/12")?.body === `Here ${MARK}`, "a comment and a review's inline comment have them taken out");
+ok(job.edits.find(e => e.route === "repos/o/r/pulls/3/reviews/13")?.method === "PUT" && !job.edits.some(e => e.route.endsWith("/reviews/14")), "a review written in the days read has them taken out, an older one is not read");
+ok(job.asked.some(a => a.includes("since=2026-11-11T12:00:00Z")), "it reads the last eight days", job.asked.join("\n"));
+ok(!leaks(job.out) && /took a term out of 5/.test(job.out), "it prints counts, never a term, a text or where one stood", job.out);
+ok(/Mend: \S+\s+\S/.test(job.out) && /--private/.test(job.out), "where it took one out, it says the mend: the private run that names the versions to delete", job.out);
+ok(!job.asked.some(a => a.startsWith("graphql")), "in a job it reads no earlier versions");
+
+const refused = run([], { refuse: route => route.startsWith("repos/o/r/pulls/") });
+ok(refused.status === 0 && /2 that hold one this account may not edit/.test(refused.out) && !leaks(refused.out), "a text the token may not edit is counted, naming nothing", refused.out);
+
+const dry = run(["--dry"]);
+ok(dry.edits.length === 0 && /would take a term out of 5/.test(dry.out), "--dry edits nothing and says what it would");
+
+const own = run(["--private"], { env: { TERMS }, refuse: route => route.endsWith("/comments/12"), versions: { C11: ["Plain", `A note ${other}`], I2: ["Plain."] } });
+ok(own.status === 0 && own.out.includes(`changed: ${issue.html_url} (issue); its old title stays in its timeline`), "--private names each text it changed, and an old title left in a timeline", own.out);
+ok(own.out.includes(`could not change: ${inline.html_url}`), "--private names a text it could not change", own.out);
+ok(own.out.includes(`earlier versions hold a term: ${comment.html_url}`) && !own.out.includes(`earlier versions hold a term: ${clean.html_url}`), "--private names each text whose kept versions hold a term, and no other", own.out);
+ok(![term, other].some(t => own.out.toLowerCase().includes(t)), "--private never prints a term either");
+
+const inJob = run(["--private"]);
+ok(inJob.status === 1 && mended(inJob.out) && inJob.edits.length === 0 && inJob.asked.length === 0, "--private in a job fails, reads nothing, and says the mend", inJob.out);
+const bad = run(["--days", "x"]);
+ok(bad.status === 1 && mended(bad.out), "a wrong option fails and says the mend", bad.out);
+const none = run([], { env: { GITHUB_ACTIONS: "true" } });
+ok(none.status === 0 && none.asked.length === 0 && /TERMS is not set/.test(none.out), "without TERMS it reads nothing and says so", none.out);
+
+done("the check of issue and comment text for the personal terms");

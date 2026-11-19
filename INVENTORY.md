@@ -258,6 +258,13 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   on a schedule; an orchestrator's wake. *Else:* the host's stale-issue actions and Renovate's dashboard, dropped on
   fact: they know nothing of the core's states; the host's agent jobs, dropped on fact: billed. *Bugs:* 3, and 2 naming
   `look.yml`. **Keep:** nothing fits.
+- `scripts/issue-terms.mjs`, a step of `.github/workflows/look.yml` and `own-look.yml`: takes the terms of the secret
+  `PERSONAL_TERMS` out of the issues, closed pull requests and comments written or edited in the week before, printing
+  counts alone; `--private`, in a session the owner works with, names them and the texts whose kept versions hold one
+  (#783). *Runs:* the runners on a schedule, where the secret is; a session the owner works with. *Else:* GitHub's
+  secret scanning with custom patterns, dropped on fact: it raises alerts and edits nothing, and its custom patterns in
+  a private repository are paid; gitleaks or Betterleaks, the lookup of #488, kept for the matching alone, as for
+  `personal-terms.yml`, whose matcher this one's test holds it in step with. *Bugs:* 0. **Keep:** nothing fits.
 - `scripts/core-moved.mjs`, `.github/workflows/core-moved.yml`: keeps one issue open while the core has moved past a
   project's pin. *Runs:* the runners on a schedule. *Else:* Dependabot and Renovate, which follow a submodule or a
   release, dropped on fact: the copy is neither (#519). *Bugs:* 1 and 1. **Keep:** small and stable.

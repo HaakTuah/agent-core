@@ -1,8 +1,9 @@
 # The scheduled look on this repository itself (AGENTS.md, "The core abides by its own rules"): the same script the
 # projects run from their copy (scripts/look.mjs), here from its source, once a day, with its monthly state report.
 # This repository only; no project calls it. Nothing is checked out but the default branch, and no text of a pull
-# request or an issue reaches a command: the script reads them through gh's answers alone. It may write issues, and
-# read pull requests, checks and statuses; nothing else.
+# request or an issue reaches a command: the scripts read them through gh's answers alone. Its last step takes the
+# personal terms out of issues, pull requests and comments (scripts/issue-terms.mjs; #783). It may write issues and
+# pull requests (that step alone edits these), and read checks and statuses; nothing else.
 name: own-look
 
 on:
@@ -20,7 +21,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: read
+      pull-requests: write # (the personal-terms step edits a closed pull request's text and a review's; the look only reads them)
       checks: read
       statuses: read
     steps:
@@ -38,3 +39,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/look.mjs
+      - name: Personal terms taken out of issues and comments (floor rule 11; counts alone, never a term or where one stood)
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TERMS: ${{ secrets.PERSONAL_TERMS }}
+          CORE_AT: "" # (the mend it prints names scripts/ here, the core's own)
+        run: node scripts/issue-terms.mjs

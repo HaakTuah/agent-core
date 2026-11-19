@@ -259,6 +259,9 @@ jobs:
       - name: The scheduled look and its state report
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/look-test.mjs ')) }}
         run: node tests/look-test.mjs
+      - name: The personal terms taken out of issues and comments
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/issue-terms-test.mjs ')) }}
+        run: node tests/issue-terms-test.mjs
       - name: The rules' pruning, when it is due and what it lists
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pruning-test.mjs ')) }}
         run: node tests/pruning-test.mjs
