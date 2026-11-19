@@ -13,9 +13,10 @@
 // commit of the pull request's, as GitHub's "Update branch" makes): Codex's by the commit its summary names, a posted
 // one by a commit it names by its whole SHA; any other later commit needs a posted review, or the note that none is
 // needed, naming the head, and the status says when the review it passes on saw an earlier commit than the head. Given
-// too the merges scripts/clean-merges.mjs proved, the tree of each the merge git makes of its two parents (#323), an
-// update from main is only such a merge: one whose tree carries a change of its own, or that git cannot make without
-// a conflict, needs a review naming it or a later commit, and the status names it. Where
+// too the merges scripts/clean-merges.mjs proved, the tree of each the merge git makes of its two parents, any file in
+// conflict settled by keeping both sides' lines whole (#323, #750), an update from main is only such a merge: one whose
+// tree carries a change of its own, or whose conflict is settled any other way, needs a review naming it or a later
+// commit, and the status names it. Where
 // Codex's summary says its security review is running, only such a comment posted after it began ends the wait for it
 // (that review is waited for: core archive 206), never one posted before, a note that none is needed among them: it
 // began when the summary's row for it says it has run since, where that time can be read and is no later than the
@@ -148,7 +149,7 @@ export const UNREAD = "Codex's summary is on the pull request, but its state can
 // { sha, done, why }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name). more:
 // { reviewers, the accounts besides the repository's owner whose posted review counts; rights, GitHub's answers on
 // accounts' rights to the repository, whose writers' posted reviews count too; pure, whether pure-sync.mjs
-// proved the head a pure sync; merges, the SHAs of the merges clean-merges.mjs proved the ones git makes, where it ran }
+// proved the head a pure sync; merges, the SHAs of the merges clean-merges.mjs proved to bring in main alone, where it ran }
 export function judge(pull, comments, reviewComments, commits, files, bound = true, more = {}) {
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
@@ -316,8 +317,8 @@ const noneOpen = (review) => review.has_unresolved_findings === false || review.
 function judgeWith(given) {
   const { sha, forHead, bind, review, bound, cut } = given;
   const short = sha.slice(0, 7);
-  // what a review of an earlier commit wants, where a merge from main after it is not the one git makes (#323)
-  const notGits = cut === undefined ? "" : `; merge ${cut.slice(0, 7)} is not the merge git makes`;
+  // what a review of an earlier commit wants, where a merge from main after it brings more than main (#323, #750)
+  const notGits = cut === undefined ? "" : `; merge ${cut.slice(0, 7)} brings more than main`;
   // what waits, or, on a pull request whose head does not hold this check as the default branch does, which stood
   // before it came, is told and never held
   const hold = (why, told = why) => (bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${told}` });

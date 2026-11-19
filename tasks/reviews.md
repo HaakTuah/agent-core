@@ -56,6 +56,16 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      one commit stood for later commits no one checked, and any collaborator's comment passed a pull request. Held by
      the `security-review` status, which waits where it is broken, in the core, and holds the merge once a ruleset
      requires it (#320).
+   - **A review carries over to a commit that adds nothing new of the pull request's own** (#750). By default the
+     `security-review` and `code-review` statuses read a review of the head. Where `scripts/clean-merges.mjs` proves
+     that the commits since the review only bring in `main`, each the merge git makes of its parents, any file in
+     conflict settled by keeping both sides' lines whole, one side's after the other's, the statuses pass on that review
+     with no new one, and the builder asks Codex, or any reviewer, again only for new content. It does not mean a
+     conflict settled by hand goes unreviewed: a merge that changes the pull request's own lines, or main's, is new
+     content. Reason: floor rule 8 says nothing is reviewed twice, and the check asked a fresh review of every head:
+     about 150 requests for Codex's review on 39 pull requests, 113 of them finding nothing, and about 140
+     security-review comments, 17 of them saying only that none was needed. Held by `scripts/clean-merges.mjs`, which
+     the `security-review` workflow runs, and its test.
    - **What a posted review declares** (#299): by default a review posted in a comment that opens
      "Security review:", "Code review:" or "Design check:" covers one kind of review, and declares what it found on two
      lines of their own: "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other
@@ -85,7 +95,8 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    otherwise filed as a follow-up with the reason in the PR, or answered with why it is wrong (a security finding: only
    as floor rule 9 allows). A review from anyone else is advisory.
 6. **Rounds end:** after a fix, one request to its reviewer, and a security check only as point 3 says, and none for an
-   update from `main` without a conflict; a PR is never marked draft and ready again to rerun its reviews.
+   update from `main` that brings in `main` alone (point 3); a PR is never marked draft and ready again to rerun its
+   reviews.
    - After three rounds, what is still open goes to escalation (`tasks/roles.md`); a PR it cannot settle stays
      unmerged.
 7. **The fallback reviewer's brief,** written as `tasks/helpers.md` says, hands it the diff, the task's text, the

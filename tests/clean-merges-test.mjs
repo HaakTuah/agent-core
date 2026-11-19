@@ -1,6 +1,7 @@
 // Tests of the proof that an update from main is the merge git makes (clean-merges.mjs, #323), on merges git really
 // makes in a scratch repository: one as git makes it, one with a change of its own, one whose conflict was resolved by
-// hand, two in a row, and a list whose parents are not git's; and, end to end, the core's security-review.yml run as
+// hand, one whose conflict keeps both sides' lines whole, in either order, and one that does so and changes a line
+// besides (#750, point 3), two in a row, and a list whose parents are not git's; and, end to end, the core's security-review.yml run as
 // GitHub runs it (workflow-run.mjs) on a pull request whose head is such a merge, GitHub's API a stand-in that gives the
 // pull request and logs the statuses it is given: the review of the commit before a merge git makes stands for the
 // head, and one before a merge with a change of its own waits, both statuses naming that merge and the mend; and a
@@ -68,6 +69,35 @@ const Y2 = commit(r, "main changes the same line");
 git(r, "checkout", "-q", "-B", "conflict", X);
 const RESOLVED = merge(r, Y2, () => write(r, "a.txt", "ONE\ntwo\nthree\n"));
 ok(proved(pullOf(RESOLVED, [X, RESOLVED]), listed(r, X, RESOLVED), r).length === 0, "nor one whose conflict was resolved by hand, even to one side's text");
+// two pull requests that add to the same place: the conflict settled by keeping both sides' lines, in either order
+git(r, "checkout", "-q", "-B", "adds", B0);
+write(r, "a.txt", "one\ntwo\nthree\nthe pull request's line\n");
+const ADDS = commit(r, "the pull request adds a line");
+git(r, "checkout", "-q", "-B", "main-adds", B0);
+write(r, "a.txt", "one\ntwo\nthree\nmain's line\n");
+const MAIN_ADDS = commit(r, "main adds a line at the same place");
+const settled = (name, text, extra) => {
+  git(r, "checkout", "-q", "-B", name, ADDS);
+  return merge(r, MAIN_ADDS, () => { write(r, "a.txt", text); if (extra) extra(); });
+};
+const MAIN_FIRST = settled("main-first", "one\ntwo\nthree\nmain's line\nthe pull request's line\n");
+const OURS_FIRST = settled("ours-first", "one\ntwo\nthree\nthe pull request's line\nmain's line\n");
+ok([MAIN_FIRST, OURS_FIRST].every((at) => proved(pullOf(at, [ADDS, at]), listed(r, ADDS, at), r).join() === at), "a conflict settled by keeping both sides' lines whole, main's first or the pull request's, is proved");
+const CHANGED = settled("changed", "one\ntwo\nthree\nmain's line\nthe pull request's line, changed\n");
+const DROPPED = settled("dropped", "one\ntwo\nthree\nthe pull request's line\n");
+const BESIDE = settled("beside", "one\ntwo\nthree\nmain's line\nthe pull request's line\n", () => write(r, "b.txt", "a change of its own\n"));
+git(r, "checkout", "-q", "-B", "markers", ADDS);
+const MARKERS = merge(r, MAIN_ADDS); // (committed as git's merge left it, its markers in a.txt)
+ok([CHANGED, DROPPED, BESIDE, MARKERS].every((at) => proved(pullOf(at, [ADDS, at]), listed(r, ADDS, at), r).length === 0),
+  "  but not one that changes the pull request's line, drops main's, changes another file besides, or keeps git's conflict markers");
+git(r, "checkout", "-q", "-B", "mode", ADDS);
+const MODE = merge(r, MAIN_ADDS, () => { write(r, "a.txt", "one\ntwo\nthree\nmain's line\nthe pull request's line\n"); fs.chmodSync(path.join(r, "a.txt"), 0o755); git(r, "update-index", "--add", "--chmod=+x", "a.txt"); });
+git(r, "checkout", "-q", "-B", "gone", B0);
+git(r, "rm", "-q", "a.txt");
+const GONE = commit(r, "main deletes the file the pull request changes");
+git(r, "checkout", "-q", "-B", "deleted", ADDS);
+const DELETED = merge(r, GONE, () => write(r, "a.txt", "one\ntwo\nthree\nthe pull request's line\n"));
+ok(git(r, "ls-tree", MODE, "a.txt").startsWith("100755") && [MODE, DELETED].every((at) => proved(pullOf(at, [ADDS, at]), listed(r, ADDS, at), r).length === 0), "  nor one that changes the file's mode, nor a file one side deleted");
 git(r, "checkout", "-q", "main");
 write(r, "d.txt", "z\n");
 const Y3 = commit(r, "main moves again");
@@ -135,10 +165,10 @@ const check = (number, head, posted = [], rights = {}) => {
   return { passed: job.passed, out: job.steps.map((x) => x.out).join(""), security: of("security-review"), code: of("code-review") };
 };
 const gits = check(1, GITS);
-ok(gits.passed && gits.out.includes("Merges from main that are the ones git makes: 1.") && gits.security.state === "success" && gits.security.description.includes("only updates from main since")
+ok(gits.passed && gits.out.includes("Merges from main that bring in main alone: 1.") && gits.security.state === "success" && gits.security.description.includes("only updates from main since")
   && gits.code.state === "success" && gits.code.description.includes("nothing but updates from main since"), "the workflow: a review of the commit before a merge git makes stands for the head, in both statuses", gits.out + JSON.stringify([gits.security, gits.code]));
 const own = check(2, OWN);
-ok(own.passed && own.out.includes("Merges from main that are the ones git makes: 0.") && own.security.state === "pending" && own.code.state === "pending"
+ok(own.passed && own.out.includes("Merges from main that bring in main alone: 0.") && own.security.state === "pending" && own.code.state === "pending"
   && own.security.description.includes(`merge ${OWN.slice(0, 7)} unproved`) && own.code.description.includes(`merge ${OWN.slice(0, 7)} unproved`) && [own.security, own.code].every((s) => mended(s.description)),
   "  and one before a merge with a change of its own waits, both statuses naming that merge and the mend", own.out + JSON.stringify([own.security, own.code]));
 

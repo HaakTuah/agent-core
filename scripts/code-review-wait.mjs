@@ -12,7 +12,7 @@
 // (tasks/reviews.md, "Which") has had none: neither Codex's code review completed nor such a comment names the head
 // commit, or one that only updates from `main` follow (merges whose second parent is no commit of the pull request's,
 // as GitHub's "Update branch" makes; floor rule 8: nothing is reviewed twice), and, given the merges
-// scripts/clean-merges.mjs proved, only through merges whose tree is the one git makes of their parents (#323), the
+// scripts/clean-merges.mjs proved, only through merges that bring in main alone (#323, #750), the
 // status naming the one where that stops it. None is needed where every changed file
 // is a Markdown file outside the rule files (docs alone; the rule files: floor rule 3's names in any folder, such as
 // CLAUDE.local.md too, the copy under core/ or the path the default branch's manifest names, .github/, .claude/, .agents/
@@ -51,7 +51,7 @@ const POSTED = /^(?:\*\*)?Code review:/u;
 const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry) => entry !== null && typeof entry === "object");
 
 // { sha, done, why, warning? }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name);
-// merges: the SHAs of the merges clean-merges.mjs proved the ones git makes, where it ran (#323)
+// merges: the SHAs of the merges clean-merges.mjs proved to bring in main alone, where it ran (#323, #750)
 export function judge(pull, comments, commits, files, rules = [], bound = true, merges = undefined, copy = null) {
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
