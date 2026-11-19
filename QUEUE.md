@@ -11,7 +11,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
 | #778, point 2 | rule builder | |
 | #783 | builder | |
-| #756 | rule builder | |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
 | #704 | builder; `tests.yml` | #715 |
 | #770 | builder; `tests.yml` | #704 |
