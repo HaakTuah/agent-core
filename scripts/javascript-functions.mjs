@@ -119,18 +119,26 @@ function nameOf(node, parent) {
 }
 
 // The node that names a function by where it stands: the variable, property, class field or parameter it is the value
-// of; a member's property where it is assigned to one. Null where none is.
-function givenName(node, parent) {
-  const t = parent?.type;
-  if (t === "variable_declarator") return parent.childForFieldName("value")?.id === node.id ? parent.childForFieldName("name") : null;
-  if (t === "pair") return parent.childForFieldName("value")?.id === node.id ? parent.childForFieldName("key") : null;
-  if (t === "public_field_definition" || t === "field_definition") return parent.childForFieldName("value")?.id === node.id ? parent.childForFieldName("name") ?? parent.childForFieldName("property") : null;
+// of; a member's property where it is assigned to one. Null where none is. Each parent's type gives the field that
+// holds the value and the fields that may name it, the first found.
+const GIVEN = {
+  variable_declarator: ["value", "name"],
+  pair: ["value", "key"],
+  public_field_definition: ["value", "name", "property"],
+  field_definition: ["value", "name", "property"],
+  assignment_expression: ["right", "left"],
+  assignment_pattern: ["right", "left"],
+  object_assignment_pattern: ["right", "left"],
   // (a parameter's default in TypeScript's grammar, which writes it so where JavaScript's writes an assignment pattern)
-  if (t === "required_parameter" || t === "optional_parameter") return parent.childForFieldName("value")?.id === node.id ? parent.childForFieldName("pattern") : null;
-  if (t !== "assignment_expression" && t !== "assignment_pattern" && t !== "object_assignment_pattern") return null;
-  if (parent.childForFieldName("right")?.id !== node.id) return null;
-  const left = parent.childForFieldName("left");
-  return left?.type === "member_expression" ? left.childForFieldName("property") : left;
+  required_parameter: ["value", "pattern"],
+  optional_parameter: ["value", "pattern"],
+};
+function givenName(node, parent) {
+  if (!parent || !Object.hasOwn(GIVEN, parent.type)) return null;
+  const [value, ...names] = GIVEN[parent.type];
+  if (parent.childForFieldName(value)?.id !== node.id) return null;
+  const named = names.map(f => parent.childForFieldName(f)).find(Boolean) ?? null;
+  return named?.type === "member_expression" ? named.childForFieldName("property") : named;
 }
 
 // The name a node gives: a word as written (a private one with its #), a string's text; "(anonymous)" for anything
