@@ -97,6 +97,7 @@ ok(files(testsChanged(tmp, "HEAD^1")) === "test/sum.test.mjs", "on a branch head
 const head = testsChanged(tmp, baseOf(tmp));
 ok(files(head) === "test/q\"b.test.mjs,test/sum.test.mjs" && head.find(f => f.file === "test/sum.test.mjs").skips.length === 1, "on a branch head that is no merge, it is read whole, against where it left origin/main", JSON.stringify(head));
 ok(files(testsChanged(tmp, baseOf(tmp, "main"))) === files(head), "--base <ref> reads it against where it left that ref");
+ok(baseOf(tmp, "--output=x") === null && testsChanged(tmp, "--output=x") === null && testsChanged(tmp, "") === null, "a ref or base that would read as an option reads as not read, and never reaches git");
 // (a branch head that merged its base in: main gains a test of its own, which the pull request's reading leaves out)
 git("checkout", "-q", "main"); put("test/main.test.mjs", "assert.equal(1, 1);\n"); git("add", "-A"); git("commit", "-q", "-m", "main's own");
 put("test/main.test.mjs", ""); git("commit", "-q", "-am", "main empties its own test");

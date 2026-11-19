@@ -80,6 +80,7 @@ const gitIn = dir => (...args) => { const r = spawnSync("git", args, { cwd: dir,
 // be read and no `ref` was given, a merge commit's first parent, which is the base in a checkout of a pull request's
 // merge. Null where none can be read.
 export function baseOf(dir = ".", ref = null) {
+  if (ref !== null && (typeof ref !== "string" || !ref || ref.startsWith("-"))) return null; // (no option reaches git as a ref)
   const git = gitIn(dir), left = git("merge-base", "HEAD", ref ?? "origin/main")?.trim();
   if (left || ref) return left || null;
   return git("rev-parse", "-q", "--verify", "HEAD^2^{commit}") !== null ? git("rev-parse", "HEAD^1")?.trim() || null : null;
@@ -88,7 +89,7 @@ export function baseOf(dir = ".", ref = null) {
 // What the pull request in the checkout at `dir` does to its tests against the commit `base`, as weakened() gives it;
 // null where it cannot be read (no base, no config at the base, or one that names no tests).
 export function testsChanged(dir = ".", base = "HEAD^1") {
-  if (!base) return null;
+  if (typeof base !== "string" || !base || base.startsWith("-")) return null;
   const git = gitIn(dir);
   const manifest = git("show", `${base}:core-manifest.md`) ?? git("show", `${base}:AGENTS.md`);
   if (manifest === null) return null;
@@ -111,8 +112,10 @@ export function testsChanged(dir = ".", base = "HEAD^1") {
 }
 
 if (started(import.meta.url)) {
-  const at = process.argv.indexOf("--base"), ref = at >= 0 ? process.argv[at + 1] : null;
-  if (at >= 0 && (!ref || ref.startsWith("-"))) { console.log("Usage: node core/scripts/weakened.mjs [--base <ref>]"); process.exit(2); }
+  const args = process.argv.slice(2), at = args.indexOf("--base"), eq = args.find(a => a.startsWith("--base="));
+  const ref = eq !== undefined ? eq.slice("--base=".length) : at >= 0 ? args[at + 1] : null;
+  const known = args.every((a, i) => a === "--base" || a.startsWith("--base=") || (i === at + 1 && at >= 0));
+  if (!known || ((at >= 0 || eq !== undefined) && (!ref || ref.startsWith("-")))) { console.log("Usage: node core/scripts/weakened.mjs [--base <ref>]"); process.exit(2); }
   const base = baseOf(".", ref), found = testsChanged(".", base);
   if (found === null) console.log(`Not read: ${base ? "the base holds no shape check config naming the tests, or the change could not be read against it" : `no base could be read${ref ? ` from ${plain(ref)}` : ": name it with --base <ref>"}`}.`);
   else if (!found.length) console.log("No test file of this pull request's has an assertion taken out or changed, or a case skipped.");
