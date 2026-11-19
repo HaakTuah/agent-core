@@ -412,7 +412,7 @@
     "tasks/tools.md: One door in: `AGENTS.md`": [232],
     "tasks/tools.md: One script says what to read": [234],
     "tasks/tools.md: Proven by the staged cases, tool by tool": [232],
-    "tasks/updates.md: CodeQL": [264],
+    "tasks/updates.md: CodeQL": [262],
     "tasks/updates.md: Node": [39, 253],
     "tasks/updates.md: The newest stable version, unless there is a reason": [37, 65],
     "tools/claude.md: Name models by family alone": [80, 81],
