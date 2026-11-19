@@ -47,7 +47,8 @@ then one release"; #322), and of `tasks/planning.md` the point on a task's relea
 holds no copy; the *report*: the PR's description (`reports/` keeps
 those written before 12 November 2026, and the staged cases' record); the *audits*: `reports/`; the *choice records*:
 `CHOICES.md`; the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
-the *mutation tool*: `node scripts/mutate.mjs --report {report} {lines}`, the core's own, in `tests.yml`;
+the *mutation tool*: `node scripts/stryker.mjs --tool tests/mutation --report {report} {lines}`, Stryker at the version
+`tests/mutation/`'s lock file pins (#581), in `tests.yml`;
 the archive is `archive/instructions.md`, the items behind each rule listed in `scripts/holders.json`; the *settling references* and the *descriptions*:
 `README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
 `tests.yml`, its baseline empty (#259); the *owner's account*: `HaakTuah`; the *users get*:
@@ -463,6 +464,15 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that rewords it. The owner is never "he" or "his" in new text: the same check reads each line a PR adds under
   `archive/` and `reports/` for a gendered pronoun, a line quoted with `>` (the owner's own words) and a record moved
   word for word aside, while the older records stay as they were.
+- **A record pull requests add to is a folder of one file per entry** (#750, point 1). By default each part of the
+  inventory (`INVENTORY.md`) stands in a file of its own under `inventory/`, read in the order of the files' names by
+  the scripts that read it (`scripts/inventory.mjs`), so that two pull requests that add an entry never edit the same
+  lines, as each archive item stands already ("A new archive item is named by its issue"). Whoever adds an entry adds
+  its file, named to stand between its neighbours. Nothing changes it. It does not mean that what the record holds, or
+  the order it is read in, changes. Reason: of 39 pull requests merged between 18 and 19 November 2026, 8 changed
+  `INVENTORY.md`, and under merge-on-green pull requests that add to one file merge side by side and collide. Held by
+  `tests/mend-test.mjs`, which reads the inventory whole, and fails a folder `INVENTORY.md` does not name and a part's
+  line written in `INVENTORY.md` itself.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
   `tests/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its

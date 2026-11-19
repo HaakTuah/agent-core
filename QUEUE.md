@@ -9,7 +9,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
-| #810 | rule builder; it changes `tests.yml` and `tasks/tests.md` | |
+| #810, its done-when | the orchestrator: reads main's runs over merges faster than a run, then closes it | |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | #715 |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
 | #704 | builder; `tests.yml` | #715 |
@@ -25,7 +25,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #579 | builder | |
 | #580 | builder | |
-| #581 | rule builder; it changes `AGENTS.md`'s *mutation tool* | |
 | #582 | builder | |
 | #583 | builder | |
 | #584 | rule builder | |
@@ -40,7 +39,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #310 | rule builder | |
 | #325 | rule builder | |
 | #314 | rule builder | |
-| #456 | rule builder; it changes the floor (rules 5 and 10) | |
 | #457 | rule builder | |
 | #458 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |

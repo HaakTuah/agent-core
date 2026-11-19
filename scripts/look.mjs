@@ -277,8 +277,10 @@ function idleFinding(repo, add) {
   }
 }
 
-// The conclusions of a check run that count as failed on the default branch. A cancelled run is left out: there a newer
-// merge's run takes its place (tasks/tests.md, "The default branch is tested at its newest commit").
+// The conclusions of a check run that count as failed on the default branch. A cancelled run is left out: a newer merge
+// cancels there only a run still waiting, which ran nothing (tasks/tests.md, "The default branch is tested at its newest
+// commit"), and a job that ran out of its time fails the core's gate, which is counted; one cancelled by hand is not
+// counted yet (#817).
 export const FAILED = ["failure", "timed_out", "startup_failure", "action_required"];
 
 // The red issue's body, from the latest check runs of the default branch's newest commit (GitHub's "latest" filter, so

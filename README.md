@@ -191,8 +191,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `STRENGTH_BASE` the pull request's base: it runs the project's mutation tool (the *mutation tool*) on the lines
      the pull request changes and shows how many faults put in on purpose a test caught; once a whole run at an audit
      has written its baseline, beside the shape check's, a fault that survives there unlisted fails
-     (`tasks/code-shape.md`). `mutate.mjs` is the core's own tool, for code run by Node with tests that are files
-     run by `node`, which with `--every` names each test that catches a fault.
+     (`tasks/code-shape.md`). For code run by Node with tests that are files run by `node`, `stryker.mjs` runs
+     Stryker as such a tool, installed from a lock file of the project's (the core's own, in `tests/mutation/`), and
+     `mutate.mjs` is a tool the core wrote, with fewer kinds of fault, which with `--every` names each test that catches
+     one.
    - **What the tests cost** (`tasks/tests.md`): `select.mjs`, a step of the same job before the tests, with
      `SELECT_BASE` the pull request's base, selects the tests the change can reach, with the project's proof, never
      selected out, and the whole suite where a changed file's reach cannot be told or no base is told; the job runs
@@ -607,5 +609,6 @@ address, until the core's owner types another name there by hand (floor rule 11)
 ## This repository
 
 How it takes its own core, and how changes are made here: `AGENTS.md`; the order of its own work: `QUEUE.md`; its
-choices that are hard to undo: `CHOICES.md`; its parts, and what else does each: `INVENTORY.md`; its security:
+choices that are hard to undo: `CHOICES.md`; its parts, and what else does each: `INVENTORY.md`, each part a file of `inventory/` (`node scripts/inventory.mjs` reads it
+whole); its security:
 `SECURITY.md`.
