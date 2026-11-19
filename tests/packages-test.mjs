@@ -233,7 +233,7 @@ try {
   fs.writeFileSync(path.join(pk, "package.json"), keptMainList);
   fs.writeFileSync(path.join(pk, "package-lock.json"), keptMainLock);
   for (const [what, r] of leftoverCases) ok(r.status === 1 && /did not run: the package yaml is not installed/u.test(r.stderr) && mended(r.stderr), `an install left from before is not loaded where ${what}`, `${r.status} ${r.stdout}${r.stderr}`);
-  ok(/no package list of the core's names it .*Mend: take the core's copy back as the core holds it/u.test(leftoverCases[0][1].stderr), "and where no package list names the package, the mend is the core's copy taken back, which no install would put there", leftoverCases[0][1].stderr);
+  ok(/no package list of the core's names it .*Mend: in a project, take the core's copy back as the core holds it .*in the core, add the package to the package list and lock file/u.test(leftoverCases[0][1].stderr), "and where no package list names the package, the mend is the core's copy taken back, or in the core the package added to a list and its lock, which no install alone would do", leftoverCases[0][1].stderr);
   // (a package the lock flags dev, which only the core's own tests run and read themselves, is never loaded by a script,
   // even where the core's own install holds it as its lock names it)
   const devLoad = spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(root, "scripts/packages.mjs")).href)}); console.log(p.installed("yaml"), p.installed("spdx-license-ids"));`], { encoding: "utf8", env });

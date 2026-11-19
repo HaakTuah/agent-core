@@ -195,10 +195,10 @@ export function unreached(name) {
 }
 
 // The failure where no package list of the core's names the package: no install puts it there, so the mend is the core's
-// copy taken back as the core holds it (#254, #719).
+// copy taken back as the core holds it, or, in the core, the package added to a list and its lock (#254, #719).
 function unlisted(name) {
   const lists = Object.values(INSTALLS).map(f => `${f}/package.json`).join(", ");
-  console.error(`FAIL: the check did not run: the package ${name} is not installed: no package list of the core's names it (${lists}). Mend: take the core's copy back as the core holds it (in a project, sync it with node core/scripts/sync.mjs; in the core, git checkout origin/main -- .packages), then run the check again`);
+  console.error(`FAIL: the check did not run: the package ${name} is not installed: no package list of the core's names it (${lists}). Mend: in a project, take the core's copy back as the core holds it (node core/scripts/sync.mjs); in the core, add the package to the package list and lock file the script's install reads (${lists}), as npm's own install there writes them, then run node scripts/install.mjs and the check again`);
   process.exit(1);
 }
 
@@ -208,7 +208,7 @@ function found(name) {
   const file = entry(name);
   if (!file && !installOf(name)) unlisted(name);
   if (!file) {
-    const which = installOf(name) ?? FIRST, named = which === FIRST ? "" : ` ${which}`;
+    const which = installOf(name), named = which === FIRST ? "" : ` ${which}`;
     const install = path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"));
     const at = path.relative(process.cwd(), path.join(dirOf(which), "node_modules"));
     const mend = process.env.GITHUB_ACTIONS === "true"
