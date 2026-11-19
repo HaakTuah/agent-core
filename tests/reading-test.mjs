@@ -117,8 +117,8 @@ ok(eq(asked("**What it is**\nAn idea, `not this`.\n\n**What to read**\nThe kinds
 // the core's own files, and the script run
 const run = (cwd, ...args) => { const r = spawnSync(process.execPath, [file, ...args], { cwd, encoding: "utf8", env: { ...process.env, GITHUB_REPOSITORY: "" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 const core = library(root, "");
-ok(coreAt(root) === "" && run(root, "--check").status === 0 && /each of the \d+ modules and 5 roles says when it is read/.test(run(root, "--check").out), "in the core, every module and role says when it is read", run(root, "--check").out);
-ok(["builder", "design", "orchestrator", "reviewer", "stand-in"].every(r => !reading(core, { role: r }).error) && [...kindsOf(core).values()].flat().every(f => fs.existsSync(path.join(root, f))), "the core has a file for each of its five roles, and every kind leads to files that stand");
+ok(coreAt(root) === "" && run(root, "--check").status === 0 && /each of the \d+ modules and 6 roles says when it is read/.test(run(root, "--check").out), "in the core, every module and role says when it is read", run(root, "--check").out);
+ok(["adviser", "builder", "design", "orchestrator", "reviewer", "stand-in"].every(r => !reading(core, { role: r }).error) && [...kindsOf(core).values()].flat().every(f => fs.existsSync(path.join(root, f))), "the core has a file for each of its six roles, and every kind leads to files that stand");
 let r = run(root, "builder", "--tool", "claude");
 ok(r.status === 0 && /^Read at the start, in the role builder \(each whole\):\n  floor\/security\.md\n  roles\/builder\.md\n/.test(r.out) && /  tools\/claude\.md\n/.test(r.out) && !/tools\/other-builders\.md/.test(r.out) && /Nothing more is called for by this task as given\./.test(r.out), "run for a builder, it prints the start, the tool's part in it", r.out);
 r = run(root, "reviewer", "--kind", "security-review", "--path", ".github/workflows/tests.yml", "--kind", "nonesuch");

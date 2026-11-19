@@ -57,12 +57,17 @@ import { started } from "./started.mjs";
 // leanness check having found 216 bytes of room for the orchestrator, made, and too little for the three. The
 // orchestrator's, raised one step again on 19 November 2026 for #467's tiers in tasks/roles.md, merged after #702's, its
 // fresh leanness check having found 118 bytes of room for 940 over: 17 made in tools/claude.md, and 101 in rules its
-// issue did not ask for, not made.
+// issue did not ask for, not made. The adviser's, set at 33 KB on 19 November 2026 for #492, what its start read when
+// the role came; the design session's and the orchestrator's not raised for it, two fresh leanness checks having found
+// room enough; the reviewer's, raised one step for it, merged after #777, a third fresh leanness check having found 9
+// bytes of room in the floor's new text, made, for 474 over; and the design session's and the orchestrator's, one step
+// each, merged after #790, a fourth having found 34 and 61 bytes of room, made, for 179 and 322 over.
 export const CAPS = {
   builder: 30 * 1024,
-  design: 31 * 1024,
-  orchestrator: 45 * 1024,
-  reviewer: 24 * 1024,
+  design: 32 * 1024,
+  orchestrator: 46 * 1024,
+  adviser: 33 * 1024,
+  reviewer: 25 * 1024,
   "stand-in": 20 * 1024,
 };
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a
