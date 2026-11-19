@@ -41,6 +41,10 @@ ok(same(fn("#!/usr/bin/env node\nexport default async function main() {\n  retur
 // Branch points: each if, loop, case and catch, and each and, or and choice within a line; a function within is its own.
 const br = src => functions(tokens(src)).map(f => `${f.name}:${f.branches}`);
 // (a large file is read in time, in step with its size, well within the suite's time mark)
+const regexes = src => tokens(src).filter(t => t.t === "regex" || t.v === "/").map(t => t.v);
+ok(same(regexes("x = /[/]/g;\n"), ["/[/]/g"]) && same(regexes("x = /a\\/b/;\n"), ["/a\\/b/"]) && same(regexes("x = /a\\\nb/;\n"), ["/a\\\nb/"]) && same(regexes("x = /a[\\]/]b/i;\n"), ["/a[\\]/]b/i"]) && same(regexes("x = /a\ny/;\n"), ["/", "/"]),
+  "a regular expression ends at its first / outside a class and an escape, an escape carries past a line's end, and a line's end with no / is no regular expression");
+ok(tokens(`x = ${"/[".repeat(300000)}\n`).length === 600002, "a large line is read in time, in step with its size");
 const unclosed = functions(tokens(`function f() {\n${"x =(:\n".repeat(100000)}${"[\n".repeat(100000)}${"]".repeat(50000)}}\n`));
 ok(same(unclosed.map(f => `${f.name}:${f.line}`), ["f:1"]), "a large file is read in time, in step with its size, and the function in it still found", JSON.stringify(unclosed.slice(0, 3)));
 const branching = [

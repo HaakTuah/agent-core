@@ -289,6 +289,8 @@ function moduleAt(parts, from, files) {
   return null;
 }
 
+const DEEP = new WeakMap();
+const deepest = files => { if (!DEEP.has(files)) DEEP.set(files, Math.max(0, ...[...files].map(f => f.split("/").length)) + 1); return DEEP.get(files); };
 // Of a module none of those roots holds, the one file whose path ends in it; null where none does, or more than one.
 function bySuffix(parts, files) {
   const p = parts.join("/"), ends = [`${p}.py`, `${p}/__init__.py`];
@@ -327,8 +329,10 @@ function relative(from, imp, files) {
 // binds to a platform: such a name is never looked for among the project's files by the end of their paths.
 export function resolvePython(from, imp, files, known) {
   if (imp.level > 0) return { to: relative(from, imp, files) };
-  const parts = imp.module.split("."), subs = imp.names.filter(n => n !== "*").map(n => [...parts, n]);
-  const find = p => moduleAt(p, from, files) ?? (known(parts[0]) ? null : bySuffix(p, files));
+  const parts = imp.module.split("."), most = deepest(files);
+  // (a module of more parts than the deepest file's path holds is no file of the project, nor is any name under it)
+  const subs = parts.length + 1 > most ? [] : imp.names.filter(n => n !== "*").map(n => [...parts, n]);
+  const find = p => (p.length > most ? null : moduleAt(p, from, files) ?? (known(parts[0]) ? null : bySuffix(p, files)));
   const named = subs.map(find).filter(Boolean);
   const own = named.length === subs.length && subs.length ? null : find(parts);
   const to = [...named, ...(own ? [own] : [])];

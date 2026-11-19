@@ -180,6 +180,27 @@ found = survey({
 ok(same(ids(found), ["clock: src/Rules/Dice.cs: DateTime.Now", "clock: src/Rules/Dice.cs: new Random(", "crossing: rules -> view: src/Rules/Dice.cs -> src/View/Board.cs", "cycle: src/Rules/Dice.cs -> src/View/Board.cs", "cycle: src/View/Board.cs -> src/Rules/Dice.cs",
   "function: src/Rules/Dice.cs#Roll", "package: src/Host/Io.cs -> Newtonsoft.Json", "package: src/Rules/Dice.cs -> Newtonsoft.Json", "platform: src/View/Board.cs -> Windows.UI"]) && found.read.nowhere === 1 && found.readers.get("src/View/Board.cs") === "csharp",
   "C#: a function past a mark, a using across a boundary nobody declared and on a cycle, a package shipped from two systems, a tie to a platform outside its system and the rules' own clock are found; the framework's own is not, and a namespace nobody declares is counted", ids(found));
+// a name a project declares is matched by the longest one an import is or lies under, a platform by the shortest; a
+// namespace that holds only deeper ones leads to no file; a Python module deeper than any file is outside
+found = survey({
+  "src/App.csproj": '<Project><ItemGroup><PackageReference Include="Acme" /><PackageReference Include="Acme.Net" /></ItemGroup></Project>',
+  "src/View/A.cs": csFile("Game.View", "using Acme.Net.Http;\nusing Win.Forms.Grid;\nusing Game.Deep;\n"),
+  "src/Rules/B.cs": csFile("Game.Deep.Inner", "using Acme.Net;\n"), "src/Rules/C.cs": csFile("Game.Rules", "using Acme;\n"),
+  "src/py/a/test_x.py": "from b.c.d.e.f import g\nimport q.r\n", "src/py/b/__init__.py": "",
+}, cfg({ ...layered, platform: ["Win.Forms", "Win", "q"] }));
+ok(same(ids(found), ["package: src/Rules/B.cs -> Acme.Net", "package: src/View/A.cs -> Acme.Net", "platform: src/View/A.cs -> Win", "platform: src/py/a/test_x.py -> q"]) && found.read.nowhere === 1 && same([...found.unsure], ["src/py/a/test_x.py"]),
+  "a dotted name is matched by the longest package declared and the shortest platform it lies under; a namespace holding only deeper ones leads to no file; a module deeper than any file is outside", JSON.stringify([ids(found), found.read.nowhere, [...found.unsure]]));
+// (a large file, or many files, of each kind is read in time, in step with its size, well within the suite's time mark)
+const many = { "src/App.csproj": '<Project><ItemGroup><PackageReference Include="Pkg" /></ItemGroup></Project>' };
+for (let i = 0; i < 3000; i++) { many[`src/Rules/R${i}.cs`] = "using Pkg;\n"; many[`src/View/V${i}.cs`] = "using Pkg;\n"; }
+ok(ids(survey(many, cfg(layered))).filter(id => id.startsWith("package: ")).length === 6000, "a package imported from many files in two systems is found once in each file");
+const large = [
+  [{ "package.json": JSON.stringify({ dependencies: { dep: "1" } }), "src/a.mjs": 'import "dep";\n'.repeat(130000) }, f => f.read.imports === 130000],
+  [{ "src/a.cs": `using ${Array(130000).fill("a").join(".")};\n` }, f => f.read.nowhere === 1],
+  [{ "src/a.cs": `${Array.from({ length: 80000 }, (_, i) => `using Z${i};`).join("\n")}\n${Array.from({ length: 80000 }, (_, i) => `namespace N${i} { }`).join("\n")}\n` }, f => f.read.nowhere === 80000],
+  [{ "src/a.py": `from ${Array(32500).fill("a").join(".")} import ${Array(32500).fill("b").join(", ")}\n` }, f => f.read.nowhere === 1],
+];
+ok(large.every(([texts, holds]) => holds(survey(texts, cfg({})))), "a large file of each kind of import is read in time, in step with its size, and what it holds still counted");
 const pyLong = (name, lines) => `def ${name}(n):\n${"    n += 1\n".repeat(lines - 2)}    return random.randint(1, n)\n`;
 found = survey({
   "pyproject.toml": '[project]\nname = "game"\ndependencies = ["requests>=2"]\n[project.optional-dependencies]\ndev = ["pytest"]\n',

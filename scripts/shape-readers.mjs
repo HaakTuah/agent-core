@@ -8,7 +8,7 @@
 // before a reader came lists none of it, and what the pull request's base held of it is reported, never failed, until
 // --write lists it (AGENTS.md, "Nothing locks a project").
 import path from "node:path";
-import { CODE, functions, globals, imports, isModule, isP, jsxIn, tokens } from "./code-shape.mjs";
+import { CODE, functions, globals, imports, isModule, isP, jsxIn, lyingUnder, nameTree, tokens } from "./code-shape.mjs";
 import { OWN as CS_OWN, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "./shape-csharp.mjs";
 import { OWN as PY_OWN, STDLIB, normal, pythonPackages, readPython, resolvePython } from "./shape-python.mjs";
 
@@ -144,19 +144,20 @@ function pattern(toks, k) {
 const another = (toks, k) => isP(toks[k], ",") && toks[k + 1]?.t === "id" && ["=", ",", ";"].some(v => isP(toks[k + 2], v));
 
 // Where an import of C# or Python leads: { to: [files] } where it is the project's own, else { outside, names }, names
-// what the config's "platform" and "wraps" are matched against (the name, and each name it lies under), and how it is
-// known: "builtin" (the framework's or the standard library's), a package's name, or null (nowhere the check can tell).
+// what the config's lists are matched against (the name itself; each match also reads the names it lies under), and
+// how it is known: "builtin" (the framework's or the standard library's), a package's name, or null (nowhere the check
+// can tell). A C# package is the longest declared name it is or lies under.
+const TREES = new WeakMap();
+const treeOf = set => { if (!TREES.has(set)) TREES.set(set, nameTree(set)); return TREES.get(set); };
 export function linked(file, imp, r, idx, files, platform) {
   if (r.lang === "csharp") {
     const to = resolveCsharp(imp, idx.csharp);
     if (to.to) return to;
-    const names = to.outside.split(".").map((_, k, parts) => parts.slice(0, k + 1).join("."));
-    const pkg = [...names].reverse().find(n => idx.declared.has(n)) ?? null;
-    return { outside: to.outside, names, known: pkg ?? (names[0] === "System" || names[0] === "Microsoft" ? "builtin" : null) };
+    const pkg = lyingUnder(treeOf(idx.declared), to.outside).at(-1) ?? null, top = to.outside.split(".", 1)[0];
+    return { outside: to.outside, names: [to.outside], known: pkg ?? (top === "System" || top === "Microsoft" ? "builtin" : null) };
   }
   const known = top => STDLIB.has(top) || idx.py.declared.has(normal(top)) || platform.includes(top);
   const to = resolvePython(file, imp, files, known);
   if (to.to) return to.to.length || imp.level === 0 ? to : { outside: `${".".repeat(imp.level)}${imp.module}`, names: [], known: null };
-  const names = to.outside.split(".").map((_, k, parts) => parts.slice(0, k + 1).join("."));
-  return { outside: to.outside, names, known: STDLIB.has(to.top) ? "builtin" : idx.py.declared.get(normal(to.top)) ?? null };
+  return { outside: to.outside, names: [to.outside], known: STDLIB.has(to.top) ? "builtin" : idx.py.declared.get(normal(to.top)) ?? null };
 }

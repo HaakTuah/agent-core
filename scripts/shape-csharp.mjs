@@ -11,7 +11,7 @@
 // namespace N; `using static N.T;` and an alias, the files that declare the type T in N. What a file sees by its own
 // namespace, and a name written out in full, it takes without a directive, and the reader does not read.
 import path from "node:path";
-import { NEST, functions, isId, isP, typeParameters } from "./code-shape.mjs";
+import { NEST, append, functions, holdsUnder, isId, isP, nameTree, typeParameters } from "./code-shape.mjs";
 
 // The clock and randomness a system of rules may not take for itself (shape.mjs, "clock"): each a run of tokens.
 export const OWN = [
@@ -279,12 +279,11 @@ export function readCsharp(src) {
 // Where the project's C# declares each namespace and type: { namespaces, types }, each a Map of a name to its files.
 export function csharpIndex(readings) {
   const namespaces = new Map(), types = new Map();
-  const add = (map, key, file) => map.set(key, [...(map.get(key) ?? []), file]);
   for (const [file, r] of readings) {
-    for (const n of r.namespaces) add(namespaces, n, file);
-    for (const t of r.types) add(types, t, file);
+    for (const n of r.namespaces) append(namespaces, n, file);
+    for (const t of r.types) append(types, t, file);
   }
-  return { namespaces, types };
+  return { namespaces, types, under: nameTree(namespaces.keys()) };
 }
 
 // Where a using directive leads: { to: [files] } where the project declares what it names, else { outside: its name }.
@@ -294,7 +293,7 @@ export function resolveCsharp(u, index) {
   const found = index.namespaces.get(name) ?? index.types.get(name);
   if (found) return { to: found };
   // (a namespace that only holds the project's own namespaces leads to no file, and nowhere outside either)
-  if ([...index.namespaces.keys()].some(n => n.startsWith(`${name}.`))) return { to: [] };
+  if (holdsUnder(index.under, name)) return { to: [] };
   return { outside: name };
 }
 
