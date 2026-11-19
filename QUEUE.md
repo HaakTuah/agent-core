@@ -9,7 +9,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
-| #841 | builder; a rework of tests; `scripts/steps-stage.mjs` and `scripts/steps/` | #750, point 1 |
+| #841 | builder; a rework of tests; `scripts/steps-stage.mjs` and `scripts/steps/` | #750's point 1 |
 | #810 | the orchestrator, for its done-when: reads `main`'s runs, then closes it | a stretch of merges landing faster than a run; at the batch's end, if none came, the orchestrator reads `main`'s runs since #813 and closes #810 on that |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | #715 |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
