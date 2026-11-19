@@ -11,7 +11,7 @@
       "check: .github/workflows/security-review.yml, in part",
       "check: scripts/pure-sync.mjs, in part"
     ],
-    "floor/security.md: 11. Nothing personal, ever": "check: .github/workflows/personal-terms.yml, in part",
+    "floor/security.md: 11. Nothing personal, ever": ["check: .github/workflows/personal-terms.yml, in part", "check: scripts/issue-terms.mjs, in part"],
     "floor/security.md: The owner's word": "check: .github/workflows/personal-terms.yml, in part",
     "floor/security.md: 12. `main` is the owners'": "check: GitHub's ruleset on the default branch",
     "floor/threat-model.md: Everything counts as public": "describes",
@@ -240,9 +240,9 @@
     "AGENTS.md: The core is measured as a feature is": [195, 199],
     "AGENTS.md: The core's address stands in one place": [192],
     "AGENTS.md: The core's state report reads the projects that take it": [218],
-    "AGENTS.md: The size caps keep the rules lean and decide nothing else": [179, 181, 182, 201, 234],
+    "AGENTS.md: The size caps keep the rules lean and decide nothing else": [179, 181, 182, 201, 234, "#750.6"],
     "AGENTS.md: Whose words an issue holds": [211, 212],
-    "floor/security.md: 11. Nothing personal, ever": [30, 43, 202, 221],
+    "floor/security.md: 11. Nothing personal, ever": [30, 43, 202, 221, "#783"],
     "floor/security.md: 12. `main` is the owners'": [113, 236, 261, "#733.8"],
     "floor/security.md: 13. Each project's files stay in its own repository": [4],
     "floor/security.md: 14. Nothing waits for the owner but the yeses the floor names": [76, 134, 195, 236],
@@ -420,7 +420,7 @@
     "tasks/reviews.md: No sign in about 5 minutes, no finished review in about 20, or an answer that is not a review": [19, 20],
     "tasks/reviews.md: Security": [47, 48, 49, 50, 51, 174, 177, 227],
     "tasks/reviews.md: The design check": [22],
-    "tasks/reviews.md: What a posted review declares": [235],
+    "tasks/reviews.md: What a posted review declares": [155, 235],
     "tasks/reviews.md: What a posted review stands for": [220, 250],
     "tasks/reviews.md: When a PR passes": [130],
     "tasks/roles.md: A file for each role": [234],
@@ -470,6 +470,7 @@
     "tasks/code-shape.md: A job a maintained package does is done by it": "findings; outcome: robust",
     "AGENTS.md: An idea is built only from a line, and a line joins in a PR of its own": "check fires; outcome: fast",
     "roles/shared/inbox.md: The *progress file* holds order only": "check fires; outcome: fast",
+    "AGENTS.md: The size caps keep the rules lean and decide nothing else": "check fires; outcome: fast",
     "tasks/updates.md: Node": "correction: does not work; outcome: robust",
     "tasks/updates.md: A question or difference about a rule of the core starts from its reasons": "findings; outcome: asked",
     "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",
@@ -516,6 +517,7 @@
     "tasks/hosts.md: The merge line follows the host": "findings; outcome: fast",
     "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": "findings; outcome: fast",
     "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check fires; outcome: fast",
-    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": "check fires; outcome: fast"
+    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": "check fires; outcome: fast",
+    "tasks/reviews.md: What a posted review declares": "check fires; outcome: readable"
   }
 }

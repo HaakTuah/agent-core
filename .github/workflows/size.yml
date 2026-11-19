@@ -1,5 +1,6 @@
 # The core's own rules, checked on every pull request here: the caps (README.md, "Two layers"; scripts/size.mjs) fail
-# one that grows what a role reads at its start past that role's cap, and one that raises a cap by more than one step or
+# one whose own change grows what a role reads at its start past that role's cap, against its base (on main, a cap
+# passed is a warning and a task the scheduled look keeps, never a red: #750, point 6), and one that raises a cap by more than one step or
 # with no "Leanness check:" comment (a fresh session's answer that it read all the rules for room:
 # roles/shared/review-guidelines.md, "A mark on what every session reads"); and the words check (scripts/general.mjs) fails
 # one that uses a word true only for some of the projects that take the core, a gendered pronoun for the owner in a
@@ -45,7 +46,9 @@ jobs:
       - name: The core's packages and the parser's, installed from their lock files for the size and shape checks (#654, #719)
         run: node scripts/install.mjs all
       - name: What each role reads at its start stays under its cap
-        run: node scripts/size.mjs
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
+        run: if [ -n "$BASE" ]; then node scripts/size.mjs --base "$BASE"; else node scripts/size.mjs; fi
       # (two steps, so the token reaches gh alone and never the pull request's own script; a base or a list of
       # comments that cannot be read fails its step: the check is never waived; a right that cannot be read, within
       # ten seconds each and thirty in all, lets no one write, and the owner's answer still counts)

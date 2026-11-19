@@ -238,8 +238,9 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   line moved word for word aside, the dated records' folders) Vale does not read, so no upkeep would move. alex, dropped
   on fact: last published in August 2023, 414 packages; textlint (MIT, 58 packages), found by the challenge and dropped
   as Vale is. *Bugs:* 0. **Keep:** small and stable; the word lists are the core's.
-- `scripts/size.mjs`, `.github/workflows/size.yml`: fails a pull request that grows what a role reads at its start past
-  that role's cap, or raises a cap without its comment; `size.yml` runs it with `scripts/general.mjs` and
+- `scripts/size.mjs`, `.github/workflows/size.yml`: fails a pull request whose own change grows what a role reads at
+  its start, or the queue, past its cap, or raises a cap without its comment; past a cap on `main`, a warning and the
+  scheduled look's task; `size.yml` runs it with `scripts/general.mjs` and
   `scripts/shape.mjs`. *Runs:* any session and the runners. *Else:* none found. *Bugs:* 0. **Keep:** nothing fits; the
   caps are the core's.
 - `scripts/own-modules.mjs`, `scripts/holders.mjs`, `scripts/archive.mjs`, `scripts/rules.mjs`, `scripts/holders.json`:
@@ -294,6 +295,14 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   overdue, and the monthly state report. *Runs:* the runners on a schedule; an orchestrator's wake. *Else:* the host's
   stale-issue actions and Renovate's dashboard, dropped on fact: they know nothing of the core's states; the host's
   agent jobs, dropped on fact: billed. *Bugs:* 3, and 2 naming `look.yml`. **Keep:** nothing fits.
+- `scripts/issue-terms.mjs`, a step of `.github/workflows/look.yml` and `.github/workflows/own-look.yml`: takes the
+  terms of the secret `PERSONAL_TERMS` out of the issues, closed pull requests and comments written or edited in the
+  week before, printing counts alone, an outsider's text left alone; `--private`, run by the owner with the list in a
+  file, names them and the texts whose kept versions hold one (#783). *Runs:* the runners on a schedule, where the
+  secret is; the owner's own terminal. *Else:* GitHub's secret scanning with custom patterns, dropped on fact: it raises
+  alerts and edits nothing, and its custom patterns in a private repository are paid; gitleaks or Betterleaks, the
+  lookup of #488, kept for the matching alone, as for `personal-terms.yml`, whose matcher this one's test holds it in
+  step with. *Bugs:* 0. **Keep:** nothing fits.
 - `scripts/core-moved.mjs`, `.github/workflows/core-moved.yml`: keeps one issue open while the core has moved past a
   project's pin. *Runs:* the runners on a schedule. *Else:* Dependabot and Renovate, which follow a submodule or a
   release, dropped on fact: the copy is neither (#519). *Bugs:* 1 and 1. **Keep:** small and stable.

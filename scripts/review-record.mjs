@@ -86,6 +86,9 @@ function declared(body, count, none) {
 // The blocking points, and the other points, a posted review declares, each a number or null (not read).
 export const blockingOf = body => declared(body, /^Blocking findings: (\d{1,6})\.(?:\s|$)/u, /^(?:No blocking findings?|No findings?|Nothing blocks|Blocking: none)\.(?:\s|$)/iu);
 export const otherOf = body => declared(body, /^Other findings: (\d{1,6})\.(?:\s|$)/u, /^(?:No other findings?|No findings?)\.(?:\s|$)/iu);
+// The score a posted review declares, on a line "Score: N of 10." of its own, N a whole number from 1 to 10
+// (roles/shared/review-guidelines.md, "Every reviewer"; #710), or null (not read).
+export const scoreOf = body => declared(body, /^Score: (10|[1-9]) of 10\.(?:\s|$)/u, /(?!)/u);
 
 // The stance a posted code review declares on a line of its own (tasks/reviews.md, "A review's stance follows the kind
 // of change"; #397): "adversarial", "regular", or null where no line says one or two lines disagree.
