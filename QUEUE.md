@@ -65,7 +65,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
 | #650 | rule builder | |
-| #661 | builder | |
 | #662 | rule builder | |
 | #679 to #682 | rule builder; one PR each | |
 | #707 | rule builder | |
