@@ -269,6 +269,15 @@ v = judge({ now: { "src/b.js": long("tall", 100) }, baseline: listed([f100]), ba
 ok(v.fail.length === 0 && /gone or moved/.test(noted(v)), "one an earlier pull request moved, the baseline left as it was, still covers it where it stands now (Codex's finding on #751)", said(v));
 v = judge({ now: { "src/b.js": long("tall", 100), "src/c.js": long("tall", 100) }, baseline: listed([f100]), base: baseOf(listed([f100]), { "src/b.js": long("tall", 100) }) });
 ok(mended(said(v)) && /src\/c\.js#tall/.test(said(v)), "and covers that one alone: a second of its name fails", said(v));
+const fn = (id, lines) => [`function: ${id}`, { lines, depth: 0, branches: 0 }], pair = listed([fn("src/a.js#tall", 300), fn("src/x.js#tall", 100)]);
+v = judge({ now: { "src/y.js": long("tall", 300) }, baseline: pair, base: baseOf(pair, { "src/y.js": long("tall", 100) }) });
+ok(mended(said(v)) && /src\/y\.js#tall/.test(said(v)), "a moved one claims the smallest entry that covers it, never a mended one's larger numbers to grow into (the fallback reviewer's finding on #751's fix)", said(v));
+const even = listed([fn("src/a.js#tall", 100), fn("src/x.js#tall", 100)]);
+v = judge({ now: { "src/y.js": long("tall", 100), "src/x.js": long("tall", 100) }, baseline: even, base: baseOf(even, { "src/y.js": long("tall", 100) }) });
+ok(mended(said(v)) && !/writes the baseline/.test(said(v)), "a breach new at a moved entry's old id takes no mended entry's place: the base held one of the name, and two fail", said(v));
+const py = n => `def tall(a):\n${"    a += 1\n".repeat(n - 1)}`, jsOnly = JSON.stringify({ reads: ["javascript"], listed: Object.fromEntries([fn("src/a.js#tall", 100)]) });
+v = judge({ now: { "src/b.js": long("tall", 100), "src/z.py": py(100) }, baseline: jsOnly, base: baseOf(jsOnly, { "src/z.py": py(100) }) });
+ok(mended(said(v)) && /src\/b\.js#tall/.test(said(v)), "a breach the base holds of a reader the baseline does not name moves no entry of another's", said(v));
 v = judge({ now: { "src/b.js": long("tall", 100) }, baseline: listed([f100]) });
 ok(v.fail.length === 0 && /gone or moved/.test(noted(v)) && !/functions? pass/.test(said(v)), "a listed function that moved is no new breach: its old entry is said, for --write to list where it stands", noted(v));
 ok(mended(`FAIL: ${(() => { try { judge({ now: {}, baseline: "{}" }); return ""; } catch (e) { return e.message; } })()}`), "a baseline that is none is refused, with its mend");
