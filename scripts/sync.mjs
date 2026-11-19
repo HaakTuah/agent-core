@@ -30,6 +30,7 @@ import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { everyInstall } from "./packages.mjs";
 import { started } from "./started.mjs";
 import { NOTES, asksBetween, fetchCore, followsOf, greenMain, hostSaid, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
+import { FOLDER } from "./sync-notes.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
 // git's own variables that point elsewhere left out: releases.mjs)
@@ -125,7 +126,7 @@ function sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp) {
   // (A pin from before the notes gives every entry. Where the entries cannot be read, it says so: never an all-clear.)
   const asks = asksBetween(old, pin, tmp);
   console.log(asks === null
-    ? `What this sync asks of the project beyond the copy could not be read: read ${at}${NOTES} for the entries newer than the old pin.`
+    ? `What this sync asks of the project beyond the copy could not be read: read the entries of ${at}${FOLDER}/ newer than the old pin.`
     : asks.length
       ? `This sync asks more of the project than the copy (${at}${NOTES}). Not in this PR, a pure sync: do each in a PR of its own once this one is merged, or file it for the queue where it is large.\n${asks.join("\n")}`
       : `This sync asks nothing of the project beyond the copy (${at}${NOTES}).`);

@@ -179,7 +179,7 @@ function main(args) {
   const at = new Date().toISOString();
   const { rules, home } = rulesOf(tolerant(() => fs.readFileSync("core-manifest.md", "utf8"), null), ".");
   const r = reading(rules);
-  if (!r) return `No config of the shape check at \`${where(rules)}\` yet, so no dose is read (${home}setup/sync-notes.md, "how code is put together").`;
+  if (!r) return `No config of the shape check at \`${where(rules)}\` yet, so no dose is read (${home}setup/sync-notes/, "how code is put together").`;
   if (args[0] === "--audited") return audited(r, at);
   const audit = auditBody(r, at, home);
   return [cleaningBody(r, changesOf(r.config, "."), shareGot(r.config, at, "."), home) ?? `${stateLine(r)}\n\nNo cleaning beyond what the shape check holds.`, "", audit ? audit.body : "No audit by a reader is due."].join("\n");
