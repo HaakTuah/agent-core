@@ -275,7 +275,7 @@ function findingsOf({ repo, manifest, owner, at }, reach, last) {
   }
   // labels and openers
   if (reach.yes) {
-    try { const since = sinceHere(), found = check({ ...gather(repo, since), owner, since }); add(TITLES.labels, found.length ? labelsReport(found, repo) : null); }
+    try { const since = sinceHere(), found = check({ ...gather(repo, since), owner, since, core: manifest === null }); add(TITLES.labels, found.length ? labelsReport(found, repo) : null); }
     catch { add(TITLES.labels, null, "the labels and openers could not be read"); }
   }
   // a missed run
