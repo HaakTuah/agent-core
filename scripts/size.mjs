@@ -71,13 +71,15 @@ import { started } from "./started.mjs";
 // silence", merged after #829: a seventh fresh leanness check found no room in the sections #471 changes that cuts no
 // condition, reason, design point or holder (89 bytes would cut the pace rule's reason and holder, and the design check
 // had refused cutting the rule's condition and its design's point 5), and about 47 bytes in rules it did not ask for,
-// not made, for 312 over.
+// not made, for 312 over. The reviewer's, raised one step the same day for #307's worked examples in the review
+// guidelines, merged after #829: an eighth fresh leanness check found 51 bytes of room in the guidelines, made, for
+// 1,073 over.
 export const CAPS = {
   builder: 31 * 1024,
   design: 33 * 1024,
   orchestrator: 48 * 1024,
   adviser: 33 * 1024,
-  reviewer: 25 * 1024,
+  reviewer: 26 * 1024,
   "stand-in": 20 * 1024,
 };
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a

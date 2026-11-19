@@ -161,6 +161,7 @@ The index, and how an item is written: `archive/instructions.md`.
      added for every game; 8, models called only where their judgement can change what happens, added to "Code decides
      facts"; 9, nothing told apart by colour alone, reduced motion keeping what informs, and one name for each thing,
      added for every game). Decided: The owner agreed to all.
+     Changed by: #484.1.
 
 113. **10 November 2026** (the core). Asked: the games' `develop` branch, from which a milestone PR carried work to
      `main`. Decided: The owner did not like the develop branch, since it makes things more complicated, and asked why
@@ -175,6 +176,7 @@ The index, and how an item is written: `archive/instructions.md`.
      past shows its age; the threshold of "came out ahead"; and two choices put to the owner: a version that changes
      play waits until the game in play ends, and a player's attention counts only for what the player must follow, kept
      readable by teaching and showing it). Decided: The owner agreed to all of it.
+     Changed by: #484.1.
 
 115. **10 November 2026** (the core). Asked: how a player gets the newest version, in the same message as item 114.
      Decided: Whenever the player launches the webpage, the newest version should start, or the player should get a note

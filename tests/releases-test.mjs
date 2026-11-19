@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
 import { STEPS } from "../scripts/steps.mjs";
+import { FOLDER, NOTICE, POINTER, entries, notesAt } from "../scripts/sync-notes.mjs";
 import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
 
 let failed = 0, count = 0;
@@ -107,6 +108,27 @@ ok(!newestRelease(c3, dir).moved && !newestRelease(c4, dir).moved, "a pin at the
 ok(!newestRelease(side, dir).moved && !newestRelease("f".repeat(40), dir).moved, "a pin that is no commit of main moves nowhere (core.yml fails such a project by itself)");
 ok(asksBetween(c1, c3, dir).join("|") === "- **First.** Done when one.|- **Second.** Done when two." && asksBetween(c3, c4, dir).length === 0, "a sync asks what the notes gained between the two commits");
 ok(asksBetween("f".repeat(40), c3, dir) === null, "notes that cannot be read give no all-clear");
+{
+  // (#750, point 1: the notes' entries move from the file into a folder, a file each; a sync across the move asks
+  // nothing it did not, and one past it asks what the folder gained, in the order of the files' names)
+  const notes = path.join(tmp, "notes"), at = (f, text) => { fs.mkdirSync(path.dirname(path.join(notes, f)), { recursive: true }); if (text === null) fs.rmSync(path.join(notes, f)); else fs.writeFileSync(path.join(notes, f), text); };
+  const save = (files) => { for (const [f, text] of Object.entries(files)) at(f, text); git(notes, "add", "-A"); git(notes, "commit", "-q", "--allow-empty", "-m", "notes"); return git(notes, "rev-parse", "HEAD"); };
+  fs.mkdirSync(notes); git(notes, "init", "-q", "-b", "main");
+  const one = "- **First.** Done when one.", two = "- **Second.** Done when two.", three = "- **Third.** Done when three.";
+  const filed = save({ [NOTES]: `${head}${one}\n${two}\n` });
+  const foldered = save({ [NOTES]: `${head}${POINTER}\n`, [`${FOLDER}/010-first.md`]: `${one}\n`, [`${FOLDER}/020-second.md`]: `${two}\n` });
+  const gained = save({ [`${FOLDER}/015-third.md`]: `${three}\n` });
+  const bare = fs.mkdtempSync(path.join(tmp, "notes-")); fetchCore(bare, notes);
+  ok(asksBetween(filed, foldered, bare).length === 0, "a sync across the notes' move into a folder asks nothing the file did not hold", asksBetween(filed, foldered, bare).join("\n"));
+  ok(asksBetween(filed, gained, bare).join("|") === three && asksBetween(foldered, gained, bare).join("|") === three, "an entry the folder gains is asked, from a commit before the move or after it");
+  ok(entries(notesAt(gained, args => git(notes, ...args))).join("|") === [one, three, two].join("|"), "the notes read whole at a commit hold the folder's entries in the order of the files' names");
+  // (a copy older than the folder syncs with its own script, whose reader took the lines a diff of the file alone
+  // added: across the move it reads the notice the core's file holds, which sends the session to the folder)
+  const notice = entries(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", NOTES), "utf8"));
+  const moved = save({ [NOTES]: `${head}${notice.join("\n")}\n\n${POINTER}\n` });
+  const oldReader = (a, b) => git(notes, "diff", "--unified=0", "--no-color", a, b, "--", NOTES).split("\n").filter(l => l.startsWith("+- ")).map(l => l.slice(1));
+  ok(notice.length === 1 && oldReader(filed, moved).join("|") === notice[0] && notice[0].includes("`core/setup/sync-notes/`"), "a sync from a copy older than the folder, by its own old reader, prints the notice that sends it to the folder", oldReader(filed, moved).join("\n"));
+}
 const coming = next(dir);
 ok(coming.name === "release-4" && coming.sha === c4 && coming.before.name === "release-2" && coming.asks.length === 0, "the next release stands on main's newest commit, numbered after every tag with a release's name, the one that is no release too, so its name is never taken");
 
@@ -255,7 +277,7 @@ ok(!inTheCore(path.join(nested, "core", "scripts", "release.mjs")), "nor is a cl
 // what a release asks, each with roughly what it costs a project where it is not done yet (steps.mjs)
 const owners = STEPS.find(s => s.owner);
 ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[0].cost}.`) && costed(`- **${owners.lead}.** Done when two.`).includes("(the owner's)")
-  && costed("- **No such entry.** Done when three.").includes("unknown"), "each ask of a release says what it costs, the owner's marked so, and one with no step says so");
+  && costed("- **No such entry.** Done when three.").includes("unknown") && costed(`${NOTICE}: and so on.`).includes("each entry it sends the session to") && costed("- A line of no form.").includes("unknown"), "each ask of a release says what it costs, the owner's marked so, one with no step or of no form says so, and the notice costs what it sends to");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the core's releases`);
 process.exitCode = failed ? 1 : 0;

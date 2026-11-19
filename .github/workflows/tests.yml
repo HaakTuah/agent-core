@@ -182,6 +182,9 @@ jobs:
       - name: The NuGet check's fetch before the restore, against each package's content hash
         if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-fetch-test.mjs ')) }}
         run: node tests/nuget-fetch-test.mjs
+      - name: The code scan of a private project, its engine fetched by its digest (#546)
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-scan-test.mjs ')) }}
+        run: node tests/code-scan-test.mjs
       - name: The hand-written readers, against SPDX's own parser and an XML parser (on Linux, where tar unpacks them)
         if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/readers-test.mjs ')) }}
         run: node tests/readers-test.mjs
@@ -287,6 +290,9 @@ jobs:
       - name: The description check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-test.mjs ')) }}
         run: node tests/pr-description-test.mjs
+      - name: The tests a pull request edits, which the description names
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/weakened-test.mjs ')) }}
+        run: node tests/weakened-test.mjs
       - name: How done will be judged
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/done-when-test.mjs ')) }}
         run: node tests/done-when-test.mjs

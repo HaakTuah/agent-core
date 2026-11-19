@@ -3,7 +3,8 @@
 Read when a project sets up an agent tool, hands a role to one or changes its tool mid-task, and when a tool's staged
 run is due: the kind `tool`; by a session that stops a task before its end, for its hand-off note: the kind
 `hand-off`; the paths `CLAUDE.md`, `.claude/`, `.kiro/`, `.agents/` and `.codex/`. Which tool takes
-which role: `tasks/roles.md`, "Tools are preferences".
+which role: `tasks/roles.md`, "Tools are preferences". What lies around a tool's session, the cloud, a tool that runs
+the agents side by side or a plain terminal, is a way, no tool, with no column below: `tasks/ways.md`.
 
 **One door in: `AGENTS.md`** (#249). By default every rule a session must know is reachable from the
 project's `AGENTS.md` in plain sentences, its `@` lines naming the files a builder reads at the start of every task. A
@@ -98,6 +99,6 @@ open, only where it is run with `--open` and gh answers.
 | How a task is handed over | carried: `roles/orchestrator.md`, a session or helper it starts | carried: `tools/codex.md`, its plug-in's subagent or its command line | carried: `tools/kiro.md`, its editor or `kiro-cli chat` | carried: `tools/antigravity.md`, a conversation in its editor | carried: `tools/copilot.md`, a conversation on GitHub |
 | How a review is asked | carried: `tasks/reviews.md`, the fallback reviewer | carried: `tools/codex.md`, its app on GitHub | carried: `tools/kiro.md`, a fresh session given the review's brief | carried: `tools/antigravity.md`, a fresh session of it with that brief | carried: `tools/copilot.md`, its code review |
 | The orchestrator | carried: `roles/orchestrator.md` | not yet | not yet | not yet | not yet |
-| Starts a session of its own, for the adviser (`roles/adviser.md`) | not yet: #397 | not yet | not yet | not yet | not yet |
+| Starts a session of its own, for the adviser (`roles/adviser.md`) | not yet: #492 | not yet | not yet | not yet | not yet |
 | The staged run | carried: `scripts/staged.mjs`, every case passed | not yet | not yet: #400 | not yet | not yet |
 | Its issue for what is not yet carried | none | #679 | #680 | #681 | #682 |

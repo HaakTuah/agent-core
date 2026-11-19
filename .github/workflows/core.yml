@@ -21,8 +21,11 @@
 # copies.yml's (copies, sizes), pr-description.yml's (description, parts), signatures.yml's (signatures) and nuget.yml's
 # (nuget, advisory), each through the copy's scripts/checks.mjs, which holds their steps and says what each holds, as
 # those workflows run it. They run only where every step of its own check passed, so a copy not proved the core runs
-# nothing here; then each runs even where one of them before it failed, so every failure is said; the package
-# checks go last, each in a step of its own, and the NuGet check, which runs the pull request's build files, after all.
+# nothing here; then each runs even where one of them before it failed, so every failure is said; the code scan of a
+# project the host's CodeQL does not scan follows them, with any of those inputs and none of its own, its engine
+# installed from the core's .packages/requirements.txt by its hashes in a step before it (scripts/code-scan.mjs; #546, #654); the
+# package checks go last, each in a step of its own, and the NuGet check, which runs the pull request's build files,
+# after all.
 # One job bills one runner's minutes where four or five did (#377); with no such input it runs its own check alone, as
 # before.
 name: core
@@ -72,8 +75,8 @@ permissions:
 jobs:
   core:
     runs-on: ubuntu-latest
-    # (each part's own: this check 5 minutes, those of the copy's scripts 5, each package check 10)
-    timeout-minutes: ${{ (inputs.signatures != '' && inputs.nuget != '') && 30 || (inputs.signatures != '' || inputs.nuget != '') && 20 || (inputs.copies != '' || inputs.description) && 10 || 5 }}
+    # (each part's own: this check 5 minutes, those of the copy's scripts 5, the code scan 5, each package check 10)
+    timeout-minutes: ${{ (inputs.signatures != '' && inputs.nuget != '') && 35 || (inputs.signatures != '' || inputs.nuget != '') && 25 || (inputs.copies != '' || inputs.description) && 15 || 5 }}
     # (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is; a run on
     # main, a schedule or a start by hand is its own group and is never cancelled; #388)
     concurrency:
@@ -351,6 +354,27 @@ jobs:
           GH_TOKEN: ${{ github.token }} # (read only: the base's commits and copy, and the issues a pull request queues or closes)
           PARTS: ${{ inputs.parts }}
         run: node "$CORE_AT"scripts/checks.mjs description --parts "$PARTS"
+      # (the code scan of a private project, #546: where no workflow of the base calls the core's codeql.yml, Semgrep's
+      # engine is installed from the core's .packages/requirements.txt by its wheels' hashes, with the runner's pip, before the scan
+      # runs and only where the change adds or alters a file the scan reads (#654), and reads those files with the core's
+      # rules, failing a finding the base did not hold; an engine not installed fails the scan, saying how to install it)
+      - name: The code scan, which a call with no input does not run
+        if: ${{ success() && steps.core-at.outcome == 'skipped' }}
+        run: 'echo "code scan: not run: core.yml was called with none of its inputs, so the copy''s scripts do not run here; the one job of the core''s setup/sync-notes.md, \"17 November 2026, the checks as one job\", runs it"'
+      - name: The code scan's engine, installed from the core's lock file where the host's CodeQL does not scan the project
+        id: scan-engine
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' }}
+        timeout-minutes: 5
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
+        run: node "$CORE_AT"scripts/code-scan.mjs --install ${BASE:+--base "$BASE"}
+      - name: The code scan
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' && steps.scan-engine.outcome == 'success' }}
+        timeout-minutes: 5
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node "$CORE_AT"scripts/code-scan.mjs ${BASE:+--base "$BASE"}
       - name: The signature check
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.signatures != '' && github.event_name == 'pull_request' }}
         timeout-minutes: 10

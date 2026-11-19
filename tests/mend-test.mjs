@@ -46,6 +46,7 @@ const CHECKS = {
   "scripts/licence-installed.mjs": "tests/licence-installed-test.mjs",
   "scripts/nuget.mjs": "tests/nuget-test.mjs",
   "scripts/nuget-fetch.mjs": "tests/nuget-fetch-test.mjs",
+  "scripts/code-scan.mjs": "tests/code-scan-test.mjs",
   "scripts/pr-description.mjs": "tests/pr-description-test.mjs",
   "scripts/checks.mjs": "tests/checks-test.mjs",
   "scripts/security-review.mjs": "tests/security-review-test.mjs",

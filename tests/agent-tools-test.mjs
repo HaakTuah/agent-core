@@ -8,12 +8,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { kitHooks, listed, printed } from "../scripts/agent-tools.mjs";
+import { installedBy, kitHooks, listed, printed } from "../scripts/agent-tools.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { kitForm } from "../scripts/hook-source.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { STEPS, notDone } from "../scripts/steps.mjs";
 import { parseToml } from "../scripts/toml.mjs";
+import { readWays, waysOf } from "../scripts/ways.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
 
 const SCRIPT = fileURLToPath(new URL("../scripts/agent-tools.mjs", import.meta.url));
@@ -117,6 +118,27 @@ passes(run(project({ ".claude/skills/release-notes/SKILL.md": "x", ...listing({ 
 const ownHook = JSON.stringify({ hooks: { ...JSON.parse(KIT).hooks, PostToolUse: [{ matcher: "Write", hooks: [{ type: "command", command: "true" }] }] } });
 fails(run(project({ ".claude/settings.json": ownHook, ...listing() })), "a hook beside the kit's, not listed, fails", 'the hook "PostToolUse Write: true"');
 passes(run(project({ ".claude/settings.json": ownHook, ...listing({ kind: "hook", name: "PostToolUse Write: true", publisher: "this project" }) })), "and passes once listed");
+
+// ---- what a way installs (tasks/ways.md, "What a way installs is listed"; #397): named on its part's line, a hook is
+// printed as that way's and fails nothing for being unlisted; a line in no form read fails ----
+{
+  const part = installs => `## A way: \`a-way\`\n\n- *Task:* x\n- *State:* x\n- *Review:* x\n- *Installs:* ${installs}\n  more of it\n- *Floor:* x\n`;
+  const byWay = (dir, installs) => {
+    const { lines, status } = printed(dir, "checks/licences.json", { ways: installedBy(readWays(part(installs))) });
+    return { status, out: lines.map(([, l]) => `${l}\n`).join("") };
+  };
+  const named = byWay(project({ ".claude/settings.json": ownHook, ...listing() }), "`hook PostToolUse Write: true`, and `hook Stop: other`");
+  passes(named, "a hook a way's part names is not failed as unlisted");
+  ok(named.out.includes('note installed by the way `a-way` (tasks/ways.md), so listed by it: the hook "PostToolUse Write: true", configured in .claude/settings.json'), "and is printed as installed by that way", named.out);
+  const inPr = byWay(pr(project(), { ".claude/settings.json": ownHook }), "`hook PostToolUse Write: true`");
+  ok(!/listed nowhere|is not listed/u.test(inPr.out) && /not in the starter kit's form/u.test(inPr.out), "nor as new in a pull request where no list is written, while a command not in the kit's form fails as any hook's does (floor rule 3)", inPr.out);
+  fails(byWay(project({ ".claude/settings.json": ownHook, ...listing() }), "none"), "a hook no way names is the project's own, unlisted", 'the hook "PostToolUse Write: true"');
+  fails(byWay(project({ ".claude/settings.json": ownHook, ...listing() }), "not yet: #397"), "nor does a way the core has not read excuse it", 'the hook "PostToolUse Write: true"');
+  for (const bad of ["a hook of its own", "`PostToolUse Write: true`", "", "`plugin some-plugin@market`"]) fails(byWay(project(), bad), `a line *Installs:* in no form read fails: ${JSON.stringify(bad)}`, "the part `a-way`'s line *Installs:* is in no form read here");
+  const real = waysOf();
+  ok(real.problems.length === 0 && real.ways.map(w => w.name).join() === "cloud,side-by-side,terminal" && installedBy().fail.length === 0, "the core's own parts are read, each line *Installs:* in its form", JSON.stringify(real));
+  ok(installedBy(waysOf(() => { throw new Error("gone"); })).notes.length === 1 && installedBy(waysOf(() => { throw new Error("gone"); })).fail.length === 0, "a module that cannot be read is noted and fails nothing");
+}
 const sameMatcher = JSON.parse(KIT);
 sameMatcher.hooks.Stop[0].hooks.push({ type: "command", command: "fetch-and-run" });
 fails(run(project({ ".claude/settings.json": JSON.stringify(sameMatcher), ...listing() })), "a command added beside a kit's hook, under the same event, fails: only the kit's own command is the core's", 'the hook "Stop: fetch-and-run"');

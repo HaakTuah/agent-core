@@ -83,7 +83,7 @@ import { CODE, append, cycles, lyingUnder, nameTree, resolve } from "./code-shap
 import { inProject, logged } from "./guards.mjs";
 import { installed, unreached } from "./packages.mjs";
 import { shapeFaults } from "./schemas.mjs";
-import { CHANGE_MARKS, FIRST_READS, PACKAGE_FILES, REACH, READERS, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
+import { CHANGE_MARKS, FIRST_READS, PACKAGE_FILES, REACH, READERS, WHOLE_ON_PARSER, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 
 export const KIT = "checks/shape.json";
@@ -373,6 +373,11 @@ function computed(r, text) {
     || (tok.v === "import" && after(t, k, ".", "meta", ".", "glob")) || (tok.v === "require" && after(t, k, ".", "context"))));
 }
 
+// Whether a file's imports are as ones the readers cannot follow: a reader could not read them, its parser not installed
+// or the file past it; and in Python, read on the parser alone, those of a file the grammar could not read whole, which
+// may stand in the part it lost.
+const unfollowed = r => !r.imports || (!r.functions && r.lang === "python");
+
 function oneFile(ctx, file, r) {
   const system = systemOf(ctx.config, file), domain = system ? ctx.config.systems[system].domain ?? null : null, from = { file, system, domain };
   if (computed(r, ctx.texts[file] ?? "")) ctx.unsure.add(file);
@@ -383,7 +388,8 @@ function oneFile(ctx, file, r) {
   if (domain === "rules") ownClock(ctx, file, r);
   changeMarks(ctx, file, r.marks);
   testReach(ctx, file, r);
-  for (const imp of r.imports) { if (r.lang === "javascript") oneImport(ctx, from, imp); else foreign(ctx, from, imp, r); }
+  if (unfollowed(r)) ctx.unsure.add(file);
+  for (const imp of r.imports ?? []) { if (r.lang === "javascript") oneImport(ctx, from, imp); else foreign(ctx, from, imp, r); }
   const names = ctx.tests.has(file) ? null : shared(file, r, ctx.idx);
   if (names) ctx.scripts.set(file, names);
 }
@@ -418,7 +424,7 @@ function wrappedOnce(ctx) {
 // `unnamed`, the files of code in no system; `readers`, the reader of each file (shape-readers.mjs); and `reach`, each
 // file's imports of the project's own files, dynamic ones and those of types among them, and `scripts`, the files that
 // share the global space, which import nothing, and `unsure`, the files with an import whose target the readers cannot
-// follow (select.mjs). `tests` is the
+// follow, or whose imports they could not read (select.mjs). `tests` is the
 // set of the files that are tests: read for their imports, not held to the marks nor to the shared space.
 export function survey(texts, config, tests = new Set()) {
   const code = Object.keys(texts).filter(isCode).sort();
@@ -759,10 +765,12 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   // (what a reader finds on the parser, where it could not run, its packages not installed for the registry not
   // answering: its functions are read as a reader's the baseline does not name, so that none fails, and a file its
   // baseline lists as lost, which only the parser tells, is kept, never gone; what the same reader finds without the
-  // parser, its imports, cycles and clock, and a file new to the baseline, are held as ever: #654, point 4)
+  // parser, the imports, cycles and clock of JavaScript and C#, and a file new to the baseline, are held as ever; of a
+  // file the parser reads whole (Python's), each entry is so: #654, point 4; #530, item 6)
   const reads = new Set(baseline.reads), skipped = unreachedReaders();
-  const unread = id => { const r = readerOf(id, found.readers); return r !== null && (!reads.has(r) || (skipped.includes(r) && groupOf(id).kind === "function")); };
-  const kept = id => !current.has(id) && skipped.includes(readerOf(id, found.readers)) && ["function", "lost"].includes(groupOf(id).kind);
+  const wholly = id => { const r = found.readers.get(fileOf(id)); return skipped.includes(r) && WHOLE_ON_PARSER.includes(r); };
+  const unread = id => { const r = readerOf(id, found.readers); return r !== null && (!reads.has(r) || (skipped.includes(r) && groupOf(id).kind === "function") || wholly(id)); };
+  const kept = id => !current.has(id) && ((skipped.includes(readerOf(id, found.readers)) && ["function", "lost"].includes(groupOf(id).kind)) || wholly(id));
   const gone = id => !current.has(id) && !unread(id) && !kept(id);
   // (against the base, a listed entry covers what the base's code still holds of it, wherever it stands now: #750, point 5)
   // (what a reader the baseline does not name finds claims after every other, so that it leaves no other without)
@@ -882,7 +890,7 @@ const aFile = at => {
 // baseline, so that from the sync that brings the check nothing gets worse and nothing that stood before fails.
 function unwritten(self, base) {
   const config = parseConfig(fs.readFileSync(TEMPLATE, "utf8"), "the starter kit's config");
-  const yet = `the project has not written its config of the shape check yet (${KIT}; core/setup/sync-notes.md, "how code is put together")`;
+  const yet = `the project has not written its config of the shape check yet (${KIT}; core/setup/sync-notes/, "how code is put together")`;
   if (!base) { console.log(`ok   ${yet}, and there is no base to compare with: nothing was held`); return 0; }
   const now = standing(config), found = survey(now.texts, config, now.tests);
   const current = new Map([...found.entries].map(([id, e]) => [id, e.n]));
@@ -918,7 +926,7 @@ function check(config, at, self, found, base, named) {
   const unnamed = skipped.length && unnamedReaders().length, install = path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)));
   const why = unnamed ? "the parser's packages are not installed, this job's install step naming the core's first install alone" : "the core's packages could not be installed, the registry not answering";
   const mend = unnamed ? `make this job's install step node ${install} all, which installs the parser's packages too` : "run this job again before the pull request merges; if it fails again, file it as a fault";
-  if (skipped.length) console.log(`::warning::The shape check did not read ${skipped.map(r => `${READERS[r]} (the reader ${r})`).join(", ")}: ${why}, so what it would find there on the parser is reported, never failed${v.kept ? `, and the ${plural(v.kept, "entry", "entries")} its baseline lists there (functions, and files the grammar cannot read) ${v.kept === 1 ? "is" : "are"} kept as listed, never failed as gone` : ""}; what it reads without the parser is held as ever. Mend: ${mend}`);
+  if (skipped.length) console.log(`::warning::The shape check did not read ${skipped.map(r => `${READERS[r]} (the reader ${r})`).join(", ")}: ${why}, so what it would find there on the parser is reported, never failed${v.kept ? `, and the ${plural(v.kept, "entry", "entries")} its baseline lists there (functions, files the grammar cannot read, and all of a file of Python) ${v.kept === 1 ? "is" : "are"} kept as listed, never failed as gone` : ""}; what it reads without the parser is held as ever. Mend: ${mend}`);
   if (!base) console.log("note no base to compare with (set SHAPE_BASE to the branch the work started from), so the baseline was not checked for what joined it, and what the config newly reads is not told from what is new");
   for (const line of v.fail.flat()) console.error(logged(line));
   if (v.fail.length) return 1;

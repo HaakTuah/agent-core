@@ -30,7 +30,7 @@ which its entry file pulls in.
 
 Read when a task calls for it, each saying when in its opening line: the files of `floor/topics/`,
 `floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
-`tasks/tools.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`, `tools/antigravity.md`,
+`tasks/tools.md`, `tasks/ways.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`, `tools/antigravity.md`,
 `tasks/github-calls.md`, `tasks/hosts.md`, `tasks/repositories.md`, `roles/shared/teams.md`, `roles/orchestrator.md`,
 `tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md`, `tasks/done-when.md`,
 `tasks/planning.md` and `roles/shared/records.md`.
@@ -204,8 +204,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   it did not start before, and fails a pull request that adds a copy until the mend its failure words is made; by the
   heading "What it asks of a project" below; and, for the dose, by the scheduled look (`scripts/look.mjs`), which
   reads it from the shape check's baseline (`scripts/dose.mjs`).
-- **A release says what it asks, step by step.** Whoever adds an entry to `setup/sync-notes.md`
-  gives it a step in `scripts/steps.mjs` that answers done or not done exactly, never by guessing: a check of its own
+- **A release says what it asks, step by step.** Whoever adds an entry to the sync notes (`setup/sync-notes/`)
+  gives it a step in `scripts/steps/` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
   is not done; or, where no check reads it, why, held by the staged case `steps`. Every standing entry has one. Every sync
   runs them all (`scripts/sync.mjs`) and prints, for the sync pull request's description, only the steps not done, and
@@ -478,14 +478,18 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `archive/` and `reports/` for a gendered pronoun, a line quoted with `>` (the owner's own words) and a record moved
   word for word aside, while the older records stay as they were.
 - **A record pull requests add to is a folder of one file per entry** (#750, point 1). By default each part of the
-  inventory (`INVENTORY.md`) stands in a file of its own under `inventory/`, read in the order of the files' names by
-  the scripts that read it (`scripts/inventory.mjs`), so that two pull requests that add an entry never edit the same
-  lines, as each archive item stands already ("A new archive item is named by its issue"). Whoever adds an entry adds
-  its file, named to stand between its neighbours. Nothing changes it. It does not mean that what the record holds, or
-  the order it is read in, changes. Reason: of 39 pull requests merged between 18 and 19 November 2026, 8 changed
-  `INVENTORY.md`, and under merge-on-green pull requests that add to one file merge side by side and collide. Held by
-  `tests/mend-test.mjs`, which reads the inventory whole, and fails a folder `INVENTORY.md` does not name and a part's
-  line written in `INVENTORY.md` itself.
+  inventory (`INVENTORY.md`) stands in a file of its own under `inventory/`, and each entry of the sync notes
+  (`setup/sync-notes.md`) under `setup/sync-notes/`, its step in a file of the same name under `scripts/steps/`, each
+  read in the order of the files' names by the scripts that read it (`scripts/inventory.mjs`, `scripts/sync-notes.mjs`,
+  `scripts/steps.mjs`), so that two pull requests that add an entry never edit the same lines, as each archive item
+  stands already ("A new archive item is named by its issue"). Whoever adds an entry adds its file, named to stand
+  between its neighbours. Nothing changes it. It does not mean that what the record holds, or the order it is read in,
+  changes. Reason: of 39 pull requests merged between 18 and 19 November 2026, 8 changed `INVENTORY.md`, 10
+  `setup/sync-notes.md` and 7 `scripts/steps.mjs`, and under merge-on-green pull requests that add to one file merge
+  side by side and collide. Held by `tests/mend-test.mjs`, which reads the inventory whole, and fails a folder
+  `INVENTORY.md` does not name and a part's line written in `INVENTORY.md` itself; and by `tests/steps-test.mjs`, which
+  reads the notes whole, and fails an entry or a step without its pair of the same name and an entry written in
+  `setup/sync-notes.md` itself.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
   `tests/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its

@@ -1,9 +1,11 @@
 // Tests of the stalled lanes (stalled.mjs): which open pull requests count as lanes, how long each has waited, the
-// order, and the printed lines. Node's own modules only; the calls to git and gh are the program's own and are not made
-// here.
+// order, the states a way reports, and the printed lines. Node's own modules only; the calls to git and gh are the
+// program's own and are not made here.
 //
 //   node tests/stalled-test.mjs
-import { goesOn, handedOff, NOTICE, print, stalled, standingStill } from "../scripts/stalled.mjs";
+import { goesOn, handedOff, NOTICE, print, readStates, reported, stalled, standingStill, statesIn } from "../scripts/stalled.mjs";
+import { fileURLToPath } from "node:url";
+import { mended } from "../scripts/mend.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -30,6 +32,23 @@ const noted = body => print(stalled([{ ...p(7, "lane/noted", "2026-11-13T10:19:0
 for (const body of ["Hand-off: done a; next b", "x\n**Hand-off:** done a", "## Hand-off: done", "- Hand-off: done"]) ok(!noted(body).includes("no hand-off note"), `a lane with a hand-off note is not marked: ${JSON.stringify(body)}`, noted(body));
 for (const body of ["It has no Hand-off: here", "", undefined, 42]) ok(noted(body).endsWith("(t7); no hand-off note"), `a lane with none is marked: ${JSON.stringify(body)}`, noted(body));
 ok(handedOff("a\nHand-off: b") && !handedOff("hand-off: b"), "the note's line is \"Hand-off:\", as written");
+
+// ---- the states a way reports (tasks/ways.md, "A session's state is read where the way gives it"; #397) ----
+// (a lane given a state, by its number or its branch, is printed by it and never judged by the clock; the rest are)
+const lanes = [p(1, "item/balance", "2026-11-13T10:09:00Z"), p(3, "lane/old", "2026-11-12T19:19:00Z"), p(8, "lane/quiet", "2026-11-13T09:00:00Z"), p(5, "patch-1", "2026-11-01T00:00:00Z", false)];
+const states = readStates(JSON.stringify({ 3: "working", "lane/quiet": "waiting", "patch-1": "blocked" }));
+ok(stalled(lanes, now, 3, states).map(l => l.number).join() === "1" && reported(lanes, states).map(l => `${l.number}:${l.state}`).join() === "3:working,8:waiting",
+  "a lane whose state the way reports is never judged by the clock, by its number or its branch; a fork's is no lane", JSON.stringify(reported(lanes, states)));
+const shown = print(stalled(lanes, now, 3, states), 4, 3, reported(lanes, states));
+ok(shown.includes("Stalled, no push for over 3 h: 1 of 4 open\n  #1 ") && shown.includes("As the way reports, not judged by the clock: 2 of 4 open\n  #3 lane/old: working (t3)\n  #8 lane/quiet: waiting (t8)"), "the lanes given a state are printed by it, after those the clock judged", shown);
+ok(print([], 2, 3, reported([p(3, "lane/old", "2026-11-12T19:19:00Z")], states)).startsWith("No lane stalled: 2 open, none of the rest without a push"), "with none stalled, the lanes given a state are still printed");
+ok(stalled(lanes, now, 3).length === 3 && stalled(lanes, now, 3, null).length === 3 && reported(lanes, null).length === 0, "with no states given, every lane is judged by the clock, as before");
+for (const bad of ["{", "[]", "null", JSON.stringify({ 3: "running" }), JSON.stringify({ 3: ["working"] }), "[".repeat(300) + "]".repeat(300), " ".repeat((1 << 20) + 1), undefined]) {
+  const r = readStates(bad);
+  ok(r.problem && mended(`FAIL: ${r.problem}`), `states in no form read here are refused, saying the mend: ${JSON.stringify(bad)?.slice(0, 40)}`, r.problem);
+}
+const missing = statesIn(fileURLToPath(new URL("./no-such-states.json", import.meta.url)));
+ok(missing.problem && mended(`FAIL: ${missing.problem}`) && statesIn(fileURLToPath(new URL(".", import.meta.url))).problem && statesIn(undefined).problem, "a states file that cannot be read, a folder or none, is refused, saying the mend", missing.problem);
 
 // ---- the work standing still (#471): the progress file's next line, no push of the repository's own for a day, no notice ----
 const queue = "| Issue | Who | Waits on |\n| --- | --- | --- |\n| #11 | builder | |\n| #14 | the owner | |\n| #13 | rule builder | #12 |\n| #15 | builder | on hold |\n| #12 | builder | |\n| #16 | rule builder; it changes the floor | |\n";
