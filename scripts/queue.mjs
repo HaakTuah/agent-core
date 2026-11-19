@@ -91,7 +91,7 @@ export function statesOf(repo, gh = route => {
 }
 
 // The command, given its option and what it reads and writes: { status, out }, `out` what it prints. `at`: { file,
-// read() the progress file's text or null, write(text), closed() a reader of whether a number has closed, which
+// project (whether it runs in a project, from its copy of the core), read() the progress file's text or null, write(text), closed() a reader of whether a number has closed, which
 // throws where GitHub cannot answer }.
 export function command(flag, at) {
   const out = [], said = (status, ...lines) => ({ status, out: [...out, ...lines].join("\n") }), FILE = at.file ?? "QUEUE.md";
@@ -107,7 +107,7 @@ export function command(flag, at) {
     return said(0, gone.length ? `${FILE}: took out the lines of ${named}, closed` : `${FILE}: no line of a closed issue`);
   }
   if (flag === "--check") {
-    if (gone.length) return said(1, `FAIL: ${FILE} holds the line of ${gone.length === 1 ? "an issue" : "issues"} closed: ${named}, and this pull request changes the queue. Mend: run node ${at.file ? "core/" : ""}scripts/queue.mjs --clear and commit ${FILE}`);
+    if (gone.length) return said(1, `FAIL: ${FILE} holds the line of ${gone.length === 1 ? "an issue" : "issues"} closed: ${named}, and this pull request changes the queue. Mend: run node ${at.project ? "core/" : ""}scripts/queue.mjs --clear and commit ${FILE}`);
     return said(0, `ok   ${FILE} holds no line of a closed issue`);
   }
   out.push(...open.map(l => l.text));
@@ -122,7 +122,7 @@ function main([flag]) {
   const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout;
   const repo = /^[\w.-]+\/[\w.-]+$/u.test(process.env.GITHUB_REPOSITORY ?? "") ? process.env.GITHUB_REPOSITORY : repoOf(origin) ?? (manifest === null ? CORE : null);
   if (repo === null) { console.error("FAIL: which repository on GitHub this is cannot be told: its origin is no address on github.com. Mend: set GITHUB_REPOSITORY to its owner/name, and run it again"); return 1; }
-  const { status, out } = command(flag, { file, read: () => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null), write: text => fs.writeFileSync(file, text), closed: () => statesOf(repo) });
+  const { status, out } = command(flag, { file, project: manifest !== null, read: () => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null), write: text => fs.writeFileSync(file, text), closed: () => statesOf(repo) });
   (status ? console.error : console.log)(out);
   return status;
 }

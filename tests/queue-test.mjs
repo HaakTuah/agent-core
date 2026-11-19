@@ -70,7 +70,8 @@ const at = { read: () => file, write: text => { file = text; }, closed: () => st
 let r = command(undefined, at);
 ok(r.status === 0 && !/^\| #10 /mu.test(r.out) && /^\| #11, point 2 /mu.test(r.out) && /4 open lines, 1 of closed issues skipped \(#10\)/u.test(r.out) && /next: #11/u.test(r.out), "the reader prints the open lines and the next", r.out);
 r = command("--check", at);
-ok(r.status === 1 && mended(r.out) && /closed: #10/u.test(r.out) && /--clear/u.test(r.out), "a pull request that changes the queue and leaves the line of a closed issue fails, saying the mend", r.out);
+ok(r.status === 1 && mended(r.out) && /closed: #10/u.test(r.out) && /run node scripts\/queue\.mjs --clear/u.test(r.out), "a pull request that changes the queue and leaves the line of a closed issue fails, saying the mend, in the core by its own path", r.out);
+ok(/run node core\/scripts\/queue\.mjs --clear/u.test(command("--check", { ...at, project: true }).out), "and in a project by its copy's (Codex's finding on #757)");
 r = command("--clear", at);
 ok(r.status === 0 && /took out the lines of #10/u.test(r.out) && file === cleared(queue, closed) && command("--check", at).status === 0, "--clear writes the queue without them, and the check then passes", r.out);
 answer = null;
