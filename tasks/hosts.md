@@ -42,14 +42,14 @@ trigger is a pull request whose reviews answered with no finding open: its build
 branch's newest commit (`tasks/github-calls.md`) and, where none failed, merges it or turns auto-merge on, as
 `roles/shared/work-flow.md`, point 1, says. Where one failed, no pull request but its fix merges: the session that reads
 it so, a builder before its merge or the orchestrator on its wake, gives the fix the first lane, or takes it as a bug
-("Bugs don't wait"), where no open pull request says it fixes it. A release is cut only where every check on the
-default branch's newest commit passed. Where the host still asks an up-to-date branch, a setting only the owner changes, each is brought up to
-date in its turn, as the merge line says, and the owner is advised to switch it off as a queue offered is, by one issue
-(`core/scripts/merge-line.mjs` prints the advice); nothing waits on it ("Nothing locks a project"). It does not
-mean a pull request merges with a failing check or an open finding, nor that a conflict git reports is merged
+("Bugs don't wait"), where no open pull request says it fixes it. A release is cut only where every check on the default
+branch's newest commit passed. Where the host still asks an up-to-date branch, a setting only the owner changes, each is
+brought up to date in its turn, as the merge line says, and the owner is advised to switch it off as a queue offered is,
+by one issue (`core/scripts/merge-line.mjs` prints the advice); nothing waits on it ("Nothing locks a project"). It does
+not mean a pull request merges with a failing check or an open finding, nor that a conflict git reports is merged
 unresolved: that one is brought up to date as before. Reason: bringing each pull request up to date and testing it
-again, one at a time, made the tests the pace of all work, where what users get is built from a release that waits on
-a green default branch anyway. Held by the release workflow, which cuts none from a default branch with a failed check
+again, one at a time, made the tests the pace of all work, where what users get is built from a release that waits on a
+green default branch anyway. Held by the release workflow, which cuts none from a default branch with a failed check
 (the core's `release.yml`); by `tests/merge-line-test.mjs`, for what `core/scripts/merge-line.mjs` prints of it; by the
 host's ruleset, once the owner sets it; a red default branch fixed first, by nothing yet: a check that failed each pull
 request while it is red would fail its fix too.
@@ -62,7 +62,8 @@ stands, and nothing waits on it ("Nothing locks a project"). Whether a branch mu
 whether a queue is offered and on, and whether runner minutes are billed are read from the host, never declared: `node
 core/scripts/merge-line.mjs --repo <owner>/<name>` prints what it read and what follows, and the manifest's rows *merge
 queue* and *billed minutes* only override it. It does not mean a project is moved to another account or plan to gain a
-queue, nor that a branch merges behind the default branch where floor rule 12 asks it up to date. Reason: what is cheapest differs by kind of
+queue, nor that a branch merges behind the default branch where floor rule 12 asks it
+up to date. Reason: what is cheapest differs by kind of
 repository (a person's public one has free minutes and no queue, an organisation's public one is offered the queue, a
 private one pays for its minutes), and no project should make a worse choice for what fits another. Held by
 `tests/merge-line-test.mjs`, which reads each kind, in `.github/workflows/tests.yml`.
