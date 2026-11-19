@@ -70,19 +70,22 @@ ok(is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but 
 // The marks reviews leave (review-marks.mjs; #551): a session's posted review declares its two lines, and, in the core,
 // a design-checked pull request has a design check of the head
 {
+  // (a review counts for the marks as the security-review status counts one: here the repository's owner, "someone")
+  const owned = { ...pull, base: { repo: { owner: { login: "someone" }, full_name: "someone/project" } } };
+  const had = (comments, commits = line, files = code, p = owned, rules = [], bound = true, copy = null, more = {}) => judge({ commits: commits.length, changed_files: files.length, ...p }, comments, commits, files, rules, bound, undefined, copy, more);
   const at = "2026-11-18T09:00:00Z", now = (body, assoc = "OWNER", when = at) => ({ ...said(body, assoc), created_at: when, updated_at: when });
   const lines = "Blocking findings: 0.\nNo other finding.";
   const ran = [summary(done)];
-  ok(is(had([...ran, now(`Code review: of ${HEAD}`)]), false, "declares no line of its findings") && mended(`FAIL ${had([...ran, now(`Code review: of ${HEAD}`)]).why}`),
+  ok(is(had([...ran, now(`Code review: of ${HEAD}`)]), false, "lacks its two lines") && mended(`FAIL ${had([...ran, now(`Code review: of ${HEAD}`)]).why}`),
     "if a session's posted code review has no declared lines, the status waits, saying its mend");
   ok(is(had([...ran, now(`Code review: of ${HEAD}\n${lines}`)]), true, "a code review has run") && is(had([...ran, now(`Security review: none needed, ${HEAD}`)]), true, "a code review has run"),
     "one with both lines, and a note that no security review is needed, which declares nothing, keep it");
-  ok(is(had([...ran, now(`Security review: ${HEAD}\nBlocking findings: 0.`)]), false, "a posted Security review declares no line") && is(had([...ran, now(`Code review: of ${HEAD}`), now(`Code review: of ${HEAD}\n${lines}`, "OWNER", "2026-11-18T10:00:00Z")]), true, "a code review has run"),
+  ok(is(had([...ran, now(`Security review: ${HEAD}\nBlocking findings: 0.`)]), false, "Security review lacks its two lines") && is(had([...ran, now(`Code review: of ${HEAD}`), now(`Code review: of ${HEAD}\n${lines}`, "OWNER", "2026-11-18T10:00:00Z")]), true, "a code review has run"),
     "a review with one line of the two waits; posted again with both, the newer one settles it");
-  ok(is(had([...ran, now(`Code review: of ${HEAD}`, "OWNER", "2026-11-17T23:59:59Z")]), true, "a code review has run") && is(had([...ran, now(`Code review: of ${HEAD}`, "NONE")]), true, "a code review has run"),
+  ok(is(had([...ran, now(`Code review: of ${HEAD}`, "OWNER", "2026-11-17T23:59:59Z")]), true, "a code review has run") && is(had([...ran, { ...now(`Code review: of ${HEAD}`, "NONE"), user: { login: "stranger", type: "User" } }]), true, "a code review has run"),
     "a review posted before the rule's day, or by an account the host does not let write, is not read");
-  const tasks = [{ filename: "tasks/reviews.md", status: "modified", patch: "@@ -1 +1 @@\n-a\n+b" }], core = { ...pull, created_at: at, base: { repo: { full_name: CORE } } };
-  ok(is(had(ran, line, tasks, core), false, "no design check of the head") && mended(`FAIL ${had(ran, line, tasks, core).why}`), "if a pull request of the core that changes tasks/ has no design check of its head, the status waits, saying its mend");
+  const tasks = [{ filename: "tasks/reviews.md", status: "modified", patch: "@@ -1 +1 @@\n-a\n+b" }], core = { ...pull, created_at: at, base: { repo: { owner: { login: "someone" }, full_name: CORE } } };
+  ok(is(had(ran, line, tasks, core), false, "no design check of head") && mended(`FAIL ${had(ran, line, tasks, core).why}`), "if a pull request of the core that changes tasks/ has no design check of its head, the status waits, saying its mend");
   ok(is(had([...ran, now(`Design check: ${HEAD}\n${lines}`)], line, tasks, core), true, "a code review has run") && is(had([...ran, now(`Design check: ${OLD}\n${lines}`)], updated, tasks, core), true, "a code review has run"),
     "a design check naming the head, or a commit only updates from main follow, settles it");
   ok(is(had([...ran, now(`Design check: ${OLD}\n${lines}`)], line, tasks, core), false, "no design check") && is(had([...ran, { ...now(`Design check: ${HEAD}\n${lines}`), updated_at: "2026-11-18T11:00:00Z" }], line, tasks, core), false, "no design check"),
@@ -91,6 +94,23 @@ ok(is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but 
     && is(had(ran, line, tasks, { ...core, created_at: "2026-11-17T12:00:00Z" }), true, "a code review has run"),
     "a change outside the rule folders, a project's pull request, and one opened before the rule's day ask no design check");
   ok(is(had(ran, line, tasks, core, [], false), true, "before this check came, so not waited for: no design check"), "a pull request from before the check is told, never held");
+  // GitHub's association proves no right to write: in an organisation a member may only read. Only the host's rights,
+  // read for those who posted (RIGHTS), or the accounts the project names (REVIEWERS), make a member's review count
+  const member = (body, login = "reader") => ({ ...now(body, "MEMBER"), user: { login, type: "User" } });
+  const right = (login, role_name, permission, push) => ({ role_name, permission, user: { login, type: "User", permissions: { push } } });
+  const org = { ...owned, base: { repo: { owner: { login: "some-org" }, full_name: "some-org/project" } } }, orgCore = { ...core, base: { repo: { owner: { login: "some-org" }, full_name: CORE } } };
+  const reads = { rights: [right("reader", "read", "read", false)] }, writes = { rights: [right("reader", "write", "write", true)] };
+  ok(is(had([...ran, member(`Security review: ${HEAD}`)], line, code, org, [], true, null, reads), true, "a code review has run") && is(had([...ran, member(`Security review: ${HEAD}`)], line, code, org), true, "a code review has run"),
+    "a posted review without its lines from a member who may only read, or whose right was not read, holds nothing");
+  ok(is(had([...ran, member(`Security review: ${HEAD}`)], line, code, org, [], true, null, writes), false, "Security review lacks its two lines") && is(had([...ran, member(`Security review: ${HEAD}`)], line, code, org, [], true, null, { reviewers: ["reader"] }), false, "lacks its two lines"),
+    "one from a member the host's rights let write, or whom the project names, holds it until posted again");
+  ok(is(had([...ran, member(`Design check: ${HEAD}\n${lines}`)], line, tasks, orgCore, [], true, null, reads), false, "no design check of head") && is(had([...ran, member(`Design check: ${HEAD}\n${lines}`)], line, tasks, orgCore, [], true, null, writes), true, "a code review has run"),
+    "a design check from a member who may only read settles nothing; one from a member who may write settles it");
+  // each mend says the whole form of what is to be posted within GitHub's 140 characters, advisory or waiting
+  const kinds = [["Security review", "Security review"], ["Code review", "Code review"], ["Design check", "Design check"]];
+  const rendered = kinds.map(([kind]) => had([...ran, now(`${kind}: ${HEAD}`)])).concat([had(ran, line, tasks, core)]);
+  ok(rendered.every(v => [true, false].every(advisory => { const d = status(v, advisory).description; return d.length <= 140 && /Blocking findings: N\.⏎Other findings: M\.$/u.test(d) && mended(`FAIL ${d}`); })),
+    "each mark's mend, as the status renders it, names the whole form within GitHub's 140 characters", rendered.map(v => status(v, false).description).join(" | "));
 }
 const proved = (comments, merges, commits = updated) => judge({ commits: commits.length, changed_files: 1, ...pull }, comments, commits, code, [], true, merges);
 const stopped = proved([summary({ ...done, commit_sha: OLD })], [HEAD]);

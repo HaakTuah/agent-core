@@ -1,6 +1,8 @@
 // The marks reviews leave, as a check reads them (#551), for every project that takes the core:
 //   - What a posted review declares (tasks/reviews.md, point 3): of the comments that open "Security review:", "Code
-//     review:" or "Design check:" from an account the host lets write, posted on or after MARKS_SINCE, the newest of
+//     review:" or "Design check:" from an account whose review counts (`whose`, security-review.mjs's counted: the
+//     repository's owner, an account the project names, or a person the host's rights let write, never GitHub's
+//     association alone, which in an organisation a member who may only read also has), posted on or after MARKS_SINCE, the newest of
 //     each kind declares its blocking findings and its other findings on lines of their own, as review-record.mjs,
 //     beside this file, reads them (blockingOf, otherOf); a note that none is needed declares nothing, and Codex's app,
 //     which posts in its own form under an account of its own, is not read here.
@@ -23,17 +25,19 @@ export const MARKS_SINCE = "2026-11-18T00:00:00Z";
 export const DESIGNED = /^(?:floor|roles|tasks|tools)\//u;
 const KINDS = { security: "Security review", code: "Code review", design: "Design check" };
 const SHAS = /(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/giu;
-// A posted review's form, as security-review.mjs's form() writes it, for each kind.
+// A posted review's form, as security-review.mjs's form() writes it, for each kind: each mend that names it says it
+// whole within GitHub's 140 characters, the situation before it worded short to leave it room.
 const formOf = kind => `${kind}: <whole SHA>⏎Blocking findings: N.⏎Other findings: M.`;
+const counts = (c, whose) => typeof whose === "function" && whose(c?.user) === true;
 
-// Of the posted reviews among `comments` (an issue's, as GitHub's API gives them) by an account in `writers` (GitHub's
-// author_association), posted on or after `since`, the kinds whose newest declares no line of its blocking findings
-// or of its other findings: ["Code review", ...].
-export function undeclared(comments, writers, since = MARKS_SINCE) {
+// Of the posted reviews among `comments` (an issue's, as GitHub's API gives them) by an account whose review counts
+// (`whose`, a function of a comment's user), posted on or after `since`, the kinds whose newest declares no line of
+// its blocking findings or of its other findings: ["Code review", ...].
+export function undeclared(comments, whose, since = MARKS_SINCE) {
   const newest = new Map();
   for (const c of comments) {
     const kind = postedKind(c?.body);
-    if (!KINDS[kind] || !writers.includes(c.author_association) || String(c.created_at ?? "") < since) continue;
+    if (!KINDS[kind] || !counts(c, whose) || String(c.created_at ?? "") < since) continue;
     if (!newest.has(kind) || String(c.created_at) >= String(newest.get(kind).created_at)) newest.set(kind, c);
   }
   return [...newest].filter(([, c]) => blockingOf(c.body) === null || otherOf(c.body) === null).map(([kind]) => KINDS[kind]);
@@ -44,16 +48,17 @@ export function undeclared(comments, writers, since = MARKS_SINCE) {
 export const designAsked = (pull, files, core, since = MARKS_SINCE) => core && String(pull?.created_at ?? "") >= since
   && files.some(f => [f?.filename, f?.previous_filename].some(n => typeof n === "string" && DESIGNED.test(n)));
 
-// Whether a "Design check:" from an account in `writers`, as first posted, names a commit of `chain` (the head and the
-// commits that only updates from main follow, as security-review.mjs's standsFrom gives them).
-export const designed = (comments, writers, chain) => comments.some(c => postedKind(c?.body) === "design" && writers.includes(c.author_association) && asPosted(c)
+// Whether a "Design check:" from an account whose review counts (`whose`), as first posted, names a commit of `chain`
+// (the head and the commits that only updates from main follow, as security-review.mjs's standsFrom gives them).
+export const designed = (comments, whose, chain) => comments.some(c => postedKind(c?.body) === "design" && counts(c, whose) && asPosted(c)
   && (String(c.body).match(SHAS) ?? []).some(sha => chain.has(sha.toLowerCase())));
 
 // What the marks make a pull request wait on, a line with its mend, or null where they are kept.
-export function marksWait({ pull, comments, files, chain, writers, core }) {
-  const missing = undeclared(comments, writers);
-  if (missing.length) return `a posted ${missing.join(" and a posted ")} declares no line of its findings. Mend: post it again, as a new comment, in its form (${formOf(missing[0])})`;
-  if (files !== undefined && chain !== undefined && designAsked(pull, files, core) && !designed(comments, writers, chain)) return `no design check of the head. Mend: a fresh reviewer judges the work against its design (tasks/reviews.md, point 4), and posts ${formOf(KINDS.design)}`;
+// (the first kind missing is named, so that its form fits; once it is posted again, the next is named)
+export function marksWait({ pull, comments, files, chain, whose, core }) {
+  const missing = undeclared(comments, whose);
+  if (missing.length) return `${missing[0]} lacks its two lines. Mend: post anew: ${formOf(missing[0])}`;
+  if (files !== undefined && chain !== undefined && designAsked(pull, files, core) && !designed(comments, whose, chain)) return `no design check of head. Mend: a fresh reviewer checks, posts ${formOf(KINDS.design)}`;
   return null;
 }
 

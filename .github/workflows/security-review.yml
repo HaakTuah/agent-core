@@ -242,7 +242,8 @@ jobs:
             else echo "The merges from main could not be proved the ones git makes: a review of the head is asked."; fi
           fi
           # whose posted review counts besides the owner's and the accounts named: a person the host lets write (#412),
-          # read from GitHub's rights for each account, at most twenty, that posted a "Security review:" with a say in the
+          # read from GitHub's rights for each account, at most twenty, that posted a "Security review:", a "Code
+          # review:" or a "Design check:" (for the code-review status's marks, review-marks.mjs) with a say in the
           # repository; its login, checked as one, is all that goes into the route, and an answer that cannot be read
           # counts for no one (the script reads each strictly). All of them share 30 seconds, ten at most each, and end
           # by the step's 225th second whatever the proofs above took, and when each of the check's two scripts came seven
@@ -253,7 +254,7 @@ jobs:
           until=$((SECONDS + 30))
           [ "$until" -le 225 ] || until=225
           for login in $(jq -r --arg o "$owner" '[.[][] | select(type == "object" and (.body | type) == "string"
-            and (.body | test("^(\\*\\*)?Security review:")) and (.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
+            and (.body | test("^(\\*\\*)?(Security review|Code review|Design check):")) and (.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
             and .user.type == "User" and (.user.login | type) == "string" and (.user.login | test("^[A-Za-z0-9][A-Za-z0-9-]{0,38}$")))
             | .user.login | ascii_downcase | select(. != $o)] | unique | .[:20][]' "$d/comments.json"); do
             left=$((until - SECONDS))
@@ -284,7 +285,7 @@ jobs:
           # (a fault in it warns and leaves the job as green as the security-review status left it)
           if [ -f "$ROOT/scripts/code-review-wait.mjs" ]; then
             bound code-review-wait.mjs
-            if node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
+            if RIGHTS="$d/rights.json" node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
               "$d/comments.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/code.json" \
               && jq -r '.status | "\(.state): \(.description)"' "$d/code.json" \
               && jq '.status' "$d/code.json" | gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then :
