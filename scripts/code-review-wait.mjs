@@ -104,8 +104,8 @@ function reviewRan(sha, posted, review, pull, commits, bound, merges) {
   // (where a merge from main that git would not make stops it, the status names that merge: #323)
   const cut = unproved(pull, flat(commits), sha, merges);
   const why = cut !== undefined && [...standsFrom(pull, flat(commits), sha)].some((at) => seen.has(at))
-    ? `merge ${cut.slice(0, 7)} unproved. Mend: review, post ${formOf("Code review")}`
-    : `no code review. Mend: ask one, or review, post ${formOf("Code review")}`;
+    ? `merge ${cut.slice(0, 7)} unproved. Mend: another posts ${formOf("Code review")}`
+    : `no code review. Mend: a fresh reviewer posts ${formOf("Code review")}`;
   // a pull request whose head does not hold this check as the default branch does stood before it came: reported only
   return bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
 }
