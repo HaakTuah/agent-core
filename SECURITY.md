@@ -23,8 +23,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the
      reviews' records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look
      (`scripts/look.mjs`), the inbox (`scripts/inbox.mjs`) and the personal terms' take-out (`scripts/issue-terms.mjs`,
-     which edits only an insider's text, its rows' shapes read in `tests/issue-terms-test.mjs`); hostile tests:
-     `tests/hostile-issues-test.mjs`.
+     which edits only an insider's text); hostile tests: `tests/hostile-issues-test.mjs`, and for the take-out
+     `tests/issue-terms-test.mjs`.
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository
      (the workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`,
      `scripts/releases.mjs`, `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`,

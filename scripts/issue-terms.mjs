@@ -34,6 +34,7 @@
 //   ... --dry                                                    takes nothing out; says what it would
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
 import { repoOf } from "./inbox.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
 import { started } from "./started.mjs";
@@ -81,8 +82,11 @@ const whole = n => Number.isSafeInteger(n) && n > 0;
 const anAddress = (v, repo) => typeof v === "string" && v.length <= 500 && v.startsWith(`https://github.com/${repo}/`) && !/[\s\u0000-\u001f\u007f]/u.test(v);
 const aNode = v => typeof v === "string" && /^[\w-]{1,100}$/u.test(v);
 const aText = v => v === null || (typeof v === "string" && v.length <= 1 << 20);
-// (those the host lets write, and apps it installed; anyone else is an outsider)
-export const insider = row => ["OWNER", "MEMBER", "COLLABORATOR"].includes(row?.author_association) || row?.user?.type === "Bot";
+// (those the host lets write, and the apps named here, whose text no outsider shapes: GitHub's own job, and Codex's
+// reviews of this repository's own pull requests, which a fork's never are here; anyone else is an outsider, Dependabot
+// among them, whose descriptions carry another publisher's release notes)
+const APPS = new Set(["github-actions[bot]", "chatgpt-codex-connector[bot]"]);
+export const insider = row => ["OWNER", "MEMBER", "COLLABORATOR"].includes(row?.author_association) || (row?.user?.type === "Bot" && APPS.has(row?.user?.login));
 
 // What is read, from GitHub's answers through `gh` (ghApi's form): each text as { kind, url, node, fields, route, method,
 // outsider }, where `fields` are its texts by the name GitHub's edit takes, `route` where it is read again and edited,
@@ -193,15 +197,36 @@ function named({ all, changed, refused, terms, dry, gh, say }) {
   if (unread.size) say(`the earlier versions of ${unread.size} texts could not be read (GitHub's GraphQL, which Claude's cloud sessions are refused); run this in a terminal of the owner's own, or look at their "edited" menus by hand`);
 }
 
-export function main(argv, { env = process.env, gh = ghApi, edit = editGh, now = new Date(), repo = undefined, say = console.log } = {}) {
+// The terms: TERMS, or the file --terms-file names, which must lie outside the repository's work tree, so that no commit
+// takes it in; { terms } or { refused }, naming no path.
+function termsFrom(file, env, top) {
+  if (file === undefined) return { terms: termsOf(env.TERMS) };
+  let real = null;
+  try { real = fs.realpathSync(file); } catch {}
+  if (real === null) return { refused: "FAIL issue-terms.mjs could not read the file --terms-file names. Mend: give the path of a file of the terms, one a line, kept outside the repository." };
+  if (top && (real === top || real.startsWith(`${top}${path.sep}`))) return { refused: "FAIL issue-terms.mjs was given a terms file inside the repository's work tree, where a commit could take it in. Mend: move the file outside the repository, and give its new path." };
+  try { return { terms: termsOf(fs.readFileSync(real, "utf8")) }; } catch { return { refused: "FAIL issue-terms.mjs could not read the file --terms-file names. Mend: give the path of a file of the terms, one a line, kept outside the repository." }; }
+}
+const workTree = () => { const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }); try { return r.status === 0 ? fs.realpathSync(r.stdout.trim()) : null; } catch { return null; } };
+
+// The repository's name as GitHub holds it (its full_name), since the addresses read are held to it exactly: an
+// origin written in another case, or before a rename, would leave every row out and the run read as clean. Null where
+// GitHub does not say.
+function canonical(at, gh) {
+  try { const name = JSON.parse(gh(`repos/${at}`))?.full_name; return typeof name === "string" && /^[\w.-]+\/[\w.-]+$/u.test(name) ? name : null; } catch { return null; }
+}
+
+export function main(argv, { env = process.env, gh = ghApi, edit = editGh, now = new Date(), repo = undefined, say = console.log, top = workTree() } = {}) {
   const options = optionsOf(argv, env);
   if (options.refused) { console.error(options.refused); return 1; }
   const { days, own, dry, file } = options;
-  let raw = env.TERMS;
-  if (file !== undefined) { try { raw = fs.readFileSync(file, "utf8"); } catch { console.error("FAIL issue-terms.mjs could not read the file --terms-file names. Mend: give the path of a file of the terms, one a line, kept outside the repository."); return 1; } }
-  const terms = termsOf(raw);
+  const given = termsFrom(file, env, top);
+  if (given.refused) { console.error(given.refused); return 1; }
+  const { terms } = given;
   if (!terms.length) { say("Personal terms in issues and comments: no terms are given here (TERMS, the Actions secret PERSONAL_TERMS passed to the daily job, or --terms-file), so nothing was read."); return 0; }
-  const at = repo === undefined ? repository() : repo;
+  const origin = repo === undefined ? repository() : repo;
+  const at = origin && canonical(origin, gh);
+  if (origin && !at) { say("Personal terms in issues and comments: GitHub did not say what the repository is named, so nothing was read. Mend: run it again where gh answers for an account that may read the repository."); return 0; }
   if (!at) { console.error("FAIL issue-terms.mjs found no GitHub repository to read here. Mend: run it from a clone whose origin is on GitHub, or in GitHub's job."); return 1; }
   const since = new Date(now.getTime() - days * 86400000).toISOString().replace(/\.\d{3}Z$/u, "Z");
   let all;

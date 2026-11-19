@@ -61,6 +61,7 @@ function github({ versions = {}, now = {}, extra = [] } = {}) {
   const asked = [];
   const gh = (...args) => {
     asked.push(args.join(" "));
+    if (args[0] === "repos/o/r" || args[0] === "repos/O/R") return JSON.stringify({ full_name: "o/r" });
     if (args[0] in now || args[0] in byRoute) { const got = args[0] in now ? now[args[0]] : byRoute[args[0]]; if (got === null) throw new Error("gone"); return JSON.stringify(got); }
     if (args[0] === "graphql") return JSON.stringify({ data: { nodes: args.filter(a => a.startsWith("ids[]=")).map(a => a.slice(6)).map(id => ({ id, userContentEdits: { nodes: (versions[id] ?? []).map(diff => ({ diff })) } })) } });
     const route = args[0], first = /[?&]page=1$/.test(route);
@@ -73,12 +74,12 @@ function github({ versions = {}, now = {}, extra = [] } = {}) {
   };
   return { gh, asked };
 }
-const run = (argv, { env = { TERMS, GITHUB_ACTIONS: "true" }, refuse = () => false, versions, now, extra } = {}) => {
+const run = (argv, { env = { TERMS, GITHUB_ACTIONS: "true" }, refuse = () => false, versions, now, extra, at = repo, top = null } = {}) => {
   const { gh, asked } = github({ versions, now, extra });
   const edits = [], lines = [], errors = [];
   const error = console.error; console.error = m => errors.push(m);
   try {
-    const status = main(argv, { env, gh, now: NOW, repo, say: m => lines.push(m), edit: (method, route, payload) => { edits.push({ method, route, payload }); return !refuse(route); } });
+    const status = main(argv, { env, gh, now: NOW, repo: at, top, say: m => lines.push(m), edit: (method, route, payload) => { edits.push({ method, route, payload }); return !refuse(route); } });
     return { status, edits, asked, out: [...lines, ...errors].join("\n") };
   } finally { console.error = error; }
 };
@@ -112,12 +113,21 @@ ok(![term, other].some(t => own.out.toLowerCase().includes(t)), "--private never
 
 // an outsider's text: neither edited nor counted, so no comment of guesses learns the list; --private names it
 const stranger = { id: 21, html_url: "https://github.com/o/r/issues/2#issuecomment-21", node_id: "C21", body: `Guesses: ${term}, ${other}`, author_association: "NONE", user: { type: "User" } };
-const app = { id: 22, html_url: "https://github.com/o/r/issues/2#issuecomment-22", node_id: "C22", body: `Quoted ${term}`, author_association: "NONE", user: { type: "Bot" } };
+const app = { id: 22, html_url: "https://github.com/o/r/issues/2#issuecomment-22", node_id: "C22", body: `Quoted ${term}`, author_association: "NONE", user: { type: "Bot", login: "github-actions[bot]" } };
 byRoute["repos/o/r/issues/comments/22"] = app;
 const guessed = run([], { extra: [stranger, app] });
 ok(!guessed.edits.some(e => e.route.endsWith("/comments/21")) && /took a term out of 6/.test(guessed.out) && /read 7 texts/.test(guessed.out), "an outsider's comment is neither edited nor counted, and an app's is", guessed.out);
 const named = run(["--private"], { env: { TERMS }, extra: [stranger] });
 ok(named.out.includes(`an outsider's text holds a term: ${stranger.html_url}`) && !named.edits.some(e => e.route.endsWith("/comments/21")), "--private names an outsider's text that holds a term, for the owner, and edits it not", named.out);
+
+// an app whose text an outsider shapes (Dependabot's, carrying another publisher's release notes) is an outsider too
+const bump = { id: 23, html_url: "https://github.com/o/r/pull/3#issuecomment-23", node_id: "C23", body: `Release notes: ${term}`, author_association: "NONE", user: { type: "Bot", login: "dependabot[bot]" } };
+const bumped = run([], { extra: [bump, app] });
+ok(!bumped.edits.some(e => e.route.endsWith("/comments/23")) && bumped.edits.some(e => e.route.endsWith("/comments/22")) && /read 7 texts/.test(bumped.out), "Dependabot's text is neither edited nor counted, GitHub's own job's is", bumped.out);
+
+// the repository as GitHub names it, so that an origin in another case reads every row
+const cased = run([], { at: "O/R" });
+ok(/took a term out of 5/.test(cased.out), "an origin written in another case still reads the repository's texts", cased.out);
 
 // a row of GitHub's answers not of its shape is left out (floor topic 5)
 const bent = [{ ...comment, id: "11/lock" }, { ...comment, id: -1 }, { ...comment, id: 1.5 }, { ...comment, id: 31, html_url: "https://github.com/x/y/issues/1#issuecomment-31" },
@@ -142,6 +152,10 @@ const file = path.join(tmp, "terms.txt");
 fs.writeFileSync(file, TERMS);
 const fromFile = run(["--private", "--terms-file", file], { env: {} });
 ok(fromFile.status === 0 && fromFile.out.includes(`changed: ${issue.html_url}`), "--terms-file reads the list from a file", fromFile.out);
+const inside = path.join(tmp, "inside.txt");
+fs.writeFileSync(inside, TERMS);
+const inTree = run(["--private", "--terms-file", inside], { env: {}, top: fs.realpathSync(tmp) });
+ok(inTree.status === 1 && mended(inTree.out) && !inTree.out.includes(tmp) && inTree.asked.length === 0, "a terms file inside the repository's work tree is refused, naming no path", inTree.out);
 const noFile = run(["--terms-file", path.join(tmp, "none")], { env: {} });
 ok(noFile.status === 1 && mended(noFile.out) && !noFile.out.includes(tmp), "a file that cannot be read fails, says the mend, and names no path", noFile.out);
 ok(/--terms-file/.test(job.out) && /never typed into a chat/.test(job.out) && !/TERMS=/.test(job.out), "the job's mend gives the list by a file, never typed into a chat", job.out);
