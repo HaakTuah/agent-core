@@ -29,6 +29,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { sizeOf } from "./file-size.mjs";
+import { everyInstall } from "./packages.mjs";
 import { MODULES } from "./reading.mjs";
 import { plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
@@ -298,7 +299,8 @@ function writeKit(o, here, pin, out) {
   // own .gitignore keeps out of the commit; a failure leaves the kit written and says the mend: #654)
   const installer = path.join(here, "core", "scripts", "install.mjs");
   if (fs.existsSync(installer)) {
-    const r = spawnSync(process.execPath, [installer], { cwd: here, encoding: "utf8" });
+    // (every install of the copy's, an older pin's (--at) as its installer knows them: #719)
+    const r = spawnSync(process.execPath, [installer, ...everyInstall(path.join(here, "core"))], { cwd: here, encoding: "utf8" });
     if (r.status !== 0) console.log(`note the core's packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node core/scripts/install.mjs before running a check`);
   }
   const marks = sizes(Object.fromEntries(startOf(Object.fromEntries(out)).map(f => [f, sizeOf(path.join(here, f))])));

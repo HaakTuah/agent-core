@@ -42,6 +42,7 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { fill, oneJob, readyOnly } from "../scripts/init.mjs";
 import { scratchEnv } from "../scripts/scratch-core.mjs";
+import { where } from "../scripts/shape.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { STEPS, callers, leads, project as read } from "../scripts/steps.mjs";
 import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
@@ -405,6 +406,35 @@ function upgrade(p, from, ownChanges, expect) {
   if (process.platform !== "win32") inboxCase(p);
 }
 
+// A project with C# whose own job runs the shape check after the core's first install alone, as it stood before the
+// parser's packages had a lock of their own (#719): synced, its pull request passes, the shape check reading no function
+// of C# and saying so as a warning whose mend names every install; and with that mend, it reads them again, warning
+// nothing. Its config and baseline written as a session writes them, every install there.
+const PARSER_LEAD = "19 November 2026, the parser's packages installed where the shape check runs";
+function parserUnnamed(p) {
+  git(p.dir, "checkout", "-q", "main");
+  const at = where(fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8"));
+  if (!fs.existsSync(path.join(p.dir, at))) write(p.dir, at, fs.readFileSync(path.join(p.dir, "core/setup/template/shape.json.tmpl"), "utf8"));
+  if (!fs.existsSync(path.join(p.dir, JSON.parse(fs.readFileSync(path.join(p.dir, at), "utf8")).baseline))) {
+    git(p.dir, "add", "-A");
+    const installed = node(p.dir, "core/scripts/install.mjs", "all"), first = node(p.dir, "core/scripts/shape.mjs", at, "--first");
+    ok(installed.status === 0 && first.status === 0, `${p.name}: its shape check's first baseline written, every install there`, `${installed.out}\n${first.out}`);
+    git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "the shape check's config and baseline"); git(p.dir, "push", "-q", "origin", "main");
+  }
+  const main0 = git(p.dir, "rev-parse", "HEAD");
+  const pr = (from, what, change) => { git(p.dir, "checkout", "-q", "-B", "change", from); change(p.dir); git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", what); return git(p.dir, "rev-parse", "HEAD"); };
+  const shapeOut = results => results.flatMap(([, r]) => r.steps.map(x => x.out ?? "")).join("\n");
+  const unnamed = pr(main0, "its own job that runs the shape check", dir => { STAGES[PARSER_LEAD].stage(dir); write(dir, "src/App/More.cs", "class More { void M(bool x) { if (x) { } } }\r\n"); });
+  const warned = checks(p, "pull_request", unnamed, { baseSha: main0, only: "shape-staged.yml", ownToo: true });
+  ok(!failures(warned) && warned.some(([, r]) => r.ran) && /^::warning::The shape check did not read C#, its functions by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone.*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(shapeOut(warned)),
+    `${p.name}: its own job that runs the shape check after the first install alone passes, reading no function of C# and saying so as a warning with the mend`, `${failures(warned)}\n${shapeOut(warned).slice(-1500)}`);
+  const mended = pr(unnamed, "the mend as the warning words it", dir => STAGES[PARSER_LEAD].mend(dir));
+  const read = checks(p, "pull_request", mended, { baseSha: main0, only: "shape-staged.yml", ownToo: true });
+  ok(!failures(read) && read.some(([, r]) => r.ran) && !/::warning::The shape check did not read/u.test(shapeOut(read)),
+    `${p.name}: and with its install step naming every install, as the mend says, it reads C#'s functions again, warning nothing`, `${failures(read)}\n${shapeOut(read).slice(-1500)}`);
+  git(p.dir, "checkout", "-q", "main"); git(p.dir, "branch", "-q", "-D", "change");
+}
+
 // A private repository's NuGet check bills no job a pull request cannot need (#373): its call with the starter kit's
 // `paths:` (what fresh.mjs lists as lacking where the call has none) starts no job on a pull request that changes
 // nothing NuGet reads by name, and one where a project file changed; and a project whose owner declines the check, in
@@ -615,6 +645,7 @@ for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newe
   (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
     ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
   nugetInPrivate(dotnetProject);
+  parserUnnamed(dotnetProject);
   if (tag === starts.at(-1)) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); } // (the kit's calls are the same from either release)
 }
 

@@ -13,6 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../core-address.mjs";
 import { hookCommands, readCore } from "../core-path.mjs";
+import { INSTALLS } from "../packages.mjs";
 import { plainEnv } from "../releases.mjs";
 
 export const CORE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -526,9 +527,10 @@ export function touched(dir) {
   // (a submodule's pointer is no file of the folder: its folder stands empty, as a submodule not checked out does)
   const want = new Map(String(originGit(dir, "ls-tree", "-r", "--end-of-options", base(dir)) ?? "").split("\n").filter(l => l && !l.startsWith("160000 ")).map(l => { const [meta, f] = l.split("\t"); return [f, meta.split(" ")[2]]; }));
   const have = [];
-  // (the core's packages, installed into the copy's .packages/node_modules/ by the kit and a session's start, are no file of the
-  // project's: the copy's .gitignore keeps them out of git, and they are not read; #654)
-  const walk = (folder, rel) => { for (const e of fs.readdirSync(folder)) { if (!rel && e === ".git") continue; const p = path.join(folder, e), r = rel ? `${rel}/${e}` : e, st = fs.lstatSync(p); if (r === "core/.packages/node_modules") continue; if (st.isSymbolicLink()) { have.push([r, null]); continue; } if (st.isDirectory()) walk(p, r); else have.push([r, p]); } };
+  // (the core's packages, installed into each of the copy's installs' node_modules/ by the kit and a session's start, are
+  // no file of the project's: the copy's .gitignore keeps them out of git, and they are not read; #654, #719)
+  const installed = new Set(Object.values(INSTALLS).map(f => `core/${f}/node_modules`));
+  const walk = (folder, rel) => { for (const e of fs.readdirSync(folder)) { if (!rel && e === ".git") continue; const p = path.join(folder, e), r = rel ? `${rel}/${e}` : e, st = fs.lstatSync(p); if (installed.has(r)) continue; if (st.isSymbolicLink()) { have.push([r, null]); continue; } if (st.isDirectory()) walk(p, r); else have.push([r, p]); } };
   walk(project, "");
   if (have.length !== want.size || have.some(([r, p]) => !p || !want.has(r))) return true;
   const r = spawnSync("git", [...SAFE_(), `--git-dir=${view(dir, "origin")}`, "hash-object", "--no-filters", "--stdin-paths"], { env: QUIET_(), encoding: "utf8", input: have.map(([, p]) => p).join("\n"), timeout: LIMITS.run, maxBuffer: 1 << 26 });

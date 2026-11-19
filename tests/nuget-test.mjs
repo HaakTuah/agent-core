@@ -11,6 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { NOT_A_FILE, REGISTRY, check as checked, importPath, imported, importsOf, lockPackages, plainText, projectRooted, readProject, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "../scripts/nuget.mjs";
 import { mended, unmended } from "../scripts/mend.mjs";
+import { parserLeftOut } from "../scripts/packages.mjs";
 
 // (each failure the check gives in this test, read as it prints it, for its mend; the last assertion says which did not
 // say one)
@@ -322,7 +323,7 @@ Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid"
 const here = fileURLToPath(new URL("../scripts", import.meta.url)); // (the scripts this tests, beside the folder tests/)
 fs.mkdirSync(path.join(repo, "core"), { recursive: true });
 fs.cpSync(here, path.join(repo, "core", "scripts"), { recursive: true });
-fs.cpSync(path.join(here, "..", ".packages"), path.join(repo, "core", ".packages"), { recursive: true });
+fs.cpSync(path.join(here, "..", ".packages"), path.join(repo, "core", ".packages"), { recursive: true, filter: parserLeftOut });
 fs.cpSync(path.join(here, "..", "floor"), path.join(repo, "core", "floor"), { recursive: true });
 // where each package was taken from, as NuGet records it beside the package
 const APP = "src/App/App.csproj", only = [APP, L];

@@ -179,16 +179,25 @@ class Lexer {
     return !prev || (prev.t === "punct" && (prev.v !== ")" || prev.condition) && prev.v !== "]") || (prev.t === "id" && REGEX_AFTER.has(prev.v));
   }
 
+  // Where a scan from each place ends, out of a class and in one ([0] and [1]): at the / that closes it, or -1; made
+  // once for the text, from its end back, so each / is read in one step.
+  regexEnds() {
+    const { src, n } = this, out = new Int32Array(n + 2).fill(-1), inside = new Int32Array(n + 2).fill(-1);
+    for (let j = n - 1; j >= 0; j--) {
+      const d = src[j];
+      if (d === "\n") continue;
+      if (d === "\\") { out[j] = out[j + 2]; inside[j] = inside[j + 2]; continue; }
+      out[j] = d === "/" ? j : d === "[" ? inside[j + 1] : out[j + 1];
+      inside[j] = d === "]" ? out[j + 1] : inside[j + 1];
+    }
+    return [out, inside];
+  }
+
   regex() {
     const { src, i, n } = this;
-    let j = i + 1, inClass = false;
-    while (j < n && src[j] !== "\n") {
-      const d = src[j];
-      if (d === "\\") { j += 2; continue; }
-      if (inClass) { if (d === "]") inClass = false; } else if (d === "[") inClass = true; else if (d === "/") break;
-      j++;
-    }
-    if (src[j] !== "/") return false;
+    this.ends ??= this.regexEnds();
+    let j = this.ends[0][i + 1];
+    if (j < 0) return false;
     j++;
     while (j < n && /[A-Za-z]/.test(src[j])) j++;
     this.push("regex", src.slice(i, j));
@@ -484,6 +493,32 @@ const countBranch = (toks, k, block, stack, lang) => { if (block?.fn && lang.bra
 // within it counted on its own. `lang` tells, for a language whose blocks are braces as JavaScript's are (C#,
 // shape-csharp.mjs), what kind of block a { opens ("function", "control" or another), a function's name, and whether
 // a token branches.
+// A tree of dotted names, each by its parts; `lyingUnder` gives the names of it that a dotted name is or lies under,
+// shortest first, and `holdsUnder` whether any name of it lies under a dotted name, each in one walk of the name.
+export function nameTree(names) {
+  const root = new Map();
+  for (const name of names) {
+    let node = root;
+    for (const part of name.split(".")) { if (!node.has(part)) node.set(part, new Map()); node = node.get(part); }
+    node.name = name;
+  }
+  return root;
+}
+export function lyingUnder(tree, name) {
+  const out = [];
+  let node = tree;
+  for (const part of name.split(".")) { node = node.get(part); if (!node) break; if (node.name !== undefined) out.push(node.name); }
+  return out;
+}
+export function holdsUnder(tree, name) {
+  let node = tree;
+  for (const part of name.split(".")) { node = node.get(part); if (!node) return false; }
+  return node.size > 0;
+}
+
+// Adds a value to the list a map holds under a key, the list made where there is none yet.
+export const append = (map, key, value) => { const list = map.get(key); if (list) list.push(value); else map.set(key, [value]); };
+
 export function functions(toks, lang = JS) {
   const found = [], stack = [], opens = { "(": [], "[": [], "{": [] };
   const openAt = new Map();
@@ -755,7 +790,7 @@ function hubsOf(offered) {
 // The scripts' ({ file, names }) global names, and those more than one of them declares.
 function globalsSummary(scripts) {
   const declared = new Map();
-  for (const s of scripts) for (const n of s.names) declared.set(n, [...(declared.get(n) ?? []), s.file]);
+  for (const s of scripts) for (const n of s.names) append(declared, n, s.file);
   const inMoreThanOne = [...declared].filter(([, f]) => f.length > 1).map(([name, f]) => ({ name, files: f.sort() }))
     .sort((a, b) => b.files.length - a.files.length || a.name.localeCompare(b.name));
   return { scripts: scripts.length, names: scripts.reduce((s, x) => s + x.names.length, 0), inMoreThanOne };
