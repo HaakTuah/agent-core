@@ -97,8 +97,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
    core files the sync moved or removed is reviewed like any PR. Where a change to the core asks something of the
-   project itself (a row of its manifest, a line of a rule file, a workflow), `setup/sync-notes.md` says so, and
-   `scripts/steps.mjs` tells each such step done or not; the sync script prints the entries a sync brings, then every
+   project itself (a row of its manifest, a line of a rule file, a workflow), an entry of the sync notes says so
+   (`setup/sync-notes.md`, each entry a file of `setup/sync-notes/`, read whole by `scripts/sync-notes.mjs`), and its
+   step of the same name in `scripts/steps/` tells it done or not (`scripts/steps.mjs`); the sync script prints the entries a sync brings, then every
    step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`), where the owner's
    inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`) and the line `Read for it:`
    (`scripts/reading.mjs`), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
@@ -314,7 +315,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      its list that the owner wants anyway, stands in "nuget.accepted" as `licence-yes.mjs` says, and there alone. It
      fails from a project's first day ("advisory" is for a fault of the check's own, while it is mended), and a private
      repository calls it too, since it needs nothing of GitHub's paid code security, or its owner declines it where a
-     job of the project's own that already runs holds its packages (`setup/sync-notes.md`, "16 November 2026, the NuGet
+     job of the project's own that already runs holds its packages (`setup/sync-notes/`, "16 November 2026, the NuGet
      check where it can matter"). Like the signature check, it first looks whether the pull request changes anything
      NuGet reads (its workflow's header lists what), and passes without a restore where it changes none; any doubt runs
      it. Before the restore, which runs the pull request's own build files, `nuget-fetch.mjs` fetches every package the
@@ -366,8 +367,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      over them: floor rule 14), so each runs only where a change can affect it and only once a pull request is ready:
      its calls to `core.yml` and `personal-terms.yml`, as the starter kit writes them, also start when a pull request
      is marked ready and skip their job on a draft, so a push to a draft bills none of them and a draft shows no check
-     until it is marked ready (#375; `setup/sync-notes.md`, "16 November 2026, checks once a pull request is ready"),
-     and a pull request then starts two jobs, `core.yml`'s one job and `personal-terms` (`setup/sync-notes.md`,
+     until it is marked ready (#375; `setup/sync-notes/`, "16 November 2026, checks once a pull request is ready"),
+     and a pull request then starts two jobs, `core.yml`'s one job and `personal-terms` (`setup/sync-notes/`,
      "17 November 2026, the checks as one job"); and the core is synced once a day at
      most, a sync PR opened that day being the day's ("Sessions" in `roles/shared/work-flow.md`). On GitHub's free plan it
      has neither rulesets nor auto-merge: there the sessions alone keep floor rule 12 and merge by hand
