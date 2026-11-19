@@ -18,9 +18,9 @@ What these are and how they are kept: `words/README.md`.
 
 130. **10 November 2026** (the core), on a game's ruleset, which required neither code scanning nor code quality
      results: the owner chose to require code scanning and status checks with Copilot's review on; agreed that the
-     floor's false-alarm line says the pull request waits for the owner's dismissal, with the same setting in every
-     project, and that Copilot's review is advisory in the rules; and then set code quality results required as well,
-     since without the check present it would not trigger.
+     floor's false-alarm line says the pull request waits for the owner's dismissal where the ruleset blocks on the
+     alert, with the same setting in every project, and that Copilot's review is advisory in the rules; and then set
+     code quality results required as well, since without the check present it would not trigger.
 
 131. **10 November 2026** (the core), on a builder taking every comment from the owner's account with Claude Code's
      attribution line for its own: the owner agreed to a rule that such a comment is not necessarily the reader's own.

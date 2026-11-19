@@ -1,4 +1,4 @@
-# The owner's words behind the core
+# The record of the owner's word behind the core
 
 The record of the owner's word behind items 1 to 245 of the core's archive, each under its item's number, with the game
 and archive entry it came from: an Amarna Letters entry by its item number, a Barkstreet Snakes entry by its date. They

@@ -103,7 +103,7 @@ export function inStep(root, last = LAST_NUMBERED) {
   wrong.push(...missing(r, last));
   for (const [n, it] of r.items) {
     if (typeof n === "number" && n > last) wrong.push(`${it.file}: item ${n} is keyed by a running number, a key that names no issue, where items after ${last} are keyed by their issue (#744). Mend: key it "#N" by the issue that carries the owner's word, or "#N.P" by the one point of it the item records, move it to a file of its own, ${REASONS}/issue-N.md or issue-N.P.md, and write that key for ${n} under "behind" in ${FILE_LIST}`);
-    if (/^\s*>/mu.test(it.text)) wrong.push(`${it.file}: item ${n} quotes (a line opening with ">"). Mend: say in the core's own words what was decided; the owner's words stay on the issue, or in ${WORDS}/`);
+    if (/^\s*>/mu.test(it.text)) wrong.push(`${it.file}: item ${n} quotes (a line opening with ">"). Mend: say in the core's own words what was decided; the owner's words stay on the issue`);
     if (w.items.has(n) && !/\bDecided:/u.test(it.text)) wrong.push(`${it.file}: item ${n} does not say what was decided. Mend: add "Decided:" and what the owner decided, in plain words`);
     if (!w.items.has(n) && !/#\d+/u.test(it.text)) wrong.push(`${it.file}: item ${n} names no issue. Mend: name the issue that holds the owner's word ("#N"), as \`archive/instructions.md\` says a new item does`);
   }
