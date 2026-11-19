@@ -308,6 +308,32 @@ ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "co
   try { total(readTree(null, dir), []); } catch (e) { thrown = e; }
   ok(thrown && mended(`FAIL: ${thrown.message}`) && Date.now() - slow < 5000, "read-total: a module of under a megabyte naming forty thousand kinds is refused with its mend, within 5 s");
   fs.rmSync(path.join(dir, "tasks/kinds.md"));
+  // (a name a role's line gives that climbs out of the tree, or is absolute, opens nothing)
+  put("../above.md", `# X\n${"y".repeat(300000)}\n`);
+  put("roles/reviewer.md", "# R\n\nRead at its start by the role `reviewer`.\n\n**Reads at its start:** `../above.md`, `/etc/hostname`.\n");
+  const named = readTree(null, dir);
+  const reviewer = total(named, []).readers.get("the role reviewer, at its start");
+  ok(named.read("../above.md") === null && named.size("../above.md") === null && named.size("/etc/hostname") === null && named.read("roles/./w.md") === null && !reviewer.files.some(f => f.includes("..") || f.startsWith("/")),
+    "read-total: a name with \"..\", \".\" or an absolute path, given by a role's line, is no file, and nothing outside the tree is read or counted");
+  fs.rmSync(path.join(dir, "roles/reviewer.md"));
+  // (the worst case within the limits: as many modules, kinds and bytes as it reads, every module naming every kind and
+  // sharing a sentence, read on both trees as --compare reads them, within 5 s)
+  const many = Array.from({ length: LIMITS.kinds - 2 }, (_, i) => `\`w${i}\``).join(", "), rules = (tag, n) => Array.from({ length: n }, (_, i) => `- A rule of ${tag}, number ${i}, which says what it says at some length.`).join("\n");
+  const worst = {}, worstHead = {};
+  for (const t of [worst, worstHead]) Object.assign(t, { "floor/security.md": "# F\n", "roles/builder.md": "# B\n\nRead at the start by the role `builder`.\n\n**Reads at its start:** `roles/shared/w.md`.\n", "roles/shared/w.md": "# W\n\nRead at the start of every task.\n" });
+  const per = Math.floor(LIMITS.all / (LIMITS.files / 2) / 80) - 10;
+  for (let i = 0; i < LIMITS.files / 2 - 2; i++) { worst[`tasks/g${i}.md`] = `# G\n\nRead when: the kinds ${many}.\n\n- A sentence every file shares, long enough to be read as moved.\n${rules(i, per)}\n`; worstHead[`tasks/a${i}.md`] = worst[`tasks/g${i}.md`].replace("# G", "# A"); }
+  const mem = texts => ({ read: f => texts[f] ?? null, list: folder => Object.keys(texts).filter(f => f.startsWith(`${folder}/`) && !f.slice(folder.length + 1).includes("/") && f.endsWith(".md")).sort(), size: f => (f in texts ? Buffer.byteLength(texts[f]) : null) });
+  slow = Date.now();
+  const w0 = total(mem(worst), []), wh = total(mem(worstHead), [], w0), wb = total(mem(worst), [], wh), wc = conditions(wb, total(mem(worstHead), [], wb), "");
+  ok(Date.now() - slow < 5000 && Array.isArray(wc.failures), `read-total: the worst case within the limits (${LIMITS.files} files, ${LIMITS.kinds} kinds, every file sharing a sentence) is read on both trees in ${Date.now() - slow} ms, within 5 s`);
+  // (files each within their limit, past the limit of all their text together, are refused with their mend)
+  for (let i = 0; i < 10; i++) put(`tasks/full${i}.md`, `# U\n\nRead when a screen changes: the kind \`screen\`.\n\n${"z".repeat(LIMITS.bytes - 100)}\n`);
+  slow = Date.now();
+  thrown = null;
+  try { total(readTree(null, dir), []); } catch (e) { thrown = e; }
+  ok(thrown && /past the \d+ MB/.test(thrown.message) && mended(`FAIL: ${thrown.message}`) && Date.now() - slow < 5000, "read-total: files each within their limit, past the limit of all the text together, are refused with their mend, within 5 s");
+  for (let i = 0; i < 10; i++) fs.rmSync(path.join(dir, `tasks/full${i}.md`));
   for (let i = 0; i < 5000; i++) put(`tasks/m${i}.md`, "# M\n\nRead when a screen changes: the kind `screen`.\n");
   slow = Date.now();
   thrown = null;

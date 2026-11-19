@@ -442,7 +442,7 @@ check a project runs that the list leaves out.
 | `codeql.yml` | read | The whole checkout, in the languages the project names. The core's own code scanning runs on its repository. |
 | `copies.mjs` | left out in part | It reads the copy as the project's config names it: the starter kit's names the copy's rule files' prose. A file of the copy moved, or its text moved into another, counts as gone, never as the config reading less, since a sync alone moves those. The core's own copies check holds them. |
 | `pointers.mjs` | left out | The copy's files are only what a pointer leads to. The core's run with `--core` holds its own pointers. |
-| `reading-size.mjs` | left out in part | Each file of the copy under `"read"` is held to its own mark. The total and the split mark count the project's own files alone. The core's caps hold the copy (`scripts/size.mjs`), and the core has no split mark. |
+| `reading-size.mjs` | left out in part | Each file of the copy under `"read"` is held to its own mark. The total and the split mark count the project's own files alone. The core's caps hold the copy (`scripts/size.mjs`). The core's own split mark is in `.github/sizes.json`, which the size workflow reads with this script. |
 | `workflows.mjs` | left out | The core's run with `--core` holds the copy's workflows and actions (floor rule 2). |
 | `entry-files.mjs` | left out | It reads the entry files at the project's root alone. The core's run with `--core` holds its own. |
 | `shape.mjs` | left out | The starter kit's config leaves the copy out (`setup/template/shape.json.tmpl`). The core holds its scripts to its own `.github/shape.json`. |

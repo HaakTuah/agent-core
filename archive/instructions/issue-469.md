@@ -13,6 +13,6 @@ The index, and how an item is written: `archive/instructions.md`.
      on 17 November and to its reach to the review guidelines on 18 November. It replaces item 182's "a file past the
      split mark is split" with that question. It stands behind "Size asks; a reader who reads less answers" and "A cut
      or a join lowers the total read" in `tasks/cleaning.md`, the line of "Split by meaning, from the start" in
-     `roles/shared/how-to-work.md` that points to them, and "A role's start holds what any of its tasks can break" in
-     `AGENTS.md`.
+     `roles/shared/how-to-work.md` that points to them, and "A role's start holds what any of its tasks can break", also
+     in `tasks/cleaning.md`.
      Changes: 182.

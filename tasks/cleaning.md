@@ -124,9 +124,9 @@ code is held to: `tasks/code-shape.md`.
   property of the code keeps a baseline that may not get worse (`tasks/code-shape.md`). It does not mean a session may
   not read them. Reason: a number made a goal stops measuring what it stood for. Held by no check: none reads a target
   set in prose without guessing; the brief's rule (`tasks/helpers.md`) and the reviews carry it.
-- **Size asks; a reader who reads less answers** (#469). By default a file past the *size marks*' split mark sets
-  whoever changes it one question: in what ways could it be split so that someone reads less? Where they set no split
-  mark, as the core's own do, size asks it of no file, and the total read's candidates ask it instead (below). That builder lists the ways found in the pull request, each with the reader who would read
+- **Size asks; a reader who reads less answers** (#469). By default a file past the *size marks*' split mark (about 20
+  KB where they name none) sets whoever changes it one question: in what ways could it be split so that someone reads
+  less? That builder lists the ways found in the pull request, each with the reader who would read
   less, a role or a kind of task. Where there is one, the file is split along it, in a pull request of its own with
   behaviour proven unchanged; where none, it stays whole, its line in the marks' baseline (`"past"`) giving the reason
   or the split's issue, and the question is not asked again until it has grown by a quarter or a new kind of reader
@@ -154,3 +154,13 @@ code is held to: `tasks/code-shape.md`.
   optimum, since each file opened is a call and one more file a session can miss. Held by `read-total.mjs --compare` in
   the core's size workflow, which fails a cut or a join where a condition fails, and by the state report, which gives
   the sum beside the last one's.
+- **A role's start holds what any of its tasks can break** (#469). By default a line of a file a role reads at its
+  start, as `scripts/reading.mjs` gives it, stays there only where any task of that role can break it, the test the
+  floor's own file keeps; a line only some kinds of task can break moves to a module read when a task calls for it.
+  Whoever cuts or joins a file read at a start puts the test to each line it moves or leaves; a line of the review
+  guidelines moves so under the owner's agreement of 18 November 2026, relayed into its pull request (floor rule 3).
+  It does not mean a size to reach, nor that a line any task can break leaves the start to make room, nor a rewrite of
+  the files that stand, nor anything in a project, whose start files are the core's copy. Reason: what stands at the
+  start is paid at every task, and one study of rule files found that they raise what a task costs without raising
+  how often it succeeds. Held by no check yet: which tasks can break a line is a reading; `scripts/read-total.mjs`
+  shows what a move saves.

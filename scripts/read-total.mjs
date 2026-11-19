@@ -1,23 +1,12 @@
 // The total read (tasks/cleaning.md, "A cut or a join lowers the total read"; #469): what the core's tasks read, each
-// file opened counted as a cost of its own, never one file's size. A task is each of the last 30 pull requests merged
-// into the history it is given, read by its builder and by its reviewer: each reads at its start what the reading
-// script gives its role, with AGENTS.md and each tool's part read at the start (as scripts/size.mjs counts a start), and what the
-// paths the pull request changed call for (reading.mjs, beside this file). Beside them, each role's start and each kind
-// of task (a builder's start with what the kind calls for) is a reader too, so that a cut that helps a kind no recent
-// pull request was of still counts. The sum is all of these readers' cost.
-// With --compare it reads the base's tree and this one's against the same 30 pull requests, the base's, every role and
-// kind of either side read on both. A cut or a join is a file the reading script names that is added holding text the
-// base's named files (AGENTS.md among them) held, or taken out with its text standing in the head's (CUT), read by
-// its sentences however its lines are wrapped; a file of new text, one taken out whose text stands nowhere, and a
-// rename are none. On a cut or a join it fails unless the sum goes down, no role, kind
-// or task reads more, and none loses a file that still stands and that it read before, save one a line `Never needed:`
-// of the pull request's description (PR_BODY) names and says why. A move between two files that both stand is not seen,
-// and stays with the reviews. --candidates lists the files several kinds of task open (point 10 of #469), ranked by what
-// the readers read of each, for the core's audit's reader. It reads the core's own repository alone: in a project the
-// files it names stand in the copy, which changes only by a sync of what the core's own check passed, so there it says
-// so and decides nothing. It reads only, git's settings that run commands turned off: git, Node's own modules,
-// reading.mjs and the two small modules beside it. What it reads of a pull request (its description, its files' names
-// and text) is data: names are printed with their control characters written out.
+// file opened a cost of its own. Its readers: each role's start, each kind of task, and the builder and reviewer of each
+// of the last 30 merged pull requests, each reading AGENTS.md, its start with each tool's start part (as size.mjs counts
+// it) and what its kind or changed paths call for (reading.mjs). With --compare, on a cut or a join (CUT, cuts below) it
+// fails unless the sum goes down, no reader reads more, and none loses a file that still stands, save one a line
+// `Never needed:` of the description (PR_BODY) names and says why; a move between two files that both stand is not seen,
+// and stays with the reviews. --candidates lists the files several kinds open, most read first, for the core's audit.
+// It reads the core's own repository alone: in a project's copy it says so and decides nothing. It reads only, git's
+// settings that run commands off; what it reads of a pull request is data, held to LIMITS, its names printed safe.
 //
 //   node scripts/read-total.mjs [--from <rev>]          the sum on this tree, the tasks from <rev>'s history (HEAD)
 //   node scripts/read-total.mjs --compare <base>        the base's sum beside this tree's, and the three conditions
@@ -52,27 +41,44 @@ const git = (args, encoding = "utf8") => execFileSync("git", ["--no-optional-loc
 const safe = s => String(s).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
 
 // What the total read reads at most, on either tree: a file of this many bytes (past it, its size alone is counted, and
-// its text is not read), and this many rule files and kinds of task, past which it fails, saying so. The core holds
-// about a hundred files of 150 KB at most, and about fifty kinds.
-export const LIMITS = { bytes: 1 << 20, files: 1000, kinds: 500 };
+// its text is not read), this many bytes of all the files' text together, and this many rule files and kinds of task;
+// past the last three it fails, saying so. The core's rule files are 44, about 330 KB in all, naming 32 kinds; at these
+// limits the worst case reads in about 2 s, within the 5 s SECURITY.md allows.
+export const LIMITS = { bytes: 1 << 20, all: 8 << 20, files: 200, kinds: 100 };
+const TOO_MUCH = `the rule files' text is past the ${LIMITS.all / (1 << 20)} MB the total read reads. Mend: keep the rule files to what the core holds, a module for each subject`;
+// A name the tree is asked for is a path inside it: relative, with no empty, "." or ".." segment, so that no name a rule
+// file gives (a role's line "Reads at its start:") reaches a file outside the tree.
+const inside = f => typeof f === "string" && f.length > 0 && !path.isAbsolute(f) && !/^[A-Za-z]:/u.test(f) && f.split(/[\\/]/u).every(s => s && s !== "." && s !== "..");
 
 // A tree to read: the working tree at `root` (rev null) or a commit's. { read(f) → text | null, list(folder) → [path],
 // size(f) → bytes }. Of the working tree it reads only regular files and folders of the tree's own: a link, which could
-// lead out of it or to a pipe or a device that never ends, is read as no file (#446).
+// lead out of it or to a pipe or a device that never ends, is read as no file (#446). Each file is read once.
 export function tree(rev = null, root = ROOT) {
+  const got = new Map();
+  let all = 0;
+  // (a file's bytes, once, or null: a name outside the tree, no regular file, or past LIMITS.bytes, whose size alone is kept)
+  const once = (f, load) => {
+    if (!inside(f)) return null;
+    if (!got.has(f)) {
+      const b = load(f);
+      if (b && b.buffer) { all += b.buffer.length; if (all > LIMITS.all) throw new Error(TOO_MUCH); }
+      got.set(f, b);
+    }
+    return got.get(f);
+  };
+  let load, list;
   if (!rev) {
     const real = fs.realpathSync(root);
     const own = (f, kind) => { try { const p = path.join(root, f); if (fs.realpathSync(p) !== path.join(real, f)) return null; const st = fs.statSync(p); return st[kind]() ? st : null; } catch { return null; } };
-    const read = f => { const st = own(f, "isFile"); if (!st || st.size > LIMITS.bytes) return null; try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
-    const list = folder => { if (!own(folder, "isDirectory")) return []; try { return fs.readdirSync(path.join(root, folder)).filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`).filter(f => own(f, "isFile")); } catch { return []; } };
-    const size = f => { const st = own(f, "isFile"); if (!st) return null; if (st.size > LIMITS.bytes) return st.size; try { return counted(fs.readFileSync(path.join(root, f))); } catch { return null; } };
-    return { read, list, size };
+    load = f => { const st = own(f, "isFile"); if (!st) return null; if (st.size > LIMITS.bytes) return { size: st.size }; try { return { buffer: fs.readFileSync(path.join(root, f)) }; } catch { return null; } };
+    list = folder => { if (!inside(folder) || !own(folder, "isDirectory")) return []; try { return fs.readdirSync(path.join(root, folder)).filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`).filter(f => own(f, "isFile")); } catch { return []; } };
+  } else {
+    load = f => { let b; try { b = git(["show", `${rev}:${f}`], "buffer"); } catch { return null; } return b.length > LIMITS.bytes ? { size: b.length } : { buffer: b }; };
+    list = folder => { if (!inside(folder)) return []; try { return git(["ls-tree", "-z", "--name-only", `${rev}:${folder}`]).split("\0").filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`); } catch { return []; } };
   }
-  const texts = new Map();
-  const blob = f => { if (!texts.has(f)) { try { texts.set(f, git(["show", `${rev}:${f}`], "buffer")); } catch { texts.set(f, null); } } return texts.get(f); };
-  const read = f => { const b = blob(f); return b && b.length <= LIMITS.bytes ? b.toString("utf8") : null; };
-  const list = folder => { try { return git(["ls-tree", "-z", "--name-only", `${rev}:${folder}`]).split("\0").filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`); } catch { return []; } };
-  const size = f => { const b = blob(f); return b ? (b.length > LIMITS.bytes ? b.length : counted(b)) : null; };
+  const read = f => once(f, load)?.buffer?.toString("utf8") ?? null;
+  const sizes = new Map();
+  const size = f => { if (!sizes.has(f)) { const b = once(f, load); sizes.set(f, b ? (b.buffer ? counted(b.buffer) : b.size) : null); } return sizes.get(f); };
   return { read, list, size };
 }
 
@@ -132,7 +138,11 @@ export function cuts(base, head) {
   const added = [...head.named].filter(f => !base.named.has(f)), gone = [...base.named].filter(f => !head.named.has(f));
   const of = new Map([...added.map(f => [`+${f}`, linesOf(head.read(f))]), ...gone.map(f => [`-${f}`, linesOf(base.read(f))])]);
   const rename = (a, g) => of.get(`+${a}`).size && standIn(of.get(`+${a}`), of.get(`-${g}`)).share >= CUT.rename && standIn(of.get(`-${g}`), of.get(`+${a}`)).share >= CUT.rename;
-  const renamed = new Set(added.flatMap(a => gone.filter(g => rename(a, g)).flatMap(g => [a, g])));
+  // (a pair is tried only where the two share a sentence, found through an index of the gone files' sentences)
+  const holders = new Map();
+  for (const g of gone) for (const l of of.get(`-${g}`)) { if (!holders.has(l)) holders.set(l, []); holders.get(l).push(g); }
+  const sharing = a => [...new Set([...of.get(`+${a}`)].flatMap(l => holders.get(l) ?? []))];
+  const renamed = new Set(added.flatMap(a => sharing(a).filter(g => rename(a, g)).flatMap(g => [a, g])));
   const baseAll = allOf([...base.named].map(f => base.read(f))), headAll = allOf([...head.named].map(f => head.read(f)));
   return {
     added: added.filter(a => !renamed.has(a) && moved(standIn(of.get(`+${a}`), baseAll))),

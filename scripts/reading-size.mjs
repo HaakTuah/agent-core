@@ -100,12 +100,13 @@ if (base) {
     const at = marks.past[f], mark = num(at) ? at : at?.mark, why = String(at?.why ?? "").trim(), n = size(f), entry = `{ "mark": ${n}, "why": "<why no split lets anyone read less, or the split's issue>" }`;
     // (a line of a mark alone that stood on the base stands as it did, failing only where its file grew past it; a line
     // this pull request writes says why, a word or the split's issue)
-    const stood = num(at) && basePast[f] === at;
+    const stood = num(at) && basePast[f] === at, was = num(basePast[f]) ? basePast[f] : basePast[f]?.mark;
     if (mark === undefined) fail.push(`${f} is ${n} bytes, past the ${marks.split}-byte mark, and this PR changes it. Mend: ${ask} ${entry}`);
     else if (stood && n > mark) fail.push(`${f} is ${n} bytes, past its mark of ${mark} under "past" in ${MARKS}, and this PR changes it. Mend: ${ask} ${entry}`);
     else if (stood) notes.push(`${f} is listed under "past" in ${MARKS} with a mark alone: when next you change its line, write it as ${entry} (core/tasks/cleaning.md, "Size asks")`);
     else if (!/\p{L}|#\d/u.test(why)) fail.push(`${f} is listed under "past" in ${MARKS} with no reason it stays whole, a line this PR writes. Mend: write its line as ${entry}, having asked in what ways it could be split so that someone reads less (core/tasks/cleaning.md, "Size asks")`);
     else if (n > mark * 1.25) fail.push(`${f} is ${n} bytes, grown more than a quarter past its mark of ${mark} under "past" in ${MARKS}, and this PR changes it. Mend: ${ask} ${entry}, its why one that still holds`);
+    else if (num(was) && mark > was) notes.push(`${f}: this PR raises its mark under "past" in ${MARKS} from ${was} to ${mark}, so the question is asked again: the reviews read that its why still holds (core/tasks/cleaning.md, "Size asks")`);
   }
 } else notes.push("no base to compare with (set SIZES_BASE), so the files past the split mark were not checked for changes");
 for (const f of Object.keys(marks.past)) if (!big.includes(f)) fail.push(`${MARKS} lists ${f} under "past", but it is not past ${marks.split} bytes now. Mend: take it out of "past"`);

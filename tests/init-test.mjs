@@ -162,6 +162,11 @@ if (p.status === 0) {
   fs.appendFileSync(path.join(p.dir, "big.md"), "a line more\n");
   const stoodGrown = sizeCheck();
   git(p.dir, "reset", "-q", "--soft", "HEAD~1");
+  // (a line that stood with its why, whose mark this pull request raises, is noted, the question asked again)
+  fs.writeFileSync(marksAt, JSON.stringify({ ...JSON.parse(marksWas), past: { "big.md": { mark: big - 100, why } } }));
+  git(p.dir, "commit", "-q", "-m", "a line with its why", "--", "checks/sizes.json");
+  const raised = pastAs({ "big.md": { mark: big + 1000, why } });
+  git(p.dir, "reset", "-q", "--soft", "HEAD~1");
   git(p.dir, "rm", "-q", "-f", "--cached", "big.md");
   fs.rmSync(path.join(p.dir, "big.md"));
   fs.writeFileSync(marksAt, marksWas);
@@ -172,6 +177,7 @@ if (p.status === 0) {
   ok(kept.status === 0 && within.status === 0 && issue.status === 0, "a line that says why the file stays whole, or names the split's issue, passes, its file grown less than a quarter past its mark too", `${kept.stderr}${within.stderr}${issue.stderr}`);
   ok(stood.status === 0 && /big\.md is listed under "past" .* with a mark alone: when next you change its line/.test(stood.stdout + stood.stderr) && stoodGrown.status === 1 && /big\.md is \d+ bytes, past its mark of \d+/.test(stoodGrown.stderr) && mended(stoodGrown.stderr),
     "a line of a mark alone that stood on the base passes while its file is within it, noted, and fails, as before, once the file grows past it", `${stood.stdout}${stood.stderr}${stoodGrown.stderr}`);
+  ok(raised.status === 0 && /big\.md: this PR raises its mark under "past" .* from \d+ to \d+, so the question is asked again/.test(raised.stdout + raised.stderr), "a mark this pull request raises on a line that stood is noted, so the reviews read its why again", `${raised.stdout}${raised.stderr}`);
   // (a copy the project adds fails the copies check, and each failure says its mend)
   undo = grow("AGENTS.md", 0);
   fs.appendFileSync(path.join(p.dir, "AGENTS.md"), `\n${fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/u).find(l => /^- It is never pushed to/u.test(l))}\n`);
