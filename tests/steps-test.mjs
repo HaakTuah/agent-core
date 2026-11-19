@@ -285,7 +285,7 @@ ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.y
 const shapeBaseline = path.join(lockProject, "checks/shape-baseline.json"), shapeAsKit = fs.readFileSync(shapeBaseline, "utf8");
 fs.writeFileSync(shapeBaseline, "{\n  \"listed\": {}\n}\n");
 let shapeMissed = notDone(lockProject);
-ok(shapeMissed.length === 4 && shapeMissed[3].lead === "19 November 2026, the shape check reads the functions of Python on the parser" && /written before the check read Python, its functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[3].mend) && shapeMissed[2].lead === "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser" && /written before the check read JavaScript and TypeScript, their functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[2].mend) && shapeMissed[1].lead === "18 November 2026, the shape check reads C#'s functions on the parser" && /written before the check read C#, its functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[1].mend) && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, its functions by the lexer, Python, its functions by the lexer, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process:/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
+ok(shapeMissed.length === 4 && shapeMissed[3].lead === "19 November 2026, the shape check reads the functions of Python on the parser" && /written before the check read Python, its functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[3].mend) && shapeMissed[2].lead === "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser" && /written before the check read JavaScript and TypeScript, their functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[2].mend) && shapeMissed[1].lead === "18 November 2026, the shape check reads C#'s functions on the parser" && /written before the check read C#, its functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[1].mend) && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, its functions by the lexer, Python, its functions by the lexer, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process, the comments that mark a change:/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
   "a shape baseline that names no reader is reported by each of its steps, each mend to write it with every reader", report(shapeMissed));
 execFileSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: lockProject, env: { ...process.env, SHAPE_BASE: "" } });
 shapeMissed = notDone(lockProject);
@@ -320,17 +320,38 @@ const rule5 = body => { fs.writeFileSync(secFile, secAsKit.replace(/^(5\. .*\n)(
 fs.mkdirSync(path.join(lockProject, "tests/hostile"), { recursive: true });
 fs.writeFileSync(path.join(lockProject, "tests/hostile/link.test.mjs"), "\n");
 ok(!rule5("   None: it takes no input but its user's.\n").length, "rule 5 that says \"None\" names no input, and reads done");
-ok(!rule5("   - a shared link: its parts checked against their shape,\n     its hostile tests: `tests/hostile/link.test.mjs`.\n     - its query string, read by the same check.\n").length,
+ok(!rule5("   - a shared link: its parts checked against their shape, limits: 2,000 characters, 5 s,\n     its hostile tests: `tests/hostile/link.test.mjs`.\n     - its query string, read by the same check.\n").length,
   "an item that names, on a wrapped line, a file that is there reads done, the item nested in it part of it");
-ok(!rule5("   - a shared link: its hostile tests in `tests/hostile/`.\n").length, "a folder that is there counts as named");
+ok(!rule5("   - a shared link: limits: none, a link's length is the browser's; its hostile tests in `tests/hostile/`.\n").length, "a folder that is there counts as named, and \"limits: none\" is an answer");
 fs.mkdirSync(path.join(lockProject, "src"), { recursive: true });
 fs.writeFileSync(path.join(lockProject, "src/peer.mjs"), "\n");
-let missedInputs = rule5("   - a shared link: hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: checked on arrival by `src/peer.mjs`; hostile tests: `tests/hostile/peer.test.mjs`.\n");
+let missedInputs = rule5("   - a shared link: limits: 2 KB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: checked on arrival by `src/peer.mjs`; limits: 64 KB, 5 s; hostile tests: `tests/hostile/peer.test.mjs`.\n");
 ok(missedInputs.length === 1 && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
   "an item whose hostile tests are not there is reported, by its words, and only it, though the file of what checks it is there", report(missedInputs));
-missedInputs = rule5("   - a shared link: hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: hostile tests: FILL IN\n");
+missedInputs = rule5("   - a shared link: limits: 2 KB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: limits: 64 KB; hostile tests: FILL IN\n");
 ok(missedInputs.length === 1 && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
   "a \"FILL IN\" left in one item reads no other item as done: the item it stands in is reported", report(missedInputs));
+missedInputs = rule5("   - a shared link: limits: 2 KB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: limits: FILL IN; hostile tests: `tests/hostile/link.test.mjs`.\n");
+ok(missedInputs.length === 1 && /"limits:"/u.test(missedInputs[0].mend) && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
+  "an item whose limits name no number and not \"none\" is reported, by its words, and only it", report(missedInputs));
+missedInputs = rule5("   - a peer's message: hostile tests: `tests/hostile/link.test.mjs`, limits: `64` in backticks\n");
+ok(missedInputs.length === 1 && /"limits:"/u.test(missedInputs[0].mend), "a number in backticks, a path's or a name's, states no limit", report(missedInputs));
+missedInputs = rule5("   - a saved game, its version read first; limits: 1 MB, 5 s; hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message, checked by `src/version-check.mjs`; limits: 64 KB; hostile tests: `tests/hostile/link.test.mjs`.\n");
+ok(missedInputs.length === 1 && /newest version/u.test(missedInputs[0].mend) && missedInputs[0].mend.includes("a saved game") && !missedInputs[0].mend.includes("a peer's message"),
+  "an item that says its input carries a version, and names no version among its limits, is reported; a path in backticks says nothing of one", report(missedInputs));
+ok(!rule5("   - a saved game, its version read first; limits: 1 MB, 5 s, version 3; hostile tests: `tests/hostile/link.test.mjs`.\n").length,
+  "an item whose limits name the newest version its reader knows reads done");
+ok(rule5("   - a saved game, its version read first; limits: 1 MB, 5 s, a newer version refused; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1
+  && rule5("   - a saved game, its version read first, `limits: version 3`; limits: 1 MB; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1,
+  "a version named among the limits with no number, or a version only in backticks, does not read done");
+ok(rule5("   - a saved game, its version read first; limits: 1 MB, a newer version refused, 5 s; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1
+  && rule5("   - a saved game, `limits: x`, its version read first; limits: 1 MB; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1,
+  "a later number in the clause is no version's, and a \"limits:\" in backticks hides none of the item's words");
+ok(!rule5("   - a peer's message, which carries no version number; limits: 64 KB; hostile tests: `tests/hostile/link.test.mjs`.\n").length,
+  "an item that says its input carries no version is not asked to name one");
+missedInputs = rule5("   - a saved game, refused without a version; limits: 1 MB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a save, \u001b[31mred\u0007\u009b\u200f\u2028\u202e\u2066\ufeff; limits: 1 MB; hostile tests: none\n");
+ok(missedInputs.length === 1 && /newest version/u.test(missedInputs[0].mend) && missedInputs[0].mend.includes("a saved game") && !/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/u.test(missedInputs[0].mend),
+  "an item that names its version otherwise is still asked to name the newest, and an item's control characters never reach the mend", report(missedInputs));
 missedInputs = rule5("   Each message a peer sends, its size checked.\n");
 ok(missedInputs.length === 1 && missedInputs[0].mend.includes("as an item of its own"), "inputs written as a paragraph, no item in it, are reported, the mend saying to list them", report(missedInputs));
 fs.writeFileSync(secFile, secAsKit.replace(/^5\. .*\n/m, ""));
@@ -602,6 +623,18 @@ ok(sized.sizes === "c/sizes.json" && configs(inMemory({}, {}, "| *size marks* | 
 const signed = configs(inMemory({ "s.yml": coreCall("signatures.yml", { directory: "${{ inputs.at }}" }) }));
 ok(signed.packages === null && signed.unread.some(u => u.startsWith("the signature check's folder not read")) && configs(inMemory({ "s.yml": coreCall("signatures.yml", {}) })).packages === ".",
   "the signature check's folder passed as an expression is not read; none passed is the root");
+// a workflow nested past what the reader of keys given twice reads is told with its own mend, to nest it less, never
+// as a key given twice it may not hold (#610)
+{
+  const keysStep = STEPS.find(s => s.lead === "16 November 2026, no workflow gives a key twice");
+  const deep = keysStep.check(inMemory({}, { ".github/workflows/deep.yml": `on: push\nx: ${"[".repeat(200)}1${"]".repeat(200)}\n` }));
+  const both = keysStep.check(inMemory({}, { ".github/workflows/deep.yml": `on: push\nx: ${"[".repeat(200)}1${"]".repeat(200)}\n`, ".github/workflows/two.yml": "on: push\non: pull_request\n" }));
+  ok(/nest the lists and mappings of these workflows or actions no deeper than a workflow needs, a few levels, since past 128 deep a key given twice in them cannot be read: `\.github\/workflows\/deep\.yml`\./.test(deep ?? "") && !/keep one of the two keys/.test(deep ?? "")
+    && /keep one of the two keys.*`\.github\/workflows\/two\.yml` line 2, "on"/.test(both ?? "") && /no deeper than a workflow needs.*`\.github\/workflows\/deep\.yml`/.test(both ?? "")
+    && keysStep.check(inMemory({}, { ".github/workflows/flat.yml": "on: push\n" })) === null,
+    "a workflow nested past 128 deep is told to nest less, a key given twice to keep one, each with its own mend, and a plain one passes", [deep, both].join("\n"));
+}
+
 const advisory = STEPS.find(s => s.lead === "13 November 2026, the NuGet check fails from the first day");
 let threw = null;
 try { advisory.check(inMemory({ "n.yml": coreCall("nuget.yml", { config: "c.json", advisory: "${{ vars.ADVISORY }}" }) })); } catch (e) { threw = e; }

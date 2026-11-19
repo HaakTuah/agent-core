@@ -13,3 +13,4 @@ The index, and how an item is written: `archive/instructions.md`.
      once an hour in the core, and to its being a priority, since it holds up everything else. It stands behind "A time
      mark measures and never fails", "No test run on a draft", "The default branch is tested at its newest commit" and
      "The slow suites run once per batch, wherever they run" in `tasks/tests.md`.
+     Changed by: #810.

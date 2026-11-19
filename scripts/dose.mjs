@@ -22,7 +22,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { notLinked, parseBaseline, parseConfig, standing, survey, where } from "./shape.mjs";
+import { fileOf, notLinked, parseBaseline, parseConfig, standing, survey, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
 export const STATES = ["in debt", "paying down", "in standard"];
@@ -64,14 +64,8 @@ export function auditDue({ state, audited, listed, read, at }) {
   return batch ? { why: `a cleaning batch is done: the baseline lists ${listed}, a tenth or more under the ${last.listed} of the audit of ${last.day}`, owner: false } : null;
 }
 
-// The file an entry of the baseline lies in: a function's own, an import's importing one.
-export function fileOf(id) {
-  const key = id.slice(id.indexOf(": ") + 2);
-  if (id.startsWith("function: ")) return key.slice(0, key.indexOf("#"));
-  if (id.startsWith("clock: ")) return key.slice(0, key.lastIndexOf(": "));
-  const pair = id.startsWith("crossing: ") || id.startsWith("inside: ") ? key.slice(key.indexOf(": ") + 2) : key;
-  return pair.slice(0, pair.indexOf(" -> "));
-}
+// The file an entry of the baseline lies in, as the shape check reads it, which knows every kind of its entries.
+export { fileOf };
 
 // What to clean first: the files the baseline lists entries of, the one where change meets tangle first: its entries
 // times how often the history changed it (once more, so that a file never changed still has its place after those).

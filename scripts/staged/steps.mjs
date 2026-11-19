@@ -93,6 +93,7 @@ PLANTED["15 November 2026, every step has its check"] = dir => Object.entries(PL
 
 // The steps no check reads that this case does not plant, each with why.
 export const UNPLANTED = {
+  "18 November 2026, a blind sample each month": "it asks nothing of a session: the scheduled look keeps the sample's issue, and only the owner answers it",
   "18 November 2026, another publisher's code named in a lock file": "it needs a project that ships or runs another publisher's code loaded otherwise than from a lock file (a content network's script), and this case's project is a private tool that loads none",
   "13 November 2026, MS-PL waits for the owner's yes": "it needs the licence check's report on an installed package under MS-PL, which a scratch project with no network cannot install",
   "13 November 2026, a game's previews share its origin": "it needs a game served by GitHub Pages with its previews, and this case's project is a private tool",
