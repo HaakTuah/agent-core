@@ -203,7 +203,7 @@ git(dir, "reset", "-q", "--hard", "base");
 const pinned = /^Core: \S+ at ([0-9a-f]{40})/m.exec(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8"))[1];
 const address = fs.readFileSync(path.join(dir, ".github", "workflows", "core.yml"), "utf8").match(/uses: (\S+)\/\.github\/workflows\/core\.yml@/)[1];
 fs.writeFileSync(path.join(dir, ".github", "workflows", "docs-terms.yml"), `on:\n  pull_request:\n    paths: ['docs/**']\njobs:\n  terms:\n    uses: ${address}/.github/workflows/personal-terms.yml@${pinned}\n    secrets:\n      PERSONAL_TERMS: \${{ secrets.PERSONAL_TERMS }}\n`);
-fs.writeFileSync(path.join(dir, ".github", "workflows", "build.yml"), "on: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix: {node: [20, 22]}\n    steps:\n      - run: echo built\n");
+fs.writeFileSync(path.join(dir, ".github", "workflows", "build.yml"), "on: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix:\n        node: [20, 22]\n        node: [24]\n    steps:\n      - run: echo built\n");
 commit(dir, "a filtered call, and a build of the project's own");
 git(dir, "branch", "-q", "-f", "filtered");
 fs.mkdirSync(path.join(dir, "docs"), { recursive: true });

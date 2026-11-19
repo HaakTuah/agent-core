@@ -10,7 +10,7 @@ general linter for its own scripts.
 It decides nothing by itself. A **replace** or a **try** becomes a line of `QUEUE.md` only on the owner's word, each a
 pull request of its own that shows the comparison, old against new (#534, point 2); no tool or package arrives before
 #488's points 1, 3, 4 and 5 have merged; and the order is #534's, point 7: the tools that only run first, then the
-packages carried in the copy, then the form the rules are delivered in.
+packages installed from the core's lock file (#654), then the form the rules are delivered in.
 
 Weighed whole: 2026-11-17
 
@@ -59,12 +59,13 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   and 4 naming `copies.yml`, the most of any check. **Try** jscpd for the finding, its definition taking the core's
   place by default (#534, point 3); the baseline and the near-copies the audit reads stay the core's glue. This weighs
   again the "Kept" of #486's inventory, whose reason was the core's own definition.
-- `scripts/pointers.mjs`, `scripts/rule-files.mjs`: fails a pointer in the rule files, to a file, a section, a numbered
-  point, a floor rule or an archive item, that leads nowhere. *Runs:* any session and the runners. *Else:* lychee
+- `scripts/pointers.mjs`, `scripts/rule-files.mjs`, `scripts/markdown.mjs`: fails a pointer in the rule files, to a file,
+  a section, a numbered point, a floor rule or an archive item, that leads nowhere. *Runs:* any session and the runners. *Else:* lychee
   (offline, with Markdown's anchors), remark-validate-links, markdown-link-check and linkinator, each kept for
   Markdown's own links and dropped, on fact, for the rest: none reads a backticked path, a quoted section, a bold lead
   or "point 6". *Bugs:* 0. **Try** a link checker, run offline, for the form `[text](path)` and a project's own
-  documents (with #486's group 5); **keep** the core's own forms: nothing fits, they are the core's.
+  documents (with #486's group 5); **keep** the core's own forms: nothing fits, they are the core's. Its reading of
+  Markdown runs on the package marked (#530, item 7).
 - `scripts/reading-size.mjs`, `scripts/file-size.mjs`: fails a file every session reads that passes its mark. *Runs:*
   any session and the runners. *Else:* size-limit and bundlesize, dropped on fact: they weigh a built bundle, not a file
   read whole. *Bugs:* 2. **Keep:** nothing fits; what a session reads is the core's own list.
@@ -87,14 +88,15 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   settings. *Bugs:* 1. **Keep:** nothing fits; the manifest's form is the core's. Its checks of shape go with #486's
   schemas.
 - `scripts/shape.mjs`, `scripts/code-shape.mjs`, `scripts/shape-readers.mjs`, `scripts/shape-csharp.mjs`,
-  `scripts/shape-python.mjs`, `scripts/dose.mjs`, `scripts/wait.mjs`, `.github/shape.json`,
-  `.github/shape-baseline.json`, `tests/readers-test.mjs`: fails what is new in how the code is put together: a function
+  `scripts/shape-python.mjs`, `scripts/csharp-functions.mjs`, `scripts/dose.mjs`, `scripts/wait.mjs`,
+  `.github/shape.json`, `.github/shape-baseline.json`, `tests/readers-test.mjs`: fails what is new in how the code is put together: a function
   past its marks for lines, depth and branching, an import on a cycle, a file in no system. *Runs:* any session and the
   runners. *Else:* Lizard (MIT, Python, some 30 languages), dropped on fact: its definitions of a branch are fixed in
   its code (#519's record); ESLint's `complexity` and `max-lines-per-function`, dropped on fact: JavaScript alone;
   dependency-cruiser (MIT, 18 packages) and madge, for cycles and boundaries, dropped on fact: JavaScript and TypeScript
   alone, where the check reads C# and Python too. *Bugs:* 3. **Keep:** fitting costs more than keeping, each tool
-  knowing one language or fixing its definitions; its readers go to the parser, as #486's group 3 and #519's path say.
+  knowing one language or fixing its definitions; its readers go to the parser, as #486's group 3 and #519's path say,
+  C#'s functions the first (`scripts/csharp-functions.mjs`, #529).
 - `scripts/choices.mjs`: fails a choice record a pull request adds without its lines, says when the pass is due, and
   reads each sign written in a measure. *Runs:* any session and the runners. *Else:* none found; the decision records'
   tools (adr-tools, log4brains) write records and check no form. *Bugs:* 1. **Keep:** nothing fits; the form is the
@@ -104,7 +106,7 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   task runner (npm scripts, just, make), dropped on fact: a project in another stack has none of npm's, and the others
   are installs. *Bugs:* 2. **Keep:** small and stable glue.
 - `scripts/pr-description.mjs`, `.github/workflows/pr-description.yml`, `.github/workflows/own-description.yml`,
-  `scripts/milestones.mjs`, `scripts/done-when.mjs`: fail a ready pull request whose description lacks a heading the
+  `scripts/milestones.mjs`, `scripts/done-when.mjs`, `scripts/owner-yes.mjs`: fail a ready pull request whose description lacks a heading the
   project names, and, here, the lines the core asks. *Runs:* the runners, where the description is; any session given
   it. *Else:* Danger JS (MIT), its rules written in JavaScript and run with a token, dropped on a measure: 14.1.0
   installs 86 packages (34 MB), and the check's rules, the headings and lines the core asks, would be written again in
@@ -135,7 +137,21 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   project's build was broken into in March 2026 and its own policy is written in Rego; ScanCode, dropped on fact: Python
   and a large install. *Bugs:* 5, 1 and 1 (15 with the NuGet check's, the most of any group). **Replace** the reading
   underneath with `npm sbom` after the install the check already makes; **keep** the policy (the floor's list, the
-  owner's yes, the scan of what no lock file holds) and the HTML reading, which goes with #486's licence group.
+  owner's yes, the scan of what no lock file holds) and the HTML reading, which goes with #486's licence group. *Tried:*
+  18 November 2026 (#585), npm 11.20.0, on the 70 projects `tests/licence-installed-test.mjs` makes and on a real
+  install; the core's reading kept, on measure, since neither of npm's own tools reads what is installed at its level.
+  `npm sbom` merges the packages of one name and version, so a GPL-3.0 copy of a locked ISC package bundled in another's
+  folder went unread, and it stopped with nothing read wherever a package.json had no name, a project's own root among
+  them (15 of the 70 that pass). `npm query "*"` failed what the old reading failed on all 70, but its review found four
+  cases it reads worse, each reproduced: a plain file named `@block` in a package's `node_modules` makes npm leave out
+  every package in that folder with no word, so a bundled GPL-3.0 package passed; a package.json that is itself a link
+  out of the project passed; a valid local package with no name and no version failed; and a folder named `..vendor`
+  read as outside the project. The fallbacks were read, not run (#649): license-checker-rseidelsohn walks the folders
+  with the same `readdirScoped` npm uses, reads its failure as nothing installed, and keys each package by name and
+  version; licensee reads npm's own tree (`loadActual`); and CycloneDX's npm tool runs `npm ls --long --all`: each would
+  read the `@block` case as npm does. *Replayed:* #444 not read (its cases, lock entries not written as npm writes one,
+  lie in the lock file, which npm's reading of what is installed never opens); #339, #364, #366, #386 and #447 not run
+  (their cases lie in where the config stands, the steps and the scan, which no tool tried here takes over).
 - `scripts/exact-versions.mjs`: fails a dependency of the project's own written as a range. *Runs:* any session and the
   runners. *Else:* npm's `save-exact`, dropped on fact: it writes exact versions and checks none already written.
   *Bugs:* 1. **Keep:** small and stable, a read of `package.json`.
@@ -164,7 +180,23 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   release on NuGet is 3.0.0-alpha.9 of 25 November 2022, and none came in the year to 17 November 2026, where
   nuget-license published 25. *Bugs:* 7, 1, 0 and 4. **Try** nuget-license and the SDK's own list for the reading;
   **keep** the fetch before the build, which is a boundary of the floor's (what a build could write never decides a
-  licence), and the policy.
+  licence), and the policy. *Tried:* 18 November 2026 (#586), nuget-license 4.0.18 (Apache-2.0) and `dotnet list package
+  --include-transitive --format json` on .NET SDK 10.0.404, on 25 projects built from the kinds of package the core's
+  tests make, each restored from a local feed; the core's reading kept, on measure, the check unchanged. Neither reads a
+  licence before a restore has run the pull request's project files: nuget-license takes only a project or solution and
+  reads its packages from the assets file a restore writes (with none, it stops), reading each licence from the `.nupkg`
+  in the folder that restore filled, hash unchecked, so a package swapped there after the restore read MIT for a GPL-3.0
+  one, and asking the project's sources over the network for one that is missing; `dotnet list package` reads no licence
+  at all, restores by itself unless told not to, and missed a PackageDownload. Against the core, on the same 25:
+  nuget-license read the same licence in 17, read another in 5 and nothing in 3 (a crash on a non-breaking space, a
+  package NuGet would not restore, the PackageDownload), and passed 7 the core fails (a licence file and a licence
+  address it guessed from, an AND and OR without brackets, a WITH, two version ranges, the PackageDownload), failing
+  none the core passes; it holds no exact version, no owner's yes, no audit and no base. *Replayed:* #240, #274 and #280
+  read, after a restore (MSBuild follows the Import that brings the GPL-3.0 package, though nuget-license holds no lock
+  file, so #240's lock file kept elsewhere goes unheld); #269 not read (a package folder the pull request names, its
+  package altered to say MIT, passes the locked restore and nuget-license alike); #373, #380, #366, #386 and #355 not
+  run (a billed job, the first look's choice to restore, the configs' paths, and a change of shape: none a reading of a
+  package); #446 not run (open, with no fix).
 - `.github/workflows/core.yml`, `scripts/copy-tree.mjs`, `scripts/core-path.mjs`, `scripts/core-address.mjs`,
   `scripts/releases.mjs`, `.gitattributes`, `tests/core-yml-test.mjs`: fail a project whose copy is not the core, whole,
   at the commit its manifest pins, or whose calls to the core's workflows are pinned elsewhere. *Runs:* the runners,
@@ -197,9 +229,10 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   files.
 - `.github/workflows/codeql.yml`: runs the host's CodeQL on a public project's pull requests, its pushes and weekly.
   *Runs:* the runners. *Else:* it is the host's maintained tool already. On a private repository it is paid, so a
-  private project does not call it (`README.md`, "A private repository") and has no scan of its code; Opengrep
-  (LGPL-2.1, a program, a fork of Semgrep's engine) would give it one, a case filed as #546. *Bugs:* 1. **Keep** for a
-  public project.
+  private project does not call it (`README.md`, "A private repository") and has no scan of its code; Semgrep's
+  engine (LGPL-2.1, from PyPI), with the core's own rules, will give it one (`CHOICES.md`, "Choice: a private
+  project's code is scanned by Semgrep's engine, with the core's own rules"; built under #546). *Bugs:* 1. **Keep**
+  for a public project.
 
 - `scripts/mend.mjs`: the form of a check's failure, a line that opens `FAIL` and says the mend, which every check's
   test reads; its test holds each check of the core to a test that reads its mends, each tracked file to a line of this
@@ -207,13 +240,6 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   core's suites; any session by hand. *Else:* none: it reads no format of anyone else's, the form and what the test
   holds being the core's own rules (`AGENTS.md`, "A check that fails says the mend"). *Bugs:* 9 labelled `bug` name
   either file, by their titles each a fault of another part. **Keep**: no package fits, the job being the core's own.
-- `third-party/`, `scripts/third-party.mjs`: the packages of other publishers the core's scripts run, carried in the
-  copy, each at one exact version taken byte for byte from its registry's tarball, with its list, its notices and its
-  digest, and the script that loads a package and holds what is carried to its list (#528). *Runs:* wherever a script
-  that reads a package runs: any session and the runners, from the copy, with nothing installed or fetched. *Else:* it
-  is the way #486's record settled for a package to reach a project, and #519's record kept, carried and never fetched
-  while a check runs. *Bugs:* 1 (#610, in the YAML package's reading, which `scripts/yaml-keys.mjs` meets). **Keep**: it
-  is the package rule's own means (`tasks/code-shape.md`, "A job a maintained package does is done by it").
 - `scripts/screens.mjs`: holds a project's screen checks to their baseline, where the project turns one on and its own
   tool writes what it found (`tasks/screens.md`). *Runs:* the runners, in a project with a screen; here its test alone,
   the core taking no screen module (`AGENTS.md`). *Else:* not weighed: the reading is the project's own tool's, and the
@@ -232,7 +258,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   for the selection, Jest's related tests, Vitest's changed mode and Nx's affected, dropped on fact: each needs its
   framework and reads JavaScript alone, where `select.mjs` reads C# and Python too. *Bugs:* 17 naming `tests.yml`, 2
   `select.mjs`. **Keep** the selection: nothing fits. The upgrade test's runner of workflows
-  (`scripts/workflow-run.mjs`) stays as #486 says: `act`, dropped on fact, needs a container a session cannot start.
+  (`scripts/workflow-run.mjs`) stays as #486 says: `act`, dropped on fact, needs a container a session cannot start;
+  its YAML is read by the YAML package (#530).
 - `scripts/mutate.mjs`, `scripts/strength.mjs`: the mutation tool puts faults into the lines a change touches, one at a
   time, and writes the open mutation report, which the strength check reads to say how strong the tests are. *Runs:* any
   session and the runners. *Else:* StrykerJS (Apache-2.0, 176 packages) and Stryker.NET, kept, tried above; mutmut and
@@ -259,7 +286,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   challenge, dropped on fact: its documentation of 17 November names no age a release must reach, which the script asks.
   *Bugs:* 1. **Keep:** fitting and keeping Renovate costs more than the script.
 - `scripts/release.mjs`, `.github/workflows/release.yml`: cuts `release-N` on `main`'s newest commit once every check
-  passed. *Runs:* the runners, started by hand. *Else:* release-please, semantic-release and changesets, dropped on
+  passed and its own run of the upgrade test on Windows, which it also runs once a day, cutting nothing. *Runs:* the
+  runners, started by hand, and daily. *Else:* release-please, semantic-release and changesets, dropped on
   fact: they write versions and notes from commit messages, which the core does not ask. *Bugs:* 0. **Keep:** small and
   stable.
 - `.github/workflows/delete-merged-branches.yml`: deletes the branches whose every commit is in `main`. *Runs:* the
@@ -272,7 +300,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
 - **What a session runs by hand** (`scripts/session-cost.mjs`, `scripts/labels.mjs`, `scripts/labels.json`,
   `scripts/inbox.mjs`, `scripts/state-report.mjs`, `scripts/pruning.mjs`, `scripts/cited.mjs`, `scripts/outcomes.mjs`,
   `scripts/outcomes-read.mjs`, `scripts/stand-in-record.mjs`, `scripts/review-record.mjs`, `scripts/review-rounds.mjs`,
-  `scripts/core-cost.mjs`, `scripts/fixes.mjs`, `scripts/test-record.mjs`, `scripts/tools-read.mjs`), a part the
+  `scripts/core-cost.mjs`, `scripts/fixes.mjs`, `scripts/test-record.mjs`, `scripts/tools-read.mjs`,
+  `scripts/merge-line.mjs`), a part the
   inventory did not list, found by the challenge: `scripts/session-cost.mjs` (the cost line a pull request ends with),
   `scripts/labels.mjs` (the labels and openers), `scripts/state-report.mjs`, `scripts/pruning.mjs`, and the records
   (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`, `scripts/core-cost.mjs`). *Runs:* any session. *Else:*
@@ -307,11 +336,19 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   measured: this session's network refused the host's release downloads, from which both, and most of the tools, are
   fetched (the tools tried here came through the Go and npm registries instead).
 - `scripts/init.mjs`, `scripts/steps.mjs`, `scripts/sync.mjs`, `scripts/fresh.mjs`, `scripts/check-configs.mjs`,
-  `scripts/steps-stage.mjs`, `setup/sync-notes.md`, `tests/init-dotnet-test.mjs`: the starter kit writes a new project's
+  `scripts/steps-stage.mjs`, `scripts/bash-commands.mjs`, `scripts/own-files.mjs`, `scripts/runners.mjs`,
+  `setup/sync-notes.md`, `tests/init-dotnet-test.mjs`: the starter kit writes a new project's
   files; the sync writes the copy at a newer commit and moves the pins; each step of the sync notes reads done or not.
   *Runs:* any session, in the project. *Else:* Copier and Cookiecutter, dropped on fact: Python and an install in the
   project, and #519 weighed the template; `git archive`, which the sync already uses. *Bugs:* 2, 8 and 4. **Keep:**
   nothing fits; what a release asks is the core's.
+- `scripts/install.mjs`, `scripts/packages.mjs`, `scripts/parser.mjs`, `scripts/parser-worker.mjs`, `.packages/`,
+  `.gitignore`: install the packages of other publishers the scripts run from the
+  core's lock file in `.packages/` into `.packages/node_modules/`, and the parser's from `.packages/parser/` only where
+  a job names it (#719), and load each from its own install alone, a missing one saying its mend (#654). *Runs:* any session, at its start and at each sync, and on the host's runners before each check.
+  *Else:* npm's own `npm ci`, which does the install, kept; a folder of carried packages (#528), dropped on the owner's
+  decision of 18 November 2026. *Bugs:* none. **Keep:** the install is npm's; the scripts run it once more after a
+  failed fetch and say the mend.
 - **What the starter kit holds** (`setup/template/`, 32 files on 17 November 2026), weighed by the challenge: eight
   templates of rule files and records, exempt as content (#534, point 9); three of hooks, weighed in the hook's line
   above; three of Dependabot, the host's own format already; three configs of the core's checks and twelve workflows,
@@ -409,7 +446,8 @@ as the trials above were, over the scripts on `main` that day (36,896 lines of J
   the sessions already keep.
 - **A scan of the packages for known faults.** *Else:* the host's Dependabot alerts, free on a private repository too,
   whose alerts the owner reads and passes on (floor rule 9); OSV-Scanner (Apache-2.0, one program). **Keep** without
-  one: the core carries no package yet, and the first comes only after #488's points 1, 3, 4 and 5; weighed again then.
+  one: the core's packages stand in its lock file since #654, which the host's Dependabot alerts read; #650 brings the
+  scan against a vulnerability database.
 - **A type checker.** **Keep** without it: #519's record weighed it on 33 fixed bugs and a writing trial, and found no
   fault it would have caught.
 - **A linter for Markdown.** *Else:* markdownlint-cli2 (MIT, 89 packages). **Keep** without it, on a measure the
@@ -496,5 +534,5 @@ points 1, 3, 4 and 5 have merged. What the challenge proposes is not among them 
    staged cases; and of what the core lacks, **try** a general linter for its scripts (oxlint, then Biome), ShellCheck
    with actionlint, and knip after the linter.
 2. The reading under the package checks: **replace** with `npm sbom`; **try** nuget-license and the SDK's own list.
-3. The packages carried in the copy: as #486's inventory and #519's path have them.
+3. The packages, installed from the core's lock file (#654): as #486's inventory and #519's path have them.
 4. The form the rules are delivered in: **try** the skill format (#534, point 8).

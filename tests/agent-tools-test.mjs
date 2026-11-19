@@ -8,11 +8,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { kitHooks, listed } from "../scripts/agent-tools.mjs";
+import { kitHooks, listed, printed } from "../scripts/agent-tools.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { kitForm } from "../scripts/hook-source.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { STEPS, notDone } from "../scripts/steps.mjs";
 import { parseToml } from "../scripts/toml.mjs";
+import { parserLeftOut } from "../scripts/packages.mjs";
 
 const SCRIPT = fileURLToPath(new URL("../scripts/agent-tools.mjs", import.meta.url));
 const template = name => fs.readFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), "utf8");
@@ -35,6 +37,8 @@ const write = (dir, file, text) => { fs.mkdirSync(path.dirname(path.join(dir, fi
 const withPlugins = plugins => JSON.stringify({ ...JSON.parse(KIT), enabledPlugins: plugins }, null, 2);
 const PLUGIN = { kind: "plugin", name: "helper@example-market", publisher: "Example Tools", version: "1.4.0" };
 
+// A link to `to`, as a value of `files`, made as the file system makes one (git stores it as one, mode 120000).
+const LINK = Symbol("link"), link = to => ({ [LINK]: to });
 // A project as the starter kit writes it: its hooks' settings and a licence config with no list. `files` replaces or
 // adds files; a null removes one.
 function project(files = {}) {
@@ -51,7 +55,8 @@ function project(files = {}) {
 function change(dir, files) {
   for (const [file, text] of Object.entries(files)) {
     if (text === null) fs.rmSync(path.join(dir, file), { force: true, recursive: true });
-    else write(dir, file, typeof text === "string" ? text : JSON.stringify(text, null, 2));
+    else if (text?.[LINK] !== undefined) { fs.rmSync(path.join(dir, file), { force: true, recursive: true }); fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.symlinkSync(text[LINK], path.join(dir, file)); }
+    else { try { if (fs.lstatSync(path.join(dir, file)).isSymbolicLink()) fs.rmSync(path.join(dir, file)); } catch { /* (nothing there) */ } write(dir, file, typeof text === "string" ? text : JSON.stringify(text, null, 2)); }
   }
 }
 // The pull request: the change committed on a branch and merged into main with --no-ff, as GitHub's merge checkout has
@@ -65,7 +70,14 @@ function pr(dir, files) {
   git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change");
   return dir;
 }
-const run = (dir, ...args) => { const r = spawnSync(process.execPath, [SCRIPT, "checks/licences.json", ...args], { cwd: dir, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
+// (the check is called here, as its command calls it, and what it prints read as a run of it would give it: its output,
+// then its errors; the command itself, run as a program, by cli, where that is what a case reads; #715)
+const run = (dir, ...args) => {
+  const { lines, status } = printed(dir, "checks/licences.json", { core: args.includes("--core") });
+  const of = stream => lines.filter(([s]) => s === stream).map(([, l]) => `${l}\n`).join("");
+  return { status, out: `${of("out")}${of("err")}` };
+};
+const cli = (dir, ...args) => { const r = spawnSync(process.execPath, [SCRIPT, "checks/licences.json", ...args], { cwd: dir, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 const passes = (r, what) => ok(r.status === 0 && !/FAIL/.test(r.out), what, r.out);
 const fails = (r, what, ...says) => ok(r.status === 1 && mended(r.out) && says.every(s => r.out.includes(s)), `${what}, and says the mend`, r.out);
 
@@ -87,6 +99,12 @@ fails(run(project({ ".claude/settings.json": JSON.stringify(slower), "checks/lic
 passes(run(project()), "a project as the starter kit writes it, with no list, passes");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } })), "and with an empty list");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } }), "--core"), "in the core's own repository too");
+// (the command prints what the check gives, and exits as it says, as the cases here read it)
+for (const [dir, what] of [[project(), "passes"], [project({ ".claude/settings.json": JSON.stringify(slower), "checks/licences.json": { lockfiles: [], agentTools: [] } }), "fails"]]) {
+  const asRun = cli(dir), asCalled = run(dir);
+  ok(asRun.status === asCalled.status && asRun.out === asCalled.out, `the command, on a project that ${what}, prints what the check gives and exits ${asCalled.status}`, `${asRun.status}\n${asRun.out}\n----\n${asCalled.out}`);
+}
+{ const r = spawnSync(process.execPath, [SCRIPT], { cwd: project(), encoding: "utf8" }); ok(r.status === 2 && r.stderr.includes("usage: "), "the command with no config says how it is run and exits 2", `${r.status}\n${r.stderr}`); }
 
 // ---- with a list ----
 const listing = (...entries) => ({ "checks/licences.json": { lockfiles: [], agentTools: entries } });
@@ -115,38 +133,136 @@ fails(run(project({ ...listing({ kind: "extension", name: "x", publisher: "y", v
 fails(run(project({ "checks/licences.json": { lockfiles: [], agentTools: {} } })), "a list that is no list fails", '"agentTools" is no list');
 fails(run(project({ ".mcp.json": "{ not json" })), "a tool's settings that are no JSON fail", ".mcp.json cannot be read as a JSON object");
 fails(run(project({ "checks/licences.json": "{" })), "a config that is no JSON fails", "checks/licences.json cannot be read");
+// ---- links where a tool reads its files: none is followed (git's mode 120000 says what a link is) ----
+// (each case one a past review found of the reading that followed links, #600 to #706: a new or changed link fails
+// whatever it leads to; one the base held is noted, and fails only where the pull request changes what its text names)
 if (LINKS) {
-// links: one inside the checkout is followed, as the tool that reads it follows it; one that leads out is not
-const inside = project({ ...listing() });
-fs.mkdirSync(path.join(inside, "shared/notes"), { recursive: true });
-fs.writeFileSync(path.join(inside, "shared/notes/SKILL.md"), "x");
-fs.mkdirSync(path.join(inside, ".claude/skills"), { recursive: true });
-fs.symlinkSync("../../shared/notes", path.join(inside, ".claude/skills/notes"));
-fails(run(inside), "a skill linked from inside the checkout is read, so it fails unlisted", 'the skill "notes"');
-const away = fs.mkdtempSync(path.join(os.tmpdir(), "agent-tools-"));
-made.push(away);
-fs.writeFileSync(path.join(away, "settings.json"), withPlugins({ "helper@example-market": true }));
-const out = project({ ...listing() });
-fs.rmSync(path.join(out, ".claude/settings.json"));
-fs.symlinkSync(path.join(away, "settings.json"), path.join(out, ".claude/settings.json"));
-fails(run(out), "a settings file linked from outside the checkout fails, never followed", '".claude/settings.json" is a link that leads out of the checkout');
-const outSkills = project({ ...listing() });
-fs.symlinkSync(away, path.join(outSkills, ".claude/skills"));
-fails(run(outSkills), "and so does a skills folder linked from outside", '".claude/skills" is a link that leads out');
-// what stood before turns nothing red: a skill linked inside the checkout, or a link out of it, the base held
-const linkedBase = project();
-fs.mkdirSync(path.join(linkedBase, "shared/notes"), { recursive: true });
-fs.writeFileSync(path.join(linkedBase, "shared/notes/SKILL.md"), "x");
-fs.mkdirSync(path.join(linkedBase, ".claude/skills"), { recursive: true });
-fs.symlinkSync("../../shared/notes", path.join(linkedBase, ".claude/skills/notes"));
-fs.symlinkSync(path.join(away, "settings.json"), path.join(linkedBase, ".mcp.json"));
-git(linkedBase, "add", "-A"); git(linkedBase, "commit", "-q", "-m", "links");
-const kept = run(pr(linkedBase, { "README.md": "a change of its own\n" }));
-ok(kept.status === 0 && /note .*"\.mcp\.json" is a link .*as the base held it/.test(kept.out) && /not listed, as the base held them: the skill "notes"/.test(kept.out), "a skill linked inside the checkout and a link out of it, both held by the base, are noted and fail nothing", kept.out);
-const fileBase = project({ ".mcp.json": path.join(away, "settings.json") });
-fs.rmSync(path.join(fileBase, ".mcp.json"));
-fs.symlinkSync(path.join(away, "settings.json"), path.join(fileBase, ".mcp.json"));
-fails(run(pr(fileBase, { "README.md": "a change of its own\n" })), "a link out of the checkout where the base held a file of the same text fails: only a link the base held stands", '".mcp.json" is a link that leads out');
+  const LINKED = "is a link where an agent tool reads its files, and this check follows no link";
+  const away = fs.mkdtempSync(path.join(os.tmpdir(), "agent-tools-"));
+  made.push(away);
+  fs.writeFileSync(path.join(away, "settings.json"), withPlugins({ "helper@example-market": true }));
+  const shared = { "shared/notes/SKILL.md": "# notes\n", "shared/settings.json": withPlugins({ "helper@example-market": true }) };
+  // (a link added by a pull request, at each kind of place a tool reads, to each kind of place: it fails as a link)
+  for (const [at, to, what] of [
+    [".claude/skills/notes", "../../shared/notes", "a skill linked inside the checkout, listed or not"],
+    [".claude/settings.json", path.join(away, "settings.json"), "a settings file linked out of the checkout"],
+    [".claude/skills", away, "a skills folder linked out of the checkout"],
+    [".mcp.json", "shared/settings.json", "a tool server's file linked inside the checkout"],
+    [".claude/skills/sub", "../../vendor/sub", "a skill's folder linked to a submodule"],
+    [".kiro/settings", "../Shared", "a link to a name the commit holds only in another case"],
+    [".claude/skills/s", "..\\..\\shared\\notes", "a link whose text only Windows reads as a path"],
+    [".claude/agents/x", "../../node_modules/pkg/agents", "a link below agents into an installed package"],
+    [".claude/agents", "../shared", "a folder of agents that is a link"],
+    [".claude", "shared", ".claude itself as a link"],
+    [".Claude", "shared", "a .claude link in another case beside a plain .claude"],
+    [".claude/commands/c.md", "../../shared/notes/SKILL.md", "a command's file that is a link"],
+    [".kiro/hooks/lint.json", "../../shared/settings.json", "a Kiro hook file that is a link"],
+    [".codex", "shared", "Codex's folder as a link"],
+  ]) fails(run(pr(project({ ...shared, ...listing({ kind: "skill", name: "notes", publisher: "this project" }) }), { [at]: link(to) })), `${what} fails, whatever it leads to`, `"${at}" ${LINKED}`);
+  // (a file the base held, made a link to a place of the same text, is a link added)
+  fails(run(pr(project({ ".mcp.json": withPlugins({}) }), { ".mcp.json": link(path.join(away, "settings.json")) })), "a link where the base held a file of the same text fails", `".mcp.json" ${LINKED}`);
+  // (a link elsewhere in the project is none of this check's)
+  passes(run(pr(project({ ...shared, ...listing() }), { "docs/notes": link("../shared/notes") })), "a link where no tool reads its files is none of the agent tools'");
+
+  // (what stood before turns nothing red: a link the base held, the same link to the same target, is noted)
+  const heldLinks = project({ ...shared, ".claude/skills/notes": link("../../shared/notes"), ".mcp.json": link(path.join(away, "settings.json")), ".claude/agents/x": link("../../node_modules/pkg/agents") });
+  const stood = run(pr(heldLinks, { "README.md": "a change of its own\n" }));
+  ok(stood.status === 0 && stood.out.includes(`as the base held it, nothing fails here: ".mcp.json" ${LINKED}`) && stood.out.includes(`".claude/skills/notes" ${LINKED}`) && stood.out.includes(`".claude/agents/x" ${LINKED}`), "links the base held, inside the checkout, out of it and into an installed package, are noted and fail nothing", stood.out);
+  passes(run(pr(heldLinks, { "shared/notes/README.md": "beside the skill\n" })), "nor once a file beside what one leads to, which no tool reads, changes");
+  // (#709's security review of c5deb9a: one into what an install fills is reported as such, never failed, since no list
+  // can name every file that steers an install, and failing each pull request would lock the project)
+  const filled = run(pr(project({ ...shared, ".claude/agents/x": link("../../node_modules/pkg/agents") }), { "package-lock.json": "{}\n" }));
+  ok(filled.status === 0 && filled.out.includes("one an install fills (node_modules, a virtual environment), so what an install puts there, which this check cannot read"), "one the base held into an installed package is reported as such, never failed, as its lock changes", filled.out);
+  passes(run(pr(heldLinks, { "shared/settings.json": withPlugins({ "other@example-market": true }) })), "nor once the place a link out of the checkout's name names in the checkout changes, which is no tool's");
+  fails(run(pr(heldLinks, { ".claude/skills/notes": link("../../shared/other") })), "but one the base held, moved, is new", `".claude/skills/notes" ${LINKED}`);
+  fails(run(heldLinks, "--core"), "and in the core's own repository none may stand", `".mcp.json" ${LINKED}`);
+  const pushed = project({ ".claude/skills/notes": link("../../shared/notes"), ...shared });
+  const noBase = run(pushed);
+  ok(noBase.status === 0 && noBase.out.includes(`with no base to read against, nothing fails here: ".claude/skills/notes" ${LINKED}`), "with no base, as on a push, one is noted", noBase.out);
+
+  // (and fails where the pull request changes what its text names: a new skill, a hook, a submodule, a link further along)
+  const behind = project({ ...shared, ".claude/skills": link("../shared/skills"), "shared/skills/notes/SKILL.md": "# notes\n", ".claude/settings.json": link("../shared/settings.json"), ".kiro/settings": link("../cfg") , "cfg/mcp.json": "{}\n" });
+  const BEHIND = "which the base held, and this pull request changes";
+  fails(run(pr(behind, { "shared/skills/evil/SKILL.md": "# evil\n" })), "a skill a pull request adds behind a link the base held fails", `".claude/skills" is a link`, BEHIND, '"shared/skills/evil/SKILL.md"');
+  fails(run(pr(behind, { "shared/skills/notes/SKILL.md": "---\nname: notes\nallowed-tools: Bash\n---\n" })), "and so does a skill changed there", BEHIND);
+  fails(run(pr(behind, { "shared/settings.json": withPlugins({ "other@example-market": true }) })), "and a settings file changed behind its link", `".claude/settings.json" is a link`, BEHIND);
+  fails(run(pr(behind, { "shared/skills": null })), "and the folder it names taken out", BEHIND);
+  fails(run(pr(behind, { cfg: link("elsewhere") , "cfg/mcp.json": null })), "and a link on its way, made further along", `".kiro/settings" is a link`, BEHIND, '"cfg"');
+  passes(run(pr(behind, { "shared/skills/notes/run.sh": "echo a helper\n", "shared/skills/README.md": "x\n" })), "while a file there that no tool reads as a tool's changes nothing");
+  fails(run(pr(project({ ...shared, ".claude/skills/s": link("..\\..\\shared\\notes") }), { "shared/notes/SKILL.md": "---\nname: s\nallowed-tools: Bash\n---\n" })), "and one whose text Windows reads by its backslashes, once what that names changes", BEHIND, '"shared/notes/SKILL.md"');
+  {
+    const sub = project({ ...shared, ".claude/skills": link("../shared/skills"), "shared/skills/notes/SKILL.md": "# notes\n" });
+    git(sub, "checkout", "-q", "-B", "change");
+    fs.mkdirSync(path.join(sub, "shared/skills/vendored"), { recursive: true });
+    git(sub, "update-index", "--add", "--cacheinfo", `160000,${git(sub, "rev-parse", "HEAD")},shared/skills/vendored`);
+    git(sub, "commit", "-q", "-m", "a submodule behind the link"); git(sub, "checkout", "-q", "main"); git(sub, "merge", "-q", "--no-ff", "-m", "merge", "change");
+    fails(run(sub), "and a submodule put behind it", BEHIND, '"shared/skills/vendored"');
+  }
+  const passing = project({ ...shared, "a/b": link("../shared"), ".claude/skills": link("../a/b/skills"), "shared/skills/notes/SKILL.md": "# notes\n" });
+  const past = run(pr(passing, { "shared/skills/evil/SKILL.md": "# evil\n" }));
+  ok(past.status === 0 && past.out.includes("the way to what its text names passes a link, which this check does not follow"), "one whose way passes another link is reported, never failed, what lies past it unread", past.out);
+
+  // (#709's fallback security review of c5deb9a: what a link's text names is read as Linux reads it, a ".." after a link
+  // on its way and Unicode's forms among it, a submodule's change is seen whatever .gitmodules says, and a link to the
+  // checkout's root is held by all a tool reads below it)
+  fails(run(pr(project({ ".claude/skills": link("../x/../y"), "x/k": "x\n", "a/b/y/.keep": "", "y/notes/SKILL.md": "# notes\n" }), { x: link("a/b"), "a/b/y/evil/SKILL.md": "# evil\n" })), "a link the base held whose way steps out of a folder the pull request makes a link fails", BEHIND, '"x"');
+  fails(run(pr(project({ ".claude/skills": link("../caf\u00e9"), "caf\u00e9/notes/SKILL.md": "# notes\n" }), { "cafe\u0301/evil/SKILL.md": "# evil\n" })), "and one where a skill is added under the name in another of Unicode's forms", BEHIND);
+  fails(run(pr(project({ ".claude/skills": link(".."), "README.md": "x\n" }), { "evil/SKILL.md": "# evil\n" })), "and one to the checkout's root, once a skill is added there", BEHIND, '"evil/SKILL.md"');
+  {
+    const ignored = project({ ".claude/skills": link("../stash"), "stash/notes/SKILL.md": "# notes\n", ".gitmodules": "" });
+    fs.mkdirSync(path.join(ignored, "stash/evil"), { recursive: true });
+    git(ignored, "update-index", "--add", "--cacheinfo", `160000,${git(ignored, "rev-parse", "HEAD")},stash/evil`); git(ignored, "commit", "-q", "-m", "a submodule");
+    git(ignored, "checkout", "-q", "-B", "change"); fs.writeFileSync(path.join(ignored, ".gitmodules"), '[submodule "evil"]\n\tpath = stash/evil\n\turl = ./x\n\tignore = all\n');
+    git(ignored, "update-index", "--add", "--cacheinfo", `160000,${git(ignored, "rev-parse", "HEAD")},stash/evil`); git(ignored, "add", ".gitmodules"); git(ignored, "commit", "-q", "-m", "moved, its change ignored");
+    git(ignored, "checkout", "-q", "main"); git(ignored, "merge", "-q", "--no-ff", "-m", "merge", "change");
+    fails(run(ignored), "and one whose submodule behind it moves, though .gitmodules says to ignore its changes", BEHIND, '"stash/evil"');
+  }
+  const outsideHeld = run(pr(project({ ".claude/skills": link(away) }), { "README.md": "x\n" }));
+  ok(outsideHeld.status === 0 && outsideHeld.out.includes("its text leaves the checkout or names a whole path, so what this pull request changes where it leads is not read"), "one that leaves the checkout is reported so, never failed", outsideHeld.out);
+  // (a tool held as the base's where a link is replaced with its files is the same tool, read with all the base's files)
+  const market = () => project({ ".claude/settings.json": link("../conf/settings.json"), "conf/settings.json": withPlugins({ "foo@m": true }) });
+  fails(run(pr(market(), { ".claude/settings.json": withPlugins({ "foo@m": true }), ".claude/settings.local.json": { extraKnownMarketplaces: { m: { source: { source: "github", repo: "example/other" } } } } })), "a link replaced with its files, a plug-in there made another by a marketplace a file beside it declares, is new", 'the plug-in "foo@m", configured in .claude/settings.json, is new');
+  passes(run(pr(market(), { ".claude/settings.json": withPlugins({ "foo@m": true }) })), "while the same plug-in, its files the link's alone, stands as the base's");
+  // (#709's code review of c5deb9a: a hook that takes a file from the working tree, behind a link the base held, stands
+  // as the base's once the link is replaced with its files; and a checkout with core.symlinks off, which writes a link as a
+  // plain file of its text, reads it as a link still)
+  {
+    const hooked = JSON.parse(KIT);
+    hooked.hooks.Stop = [{ hooks: [{ type: "command", command: "bash scripts/format.sh" }] }];
+    const text = JSON.stringify(hooked, null, 2), hookBase = project({ ".claude/settings.json": link("../conf/settings.json"), "conf/settings.json": text, "scripts/format.sh": "echo\n" });
+    const hookMend = run(pr(hookBase, { ".claude/settings.json": text }));
+    ok(hookMend.status === 0 && hookMend.out.includes("as the base held it, nothing fails here"), "a hook from the working tree behind a link the base held, the link replaced with its files, is noted as the base's", hookMend.out);
+    // (#709's code review of e2f2f28: and a pin breach a tool behind such a link held, the link replaced with its files)
+    const unpinned = JSON.stringify({ mcpServers: { files: { command: "npx", args: ["-y", "@example/files-server"] } } }, null, 2);
+    const pinBase = project({ ".mcp.json": link("conf/mcp.json"), "conf/mcp.json": unpinned, ...listing({ kind: "server", name: "files", publisher: "Example Tools", version: "2.0.0" }) });
+    const pinMend = run(pr(pinBase, { ".mcp.json": unpinned }));
+    ok(pinMend.status === 0 && pinMend.out.includes("as the base held it, nothing fails here: the tool server") && pinMend.out.includes("fetched at no fixed version"), "a pin breach of a tool server behind a link the base held, the link replaced with its files, is noted as the base's", pinMend.out);
+    const plain = project({ ...shared, ".claude/skills/notes/SKILL.md": link("../../../shared/notes/SKILL.md") });
+    git(plain, "config", "core.symlinks", "false");
+    fs.rmSync(path.join(plain, ".claude/skills/notes/SKILL.md")); fs.writeFileSync(path.join(plain, ".claude/skills/notes/SKILL.md"), "../../../shared/notes/SKILL.md");
+    const plainRun = run(pr(plain, { "README.md": "a change of its own\n" }));
+    ok(plainRun.status === 0 && plainRun.out.includes(`".claude/skills/notes/SKILL.md" ${LINKED}`), "a link a checkout with core.symlinks off writes as a plain file is read as a link, never as a skill", plainRun.out);
+  }
+  // (the mend: a link the base held replaced with the very files it named stands as the base's, a pull request that
+  // turns a link into files adds no link, and an entry the base listed behind its link stays a note until then)
+  const mendable = project({ ...shared, ".claude/skills/notes": link("../../shared/notes") });
+  passes(run(pr(mendable, { ".claude/skills/notes": null, ".claude/skills/notes/SKILL.md": "# notes\n" })), "a link the base held replaced with the files it led to passes, what they configure the base's");
+  // (#709's fallback check of 99a04a7: only where each step a ".." steps out of is a plain folder of the base's)
+  fails(run(pr(project({ ".claude/skills": link("nope/../stash"), ".claude/stash/evil/SKILL.md": "# evil\n" }), { ".claude/skills": null, ".claude/skills/evil/SKILL.md": "# evil\n" })), "one replaced with the files its words name, where a \"..\" steps out of no folder the base held, is new", 'the skill "evil"');
+  const other = run(pr(project({ ...shared, ".claude/skills/notes": link("../../shared/notes") }), { ".claude/skills/notes": null, ".claude/skills/notes/SKILL.md": "# other\n" }));
+  ok(other.status === 1 && !other.out.includes(LINKED) && other.out.includes('the skill "notes", configured in .claude/skills/notes/SKILL.md, is new in this pull request') && mended(other.out), "one replaced with other files adds no link, and fails only for what it configures anew, saying to list it", other.out);
+  const listedBehind = project({ ...shared, ".claude/skills/notes": link("../../shared/notes"), ...listing({ kind: "skill", name: "notes", publisher: "this project" }) });
+  const unseen = run(pr(listedBehind, { "README.md": "a change of its own\n" }));
+  ok(unseen.status === 0 && unseen.out.includes('as the base held it, nothing fails here: checks/licences.json: "agentTools" lists the skill "notes", which nothing configures'), "an entry the base listed behind a link it held, which no reading here follows, is noted", unseen.out);
+  fails(run(pr(project({ ...shared, ...listing({ kind: "skill", name: "notes", publisher: "this project" }), ".claude/skills/notes/SKILL.md": "# notes\n" }), { ".claude/skills/notes": null })), "while one the pull request leaves configured by nothing fails", "which nothing configures");
+  ok(notDone(heldLinks, STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed"))[0]?.mend.includes(`".claude/skills/notes" ${LINKED}`), "the sync note's step reads not done while one stands, and names it");
+
+  // (a thousand links below a folder of agents, each to one folder of thousands of files, are read in seconds, #696)
+  const many = project({ ...Object.fromEntries(Array.from({ length: 3000 }, (_, i) => [`shared/big/${i}.md`, "x"])) });
+  for (let i = 0; i < 1000; i++) { fs.mkdirSync(path.join(many, ".claude/agents"), { recursive: true }); fs.symlinkSync("../../shared/big", path.join(many, `.claude/agents/l${i}`)); }
+  git(many, "add", "-A"); git(many, "commit", "-q", "-m", "many links");
+  const at = Date.now(), manyRun = run(pr(many, { "shared/big/new.md": "y" }));
+  ok(manyRun.status === 1 && Date.now() - at < 30000, "1,000 links the base held below agents, each to 3,000 files, are read in seconds", `${Date.now() - at} ms`);
 }
 const colon = JSON.parse(KIT);
 colon.hooks.Stop.push({ matcher: "Write: x", hooks: [{ type: "command", command: "y" }] });
@@ -156,22 +272,6 @@ twins.hooks.PostToolUse = [{ hooks: [http, { type: "command", command: JSON.stri
 fails(run(project({ ".claude/settings.json": JSON.stringify(twins), ...listing({ kind: "hook", name: `PostToolUse: ${JSON.stringify(http)}`, publisher: "this project" }) })), "two hooks that would share a name, one by its command and one by its text, fail", "share the name");
 // the base read through git's own tree as the working tree is read
 passes(run(pr(project({ ".claude/skills/résumé/SKILL.md": "x" }), { "README.md": "a change of its own\n" })), "a skill whose folder's name git would quote, held by the base, stays in its baseline");
-if (LINKS) {
-const settingsLinked = project();
-fs.writeFileSync(path.join(settingsLinked, "shared-settings.json"), withPlugins({ "helper@example-market": true }));
-fs.rmSync(path.join(settingsLinked, ".claude/settings.json"));
-fs.symlinkSync("../shared-settings.json", path.join(settingsLinked, ".claude/settings.json"));
-git(settingsLinked, "add", "-A"); git(settingsLinked, "commit", "-q", "-m", "linked settings");
-const viaLink = run(pr(settingsLinked, { "README.md": "a change of its own\n" }));
-ok(viaLink.status === 0 && /not listed, as the base held them: the plug-in "helper@example-market"/.test(viaLink.out), "a settings file linked inside the checkout is read at the base through its link, so what it held stays in the baseline", viaLink.out);
-const emptyTarget = project();
-fs.mkdirSync(path.join(emptyTarget, "shared/later"), { recursive: true });
-fs.writeFileSync(path.join(emptyTarget, "shared/later/README.md"), "x");
-fs.mkdirSync(path.join(emptyTarget, ".claude/skills"), { recursive: true });
-fs.symlinkSync("../../shared/later", path.join(emptyTarget, ".claude/skills/later"));
-git(emptyTarget, "add", "-A"); git(emptyTarget, "commit", "-q", "-m", "a link to a folder with no skill");
-fails(run(pr(emptyTarget, { "shared/later/SKILL.md": "x" })), "a skill a pull request adds behind a link the base held, where the base's target held none, is new", 'the skill "later", configured in .claude/skills/later/SKILL.md, is new in this pull request');
-}
 // a hook of another type that carries a command's text is not that command's hook, against the kit or the base
 const asWeb = JSON.parse(KIT);
 asWeb.hooks.Stop[0].hooks[0] = { type: "http", url: "https://hooks.example.invalid/x", command: asWeb.hooks.Stop[0].hooks[0].command };
@@ -180,23 +280,15 @@ const echoed = { hooks: { ...JSON.parse(KIT).hooks, PostToolUse: [{ hooks: [{ ty
 const toWeb = structuredClone(echoed);
 toWeb.hooks.PostToolUse[0].hooks[0] = { type: "http", url: "https://hooks.example.invalid", command: "echo hi" };
 fails(run(pr(project({ ".claude/settings.json": echoed }), { ".claude/settings.json": toWeb })), "and a command hook the base held, turned into a web hook with the same command, is new", "is new in this pull request");
-if (LINKS) {
-const skillsDirBase = project();
-fs.mkdirSync(path.join(skillsDirBase, "shared/skills/notes"), { recursive: true });
-fs.writeFileSync(path.join(skillsDirBase, "shared/skills/notes/SKILL.md"), "x");
-fs.symlinkSync("../shared/skills", path.join(skillsDirBase, ".claude/skills"));
-git(skillsDirBase, "add", "-A"); git(skillsDirBase, "commit", "-q", "-m", "a linked skills folder");
-passes(run(pr(skillsDirBase, { "README.md": "a change of its own\n" })), "and so is a skills folder linked inside the checkout, read at the base through its link");
 if (process.platform !== "win32") {
   const odd = run(project({ ".claude/skills/x\n::warning::injected/SKILL.md": "x", ...listing() }));
   ok(odd.status === 1 && !/^::warning::/m.test(odd.out) && mended(odd.out), "a skill folder's name with a line break in it prints on the failure's own line, so it writes no workflow command", odd.out);
-}
 }
 // a sync that changes the kit's hooks: the project's own, as the base's kit wrote them, still count as the core's
 const synced = project({ ...listing() });
 const HERE = fileURLToPath(new URL("..", import.meta.url));
 fs.cpSync(path.join(HERE, "scripts"), path.join(synced, "core/scripts"), { recursive: true });
-fs.cpSync(path.join(HERE, "third-party"), path.join(synced, "core/third-party"), { recursive: true });
+fs.cpSync(path.join(HERE, ".packages"), path.join(synced, "core/.packages"), { recursive: true, filter: parserLeftOut });
 fs.cpSync(path.join(HERE, "setup/template"), path.join(synced, "core/setup/template"), { recursive: true });
 git(synced, "add", "-A"); git(synced, "commit", "-q", "-m", "the copy");
 const newKit = JSON.parse(KIT);
@@ -310,43 +402,6 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   fails(run(project({ ...kits, ".kiro/hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing() })), "a Kiro hook of the project's own, not listed, fails", 'the hook "Kiro PostFileSave \\\\.ts$: npx eslint@9.0.0 --fix", configured in .kiro/hooks/lint.json, is not listed');
   passes(run(project({ ...kits, ".kiro/hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing(LINT) })), "and passes once listed");
   passes(run(project({ ".kiro/hooks/notes.md": "# not a hook file\n", ...listing() })), "a file under .kiro/hooks that is no JSON is no hook Kiro reads");
-  if (LINKS) {
-    // (#476's code review of adeba79: a folder linked to the checkout's root is read at the base as in the tree, so a hook it held stands)
-    const rootLinked = project({ "lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing() });
-    fs.mkdirSync(path.join(rootLinked, ".kiro"), { recursive: true });
-    fs.symlinkSync("..", path.join(rootLinked, ".kiro/hooks"));
-    git(rootLinked, "add", "-A"); git(rootLinked, "commit", "-q", "-m", "hooks at the root");
-    const rootKept = run(pr(rootLinked, { "README.md": "a change of its own\n" }));
-    ok(rootKept.status === 0 && /nothing fails here: the hook "Kiro PostFileSave/.test(rootKept.out), "a hook under a folder linked to the checkout's root, the base's, is noted, not failed", rootKept.out);
-    // (#476's code review of b786c88: a link's ".." steps back from where the links before it led, as the file system walks it)
-    const walked = project({ "config/sub/keep.md": "", "config/hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), "hooks/other.md": "", ...listing() });
-    fs.mkdirSync(path.join(walked, ".kiro"), { recursive: true });
-    fs.symlinkSync("config/sub", path.join(walked, "tools"));
-    fs.symlinkSync("../tools/../hooks", path.join(walked, ".kiro/hooks"));
-    git(walked, "add", "-A"); git(walked, "commit", "-q", "-m", "hooks through two links");
-    const walkedKept = run(pr(walked, { "README.md": "a change of its own\n" }));
-    ok(walkedKept.status === 0 && /nothing fails here: the hook "Kiro PostFileSave/.test(walkedKept.out), "a hook under a link whose \"..\" follows the links before it, the base's, is noted, not failed", walkedKept.out);
-    // (#476's code review of 56c2716: a file on a link's way is no folder, so ".." after it leads nowhere, as in the tree)
-    const blocked = project({ "blocker": "a file\n", "hooks/lint.json": kiroHook("bash scripts/run.sh"), "scripts/run.sh": "", ...listing() });
-    fs.mkdirSync(path.join(blocked, ".kiro"), { recursive: true });
-    fs.symlinkSync("../blocker/../hooks", path.join(blocked, ".kiro/hooks"));
-    git(blocked, "add", "-A"); git(blocked, "commit", "-q", "-m", "a link through a file");
-    git(blocked, "checkout", "-q", "-B", "change");
-    fs.unlinkSync(path.join(blocked, ".kiro/hooks"));
-    fs.symlinkSync("../hooks", path.join(blocked, ".kiro/hooks"));
-    git(blocked, "add", "-A"); git(blocked, "commit", "-q", "-m", "the link mended");
-    git(blocked, "checkout", "-q", "main"); git(blocked, "merge", "-q", "--no-ff", "-m", "merge", "change");
-    fails(run(blocked), "a hook a link turns on, where the base's link went through a file and so led nowhere, is new", 'the hook "Kiro PostFileSave');
-    // (#476's code review of 9a2907b: a folder reached through nine links is read at the base as in the tree, which follows forty)
-    const chained = project({ "hooks/lint.json": kiroHook("npx eslint@9.0.0 --fix"), ...listing() });
-    fs.symlinkSync("hooks", path.join(chained, "l1"));
-    for (let i = 2; i <= 8; i++) fs.symlinkSync(`l${i - 1}`, path.join(chained, `l${i}`));
-    fs.mkdirSync(path.join(chained, ".kiro"), { recursive: true });
-    fs.symlinkSync("../l8", path.join(chained, ".kiro/hooks"));
-    git(chained, "add", "-A"); git(chained, "commit", "-q", "-m", "hooks through nine links");
-    const chainedKept = run(pr(chained, { "README.md": "a change of its own\n" }));
-    ok(chainedKept.status === 0 && /nothing fails here: the hook "Kiro PostFileSave/.test(chainedKept.out), "a hook under a folder reached through nine links, the base's, is noted, not failed", chainedKept.out);
-  }
   const kiroServer = { ".kiro/settings/mcp.json": { mcpServers: { docs: { command: "npx", args: ["-y", "docs-server"] } } } };
   fails(run(pr(project({ ...listing() }), { ...kiroServer, ...listing({ kind: "server", name: "Kiro docs", publisher: "Example Tools", version: "2.0.0" }) })), "a Kiro tool server is held to the pin its configuration gives", 'the tool server "Kiro docs" is fetched at no fixed version: .kiro/settings/mcp.json, in the arguments of "docs", names no version');
   fails(run(project({ ...kiroServer, ".mcp.json": { mcpServers: { "Kiro docs": { command: "x" } } }, ...listing() })), "one server name in two files is refused", 'the tool server "Kiro docs" is configured in .mcp.json too');
@@ -388,7 +443,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   fails(run(pr(older, { ".codex/config.toml": "notify = [\"notify-send\", \"again\"]\n" })), "and one the pull request adds or changes fails", 'the hook "Codex notify: notify-send again"');
   const listedOnce = project({ ".codex/config.toml": "notify = [\"notify-send\", \"done\"]\n", ...listing({ kind: "hook", name: "Codex notify: notify-send done", publisher: "this project" }) });
   fails(run(pr(listedOnce, listing())), "while an entry the base's list held, taken out, fails: the list only grows true", 'the hook "Codex notify: notify-send done", configured in .codex/config.toml, is not listed');
-  fails(run(project({ ".codex/config.toml": "[mcp_servers.x]\ncommand = \"npx\"\ncommand = \"node\"\n", ...listing() })), "a config.toml Codex would refuse is refused", ".codex/config.toml cannot be read as TOML (line 3: the key \"command\" is given twice)");
+  fails(run(project({ ".codex/config.toml": "[mcp_servers.x]\ncommand = \"npx\"\ncommand = \"node\"\n", ...listing() })), "a config.toml Codex would refuse is refused", ".codex/config.toml cannot be read as TOML (line 3: trying to redefine an already defined table or value)");
 }
 
 // ---- where each hook's command comes from (#407; floor rule 3) ----
@@ -410,6 +465,107 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
     fails(added(KIT_HOOK.replace("main:scripts/format.sh", `main:${spelt}`)), `and one that fetches ${spelt}, another spelling of a file`, NOT_KIT);
   passes(added(KIT_HOOK), "a new hook in the kit's form passes");
   passes(added(kitCommand(" check now")), "and so does one with plain words after its script, which main's copy reads");
+  // (the settings by which Claude Code runs a command of its own, read as hooks are)
+  const withSetting = (key, value) => ({ ".claude/settings.json": { ...JSON.parse(KIT), [key]: value } });
+  const named = (key, command) => ({ kind: "hook", name: `${key}: ${command}`, publisher: "this project" });
+  for (const [key, value] of [["apiKeyHelper", TREE_HOOK], ["awsAuthRefresh", TREE_HOOK], ["awsCredentialExport", TREE_HOOK], ["gcpAuthRefresh", TREE_HOOK], ["otelHeadersHelper", TREE_HOOK], ["statusLine", { type: "command", command: TREE_HOOK }], ["fileSuggestion", { type: "command", command: TREE_HOOK }]])
+    fails(run(pr(project({ ...script, ...listing() }), { ...withSetting(key, value), ...listing(named(key, TREE_HOOK)) })), `Claude Code's "${key}" not in the kit's form fails as a hook does`, NOT_KIT);
+  passes(run(pr(project({ ...script, ...listing() }), { ...withSetting("statusLine", { type: "command", command: KIT_HOOK }), ...listing(named("statusLine", KIT_HOOK)) })), "one in the kit's form passes, listed");
+  // (and Codex's model providers' commands that print a token)
+  for (const key of ["auth", "gateway_oauth.credential_export"])
+    fails(run(pr(project({ ...script, ...listing() }), { ".codex/config.toml": `[model_providers.p.${key}]\ncommand = "bash"\nargs = ["scripts/format.sh"]\n`, ...listing({ kind: "hook", name: `Codex model_providers.p.${key}: bash scripts/format.sh`, publisher: "this project" }) })), `Codex's "model_providers.p.${key}" fails as a setting of no kit's form does`, "is of a kind no starter kit writes");
+  fails(run(pr(project({ ...script, ...listing() }), withSetting("statusLine", { type: "command", command: KIT_HOOK }))), "and fails unlisted", 'the hook "statusLine: ');
+  fails(run(pr(project({ ...script, ...listing() }), withSetting("apiKeyHelper", ["bash", "x"]))), "a setting of another shape is refused", '"apiKeyHelper" is neither a command nor');
+  // (#633's fallback security review of b0f654f: a hook the base held under an event of a setting's name, which never ran,
+  // moved into that setting, is new)
+  const asEvent = { ...JSON.parse(KIT), hooks: { ...JSON.parse(KIT).hooks, statusLine: [{ hooks: [{ type: "command", command: TREE_HOOK }] }] } };
+  fails(run(pr(project({ ...script, ".claude/settings.json": asEvent }), withSetting("statusLine", { type: "command", command: TREE_HOOK }))), "a hook the base held under a setting's name, moved into the setting, is new", NOT_KIT);
+  // (and what else a tool runs by itself: the hooks of a skill's or a subagent's frontmatter, a remote server's and a
+  // marketplace's command for its headers, a marketplace's command source, and a Codex model provider, held whole)
+  const front = key => `---\nname: rev\n${key}:\n  Stop:\n    - hooks:\n        - type: command\n          command: ${TREE_HOOK}\n---\n# rev\n`;
+  const SKILL = { kind: "skill", name: "rev", publisher: "this project" };
+  for (const [what, files] of [
+    ["a subagent's frontmatter", { ".claude/agents/rev.md": front("hooks") }],
+    ["a skill's frontmatter, its key in another case", { ".claude/skills/rev/SKILL.md": front("Hooks"), ...listing(SKILL) }],
+    ["a frontmatter whose key is quoted with an escape", { ".claude/agents/rev.md": front('"ho\\u006fks"') }],
+    ["a marketplace's headersHelper", withSetting("extraKnownMarketplaces", { m: { source: { source: "github", repo: "example/m" }, headersHelper: TREE_HOOK } })],
+    ["a marketplace's command source", withSetting("extraKnownMarketplaces", { m: { source: { source: "settings", plugins: [{ name: "p", source: { source: "command", command: TREE_HOOK } }] } } })],
+    ["a Codex model provider whose token command, in the kit's form, runs in another folder", { ".codex/config.toml": `[model_providers.p.auth]\ncommand = "bash"\nargs = ["-c", ${JSON.stringify(KIT_HOOK.slice("bash -c '".length, -1))}]\ncwd = "sub"\n`, ...listing(SKILL, { kind: "hook", name: `Codex model_providers.p.auth: bash -c ${KIT_HOOK.slice("bash -c '".length, -1)}`, publisher: "this project" }) }],
+    ["a Codex model provider with no command, by where it sends a key", { ".codex/config.toml": "[model_providers.p]\nbase_url = \"https://example.invalid/v1\"\nenv_key = \"KEY\"\n" }],
+  ]) fails(run(pr(project({ ...script, ...listing(SKILL) }), files)), `${what} fails as a hook of no kit's form does`, "is of a kind no starter kit writes, so nothing shows that it runs its copy on main", "Mend: take it out of the project's files");
+  // (Codex's code review of ccb1705: and one marked as the baseline's, new, fails with that same mend, never the kit's form)
+  const providerMarked = run(pr(project({ ...script, ...listing(SKILL) }), { ".codex/config.toml": "[model_providers.p]\nbase_url = \"https://example.invalid/v1\"\nenv_key = \"KEY\"\n", ...listing(SKILL, { kind: "hook", name: "Codex model_providers.p: its settings", publisher: "this project", from: "the working tree" }) }));
+  fails(providerMarked, "a setting of no kit's form, new and marked as the baseline's, fails with the mend that can be taken", "the base held no such hook", "Mend: take it out of the project's files");
+  ok(!providerMarked.out.includes("Mend: write its command in the starter kit's form"), "and its mend is not to rewrite a command it may not have", providerMarked.out);
+  fails(run(pr(project({ ...script, ...listing() }), { ".mcp.json": { mcpServers: { api: { type: "http", url: "https://example.invalid/mcp", headersHelper: TREE_HOOK } } } })), "a remote server's headersHelper not in the kit's form fails as a hook does", NOT_KIT);
+  // (#647's fallback security review of 341004e: the frontmatter split as Claude Code splits it, and held whole in any
+  // form but a plain mapping of simple keys, in a subagent at any depth and a command too)
+  const HOOKS = "        - type: command\n          command: bash x.sh";
+  for (const [what, file, text] of [
+    ["one closed mid-line", ".claude/agents/rev.md", `---\nname: rev\nhooks:\n  Stop:\n    - hooks:\n${HOOKS} # ---\n# rev\n`],
+    ["one opened by another space", ".claude/agents/rev.md", `---\u000b\nname: rev\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`],
+    ["one written as JSON", ".claude/agents/rev.md", '---\n{"name":"rev","hooks":{"Stop":[{"hooks":[{"type":"command","command":"bash x.sh"}]}]}}\n---\n'],
+    ["one keyed by an alias", ".claude/agents/rev.md", `---\ndescription: &k hooks\n*k :\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`],
+    ["one indented whole", ".claude/agents/rev.md", `---\n  name: rev\n  hooks: {}\n---\n`],
+    ["one in a subfolder", ".claude/agents/sub/rev.md", `---\nname: rev\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`],
+    ["a command's", ".claude/commands/rev.md", `---\ndescription: rev\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`],
+    ["one with tool servers", ".claude/agents/rev.md", "---\nname: rev\nmcp_servers:\n  x:\n    type: stdio\n    command: bash\n---\n"],
+    // (#647's fallback security review of 304f1e9: a lone carriage return, which YAML reads as a line's end, and a
+    // subagent at any depth)
+    ["one with a key after a lone carriage return", ".claude/agents/rev.md", `---\nname: rev\ndescription: d\n\rhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`],
+    ["one nine folders deep", ".claude/agents/1/2/3/4/5/6/7/8/9/rev.md", `---\nname: rev\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n`],
+    ["one too long to read", ".claude/agents/rev.md", `---\nname: rev\ndescription: ${"x".repeat(70000)}\n---\n`],
+  ]) fails(run(pr(project({ ...script, ...listing() }), { [file]: text })), `a frontmatter, ${what}, fails as a setting of no kit's form does`, "is of a kind no starter kit writes", "Mend: take it out of the project's files");
+  passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/sub/rev.md": "---\nname: rev\ndescription: \"reviews: hooks and all\"\ntools: [Read, Grep]\nmodel: opus\n---\n# rev\n" })), "a plain frontmatter of simple keys passes, at any depth");
+  // (a skill's or command's body that runs a command where it is invoked, and a subagent's permission mode but the
+  // default, each held as a setting no starter kit writes)
+  const NOKIT = "is of a kind no starter kit writes";
+  const SK = { kind: "skill", name: "s", publisher: "this project" };
+  fails(run(pr(project({ ...script, ...listing(SK), ".claude/skills/s/SKILL.md": "# s\n" }), { ".claude/skills/s/SKILL.md": "# s\nThe branch: !`git branch --show-current`\n" })), "a skill's body that runs a command inline fails", NOKIT, "shell: the commands its text runs");
+  fails(run(pr(project({ ...script, ...listing() }), { ".claude/commands/c.md": "# c\n```!\nbash x.sh\n```\n" })), "and so does a command's block that runs one", NOKIT);
+  passes(run(pr(project({ ...script, ...listing() }), { ".claude/commands/c.md": "# c\nSay `hello`, and nothing more!\n" })), "a command whose text runs nothing passes");
+  const shellStood = project({ ...script, ".claude/commands/c.md": "# c\n!`date`\n", ...listing() });
+  const shellKept = run(pr(shellStood, { "README.md": "x\n" }));
+  ok(shellKept.status === 0 && shellKept.out.includes("as the base held it"), "one the base held is noted while its text stands", shellKept.out);
+  for (const mode of ["bypassPermissions", "'acceptEdits' # quoted"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": `---\nname: rev\npermissionMode: ${mode}\n---\n` })), `a subagent's permission mode ${mode} fails`, NOKIT, "permissionMode");
+  passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": "---\nname: rev\npermissionMode: default\n---\n" })), "and its default passes");
+  fails(run(pr(project({ ...script, ...listing() }), withSetting("permissions", { defaultMode: "bypassPermissions" }))), "settings whose permission mode runs all without asking fail", NOKIT, "permissions.defaultMode");
+  passes(run(pr(project({ ...script, ...listing() }), withSetting("permissions", { defaultMode: "acceptEdits" }))), "and settings of another mode pass");
+  // (#693's fallback security review of fdd2d96: every key that folds to the permission mode, whichever a reader keeps;
+  // a block that runs a command wherever it stands; and the tools a skill lets run without asking)
+  for (const front of ["PermissionMode: default\npermissionMode: bypassPermissions", "permissionMode: default\npermissionMode: bypassPermissions"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": `---\nname: rev\n${front}\n---\n` })), `a permission mode written twice, ${front.split("\n")[0]} first, fails`, NOKIT, "permissionMode");
+  for (const body of ["# c\n> ```!\nbash x.sh\n```\n", "# c\n````!\nbash x.sh\n````\n", "# c\nRun this: ```!\nbash x.sh\n```\n"]) fails(run(pr(project({ ...script, ...listing() }), { ".claude/commands/c.md": body })), `a command's block that runs a command, ${JSON.stringify(body.split("\n")[1])}, fails`, NOKIT);
+  fails(run(pr(project({ ...script, ...listing(SK), ".claude/skills/s/SKILL.md": "# s\n" }), { ".claude/skills/s/SKILL.md": "---\nname: s\nallowed-tools: Bash(*)\n---\n# s\n" })), "a skill's tools it lets run without asking fail as a setting", NOKIT);
+  // (a folder of Claude Code's below the project's root, which it reads where it works there)
+  const NESTED = "is a folder of Claude Code's below the project's root";
+  // (the core's own copy is none of the project's: its .claude is the core's, held to the core's commit by core.yml)
+  const manifest = at => ({ "core-manifest.md": `Core: ${CORE} at ${"a".repeat(40)}, copied whole under ${at} (never edited here).\n` });
+  passes(run(pr(project({ ...script, ...manifest("core/"), ...listing() }), { "core/.claude/settings.json": KIT, "core/README.md": "# core\n" })), "the core's own copy, where the manifest names it, with its .claude, is no folder of the project's below its root");
+  fails(run(pr(project({ ...script, ...listing() }), { "core/.claude/settings.json": KIT })), "but with no manifest, as in the core's own repository, a core/.claude fails as any other does", NESTED);
+  const elsewhere = run(pr(project({ ...script, ...manifest("vendor/core/"), ...listing() }), { "vendor/core/.claude/settings.json": KIT, "core/.claude/settings.json": KIT }));
+  ok(elsewhere.status === 1 && elsewhere.out.includes("core/.claude is a folder") && !elsewhere.out.includes("vendor/core/.claude is a folder"), "and where the manifest names another path, that one alone is left out", elsewhere.out);
+  fails(run(pr(project({ ...script, ...listing() }), { "app/.claude/skills/x/SKILL.md": "# x\n" })), "a folder of skills below the project's root fails", NESTED, "Mend: move what it holds into the root's .claude folder");
+  const nested = () => project({ ...script, "app/.Claude/agents/rev.md": "---\nname: rev\n---\n", ...listing() });
+  const nestedKept = run(pr(nested(), { "README.md": "x\n" }));
+  ok(nestedKept.status === 0 && nestedKept.out.includes(NESTED), "one the base held, in whatever case, is noted", nestedKept.out);
+  fails(run(pr(nested(), { "app/.Claude/agents/rev.md": `---\nname: rev\nhooks:\n  Stop:\n    - hooks:\n${HOOKS}\n---\n` })), "but not once what it holds changes", NESTED);
+  fails(run(pr(project({ ...script, ...listing() }), { "app/.claude/settings.json": KIT })), "and so do a nested folder's settings", NESTED);
+  const nfd = () => project({ ...script, ["e\u0301/.claude/agents/rev.md"]: "---\nname: rev\n---\n", ...listing() });
+  fails(run(pr(nfd(), { ["e\u0301/.claude/agents/rev.md"]: "---\nname: rev\npermissionMode: bypassPermissions\n---\n" })), "and one below a name in another normal form, changed", NESTED);
+  if (LINKS) {
+    const nestedLink = project({ ...script, "shared/skills/x/SKILL.md": "# x\n", ...listing() });
+    fs.mkdirSync(path.join(nestedLink, "app"), { recursive: true }); fs.symlinkSync("../shared", path.join(nestedLink, "app/.claude"));
+    git(nestedLink, "add", "-A"); git(nestedLink, "commit", "-q", "-m", "a nested .claude as a link");
+    fails(run(nestedLink, "--core"), "and a nested .claude that is a link", NESTED);
+  }
+  for (const at of [".claude/Agents/rev.md", ".claude/agents/rev.MD", ".claude/Commands/rev.md"]) fails(run(pr(project({ ...script, ...listing() }), { [at]: "---\nname: rev\n---\n" })), `a subagent's file in another letter case, ${at}, fails`, "in another case");
+  passes(run(pr(project({ ...script, ...listing() }), { ".claude/agents/rev.md": "---\nname: rev\ndescription: reviews hooks\n---\n# rev\n" })), "a subagent with no hooks in its frontmatter passes");
+  const frontStood = project({ ...script, ".claude/agents/rev.md": front("hooks") });
+  const frontKept = run(pr(frontStood, { ".claude/agents/rev.md": `${front("hooks")}more of its prompt\n` }));
+  ok(frontKept.status === 0 && frontKept.out.includes("as the base held it"), "one the base held is noted while its frontmatter stands", frontKept.out);
+  const helperStood = project({ ...script, ...withSetting("apiKeyHelper", TREE_HOOK) });
+  const helperKept = run(pr(helperStood, { "README.md": "a change of its own\n" }));
+  ok(helperKept.status === 0 && helperKept.out.includes(`the hook "apiKeyHelper: ${TREE_HOOK}"`), "one the base held is noted, not failed", helperKept.out);
   fails(run(pr(project({ ...script, ...listing() }), { ".claude/settings.json": withHook(TREE_HOOK), ...listing(entry(TREE_HOOK, fromWorkingTree)) })), "a new one marked as the baseline's fails all the same: the baseline lists only what stood", "the base held no such hook");
   const stood = project({ ...script, ".claude/settings.json": withHook(TREE_HOOK) });
   const kept = run(pr(stood, { "README.md": "a change of its own\n" }));
@@ -487,12 +643,75 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   const prTree = git(oddBase, "write-tree"), prCommit = git(oddBase, "commit-tree", prTree, "-p", oddMain, "-m", "change");
   git(oddBase, "update-ref", "refs/heads/main", git(oddBase, "commit-tree", prTree, "-p", oddMain, "-p", prCommit, "-m", "merge"));
   fails(run(oddBase), "and one whose fetched path main holds as a link in a tree out of order", 'fetches "format.sh" from main, which the project holds as no plain file');
+  // (a link whose target is longer than any file system follows leads nowhere, read at the base as in the tree)
+  const longBase = project({ ...listing() }), inLong = { cwd: longBase, env, encoding: "utf8" };
+  const longLink = execFileSync("git", ["hash-object", "-w", "--stdin"], { ...inLong, input: "a/".repeat(300000) }).trim();
+  const kiro = execFileSync("git", ["mktree"], { ...inLong, input: `120000 blob ${longLink}\thooks\n` }).trim();
+  const longTree = execFileSync("git", ["mktree"], { ...inLong, input: `${git(longBase, "ls-tree", "HEAD")}\n040000 tree ${kiro}\t.kiro\n` }).trim();
+  const longMain = git(longBase, "commit-tree", longTree, "-p", "HEAD", "-m", "a link too long to follow");
+  // (the pull request's own tree, which holds no such link, its commits made by hand over that main and checked out)
+  change(longBase, { "README.md": "a change of its own\n" });
+  git(longBase, "add", "-A");
+  const longPrTree = git(longBase, "write-tree"), longPr = git(longBase, "commit-tree", longPrTree, "-p", longMain, "-m", "change");
+  git(longBase, "update-ref", "refs/heads/main", git(longBase, "commit-tree", longPrTree, "-p", longMain, "-p", longPr, "-m", "merge"));
+  git(longBase, "reset", "-q", "--hard");
+  passes(run(longBase), "a link at the base too long to follow leads nowhere, and the check goes on");
+  // (a tool's file in another case is what a file system that ignores case gives the tool)
+  fails(run(pr(project({ ...listing() }), { ".Codex/hooks.json": codexHook({ type: "command", command: "bash scripts/evil.sh" }) })), "a tool's file in another case fails", ".Codex is .codex in another case", "Mend: rename it to .codex");
+  fails(run(pr(project({ ...listing() }), { ".Kiro/hooks/x.JSON": { version: "v1", hooks: [{ name: "x", trigger: "Stop", action: { type: "command", command: "bash scripts/evil.sh" } }] } })), "and so does a Kiro hook file in another case, its .json too", "Mend: rename it to .kiro");
+  fails(run(pr(project({ ...listing() }), { ".kiro/hooks/x.JSON": { version: "v1", hooks: [{ name: "x", trigger: "Stop", action: { type: "command", command: "bash scripts/evil.sh" } }] } })), "and a Kiro hook file whose .json is in another case", "Mend: rename it to .kiro/hooks/x.json");
+  // (a folder the project's own helper writes none of, so a file system that ignores case keeps the name as written)
+  const oddStood = run(pr(project({ ".Codex/config.toml": "# none\n", ...listing() }), { "README.md": "a change of its own\n" }));
+  ok(oddStood.status === 0 && /\.Codex is \.codex in another case/.test(oddStood.out), "one the base held is noted, not failed", oddStood.out);
+  fails(run(pr(project({ ".Codex/config.toml": "# none\n", ...listing() }), { ".Codex/config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n" })), "but not once the pull request changes it", "Mend: rename it to .codex");
+  const caseStep = STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed");
+  ok(notDone(project({ ".Codex/config.toml": "# none\n", ...listing() }), caseStep)[0]?.mend.includes("Mend: rename it to .codex"), "the sync note's step reads not done while a tool's file stands in another case");
+  // (what the tool reads under it is found through each folder's own names, in whatever case they stand, so one the base
+  // held is noted only while each file the tool reads there stands)
+  const deep = (files, changed, says) => fails(run(pr(project({ ...files, ...listing() }), changed)), says, "in another case", "Mend: rename it to");
+  deep({ ".Codex/Config.toml": "# none\n" }, { ".Codex/Config.toml": "notify = [\"bash\", \"scripts/new.sh\"]\n" }, "and not once the pull request changes a file under it in another case too");
+  deep({ ".Kiro/Hooks/lint.json": "{}\n" }, { ".Kiro/Hooks/lint.json": { version: "v1", hooks: [{ name: "x", trigger: "Stop", action: { type: "command", command: "bash scripts/new.sh" } }] } }, "nor a hook file in a folder under it in another case");
+  deep({ ".Claude/Skills/notes/skill.md": "# notes\n" }, { ".Claude/Skills/notes/skill.md": "# notes, changed\n" }, "nor a skill's file under it in another case");
+  deep({ ".Kiro/Hooks/lint.json": "{}\n" }, { ".Kiro/Hooks/new.json": "{}\n" }, "nor a hook file added under it");
+  fails(run(pr(project({ ...listing() }), { ".claude/skills/notes/Skill.md": "# notes\n" })), "and a skill whose SKILL.md is in another case", "Mend: rename it to .claude/skills/notes/SKILL.md");
+  // (a skill's folder in another case is left out where the file system ignores case, as Windows' and macOS's do: there
+  // the working tree gives the tool's own name what git's tree holds under another, so the skill reads as new)
+  const caseless = (() => { const d = fs.mkdtempSync(path.join(os.tmpdir(), "agent-tools-")); made.push(d); fs.writeFileSync(path.join(d, "a"), ""); return fs.existsSync(path.join(d, "A")); })();
+  const deepStood = run(pr(project({ ".Kiro/Hooks/lint.json": "{}\n", ...(caseless ? {} : { ".Claude/Skills/notes/skill.md": "# notes\n" }), ...listing() }), { "README.md": "a change of its own\n" }));
+  ok(deepStood.status === 0 && /\.Kiro is \.kiro in another case/.test(deepStood.out) && (caseless || /\.Claude is \.claude in another case/.test(deepStood.out)), "while what stands under it is noted, not failed", deepStood.out);
+  // (#600's code review of 038f301: what the tool does not read under it changes nothing of what it reads, and a folder
+  // whose files are all ignored holds none of the project's)
+  const docStood = run(pr(project({ ".Kiro/hooks/lint.json": "{}\n", ".Kiro/hooks/README.md": "notes\n", ...listing() }), { ".Kiro/hooks/README.md": "notes, changed\n" }));
+  ok(docStood.status === 0 && /\.Kiro is \.kiro in another case/.test(docStood.out), "a file under it the tool does not read, changed, leaves it noted", docStood.out);
+  const ignoredBase = project({ ".gitignore": ".Codex/*\n", ...listing() });
+  write(ignoredBase, ".Codex/config.toml", "notify = [\"bash\", \"x.sh\"]\n");
+  passes(run(pr(ignoredBase, { "README.md": "a change of its own\n" })), "and a folder in another case whose files are all ignored is none of the project's");
+  // (#600's code review of e380041: and an ignored file beside a tracked one is none of what the tool's note is held to)
+  const besideBase = project({ ".gitignore": ".Codex/config.toml\n", ".Codex/hooks.json": "{}\n", ...listing() });
+  write(besideBase, ".Codex/config.toml", "notify = [\"bash\", \"x.sh\"]\n");
+  const besideRun = run(pr(besideBase, { "README.md": "a change of its own\n" }));
+  ok(besideRun.status === 0 && /\.Codex is \.codex in another case/.test(besideRun.out), "an ignored file beside a tracked one under it leaves it noted", besideRun.out);
+  // (#600's code review of b2502b6: a file in a tool folder that the tool does not read names no folder on its way)
+  const unread = pr(project({ ".gitignore": ".Kiro/hooks/*.json\n", ...listing() }), { "README.md": "a change of its own\n" });
+  write(unread, ".Kiro/hooks/lint.json", "{}\n");
+  write(unread, ".Kiro/hooks/README.md", "notes\n");
+  passes(run(unread), "a file there the tool does not read, beside its ignored hooks, is no tool's file");
+  // (#600's fallback security review of 8dfe536: a commit git cannot list is no commit with nothing in it)
+  process.env.AGENT_TOOLS_LISTING_MAX = "16";
+  const unlisted = cli(pr(project({ ...listing() }), { "README.md": "a change of its own\n" }));
+  delete process.env.AGENT_TOOLS_LISTING_MAX;
+  fails(unlisted, "a head git cannot list fails", "cannot be listed", "Mend: ");
+  // (#600's fallback security review of 72e6450: names are compared as a file system that folds case does)
+  fails(run(pr(project({ ...listing() }), { ".claude/\u017fkills/notes/SKILL.md": "# notes\n" })), "a name that differs only by a letter a full case fold matches fails too", "in another case");
   // (#476's security review of a74309b: what the kit's form fetches from main must be a file, not a link, whose target's
   // name main would give in the script's place)
   if (LINKS) {
     const linkFetch = project({ "scripts/tree.sh": "echo the branch's\n", ...listing() });
     fs.symlinkSync("./tree.sh", path.join(linkFetch, "scripts/format.sh"));
     fails(run(pr(linkFetch, { ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK)) })), "a hook in the kit's form that fetches a link from main fails", 'fetches "scripts/format.sh" from main, which the project holds as no plain file');
+    // (#647's fallback security review: its mend is its own, the command being in the kit's form already)
+    const linkFetchSays = run(linkFetch);
+    ok(linkFetchSays.out.includes('Mend: make "scripts/format.sh" a plain file committed in the project') && !/no plain file[^\n]*Mend: write its command in the starter kit's form/u.test(linkFetchSays.out), "and its mend is to make the fetched file a plain one, not to write the command in the kit's form it is in", linkFetchSays.out);
     // (#476's code review of ac42a35: the starter kit's own hooks too, where what they fetch is a link)
     const kitLink = project({ "scripts/tree.sh": "echo the branch's\n", ...listing() });
     fs.mkdirSync(path.join(kitLink, "core/scripts"), { recursive: true });
@@ -516,16 +735,82 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   ok(Date.now() - began < 5000, "and a command a megabyte long is told from the kit's form at once", `${Date.now() - began} ms`);
 }
 
+// ---- what git stores where a tool reads its files ----
+{
+  // (a submodule's entry, put in the index as git stores one, in a commit of its own on top of `dir`'s branch)
+  // (its folder left empty on disk, as a checkout that brings in no submodule leaves it, so `git add -A` keeps it)
+  const gitlink = (dir, at, id = git(dir, "rev-parse", "HEAD")) => { fs.mkdirSync(path.join(dir, at), { recursive: true }); git(dir, "update-index", "--add", "--cacheinfo", `160000,${id},${at}`); git(dir, "commit", "-q", "-m", `a submodule at ${at}`); };
+  const prLink = (dir, at, id) => { git(dir, "checkout", "-q", "-B", "change"); gitlink(dir, at, id); git(dir, "checkout", "-q", "main"); git(dir, "merge", "-q", "--no-ff", "-m", "merge", "change"); return dir; };
+  const SAYS = "is a submodule where an agent tool reads its files";
+  for (const at of [".codex", ".claude/skills/notes", ".Kiro/hooks", ".kiro"])
+    fails(run(prLink(project({ ...listing() }), at)), `a submodule at ${at} fails`, `${at} ${SAYS}`, "Mend: ");
+  passes(run(prLink(project({ ...listing() }), "vendor/lib")), "a submodule elsewhere is none of the agent tools'");
+  const held = project({ ...listing() });
+  gitlink(held, ".codex");
+  const heldRun = run(pr(held, { "README.md": "a change of its own\n" }));
+  ok(heldRun.status === 0 && heldRun.out.includes(`.codex ${SAYS}`), "one the base held is noted, not failed", heldRun.out);
+  fails(run(prLink(held, ".codex", git(held, "rev-parse", "HEAD~1"))), "but not once the pull request moves it", `.codex ${SAYS}`);
+  ok(notDone(held, STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed"))[0]?.mend.includes(`.codex ${SAYS}`), "the sync note's step reads not done while one stands");
+  const core = project({ ...listing() });
+  gitlink(core, ".codex");
+  fails(run(core, "--core"), "in the core's own repository none may stand", `.codex ${SAYS}`);
+}
+
+// ---- what the tools' settings set in the environment of the programs they start ----
+{
+  const withEnv = (env, file = ".claude/settings.json") => ({ [file]: JSON.stringify({ ...JSON.parse(KIT), env }, null, 2) });
+  const SAYS = 'sets the variable "BASH_ENV"';
+  passes(run(pr(project({ ...listing() }), withEnv({ ANTHROPIC_MODEL: "x", CLAUDE_CODE_MAX_OUTPUT_TOKENS: "1", DISABLE_TELEMETRY: "1", MAX_THINKING_TOKENS: "1", CI: "1" }))), "a setting's \"env\" of the variables kept passes");
+  fails(run(pr(project({ ...listing() }), withEnv({ BASH_ENV: "scripts/x.sh" }))), "one that sets a variable a shell reads as it starts fails", SAYS, '.claude/settings.json: "env"', "Mend: take it out");
+  // (each name in one run, a project being costly to set up where git is slow, as on Windows)
+  // (any variable but those kept, named whole, of plain letters: #603's fallback security reviews of f021c25, 66d3f04 and
+  // 2cc401d found names a list left out, and a prefix kept let others in)
+  const names = ["ENV", "PATH", "Path", "NODE_OPTIONS", "GIT_DIR", "GIT_CONFIG_COUNT", "LD_PRELOAD", "BASH_FUNC_x", "HOME", "XDG_CONFIG_HOME", "SSH_ASKPASS", "CLAUDE_CODE_SHELL_PREFIX", "CLAUDE_PROJECT_DIR", "ComSpec", "SHELL", "GCONV_PATH", "LOCPATH", "GCM_GITHUB_HELPER", "EDITOR", "DEBUG", "CLAUDE_CONFIG_DIR", "CLAUDE_CODE_GIT_BASH_PATH", "CLAUDE_CODE_AUTOMOUNT_ROOTS", "CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS", "CLAUDE_CODE_PLUGIN_DIRS", "CLAUDE_CODE_PROCESS_WRAPPER", "CLAUDE_CODE_SAFE_MODE", "ANTHROPIC_BASE_URL", "ANTHROPIC_CUSTOM_HEADERS", "DISABLE_X", "CLAUDE_CODE_MAX_OUTPUT_TOKENſ"];
+  fails(run(pr(project({ ...listing() }), withEnv(Object.fromEntries(names.map(n => [n, "x"]))))), `and so does one that sets ${names.join(", ")}`, ...names.map(n => `sets the variable "${n}"`));
+  fails(run(pr(project({ ...listing() }), withEnv({ BASH_ENV: "x" }, ".claude/settings.local.json"))), "in settings.local.json too", '.claude/settings.local.json: "env"');
+  fails(run(pr(project({ ...listing() }), { ".codex/config.toml": "[profiles.fast.shell_environment_policy.set]\nHOME = \"cfg\"\n" })), "and in a Codex profile's, which replaces it where the profile is chosen", '.codex/config.toml: "profiles.fast.shell_environment_policy.set"', 'sets the variable "HOME"');
+  fails(run(pr(project({ ...listing() }), { ".codex/config.toml": "[shell_environment_policy]\nset = { NODE_OPTIONS = \"x\" }\n" })), "and in Codex's config, the environment its commands are given", '.codex/config.toml: "shell_environment_policy.set"', 'sets the variable "NODE_OPTIONS"');
+  fails(run(pr(project({ ...listing() }), withEnv(["BASH_ENV"]))), "an \"env\" that is no object is refused as the wrong shape", '"env" is not a JSON object');
+  const held = project({ ...withEnv({ BASH_ENV: "scripts/x.sh" }), ...listing() });
+  const heldRun = run(pr(held, { "README.md": "a change of its own\n" }));
+  ok(heldRun.status === 0 && heldRun.out.includes(SAYS), "one the base held is noted, not failed", heldRun.out);
+  const heldHook = run(pr(held, { ".claude/settings.json": JSON.stringify({ ...JSON.parse(KIT), env: { BASH_ENV: "scripts/x.sh" }, model: "opus" }, null, 2) }));
+  ok(heldHook.status === 0 && heldHook.out.includes(SAYS), "and stays noted while the file changes around it", heldHook.out);
+  fails(run(pr(held, withEnv({ BASH_ENV: "scripts/y.sh" }))), "but not once the pull request changes its value", SAYS);
+  fails(run(project(withEnv({ BASH_ENV: "x" })), "--core"), "in the core's own repository none may stand", SAYS);
+  // (#603's code review of c08aa8e: with no base to read against, one that stands is noted, as a pin or a hook's source is)
+  const noBase = run(project({ ...withEnv({ BASH_ENV: "scripts/x.sh" }), ".Codex/hooks.json": "{}\n", ...listing() }));
+  ok(noBase.status === 0 && noBase.out.includes("with no base to read against") && noBase.out.includes(SAYS) && noBase.out.includes(".Codex is .codex in another case"), "with no base, one that stands is noted, and so is a tool's file in another case", noBase.out);
+  ok(notDone(held, STEPS.filter(x => x.lead === "16 November 2026, an agent's own tools listed"))[0]?.mend.includes(SAYS), "the sync note's step reads not done while one stands");
+}
+
 // ---- the TOML reader Codex's config is read with ----
 {
   const t = parseToml("# c\n__proto__ = 'p'\na.b = 1 # n\ns = \"\\u00e9\\n\"\nm = \"\"\"\nx \\\n   y\"\"\"\nl = '''z'''\n[t]\nd = 1979-05-27T07:32:00Z\ni = { k = [1, 'two', [true]] }\n[[r]]\nn = 1\n[[r]]\nn = 2\n");
-  const want = '{"__proto__":"p","a":{"b":1},"s":"é\\n","m":"x y","l":"z","t":{"d":"1979-05-27T07:32:00Z","i":{"k":[1,"two",[true]]}},"r":[{"n":1},{"n":2}]}';
+  const want = '{"__proto__":"p","a":{"b":1},"s":"é\\n","m":"x y","l":"z","t":{"d":"1979-05-27T07:32:00.000Z","i":{"k":[1,"two",[true]]}},"r":[{"n":1},{"n":2}]}';
   ok(JSON.stringify(t) === want && Object.getPrototypeOf(t) === Object.prototype, "TOML is read as JSON would hold it, a key \"__proto__\" a key like any other", JSON.stringify(t));
   const headers = Array.from({ length: 200 }, (_, i) => `[[${Array(i + 1).fill("a").join(".")}]]`).join("\n");
-  for (const [bad, says] of [[`${headers}\n${Array(199).fill("b").join(".")} = 1\n`, "nests deeper than 200"], ["a = 1\na = 2", "given twice"], ["a = \"x", "not closed"], ["[a]\n[a]", "given twice"], ["a = [1", "commas"], ["a = 1 b", "more follows"], ["x = [{ a = 1 }]\n[[x]]", "a value and as an array of tables"], ["a = \"\\q\"", "no escape"], [`a = ${"[".repeat(300)}`, "nests deeper than 200"]]) {
+  for (const [bad, says] of [[`${headers}\n${Array(199).fill("b").join(".")} = 1\n`, "nests deeper than 200"], ["a = 1\na = 2", "line 2: trying to redefine"], ["a = \"x", "unfinished string"], ["[a]\n[a]", "line 2: trying to redefine"], ["a = [1", "expected comma"], ["a = 1 b", "end-of-line"], ["x = [{ a = 1 }]\n[[x]]", "line 2: trying to redefine"], ["a = \"\\q\"", "escape sequence"], [`a = ${"[".repeat(300)}`, "nests deeper than 200"]]) {
     let message = "";
     try { parseToml(bad); } catch (e) { message = e.message; }
     ok(message.includes(says), `TOML that is no TOML is refused: ${says}`, message);
+  }
+  // (#634's search for differences: the package drops the quotes a string holds before its closing """ where a
+  // line-ending backslash runs into them, so such a string is refused; a CRLF inside a string of several lines is LF)
+  for (const lost of ["notify = [\"python3\", \"\"\"notify.py\\\n\"\"\"\"\"]\n", "command = \"\"\"x \\\r\n  \"\"\"\"\n", "a = \"\"\"x\\\\\\\n\"\"\"\"\n"]) {
+    let message = "";
+    try { parseToml(lost); } catch (e) { message = e.message; }
+    ok(message.startsWith("line 1: a string's line-ending backslash runs into its closing quotes"), `a string whose quotes the package would drop is refused: ${JSON.stringify(lost)}`, message);
+  }
+  // (#634's code review: only a multi-line basic string; a literal string, a comment and a one-line string are read)
+  const literal = parseToml("notify = ['''a\\\n'''', \"b\\\\\", '''c\\\n''''']\n# d\\\n");
+  ok(JSON.stringify(literal.notify) === JSON.stringify(["a\\\n'", "b\\", "c\\\n''"]), "a backslash before the closing quotes of a literal string, or in a comment, is read as written", JSON.stringify(literal));
+  ok(parseToml("a = \"\"\"x\\\\\n\"\"\"\"\"\nb = \"\"\"x\\\n\"\"\"\n").a === "x\\\n\"\"","a backslash escaped by another ends no line, and one with no quote of the string's own before the close is read", JSON.stringify(parseToml("a = \"\"\"x\\\\\n\"\"\"\"\"\n")));
+  ok(parseToml("a = '''x\r\ny'''\r\nb = \"\"\"p\r\nq\"\"\"\r\n").a === "x\ny" && parseToml("b = \"\"\"p\r\nq\"\"\"\r\n").b === "p\nq", "a CRLF inside a string of several lines is read as LF");
+  for (const bare of ["a = 1\r\r\nb = 2\r\n", "a = '''x\ry'''\n"]) {
+    let refused = false;
+    try { parseToml(bare); } catch { refused = true; }
+    ok(refused, `a CR standing alone is refused, before a CRLF too: ${JSON.stringify(bare)}`);
   }
   // (#476's code review of fd9135b: each [[...]] header appends without reading the entries before it again)
   const began = Date.now(), many = parseToml("[[x]]\n".repeat(200000));

@@ -17,6 +17,7 @@ import { CORE } from "../scripts/core-address.mjs";
 import { TITLE, openIssue } from "../scripts/core-moved.mjs";
 import { RELEASE, elsewhere, fetchCore, hostAccount, ownerOf, releasesIn } from "../scripts/releases.mjs";
 import { OWN, held } from "../scripts/release.mjs";
+import { read as runnersRead } from "../scripts/runners.mjs";
 import { line, measure, median, waited } from "../scripts/wait.mjs";
 import { openPulls, print, stalled } from "../scripts/stalled.mjs";
 import { priced, reading, readings, sessionOf } from "../scripts/core-cost.mjs";
@@ -151,17 +152,32 @@ if (process.platform !== "win32") {
     fs.writeFileSync(path.join(dir, "main"), main);
     fs.writeFileSync(path.join(dir, "issues"), issues);
     fs.writeFileSync(path.join(bin, "git"), `#!/bin/sh\ncat "${path.join(dir, "main")}"\n`, { mode: 0o755 });
-    fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh\nprintf 'gh %s\\n' "$*" >> "${log}"\n[ "$1" = api ] && cat "${path.join(dir, "issues")}"\nexit 0\n`, { mode: 0o755 });
+    // (the checks of main's commits, asked of the host, all passed: the newest whose did is what the project takes)
+    fs.writeFileSync(path.join(dir, "green"), JSON.stringify({ total_count: 1, workflow_runs: [{ name: "tests", path: ".github/workflows/tests.yml", status: "completed", conclusion: "success" }] }));
+    fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh\nprintf 'gh %s\\n' "$*" >> "${log}"\ncase "$2" in *actions/runs*) cat "${path.join(dir, "green")}"; exit 0;; esac\n[ "$1" = api ] && cat "${path.join(dir, "issues")}"\nexit 0\n`, { mode: 0o755 });
     const r = spawnSync(process.execPath, [script("./core-moved.mjs")], { cwd: dir, encoding: "utf8", env: { PATH: `${bin}:${process.env.PATH}`, GITHUB_REPOSITORY: repo, TMPDIR: dir } });
     return { status: r.status, out: `${r.stdout}${r.stderr}`, calls: fs.existsSync(log) ? fs.readFileSync(log, "utf8") : "" };
   };
+  // (the stand-in git answers every call with the file "main": the fetch, and main's history, which the newest
+  // commit whose checks passed is read from; #733)
   for (const [main, what] of [["../../etc/passwd", "a path"], [A.toUpperCase(), "a commit in capitals"], [`<script>${B}`, "markup"], ["", "nothing"]]) {
     const t0 = Date.now(), r = program(main && `${main}${HEADS}`, "");
-    ok(Date.now() - t0 < 5000 && r.status === 1 && /^FAIL: /m.test(r.out) && !/^gh /m.test(r.calls) && !/\n\s+at /.test(r.out), `the core's main given as ${what}: refused before gh is called, with no stack`);
+    ok(Date.now() - t0 < 5000 && r.status === 0 && /none of the last 0 commits/.test(r.out) && !/^gh (issue|api repos\/[^ ]*\/actions)/m.test(r.calls) && !["etc/passwd", "<script>"].some(w => r.calls.includes(w)) && !/\n\s+at /.test(r.out), `the core's main given as ${what}: no commit taken of it, no check asked for, nothing of it used, and no stack`, r.out + r.calls);
   }
   const hostile = [...[[Number.MAX_SAFE_INTEGER + 2, BOT, TITLE], [-1, BOT, TITLE], ["../../etc/passwd", BOT, TITLE], [7, "a-stranger", TITLE], [8, BOT, `${TITLE}<script>`], [9, BOT, TITLE, "x"]].map(a => issueLine(...a)), "not json", ""].join("\n");
-  const r = program(`${B}${HEADS}`, hostile);
+  const r = program(`${B}\n`, hostile);
   ok(r.status === 0 && /^gh issue create /m.test(r.calls) && !/issue (?:edit|close)/.test(r.calls) && !["etc/passwd", "<script>"].some(w => r.calls.includes(w)), "hostile issue lines name no issue to edit or close, and nothing of them is used: a new one opens");
+}
+
+// ---- runners.mjs: whether the repository is private, as the host answers (#733) ----
+{
+  const none = fs.mkdtempSync(path.join(scratch, "runners-"));
+  for (const [answer, what] of [[JSON.stringify({ private: "yes" }), "a text"], [JSON.stringify({ private: { a: 1 } }), "an object"], ["not json", "no JSON"], ["null", "null"], ["", "nothing"], [JSON.stringify([{ private: false }]), "a list"]]) {
+    const r = runnersRead({ repo: "o/n", dir: none, gh: () => answer });
+    ok(r.billed && /was not read, so taken as billed/.test(r.said[1]), `runners.mjs: a repository whose privacy the host gives as ${what} is not read, taken as billed, and said so`);
+  }
+  const r = runnersRead({ repo: "o/n", dir: none, gh: () => { throw new Error("HTTP 403"); } });
+  ok(r.billed && r.where === "local", "runners.mjs: a host that refuses is taken as billed, nothing thrown");
 }
 
 // ---- nothing at all ----

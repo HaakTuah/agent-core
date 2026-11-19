@@ -35,7 +35,10 @@
 // the tests cost (tasks/tests.md; #275, #321): "screens", what a test imports that opens a screen, a window or a
 // device (a package or module by the name it is imported under, or the start of one), so that each test file that
 // imports one is an entry ("screen: <test> -> <what>", found by the reader
-// "screens"), new ones failing as any breach does; "select", for select.mjs beside this file: "proof", pathspecs of the
+// "screens"), new ones failing as any breach does; "clocks" and "processes", names beside those the check knows for
+// each language (shape-readers.mjs, REACH) that a test calls or imports and that reach a real clock or start another
+// process, so that each test file that reaches either is an entry ("timed: <test> -> <what>", "process: <test> ->
+// <what>", found by the readers "clocks" and "processes"; #457); "select", for select.mjs beside this file: "proof", pathspecs of the
 // tests never selected out, "whole", those of the tests that reach every file (one that copies or runs the whole
 // project), and "none", those of the files no test reads; "wait", the time mark in seconds on the checks of one push
 // (wait.mjs), which rises only as a suite's does; and "long", the seconds from which a measurement runs as a job of
@@ -54,10 +57,10 @@
 //                                                     "grown" gives a reason for, what a reader the baseline did
 //                                                     not name finds, and, with SHAPE_BASE set, what that branch
 //                                                     held already, where the config reads more
-//   node core/scripts/shape.mjs <config> --suite <name> -- <command>...   run a suite (with no shell) and hold its
-//                                                     time to its mark
-//   node core/scripts/shape.mjs <config> --suite <name> --since <seconds>  hold the time since a start the workflow
-//                                                     took (date +%s) to the suite's mark
+//   node core/scripts/shape.mjs <config> --suite <name> -- <command>...   run a suite (with no shell) and measure its
+//                                                     time against its mark, a warning past it, never a failure
+//   node core/scripts/shape.mjs <config> --suite <name> --since <seconds>  measure the time since a start the
+//                                                     workflow took (date +%s) against the suite's mark
 // Run from the project's root, by the copies workflow (.github/workflows/copies.yml) on every pull request; in the
 // core by its size workflow. Reads only, but for the baseline it writes when told; git and Node's own modules.
 import { execFileSync, spawnSync } from "node:child_process";
@@ -66,9 +69,9 @@ import { builtinModules } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { CODE, cycles, resolve } from "./code-shape.mjs";
+import { CODE, append, cycles, lyingUnder, nameTree, resolve } from "./code-shape.mjs";
 import { inProject, logged } from "./guards.mjs";
-import { FIRST_READS, PACKAGE_FILES, READERS, index, isCode, isPackageFile, linked, reading, shared } from "./shape-readers.mjs";
+import { FIRST_READS, PACKAGE_FILES, REACH, READERS, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 
 export const KIT = "checks/shape.json";
@@ -79,7 +82,7 @@ export const MARKS = { lines: 60, depth: 4, branches: 15 };
 export const DOMAINS = ["rules", "saved-data", "computer-players", "display", "input", "network", "storage", "platform", "packages", "tools", "tests"];
 // What the rules never use: nothing outward.
 export const OUTWARD = ["display", "input", "network", "storage", "platform"];
-const KEYS = ["baseline", "code", "tests", "systems", "aliases", "platform", "marks", "suites", "screens", "select", "wait", "long"];
+const KEYS = ["baseline", "code", "tests", "systems", "aliases", "platform", "marks", "suites", "screens", "clocks", "processes", "select", "wait", "long"];
 const SELECT_KEYS = ["proof", "whole", "none"];
 // The seconds from which a measurement runs as a job outside the session, where the config gives none (#321).
 export const LONG = 3600;
@@ -107,6 +110,9 @@ function readLists(c, at) {
   for (const k of ["code", "tests"]) if (!optional(c[k], strings)) refuse(`"${k}" in ${at} is not a list of words`, "list git pathspecs there (\":!\" leaves a path out)");
   if (!optional(c.platform, strings)) refuse(`"platform" in ${at} is not a list of words`, "list there each package or module of Node's that binds code to one platform, by the name it is imported under");
   if (!optional(c.screens, strings)) refuse(`"screens" in ${at} is not a list of words`, "list there each package or module a test imports that opens a screen, a window or a device, by the name it is imported under");
+  for (const [k, what] of [["clocks", "reaches a real clock (sleeps, waits on a timer or reads the time)"], ["processes", "starts another process"]]) {
+    if (!optional(c[k], strings)) refuse(`"${k}" in ${at} is not a list of words`, `list there each name a test calls or imports that ${what}, beside those the check knows for each language: a call by its dotted name (Clock.Wait), a module by the name it is imported under`);
+  }
   if (!optional(c.select, v => isObject(v) && Object.keys(v).every(k => SELECT_KEYS.includes(k)) && Object.values(v).every(strings))) refuse(`"select" in ${at} is not in the form the check reads`, `give it ${SELECT_KEYS.map(k => `"${k}"`).join(", ")} alone, each a list of git pathspecs`);
   for (const k of ["wait", "long"]) if (!optional(c[k], aSecond)) refuse(`"${k}" in ${at} is not a number of seconds`, `give it a number of seconds above 0, or take it out`);
   if (!c.code?.length) refuse(`${at} names no "code" to read`, "list the code's folders in \"code\", as git pathspecs (\":!\" leaves a path out)");
@@ -161,7 +167,7 @@ export function parseConfig(text, at = KIT) {
   if (!isObject(systems)) refuse(`"systems" in ${at} is not an object`, "give each system's name its \"paths\", and what else it declares: \"uses\", \"entrance\", \"domain\", \"wraps\"");
   for (const [name, s] of Object.entries(systems)) readSystem(name, s, systems, at);
   const select = Object.fromEntries(SELECT_KEYS.map(k => [k, c.select?.[k] ?? []]));
-  return { baseline: c.baseline, code: c.code, tests: c.tests ?? [], systems, platform: c.platform ?? [], screens: c.screens ?? [], select, wait: c.wait, long: c.long ?? LONG, ...readMarks(c, at), wrapped: readTogether(systems, at) };
+  return { baseline: c.baseline, code: c.code, tests: c.tests ?? [], systems, platform: c.platform ?? [], screens: c.screens ?? [], clocks: c.clocks ?? [], processes: c.processes ?? [], select, wait: c.wait, long: c.long ?? LONG, ...readMarks(c, at), wrapped: readTogether(systems, at) };
 }
 
 // ---- what stands ----
@@ -229,7 +235,7 @@ function outside(ctx, from, spec, aliased) {
   if (BUILTIN.has(spec)) return;
   const known = !aliased && !isRelative(spec) && !ctx.packages.has(name) && ctx.declared.has(name);
   if (!known) ctx.unsure.add(from.file); // (it leads to a file the readers do not read, or nowhere they can tell)
-  if (known && ctx.ships.has(name)) ctx.usedBy.set(name, [...(ctx.usedBy.get(name) ?? []), from]);
+  if (known && ctx.ships.has(name)) append(ctx.usedBy, name, from);
   else if (!known && (toCode(spec) || !isRelative(spec))) ctx.read.nowhere++;
 }
 
@@ -238,8 +244,49 @@ function outside(ctx, from, spec, aliased) {
 // is none: importing it opens nothing.
 function opensScreen(ctx, from, names) {
   if (!ctx.tests.has(from.file)) return;
-  const what = ctx.config.screens.find(s => names.some(n => n === s || n.startsWith(`${s}/`) || n.startsWith(`${s}.`)));
+  const under = s => names.some(n => n === s || n.startsWith(`${s}/`) || n.startsWith(`${s}.`));
+  const what = ctx.config.screens.find(under);
   if (what !== undefined) add(ctx, "screen", `${from.file} -> ${what}`, what);
+  // (an import of types alone, which the program never loads, reaches nothing)
+  if (!from.types) for (const kind of ["clock", "process"]) for (const name of [...IMPORTS[kind], ...ctx.config[LISTS[kind]]].filter(under)) reached(ctx, kind, from.file, name);
+}
+// A module of the project's own that the config names under "clocks" or "processes" (a helper that sleeps or starts
+// a program), by its path or by the name the test imports it under.
+function configuredReach(ctx, from, names) {
+  if (!ctx.tests.has(from.file) || from.types) return;
+  const under = s => names.some(n => n === s || n.startsWith(`${s}/`) || n.startsWith(`${s}.`));
+  for (const kind of ["clock", "process"]) for (const name of ctx.config[LISTS[kind]].filter(under)) reached(ctx, kind, from.file, name);
+}
+
+// What a test reaches that costs the most time, by the names its reader knows and the config's (shape-readers.mjs,
+// REACH): each test file is one entry of each kind it reaches, "timed: <test> -> <what>" or "process: <test> ->
+// <what>", its first name in order; found by the readers "clocks" and "processes".
+const KINDS = { clock: "timed", process: "process" }, LISTS = { clock: "clocks", process: "processes" };
+const IMPORTS = Object.fromEntries(Object.keys(KINDS).map(kind => [kind, [...new Set(Object.values(REACH).flatMap(l => l[kind].imports))]]));
+function reached(ctx, kind, file, name) {
+  const of = ctx.reached.get(file) ?? { clock: new Set(), process: new Set() };
+  ctx.reached.set(file, of);
+  of[kind].add(name);
+}
+const isPunct = (t, v) => t?.t === "punct" && t.v === v;
+// Whether a run of tokens is called or read at k: never one after a dot, a property's key before ":" or what "=" assigns.
+function runAt(toks, run, k) {
+  if (!run.every((v, j) => toks[k + j].v === v && toks[k + j].t !== "str") || isPunct(toks[k - 1], ".")) return false;
+  const next = toks[k + run.length];
+  return !isPunct(next, ":") && !(isPunct(next, "=") && !isPunct(toks[k + run.length + 1], "="));
+}
+function testReach(ctx, file, r) {
+  if (!ctx.tests.has(file)) return;
+  for (const kind of ["clock", "process"]) {
+    const own = REACH[r.lang]?.[kind]?.runs ?? [], named = reachRuns(ctx.config[LISTS[kind]]);
+    for (const { run, what } of [...own, ...named]) for (let k = 0; k + run.length <= r.toks.length; k++) if (runAt(r.toks, run, k)) { reached(ctx, kind, file, what); break; }
+  }
+}
+function reachEntries(ctx) {
+  for (const [file, of] of ctx.reached) for (const kind of ["clock", "process"]) {
+    const what = [...of[kind]].sort()[0];
+    if (what !== undefined) add(ctx, KINDS[kind], `${file} -> ${what}`, file);
+  }
 }
 
 // An import from one file of the project to another: across a boundary nobody declared, or past an entrance.
@@ -256,7 +303,8 @@ function oneImport(ctx, from, imp) {
   const alias = Object.keys(ctx.config.aliases).filter(a => imp.spec.startsWith(a)).sort((a, b) => b.length - a.length)[0];
   const spec = alias === undefined ? imp.spec : `./${path.posix.relative(path.posix.dirname(from.file), path.posix.join(ctx.config.aliases[alias], imp.spec.slice(alias.length))) || "."}`;
   const to = resolve(from.file, spec, ctx.files, ctx.packages);
-  if (!to) { outside(ctx, from, imp.spec, alias !== undefined); return; }
+  if (!to) { outside(ctx, imp.types ? { ...from, types: true } : from, imp.spec, alias !== undefined); return; }
+  configuredReach(ctx, imp.types ? { ...from, types: true } : from, [to, imp.spec]);
   // (a package of the project's own that maps its entrances, "exports" or "imports", may load another file than this)
   if (!isRelative(spec) && ctx.packages.get(packageOf(spec))?.exports) ctx.unsure.add(from.file);
   if (to !== from.file) ctx.reach.set(from.file, (ctx.reach.get(from.file) ?? new Set()).add(to));
@@ -270,15 +318,17 @@ function foreign(ctx, from, imp, r) {
   ctx.read.imports++;
   const l = linked(from.file, imp, r, ctx.idx, ctx.files, ctx.config.platform);
   for (const to of (l.to ?? []).filter(t => t !== from.file)) {
+    configuredReach(ctx, from, [to, ...l.names ?? []]);
     ctx.reach.set(from.file, (ctx.reach.get(from.file) ?? new Set()).add(to));
     if (!imp.dynamic && !imp.types) ctx.graph.set(from.file, (ctx.graph.get(from.file) ?? new Set()).add(to));
     between(ctx, from, to);
   }
   if (l.to) return;
   opensScreen(ctx, from, l.names);
-  const bound = l.names.find(n => ctx.config.platform.includes(n));
+  // (the shortest name of the config's "platform" that the import is or lies under)
+  const bound = lyingUnder(ctx.platformTree ??= nameTree(ctx.config.platform), l.outside)[0];
   if (bound) { if (from.domain !== "platform") add(ctx, "platform", `${from.file} -> ${bound}`, bound); return; }
-  if (l.known && l.known !== "builtin" && ctx.ships.has(l.known)) ctx.usedBy.set(l.known, [...(ctx.usedBy.get(l.known) ?? []), from]);
+  if (l.known && l.known !== "builtin" && ctx.ships.has(l.known)) append(ctx.usedBy, l.known, from);
   else if (!l.known) { ctx.read.nowhere++; ctx.unsure.add(from.file); }
 }
 
@@ -305,6 +355,7 @@ function oneFile(ctx, file, r) {
   if (!r.functions) { ctx.read.jsx++; add(ctx, "lost", file, file); }
   else if (!ctx.tests.has(file)) markedFunctions(ctx, file, r.functions);
   if (domain === "rules") ownClock(ctx, file, r);
+  testReach(ctx, file, r);
   for (const imp of r.imports) { if (r.lang === "javascript") oneImport(ctx, from, imp); else foreign(ctx, from, imp, r); }
   const names = ctx.tests.has(file) ? null : shared(file, r, ctx.idx);
   if (names) ctx.scripts.set(file, names);
@@ -314,7 +365,7 @@ function oneFile(ctx, file, r) {
 // than one such file declares.
 function sharedSpace(ctx) {
   const by = new Map();
-  for (const [file, names] of ctx.scripts) for (const n of names) by.set(n, [...(by.get(n) ?? []), file]);
+  for (const [file, names] of ctx.scripts) for (const n of names) append(by, n, file);
   for (const [file, names] of ctx.scripts) for (const n of names) if (names.length > 1 || by.get(n).length > 1) add(ctx, "global", `${file}: ${n}`, n);
 }
 
@@ -348,14 +399,15 @@ export function survey(texts, config, tests = new Set()) {
   const readings = code.map(file => [file, reading(file, texts[file])]);
   const idx = index(readings, texts), js = manifests(texts);
   const ctx = { config, tests, texts, unsure: new Set(), files: new Set(Object.keys(texts)), idx, packages: js.packages, ships: new Set([...js.ships, ...idx.ships]), declared: new Set([...js.declared, ...idx.declared]),
-    entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map() };
+    entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map(), reached: new Map() };
   for (const [file, r] of readings) oneFile(ctx, file, r);
+  reachEntries(ctx);
   sharedSpace(ctx);
   onCycles(ctx);
   wrappedOnce(ctx);
   read.unnamed = ctx.unnamed.length;
   read.tests = tests.size;
-  read.screens = new Set([...ctx.entries.keys()].filter(id => id.startsWith("screen: ")).map(fileOf)).size;
+  for (const [k, kind] of [["screens", "screen"], ["timed", "timed"], ["processes", "process"]]) read[k] = new Set([...ctx.entries.keys()].filter(id => id.startsWith(`${kind}: `)).map(fileOf)).size;
   return { entries: ctx.entries, read, unnamed: ctx.unnamed, readers: ctx.readers, reach: ctx.reach, scripts: new Set(ctx.scripts.keys()), unsure: ctx.unsure };
 }
 
@@ -369,6 +421,8 @@ export function groupOf(id) {
   if (kind === "cycle") return { kind, group: "cycle" };
   if (kind === "lost") return { kind, group: key }; // (a file lost covers itself alone)
   if (kind === "clock" || kind === "global") return { kind, group: key.slice(key.lastIndexOf(": ") + 2) };
+  // (a test's reach is its file's: one that reaches another name, or keeps a later one, stands under its old entry)
+  if (kind === "timed" || kind === "process") return { kind, group: key.slice(0, key.lastIndexOf(" -> ")) };
   return { kind, group: key.slice(key.lastIndexOf(" -> ") + 4) };
 }
 
@@ -384,7 +438,8 @@ export function fileOf(id) {
 
 // The reader that found an entry: the reader of its file as the check reads it now, the shared space's own; null where
 // the file is not read now.
-export const readerOf = (id, readers) => { const { kind } = groupOf(id); return kind === "global" ? "scripts" : kind === "screen" ? "screens" : readers.get(fileOf(id)) ?? null; };
+const OWN_READER = { global: "scripts", screen: "screens", timed: "clocks", process: "processes" };
+export const readerOf = (id, readers) => OWN_READER[groupOf(id).kind] ?? readers.get(fileOf(id)) ?? null;
 
 const NUMBERS = ["lines", "depth", "branches", "count"];
 // Whether an entry's numbers are within a listed one's: each no more than listed, or, for a function, than its mark.
@@ -496,12 +551,16 @@ const SAID = {
   cycle: n => [`${plural(n, "import lies", "imports lie")} on a cycle between files that did not stand before`, "turn one import of the cycle round: move what both files need into a file that imports neither, or pass it in"],
   platform: n => [`${plural(n, "import binds", "imports bind")} code to one platform outside the system declared for that`, "move the code that needs it into the system of the domain \"platform\", and have the rest call what that system offers, so that the rest builds and tests wherever the project's checks run"],
   package: n => [`${plural(n, "import takes", "imports take")} a package the project ships with outside the one system that wraps it`, "import it in one system alone, named under that system's \"wraps\" in the config, and have the others use what that system offers"],
-  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (an element of JSX that never closes, a type's parameter in .tsx it takes for one, as in <T>(x: T) => T, or code nested more than 200 levels deep), so ${n === 1 ? "its" : "their"} functions are not held`,
-    "write it so that the reader can follow it: close each element, give a type's parameter in .tsx a comma or a bound (<T,>, <T extends U>), or nest less deep; the check's failure on the file then names what it holds"],
+  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (an element of JSX that never closes, a type's parameter in .tsx it takes for one, as in <T>(x: T) => T, code nested more than 200 levels deep, or C# the grammar the core installs cannot read whole, or in two minutes), so ${n === 1 ? "its" : "their"} functions are not held`,
+    "write it so that the reader can follow it: close each element, give a type's parameter in .tsx a comma or a bound (<T,>, <T extends U>), or nest less deep; where it is C# that builds, newer than the grammar reads, list the entry under \"grown\" with that reason, by its id, and tell the core which construct it is, never the project's code (the core's README.md, \"Reporting to the core\"); the check's failure on the file then names what it holds"],
   global: n => [`${plural(n, "name joins", "names join")} the global space that scripts with no import or export share: a second name of one file there, or a name another such file declares too`,
     "make the file a module that imports what it uses and exports what it offers; where the page cannot load it so, put what it adds under the one name the file declares there already (an object of its functions), and give a name that two files declare one home"],
   screen: n => [`${plural(n, "test imports", "tests import")} what opens a screen, a window or a device, where no test of ${n === 1 ? "its" : "their"} file did before`,
     "test what it guards beneath the screen, through the system it uses, and take the import out; only where the screen, the window or the device itself is what the test guards, list the entry in the baseline with that reason under \"grown\", by its id, and in the pull request"],
+  timed: n => [`${plural(n, "test reaches", "tests reach")} a real clock (a sleep, a timed wait, a read of the time), where no test of ${n === 1 ? "its" : "their"} file did before`,
+    "hand the time in, as the rules take it, and test beneath the clock; only where the clock itself is what the test guards, or the test runs under a fake clock it installs (which the check does not tell apart from the real one), list the entry in the baseline with that reason under \"grown\", by its id, and in the pull request"],
+  process: n => [`${plural(n, "test starts", "tests start")} another process, where no test of ${n === 1 ? "its" : "their"} file did before`,
+    "call the code the process would run from the test itself, beneath the process; only where starting it is what the test guards (a command's own line, its exit code, what it prints), list the entry in the baseline with that reason under \"grown\", by its id, and in the pull request"],
   clock: n => [`${plural(n, "file", "files")} of the rules ${n === 1 ? "reads" : "read"} the clock or ${n === 1 ? "makes" : "make"} randomness of ${n === 1 ? "its" : "their"} own`, "pass the time and the source of randomness in as arguments, so that the same input gives the same result"],
 };
 
@@ -528,7 +587,7 @@ function fresh({ config, at, self, found, current, base, news, unread }) {
 // The failures of new breaches, one for each kind, with its mend and the breaches under it.
 function byKind(news, found, current, config, also = "") {
   const kinds = new Map();
-  for (const id of news) { const k = found.entries.get(id).kind; kinds.set(k, [...(kinds.get(k) ?? []), id]); }
+  for (const id of news) append(kinds, found.entries.get(id).kind, id);
   return [...kinds].map(([kind, ids]) => { const [what, mend] = SAID[kind](ids.length, config); return [`FAIL: ${what}. Mend: ${mend}${also}`, ...some(ids, current)]; });
 }
 
@@ -576,6 +635,8 @@ function notesOf(read) {
   if (read.nowhere) notes.push(`${plural(read.nowhere, "import leads", "imports lead")} nowhere the check can tell (no file, no package the project declares, no alias the config names): not held`);
   if (read.unnamed) notes.push(`${read.unnamed} of ${plural(read.files, "file")} lie in no system the config names: held to the marks and the cycles alone${read.systems ? ", and a new one fails" : ""}`);
   if (read.screens) notes.push(`${plural(read.screens, "test file")} of ${read.tests} ${read.screens === 1 ? "opens" : "open"} a screen, a window or a device (tasks/tests.md): each is listed, and a new one fails`);
+  if (read.timed) notes.push(`${plural(read.timed, "test file")} of ${read.tests} ${read.timed === 1 ? "reaches" : "reach"} a real clock (tasks/tests.md): each is listed, and a new one fails`);
+  if (read.processes) notes.push(`${plural(read.processes, "test file")} of ${read.tests} ${read.processes === 1 ? "starts" : "start"} another process (tasks/tests.md): each is listed, and a new one fails`);
   if (read.noEntrance && read.systems > 1) notes.push(`${plural(read.noEntrance, "system names", "systems name")} no entrance: nothing holds what the others import from ${read.noEntrance === 1 ? "it" : "them"}`);
   return notes;
 }
@@ -588,15 +649,21 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   const baseline = parseBaseline(baselineText, config.baseline, restore);
   const current = new Map([...found.entries].map(([id, e]) => [id, e.n]));
   if (base) { base.standing = once(base.standing); base.stood = once(() => stoodAt(base, config)); }
-  const reads = new Set(baseline.reads), unread = id => { const r = readerOf(id, found.readers); return r !== null && !reads.has(r); };
+  // (what a reader finds on the parser, where it could not run, its packages not installed for the registry not
+  // answering: its functions are read as a reader's the baseline does not name, so that none fails, and a file its
+  // baseline lists as lost, which only the parser tells, is kept, never gone; what the same reader finds without the
+  // parser, its imports, cycles and clock, and a file new to the baseline, are held as ever: #654, point 4)
+  const reads = new Set(baseline.reads), skipped = unreachedReaders();
+  const unread = id => { const r = readerOf(id, found.readers); return r !== null && (!reads.has(r) || (skipped.includes(r) && groupOf(id).kind === "function")); };
+  const kept = id => !current.has(id) && skipped.includes(readerOf(id, found.readers)) && ["function", "lost"].includes(groupOf(id).kind);
   const news = unclaimed(current, baseline.listed, config.marks);
   const { fail, later } = fresh({ config, at, self, found, current, base, news, unread });
   // (one that only shrank passes as it is listed: --write lowers its numbers whenever it is run)
-  const stale = [...baseline.listed.keys()].filter(id => !current.has(id) && !unread(id));
+  const stale = [...baseline.listed.keys()].filter(id => !current.has(id) && !unread(id) && !kept(id));
   if (stale.length) fail.push([`FAIL: ${config.baseline} lists ${plural(stale.length, "entry", "entries")} that ${stale.length === 1 ? "is" : "are"} gone or moved now. Mend: run node ${self} ${at} --write and commit the baseline it lowers`, ...some(stale, baseline.listed)]);
   if (base) fail.push(...againstBase({ config, at, self, baseline, base, found }));
-  const reread = [...baseline.listed.keys()].filter(id => !current.has(id) && unread(id)).length;
-  return { fail, notes: [...notesOf(found.read), ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read };
+  const reread = [...baseline.listed.keys()].filter(id => !current.has(id) && unread(id) && !kept(id)).length;
+  return { fail, notes: [...notesOf(found.read), ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read, kept: [...baseline.listed.keys()].filter(kept).length };
 }
 
 // What a baseline written before a reader came does not list yet, said, never failed.
@@ -609,7 +676,8 @@ function unlisted({ config, at, self, reads, later, reread }) {
 
 // ---- the commands ----
 
-// A suite held to its time mark: the command after --, run and timed, or the time since a start the workflow took.
+// A suite measured against its time mark: the command after --, run and timed, or the time since a start the workflow
+// took.
 function timed(name, rest, usage) {
   if (rest[0] === "--since" && /^\d+$/u.test(rest[1] ?? "") && rest.length === 2) return { took: Date.now() / 1000 - Number(rest[1]), status: 0 };
   if (rest[0] !== "--" || rest.length < 2) refuse("--suite takes a name, then -- and the suite's command, or --since and the second its run started at", usage);
@@ -625,9 +693,10 @@ function suite(config, at, self, [name, ...rest]) {
   const limit = isObject(mark) ? mark[process.platform] : mark;
   const { took, status } = timed(name, rest, `run node ${self} ${at} --suite ${name} -- <command>`);
   if (status !== 0) return status; // (the suite's own failure, which says its own mend)
+  // (a time mark measures and never fails, tasks/tests.md; #733, point 5: past it, a warning, which the run shows)
   if (limit !== undefined && took > limit) {
-    console.error(`FAIL: the suite ${name} took ${Math.round(took)} s, past its mark of ${limit}. Mend: make it faster (set up only what each test needs, run only what the change can reach), or split it so that each part runs alone under a mark of its own; only where it cannot be, raise its mark in ${at} with the reason under "grown" in ${config.baseline} and in the pull request`);
-    return 1;
+    console.log(`::warning::the suite ${name} took ${Math.round(took)} s, past its mark of ${limit}, which fails nothing. Mend: add it to the open task on the tests' time, or file one where none is open: make it faster (set up only what each test needs, run only what the change can reach), or split it so that each part runs alone under a mark of its own; only where it cannot be, raise its mark in ${at} with the reason under "grown" in ${config.baseline} and in the pull request`);
+    return 0;
   }
   console.log(`ok   the suite ${name} took ${Math.round(took)} s${limit === undefined ? `; ${at} gives it no mark on ${process.platform}` : `, within its mark of ${limit}`}`);
   return 0;
@@ -715,6 +784,13 @@ function check(config, at, self, found, base, named) {
   const v = verdict({ config, at, self, found, baselineText: fs.readFileSync(config.baseline, "utf8"),
     base: base && { name: base.name, ...baseFiles(base, named), standing: () => standingAt(base.name, config) } });
   for (const note of v.notes) console.log(`note ${logged(note)}`);
+  const skipped = unreachedReaders().filter(r => [...found.readers.values()].includes(r));
+  // (a job of the project's own that names the core's first install alone, written before the parser's came, is told to
+  // name every one; one whose install could not reach the registry, to run again: #719)
+  const unnamed = skipped.length && unnamedReaders().length, install = path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)));
+  const why = unnamed ? "the parser's packages are not installed, this job's install step naming the core's first install alone" : "the core's packages could not be installed, the registry not answering";
+  const mend = unnamed ? `make this job's install step node ${install} all, which installs the parser's packages too` : "run this job again before the pull request merges; if it fails again, file it as a fault";
+  if (skipped.length) console.log(`::warning::The shape check did not read ${skipped.map(r => `${READERS[r]} (the reader ${r})`).join(", ")}: ${why}, so what it would find there on the parser is reported, never failed${v.kept ? `, and the ${plural(v.kept, "entry", "entries")} its baseline lists there (functions, and files the grammar cannot read) ${v.kept === 1 ? "is" : "are"} kept as listed, never failed as gone` : ""}; what it reads without the parser is held as ever. Mend: ${mend}`);
   if (!base) console.log("note no base to compare with (set SHAPE_BASE to the branch the work started from), so the baseline was not checked for what joined it, and what the config newly reads is not told from what is new");
   for (const line of v.fail.flat()) console.error(logged(line));
   if (v.fail.length) return 1;
@@ -732,6 +808,10 @@ function main(argv) {
   const command = { "--first": first, "--write": write }[rest[0] ?? ""];
   if (rest.length > 1 || (rest.length && !command)) refuse(`the check does not know ${rest.join(" ")}`, `run node ${self} [<config>] [--first | --write], or --suite <name> with -- <command> or --since <seconds>`);
   const now = standing(config), found = survey(now.texts, config, now.tests);
+  // (a baseline is written only where every reader of a file the project holds could run: one that has no file to read
+  // is no reason to refuse, so a project with no C# writes its own with the parser's packages not installed)
+  const skipped = unreachedReaders().filter(r => [...found.readers.values()].includes(r));
+  if (command && skipped.length) refuse(`the core's packages are not installed, so ${skipped.map(r => READERS[r]).join(", ")} cannot be read and a baseline written now would leave out what stands there`, `run node ${path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)))}${unnamedReaders().length ? " all" : ""} until it installs them, then run this again`);
   if (!command) return check(config, at, self, found, base, named);
   if (command === write && !fs.existsSync(config.baseline)) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} ${at} --first, and commit it`);
   return command(config, at, self, new Map([...found.entries].map(([id, e]) => [id, numbersOf(e.n)])), base, found);
@@ -739,5 +819,6 @@ function main(argv) {
 
 if (started(import.meta.url)) {
   try { process.exitCode = main(process.argv.slice(2)); }
-  catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${logged(e.message)}`); process.exitCode = 1; }
+  // (a reader's own failure that says its mend, as the parser's that cannot be loaded, is told as the check's own)
+  catch (e) { if (!(e instanceof Refused) && !/\. Mend: /u.test(String(e?.message))) throw e; console.error(`FAIL: ${logged(e.message)}`); process.exitCode = 1; }
 }

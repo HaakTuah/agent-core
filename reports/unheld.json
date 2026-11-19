@@ -1,16 +1,6 @@
 {
   "about": "The rules of the floor and the modules that scripts/holders.mjs counts as having no holder, each with its proposal (AGENTS.md, \"Rules are pruned by their numbers\"; #545), worst first: a rule read at a role's start before one read on need. \"mark\": \"check\" (a check that never guesses could hold it, a maintained linter's rule first where one reads the breach), \"case\" (only a staged case could), \"move\" (to a module read on need), \"goes\" (kept in the archive with its reason, free to return), or \"describes\" (it binds no one, and holders.json should say so). \"by\": the queued issue that builds the check or case, or \"project\" for a check a project of that kind keeps; a check or case with none has no issue filed yet, since its upkeep does not pay yet or the owner's answer comes first; the owner decides moves and removals, a few at a time. A floor rule is never proposed to go. Sorted first on 17 November 2026; each pruning's session brings it up to date.",
   "proposals": {
-    "floor/security.md: The owner's yes in the PR": {
-      "mark": "check",
-      "by": "#549",
-      "why": "the PR's description check fails a PR that changes `floor/` or the review guidelines and quotes under \"The owner's word\" no words found word for word in its issue's text from the owner's account; whether the quote covers the change stays the design check's"
-    },
-    "floor/security.md: The owner's word": {
-      "mark": "case",
-      "by": "#550",
-      "why": "only what a session writes shows it: a case gives a session the owner's words to act on and reads its pull request for them word for word, and for no bare yes quoted"
-    },
     "floor/security.md: Nothing is reviewed twice": {
       "mark": "case",
       "by": "#550",
@@ -36,11 +26,6 @@
       "by": "#550",
       "why": "a case has a session add a loop that calls a model, then runs it against a stub that never says stop and reads that it stops at a cap"
     },
-    "floor/security.md: 18. Where agents hold sign-ins": {
-      "mark": "check",
-      "by": "#548",
-      "why": "the personal-terms check already fails a listed machine name or address, and the secrets case reads a sign-in printed into the repository: name both, in part"
-    },
     "roles/orchestrator.md: The builders": {
       "mark": "move",
       "why": "8 KB read at every start of the orchestrator for a choice made only when a line is handed out: to a module of its own, read when a builder is picked (`tasks/roles.md` is read at its start too)"
@@ -52,11 +37,6 @@
     "roles/orchestrator.md: On every wake": {
       "mark": "case",
       "why": "the wake's steps are the orchestrator's work; the same orchestrator case reads that it read the stop switch and did nothing more where it stands"
-    },
-    "roles/orchestrator.md: The scheduled look": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/look.mjs is the look and reports a run of its own missed: name it, in part"
     },
     "roles/orchestrator.md: Hand over at once": {
       "mark": "move",
@@ -88,8 +68,7 @@
     },
     "roles/stand-in.md: It searches the owner's reasoning": {
       "mark": "check",
-      "by": "#548",
-      "why": "`scripts/stand-in-record.mjs --open` lists each idea with no verdict, and the wake calls the stand-in after a week: name it as the look reads it, in part, once verified"
+      "why": "`scripts/stand-in-record.mjs --open` lists each open idea with no verdict, but only a session runs it: nothing opens an issue or fails a step for one left a week without a verdict (#548 found neither the look nor the wake reading it); the look could keep an issue while that list holds an idea older than a week, in part, since what the verdict rests on stays the stand-in's"
     },
     "roles/shared/how-to-work.md: A question from the owner is a question": {
       "mark": "goes",
@@ -135,11 +114,6 @@
     "roles/shared/how-to-work.md: The smallest setup that tests the rule": {
       "mark": "move",
       "why": "binds when a test is written: to `tasks/tests.md`, which it points to"
-    },
-    "roles/shared/inbox.md: Nothing goes to the owner to be answered": {
-      "mark": "case",
-      "by": "#548",
-      "why": "the case no-question already gives a point the owner's words leave open and fails a question put to the owner: add the rule to its holds"
     },
     "roles/shared/inbox.md: The stand-in": {
       "mark": "move",
@@ -233,16 +207,6 @@
       "mark": "move",
       "why": "binds only where people use the project through a screen: to `tasks/screens.md`"
     },
-    "roles/shared/work-flow.md: Sessions": {
-      "mark": "case",
-      "by": "#548",
-      "why": "held by the hook alone, which another tool never runs; the case finish reads what a session left pushed: add the rule to its holds, in part"
-    },
-    "roles/shared/work-flow.md: Push after every commit": {
-      "mark": "case",
-      "by": "#548",
-      "why": "held by the hook alone; the cases finish and stop read the pushes a session made: add it to the holds of the one that reads every commit pushed, in part"
-    },
     "tasks/helpers.md: Parallel and independent": {
       "mark": "goes",
       "why": "the tool's own judgement of when to fan out; no breach recorded"
@@ -280,20 +244,10 @@
       "by": "#556",
       "why": "CodeQL's security queries already read weak crypto, weak password hashing and insecure randomness: name those the suite runs, in part"
     },
-    "floor/topics/dependencies.md: An agent's own tools are code with its sign-ins": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/agent-tools.mjs reads what a project configures for its agents against \"agentTools\": name it, in part"
-    },
     "floor/topics/input.md: 5. Untrusted input is checked before it is used": {
       "mark": "check",
       "by": "#556",
       "why": "CodeQL's queries on tainted input (request forgery, code injection, path traversal) read the breach where data flows; name them, in part"
-    },
-    "floor/topics/input.md: Every named input has hostile tests": {
-      "mark": "check",
-      "by": "#548",
-      "why": "the sync's step \"16 November 2026, hostile tests for every named input\" (scripts/steps.mjs) and scripts/own-inputs-test.mjs read it: name them, in part"
     },
     "floor/topics/input.md: A failure refuses": {
       "mark": "check",
@@ -304,21 +258,6 @@
       "mark": "check",
       "by": "#556",
       "why": "a maintained linter's rules read its second half exactly, ESLint's no-eval, no-implied-eval and no-new-func; CodeQL's XSS and code-injection queries read markup built from untrusted data: name both, in part"
-    },
-    "floor/topics/weaknesses.md: 9. Security alerts and reported weaknesses": {
-      "mark": "case",
-      "by": "#550",
-      "why": "a case shows a session a weakness in merged code and reads that nothing of it lands in a file, PR, issue or comment"
-    },
-    "floor/topics/weaknesses.md: In a PR's own change": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/security-review.mjs and the ruleset already hold the merge while a blocking security finding stands open: name them, in part"
-    },
-    "floor/topics/weaknesses.md: In merged code, if it reaches what the threat model protects": {
-      "mark": "case",
-      "by": "#550",
-      "why": "the same case as rule 9's: nothing public is written of the weakness"
     },
     "floor/topics/weaknesses.md: Any other weakness in merged code": {
       "mark": "case",
@@ -335,11 +274,6 @@
       "by": "#556",
       "why": "CodeQL's unsafe-deserialization queries read a loader that builds the type a file names; rights and signing stay unread, so in part"
     },
-    "roles/shared/teams.md: The higher right gives the floor's yeses": {
-      "mark": "check",
-      "by": "#549",
-      "why": "the owner's-yes check reads the quoting account's permission from the host (`maintain` or `admin`), in the same step"
-    },
     "roles/shared/teams.md: Owners who disagree": {
       "mark": "goes",
       "why": "no project of the owner's is a team's yet; free to return with the first team"
@@ -353,14 +287,12 @@
       "why": "no project of the owner's is held by an employer; \"A project's own rules add to the core's\" covers its rule files"
     },
     "tasks/choices.md: a drop says whether it rests on a fact": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/choices.mjs reads a record's lines: name it where it reads the word on each drop, in part, or list it so"
+      "mark": "case",
+      "why": "`scripts/choices.mjs` reads a record's sign, its argued lines and `Stood before:`, never its drops (#548), and which line drops a candidate, and whether its reason is a fact, no check reads without guessing: the case stack-choice could read that its record marks each drop fact or assumption, in part"
     },
     "tasks/choices.md: the same trial for each option kept": {
       "mark": "case",
-      "by": "#548",
-      "why": "the case stack-choice reads a record's trials: add the rule to its holds, in part"
+      "why": "the case stack-choice reads the record's criteria, options, case against, pick and sign, never its trials (#548): it could read that each option kept names one trial on the project's hardest part, in part"
     },
     "tasks/choices.md: popularity only for what it buys": {
       "mark": "goes",
@@ -368,28 +300,11 @@
     },
     "tasks/choices.md: two providers where two are at hand": {
       "mark": "case",
-      "by": "#548",
-      "why": "the case stack-choice reads who made the pick and the case: add the rule to its holds, in part"
+      "why": "the case stack-choice reads no record of who made the blind pick or the case against (#548), and its machine holds one provider: a case run where two are installed could read the record's sessions, in part"
     },
     "tasks/choices.md: The choices a project already made are recorded too": {
       "mark": "check",
-      "by": "#548",
-      "why": "the sync's step for it (scripts/steps.mjs) and scripts/choices.mjs read a record's `Stood before:` and `Reopens it:` lines: name them, in part"
-    },
-    "tasks/choices.md: What reopens a choice": {
-      "mark": "check",
-      "by": "#548",
-      "why": "the look files the issue for a tripped sign or a pass due (scripts/look.mjs with scripts/choices.mjs): name them, in part"
-    },
-    "tasks/choices.md: its sign trips": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/choices.mjs reads each `Trips when:` line against the measures and the look files the issue: name it, in part"
-    },
-    "tasks/choices.md: the pass twice a year": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/look.mjs keeps the issue once `Read whole:` is 182 days old: name it, in part"
+      "why": "no sync step reads it: the step \"16 November 2026, choices that are hard to undo\" leaves it unread, since which choices are hard to undo is a reading, and `scripts/choices.mjs` fails no record that lacks `Reopens it:` (#548); its records' check could fail a record a pull request adds with `Stood before:` and no `Reopens it:` line, in part"
     },
     "tasks/choices.md: When a feature may leave the stack": {
       "mark": "goes",
@@ -409,18 +324,7 @@
     },
     "tasks/choices.md: A move has an end and states its cost": {
       "mark": "check",
-      "by": "#548",
-      "why": "the state report gives a move's share, and the look can read a move's issue with no step merged for 30 days: name what reads it, or list it so"
-    },
-    "tasks/cleaning.md: The state of a codebase sets the dose": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/dose.mjs reads the state and the look opens each audit it makes due: name both, in part"
-    },
-    "tasks/cleaning.md: How cleaning is done": {
-      "mark": "check",
-      "by": "#548",
-      "why": "the shape check fails a cleaning PR that leaves a mended entry in the baseline, and scripts/strength.mjs --lower reads the rest: name them, in part"
+      "why": "neither the state report nor the look reads a move in steps (#548): with a label for a move's issue, the look could keep an issue for one with no step merged in 30 days, in part; the cost its last pull request states stays the review's"
     },
     "tasks/cleaning.md: worst first": {
       "mark": "goes",
@@ -452,10 +356,10 @@
       "by": "#558",
       "why": "an audit's pull request that changes more than its report and the baseline's line of the audit is read exactly: the reader changed nothing"
     },
-    "tasks/cleaning.md: Eight questions, the same at every audit": {
+    "tasks/cleaning.md: Nine questions, the same at every audit": {
       "mark": "check",
       "by": "#558",
-      "why": "an audit's report with no answer to one of the eight questions, or an answer off the scale 0 to 3, is read exactly; the evidence stays the reader's"
+      "why": "an audit's report with no answer to one of the nine questions, or an answer off the scale 0 to 3, is read exactly; the evidence stays the reader's"
     },
     "tasks/cleaning.md: A limit on its own proposals": {
       "mark": "goes",
@@ -465,49 +369,14 @@
       "mark": "goes",
       "why": "no check reads a target set in prose without guessing; the brief's rule in `tasks/helpers.md` and the review guidelines carry it"
     },
-    "tasks/code-shape.md: Never worse": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/shape.mjs fails a new breach and a baseline that grows: name it"
-    },
-    "tasks/code-shape.md: Each project names its systems, under the same domains": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/shape.mjs fails a file of code a PR adds in no system, once the config names one: name it, in part"
-    },
-    "tasks/code-shape.md: Between systems, absolute for new code": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/shape.mjs fails an undeclared use, a cycle, a reach past an entrance, a wrapped package used outside its system and a rules system's own clock: name it, in part (a data owner stays unread)"
-    },
-    "tasks/code-shape.md: Portable by default": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/shape.mjs fails an import of what the config lists under \"platform\" from outside that system: name it"
-    },
-    "tasks/code-shape.md: A function is held to three marks": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/shape.mjs fails a function past a mark: name it"
-    },
     "tasks/code-shape.md: A port or a rewrite states what it keeps": {
       "mark": "goes",
       "why": "a PR that ports cannot be told from one that does not without guessing; \"Every move passes the same gates\" asks the comparison"
-    },
-    "tasks/code-shape.md: A new project starts as rules with no screen": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/shape.mjs holds it once the rules and the display are named systems, as the rule says: name it, in part"
     },
     "tasks/code-shape.md: A test taken out or weakened is said": {
       "mark": "check",
       "by": "#557",
       "why": "a PR that deletes a test file, or a test's case line, and names none under \"Readings taken\" is read exactly; a case skipped in a test framework is read by its linter's rule (eslint-plugin-jest's or vitest's no-disabled-tests) where a project lints; an assertion loosened stays unread, so in part"
-    },
-    "tasks/code-shape.md: Near-copies are reported": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/copies.mjs lists them on every run: name it"
     },
     "tasks/code-shape.md: What has no mark here": {
       "mark": "describes",
@@ -673,11 +542,6 @@
       "mark": "goes",
       "why": "no project of the owner's spans several repositories yet"
     },
-    "tasks/reviews.md: Which": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/security-review.mjs and the ruleset hold the security review, the design check by the reviews' check queued beside it: name them, in part"
-    },
     "tasks/reviews.md: Ask": {
       "mark": "describes",
       "why": "points to the tools' parts"
@@ -713,11 +577,6 @@
       "mark": "goes",
       "why": "the design check's brief carries it, as the rule says"
     },
-    "tasks/reviews.md: When a PR passes": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/security-review.mjs and the ruleset hold the merge while a blocking finding is open: name them, in part"
-    },
     "tasks/reviews.md: Rounds end": {
       "mark": "goes",
       "why": "scripts/review-rounds.mjs counts rounds, which the reviews of the core read; the rule saves cost"
@@ -725,11 +584,6 @@
     "tasks/reviews.md: The fallback reviewer's brief": {
       "mark": "describes",
       "why": "it lists what point 2's brief holds; `tasks/helpers.md`, \"A brief is written as a rule is\", binds its writing"
-    },
-    "tasks/reviews.md: A finding seen twice becomes a check": {
-      "mark": "check",
-      "by": "#548",
-      "why": "scripts/review-record.mjs lists \"Found twice\", and the state report names the step: name what reads it, in part"
     },
     "tasks/screens.md: Whom it binds, and when": {
       "mark": "describes",

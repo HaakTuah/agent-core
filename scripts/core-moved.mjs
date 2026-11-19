@@ -1,6 +1,6 @@
 // The core has moved (README.md, "How a project takes the core", point 5), for a project whose orchestrator does not
 // wake every day: it compares the commit the project's core-manifest.md pins with the newest of what the project
-// follows (releases.mjs, beside this file: the newest commit of the core's main, or the core's newest release, which
+// follows (releases.mjs, beside this file: the newest commit of the core's main whose checks all passed, or the core's newest release, which
 // has moved only where it is past the pin and changes something the project takes) and keeps one issue open for the owner while the project is behind, saying
 // what changed and how a session takes it; once the project holds it again, it closes that issue. It opens no pull
 // request and changes no file: a session makes the sync (sync.mjs, beside this file), since a pull request a workflow
@@ -17,10 +17,9 @@ import path from "node:path";
 import { aRepository } from "./guards.mjs";
 import { CORE } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
-import { fetchCore, followsOf, hostSaid, newestRelease, ownerOf, staysAt } from "./releases.mjs";
+import { fetchCore, followsOf, greenMain, hostSaid, newestRelease, ownerOf, past, staysAt } from "./releases.mjs";
 import { started } from "./started.mjs";
 
-const SHA = /^[0-9a-f]{40}$/;
 // The one issue it keeps: found again by this title among the issues the workflow itself opened.
 export const TITLE = "The core has moved past this project's copy";
 const BOT = "github-actions[bot]";
@@ -91,9 +90,15 @@ const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8", stdio: ["
 function newestOf(follows, pin, manifest) {
   let newest, moved, release = "", stays = false;
   if (follows === "main") {
-    newest = run("git", ["ls-remote", `https://github.com/${CORE}`, "refs/heads/main"]).split(/\s/)[0];
-    if (!SHA.test(newest)) fail("the core's main gave no commit");
-    moved = newest !== pin;
+    // (main's newest commit whose checks all passed, which needs its history: fetched as the releases' is; #733)
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "core-main-"));
+    let green = null;
+    try { fetchCore(dir); green = greenMain(dir); moved = !!green.sha && green.sha !== pin && past(pin, green.sha, dir); }
+    catch { /* (said below, once the folder is gone) */ } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    if (!green) fail("the core's main could not be fetched");
+    console.log(green.said);
+    newest = green.sha ?? pin;
+    if (!green.sha) return { newest, moved: false, release, stays, unread: true };
   } else {
     // (which commit is past which takes the core's history: fetched into a folder of its own, removed again)
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "core-releases-"));
@@ -107,8 +112,8 @@ function newestOf(follows, pin, manifest) {
 }
 
 // What the project and the core stand at, in a line.
-const standing = (follows, pin, { newest, release, stays }, what) => follows === "main"
-  ? `the project holds ${pin.slice(0, 7)}, the core's main is at ${newest.slice(0, 7)}: ${what}`
+const standing = (follows, pin, { newest, release, stays, unread }, what) => follows === "main"
+  ? unread ? `the project holds ${pin.slice(0, 7)}, and no commit of the core's main was read to pass: ${what}` : `the project holds ${pin.slice(0, 7)}, the core's main is at ${newest.slice(0, 7)}: ${what}`
   : release
     ? `the project holds ${pin.slice(0, 7)}, the core's newest release, ${release}, is at ${newest.slice(0, 7)}${stays ? " and changes nothing the project takes" : ""}: ${what}`
     : `the project holds ${pin.slice(0, 7)}, and the core has cut no release yet: ${what}`;
@@ -141,7 +146,8 @@ function main(dry) {
   const open = dry ? null : openIssue(run("gh", ["api", "--paginate",
     `repos/${repo}/issues?state=open&labels=enhancement&per_page=100`,
     "--jq", ISSUES]));
-  const what = plan(found.moved, open);
+  // (where no commit of main was read to pass, an open issue is left as it stands: nothing says the project holds it)
+  const what = found.unread ? "nothing" : plan(found.moved, open);
   console.log(standing(follows, pin, found, what));
   if (dry || what === "nothing") return;
   settle(what, { pin, manifest, repo, open, found });

@@ -32,6 +32,7 @@ ok(failures("FAILED to read\n  FAIL indented\nFAIL: a. Mend: do it now.\r\nFAIL\
 const CHECKS = {
   "scripts/copies.mjs": "tests/init-test.mjs",
   "scripts/pointers.mjs": "tests/pointers-test.mjs",
+  "scripts/install.mjs": "tests/packages-test.mjs",
   "scripts/reading-size.mjs": "tests/init-test.mjs",
   "scripts/workflows.mjs": "tests/workflows-test.mjs",
   "scripts/licences.mjs": "tests/licence-scan-test.mjs",
@@ -67,6 +68,8 @@ const CHECKS = {
   ".github/workflows/versions.yml": "tests/core-path-test.mjs",
   ".github/workflows/nuget.yml": "tests/nuget-gate-test.mjs",
   ".github/workflows/personal-terms.yml": "tests/personal-terms-test.mjs",
+  // (its gate fails on a draft, saying the mend, since a required check whose job is skipped passes; #733)
+  ".github/workflows/tests.yml": "tests/workflows-test.mjs",
 };
 // what a workflow names that fails no pull request, each with why
 const NOT_CHECKS = {
@@ -80,7 +83,7 @@ const NOT_CHECKS = {
   "scripts/pure-sync.mjs": "run by security-review.yml as a proof alone: where it fails, the sync is not proved pure and the status says its own mend",
   "scripts/clean-merges.mjs": "run by security-review.yml as a proof alone: a merge it does not prove stops a review of an earlier commit, and the status says its own mend",
   ".github/workflows/preview.yml": "publishes a preview of a pull request's site",
-  ".github/workflows/release.yml": "cuts a release, started by hand on main",
+  ".github/workflows/release.yml": "cuts a release, started by hand on main, and runs the upgrade test on Windows on main once a day: no pull request runs it",
 };
 
 const workflows = [
