@@ -40,7 +40,7 @@ const numbers = text => [...String(text).matchAll(/(?<![\w/-])#(\d{1,9})\b(?:\s+
 // "#a-#b", "#a–b", "#a..#b", "#a through #b", ...) at most a hundred wide is read whole; one wider, or backwards,
 // keeps the line, as does a row's first cell holding anything but issues, the words that join them and their points,
 // steps, cases or parts; a bare number joined to an issue ("#12, 13 and 14", "#12/13") is read as one.
-const RANGE = /#(\d{1,9})\b\s*(?:-|\u2013|\u2014|\.{2,3}|\u2026|\bup\s+to\b|\bto\b|\bthrough\b|\bthru\b|\btill\b|\buntil\b)\s*#?(\d{1,9})\b/giu;
+const RANGE = /#(\d{1,9})\b\s*(?:-|\u2010|\u2011|\u2012|\u2212|~|\u2013|\u2014|\.{2,3}|\u2026|\bup\s+to\b|\bto\b|\bthrough\b|\bthru\b|\btill\b|\buntil\b)\s*#?(\d{1,9})\b/giu;
 function named(text, strict) {
   const issues = [];
   let kept = false;
@@ -64,7 +64,7 @@ const beyond = words => String(words).replace(/#\d{1,9}(?:'s\s+points?\s+[\d\s,]
 // `waits` the numbers what it waits on names (a row's last cell, or what an item names after "waits on"), `words`
 // that text; `owner` whether a row's second cell holds it for the owner ("the owner", AGENTS.md, "The queue").
 export function linesOf(text) {
-  const all = String(text ?? "").split("\n").map(l => l.replace(/\r$/u, ""));
+  const raw = String(text ?? "").split("\n"), all = raw.map(l => l.replace(/\r$/u, ""));
   return all.map((plain, at) => {
     const row = ROW.exec(plain), item = row ? null : ITEM.exec(plain);
     const { span, wraps } = item ? wrapped(all, at, item[1].length) : { span: 1, wraps: 1 }, whole = all.slice(at, at + wraps).join(" ");
@@ -72,19 +72,21 @@ export function linesOf(text) {
     if (!head?.issues.length) return null;
     const cells = row ? plain.split("|").slice(1, -1) : [];
     const words = (row ? cells.at(-1) ?? "" : /\bwaits\s+on\b(.*)$/iu.exec(whole)?.[1] ?? "").trim();
-    return { at, span, text: String(text).split("\n")[at], issues: head.issues, kept: head.kept, waits: numbers(words), words, owner: row !== null && /^\s*the owner\b/iu.test(cells[1] ?? "") };
+    return { at, span, text: raw[at], issues: head.issues, kept: head.kept, waits: numbers(words), words, owner: row !== null && /^\s*the owner\b/iu.test(cells[1] ?? "") };
   }).filter(Boolean);
 }
 // What an item at `at` spans: { span, wraps }, `span` itself and each line after it indented past its bullet (its
-// wrapped text, and the items under it that name no issue, which leave with it; one that names an issue is a line of
-// its own and ends the span), `wraps` how many of those are its own text, wrapped,
+// wrapped text, and the lines under it that name no issue, which leave with it; one that names an issue anywhere, a
+// heading or a fence ends the span; a tab counts four), `wraps` how many of those are its own text, wrapped,
 // before the first line that is a bullet of its own.
 const BULLET = /^\s*(?:[-*+]|\d{1,9}[.)])\s/u;
 function wrapped(all, at, indent) {
   let span = 1, wraps = 1;
-  while (at + span < all.length && new RegExp(`^ {${indent + 1},}\\S`, "u").test(all[at + span]) && !ROW.test(all[at + span].trim()) && !ITEM.test(all[at + span])) {
-    if (wraps === span && !BULLET.test(all[at + span])) wraps++;
-    span++;
+  for (; at + span < all.length; span++) {
+    const line = all[at + span].replace(/\t/gu, "    ");
+    if (!new RegExp(`^ {${indent + 1},}\\S`, "u").test(line) || ROW.test(line.trim()) || ITEM.test(line) || /^\s*(?:#{1,6}\s|```|~~~)/u.test(line)) break;
+    if (wraps === span && !BULLET.test(line)) wraps++;
+    else if (/#\d/u.test(line)) break;
   }
   return { span, wraps };
 }
