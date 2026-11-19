@@ -10,6 +10,7 @@ it merges last.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
+| #715 | rule builder; `tests.yml` steps one by one, 2 security reviews | |
 | #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue | |
 | #530, step 5 | builder; licence readers after #585 and #586 | #529 |
 | #593, points 1 to 3 | rule builder | |
@@ -77,7 +78,8 @@ it merges last.
 | #661 | builder | |
 | #662 | rule builder | |
 | #679 to #682 | rule builder; one PR each | #467 |
-| #702 | rule builder; it changes what every role reads at its start | |
+| #707 | rule builder | |
+| #701 | builder | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line

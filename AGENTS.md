@@ -164,7 +164,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   asked to (`tasks/cleaning.md`). It does not mean that all a release brings arrives advisory or off, nor that old code is left
   alone. Reason: a project that takes the core on trust, from a release, never finds a pull request failing, or work
   waiting on its owner, for something it did not change. Held by `tests/upgrade-test.mjs`, in
-  `.github/workflows/tests.yml`: a project written by the starter kit of each of the last two releases (npm and .NET,
+  `.github/workflows/tests.yml` on Linux, and on Windows in `release.yml` daily and before each release: a project written by the starter kit of each of the last two releases (npm and .NET,
   the .NET one as Windows holds it, its commits made under a listed name), holding old content of each kind a check
   reads and synced to the commit under test, passes every check of the core unchanged, that mend made, starts no job
   it did not start before, and fails a pull request that adds a copy until the mend its failure words is made; by the

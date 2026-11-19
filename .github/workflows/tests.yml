@@ -8,10 +8,12 @@
 # scratch folder, and takes a few packages from nuget.org for it (tests/init-dotnet-test.mjs). Another writes
 # projects with the starter kit of each of the last two releases, syncs them to the commit under test and runs every
 # check of the core on them, taking one package from npm's registry (tests/upgrade-test.mjs): it reads the core's
-# whole history and its release tags, so its checkout fetches them, and it runs in a job of its own, beside the suites,
-# since on Windows it takes as long as a third of them, and there in two jobs, a part of it each. The staged cases'
-# test, which writes a scratch project with the starter kit for each case it reads, runs after it in that job, on
-# Windows half after each part (#508).
+# whole history and its release tags, so its checkout fetches them, and it runs in two jobs of its own, a part of it
+# each, beside the suites, here on Linux alone; on Windows, where it set the length of every run, the release workflow
+# runs it once a day and before each release (.github/workflows/release.yml; #715), since what it guards reaches a
+# project only through a release. The staged cases' test, which writes a scratch project with the starter kit for
+# each case it reads, runs half in each of those jobs, after the upgrade test's part on Linux, and on Windows in two
+# jobs of the same name with nothing before it (#508).
 # A third runs the reference parsers the hand-written readers are held to, tools that only run, the devDependencies of
 # the core's lock file, which its own jobs install and a copy does not (tests/readers-test.mjs, on Linux).
 # Each job first installs the core's own packages from its lock file in .packages/, from npm's registry, running no
@@ -19,7 +21,7 @@
 # tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
 # Once, on Linux, the core's own lock file is held as a project's is: each package it brings looked up in npm's
 # registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures).
-# Each job of the suites, three on Linux and seven on Windows on each Node, and the upgrade test, are each held to a time
+# Each job of the suites, three on Linux and eight on Windows on each Node, and the upgrade test, are each held to a time
 # mark (the "suites" of .github/shape.json, by scripts/shape.mjs; tasks/tests.md, "The tests have a time mark").
 # On a pull request each job runs only the suites its change can reach, against the merge's first parent, its base, and
 # says on its summary what it ran; a push to main, and a re-run, runs every suite (scripts/select.mjs; tasks/tests.md,
@@ -198,6 +200,9 @@ jobs:
       - name: What a push waits on, against its mark
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/wait-test.mjs ')) }}
         run: node tests/wait-test.mjs
+      - name: The merge line read from the host, its measure and the runs it cancels
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/merge-line-test.mjs ')) }}
+        run: node tests/merge-line-test.mjs
       - name: The strength check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/strength-test.mjs ')) }}
         run: node tests/strength-test.mjs
@@ -437,12 +442,13 @@ jobs:
           MUTATE_BUDGET: "240"
         run: node scripts/strength.mjs
 
-  # (on each system the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the
-  # older of the two releases with the copy older than the first, and the newer release; the staged cases' test follows
-  # each, its first half after the older and its second after the newer, each half under the suite's own mark, since
-  # whole it took up to 1009 s of its 900 on Windows and up to 264 s of its 240 on Linux; #304, #508, #515)
+  # (on Linux the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the older
+  # of the two releases with the copy older than the first, and the newer release; on Windows it runs in the release
+  # workflow alone, daily and before each release, and these two jobs run the staged cases' test alone (#715). Its
+  # first half runs in the older's job and its second in the newer's, each half under the suite's own mark, since whole
+  # it took up to 1009 s of its 900 on Windows and up to 264 s of its 240 on Linux; #304, #508, #515)
   upgrade:
-    name: upgrade (${{ matrix.os }}, ${{ matrix.part }})
+    name: ${{ matrix.os == 'windows-latest' && 'staged' || 'upgrade' }} (${{ matrix.os }}, ${{ matrix.part }})
     strategy:
       fail-fast: false
       matrix:
@@ -470,8 +476,8 @@ jobs:
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
         run: node scripts/select.mjs .github/shape.json --env RUN
-      - name: A project of each of the last two releases, or of the one this job's part names, synced to this commit, passes every check unchanged
-        if: ${{ env.RUN == 'all' || contains(env.RUN, ' tests/upgrade-test.mjs ') }}
+      - name: A project of each of the last two releases, or of the one this job's part names, synced to this commit, passes every check unchanged (on Linux; on Windows, the release workflow)
+        if: ${{ runner.os == 'Linux' && (env.RUN == 'all' || contains(env.RUN, ' tests/upgrade-test.mjs ')) }}
         env:
           PART: ${{ matrix.part }}
         run: node scripts/shape.mjs .github/shape.json --suite upgrade -- node tests/upgrade-test.mjs --part "$PART"
@@ -482,8 +488,8 @@ jobs:
           STAGED: ${{ matrix.part == 'older' && 'first' || matrix.part == 'newer' && 'second' || 'all' }}
         run: node scripts/shape.mjs .github/shape.json --suite staged -- node tests/staged-test.mjs --part "$STAGED"
 
-  # (the one check the ruleset asks for by name: it passes only where the suites, and the upgrade test with the staged
-  # cases, passed on both; a job that ran out of its time is cancelled, which no failing test is, so the gate says which
+  # (the one check the ruleset asks for by name: it passes only where the suites, the staged cases on both and the
+  # upgrade test on Linux passed; a job that ran out of its time is cancelled, which no failing test is, so the gate says which
   # it was)
   tests:
     needs: [suites, upgrade]
@@ -491,7 +497,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: The suites, the upgrade test and the staged cases passed on Linux and on Windows
+      - name: The suites and the staged cases passed on Linux and on Windows, and the upgrade test on Linux
         env:
           SUITES: ${{ needs.suites.result }}
           UPGRADE: ${{ needs.upgrade.result }}

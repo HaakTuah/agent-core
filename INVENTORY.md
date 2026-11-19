@@ -259,7 +259,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   17 November names no age a release must reach, which the script asks. *Bugs:* 1. **Keep:** fitting and keeping
   Renovate costs more than the script.
 - `scripts/release.mjs`, `.github/workflows/release.yml`: cuts `release-N` on `main`'s newest commit once every check
-  passed. *Runs:* the runners, started by hand. *Else:* release-please, semantic-release and changesets, dropped on
+  passed and its own run of the upgrade test on Windows, which it also runs once a day, cutting nothing. *Runs:* the
+  runners, started by hand, and daily. *Else:* release-please, semantic-release and changesets, dropped on
   fact: they write versions and notes from commit messages, which the core does not ask. *Bugs:* 0. **Keep:** small and
   stable.
 - `.github/workflows/delete-merged-branches.yml`: deletes the branches whose every commit is in `main`. *Runs:* the
