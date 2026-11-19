@@ -4,7 +4,9 @@
 // its mend; a project that calls none of the core's workflows, as on another host, is checked by the kit's calls; and
 // every workflow of the core's that the starter kit calls is run by it or named among the host's own (HOST_OWN), so a
 // new check cannot be left out of it. A scratch core reached through the core's own address by a git rewrite, so no
-// call reaches the network. Git, tar, bash and Node's own modules.
+// git call reaches the network; the checks it runs on the scratch project install the core's packages from npm's
+// registry, so it runs with the tests that reach the network (tasks/tests.md; #733, point 9). Git, tar, bash, npm and
+// Node's own modules.
 //
 //   node tests/check-test.mjs
 import { spawnSync } from "node:child_process";
