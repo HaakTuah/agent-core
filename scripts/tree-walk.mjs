@@ -2,10 +2,19 @@
 // javascript-functions.mjs and python-tree.mjs, beside this file): each function found with its name, its body's line
 // and lines, the depth its control blocks reach and its branch points, by the reader's own parts. Node's own modules only: none.
 
-/** The largest file a reader gives its grammar, in characters: a tree takes memory in step with its nodes, a 4 MB array
- *  literal of JavaScript about 2.5 GB, and a file of code that size is data a script wrote, not code someone reads. One
- *  past it has no functions told, as a file the grammar cannot read whole has none. */
-export const LARGEST = 2_000_000;
+/** The largest file each reader gives its grammar, in characters, by its language: one past it has no functions told,
+ *  as a file the grammar cannot read whole has none. SECURITY.md, rule 5, asks a pull request's file read within 5 s,
+ *  process and parser started; at these sizes the slowest text measured, one long list of Python or JavaScript and C#'s
+ *  braces nested as deep as the grammar goes, takes about 2 s on a 4-core 2.1 GHz Xeon, where its walk, which no budget
+ *  stops, takes most of C#'s. A file of code past them is most often data a script wrote, not code someone reads. */
+export const LARGEST = { javascript: 500_000, python: 500_000, csharp: 250_000 };
+
+/** How long the grammar may take on `src`, in milliseconds: a second and 4 more for each thousand characters, as
+ *  ordinary code is read in time in step with its size, about 1 ms for each thousand characters, and 2 s at most, so
+ *  that text the grammar recovers from slowly (C#'s `x;` repeated, past 50 s a megabyte; JavaScript's `/[`, past two
+ *  minutes at 600 KB) leaves room in rule 5's 5 s for
+ *  the walk after it. A file it cannot read within it has no functions told. */
+export const budgetOf = src => Math.min(1000 + src.length / 250, 2000);
 
 /** The functions under `root`, in the order their bodies open, as a baseline numbers functions of one name. `parts`
  *  are the reader's: `functionBody(node)`, the body of a node that is a function, else null; `nameOf(node, parent)`;

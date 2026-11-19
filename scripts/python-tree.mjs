@@ -32,14 +32,14 @@
 // may import (shape.mjs, "unsure"). A file it cannot read within its time, or past LARGEST, has none of the three told.
 import { inParser } from "./parser.mjs";
 import { COMMENT_READ } from "./code-shape.mjs";
-import { LARGEST, walkFunctions } from "./tree-walk.mjs";
+import { LARGEST, budgetOf, walkFunctions } from "./tree-walk.mjs";
 
 /** The file `src` read: { functions: [{ name, line, lines, depth, branches }] in the order their bodies open, null where
  *  they cannot be told; imports: [{ level, module, names, line, dynamic, types }]; toks: [{ t, v, line }]; comments:
  *  [{ line, text }] }; null where the parser could not read it within its time or it is past LARGEST. Read in the
  *  parser's thread (read, below). */
 export function pythonTree(src) {
-  if (src.length > LARGEST) return null;
+  if (src.length > LARGEST.python) return null;
   try { const r = inParser(import.meta.url, "read", src); return r && { ...r, toks: unpacked(r.toks) }; } catch (e) {
     if (e?.kind === "read") return null;
     // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step: #719)
@@ -48,10 +48,6 @@ export function pythonTree(src) {
     throw e;
   }
 }
-
-// (how long the grammar may take on one file, in milliseconds, as JavaScript's reader gives it: a second and 4 more for
-// each thousand characters)
-const budgetOf = src => 1000 + src.length / 250;
 
 /** `src` read with the parser's `parse` (in its thread: pythonTree, above). */
 export function read(parse, src) {
