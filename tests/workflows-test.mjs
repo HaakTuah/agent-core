@@ -186,4 +186,12 @@ ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] =
     "and both in full by hand, which the release waits on: it reads the push's runs and, apart, the tests' runs on its commit, every page, none unfinished and the newest passed, and the tests stay a workflow no project calls (point 6; release.mjs, fullRun)", cut);
 }
 
+// (#802: the copy's check removes the folders it fetched into, so no fetch there may leave git's own upkeep running
+// behind the step, which raced that removal on main)
+{
+  const fetches = fs.readFileSync(path.join(wfDir, "core.yml"), "utf8").split("\n").filter(l => /\bgit\b[^#|;&]*\bfetch\b/.test(l.replace(/#.*/, "")));
+  ok(fetches.length >= 3 && fetches.every(l => l.includes("--no-auto-maintenance")),
+    "each fetch of the copy's check starts no upkeep of git's own, which would race the check's removal of what it fetched (#802)", fetches.filter(l => !l.includes("--no-auto-maintenance")).join(" | "));
+}
+
 process.exit(failed ? 1 : 0);
