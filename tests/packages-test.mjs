@@ -32,7 +32,7 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   // (what the package list and lock file hold, as install.mjs reads them before npm runs: their own fields, registry
   // entries alone, and every spec a version, range or tag of npm's registry)
   const { lockFaults, ENTRY_FIELDS } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href);
-  const faults = lockFaults(list, lock);
+  const faults = [...lockFaults(list, lock), ...lockFaults(json(".packages/parser/package.json"), json(".packages/parser/package-lock.json")).map(f => `parser's ${f}`)];
   ok(faults.length === 0, "the package list and the lock file hold what install.mjs takes: their own fields, registry entries alone, and every spec a version, range or tag of npm's registry", faults.slice(0, 5).join("; "));
   const bad = [{ ...list, overrides: {} }, { ...list, devDependencies: { x: "git+https://example.invalid/x.git" } }, { ...list, devDependencies: { x: "ids.tgz" } }, { ...list, devDependencies: { x: "1.0.0 || a.tar.gz" } }, { ...list, devDependencies: { x: "file:x" } }, { ...list, devDependencies: { x: "x.tar_gz" } }, { ...list, devDependencies: { x: "^1.0.0" } }];
   const badLocks = [{ ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], dependencies: { b: "git+https://example.invalid/b.git" } } } },
@@ -41,7 +41,8 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
     { lockfileVersion: 3, requires: true, dependencies: { yaml: { version: "git+https://example.invalid/yaml.git" } } }, { ...lock, packages: null }, { ...lock, dependencies: {} },
     { ...lock, packages: { ...lock.packages, "node_modules/a.tgz": lock.packages["node_modules/yaml"] } },
     { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], resolved: `${lock.packages["node_modules/yaml"].resolved}?d` } } },
-    { ...lock, packages: { ...lock.packages, "": { ...lock.packages[""], scripts: {} } } }, []];
+    { ...lock, packages: { ...lock.packages, "": { ...lock.packages[""], scripts: {} } } }, [],
+    { ...lock, packages: Object.fromEntries(Object.entries(lock.packages).filter(([k]) => k)) }, { ...lock, packages: {} }];
   ok([...bad, null, []].every(l => lockFaults(l, lock).length > 0) && badLocks.every(l => lockFaults(list, l).length > 0) && lockFaults(list, { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], dependencies: { z: "^1.2.3 || ~2", y: "latest" } } } }).length === 0,
     "and a field of its own, a spec naming git, a file or a tarball, a linked entry or one from another address, each is one it refuses; a range or a tag is none");
   const acted = { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], optional: true, integrity: "sha512-AAAA" } } };
@@ -55,7 +56,7 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
     .filter(k => record[k]?.link || ["version", "resolved", "integrity"].some(f => record[k]?.[f] !== lock.packages[k]?.[f]));
   ok(differ.length === 0, "what npm installed, by its own record, is each entry of the lock file as written, and nothing else", `${differ.slice(0, 5).join(", ")}\nMend: run node scripts/install.mjs; where it still differs, an entry of the lock file or a spec in it names another source than npm's registry, which goes`);
   const config = json(".github/licences.json");
-  ok((config.lockfiles ?? []).includes(".packages/package-lock.json"), "the core's licence check reads the lock file, so the licence check and the lookup hold each package (floor rules 10 and 15)");
+  ok(["", "parser/"].every(d => (config.lockfiles ?? []).includes(`.packages/${d}package-lock.json`) && (config.ignoreScriptsIn ?? []).includes(`.packages/${d}.npmrc`)), "the core's licence check reads the lock file, so the licence check and the lookup hold each package (floor rules 10 and 15)");
   // (an install script never runs, whatever npm command is run at the core's root or a copy's: the mechanism holds it)
   const npmrc = fs.readFileSync(path.join(root, ".packages/.npmrc"), "utf8");
   ok(/^ignore-scripts\s*=\s*true$/mu.test(npmrc) && /^min-release-age\s*=\s*7$/mu.test(npmrc) && (config.ignoreScriptsIn ?? []).includes(".packages/.npmrc"), "the core's .npmrc, which the copy carries, keeps every package's install script off and waits a week, and the licence check holds it there (floor rules 7 and 15)", npmrc);
@@ -106,11 +107,15 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
     }
     return out;
   };
-  let base = {};
-  try { base = JSON.parse(execFileSync("git", ["show", `${process.env.PACKAGES_BASE || "HEAD^1"}:.packages/package-lock.json`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })).packages ?? {}; } catch { /* (no lock file at the base: every entry is new) */ }
+  // (every install's lock, each entry against what any lock at the base held, so a package moved from one install to
+  // another at the same version is no new one, and one the parser's lock brings or updates is held as the first's: #719)
+  const locks = [".packages/package-lock.json", ".packages/parser/package-lock.json"];
+  const base = {};
+  for (const f of locks) try { Object.assign(base, JSON.parse(execFileSync("git", ["show", `${process.env.PACKAGES_BASE || "HEAD^1"}:${f}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })).packages ?? {}); } catch { /* (no such lock file at the base: its entries are new) */ }
   // (the day the week is counted to, handed in: the run's own date, or PACKAGES_TODAY's; nothing else reads the clock)
   const today = Date.parse(process.env.PACKAGES_TODAY || new Date().toISOString());
-  const young = await tooYoung(json(".packages/package-lock.json").packages, base, name => fetched(`https://registry.npmjs.org/${name.replaceAll("/", "%2f")}`), today);
+  const young = [];
+  for (const f of locks) young.push(...await tooYoung(json(f).packages, base, name => fetched(`https://registry.npmjs.org/${name.replaceAll("/", "%2f")}`), today));
   ok(young.length === 0, "each package the change brings or updates in the lock file is a week old or more by the registry's date (floor rule 7)",
     `${young.join("; ")}\nMend: wait until the version is a week old and run the job again, or take the version before it, its lock entry written by npm's own install`);
   // (held on a lock written by hand: a version field kept while the address names another tarball, an entry with no
@@ -151,7 +156,7 @@ if (failed) { console.log(`FAIL ${failed} of the lock file's checks above failed
   const theirs = f => /(?:^|\/)node_modules(?:\/|$)/u.test(f) || f.startsWith("third-party/");
   ok(!tracked.some(theirs), "no file of another publisher's is tracked in the core, nor a link in its install's place: its packages are installed, never carried", tracked.filter(theirs).slice(0, 5).join(", "));
   const ignore = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
-  ok(/^\/\.packages\/node_modules$/mu.test(ignore) && ["/.packages/", "/.packages/.npmrc", "/.packages/package.json", "/.packages/package-lock.json"].every(f => ignore.split("\n").includes(`!${f}`)), "the core's .gitignore, which travels to the copy's root, keeps the install out of git, a link in its place too, and the copy's package list, lock file and .npmrc in it");
+  ok(/^\/\.packages\/node_modules$/mu.test(ignore) && /^\/\.packages\/parser\/node_modules$/mu.test(ignore) && ["/.packages/", "/.packages/.npmrc", "/.packages/package.json", "/.packages/package-lock.json", "/.packages/parser/", "/.packages/parser/.npmrc", "/.packages/parser/package.json", "/.packages/parser/package-lock.json"].every(f => ignore.split("\n").includes(`!${f}`)), "the core's .gitignore, which travels to the copy's root, keeps the install out of git, a link in its place too, and the copy's package list, lock file and .npmrc in it");
   // (the .npmrc the copy carries holds the core's own two settings alone, which install.mjs holds it to too)
   const { npmrcOthers } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href), npmrc = fs.readFileSync(path.join(root, ".packages/.npmrc"), "utf8");
   ok(npmrcOthers(npmrc).length === 0, "the core's .npmrc holds nothing but its own two settings, so the install and the signatures' check ask npm's own registry, with no token, proxy or certificate of another's", npmrcOthers(npmrc).join(" | "));
@@ -172,7 +177,15 @@ try {
   // no such pattern takes in, and install on their own all the same)
   fs.writeFileSync(path.join(project, "package.json"), JSON.stringify({ name: "project", private: true, workspaces: ["*", "**"] }));
   fs.cpSync(path.join(root, "scripts"), path.join(copy, "scripts"), { recursive: true });
-  for (const f of [".packages/package.json", ".packages/package-lock.json", ".gitignore", ".packages/.npmrc"]) fs.cpSync(path.join(root, f), path.join(copy, f));
+  for (const f of [".packages/package.json", ".packages/package-lock.json", ".gitignore", ".packages/.npmrc", ".packages/parser/package.json", ".packages/parser/package-lock.json", ".packages/parser/.npmrc"]) fs.cpSync(path.join(root, f), path.join(copy, f));
+  // (the parser's install holding one package, a small one of the registry's, so that what installs it, and what does
+  // not, is seen whatever the core's parser's lock holds today: #719)
+  // (is-number 7.0.0, of 2018, as npm's registry gives it, which no other lock file of the core's names)
+  const pp = path.join(pk, "parser");
+  const staged = { version: "7.0.0", resolved: "https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz", integrity: "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==", license: "MIT", engines: { node: ">=0.12.0" } };
+  const parserList = { ...JSON.parse(fs.readFileSync(path.join(pp, "package.json"), "utf8")), dependencies: { "is-number": staged.version } };
+  fs.writeFileSync(path.join(pp, "package.json"), JSON.stringify(parserList, null, 2));
+  fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license, dependencies: parserList.dependencies }, "node_modules/is-number": staged } }, null, 2));
   // (each script that loads a package, by the call that loads it; a script that loads one and has no case here fails)
   const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")` };
   const loads = fs.readdirSync(path.join(root, "scripts")).filter(f => f.endsWith(".mjs") && f !== "packages.mjs" && /\bload(?:Sync)?\("/u.test(fs.readFileSync(path.join(root, "scripts", f), "utf8")));
@@ -218,8 +231,8 @@ try {
   fs.writeFileSync(path.join(project, ".gitignore"), ".*\n!.gitignore\n.npmrc\npackage-lock.json\npackage.json\n");
   execFileSync("git", ["init", "-q"], { cwd: project });
   execFileSync("git", ["add", "-A"], { cwd: project });
-  const staged = execFileSync("git", ["ls-files"], { cwd: project, encoding: "utf8" }).split("\n");
-  ok(["core/.packages/.npmrc", "core/.packages/package.json", "core/.packages/package-lock.json"].every(f => staged.includes(f)) && !staged.some(f => f.startsWith("core/.packages/node_modules/")), "a project whose .gitignore leaves out .npmrc and lock files, and dot folders, tracks the copy's all the same", staged.filter(f => f.startsWith("core/") && !f.startsWith("core/scripts/")).join(", "));
+  const tracked = execFileSync("git", ["ls-files"], { cwd: project, encoding: "utf8" }).split("\n");
+  ok(["core/.packages/.npmrc", "core/.packages/package.json", "core/.packages/package-lock.json", "core/.packages/parser/.npmrc", "core/.packages/parser/package.json", "core/.packages/parser/package-lock.json"].every(f => tracked.includes(f)) && !tracked.some(f => /^core\/\.packages\/(?:parser\/)?node_modules\//u.test(f)), "a project whose .gitignore leaves out .npmrc and lock files, and dot folders, tracks the copy's all the same", tracked.filter(f => f.startsWith("core/") && !f.startsWith("core/scripts/")).join(", "));
   fs.rmSync(path.join(project, ".git"), { recursive: true, force: true });
   const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env });
   const lock = JSON.parse(fs.readFileSync(path.join(pk, "package-lock.json"), "utf8"));
@@ -229,6 +242,112 @@ try {
   ok(tests.length > 0 && !tests.some(([k]) => fs.existsSync(path.join(pk, k))), "and none that only the core's own tests run: a copy holds no tests", tests.map(([k]) => k).join(", "));
   const loaded = spawnSync(process.execPath, ["--input-type=module", "-e", `const { load } = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); const m = await load("yaml"); console.log(m.project ? "project" : typeof m.Lexer);`], { cwd: project, encoding: "utf8", env });
   ok(loaded.status === 0 && loaded.stdout.trim() === "function", "and load() takes the copy's own, never the project's", `${loaded.stdout}${loaded.stderr}`);
+  // (an install left from before is never loaded for a package its lock does not name as installed: where the package
+  // list and lock name nothing, and where the package's own entry is flagged dev at another version; #719)
+  const keptMainList = fs.readFileSync(path.join(pk, "package.json"), "utf8"), keptMainLock = fs.readFileSync(path.join(pk, "package-lock.json"), "utf8");
+  const leftoverCases = [];
+  {
+    const list = JSON.parse(keptMainList);
+    delete list.dependencies; delete list.devDependencies;
+    fs.writeFileSync(path.join(pk, "package.json"), JSON.stringify(list, null, 2));
+    fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify({ name: list.name, lockfileVersion: 3, requires: true, packages: { "": { name: list.name, license: list.license } } }, null, 2));
+    leftoverCases.push(["a package list and lock that name nothing", call("yaml-keys.mjs", CALLS["yaml-keys.mjs"])]);
+  }
+  {
+    const list = JSON.parse(keptMainList), lock = JSON.parse(keptMainLock);
+    list.dependencies = { ...list.dependencies, yaml: "2.8.0" };
+    lock.packages[""].dependencies = { ...lock.packages[""].dependencies, yaml: "2.8.0" };
+    lock.packages["node_modules/yaml"] = { ...lock.packages["node_modules/yaml"], version: "2.8.0", resolved: "https://registry.npmjs.org/yaml/-/yaml-2.8.0.tgz", integrity: `sha512-${Buffer.alloc(64, 9).toString("base64")}`, dev: true };
+    fs.writeFileSync(path.join(pk, "package.json"), JSON.stringify(list, null, 2));
+    fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify(lock, null, 2));
+    leftoverCases.push(["the package's own entry flagged dev at another version", call("yaml-keys.mjs", CALLS["yaml-keys.mjs"])]);
+  }
+  fs.writeFileSync(path.join(pk, "package.json"), keptMainList);
+  fs.writeFileSync(path.join(pk, "package-lock.json"), keptMainLock);
+  for (const [what, r] of leftoverCases) ok(r.status === 1 && /did not run: the package yaml is not installed/u.test(r.stderr) && mended(r.stderr), `an install left from before is not loaded where ${what}`, `${r.status} ${r.stdout}${r.stderr}`);
+  ok(/no package list of the core's names it .*Mend: in a project, take the core's copy back as the core holds it .*in the core, add the package to the package list and lock file/u.test(leftoverCases[0][1].stderr), "and where no package list names the package, the mend is the core's copy taken back, or in the core the package added to a list and its lock, which no install alone would do", leftoverCases[0][1].stderr);
+  // (a package the lock flags dev, which only the core's own tests run and read themselves, is never loaded by a script,
+  // even where the core's own install holds it as its lock names it)
+  const devLoad = spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(root, "scripts/packages.mjs")).href)}); console.log(p.installed("yaml"), p.installed("spdx-license-ids"));`], { encoding: "utf8", env });
+  ok(devLoad.status === 0 && devLoad.stdout.trim() === "true false", "a package the lock flags dev reads as not installed for a script, beside one it names for them", `${devLoad.stdout}${devLoad.stderr}`);
+  // (the parser's install only where a job names it: with none named, its packages are not there, and a script that
+  // loads one says it did not run, naming the install; `install.mjs parser` installs it, and `all` every one: #719)
+  const loadParser = () => spawnSync(process.execPath, ["--input-type=module", "-e", `const { loadSync } = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(loadSync("is-number")(7));`], { cwd: project, encoding: "utf8", env });
+  const notNamed = loadParser();
+  ok(!fs.existsSync(path.join(pp, "node_modules")) && notNamed.status === 1 && /did not run: the package is-number is not installed in \S*parser\S*node_modules as \.packages\/parser\/package-lock\.json names it\. Mend: run node \S*install\.mjs parser,/u.test(notNamed.stderr) && mended(notNamed.stderr),
+    "the parser's install is not installed where no job names it, and what loads one of its packages says it did not run, naming the install", `${notNamed.stdout}${notNamed.stderr}`);
+  // (a project's own job that installs the core's first install alone, written before the parser's came, has the reader
+  // that needs it told so as a warning, never failed; not in the core, which holds its tests: #719)
+  const askUnnamed = () => spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(p.unreached("is-number"), p.unnamed("is-number"), p.unreached("yaml"));`], { cwd: project, encoding: "utf8", env });
+  const asked = askUnnamed();
+  // (a file of a package that is no module, as the parser reads its grammar, named with the same mend as a load: in a job,
+  // the install step to name)
+  const fileAsked = spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); try { p.installedFile("is-number", "index.js"); } catch (e) { console.log("FAIL: " + e.message); }`], { cwd: project, encoding: "utf8", env: { ...env, GITHUB_ACTIONS: "true" } });
+  ok(/^FAIL: the check did not run: the package is-number is not installed in \S*parser\S*node_modules as \.packages\/parser\/package-lock\.json names it \(index\.js\)\. Mend: in a pull request of its own, never a sync pull request, add the step .*install\.mjs parser; fi .*name parser in it/mu.test(fileAsked.stdout) && mended(fileAsked.stdout),
+    "a file of a package not installed says it did not run, and in a job names the install step to add or name", `${fileAsked.stdout}${fileAsked.stderr}`);
+  fs.mkdirSync(path.join(copy, "tests"));
+  const askedInCore = askUnnamed();
+  fs.rmSync(path.join(copy, "tests"), { recursive: true });
+  ok(asked.stdout.trim() === "true true false" && askedInCore.stdout.trim() === "false false false",
+    "in a copy whose job installed the first install alone, a package of the parser's reads as unreached, so its reader warns and fails nothing; in the core, never", `${asked.stdout}${asked.stderr}${askedInCore.stdout}${askedInCore.stderr}`);
+  {
+    // (the shape check in such a job, its copy's parser list naming the parser's own packages, as the core's does: it
+    // reads no function of C#, and its warning names the install step's mend, not a run again)
+    const cs = path.join(tmp, "cs-unnamed");
+    fs.mkdirSync(cs);
+    fs.cpSync(copy, path.join(cs, "core"), { recursive: true });
+    fs.copyFileSync(path.join(root, ".packages/parser/package.json"), path.join(cs, "core/.packages/parser/package.json"));
+    fs.writeFileSync(path.join(cs, "shape.json"), JSON.stringify({ baseline: "shape-baseline.json", code: [".", ":!core/"], tests: [], systems: {} }));
+    fs.writeFileSync(path.join(cs, "Program.cs"), "class A { void M(bool x) { if (x) { } } }\n");
+    fs.writeFileSync(path.join(cs, "shape-baseline.json"), JSON.stringify({ reads: ["javascript", "jsx", "csharp", "csharp-tree", "python", "scripts", "screens"], listed: { "function: Program.cs#A.M": { lines: 99 } } }));
+    execFileSync("git", ["init", "-q"], { cwd: cs });
+    execFileSync("git", ["add", "-A"], { cwd: cs });
+    const r = spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json"], { cwd: cs, encoding: "utf8", timeout: 120000, env: { ...env, SHAPE_BASE: "" } }), out = `${r.stdout}${r.stderr}`;
+    ok(r.status === 0 && /^::warning::The shape check did not read C#, its functions by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone, .*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(out),
+      "and the shape check there reads no function of C#, failing nothing, and its warning says to name every install in the job's install step", out);
+  }
+  const parser = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
+  const named = loadParser();
+  ok(parser.status === 0 && /into \.packages\/parser\/node_modules\//u.test(parser.stdout) && !/into \.packages\/node_modules\//u.test(parser.stdout) && named.status === 0 && named.stdout.trim() === "true" && askUnnamed().stdout.trim() === "false false false",
+    "install.mjs parser installs the parser's alone, and its package then loads from there", `${parser.stdout}${parser.stderr}${named.stdout}${named.stderr}`);
+  fs.rmSync(path.join(pp, "node_modules"), { recursive: true, force: true });
+  const every = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "all"], { cwd: project, encoding: "utf8", timeout: 300000, env });
+  // (what the sync and the starter kit hand a copy's installer: `all` where the copy holds the parser's package list,
+  // nothing for an older copy's, which knows no other word: #719)
+  const { everyInstall } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href);
+  const older = path.join(tmp, "older-copy");
+  fs.mkdirSync(path.join(older, ".packages"), { recursive: true });
+  ok(JSON.stringify(everyInstall(copy)) === '["all"]' && JSON.stringify(everyInstall(older)) === "[]", "everyInstall(), which the sync and the starter kit hand a copy's installer, names every install to a copy that holds the parser's package list, and none to an older copy's (that they call it, the mutation tool's report on their lines holds)");
+  ok(every.status === 0 && /into \.packages\/node_modules\//u.test(every.stdout) && /into \.packages\/parser\/node_modules\//u.test(every.stdout) && loadParser().status === 0, "and install.mjs all installs every one, as the sync and the starter kit run it", `${every.stdout}${every.stderr}`);
+  // (a lock file that names no package starts no npm, so a job that names `all` pays nothing for an install with nothing in it)
+  const keptList = fs.readFileSync(path.join(pp, "package.json"), "utf8"), keptLock = fs.readFileSync(path.join(pp, "package-lock.json"), "utf8");
+  const emptyList = { ...JSON.parse(keptList) };
+  delete emptyList.dependencies;
+  fs.writeFileSync(path.join(pp, "package.json"), JSON.stringify(emptyList, null, 2));
+  fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: emptyList.name, lockfileVersion: 3, requires: true, packages: { "": { name: emptyList.name, license: emptyList.license } } }, null, 2));
+  fs.rmSync(path.join(pp, "node_modules"), { recursive: true, force: true });
+  const empty = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
+  fs.writeFileSync(path.join(pp, "package.json"), keptList);
+  fs.writeFileSync(path.join(pp, "package-lock.json"), keptLock);
+  ok(empty.status === 0 && /parser\/package-lock\.json names no package: nothing to install/u.test(empty.stdout) && !fs.existsSync(path.join(pp, "node_modules")), "an install whose lock file names no package starts no npm, and says so", `${empty.stdout}${empty.stderr}`);
+  // (but a lock whose root and package list name a package it holds no entry for is no empty one: npm runs, and refuses it,
+  // so an install left from before is never taken as current)
+  fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license, dependencies: parserList.dependencies } } }, null, 2));
+  const unentered = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
+  fs.writeFileSync(path.join(pp, "package-lock.json"), keptLock);
+  ok(unentered.status === 1 && !/nothing to install/u.test(unentered.stdout) && mended(unentered.stderr), "and a lock whose root names a package it holds no entry for is no empty one: npm is run, and the install fails, saying the mend", `${unentered.status} ${unentered.stdout}${unentered.stderr}`);
+  // (nor one with no root entry at all beside a package list that names a package: refused before npm, as npm writes none so)
+  fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: {} }, null, 2));
+  const rootless = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
+  fs.writeFileSync(path.join(pp, "package-lock.json"), keptLock);
+  ok(rootless.status === 1 && /no root entry ""/u.test(rootless.stderr) && !/nothing to install/u.test(rootless.stdout) && mended(rootless.stderr), "and a lock with no root entry beside a package list that names a package is refused before npm runs, saying the mend", `${rootless.status} ${rootless.stdout}${rootless.stderr}`);
+  // (and whatever the install did, an install left from before is never loaded where the lock names fewer packages than
+  // the package list beside it: the package did not run)
+  const reinstalled = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
+  fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license } } }, null, 2));
+  const leftover = loadParser();
+  fs.writeFileSync(path.join(pp, "package-lock.json"), keptLock);
+  ok(reinstalled.status === 0 && leftover.status === 1 && /did not run: the package is-number is not installed/u.test(leftover.stderr) && mended(leftover.stderr), "an install left from before is not loaded where the lock beside the package list names none of its packages", `${reinstalled.status} ${leftover.status} ${leftover.stdout}${leftover.stderr}`);
   // (an install npm recorded for another lock file is no install of this one: the package did not run)
   const record = path.join(pk, "node_modules/.package-lock.json"), kept = fs.readFileSync(record, "utf8");
   const other = JSON.parse(kept);
@@ -260,14 +379,16 @@ try {
   const warned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...inPr, [["npm_config_regi", "stry"].join("")]: "http://127.0.0.1:9/", npm_config_fetch_retries: "0", npm_config_cache: path.join(tmp, "empty-cache") } });
   ok(warned.status === 0 && /^::warning::The core's packages could not be installed .*twice/mu.test(warned.stdout) && /Mend: run this job again/u.test(warned.stdout) && /^CORE_PACKAGES_UNREACHED=1$/mu.test(fs.readFileSync(jobEnv, "utf8")), "in a project's pull request a registry that does not answer twice is a warning, and tells the job's later checks", `${warned.status} ${warned.stdout}${warned.stderr}`);
   // (what would reach past the core's own files: a shrinkwrap npm reads first, another registry, a link in the install's place)
-  const refuses = (what, plant, unplant, said) => {
+  const refuses = (what, plant, unplant, said, names = []) => {
     plant();
-    const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env });
+    const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), ...names], { cwd: project, encoding: "utf8", timeout: 300000, env });
     unplant();
     ok(r.status === 1 && said.test(r.stderr) && mended(r.stderr), `install.mjs installs nothing where ${what}, saying the mend`, `${r.status} ${r.stdout}${r.stderr}`);
   };
   fs.rmSync(path.join(pk, "node_modules"), { recursive: true, force: true });
   refuses("a shrinkwrap stands beside the lock file", () => fs.copyFileSync(path.join(pk, "package-lock.json"), path.join(pk, "npm-shrinkwrap.json")), () => fs.rmSync(path.join(pk, "npm-shrinkwrap.json")), /npm-shrinkwrap\.json stands beside the lock file/u);
+  refuses("a file stands in the parser's folder beside its own", () => fs.writeFileSync(path.join(pp, "npmrc"), "\n"), () => fs.rmSync(path.join(pp, "npmrc")), /parser holds "npmrc" beside the package list/u, ["parser"]);
+  refuses("the parser's folder is a link", () => { fs.renameSync(pp, `${pp}-moved`); fs.symlinkSync(`${pp}-moved`, pp, "junction"); }, () => { fs.unlinkSync(pp); fs.renameSync(`${pp}-moved`, pp); }, /parser is a link/u, ["parser"]);
   refuses("a file stands in .packages/ beside the core's own", () => { fs.mkdirSync(path.join(pk, "etc")); fs.writeFileSync(path.join(pk, "etc", "npmrc"), "\n"); }, () => fs.rmSync(path.join(pk, "etc"), { recursive: true }), /holds "etc" beside the package list/u);
   const copyNpmrc = fs.readFileSync(path.join(pk, ".npmrc"), "utf8");
   refuses("the .npmrc holds a line beside the core's own two settings", () => fs.appendFileSync(path.join(pk, ".npmrc"), `"${["regi", "stry"].join("")}" = https://example.invalid/\n`), () => fs.writeFileSync(path.join(pk, ".npmrc"), copyNpmrc), /holds a line beside the core's own two settings/u);

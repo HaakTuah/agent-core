@@ -508,8 +508,8 @@ counter and its commands are in the pull request that adds this record (#487).
   the source version of none of its grammars (its `cgmanifest.json` names only the runtime's), so floor rule 7's
   reading of a diff against the release notes has nothing to read against, it has no provenance, and its C# grammar
   reads C# 14's extension blocks no better. Registered, as the owner decided on 18 November 2026 (#654): both in the
-  core's lock file at one exact version, installed from the registry into the core's `.packages/node_modules/` with no
-  script run, the runtime's CommonJS build and WebAssembly (378 KB) and the grammar's WebAssembly (5.4 MB) read from there;
+  parser's own lock file (`.packages/parser/`, #719) at one exact version, installed from the registry into
+  `.packages/parser/node_modules/`, only where a job names it, with no script run, the runtime's CommonJS build and WebAssembly (378 KB) and the grammar's WebAssembly (5.4 MB) read from there;
   the grammar's package brings two more, `node-addon-api` and `node-gyp-build` (MIT), which only its native build,
   never run, uses. Nothing of them is in the repository's history.
 - Reopens it: the counts of a reader built this way differ from a count by hand on code it was not written against,
