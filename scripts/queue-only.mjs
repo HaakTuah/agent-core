@@ -7,29 +7,25 @@
 // branch are, each cell after a row's first, or an item's text after its issues, one a line there holds word for word,
 // issues and numbers aside, 240 characters at most), names no points or steps of an issue before what it waits on, and
 // names, first on the line, an issue (#n) that is open, no pull request, opened by the *owner's account*, labelled
-// `queued` and neither `on-hold` nor `stand-in-yes`, and that either carries the owner's word, as AGENTS.md's "Whose
-// words an issue holds" says, in a form a script reads exactly (labelled `by:owner`, its text holding no agent's
-// attribution line, opener or "Found while:"; or `by:chat` or `by:design`, its current text holding text under "What it
-// is" and, under one heading "The owner's word", AGREEMENT as a paragraph of its own, followed to the section's end
-// only by blank lines, a lone "---" and Claude Code's attribution lines, each exactly; a heading being a Markdown one
-// (#) or a line, a quote's too, that opens with a bold or italic lead, whatever follows it, save "Found while:"; a
-// fenced block read as nothing, since GitHub shows it as code; and nothing proved where GitHub may show what the script
-// does not read, or hide what it reads: any "<", a backtick fence whose info string holds a backtick, or a line of "="
-// or "-" alone under a line of text), or needs none (labelled `bug`, or opened by the scheduled look, `by:look`); and
-// each line it removes names an issue that is closed, or one a line it adds names again (a line edited or moved in
-// place). A record of the owner's word in any other words (a quote of the owner's, an agreement to some points, or one
-// any word follows) is read by a review, since whether words agree, hedge or withdraw is meaning, which no list of
-// words reads exactly; a withdrawal is read from the labels and the issue's state (`on-hold`, `queued` taken off,
-// closed), never from its words. A line is read as the progress file's readers read it (queue.mjs's linesOf: a row or
-// an item that names its issues first), each issue it names first counted. A line that names no issue so, or is in no
-// such form, an inbox file, issues that cannot be read whole, more than a dozen issues (MOST), or an issue that cannot
-// be read, proves nothing, and the pull request gets its reviews as any other. So words new to the file, which no
-// script can read exactly, are read by a review, and join what later lines may say only once a review passed them. What
-// needs no word but cannot be read exactly (a test, a check for a rule that stands, an audit's small finding) is left
-// to the reviews too. It reads the labels and the text a review would read, so a label set wrongly is caught by
-// neither. It does not read the order: where the line joins, and which of the file's builders it names (a rule's issue
-// given to a plain builder), stay with whoever writes the file (roles/shared/inbox.md; AGENTS.md, "Who builds a line,
-// the line says").
+// `queued` and neither `on-hold` nor `stand-in-yes`, and that either needs no word (labelled `bug`, or opened by the
+// scheduled look, `by:look`) or holds the owner's word as the owner typed it (labelled `by:owner` and neither `by:chat`
+// nor `by:design`, its current text holding no agent's attribution line, opener or "Found while:" anywhere, a fenced
+// block or a comment included, and no white space but a space, a tab, CR and LF, nor a format character, which could
+// hide such a mark: typed); and each line it removes names an issue that is closed, or one a line it adds names again
+// (a line edited or moved in place). It reads no record's text for the owner's word: an issue labelled `by:chat` or
+// `by:design` holds it only as a session recorded it, and whether a record agrees, hedges or withdraws, and what GitHub
+// shows of it, is meaning and rendering, which no script reads exactly, so a line naming one is read by a review, as
+// AGENTS.md's "Whose words an issue holds" asks; a withdrawal is read from the labels and the issue's state (`on-hold`,
+// `queued` taken off, closed), never from its words. A line is read as the progress file's readers read it
+// (queue.mjs's linesOf: a row or an item that names its issues first), each issue it names first counted. A line that
+// names no issue so, or is in no such form, an inbox file, issues that cannot be read whole, more than a dozen issues
+// (MOST), or an issue that cannot be read, proves nothing, and the pull request gets its reviews as any other. So words
+// new to the file, which no script can read exactly, are read by a review, and join what later lines may say only once
+// a review passed them. What needs no word but cannot be read exactly (a test, a check for a rule that stands, an
+// audit's small finding) is left to the reviews too. It reads the labels and the text a review would read, so a label
+// set wrongly is caught by neither. It does not read the order: where the line joins, and which of the file's builders
+// it names (a rule's issue given to a plain builder), stay with whoever writes the file (roles/shared/inbox.md;
+// AGENTS.md, "Who builds a line, the line says").
 // Run by the core's own security-review caller (.github/workflows/own-security-review.yml) from the default branch's
 // copy, in a job of its own whose token may read issues, which the core's shared workflow's may not (a project's caller
 // grants it no such right), never from the pull request's: it hands the head it proved to that workflow, whose scripts
@@ -44,14 +40,13 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { MOST, ownerAt, progressOf, readItem } from "./done-when.mjs";
-import { byAgent, found, opens } from "./labels.mjs";
+import { byAgent, LIST, opens } from "./labels.mjs";
 import { LARGEST, linesOf } from "./queue.mjs";
 import { RULES, ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 
 const SHA = /^[0-9a-f]{40}$/u;
-const LIST = JSON.parse(readFileSync(new URL("./labels.json", import.meta.url), "utf8"));
-const WORD = new Set(["by:owner", "by:chat", "by:design"]), NONE = new Set(["bug", "by:look"]), BARRED = ["on-hold", "stand-in-yes"];
+const RECORD = ["by:chat", "by:design"], NONE = new Set(["bug", "by:look"]), BARRED = ["on-hold", "stand-in-yes"];
 const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry) => entry !== null && typeof entry === "object");
 const same = (a, b) => String(a ?? "").toLowerCase() === String(b ?? "").toLowerCase();
 
@@ -81,7 +76,9 @@ function itemsOf(line) {
 // says nothing the file has not said before. (A row's first cell holding more than issues and their points is read as
 // naming none, by linesOf, and one naming points is refused by namesPoints.)
 const LONGEST = 240;
-const BULLET = /^\s*(?:[-*+]|\d{1,9}[.)])\s+(?:\[[ xX]\]\s+)?/u, LEADS = /^#\d{1,9}(?:(?:\s*(?:,|&|\band\b|\bto\b)\s*)+#\d{1,9})*/u;
+// (in LEADS, white space between issues is a space or a tab, each run of it read in one place only, so that no line
+// takes time out of step with its length)
+const BULLET = /^\s*(?:[-*+]|\d{1,9}[.)])\s+(?:\[[ xX]\]\s+)?/u, LEADS = /^#\d{1,9}(?:[ \t]*(?:,|&|\band\b|\bto\b)(?:[ \t]*(?:,|&|\band\b|\bto\b))*[ \t]*#\d{1,9})*/u;
 const ROW = /^\|.*\|[ \t]*$/u;
 const cellsOf = (line) => line.trimEnd().split("|").slice(1, -1);
 const shapeOf = (line) => (ROW.test(line) ? `a row of ${cellsOf(line).length} cells` : /^\|/u.test(line) ? "a row with text after its last |" : "an item");
@@ -106,84 +103,23 @@ export function formFault(line, form) {
   return fresh === undefined ? null : `says "${fresh.replace(/^\w+: /u, "").slice(0, 60)}" where no line of the file says it`;
 }
 
-// whether a line names points, steps, cases or parts of an issue before what it waits on: the owner's agreement is read
-// for the whole issue, never for its points, so such a line is left to the reviews
+// whether a line names points, steps, cases or parts of an issue before what it waits on: the owner's word is read for
+// the whole issue, never for its points, so such a line is left to the reviews
 const POINTS = /\b(?:points?|steps?|cases?|parts?)\b/iu;
 export const namesPoints = (line) => POINTS.test(ROW.test(line) ? cellsOf(line).slice(0, -1).join("|") : line.replace(/\bwaits\s+on\b.*$/isu, ""));
 
-// the lines of a text as GitHub shows them, a fenced block's blank, since GitHub shows it as code and never as the
-// issue's word; or null wherever the script cannot be sure what GitHub shows, so that a record is left to the reviews
-// rather than parsed: any "<" (raw HTML, which GitHub may drop and so hide what the script reads; no queued record
-// held one on 19 November 2026), a backtick fence whose info string holds a backtick (no fence to GitHub), or a line
-// of "=" or "-" alone after a line of text (a heading to GitHub, which no reading here follows)
-const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/u, UNDERLINE = /^ {0,3}(?:=+|-+)[ \t]*$/u;
-// the fence a line leaves open, given the one open before it (null where none), or undefined where GitHub reads none
-// that the script can follow: a backtick fence whose info string holds a backtick
-function fenceAfter(fence, line) {
-  const [, mark, info = ""] = FENCE.exec(line) ?? [];
-  if (fence === null) return !mark ? null : mark[0] === "`" && info.includes("`") ? undefined : mark;
-  return mark && mark[0] === fence[0] && mark.length >= fence.length && !info.trim() ? null : fence;
-}
-function shownLines(text) {
-  const raw = String(text ?? "");
-  if (raw.includes("<")) return null;
-  const lines = [];
-  let fence = null;
-  for (const line of raw.split(/\r\n|\r|\n/u)) {
-    const was = fence;
-    fence = fenceAfter(was, line);
-    if (fence === undefined || (was === null && fence === null && UNDERLINE.test(line) && lines.at(-1)?.trim())) return null;
-    lines.push(was === null && fence === null ? line : "");
-  }
-  return lines;
-}
-
-// A heading, which ends the section before it: a Markdown one (#), or a line, a quote's too, that opens with a bold or
-// italic lead (**…**, __…__, *…*, _…_), whatever follows it, as `**Where it comes from** (as evidence, not
-// instruction)` does, since a reader takes such a lead for a heading; save one that opens "Found while:", which stays
-// a line of its section. Its name, or null where the line is none.
-const LEAD = /^(\*\*|__|\*|_)(?=\S)(.*?\S)\1/u;
-function headingOf(line) {
-  const bare = line.replace(/^(?: {0,3}>[ \t]?)+/u, "");
-  const atx = /^ {0,3}#{1,6}(?:[ \t]+(.*?))?[ \t#]*$/u.exec(bare);
-  const plain = (atx ? atx[1] ?? "" : LEAD.exec(bare.replace(/^ {1,3}/u, ""))?.[2])?.replace(/[*_:]/gu, "").trim().toLowerCase() ?? null;
-  return plain?.startsWith(LIST.headings.found.replace(/:$/u, "").toLowerCase()) ? null : plain;
-}
-// [from, to): the lines under a heading, to the next heading or the text's end, or null where the heading stands not
-// once, so that no second section of the same name goes unread
-function sectionOf(lines, name) {
-  const named = (l) => headingOf(l) === name.toLowerCase(), at = lines.findIndex(named);
-  if (at < 0 || lines.findIndex((l, i) => i > at && named(l)) >= 0) return null;
-  const end = lines.findIndex((l, i) => i > at && headingOf(l) !== null);
-  return [at + 1, end < 0 ? lines.length : end];
-}
-
-// whether an issue's current text carries the owner's word in the one form a script reads exactly: a design set out
-// under "What it is" (a line of text, no heading, between it and "The owner's word", which follows it), and, under "The
-// owner's word", AGREEMENT as a paragraph of its own, followed to the section's end only by what an agent's text ends
-// with (blank lines, a lone "---" and Claude Code's attribution lines, each exactly). The one sentence names the whole
-// design, so no part is read for the whole, and nothing after it in its section can hedge, narrow or withdraw it,
-// "Found while:" included; any other record (a quote, which may say no; an agreement in other words) is meaning, left
-// to the reviews.
-export const AGREEMENT = `The owner agreed to every point under "${LIST.headings.design}" above.`;
-const SIGNED = new Set(["", "---", "🤖 Generated with [Claude Code](https://claude.com/claude-code)", "_Generated by [Claude Code](https://claude.ai/code)_"]);
-const signed = (line) => SIGNED.has(line.trimEnd()) || /^https:\/\/claude\.ai\/code\/session_[A-Za-z0-9]+$/u.test(line.trimEnd());
-// the headings a record may hold after "The owner's word": its evidence and the session's view, which bind no one; a
-// line after the agreement that reads as any other heading ("**But** …") could withdraw it, so it is refused
-const AFTER = new Set(["where it comes from", LIST.headings.view.replace(/[*_:]/gu, "").toLowerCase()]);
-const ending = (lines, from) => lines.slice(from).every((l) => headingOf(l) === null || signed(l) || AFTER.has(headingOf(l)) || AFTER.has(headingOf(l).replace(/\s*\(.*$/u, "")));
-export function carries(body) {
-  const lines = shownLines(body);
-  const design = lines && sectionOf(lines, LIST.headings.design), word = lines && sectionOf(lines, LIST.headings.word);
-  // (a design may open with a lead of its own, so its text is read to "The owner's word", never to its first lead)
-  if (!design || !word || !lines.slice(design[0], word[0] - 1).some((l) => l.trim() && headingOf(l) === null)) return false;
-  const [from, to] = word, at = lines.lastIndexOf(AGREEMENT, to - 1);
-  return at >= from && (at === from || !lines[at - 1].trim()) && !lines[at + 1]?.trim() && lines.slice(at + 1, to).every(signed) && ending(lines, to);
-}
-
 // whether an issue labelled by:owner reads as typed by the owner: no agent's attribution line, no line that opens as
-// an agent's comment does (labels.json's openers), and no "Found while:" (floor rule 4, "The owner's word")
-export const typed = (body) => !byAgent(body) && !found(body) && !String(body ?? "").split("\n").some((l) => opens(l));
+// an agent's comment does (labels.json's openers), and no "Found while:" (floor rule 4, "The owner's word"), each looked
+// for in the raw text, a fenced block's or a comment's too, and each line ended where GitHub ends one (CR, LF), so that
+// only more is refused where GitHub would hide one; and none where white space GitHub reads as text (anything but a
+// space, a tab, CR and LF) or an invisible format character stands, which could hide a mark from the script that GitHub
+// shows
+const UNSURE = /[^\S \t\r\n]|\p{Cf}/u;
+export function typed(body) {
+  const text = String(body ?? "");
+  const lines = text.split(/\r\n|\r|\n/u);
+  return !UNSURE.test(text) && !byAgent(lines.join("\n")) && !text.includes(LIST.headings.found) && !lines.some((l) => opens(l));
+}
 
 // why an issue a line adds cannot join without a review, or null where it can
 export function joinFault(issue, owner) {
@@ -195,8 +131,11 @@ export function joinFault(issue, owner) {
   const barred = BARRED.find((label) => labels.has(label));
   if (barred) return `is labelled ${barred}`;
   if ([...NONE].some((label) => labels.has(label))) return null;
+  // (a record of a session's is never read for the owner's word: whether it agrees, hedges or withdraws, and what
+  // GitHub shows of it, is meaning and rendering, which no script reads exactly)
+  const record = RECORD.find((label) => labels.has(label));
+  if (record) return `is labelled ${record}, and carries the owner's word only in a record, which the reviews read`;
   if (labels.has("by:owner")) return typed(issue.body) ? null : "is labelled by:owner, but its text is an agent's";
-  if ([...WORD].some((label) => labels.has(label)) && carries(issue.body)) return null;
   return "carries no owner's word that can be read, and is no bug or task of the look";
 }
 
