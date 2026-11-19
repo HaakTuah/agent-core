@@ -34,6 +34,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { MEND } from "./mend.mjs";
+import { installed } from "./packages.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./workflow-run.mjs";
 
@@ -135,6 +136,8 @@ function callsHere(root) {
 // By hand, with no part named: what the project's own calls to the core's workflows run, each call's part with its own
 // inputs, a part run once for each distinct call (runsOf), what the command line gives winning.
 export function fromCalls(root, given) {
+  // (the calls are read with the YAML package: with it not installed, none could be read, which is no "calls none")
+  if (!installed("yaml")) fail("no part is named, and the project's calls to the core's workflows cannot be read: the core's packages are not installed.", `run node ${path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)))}, then this again, or name a part (${PARTS.join(", ")})`);
   const runs = [];
   for (const [part, settings] of callsHere(root).flatMap(([which, w]) => FROM[which](w))) {
     const set = Object.fromEntries(Object.entries(settings).filter(([, v]) => v !== undefined && v !== null && v !== "").map(([k, v]) => [k, k === "advisory" ? v === true : String(v)]));

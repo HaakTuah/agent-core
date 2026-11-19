@@ -28,7 +28,10 @@ let n = 0;
 function project(files = {}) {
   const dir = path.join(tmp, `p${++n}`);
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of ["checks.mjs", "core-address.mjs", "core-path.mjs", "mend.mjs", "started.mjs", "workflow-run.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
+  for (const f of ["checks.mjs", "core-address.mjs", "core-path.mjs", "mend.mjs", "started.mjs", "workflow-run.mjs", "packages.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
+  // (the YAML package its reader of workflows loads, as the core's install leaves it: the lock file, npm's record of the
+  // install and the package, from the core's own install, which its tests' job runs)
+  for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/yaml"]) fs.cpSync(path.join(root, ".packages", f), path.join(dir, "core/.packages", f), { recursive: true });
   for (const [, script] of COPIES) fs.writeFileSync(path.join(dir, "core/scripts", script), STAND_IN(script));
   for (const s of ["pr-description.mjs", "licence-installed.mjs", "nuget.mjs", "nuget-fetch.mjs", "lookup.mjs"]) fs.writeFileSync(path.join(dir, "core/scripts", s), STAND_IN(s));
   fs.writeFileSync(path.join(dir, "core/scripts/nuget-look.sh"), 'echo "ran nuget-look.sh BASE=$BASE CONFIG=$CONFIG"\necho "run=false" >> "$GITHUB_OUTPUT"\n');
@@ -79,6 +82,12 @@ const run = (dir, args, extra = {}) => {
   const r = run(folded, []);
   ok(r.status === 0 && /^ran copies\.mjs \[checks\/copies\.json\]/m.test(r.out) && /^ran nuget-look\.sh BASE= CONFIG=checks\/licences\.json$/m.test(r.out) && !/^ran pr-description/m.test(r.out) && /description check is not run/.test(r.out),
     "core.yml's inputs: the copies checks with its files, and the NuGet check's look with its config; the description only where one is given", r.out);
+  // (with the core's packages not installed, the calls cannot be read, which is said so, never as calling none)
+  fs.renameSync(path.join(folded, "core/.packages/node_modules"), path.join(folded, "core/.packages/away"));
+  const bare = run(folded, []);
+  ok(bare.status === 1 && mended(bare.out) && /cannot be read: the core's packages are not installed/.test(bare.out) && /install\.mjs/.test(bare.out) && !/^ran /m.test(bare.out),
+    "with the core's packages not installed, a run with no part named fails, saying the calls cannot be read and how to install", bare.out);
+  fs.renameSync(path.join(folded, "core/.packages/away"), path.join(folded, "core/.packages/node_modules"));
   fs.writeFileSync(path.join(folded, "body.md"), "the description\n");
   const d = run(folded, ["--description", "body.md"]);
   ok(d.status === 0 && /^ran pr-description\.mjs \[\] .*PR_BODY=the description/m.test(d.out), "given a description's file, it runs the description check on it", d.out);
