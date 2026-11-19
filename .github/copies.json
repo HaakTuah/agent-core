@@ -1,6 +1,6 @@
 {
   "baseline": ".github/copies-baseline.json",
-  "code": ["scripts/*.mjs", "scripts/*.sh", ".github/workflows/*.yml"],
+  "code": ["scripts/*.mjs", "scripts/*.sh", "tests/*.mjs", ".github/workflows/*.yml"],
   "prose": ["AGENTS.md", "CLAUDE.md", "SECURITY.md", "README.md", "floor/*.md", "floor/topics/*.md", "modules/*.md", "roles/*.md", "roles/shared/*.md", "tasks/*.md", "tools/*.md", "setup/*.md", "GEMINI.md", ".kiro/steering/*", ".kiro/agents/*", ".agents/rules/*", ".agent/rules/*", ":!setup/sync-notes.md"],
   "proseFromSecurity": false
 }

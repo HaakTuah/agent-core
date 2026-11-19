@@ -21,9 +21,9 @@ it starts from one: its clone is made at the newest release (`git clone --branch
 templates and the copy are then all that release's.
 
 Every template ends in `.tmpl`, so that no tool takes one for a rule file, a workflow or a config of this repository
-or of a project that holds the copy (floor rule 3), and no check reads one as the real thing. `scripts/init-test.mjs`
+or of a project that holds the copy (floor rule 3), and no check reads one as the real thing. `tests/init-test.mjs`
 writes a project from them and runs the core's own checks on it, so a template that no longer fits the core fails
-here, not in a project; `scripts/init-dotnet-test.mjs` does the same for a .NET project, in a clone made the way
+here, not in a project; `tests/init-dotnet-test.mjs` does the same for a .NET project, in a clone made the way
 Windows makes one, with every line ending converted, and builds it where a .NET SDK is installed. Which template
 becomes which file, and when: the list `FILES` in `scripts/init.mjs`.
 

@@ -3,8 +3,7 @@
 Read at its start by the role `reviewer`: a session that judges a change it did not write (the code reviewer, the
 security reviewer, the fallback reviewer, the design check, the leanness check).
 
-**Reads at its start:** `roles/shared/review-guidelines.md`, `roles/shared/how-to-work.md`; with its brief, the project's own
-guidelines and its `SECURITY.md`.
+**Reads at its start:** `roles/shared/review-guidelines.md`, `roles/shared/how-to-work.md`.
 
 **It judges by what the change calls for** (#304). By default a reviewer judges a change by what it
 reads at its start; where the change's paths call for more, it runs `scripts/reading.mjs reviewer --changed <the pull

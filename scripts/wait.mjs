@@ -9,6 +9,7 @@
 //       the last n merged pull requests (30 where none is given), through gh. Reads only; gh and Node's own modules.
 import fs from "node:fs";
 import { aCommit, aRepository } from "./guards.mjs";
+import { timeOf } from "./moment.mjs";
 import { ghApi } from "./labels.mjs";
 import { notLinked, parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
@@ -20,28 +21,34 @@ export const COUNT = 30;
 // The seconds the checks of one push took: from the first one's start to the last one's end, of those that ran to an
 // end (one skipped or not started counts nothing); null where none did.
 export function waited(checks) {
-  const ran = checks.filter(c => c.started_at && c.completed_at && c.conclusion !== "skipped");
+  const ran = checks.filter(c => timeOf(c?.started_at) !== null && timeOf(c.completed_at) !== null && c.conclusion !== "skipped");
   if (!ran.length) return null;
-  const from = Math.min(...ran.map(c => Date.parse(c.started_at))), to = Math.max(...ran.map(c => Date.parse(c.completed_at)));
+  const from = Math.min(...ran.map(c => timeOf(c.started_at))), to = Math.max(...ran.map(c => timeOf(c.completed_at)));
   return Math.max(0, Math.round((to - from) / 1000));
 }
 
 export const median = xs => { const s = [...xs].sort((a, b) => a - b), k = s.length >> 1; return s.length ? (s.length % 2 ? s[k] : Math.round((s[k - 1] + s[k]) / 2)) : null; };
 
-// The median wait of the last `count` merged pull requests of `repo`, read through `gh`: { median, read, mark }, mark
-// the config's, or undefined where it gives none.
-export function measure({ repo, count = COUNT, mark, gh = ghApi }) {
-  if (!aRepository(repo)) throw new Refused(`${JSON.stringify(String(repo)).slice(0, 80)} names no repository. Mend: name it as <owner>/<name>`);
+// The last `count` merged pull requests of `repo` that `kept` keeps, newest first, read through `gh`: GitHub's rows.
+// Also read by merge-line.mjs, beside this file, which keeps those into the default branch alone.
+export function lastMerged(repo, count, gh = ghApi, kept = () => true) {
   // (newest updated first: a pull request is updated when it merges, so once a page's last update is older than the
   // count-th newest merge read, no later page holds a newer one)
   const merged = [], kth = () => merged.map(p => p.merged_at).sort().reverse()[count - 1];
   for (let page = 1; page <= 10; page++) {
     const rows = JSON.parse(gh(`repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`) || "[]");
-    merged.push(...rows.filter(p => p.merged_at));
+    merged.push(...rows.filter(p => p.merged_at && kept(p)));
     if (rows.length < 100 || (merged.length >= count && String(rows.at(-1).updated_at) < kth())) break;
   }
+  return merged.sort((a, b) => b.merged_at.localeCompare(a.merged_at)).slice(0, count);
+}
+
+// The median wait of the last `count` merged pull requests of `repo`, read through `gh`: { median, read, mark }, mark
+// the config's, or undefined where it gives none.
+export function measure({ repo, count = COUNT, mark, gh = ghApi }) {
+  if (!aRepository(repo)) throw new Refused(`${JSON.stringify(String(repo)).slice(0, 80)} names no repository. Mend: name it as <owner>/<name>`);
   // (a head that is no commit's whole name, as GitHub gives one, is not read: it would name another route than the commit's)
-  const times = merged.sort((a, b) => b.merged_at.localeCompare(a.merged_at)).slice(0, count).filter(p => aCommit(p.head?.sha))
+  const times = lastMerged(repo, count, gh).filter(p => aCommit(p.head?.sha))
     .map(p => waited(JSON.parse(gh(`repos/${repo}/commits/${p.head.sha}/check-runs?per_page=100`) || "{}").check_runs ?? [])).filter(t => t !== null);
   return { median: median(times), read: times.length, mark };
 }

@@ -31,12 +31,16 @@ import { started } from "./started.mjs";
 // (#304), its leanness check having found 108 bytes of room for the 1,038 that file needed; the others were first set
 // that day, each the whole KB next above its start. The reviewer's, raised one step the same day for the review
 // guidelines' "A finding names its rule" (#254), its leanness check having found 124 bytes of room for 204 over, in
-// trims of the guidelines that its issue did not ask for and so are not made.
+// trims of the guidelines that its issue did not ask for and so are not made; and again on 17 November 2026 for #486's
+// package rule, its pointers in the review guidelines and how-to-work, its leanness check having found 135 bytes of
+// room, made, for 262 over, and 65 more in trims of the guidelines that its issue did not ask for. The builder's, the
+// design session's and the orchestrator's, each raised one step on 19 November 2026 for #702's merge line, their
+// leanness check having found 216 bytes of room for the orchestrator, made, and too little for the three.
 export const CAPS = {
-  builder: 29 * 1024,
-  design: 30 * 1024,
-  orchestrator: 43 * 1024,
-  reviewer: 23 * 1024,
+  builder: 30 * 1024,
+  design: 31 * 1024,
+  orchestrator: 44 * 1024,
+  reviewer: 24 * 1024,
   "stand-in": 20 * 1024,
 };
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a

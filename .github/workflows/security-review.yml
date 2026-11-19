@@ -21,9 +21,9 @@
 # scripts/pure-sync.mjs on the head itself, and one it proves passes with no review and no note
 # (scripts/security-review.mjs, whose header says what it does not hold). Where the pull request's files show a change
 # to what runs by itself beyond its pins, it asks floor rule 3's two security reviews (the same script says
-# which count, and when one is enough); of a pull request that leaves the check's scripts alone and whose head does
-# not hold them as the default branch does, which stood before the check came, what the check reads more is said,
-# never waited for. A project
+# which count, and when one is enough); of a pull request that leaves the check's scripts alone, whose head does
+# not hold them as the default branch does and that the host says was opened before the default branch's copy came,
+# which stood before the check came, what the check reads more is said, never waited for. A project
 # calls it (workflow_call) from
 # a workflow of its own of the same name, on pull_request (the types opened, reopened, synchronize and ready_for_review)
 # and on issue_comment (created and edited), so that the status follows a review the moment its comment arrives and
@@ -125,6 +125,7 @@ jobs:
           ADVISORY: ${{ inputs.advisory }}
           REVIEWERS: ${{ inputs.reviewers }}
           SERVER: ${{ github.server_url }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -139,9 +140,11 @@ jobs:
           gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/commits?per_page=100" > "$d/commits.json"
           gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100" > "$d/files.json"
           # whether the pull request is held by what a script of the check reads more: not where it leaves the script
-          # alone and its head holds it as it stood before this branch's (it stood before the check came, and is told,
-          # never waited for: AGENTS.md, "Nothing locks a project"); always where it changes the script itself, where
-          # its list of files is cut short, or where the head's copy cannot be read for any reason but its absence
+          # alone, its head holds it as it stood before this branch's, and the host says it was opened before the
+          # default branch's copy came (it stood before the check came, and is told, never waited for: AGENTS.md,
+          # "Nothing locks a project"; the script decides that last from came, below); always where it changes the
+          # script itself, where its list of files is cut short, or where the head's copy cannot be read for any reason
+          # but its absence
           head=$(jq -r '.head.sha // empty' "$d/pull.json")
           held() {
             local p="$ROOT/scripts/$1" theirs
@@ -155,6 +158,30 @@ jobs:
               if [ "$theirs" = "$(git rev-parse "HEAD:$p")" ]; then echo true; else echo false; fi
             elif grep -q "HTTP 404" "$d/error"; then echo false # the head holds no such script: from before it came
             else echo true; fi
+          }
+          # when the default branch's copy of a script of the check came, as the host dates it: the merge of the pull
+          # request that brought it; nothing where that cannot be read, or the time set aside for it (came_by, set by
+          # bound) is spent, and the script then holds the pull request (it holds one opened since then whatever its head holds:
+          # boundOf in security-review.mjs)
+          came() {
+            local p="$ROOT/scripts/$1" c at= left
+            p="${p#./}"
+            left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
+            c=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits?path=$(jq -rn --arg v "$p" '$v | @uri')&sha=$(jq -rn --arg v "$DEFAULT" '$v | @uri')&per_page=1" 2> /dev/null \
+              | jq -r '.[0].sha // empty' 2> /dev/null) || c=
+            [[ "$c" =~ ^[0-9a-f]{40}$ ]] || return 0
+            left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
+            at=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits/$c/pulls" 2> /dev/null \
+              | jq -r --arg b "$DEFAULT" '[.[] | select(.merged_at != null and .base.ref == $b) | .merged_at] | min // empty' 2> /dev/null) || at=
+            echo "$at"
+          }
+          # held as the workflow reads it (BOUND), and, where not, when the script came (SINCE), for the script to decide
+          # (each script's own seven seconds, so a slow answer for one leaves the other its time)
+          bound() {
+            BOUND=$(held "$1"); SINCE=
+            came_by=$((SECONDS + 7)); [ "$came_by" -le 240 ] || came_by=240
+            if [ "$BOUND" = false ]; then SINCE=$(came "$1"); fi
+            export BOUND SINCE
           }
           # the head's commits, in a clone of its own that fetches them by the head's SHA (never a ref GitHub moves after
           # the push) and checks out nothing, all within the job's time so its status is always written, so no file of
@@ -212,13 +239,14 @@ jobs:
           # whose posted review counts besides the owner's and the accounts named: a person the host lets write (#412),
           # read from GitHub's rights for each account, at most twenty, that posted a "Security review:" with a say in the
           # repository; its login, checked as one, is all that goes into the route, and an answer that cannot be read
-          # counts for no one (the script reads each strictly). All of them share 45 seconds, ten at most each, and end
-          # by the step's 240th second whatever the proofs above took, so both statuses are still written within the
-          # job's time; past that, the owner's and the named accounts count
+          # counts for no one (the script reads each strictly). All of them share 30 seconds, ten at most each, and end
+          # by the step's 225th second whatever the proofs above took, and when each of the check's two scripts came seven
+          # more, five at most a call, by the 240th, so both statuses are still written within the job's time; past that, the owner's
+          # and the named accounts count
           owner=$(jq -r '.base.repo.owner.login // "" | ascii_downcase' "$d/pull.json")
           : > "$d/rights.txt"
-          until=$((SECONDS + 45))
-          [ "$until" -le 240 ] || until=240
+          until=$((SECONDS + 30))
+          [ "$until" -le 225 ] || until=225
           for login in $(jq -r --arg o "$owner" '[.[][] | select(type == "object" and (.body | type) == "string"
             and (.body | test("^(\\*\\*)?Security review:")) and (.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
             and .user.type == "User" and (.user.login | type) == "string" and (.user.login | test("^[A-Za-z0-9][A-Za-z0-9-]{0,38}$")))
@@ -234,7 +262,8 @@ jobs:
             else echo "The host's rights of $login could not be read: a review of theirs counts only where the input reviewers names it."; fi
           done
           jq -s '.' "$d/rights.txt" > "$d/rights.json"
-          BOUND=$(held security-review.mjs) PURE="$pure" RIGHTS="$d/rights.json" node "$ROOT/scripts/security-review.mjs" "$d/pull.json" \
+          bound security-review.mjs
+          PURE="$pure" RIGHTS="$d/rights.json" node "$ROOT/scripts/security-review.mjs" "$d/pull.json" \
             "$d/comments.json" "$d/findings.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/out.json"
           sha=$(jq -r '.sha // empty' "$d/out.json")
           if [ -z "$sha" ]; then
@@ -249,7 +278,8 @@ jobs:
           # whose core is older has no such script, and says nothing of it)
           # (a fault in it warns and leaves the job as green as the security-review status left it)
           if [ -f "$ROOT/scripts/code-review-wait.mjs" ]; then
-            if BOUND=$(held code-review-wait.mjs) node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
+            bound code-review-wait.mjs
+            if node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
               "$d/comments.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/code.json" \
               && jq -r '.status | "\(.state): \(.description)"' "$d/code.json" \
               && jq '.status' "$d/code.json" | gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then :

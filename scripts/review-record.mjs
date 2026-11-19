@@ -200,7 +200,7 @@ export function tally(pulls) {
 export const secondFound = pulls => pulls.filter(p => p.reviews.codexSecurity.blocked === "no" && p.reviews.postedSecurity.blocked === "yes").map(p => p.number);
 
 // The pull request a bug names as the one that brought it in ("Brought in by: #N" on a line of its own), or null.
-export const broughtBy = body => { const all = [...lines(seen(body)).join("\n").matchAll(/^Brought in by: #(\d{1,9})[ \t]*$/gmu)]; return all.length ? Number(all.at(-1)[1]) : null; };
+export const broughtBy = body => { const all = [...lines(seen(body)).join("\n").matchAll(/^Brought in by: #([1-9]\d{0,8})[ \t]*$/gmu)]; return all.length ? Number(all.at(-1)[1]) : null; };
 
 // The bugs, given as { number, at, login, body } with the owner's comments on any issue as { issue, at, login, body }:
 // how many the owner's account filed, which of them are tied to a merged pull request (the newest "Brought in by" of the

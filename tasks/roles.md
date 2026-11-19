@@ -7,8 +7,7 @@ change): the kind `role`.
 (`roles/orchestrator.md`); a builder builds one line to its merge; the session that syncs the core moves the copy
 (`roles/shared/work-flow.md`, "Sessions"); the code reviewer and the security reviewer review a PR (`tasks/reviews.md`);
 the fallback reviewer takes a review no other gives; the design check, the stand-in and planning design judge or plan
-against the design and the owner's words; escalation takes what has beaten a builder twice. Any agent tool the owner
-has may take any of them.
+against the design and the owner's words; escalation takes what has beaten a builder twice.
 
 **A file for each role** (#304). By default what a role reads at its start is the floor's
 `security.md`, its own file under `roles/` (the builder's, the orchestrator's, a reviewer's, the stand-in's, the design
