@@ -17,7 +17,8 @@ mean it opens no other file. Reason: a module the change turned out to call for 
 Held, in part, by the description check, which fails a line that leaves out a file the changed paths call for.
 
 **Hands over, gets back:**
-- the orchestrator: word when its PR is ready and when it merges; back, its line and brief.
+- the orchestrator: word when its PR is ready, when it merges and when it hands over by its context; back, its line
+  and brief.
 - a reviewer: the PR, ready; back, findings, each blocking or not.
 - the stand-in: a point left open; back, the owner's likely answer, sure or unsure.
 - the design session: a rule the owner's words leave open; back, the rule.

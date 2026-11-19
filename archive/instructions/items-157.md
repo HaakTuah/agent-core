@@ -322,6 +322,7 @@ The index, and how an item is written: `archive/instructions.md`.
      that this touches the review guidelines every project takes, so needs the owner's yes. Decided: the owner agreed to
      all of it. Behind: "A mark on what every session reads" in `modules/review-guidelines.md`, which the core's own cap
      now follows too (`AGENTS.md`).
+     Changed by: #469.
 
 183. **13 November 2026** (the core, in the design chat). Asked, on being told what a fresh session's read of all the
      rules for room had found in the floor: six wordings another floor sentence already says. Recommended: yes to three

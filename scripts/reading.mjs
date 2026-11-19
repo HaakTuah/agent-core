@@ -87,11 +87,84 @@ export function readsOf(text, lead) {
 }
 
 // Whether a changed path matches a pattern of a module's line.
-export function matches(pattern, file) {
-  const p = String(pattern).replace(/^\.\//u, ""), f = String(file).replace(/\\/gu, "/").replace(/^\.\//u, "");
-  if (p.endsWith("/")) return f.startsWith(p);
-  const glob = s => s.replace(/[.+^${}()|[\]\\?]/gu, "\\$&").replace(/\*\*\/?/gu, "\u0000").replace(/\*/gu, "[^/]*").replace(/\u0000/gu, ".*");
-  return new RegExp(`^${glob(p)}$`, "u").test(p.includes("/") ? f : f.split("/").pop());
+// A pattern as its parts: each character a literal, `*` any run of characters but "/", `**` (with a "/" after it, which
+// it takes) any run at all, a line's end included. Matched by walking the path once for each part, never by a regular
+// expression, whose backtracking takes time that grows exponentially with the stars a pattern a branch writes holds side
+// by side; stars side by side are one part (`**` where either is), so a run of them costs one walk.
+const partsOf = p => {
+  const out = [], wild = part => { const last = out[out.length - 1]; if (last === STAR || last === ANY) out[out.length - 1] = last === ANY || part === ANY ? ANY : STAR; else out.push(part); };
+  for (let i = 0; i < p.length; i++) { if (p[i] !== "*") out.push(p[i]); else if (p[i + 1] === "*") { wild(ANY); i += p[i + 2] === "/" ? 2 : 1; } else wild(STAR); }
+  return out;
+};
+const STAR = Symbol("*"), ANY = Symbol("**");
+// What one reading's tries may take, in steps (#673). A reading (a run of this script, a pull request's description, a
+// tree the total read sums) is given a budget of its own and makes its patterns ready in it, never in one another
+// reading spent, so that no answer hangs on what was read before it. Making a pattern ready costs MAKE and TRY for each
+// of its characters, and making the parts for its walk TRY for each again, each once a reading; a try, TRY and what it
+// compares, at most the path's length and the pattern's; and a walk, two for each part for each character of the
+// path. Once a step cannot be paid, that try and every try after it in the reading match, which calls for more
+// reading, never less: beyond reading its patterns and its paths once, a reading's tries then take at most STEPS, some
+// tens of milliseconds, whatever their count and length, and each of the core's own readings takes under a tenth.
+export const STEPS = 1 << 24, TRY = 16, MAKE = 1024;
+export const budget = (steps = STEPS) => ({ left: steps, over: false, made: new Map() });
+const paid = (within, steps) => {
+  if (!within.over && steps <= within.left) { within.left -= steps; return true; }
+  within.over = true;
+  within.left = 0;
+  return false;
+};
+// A pattern made ready for the reading `within`, or null where that cannot be paid: a folder (ending in /), which holds
+// every path under it; one with no star, which is the path, or its name, exactly; any other, its literal runs (the text
+// between its stars, as partsOf reads them), which must stand in the path in their order (a check in one pass that
+// turns away nearly every path before the walk), the first at its start and the last at its end; and its parts, made
+// for its first walk.
+const WILD = /\*\*\/|\*\*|\*/u;
+function patternOf(given, within) {
+  if (!within.made.has(given)) {
+    if (!paid(within, MAKE + TRY * given.length)) return null;
+    const p = given.startsWith("./") ? given.slice(2) : given, runs = p.split(WILD), whole = p.includes("/");
+    within.made.set(given, p.endsWith("/") ? { folder: p } : runs.length === 1 ? { whole, exact: p }
+      : { p, whole, exact: null, runs: runs.filter(Boolean), first: runs[0], last: runs[runs.length - 1], parts: null });
+  }
+  return within.made.get(given);
+}
+// A changed path as a pattern reads it: its separators "/", a leading "./" taken off, and its name, what follows its
+// last "/".
+const pathOf = file => {
+  const f = String(file), slashed = f.includes("\\") ? f.replaceAll("\\", "/") : f, whole = slashed.startsWith("./") ? slashed.slice(2) : slashed;
+  return { whole, name: whole.slice(whole.lastIndexOf("/") + 1) };
+};
+function inOrder(runs, s) { let from = 0; for (const r of runs) { const at = s.indexOf(r, from); if (at < 0) return false; from = at + r.length; } return true; }
+function globbed(parts, s) {
+  let at = new Uint8Array(s.length + 1);
+  at[0] = 1;
+  for (const part of parts) {
+    const next = new Uint8Array(s.length + 1);
+    if (typeof part === "string") { for (let j = 0; j < s.length; j++) if (at[j] && s[j] === part) next[j + 1] = 1; }
+    else for (let j = 0; j <= s.length; j++) next[j] = at[j] || (j > 0 && next[j - 1] && (part === ANY || s[j - 1] !== "/")) ? 1 : 0;
+    at = next;
+  }
+  return at[s.length] === 1;
+}
+// One try of a pattern on a path, both made ready, its steps paid from `within`: whether it matches, true where they
+// cannot be paid.
+function tried(g, n, within) {
+  if (g.folder !== undefined) return !paid(within, TRY + Math.min(g.folder.length, n.whole.length)) || n.whole.startsWith(g.folder);
+  const s = g.whole ? n.whole : n.name;
+  if (g.exact !== null) return !paid(within, TRY + (s.length === g.exact.length ? s.length : 0)) || s === g.exact;
+  if (!paid(within, TRY + Math.min(s.length, g.first.length + g.last.length))) return true;
+  if (!s.startsWith(g.first) || !s.endsWith(g.last)) return false;
+  if (!paid(within, s.length + g.p.length)) return true;
+  if (!inOrder(g.runs, s)) return false;
+  if (g.parts === null) { if (!paid(within, TRY * g.p.length)) return true; g.parts = partsOf(g.p); }
+  return !paid(within, 2 * g.parts.length * (s.length + 1)) || globbed(g.parts, s);
+}
+// Whether a changed path matches a pattern, the steps paid from `within`, the reading's budget, which every caller gives
+// (none given is refused, so no caller tries patterns outside a reading's bound), or true where they cannot be paid.
+export function matches(pattern, file, within) {
+  if (!within || typeof within.left !== "number" || !(within.made instanceof Map)) throw new TypeError("matches(): no reading's budget given. Mend: pass the reading's budget(), as calledByPaths does");
+  const g = patternOf(String(pattern), within), name = String(file);
+  return g === null || !paid(within, name.length) || tried(g, pathOf(name), within);
 }
 
 // The core's roles and modules as they say when they are read: `read(file)` gives a file's text or null, `list(folder)`
@@ -191,17 +264,33 @@ export function kindsOf(lib) {
 
 // A changed path as it is printed: as it is spelled, or, where it holds a control character (a line break, an escape),
 // in quotes with that character written out, so that no path's name reads as a line of this script's own.
-const shown = p => (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(p) ? JSON.stringify(p).replace(/[\u007f-\u009f\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`) : p);
+export const shown = p => (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(p) ? JSON.stringify(p).replace(/[\u007f-\u009f\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`) : p);
 // What the changed paths call for, whatever the role: [{ file, why }], each file once, by the first path that called it.
-export function calledByPaths(lib, paths, own = []) {
-  const out = new Map(), kinds = new Map();
-  for (const p of paths) for (const r of KINDS_BY_PATH) if (!kinds.has(r.kind) && matches(r.path, p)) kinds.set(r.kind, `the path ${shown(p)}`);
-  for (const p of paths) for (const r of own) if (!kinds.has(r.kind) && matches(r.path, p)) kinds.set(r.kind, `the path ${shown(p)}, of the kind ${r.kind} by the project's reading config`);
+// Its tries spend `within`, the reading's budget (a budget of its own where none is given); a file called once it is
+// spent says so, as PAST.
+export const PAST = "the changed paths, past the steps a reading tries them for, where each pattern left counts as matching";
+export function calledByPaths(lib, paths, own = [], within = budget()) {
+  const out = new Map(), kinds = new Map(), ready = paths.map(pathOf);
+  // (the first path some of the patterns match: each kind's patterns, and each module's, are tried together, so that
+  // past the budget, where every try matches, each answers at once, with the first path)
+  const first = patterns => {
+    if (!patterns.length || !paths.length) return undefined;
+    const made = [];
+    for (const p of patterns) { const g = within.over ? null : patternOf(String(p), within); if (g === null) return paths[0]; made.push(g); }
+    return paths[ready.findIndex(n => made.some(g => tried(g, n, within)))];
+  };
+  const why = (hit, rest = "") => `${within.over ? PAST : `the path ${shown(hit)}`}${rest}`;
+  const byKind = (rules, rest) => {
+    const of = new Map();
+    for (const r of rules) if (!kinds.has(r.kind)) { if (!of.has(r.kind)) of.set(r.kind, []); of.get(r.kind).push(r.path); }
+    for (const [kind, patterns] of of) { const hit = first(patterns); if (hit !== undefined) kinds.set(kind, why(hit, rest(kind))); }
+  };
+  byKind(KINDS_BY_PATH, () => "");
+  byKind(own, kind => `, of the kind ${kind} by the project's reading config`);
   for (const [f, w] of [...Object.entries(FLOOR_WHEN), ...Object.entries(lib.modules)]) {
     if (!w) continue;
-    const hit = paths.find(p => w.paths.some(pattern => matches(pattern, p)));
-    const kind = w.kinds.find(k => kinds.has(k));
-    if (hit !== undefined) out.set(f, `the path ${shown(hit)}`); else if (kind) out.set(f, kinds.get(kind));
+    const hit = first(w.paths), kind = w.kinds.find(k => kinds.has(k));
+    if (hit !== undefined) out.set(f, why(hit)); else if (kind) out.set(f, kinds.get(kind));
   }
   return [...out].map(([file, why]) => ({ file, why }));
 }
@@ -221,8 +310,9 @@ function toolParts(lib, tools) {
 }
 
 // What a session reads: { start: [file], task: [{ file, why }] }, or { error } where the role has no file. `tools`,
-// `kinds` ([{ kind, why }] or names), `paths` and `named` (files an issue names) are the task.
-export function reading(lib, { role, tools = [], kinds = [], paths = [], named = [], own = [] }) {
+// `kinds` ([{ kind, why }] or names), `paths` and `named` (files an issue names) are the task; `within`, the budget its
+// paths' tries spend, a fresh one where none is given.
+export function reading(lib, { role, tools = [], kinds = [], paths = [], named = [], own = [], within }) {
   const file = Object.keys(lib.roles).find(f => lib.roles[f].name === role);
   if (!file) return { error: `"${role}" is no role the core has a file for. Mend: give one of ${Object.values(lib.roles).map(r => r.name).join(", ")} (the builder, where your brief names none)` };
   const start = [FLOOR], task = new Map(), parts = toolParts(lib, tools);
@@ -234,7 +324,7 @@ export function reading(lib, { role, tools = [], kinds = [], paths = [], named =
   parts.task.forEach(call);
   for (const f of named) call({ file: f, why: "the issue names it" });
   calledByKinds(lib, kinds.map(k => (typeof k === "string" ? { kind: k, why: `the kind ${k}` } : k))).forEach(call);
-  calledByPaths(lib, paths, own).forEach(call);
+  calledByPaths(lib, paths, own, within).forEach(call);
   return { start, task: [...task].map(([f, why]) => ({ file: f, why })) };
 }
 
