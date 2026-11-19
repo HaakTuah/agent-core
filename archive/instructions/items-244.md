@@ -179,8 +179,16 @@ The index, and how an item is written: `archive/instructions.md`.
      happens to read it. The owner agreed to it in a chat session, as the third of three ways to gain on what the
      core already has. It stands behind "The audit's reader has a fixed brief and fixed questions" in
      `tasks/cleaning.md`.
+263. **18 November 2026**, #652. A choice record whose option does a job in a way of the project's own that an
+     ecosystem's standard mechanism does for most of its users lists what that mechanism gives beside its main job,
+     and for each what does it under the option, or that nothing does; the challenger reads the list for what it
+     lacks. The record that chose to carry packages in the core's copy never listed what a lock file gives beside the
+     install, and the host's alerts, update proposals, the registry's audit and the list of what is inside were each
+     found missing later, one at a time. The owner agreed to it in a chat session, asked what the core had lacked for
+     the carried packages to stand outside the host's alerts. It stands behind "what a standard mechanism gave" in
+     `tasks/choices.md`.
 
-263. **17 November 2026**, #546. A private project gets a scan of its code in place of the host's CodeQL, paid there:
+264. **17 November 2026**, #546. A private project gets a scan of its code in place of the host's CodeQL, paid there:
      Semgrep's engine, a program that only runs, installed in the scan's own step from PyPI's lock form by its hashes
      (#654) and run with no Python, reads what a pull request adds or alters with rules the core writes, since no
      maintained rule set carries a licence the floor allows, and a finding is handled as floor rule 9 handles CodeQL's,
