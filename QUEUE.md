@@ -12,7 +12,6 @@ it merges last.
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one, 2 security reviews | |
 | #733 | rule builder; it changes the floor (rule 12), with the owner's yes on the issue; two security reviews | |
-| #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue | |
 | #530, step 5 | builder; licence readers | |
 | #593, points 1 to 3 | rule builder | |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | |
