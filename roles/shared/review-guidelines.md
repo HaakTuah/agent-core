@@ -14,6 +14,12 @@ project's own guidelines, its `SECURITY.md` and the floor. Changes only on the o
   written rule with a line `Rule:` and the rule's file and bold lead (`Rule: floor/security.md: 1. Nothing secret in
   the repository`); a plain bug's has none. It does not mean one without it blocks less. Reason: what reviews find
   twice is counted only so (`tasks/reviews.md`, point 8). Held by no check.
+- **Its stance is its brief's** (#397). By default a reviewer reviews against these guidelines. Where its brief says
+  adversarial, it also looks for an input or a sequence that breaks the change, and argues that the approach is wrong,
+  each a finding. Either way a posted code review says "Stance: adversarial." or "Stance:
+  regular." on a line of its own. It does not mean a review whose brief names no stance is adversarial. Reason: a
+  review that tries to break a change finds most in the *hard work*. Held by no check:
+  `core/scripts/review-record.mjs` counts reviews by stance.
 - **A mechanical move is read by its rule and a sample** (#515). By default a reviewer reads every file changed.
   Where a move between stacks changes many files alike (`tasks/choices.md`), its reviewer reads the rule applied, a
   sample, and each file the comparison of old against new flags. It does not mean a security review is skipped (floor

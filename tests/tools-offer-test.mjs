@@ -1,6 +1,7 @@
 // Tests the check of what the core offers each agent tool (scripts/tools-offer.mjs; tasks/tools.md, "What the core
 // offers one tool, it offers each"; #467): the core's own table passes, and each kind of wrong cell, a tool with no
-// column, a file no cell names and a map with no day fails, saying its mend. Its tests workflow runs it on every pull
+// column, a file no cell names, a map with no day and a part that leaves out a way a review is asked, or names the ways
+// out of order (#397), fails, saying its mend. Its tests workflow runs it on every pull
 // request here. Node's own modules.
 //
 //   node tests/tools-offer-test.mjs
@@ -8,7 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { TABLE, TOOL_DIRS, table, wrong } from "../scripts/tools-offer.mjs";
+import { TABLE, TOOL_DIRS, WAYS, table, wrong } from "../scripts/tools-offer.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
@@ -47,6 +48,15 @@ const kit = check(cell("The entry file", "Kiro", "carried: it reads `AGENTS.md` 
 ok(kit.wrong.length === 2 && kit.wrong[0].startsWith("setup/template/kiro-steering.md.tmpl is a file of a tool's own") && kit.wrong[1].startsWith(".kiro/steering/core.md is a file") && kit.wrong.every(w => mended(`FAIL ${w}`)),
   "a template of the starter kit for a tool that no cell names fails, and so does the core's own file it writes, which counts as named where its template is", kit.wrong.join("\n"));
 ok(says(check(cell("The map of the tiers to its models", "Codex", "carried: `tools/other-builders.md`")), "says no day its documentation was read"), "a map whose part says no day its documentation was read fails");
+// (Kiro's part as it stands, read through `read`, with its ways' lines written anew)
+const kiro = fs.readFileSync(path.join(root, "tools/kiro.md"), "utf8");
+const withKiro = to => check(text, { read: f => (f === "tools/kiro.md" ? to : fs.readFileSync(path.join(root, f), "utf8")) });
+ok(WAYS.every(w => kiro.includes(w)) && withKiro(kiro).wrong.length === 0, "each tool's part says how a review is asked by each way, and passes");
+ok(says(withKiro(kiro.replace("*Through a plug-in:*", "Through a plug-in:")), 'by the way "*Through a plug-in:*"'), "a part that leaves out a way fails, naming it and saying its mend");
+const swapped = kiro.replace("*Side by side:*", "\u0000").replace("*On the host:*", "*Side by side:*").replace("\u0000", "*On the host:*");
+ok(says(withKiro(swapped), "out of order"), "a part that names the ways out of order fails, saying its mend");
+const heading = to => text.replace("Kiro (`tools/kiro.md`)", `Kiro (\`${to}\`)`);
+ok(says(check(heading("tools")), "which is no file in the repository") && says(check(heading("../outside.md")), "which is no file in the repository"), "a heading that names a folder, or a file outside the repository, as a part fails, saying its mend");
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);
