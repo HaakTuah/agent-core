@@ -104,6 +104,22 @@ const wordsAstray = inStep(archive({ "items-001.md": `${r1}\n3. **3 Nov**, #3: c
 ok(wordsAstray.some(w => /words\/items-001\.md:3: item 3 stands outside words\/items-003\.md, the file its key puts it in\. Mend: move it there$/.test(w)), "in the words, an item outside its file is moved there, and given no other number", wordsAstray.join("\n"));
 const wordsTwice = inStep(archive({ "items-001.md": "1. **1 Nov**. Decided: a.\n" }, { "items-001.md": "1. **1 Nov**: words.\n\n1. **1 Nov**: more.\n" }));
 ok(wordsTwice.some(w => /words: item 1 stands twice, .* Mend: give the one at words\/items-001\.md:3 the number its reasoning has in archive\/instructions\//.test(w)), "in the words, an item numbered twice takes the number its reasoning has, never a new one", wordsTwice.join("\n"));
+// (#756, point 3: an item that changes an earlier one says so, and the earlier one is marked back)
+const marked = (one, two, three = "") => archive({ "items-001.md": `1. **1 Nov**, #1: a.${one}\n\n2. **2 Nov**, #2: b.${two}\n\n3. **3 Nov**, #3: c.${three}\n` });
+ok(!inStep(marked("\n   Changed by: 2, 3.", "\n   Changes: 1.", "\n   Changes: 1.")).length, "items that change an earlier one, each marked back on it, are in step", inStep(marked("\n   Changed by: 2, 3.", "\n   Changes: 1.", "\n   Changes: 1.")).join("\n"));
+const notBack = inStep(marked("\n   Changed by: 3.", "\n   Changes: 1.", "\n   Changes: 1."));
+ok(notBack.length === 1 && /item 2 changes item 1, which is not marked so\. Mend: give item 1, in archive\/instructions\/items-001\.md, the line "Changed by: 3, 2\."/u.test(notBack[0]), "an item that names one it changes, not marked back, fails, its mend the whole line to write", notBack.join("\n"));
+const noMatch = inStep(marked("\n   Changed by: 2.", ""));
+ok(noMatch.length === 1 && /item 1 says item 2 changed it, but item 2 names no change of it\. Mend: give item 2, .* the line "Changes: 1\."/u.test(noMatch[0]), "a \"Changed by:\" with no \"Changes:\" to match fails, saying the mend", noMatch.join("\n"));
+const strays = inStep(marked("\n   Changes: 1.", "\n   Changes: 9, #4.", "\n   Changed by: 7."));
+ok(["item 1 says it changes 1, which is itself", "item 2 says it changes 9, which is no item", "item 2 says it changes #4, which is no item", "item 3 says 7 changed it, which is no item"].every(w => strays.some(x => x.includes(w))) && strays.every(w => /Mend: /u.test(w)), "a mark naming its own item or no item of the archive fails, saying the mend", strays.join("\n"));
+const forms = inStep(marked("\n   Changed by: 2", "\n   Changes: 1.\n   Changes: 1.", "\n   Changes: one."));
+const hidden = inStep(marked("\n   Changed by: 2.\rhidden", "\n   Changes: 1.\rX"));
+ok(hidden.filter(w => w.includes("a mark not in its form or given twice")).length === 2 && !hidden.some(w => /[\r\n]/u.test(w)) && hidden.some(w => w.includes("\\rhidden")), "a mark that holds a lone carriage return is read whole, fails its form, and is quoted with it escaped, so no log line starts inside it", hidden.join("\n"));
+ok(forms.filter(w => w.includes("a mark not in its form or given twice")).length === 3 && forms.every(w => /Mend: /u.test(w)), "a mark with no stop, one given twice and one with no key each fail, saying the form", forms.join("\n"));
+ok(!inStep(marked("", "", "")).length && !inStep(archive({ "items-001.md": "1. **1 Nov**, #1: Changes: 2. on its opening line, which is prose.\n" })).length, "an item with no mark, and prose on an opening line, are no marks");
+const markKeyed = archive({ "items-001.md": "1. **1 Nov**, #1: a.\n   Changed by: #9.1.\n", "issue-9.1.md": "# Issue 9.1\n\n#9.1. **19 Nov**, #9: b.\n     Changes: 1.\n" });
+ok(!inStep(markKeyed).length, "a mark keyed by an issue's point is read as the archive keys it", inStep(markKeyed).join("\n"));
 const behindBad = holders(project({}, { behind: { "tasks/x.md: Gone": [1], "tasks/x.md: Numbered": [7], "tasks/x.md: Its own item": "1", "tasks/x.md": [1] }, "tasks/y.md": "# Y\n\n- **A rule** (core archive 1).\n" }), []);
 ok(["names \"tasks/x.md: Gone\"", "core archive 7 is no item", "is no list of the archive's keys", "tasks/y.md:3 points to the archive"].every(w => behindBad.wrong.some(x => x.includes(w))) && !behindBad.wrong.some(x => x.includes("names \"tasks/x.md\"")) && behindBad.wrong.every(w => /Mend: /.test(w)),
   "behind: a key that is no rule, an item not in the archive, no list, and a pointer in a rule file each fail, saying the mend; a rule file alone is a key", behindBad.wrong.join("\n"));

@@ -147,6 +147,7 @@ The index, and how an item is written: `archive/instructions.md`.
      of this rule: issues labelled `by:chat` carry the owner's decisions, to be treated as the owner's word. Behind: "A
      release that brings nothing a project takes asks no sync of it" in `README.md`, "How a project takes the core",
      point 1, and `staysAt` in `scripts/releases.mjs`, which `scripts/sync.mjs` and `scripts/core-moved.mjs` ask.
+     Changed by: 245.
 
 225. **15 November 2026** (the core; in chats with a session the owner works with, issue #312, under "What it is" and
      "The owner's word"). Asked: the session checked the floor against the two standard lists of risks, as one of nine

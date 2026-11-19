@@ -10,7 +10,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
 | #778, point 2 | rule builder | #774 |
-| #756 | rule builder | |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
 | #773 | rule builder; it changes floor rule 4 | |
 | #704 | builder; `tests.yml` | #715 |
