@@ -281,7 +281,8 @@ export function staleFinding(run = () => spawnSync(process.execPath, [fileURLToP
 // their pull request merged with no reply, or why they could not be read; `gh` in ghApi's form. Only the pull requests
 // that hold a finding of Codex's are looked up, the newest first, and what is past LATE_PULLS or LATE_PAGES is said to be
 // unread, never dropped: with nothing found, the issue is left as it stands. The comments are read newest first, so a
-// reply, always newer than its finding, is read before it past the cap.
+// reply, always newer than its finding, is read before it past the cap. The rights of at most LATE_PULLS accounts that
+// replied are read; a reply of any other counts as none, and that too is said.
 export function lateFinding(repo, add, at, gh = ghApi) {
   try {
     const since = new Date(Date.parse(at) - LATE_DAYS * 86400000).toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -290,10 +291,10 @@ export function lateFinding(repo, add, at, gh = ghApi) {
     const all = [...new Set(inline.filter(c => codexFind(c)).map(pullOf).filter(Number.isInteger))].sort((a, b) => b - a);
     const merged = new Map(all.slice(0, LATE_PULLS).map(n => [n, JSON.parse(gh(`repos/${repo}/pulls/${n}`)).merged_at ?? null]).filter(([, m]) => typeof m === "string"));
     const left = [pages > LATE_PAGES && `the review comments past the first ${LATE_PAGES * 100} of the week`, all.length > LATE_PULLS && `Codex's findings on ${all.length - LATE_PULLS} older pull requests`].filter(Boolean);
-    // a reply answers a finding only where the host says its author may write: a right not read counts as none, so its
-    // finding stays listed, and is said
-    const repliers = repliersOf(inline, LATE_PULLS), rights = [], unknown = [];
-    for (const login of repliers) { try { rights.push(JSON.parse(gh(`repos/${repo}/collaborators/${login}/permission`))); } catch { unknown.push(login); } }
+    // a reply answers a finding only where the host says its author may write: a right not read, or past LATE_PULLS
+    // accounts, counts as none, so its finding stays listed, and is said
+    const repliers = repliersOf(inline), rights = [], unknown = repliers.slice(LATE_PULLS);
+    for (const login of repliers.slice(0, LATE_PULLS)) { try { rights.push(JSON.parse(gh(`repos/${repo}/collaborators/${login}/permission`))); } catch { unknown.push(login); } }
     if (unknown.length) left.push(`the rights of ${unknown.length} account${unknown.length === 1 ? "" : "s"} that replied, whose replies are counted as none`);
     const body = lateBody(lateOf(inline, merged, since, writersOf(rights)));
     if (left.length === 0) return add(TITLES.late, body);

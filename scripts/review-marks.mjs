@@ -75,11 +75,12 @@ export function lateOf(inline, merged, since = "", writers = new Set()) {
   });
 }
 
-// The logins whose rights lateOf needs: of `inline`, the people (accounts of type User) whose association GitHub gives
-// as one that may write (WRITERS) and who replied to a finding of Codex's, in lower case, the first `cap` of them.
-export function repliersOf(inline, cap) {
+// The logins whose rights lateOf needs: of `inline`, the people (accounts of type User, with a login in GitHub's own
+// form, so that it can stand in a request's route) whose association GitHub gives as one that may write (WRITERS) and
+// who replied to a finding of Codex's, in lower case.
+export function repliersOf(inline) {
   const finds = new Set(inline.filter(c => codexFind(c)).map(c => c.id));
-  return [...new Set(inline.filter(c => finds.has(c?.in_reply_to_id) && c?.user?.type === "User" && typeof c.user.login === "string" && /^[a-z\d](?:[a-z\d-]{0,38})$/iu.test(c.user.login) && WRITERS.includes(c.author_association)).map(c => c.user.login.toLowerCase()))].slice(0, cap);
+  return [...new Set(inline.filter(c => finds.has(c?.in_reply_to_id) && c?.user?.type === "User" && typeof c.user.login === "string" && /^[a-z\d](?:[a-z\d-]{0,38})$/iu.test(c.user.login) && WRITERS.includes(c.author_association)).map(c => c.user.login.toLowerCase()))];
 }
 
 // The body of the look's issue for them, or null where none stands.

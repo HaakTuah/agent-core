@@ -187,6 +187,11 @@ ok(stale(0, "Packages the project holds that have gone stale\n\n- a\n").what ===
   const blind = [];
   lateFinding("o/r", (title, w, unread = null) => blind.push({ what: w, unread }), "2026-11-18T12:00:00Z", route => (/collaborators\/owner\/permission$/.test(route) ? (() => { throw new Error("HTTP 403"); })() : gh(route)));
   ok(blind[0].what?.includes("discussion_r3") && /Not read this run: the rights of 1 account that replied, whose replies are counted as none/.test(blind[0].what), "where the right of an account that replied cannot be read, its reply answers nothing, and the issue says so", blind[0].what);
+  // past LATE_PULLS accounts that replied, no right is read: the rest's replies count as none, and that is said
+  const crowd = Array.from({ length: LATE_PULLS + 1 }, (_, i) => [codex(500 + i, 7, "2026-11-18T10:00:00Z", `${badge("P1")} One of a crowd`), { id: 600 + i, in_reply_to_id: 500 + i, pull_request_url: "https://api.github.com/repos/o/r/pulls/7", created_at: "2026-11-18T11:00:00Z", user: { login: `m${i}`, type: "User" }, author_association: "MEMBER", body: "Done." }]).flat();
+  const crowded = [], askedRights = [];
+  lateFinding("o/r", (title, w, unread = null) => crowded.push({ what: w, unread }), "2026-11-18T12:00:00Z", route => { const who = /collaborators\/([^/]+)\/permission$/.exec(route)?.[1]; if (who) { askedRights.push(who); return JSON.stringify(right(who, "write", "write", true)); } return route.startsWith("repos/o/r/pulls/comments") ? JSON.stringify(/page=1$/.test(route) ? crowd : []) : gh(route); });
+  ok(askedRights.length === LATE_PULLS && (crowded[0].what?.match(/discussion_r5\d\d/g) ?? []).length === 1 && /the rights of 1 account that replied, whose replies are counted as none/.test(crowded[0].what), "past the cap on the accounts whose rights are read, the rest's replies answer nothing, and the issue says so", crowded[0].what);
   ok(/#7, a finding of Codex's security review/.test(what) && !what.includes("discussion_r7") && !what.includes("A late security finding"), "a security finding is listed by its pull request alone, nothing of it written (floor rule 9)", what);
   const none = [];
   lateFinding("o/r", (title, what2, unread = null) => none.push({ what: what2, unread }), "2026-11-18T12:00:00Z", route => JSON.stringify(route.startsWith("repos/o/r/pulls/comments") ? [] : {}));

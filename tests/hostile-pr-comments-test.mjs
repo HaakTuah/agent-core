@@ -2,7 +2,9 @@
 // reviews on a pull request, their bodies and authors, as GitHub's API gives them. They are read by the security-review
 // check (security-review.mjs: judge, codexState, codexs, reviewersOf, named, commentsAlone, standsFrom, whole), the
 // code-review wait (code-review-wait.mjs: judge) and the size check's reader of the "Leanness check:" answer (size.mjs:
-// answered, raised, capsOf, and its run with --raise), and the tools reader (tools-read.mjs: tally, said). Each case is
+// answered, raised, capsOf, and its run with --raise), the tools reader (tools-read.mjs: tally, said), and the late
+// findings' reader (review-marks.mjs: repliersOf, lateOf; look.mjs: lateFinding), whose replier's login goes into a
+// request's route. Each case is
 // refused: nothing of it is taken as a review, an answer, a commit or a pass, nor a tool's name past the line it stands on. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/hostile-pr-comments-test.mjs
@@ -14,6 +16,8 @@ import { fileURLToPath } from "node:url";
 import { judge as codeJudge } from "../scripts/code-review-wait.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { CODEX, codexState, codexs, commentsAlone, judge, named, reviewersOf, standsFrom, status, whole } from "../scripts/security-review.mjs";
+import { lateFinding } from "../scripts/look.mjs";
+import { lateOf, repliersOf } from "../scripts/review-marks.mjs";
 import { answered, capsOf, raised } from "../scripts/size.mjs";
 import { NONE, said as toolsSaid, tally } from "../scripts/tools-read.mjs";
 
@@ -183,6 +187,30 @@ function runSize(baseFile, commentsText) {
   const big = "Generated with [".repeat(1 << 18), at = Date.now();
   tally([{ login: "o", type: "User", body: big, reviews: [{ login: "b", type: "Bot", body: big }], comments: [{ login: "o", type: "User", body: `Code review: ${big}` }] }], "o");
   ok(Date.now() - at < 3000, `tools-read.mjs: bodies of 4 MB of half-made attribution lines are read in ${Date.now() - at} ms`);
+}
+
+// the late findings' reader (review-marks.mjs: repliersOf, lateOf; look.mjs: lateFinding): a replier's login goes into
+// the route of a request for its right, so a login that is not GitHub's own form, an account that is no person's, or a
+// reply whose association may not write, is asked for nothing, and answers no finding
+{
+  const badge = "<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>";
+  const find = { id: 1, pull_request_url: "https://api.github.com/repos/o/r/pulls/7", html_url: "https://github.com/o/r/pull/7#discussion_r1", created_at: "2026-11-18T10:00:00Z", user: bot, body: `${badge} A finding` };
+  const reply = (user, more = {}) => ({ id: 2, in_reply_to_id: 1, pull_request_url: "https://api.github.com/repos/o/r/pulls/7", created_at: "2026-11-18T11:00:00Z", user, author_association: "MEMBER", body: "Done.", ...more });
+  const logins = ["../../admin", "a/b", "a?per_page=1", "a%2Fb", "a#b", "<b>x</b>", "a b", "a\nb", "-a", "a".repeat(40), "", 123, null, undefined, {}];
+  const hostile = [...logins.map(login => reply({ login, type: "User" })), reply(null), reply(undefined), reply("someone"), reply({ login: "someone", type: "Bot" }), reply({ login: "someone", type: "Organization" }),
+    reply({ login: "someone", type: "User" }, { author_association: "NONE" }), reply({ login: "someone", type: "User" }, { author_association: "CONTRIBUTOR" }), reply({ login: "someone", type: "User" }, { author_association: ["MEMBER"] }),
+    reply({ login: "someone", type: "User" }, { in_reply_to_id: "1" }), reply({ login: "someone", type: "User" }, { in_reply_to_id: null })];
+  for (const c of hostile) {
+    const routes = [], seen = [];
+    const gh = route => { routes.push(route); if (route.startsWith("repos/o/r/pulls/comments")) return JSON.stringify(/page=1$/.test(route) ? [find, c] : []); if (/collaborators\//.test(route)) return JSON.stringify({ role_name: "admin", permission: "admin", user: { login: "someone", type: "User", permissions: { push: true } } }); return JSON.stringify({ merged_at: "2026-11-18T09:00:00Z" }); };
+    lateFinding("o/r", (title, what) => seen.push(what), "2026-11-18T12:00:00Z", gh);
+    ok(repliersOf([find, c]).length === 0 && !routes.some(r => /collaborators\//.test(r)) && /discussion_r1/.test(seen[0] ?? ""),
+      `review-marks.mjs: a reply from ${String(JSON.stringify(c.user)).slice(0, 60)}, ${JSON.stringify(c.author_association)}, to ${JSON.stringify(c.in_reply_to_id)}, is asked no right and answers no finding`);
+  }
+  // and where a right is read, only the host's answer for that very person counts: another's answer, or a bot's, is none
+  const member = reply({ login: "someone", type: "User" }), merged = new Map([[7, "2026-11-18T09:00:00Z"]]);
+  ok(lateOf([find, member], merged, "", new Set(["other"])).length === 1 && lateOf([find, member], merged, "", new Set()).length === 1 && lateOf([find, member], merged).length === 1 && lateOf([find, member], merged, "", new Set(["someone"])).length === 0,
+    "review-marks.mjs: a reply answers a finding only where the rights read name its own author");
 }
 
 process.exit(failed ? 1 : 0);
