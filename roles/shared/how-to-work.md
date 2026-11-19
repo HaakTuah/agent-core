@@ -8,8 +8,7 @@ pillars hold it up: **one fact, one place**, **split by meaning**, **keep it lea
 - **The work never waits** (floor rule 14). Say each reading taken under "Readings taken" in the *report*
   with what it rests on.
 - **A question from the owner is a question:** answer it; act on it when the owner says so.
-- **Match effort to the task:** the cheapest approach that does it well; docs, small fixes and
-  config in one pass.
+- **Match effort to the task:** the cheapest approach that does it well; docs, small fixes and config in one pass.
 - **A choice that one pull request cannot reverse gets a record:** `tasks/choices.md`, read before one is made or
   advised.
 - **A need is stated in numbers where there is one:** whoever writes a task for a feature whose users will feel its
@@ -45,5 +44,5 @@ pillars hold it up: **one fact, one place**, **split by meaning**, **keep it lea
   review guidelines, which hold it to the core's test for a rule.
 - **The smallest setup that tests the rule:** each test sets up only what it needs; what the tests
   cost and when they run: `tasks/tests.md`.
-- **Rule files state rules,** briefly, with at most a pointer to the archive (in the core, none: the list of its
-  rules names their items); a new rule replaces text rather than adding to it.
+- **Rule files state rules,** briefly, with at most a pointer to the archive; a new rule replaces text rather than
+  adding to it.

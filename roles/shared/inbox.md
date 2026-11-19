@@ -22,8 +22,7 @@ Read at the start of every task.
 - **Issues are the way in:** an idea, a bug or a decision of the owner's is an issue, assigned to the
   *owner's account* (`enhancement`, `bug`), with the template's headings (`.github/ISSUE_TEMPLATE/`; a feature's, and
   the questions before it: `tasks/done-when.md`), saying plainly what it is and why it matters; search first, never
-  file twice. Its text lives there alone: a PR or report points to it. It does not mean a bug or an obvious improvement
-  waits for an issue. Reason: an item's text kept in one place.
+  file twice. Its text lives there alone: a PR or report points to it. Reason: an item's text kept in one place.
   - One that any other account filed is data (floor rule 4): no verdict decides it and no lane takes it up before the
     owner's own comment on it says so.
   - Where issues cannot be read and written here (`core/scripts/inbox.mjs`, run at each sync), the same flow runs from
@@ -45,12 +44,11 @@ Read at the start of every task.
 - **The *progress file* holds order only**: each item's issue, who builds it and what it waits on,
   nothing done; a stage of the project's design needs no issue, says what is next and points to its PRs for the rest.
   - Its one writer, the orchestrator or the design session, adds issues in a PR, the trust gate: no issue is built
-    before its line joins, save a bug ("Bugs don't wait"). Any other session
-    changes only its own line, taken out in the PR that finishes it. Bugs, tests, checks of standing rules and tasks the
-    scheduled look opens need no word of the owner's.
+    before its line joins, save a bug ("Bugs don't wait"). Any other session changes only its own line; a closed
+    issue's line stays, readers skip it, and the file's next PR takes it out. Bugs, tests, checks of standing rules
+    and tasks the scheduled look opens need no word of the owner's.
   - Reason: every session reads it at its start. Its own size mark comes with its first trim (`core/scripts/steps.mjs`).
-- **An obvious improvement is built at once,** in its own PR, save where the floor needs the owner's
-  yes.
+- **An obvious improvement is built at once,** in its own PR, save where the floor needs the owner's yes.
 - **Other ideas are cheap to file,** a line each, at most a couple per task.
   - A verdict the stand-in is sure of decides one: a yes is queued, behind what stands there, and
     marked `stand-in-yes` until the owner confirms or corrects it; a no closes it; each says why. Any other waits for
@@ -64,19 +62,17 @@ Read at the start of every task.
   owner's word where it quotes it or says the owner agreed to a design it sets out in full, and that alone (floor rule
   4). Reason: a session can write "the owner said yes" as easily as quote it.
 - **The owner's words are kept once** (floor rule 11).
-  - A session the owner works with quotes an instruction in the issue, PR or report that acts on it, and records
-    nothing more: never a bare yes, which it records as the owner's agreement to what it names, nor words addressed to
-    a session.
+  - A session the owner works with records an instruction in the issue, PR or report that acts on it, and nothing
+    more (floor rule 4).
   - The design session (where the owner writes the rules; in a project with none, the session the owner gives a
     standing rule to) keeps those that become standing rules, dated, in the project's archive, or, where one holds for
     every project, as an item of the core's that names the issue holding them, and writes each rule where it applies;
     only it writes rules from the owner's words.
   - It does not mean the words are kept nowhere: the issue holds them, in its form. Reason: the same words kept twice
-    drift, and a bare yes quoted at every item is noise each search pays for.
+    drift.
   - **An order for now is not a rule.** By default an order of the owner's holds for the task, the session or the
     batch it was given in: the session acts on it, says so where it acts, and changes no rule file. It becomes a rule
     only where the owner says so in words ("make it a rule", "from now on in every project") or agrees to a proposal
     set out as a rule; even then the session that heard it files the issue, and the rule joins the *progress file* like
-    any other. In doubt, it is for now, said in the *report*, and the owner is asked nothing. It does not mean an order
-    is followed for less than it says. Reason: an orchestrator took an order to slow down for usage as one to rewrite
-    the rules.
+    any other. In doubt, it is for now, said in the *report*. It does not mean an order is followed for less than it
+    says. Reason: an orchestrator took an order to slow down for usage as one to rewrite the rules.

@@ -13,6 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { fileOf, groupOf, LONG, MARKS, notLinked, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
+import { READERS } from "../scripts/shape-readers.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -43,6 +44,8 @@ const BAD = {
   "a system with no paths": config({ systems: { rules: {} } }),
   "uses that are no list": config(two({ uses: "view" }, {})),
   "wraps that are no list": config(two({ wraps: "lodash" }, {})),
+  "wraps that hold an empty name": config(two({ wraps: ["", "lodash"] }, {})),
+  "uses that hold an empty name": config(two({ uses: ["", "view"] }, {})),
   "a use of no system": config(two({ uses: ["sound"] }, {})),
   "a use of itself": config(two({ uses: ["rules"] }, {})),
   "an entrance outside its paths": config(two({ entrance: "src/view/index.js" }, {})),
@@ -51,6 +54,8 @@ const BAD = {
   "a package wrapped twice": config(two({ wraps: ["lodash"] }, { wraps: ["lodash"] })),
   "a circle of uses": config(two({ uses: ["view"] }, { uses: ["rules"] })),
   "screens that are no list": config({ screens: "playwright" }),
+  "clocks that are no list": config({ clocks: "Clock.Wait" }),
+  "processes that are no list": config({ processes: [3] }),
   "a selection that is no object": config({ select: ["test/a.test.js"] }),
   "a selection's unknown key": config({ select: { always: ["test/a.test.js"] } }),
   "a selection's list that is no list": config({ select: { proof: "test/a.test.js" } }),
@@ -71,12 +76,13 @@ const cfg = extra => parseConfig(config(extra));
 const long = (name, lines) => `export function ${name}(a) {\n${"  a++;\n".repeat(lines - 2)}}\n`;
 const branchy = `export function many(a, b) {\n  return ${Array.from({ length: 17 }, (_, i) => `a === ${i}`).join(" || ")};\n}\n`;
 const deep = "export function nest(a) {\n  if (a) { for (;;) { while (a) { if (a) { try { a(); } catch { a = 0; } } } } }\n}\n";
-const lostJsx = `const cast = <T>(x: T) => x;\n${long("lost", 200)}`;
+// (JSX whose text holds a bare }, which the grammar refuses, as JSX does)
+const lostJsx = `const shown = <p>a } b</p>;\n${long("lost", 200)}`;
 let found = survey({ "src/a.js": long("tall", 61) + long("fine", 60) + branchy + deep, "src/a.test.js": long("inATest", 200), "src/b.jsx": `export const B = () => <p>{x}</p>;\n${long("inJsx", 200)}`, "src/c.tsx": lostJsx }, cfg({ tests: ["src/a.test.js"] }), new Set(["src/a.test.js"]));
 ok(same(ids(found), ["function: src/a.js#many", "function: src/a.js#nest", "function: src/a.js#tall", "function: src/b.jsx#inJsx", "lost: src/c.tsx"]) && found.entries.get("function: src/a.js#tall").n.lines === 61 && found.entries.get("function: src/a.js#many").n.branches === 16 && found.entries.get("function: src/a.js#nest").n.depth === 5 && found.read.jsx === 1 && found.read.functions === 5,
   "a function past a mark is found: its lines, its depth, its branch points, in a file with JSX too; one at the mark and a test's are not; a file whose JSX the reader cannot follow is found as such, its functions not", ids(found));
-const lostSaid = verdict({ config: cfg({}), at: "c.json", self: "s", found, baselineText: JSON.stringify({ reads: ["javascript", "jsx", "csharp", "python", "scripts", "screens"], listed: {} }) }).fail.flat().join("\n");
-ok(found.readers.get("src/a.js") === "javascript" && found.readers.get("src/b.jsx") === "jsx" && found.readers.get("src/c.tsx") === "jsx" && mended(lostSaid) && /1 file of code holds what the reader cannot follow/.test(lostSaid) && /src\/c\.tsx/.test(lostSaid),
+const lostSaid = verdict({ config: cfg({}), at: "c.json", self: "s", found, baselineText: JSON.stringify({ reads: Object.keys(READERS), listed: {} }) }).fail.flat().join("\n");
+ok(["src/a.js", "src/b.jsx", "src/c.tsx"].every(f => found.readers.get(f) === "javascript-tree") && mended(lostSaid) && /1 file of code holds what the reader cannot follow/.test(lostSaid) && /src\/c\.tsx/.test(lostSaid),
   "each file's reader is known, and a new file the reader cannot follow fails, with its mend, so that no line hides a file's functions", lostSaid);
 found = survey({ "src/a.js": long("same", 70) + long("same", 80) }, cfg({}));
 ok(same(ids(found), ["function: src/a.js#same", "function: src/a.js#same#2"]), "two functions of one name in a file are told apart");
@@ -127,6 +133,41 @@ const screened = survey({
 ok(same(ids(screened).filter(id => id.startsWith("screen: ")), ["screen: Tests/FormTests.cs -> System.Windows.Forms", "screen: src/e2e/c.test.js -> @testing-library", "screen: src/e2e/c.test.js -> playwright"])
   && screened.read.screens === 2 && readerOf("screen: src/e2e/c.test.js -> playwright", screened.readers) === "screens" && fileOf("screen: src/e2e/c.test.js -> playwright") === "src/e2e/c.test.js",
   "a test that imports what opens a screen (a package named, a module under it, in C# a namespace) is an entry of the reader \"screens\"; a test of the display's own code, one of the rules, code that is no test and a package that only starts with a name are not", ids(screened));
+
+// ---- the tests that reach a real clock or start another process (#457, point 1) ----
+const reachCfg = cfg({ tests: ["src/**/*.test.js", "Tests/**", "tests/**"], clocks: ["Clock.wait"], processes: ["runTool", "spawnly", "src/helpers/run.js"] });
+const reachTests = ["src/a.test.js", "src/b.test.js", "src/c.test.js", "src/d.test.js", "src/e.test.js", "Tests/WaitTests.cs", "tests/test_run.py"];
+const reaching = survey({
+  "src/a.test.js": "import { spawnSync } from 'node:child_process';\nconst t0 = Date.now();\n",
+  "src/b.test.js": "const said = 'Date.now and setTimeout';\nconst o = { x: 1 };\no.setTimeout(1);\n// performance.now()\n",
+  "src/c.test.js": "import { setTimeout as sleep } from 'node:timers/promises';\nawait Clock.wait(5);\nrunTool('x');\n",
+  "src/d.test.js": "import { run } from 'spawnly/sync';\nconst d = new Date();\nconst e = new Date(0);\n",
+  "src/e.test.js": "export const plain = 1;\n", "src/tool.js": "setTimeout(() => {}, 5);\nimport { exec } from 'child_process';\n",
+  "Tests/WaitTests.cs": "namespace T;\nclass WaitTests { void A() { Thread.Sleep(5); Process.Start(\"git\"); } }\n",
+  "tests/test_run.py": "import subprocess\nimport time\n\ndef test_a():\n    time.sleep(1)\n",
+}, reachCfg, new Set(reachTests));
+ok(same(ids(reaching).filter(id => /^(timed|process): /.test(id)), ["process: Tests/WaitTests.cs -> Process.Start", "process: src/a.test.js -> node:child_process", "process: src/c.test.js -> runTool", "process: src/d.test.js -> spawnly",
+  "process: tests/test_run.py -> subprocess", "timed: Tests/WaitTests.cs -> Thread.Sleep", "timed: src/a.test.js -> Date.now", "timed: src/c.test.js -> Clock.wait", "timed: src/d.test.js -> new Date()", "timed: tests/test_run.py -> time"])
+  && reaching.read.timed === 5 && reaching.read.processes === 5,
+  "a test that calls or imports what reaches a real clock or starts another process, by its language's names or the config's, is one entry of each kind, its first name in order; a name in a string, a comment, after a dot or with what follows it, and code that is no test, are none", ids(reaching).filter(id => /^(timed|process): /.test(id)));
+ok(readerOf("timed: src/a.test.js -> Date.now", reaching.readers) === "clocks" && readerOf("process: src/a.test.js -> node:child_process", reaching.readers) === "processes" && fileOf("timed: src/a.test.js -> Date.now") === "src/a.test.js",
+  "each kind is the entry of a reader of its own, \"clocks\" and \"processes\", in the test's file");
+const faked = survey({
+  "src/f.test.js": "vi.useFakeTimers();\nsetTimeout(() => {}, 5);\nimport { spawnSync } from 'node:child_process';\n",
+  "tests/test_sleep.py": "from time import sleep\n\ndef test_a():\n    sleep(1)\n",
+  "src/g.test.js": "const options = { setTimeout: false };\nDate.now = () => 42;\n",
+  "src/i.test.js": "const useFakeTimers = 1;\nsetTimeout(() => {}, 5);\n", "src/j.test.js": "vi.useFakeTimers();\nvi.useRealTimers();\nconst t = Date.now();\n",
+  "Tests/FakeTests.cs": "namespace T;\nclass FakeTests { void A() { var c = new FakeTimeProvider(); Thread.Sleep(5); } }\n",
+  "tests/test_frozen.py": "from freezegun import freeze_time\n\n@freeze_time('2026-01-01')\ndef test_a():\n    time.sleep(1)\n",
+  "src/k.test.ts": "import type { ChildProcess } from 'node:child_process';\nimport type { TimerOptions } from 'node:timers';\nexport const k = 1;\n",
+  "src/helpers/run.js": "export const run = () => 1;\n", "src/h.test.js": "import { run } from './helpers/run.js';\nrun();\n",
+}, reachCfg, new Set(["src/f.test.js", "tests/test_sleep.py", "src/g.test.js", "src/h.test.js", "src/i.test.js", "src/j.test.js", "Tests/FakeTests.cs", "tests/test_frozen.py", "src/k.test.ts"]));
+ok(same(ids(faked).filter(id => /^(timed|process): /.test(id)), ["process: src/f.test.js -> node:child_process", "process: src/h.test.js -> src/helpers/run.js", "timed: Tests/FakeTests.cs -> Thread.Sleep", "timed: src/f.test.js -> setTimeout", "timed: src/i.test.js -> setTimeout", "timed: src/j.test.js -> Date.now", "timed: tests/test_frozen.py -> time.sleep", "timed: tests/test_sleep.py -> time"]),
+  "a test that installs a fake clock is counted all the same, since which calls run under it only running tells (its mend names it); an import of types alone reaches nothing; nor does one that names a clock as a property's key or assigns to it; a module of the clock imported by name counts (Python's from time import sleep), and so does a module of the project's own that the config names", ids(faked));
+ok(unclaimed(new Map([["timed: src/a.test.js -> Date.now", true]]), new Map([["timed: src/a.test.js -> setTimeout", true]])).length === 0
+  && unclaimed(new Map([["process: src/a.test.js -> runTool", true]]), new Map([["process: src/a.test.js -> node:child_process", true]])).length === 0
+  && unclaimed(new Map([["timed: src/b.test.js -> setTimeout", true]]), new Map([["timed: src/a.test.js -> setTimeout", true]])).length === 1,
+  "a listed test that reaches another name, or keeps a later one, stands under its old entry; another test's entry is never its");
 ok(screened.reach.get("src/e2e/d.test.js") === undefined && same([...screened.reach.get("src/rules/a.test.js")], ["src/rules/a.js"]), "each file's imports of the project's own files are told, for the selection", JSON.stringify([...screened.reach]));
 
 // ---- the readers of other code ----
@@ -140,8 +181,29 @@ found = survey({
   "src/Host/Io.cs": csFile("Game.Host", "using Newtonsoft.Json.Linq;\nusing Windows.UI.Core;\nusing Game.View;\n"),
 }, cfg({ ...layered, platform: ["Windows.UI"] }));
 ok(same(ids(found), ["clock: src/Rules/Dice.cs: DateTime.Now", "clock: src/Rules/Dice.cs: new Random(", "crossing: rules -> view: src/Rules/Dice.cs -> src/View/Board.cs", "cycle: src/Rules/Dice.cs -> src/View/Board.cs", "cycle: src/View/Board.cs -> src/Rules/Dice.cs",
-  "function: src/Rules/Dice.cs#Roll", "package: src/Host/Io.cs -> Newtonsoft.Json", "package: src/Rules/Dice.cs -> Newtonsoft.Json", "platform: src/View/Board.cs -> Windows.UI"]) && found.read.nowhere === 1 && found.readers.get("src/View/Board.cs") === "csharp",
+  "function: src/Rules/Dice.cs#Roll", "package: src/Host/Io.cs -> Newtonsoft.Json", "package: src/Rules/Dice.cs -> Newtonsoft.Json", "platform: src/View/Board.cs -> Windows.UI"]) && found.read.nowhere === 1 && found.readers.get("src/View/Board.cs") === "csharp-tree",
   "C#: a function past a mark, a using across a boundary nobody declared and on a cycle, a package shipped from two systems, a tie to a platform outside its system and the rules' own clock are found; the framework's own is not, and a namespace nobody declares is counted", ids(found));
+// a name a project declares is matched by the longest one an import is or lies under, a platform by the shortest; a
+// namespace that holds only deeper ones leads to no file; a Python module deeper than any file is outside
+found = survey({
+  "src/App.csproj": '<Project><ItemGroup><PackageReference Include="Acme" /><PackageReference Include="Acme.Net" /></ItemGroup></Project>',
+  "src/View/A.cs": csFile("Game.View", "using Acme.Net.Http;\nusing Win.Forms.Grid;\nusing Game.Deep;\n"),
+  "src/Rules/B.cs": csFile("Game.Deep.Inner", "using Acme.Net;\n"), "src/Rules/C.cs": csFile("Game.Rules", "using Acme;\n"),
+  "src/py/a/test_x.py": "from b.c.d.e.f import g\nimport q.r\n", "src/py/b/__init__.py": "",
+}, cfg({ ...layered, platform: ["Win.Forms", "Win", "q"] }));
+ok(same(ids(found), ["package: src/Rules/B.cs -> Acme.Net", "package: src/View/A.cs -> Acme.Net", "platform: src/View/A.cs -> Win", "platform: src/py/a/test_x.py -> q"]) && found.read.nowhere === 1 && same([...found.unsure], ["src/py/a/test_x.py"]),
+  "a dotted name is matched by the longest package declared and the shortest platform it lies under; a namespace holding only deeper ones leads to no file; a module deeper than any file is outside", JSON.stringify([ids(found), found.read.nowhere, [...found.unsure]]));
+// (a large file, or many files, of each kind is read in time, in step with its size, well within the suite's time mark)
+const many = { "src/App.csproj": '<Project><ItemGroup><PackageReference Include="Pkg" /></ItemGroup></Project>' };
+for (let i = 0; i < 3000; i++) { many[`src/Rules/R${i}.cs`] = "using Pkg;\n"; many[`src/View/V${i}.cs`] = "using Pkg;\n"; }
+ok(ids(survey(many, cfg(layered))).filter(id => id.startsWith("package: ")).length === 6000, "a package imported from many files in two systems is found once in each file");
+const large = [
+  [{ "package.json": JSON.stringify({ dependencies: { dep: "1" } }), "src/a.mjs": 'import "dep";\n'.repeat(130000) }, f => f.read.imports === 130000],
+  [{ "src/a.cs": `using ${Array(130000).fill("a").join(".")};\n` }, f => f.read.nowhere === 1],
+  [{ "src/a.cs": `${Array.from({ length: 80000 }, (_, i) => `using Z${i};`).join("\n")}\n${Array.from({ length: 80000 }, (_, i) => `namespace N${i} { }`).join("\n")}\n` }, f => f.read.nowhere === 80000],
+  [{ "src/a.py": `from ${Array(32500).fill("a").join(".")} import ${Array(32500).fill("b").join(", ")}\n` }, f => f.read.nowhere === 1],
+];
+ok(large.every(([texts, holds]) => holds(survey(texts, cfg({})))), "a large file of each kind of import is read in time, in step with its size, and what it holds still counted");
 const pyLong = (name, lines) => `def ${name}(n):\n${"    n += 1\n".repeat(lines - 2)}    return random.randint(1, n)\n`;
 found = survey({
   "pyproject.toml": '[project]\nname = "game"\ndependencies = ["requests>=2"]\n[project.optional-dependencies]\ndev = ["pytest"]\n',
@@ -152,7 +214,7 @@ found = survey({
   "game/host/io.py": "import winreg\nfrom typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from game.view.board import later\n",
 }, cfg({ ...layered, platform: ["winreg"] }));
 ok(same(ids(found), ["clock: game/rules/dice.py: datetime.datetime.now", "clock: game/rules/dice.py: random.", "crossing: rules -> view: game/rules/dice.py -> game/view/board.py", "crossing: view -> host: game/view/board.py -> game/host/io.py", "cycle: game/rules/dice.py -> game/view/board.py", "cycle: game/view/board.py -> game/rules/dice.py",
-  "function: game/rules/dice.py#roll", "package: game/rules/dice.py -> requests", "package: game/view/board.py -> requests", "platform: game/view/board.py -> winreg"]) && found.read.nowhere === 1 && found.readers.get("game/host/io.py") === "python",
+  "function: game/rules/dice.py#roll", "package: game/rules/dice.py -> requests", "package: game/view/board.py -> requests", "platform: game/view/board.py -> winreg"]) && found.read.nowhere === 1 && found.readers.get("game/host/io.py") === "python-tree",
   "Python: the same, relative imports too; an import in a def crosses but makes no cycle, nor one of types alone; a package of development alone and the standard library are not found, and an undeclared one is counted", ids(found));
 found = survey({
   "web/a.js": "var App = {};\nfunction helper() {}\n",
@@ -183,7 +245,8 @@ ok(unclaimed(want([["cycle: c.js -> d.js", true]]), M).length === 0 && unclaimed
 ok(same(["function: a/b.js#f#2", "inside: (no system) -> rules: a.js -> b.js", "platform: a.js -> node:fs", "clock: a.js: new Date()", "package: a.js -> @x/y", "global: a.js: App"].map(id => groupOf(id).group), ["f", "(no system) -> rules", "node:fs", "new Date()", "@x/y", "App"]), "an entry's group is read from its id");
 
 // ---- the verdict, against a base ----
-const listed = entries => JSON.stringify({ listed: Object.fromEntries(entries) });
+// (a baseline written when the check read JavaScript and TypeScript alone, their functions on the parser)
+const listed = entries => JSON.stringify({ reads: ["javascript", "javascript-tree"], listed: Object.fromEntries(entries) });
 const f100 = ["function: src/a.js#tall", { lines: 100, depth: 0, branches: 0 }];
 const judge = ({ now, baseline, base, conf = cfg({}) }) => verdict({ config: conf, at: "checks/shape.json", self: "core/scripts/shape.mjs", found: survey(now, conf), baselineText: baseline, base });
 const said = v => v.fail.flat().join("\n");
@@ -202,7 +265,7 @@ ok(mended(said(v)) && v.fail.length === 2 && /1 breach that origin\/main held al
   "where the config reads more than it did, what the base held already is told from what is new, and its mend is to list it", said(v));
 v = judge({ now: { "src/a.js": long("tall", 100) + long("other", 70) }, baseline: listed([f100, ["function: src/a.js#other", { lines: 70, depth: 0, branches: 0 }]]), base: baseOf(listed([f100]), { "src/a.js": long("tall", 100) + long("other", 60) }) });
 ok(mended(said(v)) && /lists 1 entry that origin\/main neither listed nor held/.test(said(v)) && /"grown"/.test(said(v)), "an entry that joins the baseline, of code that got worse, fails against the base", said(v));
-v = judge({ now: { "src/a.js": long("tall", 100) + long("other", 70) }, baseline: JSON.stringify({ grown: { "function: src/a.js#other": "it mirrors the table of the standard, which a split would hide" }, listed: { [f100[0]]: f100[1], "function: src/a.js#other": { lines: 70, depth: 0, branches: 0 } } }), base: baseOf(listed([f100]), { "src/a.js": long("tall", 100) + long("other", 60) }) });
+v = judge({ now: { "src/a.js": long("tall", 100) + long("other", 70) }, baseline: JSON.stringify({ reads: ["javascript", "javascript-tree"], grown: { "function: src/a.js#other": "it mirrors the table of the standard, which a split would hide" }, listed: { [f100[0]]: f100[1], "function: src/a.js#other": { lines: 70, depth: 0, branches: 0 } } }), base: baseOf(listed([f100]), { "src/a.js": long("tall", 100) + long("other", 60) }) });
 ok(v.fail.length === 0, "and passes where the baseline gives its reason under \"grown\"", said(v));
 v = judge({ now: { "src/a.js": long("tall", 100) }, baseline: listed([f100]), base: baseOf(null, { "src/a.js": long("tall", 100) }, null) });
 ok(v.fail.length === 0, "a first baseline lists what the base already held: the check has come, and nothing got worse", said(v));
@@ -219,9 +282,18 @@ const screenJudge = (now, reads, baseTexts) => verdict({ config: screenCfg, at: 
   base: { name: "origin/main", baseline: JSON.stringify({ reads, listed: {} }), config: JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"] }), standing: () => ({ texts: baseTexts, tests: new Set(Object.keys(baseTexts).filter(f => f.endsWith(".test.js"))) }) } });
 v = screenJudge(viewTest, ["javascript", "jsx", "csharp", "python", "scripts"], viewTest);
 ok(v.fail.length === 0 && v.notes.some(n => /1 test file of 1 opens a screen/.test(n)) && v.notes.some(n => /tests that open a screen.*1 breach that stood before/.test(n)), "a test that opened a screen before the baseline named the reader is counted and said, never failed", JSON.stringify(v));
-v = screenJudge(viewTest, ["javascript", "jsx", "csharp", "python", "scripts", "screens"], view);
+v = screenJudge(viewTest, Object.keys(READERS), view);
 ok(mended(said(v)) && /1 test imports what opens a screen/.test(said(v)) && /beneath the screen/.test(said(v)), "once it does, a new test that opens one fails, its mend to test beneath the screen or give its reason", said(v));
-v = judge({ now: {}, conf: cfg({ marks: { lines: 80 } }), baseline: JSON.stringify({ grown: { "mark: lines": "the generated tables run to 75 lines each" }, listed: {} }), base: baseOf(listed([]), {}, config({})) });
+const timedTest = { "src/view/b.js": "export const b = 1;\n", "src/view/b.test.js": "import { b } from './b.js';\nimport { execFileSync } from 'node:child_process';\nconst t = Date.now();\n" };
+const reachJudge = (now, reads, baseTexts) => verdict({ config: reachCfg, at: "checks/shape.json", self: "core/scripts/shape.mjs", found: survey(now, reachCfg, new Set(Object.keys(now).filter(f => f.endsWith(".test.js")))), baselineText: JSON.stringify({ reads, listed: {} }),
+  base: { name: "origin/main", baseline: JSON.stringify({ reads, listed: {} }), config: JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"] }), standing: () => ({ texts: baseTexts, tests: new Set(Object.keys(baseTexts).filter(f => f.endsWith(".test.js"))) }) } });
+const before = reachJudge(timedTest, Object.keys(READERS).filter(r => r !== "clocks" && r !== "processes"), timedTest);
+ok(before.fail.length === 0 && before.notes.some(n => /1 test file of 1 reaches a real clock/.test(n)) && before.notes.some(n => /1 test file of 1 starts another process/.test(n)) && before.notes.some(n => /reach a real clock, the tests that start another process: 2 breaches that stood before/.test(n)),
+  "a test that reached a clock or started a process before the baseline named the readers is counted and said, never failed (a sync turns nothing red)", JSON.stringify(before));
+const after = said(reachJudge(timedTest, Object.keys(READERS), { "src/view/b.js": timedTest["src/view/b.js"] }));
+ok(mended(after) && /1 test reaches a real clock/.test(after) && /beneath the clock/.test(after) && /a fake clock it installs/.test(after) && /1 test starts another process/.test(after) && /beneath the process/.test(after),
+  "once it does, a new one of each fails, its mend to test beneath the clock or the process, or give its reason under \"grown\"", after);
+v = judge({ now: {}, conf: cfg({ marks: { lines: 80 } }), baseline: JSON.stringify({ reads: ["javascript", "javascript-tree"], grown: { "mark: lines": "the generated tables run to 75 lines each" }, listed: {} }), base: baseOf(listed([]), {}, config({})) });
 ok(v.fail.length === 0, "and pass where \"grown\" gives the raise its reason");
 const named = cfg({ systems: { rules: { paths: ["src/rules/"] } } });
 v = judge({ now: { "src/rules/a.js": "export const a = 1;\n", "src/old.js": "export const o = 1;\n", "src/new.js": "export const n = 1;\n" }, conf: named, baseline: listed([]), base: baseOf(listed([]), { "src/old.js": "export const o = 1;\n" }) });
@@ -233,15 +305,15 @@ ok(v.fail.length === 0, "a use declared in the config with its first import pass
 ok(parseBaseline(JSON.stringify({ audited: { day: "2026-11-15", listed: 3, read: 90 }, listed: {} }), "b.json", "").audited.listed === 3, "a baseline keeps the day and the counts of its last audit");
 
 // a reader the baseline does not name yet: what the base held of it is said, never failed (a sync turns nothing red)
-const csBig = { "src/A.cs": `namespace N;\nclass A {\n${csLong("Big", 70)}}\n` }, allReads = { reads: ["javascript", "jsx", "csharp", "python", "scripts", "screens"] };
+const csBig = { "src/A.cs": `namespace N;\nclass A {\n${csLong("Big", 70)}}\n` }, allReads = { reads: Object.keys(READERS) };
 v = judge({ now: csBig, baseline: listed([]), base: baseOf(listed([]), csBig) });
-ok(v.fail.length === 0 && v.notes.some(n => /written before the check read files that hold JSX, C#, Python, scripts that share one global space, the tests that open a screen, a window or a device: 1 breach that stood before is not listed yet/.test(n) && /--write/.test(n)),
+ok(v.fail.length === 0 && v.notes.some(n => /written before the check read files that hold JSX, C#, its functions by the lexer, C#, its functions by the parser, Python, its functions by the lexer, Python, its functions by the parser, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process: 1 breach that stood before is not listed yet/.test(n) && /--write/.test(n)),
   "a baseline written before a reader came: what the base held of it is said, not failed", JSON.stringify(v));
 v = judge({ now: { ...csBig, "src/B.cs": `namespace N;\nclass B {\n${csLong("New", 70)}}\n` }, baseline: listed([]), base: baseOf(listed([]), csBig) });
 ok(mended(said(v)) && v.fail.length === 1 && /1 function passes/.test(said(v)) && /B\.cs#New/.test(said(v)) && !/A\.cs/.test(said(v)), "and what is new of it fails, from the sync on", said(v));
 v = judge({ now: csBig, baseline: listed([]) });
 ok(v.fail.length === 0 && v.notes.some(n => /1 breach that stood before/.test(n)), "with no base told, what it finds is said, never failed", said(v));
-v = judge({ now: { "src/v.js": `export const V = () => <p>{x}</p>;\n${long("tall", 70)}` }, baseline: listed([["function: src/v.js#V", { lines: 90, depth: 0, branches: 0 }]]), base: baseOf(listed([]), {}) });
+v = judge({ now: { "src/v.js": `export const V = () => <p>{x}</p>;\n${long("tall", 70)}` }, baseline: JSON.stringify({ listed: { "function: src/v.js#V": { lines: 90, depth: 0, branches: 0 } } }), base: baseOf(listed([]), {}) });
 ok(!v.fail.some(f => /gone or moved/.test(f[0])) && v.notes.some(n => /1 entry listed there reads otherwise now/.test(n)), "an entry listed of a file a new reader reads otherwise is said, not failed", said(v));
 v = judge({ now: csBig, baseline: JSON.stringify({ ...allReads, listed: {} }), base: baseOf(listed([]), csBig) });
 ok(mended(said(v)) && /held already is not in/.test(said(v)) && !v.notes.some(n => /written before/.test(n)), "once the baseline names the reader, what it does not list fails as any other", said(v));
@@ -250,7 +322,7 @@ ok(mended(said(v)) && /src\/b\.tsx/.test(said(v)) && /cannot follow/.test(said(v
 const refusedReads = reads => { try { parseBaseline(JSON.stringify({ reads, listed: {} }), "b.json", ""); return ""; } catch (e) { return `FAIL: ${e.message}`; } };
 ok(mended(refusedReads("all")) && mended(refusedReads(["javascript", "cobol"])), "readers that are no list, or a name no reader has, are refused, with their mend");
 v = judge({ now: csBig, baseline: JSON.stringify({ reads: ["javascript"], listed: {} }), base: baseOf(JSON.stringify({ ...allReads, listed: { "function: src/A.cs#Big": { lines: 70, depth: 0, branches: 0 } } }), csBig) });
-ok(mended(said(v)) && /no longer names 5 readers that origin\/main's names: jsx, csharp, python, scripts, screens/.test(said(v)), "a baseline that drops a reader its base named fails, so that what it lists cannot go unlisted while it stands", said(v));
+ok(mended(said(v)) && /no longer names 10 readers that origin\/main's names: jsx, javascript-tree, csharp, csharp-tree, python, python-tree, scripts, screens, clocks, processes/.test(said(v)), "a baseline that drops a reader its base named fails, so that what it lists cannot go unlisted while it stands", said(v));
 
 // ---- whole runs, in a scratch repository ----
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shape-test-"));
@@ -362,14 +434,14 @@ git("checkout", "-q", "--", ".");
 put("checks/shape.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"checks/shape-baseline.json"', '"checks/moved.json"'));
 put("checks/moved.json", JSON.stringify({ reads: ["javascript"], listed: {} }));
 r = run([], { SHAPE_BASE: "base" });
-ok(r.status === 1 && mended(r.out) && /no longer names 5 readers/.test(r.out), "a baseline moved to a new path is compared with the one the base's config names: its readers too only grow", r.out);
+ok(r.status === 1 && mended(r.out) && /no longer names 10 readers/.test(r.out), "a baseline moved to a new path is compared with the one the base's config names: its readers too only grow", r.out);
 fs.rmSync(path.join(dir, "checks/moved.json"));
 git("checkout", "-q", "--", ".");
 put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/other.json` |\n");
 put("checks/other.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"checks/shape-baseline.json"', '"checks/moved.json"'));
 put("checks/moved.json", JSON.stringify({ reads: ["javascript"], listed: {} }));
 r = run([], { SHAPE_BASE: "base" });
-ok(r.status === 1 && mended(r.out) && /no longer names 5 readers/.test(r.out), "a config moved by the manifest is compared with the one the base's own manifest names, its baseline too", r.out);
+ok(r.status === 1 && mended(r.out) && /no longer names 10 readers/.test(r.out), "a config moved by the manifest is compared with the one the base's own manifest names, its baseline too", r.out);
 for (const f of ["core-manifest.md", "checks/other.json", "checks/moved.json"]) fs.rmSync(path.join(dir, f));
 git("checkout", "-q", "--", ".");
 put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/gone.json` |\n");
@@ -398,11 +470,11 @@ if (process.platform !== "win32") { // (a link is made without a privilege only 
 r = run(["checks/shape.json", "--suite", "quick", "--", process.execPath, "-e", "console.log('ran')"]);
 ok(r.status === 0 && /ran/.test(r.out) && /the suite quick took \d+ s, within its mark of 30/.test(r.out), "a suite within its mark passes, its own output shown", r.out);
 r = run(["checks/shape.json", "--suite", "slow", "--", process.execPath, "-e", "0"]);
-ok(r.status === 1 && mended(r.out) && /past its mark of 0\.001/.test(r.out), "a suite past its mark, on this platform, fails with its mend", r.out);
+ok(r.status === 0 && /^::warning::the suite slow took \d+ s, past its mark of 0\.001, which fails nothing\. Mend: /m.test(r.out) && !/FAIL/.test(r.out), "a suite past its mark, on this platform, is said as a warning with its mend and fails nothing (#733, point 5)", r.out);
 r = run(["checks/shape.json", "--suite", "quick", "--", process.execPath, "-e", "process.exit(7)"]);
 ok(r.status === 7 && !/FAIL/.test(r.out), "a suite that fails keeps its own status, and the check adds nothing", r.out);
 r = run(["checks/shape.json", "--suite", "quick", "--since", String(Math.floor(Date.now() / 1000) - 100)]);
-ok(r.status === 1 && mended(r.out) && /took 10\d s/.test(r.out), "a time taken since a start the workflow gave is held to the mark too", r.out);
+ok(r.status === 0 && /^::warning::the suite quick took 10\d s, past its mark/m.test(r.out), "a time taken since a start the workflow gave is measured against the mark too", r.out);
 ok([["--suite", "unnamed", "--", "x"], ["--suite", "quick"], ["--suite", "quick", "--since", "soon"], ["--suite", "quick", "--", "no-such-command-here"]].every(a => { const x = run(["checks/shape.json", ...a]); return x.status === 1 && mended(x.out); }),
   "a suite with no mark, no command, no start or a command that cannot be started is refused, with its mend");
 
@@ -410,5 +482,22 @@ ok([["--suite", "unnamed", "--", "x"], ["--suite", "quick"], ["--suite", "quick"
 const outside = file => { try { notLinked(file); return ""; } catch (e) { return `FAIL: ${e.message}`; } };
 ok(["../shape.json", "checks/../../shape.json", "/etc/shape.json", "C:/shape.json", "\\shape.json"].every(f => mended(outside(f)) && /lies outside the project/u.test(outside(f))) && outside("checks/shape.json") === "" && outside("./checks/shape.json") === "",
   "a config or baseline named outside the project is refused, with its mend; one inside it is read");
+// (with the core's packages not installed, as in a project's job of tests that selects with the config and installs
+// none, the config's shape goes unchecked: what the check reads is taken where it holds its form, its defaults else, the
+// check says so as a warning, and a config that names no baseline or no code still fails with its mend)
+{
+  const bare = fs.mkdtempSync(path.join(os.tmpdir(), "shape-bare-"));
+  fs.cpSync(path.join(path.dirname(script), "."), path.join(bare, "core/scripts"), { recursive: true });
+  fs.cpSync(path.join(path.dirname(script), "../setup/template"), path.join(bare, "core/setup/template"), { recursive: true });
+  const parse = text => spawnSync(process.execPath, ["--input-type=module", "-e", `import { parseConfig } from "./core/scripts/shape.mjs"; try { console.log(JSON.stringify(parseConfig(process.argv[1], "checks/shape.json"))); } catch (e) { console.log("FAIL: " + e.message); }`, text], { cwd: bare, encoding: "utf8" }).stdout;
+  const odd = parse(JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"], marks: JSON.parse('{"lines":"x","depth":2,"constructor":5,"__proto__":7}'), suites: { q: {}, r: 30 }, tests: "test/", wiat: 3 })), none = parse(JSON.stringify({ baseline: "b.json" }));
+  ok(/"marks":\{"lines":60,"depth":2,"branches":15\}/.test(odd) && /"suites":\{"r":30\}/.test(odd) && /"tests":\[\]/.test(odd) && mended(none) && /names no "baseline" and "code"/.test(none),
+    "with the core's packages not installed, the config's shape goes unchecked: what holds its form is read, the rest (a key no mark has, a platform's empty seconds) takes its default, and a config with no code still fails with its mend", `${odd}\n${none}`);
+  fs.writeFileSync(path.join(bare, "shape.json"), config({}));
+  for (const a of [["init", "-q"], ["add", "shape.json"]]) execFileSync("git", a, { cwd: bare });
+  const said = spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json", "--first"], { cwd: bare, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });
+  ok(said.status === 0 && /^::warning::The config's shape was not checked: the package ajv is not installed.*\. Mend: /m.test(said.stdout), "and the check says so as a warning, with its mend, and goes on", `${said.stdout}${said.stderr}`);
+  fs.rmSync(bare, { recursive: true, force: true });
+}
 console.log(`${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;
