@@ -8,6 +8,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
+import { ghStandIn } from "../scripts/scratch-core.mjs";
+import { onPath, parseYaml } from "../scripts/workflow-run.mjs";
 import { CAPS, QUEUE, answered, capsOf, counted, raised as raisedWith, rolesAt, whoseOf } from "../scripts/size.mjs";
 
 let failed = 0, count = 0;
@@ -110,6 +112,31 @@ const elsewhere = spawnSync(process.execPath, [file], { cwd: os.tmpdir(), encodi
 ok(elsewhere.status === 1 && /cannot be counted: roles\/ is not here/.test(elsewhere.stderr) && mended(elsewhere.stderr), "where the core is not there (run from another folder), it fails and says so", elsewhere.stdout + elsewhere.stderr);
 ok(run("--raise").status === 1 && run("--raise", same).status === 1 && run("--raise", same, path.join(tmp, "missing.json")).status === 1 && run("--raise", same, put("bad.json", "{")).status === 1 && run("--raise", path.join(tmp, "missing.mjs"), one).status === 1,
   "without its two files, or with one it cannot read, it fails");
+
+// size.yml's step that reads the rights of those who answered, run as it stands, against a stand-in for GitHub's API:
+// a writer's right is read, and counts; a reader's is read, and does not; one the host does not answer, nor the
+// owner's, which needs none, nor an account outside the repository, is asked for
+{
+  const step = parseYaml(fs.readFileSync(path.join(root, ".github/workflows/size.yml"), "utf8")).jobs.size.steps.find((s) => /rights of those who answered/u.test(s.name ?? ""));
+  const repo = fs.mkdtempSync(path.join(tmp, "repo-"));
+  const git = (...args) => spawnSync("git", args, { cwd: repo, encoding: "utf8" });
+  git("init", "-q"); fs.mkdirSync(path.join(repo, "scripts")); fs.writeFileSync(path.join(repo, "scripts", "size.mjs"), own);
+  for (const m of ["base", "head"]) { git("add", "-A"); git("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", m); }
+  const { env, ghData, ghLog } = ghStandIn(process.env, fs.mkdtempSync(path.join(tmp, "gh-")), repo);
+  const says = (login, author_association) => ({ user: { login, type: "User" }, author_association, body: "Leanness check: too little room." });
+  fs.writeFileSync(ghData, JSON.stringify({ "issues/1/comments": [says("SomeOne", "OWNER"), says("writer", "COLLABORATOR"), says("reader", "MEMBER"), says("silent", "MEMBER"), says("outsider", "NONE"), says("bad;name", "MEMBER")],
+    "collaborators/writer/permission$": right("writer", "write", "write", true), "collaborators/reader/permission$": right("reader", "read", "read", false) }));
+  fs.writeFileSync(ghLog, "");
+  const runner = fs.mkdtempSync(path.join(tmp, "runner-"));
+  // (in bash as GitHub runs a step, found as the workflow runner finds it: on Windows, Git for Windows' own)
+  const script = path.join(runner, "step.sh");
+  fs.writeFileSync(script, step.run);
+  const r = spawnSync(onPath("bash", env), ["-e", script], { cwd: repo, encoding: "utf8", env: { ...env, ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}), GH_TOKEN: "not-a-token", NUMBER: "1", OWNER: "someone", RUNNER_TEMP: runner, GITHUB_REPOSITORY: "someone/project" } });
+  const rights = JSON.parse(fs.readFileSync(path.join(runner, "raise", "rights.json"), "utf8")), whose = whoseOf("someone", rights);
+  ok(r.status === 0 && rights.length === 2 && whose({ login: "writer", type: "User" }) && !whose({ login: "reader", type: "User" }) && !whose({ login: "silent", type: "User" }) && whose({ login: "SomeOne", type: "User" })
+    && r.stdout.includes("The host's rights of silent could not be read") && !/outsider|bad;name|someone\b/iu.test(r.stdout),
+    "size.yml reads the rights of those who answered: a writer's counts, a reader's and one not answered do not, and the owner, an outsider and a login of any other form are not asked for", r.stdout + r.stderr);
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the cap's check`);
 process.exit(failed ? 1 : 0);
