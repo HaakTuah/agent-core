@@ -112,8 +112,8 @@ function newestOf(follows, pin, manifest) {
 }
 
 // What the project and the core stand at, in a line.
-const standing = (follows, pin, { newest, release, stays }, what) => follows === "main"
-  ? `the project holds ${pin.slice(0, 7)}, the core's main is at ${newest.slice(0, 7)}: ${what}`
+const standing = (follows, pin, { newest, release, stays, unread }, what) => follows === "main"
+  ? unread ? `the project holds ${pin.slice(0, 7)}, and no commit of the core's main was read to pass: ${what}` : `the project holds ${pin.slice(0, 7)}, the core's main is at ${newest.slice(0, 7)}: ${what}`
   : release
     ? `the project holds ${pin.slice(0, 7)}, the core's newest release, ${release}, is at ${newest.slice(0, 7)}${stays ? " and changes nothing the project takes" : ""}: ${what}`
     : `the project holds ${pin.slice(0, 7)}, and the core has cut no release yet: ${what}`;
