@@ -33,8 +33,8 @@ once it is ready starts 2. The merge's push to `main` starts 3.
 
 ## How many pushes a pull request gets
 
-`modules/git.md`: "Push after every commit". This batch merged 43 pull requests here, from release-5 (14 November,
-12:04) to 2501701. Every commit on a branch was pushed, a merge from `main` included. The first is pushed before the
+`modules/git.md`: "Push after every commit". This batch merged 43 pull requests here, from release-5 (14 November)
+to 2501701. Every commit on a branch was pushed, a merge from `main` included. The first is pushed before the
 pull request opens, and its `opened` event checks it, so a pull request's runs equal its commits.
 
 - **Median:** 5 commits.
@@ -104,7 +104,7 @@ so that run is the only one that catches a merge made without its checks passing
 ## Runs a newer push supersedes
 
 The counts above take each run as one that ends. None did end early: no workflow of the core's cancelled a run once a
-newer push, or an update from `main`, made its commit no longer the pull request's head. At 17:25 on 15 November the
+newer push, or an update from `main`, made its commit no longer the pull request's head. On 15 November the
 core's own Actions held 96 runs queued or running, and 49 of them, about half, were for commits that were no longer any
 open pull request's head. Each such run goes to its end, and in a private repository it is billed. With many lanes, and
 every branch brought up to date after each merge, a run is superseded more often than it is read. #388, a bug, fixed in

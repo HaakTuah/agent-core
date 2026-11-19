@@ -13,8 +13,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      "Read for it:" by `scripts/reading.mjs`); hostile tests: `tests/hostile-pr-text-test.mjs`.
    - the comments and reviews on a pull request, their bodies and authors: read by the security-review check and
      the code-review wait (`scripts/security-review.mjs`, `scripts/code-review-wait.mjs`) and the size check's reader
-     of a "Leanness check:" answer (`scripts/size.mjs`), and, with the descriptions of merged pull requests, by the
-     tools reader (`scripts/tools-read.mjs`); hostile tests: `tests/hostile-pr-comments-test.mjs`.
+     of a "Leanness check:" answer (`scripts/size.mjs`), with the descriptions of merged pull requests by the tools
+     reader (`scripts/tools-read.mjs`), and, of any pull request's, by the scheduled look's reader of late review
+     findings (`scripts/look.mjs` through `scripts/review-marks.mjs`), which puts a replier's login in a request's
+     route; hostile tests: `tests/hostile-pr-comments-test.mjs`.
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`) and the tree a copy must be (`scripts/copy-tree.mjs`); hostile
@@ -26,8 +28,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      (the workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`,
      `scripts/releases.mjs`, `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`,
      `scripts/clean-merges.mjs`, `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs` and
-     `scripts/tools-offer.mjs`;
-     hostile tests: `tests/hostile-github-test.mjs`.
+     `scripts/tools-offer.mjs`, and an account's rights by the code-review wait (`scripts/code-review-wait.mjs`) and
+     the scheduled look (`scripts/look.mjs`) through `security-review.mjs`'s reader; hostile tests:
+     `tests/hostile-github-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`), the sync and its steps

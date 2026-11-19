@@ -285,7 +285,7 @@ function testsWhenReady(p) {
 // or { mend } where the config or the baseline is not there or cannot be read.
 function shapeHeld(p) {
   const at = shapeAt(p.manifest), text = p.read(at);
-  const first = `write its first baseline with \`node core/scripts/install.mjs all\` and then \`node core/scripts/shape.mjs ${at} --first\` (the parser's packages, which C#'s reader needs, are installed only where named: #719), commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
+  const first = `write its first baseline with \`node core/scripts/install.mjs all\` and then \`node core/scripts/shape.mjs ${at} --first\` (the parser's packages, which the readers of JavaScript, TypeScript and C# need, are installed only where named: #719), commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
   if (text === null) return { none: true, mend: `Write \`${at}\` as the starter kit does (\`core/setup/template/shape.json.tmpl\`), with the project's own code under "code" and its test files under "tests", as git pathspecs; then ${first}. Until then the shape check holds the project to the starter kit's config, with each pull request's base as its baseline.` };
   let config;
   try { config = parseConfig(text, at); } catch (e) { return { mend: `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.` }; }
@@ -297,7 +297,7 @@ function shapeHeld(p) {
 }
 
 // The readers a later entry of the sync notes asks a baseline to name, each by its own step (shapeReadsParsed).
-const LATER_READERS = ["csharp-tree"];
+const LATER_READERS = ["csharp-tree", "javascript-tree"];
 
 // Whether a baseline names `readers`, else the mend that writes it again.
 const readersNamed = (held, readers) => {
@@ -314,19 +314,19 @@ function shapeWritten(p) {
   return held.mend ?? readersNamed(held, Object.keys(READERS).filter(r => !LATER_READERS.includes(r)));
 }
 
-// Whether the shape check's baseline names its reader of C# on the parser, so that it lists what that reader finds:
-// the baseline its config names, or, where the project has no config yet, the one the starter kit's names, which the
-// check holds it to. Null where it does, and where there is no such baseline or the config cannot be read, which the
-// step of 16 November reports: the first baseline it asks for names every reader.
-function shapeReadsParsed(p) {
+// Whether the shape check's baseline names `reader`, one of its readers on the parser, so that it lists what that reader
+// finds: the baseline its config names, or, where the project has no config yet, the one the starter kit's names, which
+// the check holds it to. Null where it does, and where there is no such baseline or the config cannot be read, which
+// the step of 16 November reports: the first baseline it asks for names every reader.
+function shapeReadsParsed(p, reader) {
   const held = shapeHeld(p);
-  if (!held.mend) return readersNamed(held, LATER_READERS);
+  if (!held.mend) return readersNamed(held, [reader]);
   if (!held.none) return null;
   const config = JSON.parse(fs.readFileSync(path.join(HERE, "setup/template/shape.json.tmpl"), "utf8")), baseline = p.read(config.baseline);
   if (baseline === null) return null;
   let reads = [];
   try { reads = parseBaseline(baseline, config.baseline, "").reads; } catch { /* (read as naming no reader) */ }
-  return readersNamed({ at: shapeAt(p.manifest), config, reads }, LATER_READERS);
+  return readersNamed({ at: shapeAt(p.manifest), config, reads }, [reader]);
 }
 
 // The files that hold only calls to the core's workflows, each job of each a call: a sync moves their pins, which
@@ -386,7 +386,7 @@ function parserFirst(p) {
     const at = job.steps.findIndex(shapes);
     return at >= 0 && !job.steps.slice(0, at).some(st => installs(st, ["parser", "all"]));
   })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
-  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check install the parser's too, \`node ${install} all\`, before the shape check runs: it reads C# on the parser, whose packages stand in a lock file of their own, and without them, after an install of the core's first lock alone, the check reads no function of C#, saying so as a warning, and with no install of the core's at all it fails, saying so.` : null;
+  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check install the parser's too, \`node ${install} all\`, before the shape check runs: it reads the functions of JavaScript, TypeScript and C# on the parser, whose packages stand in a lock file of their own, and without them, after an install of the core's first lock alone, the check reads none of them, saying so as a warning, and with no install of the core's at all it fails, saying so.` : null;
 }
 
 // Where the project's call to the NuGet check starts only on the paths it names, each build file a build reads by
@@ -993,11 +993,12 @@ export const STEPS = [
   { lead: "18 November 2026, another publisher's code named in a lock file", cost: COST.line, unread: "how a project loads another publisher's code (a content network's script, a file copied in) is no file's to say exactly: the session that syncs reads the project's pages and folders for it" },
   { lead: "18 November 2026, a tree that passed is not run again", cost: COST.workflow, check: passedRuns,
     partly: "which check gates a project's tests is the project's own, as its ruleset names it, and which entries of a job's matrix a pull request leaves out is a reading of its expressions" },
-  { lead: "18 November 2026, the shape check reads C#'s functions on the parser", cost: COST.config, check: shapeReadsParsed },
+  { lead: "18 November 2026, the shape check reads C#'s functions on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "csharp-tree") },
   { lead: "19 November 2026, the parser's packages installed where the shape check runs", cost: COST.workflow, check: parserFirst,
     partly: "that a job reaching the shape check through the project's own npm or shell script installs the parser's first is read by the review" },
   { lead: "19 November 2026, the project's tests at the pace of a release", cost: COST.workflow, check: testsWhenReady,
     partly: "that the check the ruleset requires fails on a draft rather than being skipped, a suite started inside a workflow a job calls, which suites are the platform suites and on what schedule they run, how the runs on the default branch give way to a newer merge, where the tests that guard only what a release brings run (#715), and whether the host still asks an up-to-date branch where users get a release are read by the session that syncs, with `core/scripts/runners.mjs` and `core/scripts/merge-line.mjs`, not by a file" },
+  { lead: "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "javascript-tree") },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

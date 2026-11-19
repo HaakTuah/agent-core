@@ -6,7 +6,10 @@
 # "Which" and point 2: a review already running is waited for, and one that hangs is taken over, its review posted in a
 # comment that opens "Code review:" naming the commit by its whole SHA, which ends the wait; such a comment starts the
 # job only where the check is not advisory, since an advisory status passes anyway and the next push or Codex's own
-# summary rewrites it, so that no project starts a job for it it did not start before).
+# summary rewrites it, so that no project starts a job for it it did not start before). The same status waits, too,
+# while the newest posted review of a kind from such an account declares no line of its findings, and, in the core's
+# own repository, while a design-checked pull request has no "Design check:" of its head, which starts the job as
+# "Code review:" does (scripts/review-marks.mjs; tasks/reviews.md, points 3 and 4; #551).
 # Proof is the summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment
 # that opens "Security review:" from the repository's owner, a person the host lets write (in a team's project, each
 # owner: roles/shared/teams.md; the job reads each such commenter's rights from GitHub, #412), or an account the caller
@@ -48,9 +51,9 @@
 # What keeps it safe, since a comment starts it and it may write a status (floor rule 2): it checks out the default
 # branch, never the pull request, and runs only that branch's copies of the scripts; a comment's text is read only in
 # the job's condition and as data from GitHub's API, never written into a run line; it runs for a comment only where
-# that is the summary of Codex's app or opens "Security review:" or "Code review:" from the owner, a member or a
-# collaborator; on pull_request it runs only for a branch of the repository itself and not for Dependabot, whose token
-# could not write the status (theirs is written when the first comment that counts arrives: on Dependabot's own, Codex's
+# that is the summary of Codex's app or opens "Security review:", "Code review:" or "Design check:" from the owner, a
+# member or a collaborator; on pull_request it runs only for a branch of the repository itself and not for Dependabot,
+# whose token could not write the status (theirs is written when the first comment that counts arrives: on Dependabot's own, Codex's
 # summary, once the code review that floor rule 17 asks for is asked); and the token can read, and write a commit
 # status, nothing more. The proofs of a pure sync and of the merges from main fetch the head's commits into a clone of
 # their own and check out nothing, so no file of the pull request's is written to disk or run (git's merge of two
@@ -78,7 +81,7 @@ on:
         type: boolean
         default: false
       reviewers:
-        description: The accounts, besides the repository's owner and the people GitHub lets write to it, whose posted "Security review:" counts, by login, separated by spaces. Left out, none.
+        description: The accounts, besides the repository's owner and the people GitHub lets write to it, whose posted "Security review:", "Code review:" or "Design check:" counts, by login, separated by spaces. Left out, none.
         required: false
         type: string
         default: ""
@@ -101,7 +104,9 @@ jobs:
       && (startsWith(github.event.comment.body, 'Security review:')
       || startsWith(github.event.comment.body, '**Security review:')
       || (!inputs.advisory && (startsWith(github.event.comment.body, 'Code review:')
-      || startsWith(github.event.comment.body, '**Code review:')))))))) }}
+      || startsWith(github.event.comment.body, '**Code review:')
+      || startsWith(github.event.comment.body, 'Design check:')
+      || startsWith(github.event.comment.body, '**Design check:')))))))) }}
     # one at a time for a pull request, in the order they came: the last to run has read the newest comments
     concurrency:
       group: security-review-${{ github.event.issue.number || github.event.pull_request.number }}
@@ -256,7 +261,9 @@ jobs:
             else echo "The merges from main could not be proved the ones git makes: a review of the head is asked."; fi
           fi
           # whose posted review counts besides the owner's and the accounts named: a person the host lets write (#412),
-          # read from GitHub's rights for each account, at most twenty, that posted a "Security review:" with a say in the
+          # read from GitHub's rights for each account, at most twenty, that posted a "Security review:", a "Code
+          # review:" or a "Design check:" (for the code-review status's marks, review-marks.mjs), those who posted a
+          # "Security review:" first, with a say in the
           # repository; its login, checked as one, is all that goes into the route, and an answer that cannot be read
           # counts for no one (the script reads each strictly). All of them share 30 seconds, ten at most each, and end
           # by the step's 225th second whatever the proofs above took, and when each of the check's two scripts came seven
@@ -267,9 +274,11 @@ jobs:
           until=$((SECONDS + 30))
           [ "$until" -le 225 ] || until=225
           for login in $(jq -r --arg o "$owner" '[.[][] | select(type == "object" and (.body | type) == "string"
-            and (.body | test("^(\\*\\*)?Security review:")) and (.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
+            and (.body | test("^(\\*\\*)?(Security review|Code review|Design check):")) and (.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
             and .user.type == "User" and (.user.login | type) == "string" and (.user.login | test("^[A-Za-z0-9][A-Za-z0-9-]{0,38}$")))
-            | .user.login | ascii_downcase | select(. != $o)] | unique | .[:20][]' "$d/comments.json"); do
+            | {k: (if (.body | test("^(\\*\\*)?Security review:")) then 0 else 1 end), l: (.user.login | ascii_downcase)}
+            | select(.l != $o)] | sort_by(.k, .l) | reduce .[].l as $l ([]; if index([$l]) then . else . + [$l] end)
+            | .[:20][]' "$d/comments.json"); do
             left=$((until - SECONDS))
             if [ "$left" -le 0 ]; then
               echo "The time for reading the host's rights is spent: a review of $login and those after counts only where the input reviewers names it."
@@ -301,7 +310,7 @@ jobs:
           # (a fault in it warns and leaves the job as green as the security-review status left it)
           if [ -f "$ROOT/scripts/code-review-wait.mjs" ]; then
             bound code-review-wait.mjs
-            if node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
+            if RIGHTS="$d/rights.json" node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
               "$d/comments.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/code.json" \
               && jq -r '.status | "\(.state): \(.description)"' "$d/code.json" \
               && jq '.status' "$d/code.json" | timeout 20 gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then :

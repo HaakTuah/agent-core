@@ -40,8 +40,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
-      - name: The core's packages, installed from its lock file for the size and shape checks (#654)
-        run: node scripts/install.mjs
+      - name: The core's packages and the parser's, installed from their lock files for the size and shape checks (#654, #719)
+        run: node scripts/install.mjs all
       - name: What each role reads at its start stays under its cap
         run: node scripts/size.mjs
       # (two steps, so the token reaches gh alone and never the pull request's own script; a base or a list of
