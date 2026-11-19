@@ -4,9 +4,11 @@
 // What ships is held to floor rule 10's list, read from floor/topics/licences.md itself, so the list stands in one place; a tool
 // that only runs, to the tools' list: every licence the Open Source Initiative approves (OSI below), one on the same
 // terms, and everything what ships may be under. CC-BY is allowed only for what is named as data or assets, OFL only
-// for fonts, as the floor says. No licence, or an expression it cannot read, fails. Node's own modules only, so the
-// check needs no install. It checks the project it lies in (core/scripts/ there), whatever the directory it is started
-// from; the config's own path is read from that directory, the paths inside it from the project's root.
+// for fonts, as the floor says. No licence, or an expression it cannot read, fails. It needs no install: the config's
+// form is its schema's (scripts/schemas/licences.json, read by ajv; #530) where the core's packages are installed, and
+// its own checks' (configLists, configPaths and configScan) where they are not. It checks the project it lies in
+// (core/scripts/ there), whatever the directory it is started from; the config's own path is read from that directory,
+// the paths inside it from the project's root.
 //
 //   node core/scripts/licences.mjs <config>            the check
 //   node core/scripts/licences.mjs <config> --action   the dependency review's lists, as lines for $GITHUB_OUTPUT
@@ -37,6 +39,7 @@ import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, parseBounded } from "./guards.mjs";
 import { scan } from "./licence-scan.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
+import { shapeFaults } from "./schemas.mjs";
 import { started } from "./started.mjs";
 import { projectAt } from "./core-path.mjs";
 
@@ -340,9 +343,7 @@ const ACCEPTED_NPM = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*@[0
 /** The config, read and checked: a key it does not know, or one of the wrong shape, would check less without a word. */
 export function loadConfig(path) {
   let config = configRead(path);
-  configLists(config);
-  configPaths(config);
-  if (config.scan !== undefined) configScan(config);
+  configShape(config);
   within(config);
   config = normalised(config);
   const beside = (config.lockfiles ?? []).map((f) => posix.join(posix.dirname(f), "package.json"));
@@ -364,6 +365,24 @@ function configRead(path) {
   return config;
 }
 
+const NOTHING = 'the config names nothing to check. Mend: name the lockfiles in "lockfiles", or the audit\'s file in "audit"';
+
+/** The config's form: its schema's, the first fault refused, where ajv is installed; else the checks below. Then, either
+ *  way, what a schema cannot say: that it names something to check, and that each path of its scan is written as git
+ *  lists it. */
+function configShape(config) {
+  const faults = shapeFaults("licences", config);
+  if (faults === null) {
+    configLists(config);
+    configPaths(config);
+    if (config.scan !== undefined) configScan(config);
+  } else if (faults.length) throw new Error(faults[0]);
+  if (!config.lockfiles?.length && !config.audit) throw new Error(NOTHING);
+  for (const key of ["served", "tools", "skip"]) {
+    if (!(config.scan?.[key] ?? []).every((p) => scanPathOk(key, p))) throw new Error(`the config's "scan.${key}" is not a list of paths in the project. Mend: list each as a path from the project's root`);
+  }
+}
+
 /** The config's keys, each one it knows, its lists each a list of names, and "ships" among them. */
 function configLists(config) {
   const lists = ["lockfiles", "ships", "data", "fonts", "ignoreScriptsIn"];
@@ -381,7 +400,7 @@ function configLists(config) {
 /** The config's "audit" and "notices", each a path where it stands, and something named to check. */
 function configPaths(config) {
   if (config.audit !== undefined && (typeof config.audit !== "string" || !config.audit)) throw new Error('the config\'s "audit" is not a path. Mend: name the audit\'s file, or take "audit" out');
-  if (!config.lockfiles?.length && !config.audit) throw new Error('the config names nothing to check. Mend: name the lockfiles in "lockfiles", or the audit\'s file in "audit"');
+  if (!config.lockfiles?.length && !config.audit) throw new Error(NOTHING);
   if (config.notices !== undefined && (typeof config.notices !== "string" || !config.notices || !config.audit)) throw new Error('the config\'s "notices" is not a path, or the config names no "audit" whose entries it holds. Mend: name the notices file by its path, beside an "audit", or take "notices" out');
 }
 
