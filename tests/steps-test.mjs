@@ -623,6 +623,18 @@ ok(sized.sizes === "c/sizes.json" && configs(inMemory({}, {}, "| *size marks* | 
 const signed = configs(inMemory({ "s.yml": coreCall("signatures.yml", { directory: "${{ inputs.at }}" }) }));
 ok(signed.packages === null && signed.unread.some(u => u.startsWith("the signature check's folder not read")) && configs(inMemory({ "s.yml": coreCall("signatures.yml", {}) })).packages === ".",
   "the signature check's folder passed as an expression is not read; none passed is the root");
+// a workflow nested past what the reader of keys given twice reads is told with its own mend, to nest it less, never
+// as a key given twice it may not hold (#610)
+{
+  const keysStep = STEPS.find(s => s.lead === "16 November 2026, no workflow gives a key twice");
+  const deep = keysStep.check(inMemory({}, { ".github/workflows/deep.yml": `on: push\nx: ${"[".repeat(200)}1${"]".repeat(200)}\n` }));
+  const both = keysStep.check(inMemory({}, { ".github/workflows/deep.yml": `on: push\nx: ${"[".repeat(200)}1${"]".repeat(200)}\n`, ".github/workflows/two.yml": "on: push\non: pull_request\n" }));
+  ok(/nest the lists and mappings of these workflows or actions no deeper than a workflow needs, a few levels, since past 128 deep a key given twice in them cannot be read: `\.github\/workflows\/deep\.yml`\./.test(deep ?? "") && !/keep one of the two keys/.test(deep ?? "")
+    && /keep one of the two keys.*`\.github\/workflows\/two\.yml` line 2, "on"/.test(both ?? "") && /no deeper than a workflow needs.*`\.github\/workflows\/deep\.yml`/.test(both ?? "")
+    && keysStep.check(inMemory({}, { ".github/workflows/flat.yml": "on: push\n" })) === null,
+    "a workflow nested past 128 deep is told to nest less, a key given twice to keep one, each with its own mend, and a plain one passes", [deep, both].join("\n"));
+}
+
 const advisory = STEPS.find(s => s.lead === "13 November 2026, the NuGet check fails from the first day");
 let threw = null;
 try { advisory.check(inMemory({ "n.yml": coreCall("nuget.yml", { config: "c.json", advisory: "${{ vars.ADVISORY }}" }) })); } catch (e) { threw = e; }

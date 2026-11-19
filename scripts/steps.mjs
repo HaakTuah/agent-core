@@ -39,7 +39,7 @@ import { toolOf } from "./strength.mjs";
 import { Unread, call, calls, commands, uncommented, copiesConfig, folded, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { draftHoles, reads } from "./workflows.mjs";
-import { twice } from "./yaml-keys.mjs";
+import { DEEPEST, twice } from "./yaml-keys.mjs";
 import { releaseAge, WAIT } from "./licences.mjs";
 import { codeOf, covers, pinFault, pinRead } from "./licence-scan.mjs";
 import { npmPackages, offRegistry } from "./lookup.mjs";
@@ -130,8 +130,13 @@ function keysOnce(p) {
   // (with the core's packages not installed, as after a sync made by a copy from before #654, this step cannot be read:
   // it says so, with the install, and every other step is still told)
   if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`node ${corePath(p.root) || "core/"}scripts/install.mjs\`, then \`node ${corePath(p.root) || "core/"}scripts/steps.mjs\` again.`;
-  const found = reads(p.files).flatMap(f => twice(p.read(f) ?? "").map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
-  return found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : null;
+  const read = reads(p.files).map(f => [f, twice(p.read(f) ?? "")]);
+  const found = read.flatMap(([f, keys]) => keys.filter(k => k.key !== null).map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
+  const deep = read.filter(([, keys]) => keys.some(k => k.key === null)).map(([f]) => `\`${f}\``);
+  const said = [
+    found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : "",
+    deep.length ? `In one pull request, nest the lists and mappings of these workflows or actions no deeper than a workflow needs, a few levels, since past ${DEEPEST} deep a key given twice in them cannot be read: ${deep.join("; ")}.` : ""];
+  return said.filter(Boolean).join(" ") || null;
 }
 
 // Whether what the copies and pointer checks hold against in an agent tool's files is listed (#405; AGENTS.md of the
