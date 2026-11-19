@@ -113,7 +113,9 @@ jobs:
           # ones none may be unfinished and the newest, by when it last started, decides, however many stand there)
           runs=$(mktemp) full=$(mktemp)
           gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs" -f head_sha="$GITHUB_SHA" -f branch=main -f event=push -F per_page=100 > "$runs"
-          gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$GITHUB_SHA" -f branch=main -F per_page=100 > "$full"
+          # (the tests' runs, every page of them, gathered into one list: a page that cannot be read stops the step)
+          gh api --paginate -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$GITHUB_SHA" -f branch=main -F per_page=100 --jq '.workflow_runs[]' > "$full.pages"
+          jq -s '{ workflow_runs: . }' "$full.pages" > "$full"
           # (git asks this helper for the push's password; it answers from the step's own environment)
           git config --global credential.https://github.com.helper \
             '!f() { test "$1" = get && printf "username=x-access-token\npassword=%s\n" "$GH_TOKEN"; }; f'
