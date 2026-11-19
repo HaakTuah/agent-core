@@ -2,9 +2,9 @@
 // files it reads, and each file as its reader reads it, in one form whatever its language. JavaScript and TypeScript,
 // JSX among them, by the readers of the measures (code-shape.mjs), their functions on the parser the core installs
 // (javascript-functions.mjs); C# by shape-csharp.mjs, its functions on the parser too (csharp-functions.mjs); Python by
-// shape-python.mjs, its functions on the parser too (python-functions.mjs); and the scripts that share one global space,
-// those of JavaScript or TypeScript with no import or export, by the names their top level declares. None runs the code
-// it reads. Node's own modules, and the parser's installed packages.
+// shape-python.mjs, its functions, imports and tokens on the parser too (python-tree.mjs); and the scripts that share
+// one global space, those of JavaScript or TypeScript with no import or export, by the names their top level declares.
+// None runs the code it reads. Node's own modules, and the parser's installed packages.
 //
 // Each reader has a name, which a baseline lists under "reads" once it lists what that reader finds: a baseline written
 // before a reader came lists none of it, and what the pull request's base held of it is reported, never failed, until
@@ -30,7 +30,7 @@ export const READERS = {
   // (Python as its functions were read by a lexer written here, until #530's item 6: no file is read so now, and a
   // baseline that names it stays one the check reads)
   python: "Python, its functions by the lexer",
-  "python-tree": "Python, its functions by the parser",
+  "python-tree": "Python, by the parser",
   scripts: "scripts that share one global space",
   screens: "the tests that open a screen, a window or a device",
   clocks: "the tests that reach a real clock",
@@ -45,6 +45,9 @@ export const READERS = {
 const ON_PARSER = { "javascript-tree": ["javascript", "typescript", "tsx"], "csharp-tree": ["csharp"], "python-tree": ["python"] };
 const readersWhere = gone => Object.keys(ON_PARSER).filter(r => ON_PARSER[r].some(gone));
 export const unreachedReaders = () => readersWhere(unreachedFor);
+// (the readers that read all they find on the parser, imports and tokens too, so that none of a file's finds is read
+// where it could not run)
+export const WHOLE_ON_PARSER = ["python-tree"];
 export const unnamedReaders = () => readersWhere(unnamedFor);
 // The marks of a change in a comment (tasks/code-shape.md, "A comment says why the code is so, never what changed";
 // #458), each by its name, read of each line of a comment, a block's own * and a list's - before it aside: a change's
@@ -113,8 +116,9 @@ function javascript(file, text) {
   return { reader: "javascript-tree", toks: read, functions, imports: imports(read), own: JS_OWN, lang: "javascript", comments: toks.lost ? [] : toks.comments };
 }
 
-// Each file of code as its reader reads it: { reader, toks, functions (null where they cannot be told), imports, own,
-// lang, comments: each line of its comments, { line, text } }, and of C# its namespaces and types.
+// Each file of code as its reader reads it: { reader, toks, functions (null where they cannot be told), imports (null
+// where they cannot be read), own, lang, comments: each line of its comments, { line, text } }, and of C# its namespaces
+// and types.
 export function reading(file, text) {
   const ext = path.posix.extname(file);
   if (ext === ".cs") { const r = readCsharp(text); return { ...r, reader: "csharp-tree", imports: r.usings, own: CS_OWN, lang: "csharp" }; }
