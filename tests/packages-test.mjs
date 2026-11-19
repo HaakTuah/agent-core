@@ -107,11 +107,15 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
     }
     return out;
   };
-  let base = {};
-  try { base = JSON.parse(execFileSync("git", ["show", `${process.env.PACKAGES_BASE || "HEAD^1"}:.packages/package-lock.json`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })).packages ?? {}; } catch { /* (no lock file at the base: every entry is new) */ }
+  // (every install's lock, each entry against what any lock at the base held, so a package moved from one install to
+  // another at the same version is no new one, and one the parser's lock brings or updates is held as the first's: #719)
+  const locks = [".packages/package-lock.json", ".packages/parser/package-lock.json"];
+  const base = {};
+  for (const f of locks) try { Object.assign(base, JSON.parse(execFileSync("git", ["show", `${process.env.PACKAGES_BASE || "HEAD^1"}:${f}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })).packages ?? {}); } catch { /* (no such lock file at the base: its entries are new) */ }
   // (the day the week is counted to, handed in: the run's own date, or PACKAGES_TODAY's; nothing else reads the clock)
   const today = Date.parse(process.env.PACKAGES_TODAY || new Date().toISOString());
-  const young = await tooYoung(json(".packages/package-lock.json").packages, base, name => fetched(`https://registry.npmjs.org/${name.replaceAll("/", "%2f")}`), today);
+  const young = [];
+  for (const f of locks) young.push(...await tooYoung(json(f).packages, base, name => fetched(`https://registry.npmjs.org/${name.replaceAll("/", "%2f")}`), today));
   ok(young.length === 0, "each package the change brings or updates in the lock file is a week old or more by the registry's date (floor rule 7)",
     `${young.join("; ")}\nMend: wait until the version is a week old and run the job again, or take the version before it, its lock entry written by npm's own install`);
   // (held on a lock written by hand: a version field kept while the address names another tarball, an entry with no
@@ -276,6 +280,11 @@ try {
   // that needs it told so as a warning, never failed; not in the core, which holds its tests: #719)
   const askUnnamed = () => spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(p.unreached("is-number"), p.unnamed("is-number"), p.unreached("yaml"));`], { cwd: project, encoding: "utf8", env });
   const asked = askUnnamed();
+  // (a file of a package that is no module, as the parser reads its grammar, named with the same mend as a load: in a job,
+  // the install step to name)
+  const fileAsked = spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); try { p.installedFile("is-number", "index.js"); } catch (e) { console.log("FAIL: " + e.message); }`], { cwd: project, encoding: "utf8", env: { ...env, GITHUB_ACTIONS: "true" } });
+  ok(/^FAIL: the check did not run: the package is-number is not installed in \S*parser\S*node_modules as \.packages\/parser\/package-lock\.json names it \(index\.js\)\. Mend: in a pull request of its own, never a sync pull request, add the step .*install\.mjs parser; fi .*name parser in it/mu.test(fileAsked.stdout) && mended(fileAsked.stdout),
+    "a file of a package not installed says it did not run, and in a job names the install step to add or name", `${fileAsked.stdout}${fileAsked.stderr}`);
   fs.mkdirSync(path.join(copy, "tests"));
   const askedInCore = askUnnamed();
   fs.rmSync(path.join(copy, "tests"), { recursive: true });
@@ -294,7 +303,7 @@ try {
     execFileSync("git", ["init", "-q"], { cwd: cs });
     execFileSync("git", ["add", "-A"], { cwd: cs });
     const r = spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json"], { cwd: cs, encoding: "utf8", timeout: 120000, env: { ...env, SHAPE_BASE: "" } }), out = `${r.stdout}${r.stderr}`;
-    ok(r.status === 0 && /^::warning::The shape check did not read C#, its functions by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone, .*Mend: make this job's install step node core\/scripts\/install\.mjs all/mu.test(out),
+    ok(r.status === 0 && /^::warning::The shape check did not read C#, its functions by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone, .*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(out),
       "and the shape check there reads no function of C#, failing nothing, and its warning says to name every install in the job's install step", out);
   }
   const parser = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });

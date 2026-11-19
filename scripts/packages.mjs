@@ -22,6 +22,9 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 export const INSTALLS = { npm: ".packages", parser: ".packages/parser" };
 
 const FIRST = Object.keys(INSTALLS)[0];
+// For a copy of .packages/ made by a test that reads no C#: false for the parser's own node_modules/, some 70 MB it would
+// copy for nothing, true for every other path (fs.cpSync's filter; #719).
+export const parserLeftOut = src => !path.resolve(src).endsWith(path.join(path.normalize(INSTALLS.parser), "node_modules"));
 
 // What to hand the installer of a copy of the core at `copy` (a folder holding scripts/install.mjs) so that it installs
 // every one of its installs, as the sync and the starter kit run it: `all`, where the copy holds the parser's package
@@ -217,16 +220,22 @@ function found(name) {
   const file = entry(name);
   if (!file && !installOf(name)) unlisted(name);
   if (!file) {
-    const which = installOf(name), named = which === FIRST ? "" : ` ${which}`;
-    const install = path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"));
-    const at = path.relative(process.cwd(), path.join(dirOf(which), "node_modules"));
-    const mend = process.env.GITHUB_ACTIONS === "true"
-      ? `in a pull request of its own, never a sync pull request, add the step if [ -f ${install} ]; then node ${install}${named}; fi to this job before the step that runs this check, then run the job again; where the job has such a step${named ? `, name${named} in it` : ""}, run the job again`
-      : `run node ${install}${named}, which installs the core's packages from its lock file, then run the check again`;
-    console.error(`FAIL: the check did not run: the package ${name} is not installed in ${at} as ${INSTALLS[which]}/package-lock.json names it. Mend: ${mend}`);
+    console.error(`FAIL: ${missing(installOf(name), name)}`);
     process.exit(1);
   }
   return file;
+}
+
+// The words where the package `name` of the install `which` is not installed as its lock names it, with the mend: in a
+// job of a workflow, the install step the job lacks or must name; elsewhere, the install to run (#254, #719).
+function missing(which, name, rel) {
+  const named = which === FIRST ? "" : ` ${which}`;
+  const install = path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"));
+  const at = path.relative(process.cwd(), path.join(dirOf(which), "node_modules"));
+  const mend = process.env.GITHUB_ACTIONS === "true"
+    ? `in a pull request of its own, never a sync pull request, add the step if [ -f ${install} ]; then node ${install}${named}; fi to this job before the step that runs this check, then run the job again; where the job has such a step${named ? `, name${named} in it` : ""}, run the job again`
+    : `run node ${install}${named}, which installs the core's packages from its lock file, then run the check again`;
+  return `the check did not run: the package ${name} is not installed in ${at} as ${INSTALLS[which]}/package-lock.json names it${rel ? ` (${rel})` : ""}. Mend: ${mend}`;
 }
 
 // The file `rel` of the package `name`, inside that package's own folder in the core's install that names it, and only
@@ -234,8 +243,9 @@ function found(name) {
 // a build of the module's own); where it is not there, the failure's words with its mend, thrown and never an exit, so
 // that a worker thread that asks tells its caller (#529, #719).
 export function installedFile(name, rel) {
-  const which = installOf(name), dir = path.join(dirOf(which ?? FIRST), "node_modules", name), file = path.join(dir, rel);
-  try { if (entry(name) && fs.realpathSync(file).startsWith(fs.realpathSync(dir) + path.sep)) return file; } catch { /* said below */ }
-  const install = path.relative(process.cwd(), path.join(root, "scripts", "install.mjs")), named = !which || which === FIRST ? "" : ` ${which}`;
-  throw new Error(`the check did not run: the package ${name} is not installed in ${path.relative(process.cwd(), path.dirname(dir))} as ${INSTALLS[which ?? FIRST]}/package-lock.json names it (${rel}). Mend: run node ${install}${named}, which installs the core's packages from its lock file, then run the check again`);
+  const which = installOf(name) ?? FIRST, own = path.join(dirOf(which), "node_modules"), dir = path.join(own, name), file = path.join(dir, rel);
+  // (the package's folder inside its install's node_modules/, and the file inside that folder, each by its real path)
+  const inside = (f, d) => fs.realpathSync(f).startsWith(fs.realpathSync(d) + path.sep);
+  try { if (entry(name) && inside(dir, own) && inside(file, dir)) return file; } catch { /* said below */ }
+  throw new Error(missing(which, name, rel));
 }

@@ -14,6 +14,7 @@ import { kitForm } from "../scripts/hook-source.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { STEPS, notDone } from "../scripts/steps.mjs";
 import { parseToml } from "../scripts/toml.mjs";
+import { parserLeftOut } from "../scripts/packages.mjs";
 
 const SCRIPT = fileURLToPath(new URL("../scripts/agent-tools.mjs", import.meta.url));
 const template = name => fs.readFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), "utf8");
@@ -274,7 +275,7 @@ if (process.platform !== "win32") {
 const synced = project({ ...listing() });
 const HERE = fileURLToPath(new URL("..", import.meta.url));
 fs.cpSync(path.join(HERE, "scripts"), path.join(synced, "core/scripts"), { recursive: true });
-fs.cpSync(path.join(HERE, ".packages"), path.join(synced, "core/.packages"), { recursive: true });
+fs.cpSync(path.join(HERE, ".packages"), path.join(synced, "core/.packages"), { recursive: true, filter: parserLeftOut });
 fs.cpSync(path.join(HERE, "setup/template"), path.join(synced, "core/setup/template"), { recursive: true });
 git(synced, "add", "-A"); git(synced, "commit", "-q", "-m", "the copy");
 const newKit = JSON.parse(KIT);
