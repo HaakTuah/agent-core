@@ -127,15 +127,23 @@ ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon"
   ok(yesOf({ paths: [], body: "x", texts: [] }).note && yesOf({ paths: floor, body: pr("> Not on the issue."), texts, read: false }).note && yesOf({ paths: floor, body: pr(said), texts, read: false }).note?.startsWith("the owner's yes is quoted"),
     "a change of no such file is asked nothing; where a text or a right could not be read the line is said, never failed, and a quote found in what was read still passes");
   ok(issuesOf("Fixes #548. Part of #545, closes #12, resolved #7, Fixes #548").join() === "548,545,12" && issuesOf("See #3 and #4.").length === 0, "the issues a description names as its own, at most three, each once; one only mentioned is none");
-  ok(found("my yes […] is given", [readable("my yes for the floor is given")]) && !found("my yes […] is given", [readable("my yes"), readable("is given")]) && !found("[…]", [readable("x")]), "the pieces of a quote stand in one text, and a quote of marks alone is none");
+  ok(found("my yes for […] is given", [readable("my yes for the floor is given")]) && !found("my yes for […] is given", [readable("my yes for"), readable("is given")]) && !found("[…]", [readable("x")]), "the pieces of a quote stand in one text, and a quote of marks alone is none");
   const later = [readable("We will look at this later.")];
   ok(!found("e", later) && !found("will look", later) && !found("ill look at", later) && !found("at this late", later) && found("will look at", later) && found("We will look", later),
     "a quote of fewer than three words, or one cut inside a word, is no yes: only whole words, three or more to a line, are found");
+  ok(!found("We […] We […] We", later) && !found("later […] We […] will", later) && !found("We […] will […] look", later) && found("We will look […] later", later) && !found("this later […] We will look", later),
+    "the pieces of a quote are found in their order, each once, one of them three words or more: common words strung by […] are no yes");
+  ok(found("我同意这个改动", [readable("我同意这个改动。")]) && !found("𝐚bc plan is here", [readable("x𝐚bc plan is here")]) && !found("s note […] a", [readable("The owner's note, a plan")]) && !found("cafe\u0301 is fine", [readable("x\u0301cafe\u0301 is fine")]) && found("“the owner's note is", [readable("He said: “the owner's note is final.")]),
+    "words are counted and their edges read by code points: a script without blanks, a letter past the first plane, a mark and an apostrophe are read as letters are");
   // where the core lies, from the base's manifest alone, never the head's
-  const git = answers => args => answers[args[0]] ?? { status: 1, stdout: "" };
-  ok(coreAtBase(".", git({ "ls-tree": { status: 0, stdout: "" } })) === "" && coreAtBase(".", git({ "ls-tree": { status: 0, stdout: "core-manifest.md\n" }, show: { status: 0, stdout: "Core: HaakTuah/agent-core at " + "a".repeat(40) + ", copied whole under core/\n" } })) === "core/"
-    && coreAtBase(".", git({})) === null && coreAtBase(".", git({ "ls-tree": { status: 0, stdout: "core-manifest.md\n" } })) === null,
-    "where the core lies is read from the base: its root where the base holds no manifest, the manifest's path where it does, and unread where git cannot say");
+  // (a base that holds `files`, and `manifest`'s text where it holds core-manifest.md, as git answers for HEAD^1)
+  const git = (files, manifest = null) => args => args[0] === "show" ? (manifest === null ? { status: 1, stdout: "" } : { status: 0, stdout: manifest })
+    : args[0] === "ls-tree" && files !== null ? { status: 0, stdout: args.slice(4).filter(f => files.includes(f)).join("\n") } : { status: 1, stdout: "" };
+  const copy = "Core: HaakTuah/agent-core at " + "a".repeat(40) + ", copied whole under core/\n", core = ["roles", "floor/security.md"];
+  ok(coreAtBase(".", git(core)) === "" && coreAtBase(".", git(["core-manifest.md", "core/roles", "core/floor/security.md"], copy)) === "core/"
+    && coreAtBase(".", git(["core-manifest.md", ...core], copy)) === "" && coreAtBase(".", git(["core-manifest.md", ...core], "no line")) === ""
+    && coreAtBase(".", git(null)) === null && coreAtBase(".", git(["core-manifest.md"], copy)) === null && coreAtBase(".", git(["core-manifest.md", "core/roles", "core/floor/security.md"])) === null,
+    "where the core lies is read from the base, as coreAt finds it: the manifest's path or the root, whichever holds roles/ and the floor, and unread where neither does or git cannot say");
   // the texts, through a host that answers as gh would: the description and comments of each issue, those by an account with maintain or admin
   const host = { "repos/o/r/issues/9": { user: { login: "boss" }, body: record, node_id: "I_9" }, "repos/o/r/issues/9/comments?per_page=100&page=1": [{ user: { login: "writer" }, body: "> my yes, as a writer", node_id: "C_1" }, { user: { login: "helper[bot]" }, body: "> my yes, as a bot", node_id: "C_2" }, { user: { login: "app" }, body: "> my yes, as an app", node_id: "C_3" }, { user: { login: "keeper" }, body: "> my yes, as a maintainer", node_id: "C_4" }],
     "repos/o/r/collaborators/boss/permission": { role_name: "admin", user: { type: "User" } }, "repos/o/r/collaborators/writer/permission": { role_name: "write", user: { type: "User" } },

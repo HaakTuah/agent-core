@@ -12,7 +12,7 @@
 // copy, which a sync alone changes (floor rule 8), so a sync is never asked. gh, git and Node's own modules.
 import { spawnSync } from "node:child_process";
 import { under } from "./milestones.mjs";
-import { pathIn } from "./reading.mjs";
+import { FLOOR, pathIn } from "./reading.mjs";
 
 export const WORD = "The owner's word";
 // The paths that ask for the yes, relative to the core's root.
@@ -27,14 +27,24 @@ const flat = text => String(text ?? "").normalize("NFC").replace(/\s+/gu, " ").t
 export const readable = text => flat(String(text ?? "").split(/\r\n|\r|\n/u).map(l => l.replace(/^\s{0,3}(?:>\s?)+/u, "")).join("\n"));
 
 // Where the core lies on the base (the merge's first parent, HEAD^1), as the base's manifest says, so that a pull request
-// cannot steer it by the manifest it brings: "" where the base holds no core-manifest.md (the core's own repository),
-// the manifest's path where it does, null where git cannot say.
+// cannot steer it by the manifest it brings, and as coreAt (reading.mjs) finds it: of the manifest's path and the root,
+// the first under which the base holds roles/ and the floor ("" for the core's own repository); null where neither does
+// or git cannot say.
 export function coreAtBase(dir, git = args => spawnSync("git", args, { cwd: dir, encoding: "utf8", maxBuffer: 1 << 24 })) {
   const tree = git(["ls-tree", "--name-only", "HEAD^1", "--", "core-manifest.md"]);
   if (tree.status !== 0) return null;
-  if (tree.stdout.trim() === "") return "";
-  const manifest = git(["show", "HEAD^1:core-manifest.md"]);
-  return manifest.status === 0 ? pathIn(manifest.stdout) : null;
+  let prefixes = [""];
+  if (tree.stdout.trim() !== "") {
+    const manifest = git(["show", "HEAD^1:core-manifest.md"]);
+    if (manifest.status !== 0) return null;
+    prefixes = [pathIn(manifest.stdout), ""];
+  }
+  for (const prefix of prefixes) {
+    const held = git(["ls-tree", "--name-only", "HEAD^1", "--", `${prefix}roles`, `${prefix}${FLOOR}`]);
+    if (held.status !== 0) return null;
+    if (held.stdout.split("\n").filter(Boolean).length === 2) return prefix;
+  }
+  return null;
 }
 
 // The paths of the change that ask for the yes: none where the change is not the core's own (`prefix` "" is the core's
@@ -55,23 +65,30 @@ export function quoted(body) {
   return part.split("\n").filter(l => /^\s{0,3}>/u.test(l)).map(l => flat(l.replace(/^\s{0,3}(?:>\s?)+/u, ""))).filter(Boolean);
 }
 
-// The fewest words a quoted line holds, its pieces together, so that a letter or two found in any text is no yes.
+// The fewest words one piece of a quoted line holds, so that a letter or two, or common words strung by "[…]", found in
+// any text is no yes. Words are counted as Unicode segments words, so a script written without blanks counts too.
 export const WORDS = 3;
-const WORDY = /[\p{L}\p{N}]/u;
-const words = piece => piece.split(" ").filter(w => WORDY.test(w)).length;
-// Whether `piece` stands in `text` as whole words: no letter or digit runs on into it at either end.
-const whole = (text, piece) => {
-  for (let at = text.indexOf(piece); at !== -1; at = text.indexOf(piece, at + 1)) {
-    const runs = (outside, inside) => outside !== undefined && WORDY.test(outside) && WORDY.test(inside);
-    if (!runs(text[at - 1], piece[0]) && !runs(text[at + piece.length], piece.at(-1))) return true;
+const STARTS = /^[\p{L}\p{N}\p{M}]/u, ENDS = /[\p{L}\p{N}\p{M}]$/u;
+const segments = new Intl.Segmenter("und", { granularity: "word" });
+const words = piece => [...segments.segment(piece)].filter(s => s.isWordLike).length;
+// Whether a letter, digit or mark runs on into a piece at `at` (before) or `end` (after) in `text`: one next to it, or
+// one past an apostrophe or hyphen that joins it (owner's, well-known), read by code points.
+const runsBefore = (text, at) => /[\p{L}\p{N}\p{M}]['’\-]?$/u.test(text.slice(Math.max(0, at - 3), at));
+const runsAfter = (text, end) => /^['’\-]?[\p{L}\p{N}\p{M}]/u.test(text.slice(end, end + 3));
+// Where `piece` stands in `text` as whole words, from `from` on: the end of its first such place, or -1.
+const wholeAt = (text, piece, from) => {
+  for (let at = text.indexOf(piece, from); at !== -1; at = text.indexOf(piece, at + 1)) {
+    const end = at + piece.length;
+    if (!(STARTS.test(piece) && runsBefore(text, at)) && !(ENDS.test(piece) && runsAfter(text, end))) return end;
   }
-  return false;
+  return -1;
 };
-// Whether a quoted line stands word for word in one of `texts` (each already readable()): every piece of it between
-// "[…]" marks in that one text, as whole words, the pieces holding WORDS words or more together.
+// Whether a quoted line stands word for word in one of `texts` (each already readable()): its pieces between "[…]"
+// marks in that one text, in their order, each as whole words after the one before, one of them holding WORDS words.
 export function found(line, texts) {
   const pieces = String(line).split(/\s*\[(?:…|\.\.\.)\]\s*/u).map(flat).filter(Boolean);
-  return pieces.reduce((n, p) => n + words(p), 0) >= WORDS && texts.some(t => pieces.every(p => whole(t, p)));
+  if (!pieces.some(p => words(p) >= WORDS)) return false;
+  return texts.some(t => { let from = 0; return pieces.every(p => (from = wholeAt(t, p, from)) !== -1); });
 }
 
 // The mend for a pull request, or null where nothing is asked or the yes is found. `paths`: the paths the change asks
@@ -81,7 +98,7 @@ export function found(line, texts) {
 export function yesOf({ paths, body, texts, read = true }) {
   if (!paths.length) return { note: "the owner's yes is not asked here: the change touches neither the floor nor the review guidelines" };
   const lines = quoted(body), issues = issuesOf(body), named = `${paths.slice(0, 3).join(", ")}${paths.length > 3 ? ", …" : ""}`;
-  const how = `quote under a heading "## ${WORD}", in lines that open with ">", the owner's words word for word from the issue's text (its description or a comment) written by an account the host gives maintain or admin, whole words, ${WORDS} or more to a line, details floor rule 11 keeps out written "[…]"`;
+  const how = `quote under a heading "## ${WORD}", in lines that open with ">", the owner's words word for word from the issue's text (its description or a comment) written by an account the host gives maintain or admin, whole words in their order, one piece of ${WORDS} or more, details floor rule 11 keeps out written "[…]"`;
   if (!issues.length) return { mend: `this pull request changes ${named}, which asks the owner's yes (floor rule 3), and names no issue. Mend: name the issue that holds the owner's yes ("Fixes #n" or "Part of #n"), and ${how}` };
   if (!lines.length) return { mend: `this pull request changes ${named}, which asks the owner's yes (floor rule 3), and quotes nothing under "${WORD}". Mend: ${how}; where the issue holds no yes for this change, file one asking the owner and leave this pull request unmerged meanwhile` };
   if (lines.some(l => found(l, texts))) return { note: `the owner's yes is quoted, found word for word on ${issues.map(n => `#${n}`).join(", ")}` };
