@@ -837,11 +837,11 @@ function preRelease(name, { windows }) {
   // the steps and the differences name the configs where the project holds them, and read no comment as a run
   git(dir, "checkout", "-q", "main");
   // (with nothing installed, as its own old sync script left it, the steps that read its workflows say so and go on;
-  // then installed, as a session's start installs, they read them)
+  // then installed, as the sync installs, the parser's packages with the rest, they read them)
   const bare = node(dir, "core/scripts/steps.mjs");
   ok(bare.status === 0 && /the core's packages are not installed, so \.github\/workflows\/\S+ could not be read: run `node core\/scripts\/install\.mjs`/u.test(bare.out),
     `${name}: with the core's packages not installed, the steps that read its workflows say so, with the install as the mend, and the rest go on`, bare.out);
-  const installed = node(dir, "core/scripts/install.mjs");
+  const installed = node(dir, "core/scripts/install.mjs", "all");
   const steps = node(dir, "core/scripts/steps.mjs"), fresh = node(dir, "core/scripts/fresh.mjs");
   const tools = steps.out.split("\n").find(l => l.startsWith("- 16 November 2026, an agent's own tools listed:")) ?? "";
   ok(installed.status === 0 && steps.status === 0 && tools.includes("`node core/scripts/agent-tools.mjs config/licences.json`") && !/checks\/(licences|copies)/.test(steps.out) && !/`(reads|takes)`/.test(steps.out),

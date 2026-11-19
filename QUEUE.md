@@ -71,7 +71,6 @@ it merges last.
 | #502, case 2 | rule builder; it changes what every role reads at its start | |
 | #593, points 4 and 12 | rule builder; it changes what a builder reads at its start | |
 | #594 | rule builder; it changes the README | |
-| #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
 | #652 | rule builder | |
