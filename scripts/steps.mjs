@@ -1059,6 +1059,7 @@ export const STEPS = [
     partly: "which check gates a project's tests is the project's own, as its ruleset names it, and which entries of a job's matrix a pull request leaves out is a reading of its expressions" },
   { lead: "18 November 2026, the shape check reads C#'s functions on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "csharp-tree") },
   { lead: "18 November 2026, a check a draft skips runs once ready", cost: COST.check, held: "the workflow check" },
+  { lead: "18 November 2026, a blind sample each month", cost: COST.owner, unread: "it asks nothing of the project's files: the look keeps the sample's issue by itself, and whether the owner answers it is the owner's, read by no check" },
   { lead: "19 November 2026, the parser's packages installed where the shape check runs", cost: COST.workflow, check: parserFirst,
     partly: "that a job reaching the shape check through the project's own npm or shell script installs the parser's first is read by the review" },
   { lead: "19 November 2026, the project's tests at the pace of a release", cost: COST.workflow, check: testsWhenReady,

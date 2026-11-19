@@ -4,7 +4,7 @@
   "type": "object",
   "mend": "write it as the starter kit does ({core}setup/template/shape.json.tmpl): a JSON object with \"baseline\", the baseline's path, and \"code\", git pathspecs of the code to read",
   "mendFor": {
-    "additionalProperties": "take it out; the config holds \"baseline\", \"code\", \"tests\", \"systems\", \"aliases\", \"platform\", \"marks\", \"suites\", \"screens\", \"clocks\", \"processes\", \"select\", \"wait\" and \"long\" alone",
+    "additionalProperties": "take it out; the config holds \"baseline\", \"code\", \"tests\", \"systems\", \"aliases\", \"platform\", \"marks\", \"suites\", \"screens\", \"clocks\", \"processes\", \"changes\", \"select\", \"wait\" and \"long\" alone",
     "required": "name the baseline's path in \"baseline\", as the starter kit writes it (checks/shape-baseline.json), and list the code's folders in \"code\", as git pathspecs (\":!\" leaves a path out)"
   },
   "required": ["baseline", "code"],
@@ -17,6 +17,7 @@
     "screens": { "type": "array", "items": { "type": "string", "minLength": 1 }, "mend": "list there each package or module a test imports that opens a screen, a window or a device, by the name it is imported under" },
     "clocks": { "type": "array", "items": { "type": "string", "minLength": 1 }, "mend": "list there each name a test calls or imports that reaches a real clock (sleeps, waits on a timer or reads the time), beside those the check knows for each language: a call by its dotted name (Clock.Wait), a module by the name it is imported under" },
     "processes": { "type": "array", "items": { "type": "string", "minLength": 1 }, "mend": "list there each name a test calls or imports that starts another process, beside those the check knows for each language: a call by its dotted name (Process.Start), a module by the name it is imported under" },
+    "changes": { "type": "array", "maxItems": 20, "items": { "type": "string", "minLength": 1, "maxLength": 120, "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$" }, "mend": "list there each mark of a change in a comment the project adds, as plain text the check finds anywhere in a comment line (\"Ticket: ABC-\", \"fixed in JIRA-\"), at most 20 of them, each of at most 120 characters with no control character, or take it out" },
     "select": {
       "type": "object",
       "additionalProperties": false,
