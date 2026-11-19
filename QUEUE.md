@@ -41,7 +41,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #325 | rule builder | |
 | #314 | rule builder | |
 | #457 | rule builder | |
-| #458 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose rule list it reads |
 | #469 | rule builder; it changes what every role reads at its start | |
@@ -50,8 +49,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #471 | rule builder; it changes what the orchestrator reads at its start | |
 | #355 | builder | #530: the readers left go on the parser #529 brings |
 | #542, point 5 | rule builder | #457 |
-| #337 | builder | |
-| #426 | builder | |
+| #675 | builder | |
 | #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | |
 | #492 | rule builder; it changes floor rule 4, who may start the orchestrator, and what every role reads at its start | #397 |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
@@ -63,11 +61,9 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #460, point 5 (a report's size) | builder | |
 | #502, case 2 | rule builder; it changes what every role reads at its start | |
 | #593, points 4 and 12 | rule builder; it changes what a builder reads at its start | |
-| #594 | rule builder; it changes the README | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
 | #650 | rule builder | |
-| #661 | builder | |
 | #662 | rule builder | |
 | #679 to #682 | rule builder; one PR each | |
 | #707 | rule builder | |

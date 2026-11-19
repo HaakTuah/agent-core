@@ -25,10 +25,11 @@ import { differencesOf, modulesOf } from "./manifest-reads.mjs";
 import { progressOf } from "./done-when.mjs";
 import { NOTES } from "./releases.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
+import { OWN as OWN_HOLDERS } from "./holders.mjs";
 import { started } from "./started.mjs";
 import { Unread, call, calls, folded, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml } from "./workflow-run.mjs";
-import { HERE, COST, PROJECT_FILES, strengthNamed, keysOnce, toolFilesListed, selectionRuns, passedRuns, testsWhenReady, shapeWritten, shapeReadsParsed, shown, suitesOnPins, installsFirst, parserFirst, nugetPathsHold, readyOnlyHolds, oneJobHolds, hostileTests, movedPaths, INLINED_MOST, jobsOf, placed, lookupOf, FIRST, running, configOf, looksUp, packagesHeld, plain } from "./step-checks.mjs";
+import { HERE, COST, plain, PROJECT_FILES, strengthNamed, keysOnce, toolFilesListed, selectionRuns, passedRuns, testsWhenReady, shapeWritten, shapeReadsParsed, shown, suitesOnPins, installsFirst, parserFirst, nugetPathsHold, readyOnlyHolds, oneJobHolds, hostileTests, movedPaths, INLINED_MOST, jobsOf, placed, lookupOf, FIRST, running, configOf, looksUp, packagesHeld } from "./step-checks.mjs";
 
 // What a step reads a project with, and the words of an error with no path of the machine's in them: step-checks.mjs,
 // beside this file.
@@ -302,6 +303,7 @@ export const STEPS = [
     partly: "which check gates a project's tests is the project's own, as its ruleset names it, and which entries of a job's matrix a pull request leaves out is a reading of its expressions" },
   { lead: "18 November 2026, the shape check reads C#'s functions on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "csharp-tree") },
   { lead: "18 November 2026, a check a draft skips runs once ready", cost: COST.check, held: "the workflow check" },
+  { lead: "18 November 2026, a blind sample each month", cost: COST.owner, unread: "it asks nothing of the project's files: the look keeps the sample's issue by itself, and whether the owner answers it is the owner's, read by no check" },
   { lead: "19 November 2026, the parser's packages installed where the shape check runs", cost: COST.workflow, check: parserFirst,
     partly: "that a job reaching the shape check through the project's own npm or shell script installs the parser's first is read by the review" },
   { lead: "19 November 2026, the project's tests at the pace of a release", cost: COST.workflow, check: testsWhenReady,
@@ -315,6 +317,17 @@ export const STEPS = [
       : "Each job of the project's that calls the core's `look.yml` passes it the secret, as `core/setup/template/workflows/look.yml.tmpl` has it: under its `uses:`, `secrets:` and below it `PERSONAL_TERMS: ${{ secrets.PERSONAL_TERMS }}`.",
     partly: "whether the owner has set the secret `PERSONAL_TERMS` is the repository's setting, which no file holds" },
   { lead: "19 November 2026, the shape check reads the functions of Python on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "python-tree") },
+  { lead: "19 November 2026, a project's own rules and what holds them", cost: COST.config,
+    // (the list of what holds each of the project's own rules, holders.mjs's OWN, written and readable; what it names
+    // for each is the project's to work down, which nothing fails)
+    check: p => {
+      const text = p.read(OWN_HOLDERS);
+      const mend = `run \`node core/scripts/holders.mjs --own --write\`, which writes \`${OWN_HOLDERS}\` with each of the project's own rules named as held by "none", and commit it in a pull request of its own; where a check, test, simulation or script of the project's already fails where a rule is broken, name it there as "check: <its path>"`;
+      if (text === null) return `The project holds no list of what holds its own rules: ${mend}.`;
+      let holds;
+      try { holds = JSON.parse(text)?.holders; } catch { holds = null; }
+      return holds && typeof holds === "object" && !Array.isArray(holds) ? null : `\`${OWN_HOLDERS}\` cannot be read as JSON with an object "holders": write it so, or take it out and ${mend}.`;
+    } },
 ];
 
 // Whether the manifest declares a step undone on purpose: a line of its "Differences" that quotes the step's lead.

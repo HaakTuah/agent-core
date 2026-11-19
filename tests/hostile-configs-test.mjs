@@ -16,7 +16,7 @@ import { loadConfig } from "../scripts/licences.mjs";
 import { notes } from "../scripts/manifest-reads.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir, root } from "../scripts/scratch-core.mjs";
-import { parseConfig, where, KIT } from "../scripts/shape.mjs";
+import { parseConfig, survey, where, KIT } from "../scripts/shape.mjs";
 import { answered, capsOf, whoseOf } from "../scripts/size.mjs";
 // (the size check counts an answer from the repository's owner, "someone" here, with no right read)
 const owner = whoseOf("someone", []), me = { login: "someone", type: "User" };
@@ -118,6 +118,21 @@ const SHAPE = { baseline: "checks/shape-baseline.json", code: ["src/"] };
 for (const [c, what] of [["null", "null"], ["[]", "a list"], ["5", "a number"], ['"x"', "a string"], [{ ...SHAPE, code: "src/" }, "code that is no list"], [{ ...SHAPE, systems: [] }, "systems that is a list"],
   [{ ...SHAPE, select: { proof: "x" } }, "select.proof that is no list"]]) ok(mended(shape(c)), `shape.mjs: parseConfig refuses with its mend a config of the wrong type: ${what}`);
 ok(mended(shape("")) && mended(shape("{}")), "shape.mjs: parseConfig refuses with its mend an empty config, and one with no baseline");
+// (the marks of a change a project adds, #458: plain text, so that none can make the check slow, and none too long, too
+// many or holding a control character)
+for (const [changes, what] of [[["x".repeat(121)], "a mark too long"], [Array.from({ length: 21 }, (_, i) => `Mark${i}:`), "too many marks"], [["Changed:\u0000"], "a control character"], [["Changed:\n"], "a line break"], [[7], "a mark of the wrong type"], ["Changed:", "a mark that is no list"]])
+  ok(mended(shape({ ...SHAPE, changes })), `shape.mjs: parseConfig refuses with its mend the marks of a change with ${what}`);
+// (a mark's length counted in characters, as the schema counts them: one of 70 characters outside the Basic Multilingual
+// Plane, 140 of UTF-16's halves, is kept, and one of 121 refused)
+const wide = "\u{1F600}".repeat(70);
+ok(parseConfig(JSON.stringify({ ...SHAPE, changes: [wide] }), KIT).changes.some(([name]) => name === JSON.stringify(wide)) && mended(shape({ ...SHAPE, changes: ["\u{1F600}".repeat(121)] })),
+  "shape.mjs: a mark of a change is held to 120 characters, never to UTF-16's halves: one the schema takes is kept, one past it refused");
+const asText = ["^(a+)+$", "a*a*a*b", "(a|a)*b", "<b>Changed</b>:"];
+ok(!shape({ ...SHAPE, changes: asText }), "shape.mjs: parseConfig takes the marks of a change as plain text, a pattern's or markup's characters only text to match");
+const slowFor = parseConfig(JSON.stringify({ ...SHAPE, changes: asText }), KIT), t0 = Date.now();
+const lines400 = Array.from({ length: 200 }, () => `// ${"a".repeat(400)}!`).join("\n");
+const surveyed = survey({ "src/a.js": `${lines400}\n// a line that says (a|a)*b by name\n` }, slowFor);
+ok(Date.now() - t0 < 5000 && surveyed.entries.get('change: src/a.js: "(a|a)*b"')?.n.count === 1, "shape.mjs: a project's marks are found as text, in time, whatever a comment holds", `${Date.now() - t0} ms`);
 for (const b of ["../x.json", "/etc/x.json", "C:\\x.json", "a/../../x.json", "<b>x</b>.json"]) ok(mended(shape({ ...SHAPE, baseline: b })), `shape.mjs: parseConfig refuses with its mend a baseline at ${b}`);
 ok(mended(shape({ ...SHAPE, aliases: { "@/": "../src/" } })) && mended(shape({ ...SHAPE, systems: { a: { paths: ["/etc/"] } } })), "shape.mjs: parseConfig refuses with its mend an alias or a system's path that leaves the project");
 ok(mended(shape({ ...SHAPE, systems: { "<script>": { paths: ["src/"] } } })), "shape.mjs: parseConfig refuses with its mend a system named with markup");
