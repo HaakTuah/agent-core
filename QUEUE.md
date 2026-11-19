@@ -46,6 +46,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #542, point 5 | rule builder | #457 |
 | #675 | builder | |
 | #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | |
+| #492 | rule builder; point 14 (each tool's part says whether and how it starts a session of its own) | #397 |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 1 | rule builder | |
 | #486, point 5 | builder | the types record reopening |
