@@ -20,9 +20,6 @@ import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { started } from "./started.mjs";
 
 export const MANIFEST = "core-manifest.md", DEFAULT = "core/";
-// The folder of the core's that holds the packages of other publishers its scripts run (third-party.mjs, beside this
-// file), from the core's root: a check that reads a project's files by the project's own patterns leaves it out.
-export const THIRD_PARTY = "third-party/";
 // (a folder of the repository, from its root: plain names joined by "/", ending in "/"; none is "." or "..", nor .git,
 // nor node_modules, where an install writes and no checkout holds the files)
 const SEGMENT = "[A-Za-z0-9_][A-Za-z0-9._-]*";
@@ -52,9 +49,17 @@ export function readCore(text, address = CORE) {
 /** The path of the core from the root `root`: "" in the core's own repository (no manifest), the manifest's where its
  *  line reads, and the default where it does not (the checks that read the line say what is wrong with it). */
 export function corePath(root = ".") {
-  let text;
-  try { text = fs.readFileSync(path.join(root, MANIFEST), "utf8"); } catch { return ""; }
-  return readCore(text).path ?? DEFAULT;
+  const text = manifestText(path.join(root, MANIFEST));
+  return text === null ? "" : readCore(text).path ?? DEFAULT;
+}
+
+/** The manifest's text at `file`, or null where there is none. One that is no regular file, a link to a device say, or
+ *  past a mebibyte reads as empty, its "Core:" line then missing, so that it stops no script that reads it. */
+export function manifestText(file) {
+  let stat;
+  try { stat = fs.statSync(file); } catch { return null; }
+  if (!stat.isFile() || stat.size > 1 << 20) return "";
+  try { return fs.readFileSync(file, "utf8"); } catch { return null; }
 }
 
 /** The core's copy as a path prefix, for a check to leave out of a project's own files: the manifest's path at `root`, or
@@ -73,7 +78,8 @@ export function floorCopyIn(text) {
   return new RegExp(`^Floor copy: (${PATH})(?= |$)`, "mu").exec(String(text ?? ""))?.[1] ?? null;
 }
 export function floorCopy(root = ".") {
-  try { return floorCopyIn(fs.readFileSync(path.join(root, MANIFEST), "utf8")); } catch { return null; }
+  const text = manifestText(path.join(root, MANIFEST));
+  return text === null ? null : floorCopyIn(text);
 }
 
 /** For a carried core, what the library's own manifest says: { pin, path } with the path from this repository's root,
@@ -96,8 +102,9 @@ export function projectAt(from) {
   const ask = args => { try { return execFileSync("git", ["rev-parse", ...args], { cwd: from, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return ""; } };
   const top = ask(["--show-toplevel"]), prefix = ask(["--show-prefix"]), above = top ? ask(["--show-superproject-working-tree"]) : "";
   if (!above) return { root: top, prefix };
-  let line = {};
-  try { line = readCore(fs.readFileSync(path.join(above, MANIFEST), "utf8")); } catch { return { root: top, prefix }; }
+  const text = manifestText(path.join(above, MANIFEST));
+  if (text === null) return { root: top, prefix };
+  const line = readCore(text);
   // (where `from` stands in the project, spelled from git's own answers alone, since a folder's name as Node gives it
   // may differ, as Windows' short names do from git's long ones)
   const within = `${path.relative(above, top).split(path.sep).join("/")}/${prefix}`;
@@ -127,8 +134,7 @@ export function hookCommands(core) {
 }
 
 if (started(import.meta.url)) {
-  let text = null;
-  try { text = fs.readFileSync(MANIFEST, "utf8"); } catch { /* (the core's own root) */ }
+  const text = manifestText(MANIFEST); // (null: the core's own root)
   const core = text === null ? { path: "" } : readCore(text);
   if (core.wrong) { console.error(`FAIL: ${core.wrong}`); process.exit(1); }
   if (process.argv.includes("--hooks")) console.log(JSON.stringify(hookCommands(core), null, 2));

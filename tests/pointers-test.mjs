@@ -8,22 +8,30 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { markdownReader } from "../scripts/markdown.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
 const here = fileURLToPath(new URL("../scripts/", import.meta.url));
+// (the check's scripts, and the package its Markdown is read with as the core's install leaves it: the lock file, npm's
+// record of the install and the package itself, from the core's own install, which its tests' job runs)
+const carry = core => {
+  fs.mkdirSync(path.join(core, "scripts"), { recursive: true });
+  for (const f of ["pointers.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(core, "scripts", f));
+  for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/marked"]) fs.cpSync(path.join(here, "../.packages", f), path.join(core, ".packages", f), { recursive: true });
+};
 const FILES = {
   "AGENTS.md": "# A project\n\n## Where things are\n\nIts rules: `SECURITY.md`, rule 3, and \"Running it\" in `docs/developing.md`.\n",
   "SECURITY.md": "# Security\n\n**3. The protected files,** here, **the rule files:** `docs/developing.md`;\n",
   "docs/developing.md": "# Developing\n\n## Running it\n\nAs \"Where things are\" in `AGENTS.md` says.\n",
 };
-function run(files) {
+function run(files, { installed = true } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pointers-test-"));
   try {
     for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
-    fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-    for (const f of ["pointers.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
+    carry(path.join(dir, "core"));
+    if (!installed) fs.rmSync(path.join(dir, "core/.packages/node_modules"), { recursive: true, force: true });
     for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: dir, stdio: "ignore" });
     const r = spawnSync(process.execPath, [path.join(dir, "core/scripts/pointers.mjs")], { cwd: dir, encoding: "utf8" });
     return { code: r.status, out: r.stdout + r.stderr };
@@ -35,6 +43,12 @@ const { "SECURITY.md": _, ...bare } = FILES;
 
 let r = run(FILES);
 ok(r.code === 0 && /^ok /m.test(r.out), "rule files whose pointers all lead somewhere pass");
+// (a project's own job that ran the check before the core's packages came installs nothing: the sync never turns it red)
+r = run(broken, { installed: false });
+ok(r.code === 0 && /::warning::The pointer check did not run: the package marked is not installed[^\n]*Mend: /.test(r.out) && /core\/scripts\/install\.mjs/.test(r.out), "in a project with the core's packages not installed, the check says as a warning that it did not run, with the install step as its mend, and fails nothing", r.out);
+// (a rule file nested deeper than the lexer follows fails, saying so, never in silence: the fallback reviewer's finding)
+r = run({ ...FILES, "docs/developing.md": `${FILES["docs/developing.md"]}${">".repeat(5000)} deep\n` });
+ok(r.code === 1 && mended(r.out) && /docs\/developing\.md could not be read as Markdown/.test(r.out), "a rule file nested deeper than the lexer can follow fails, naming the file, with its mend");
 r = run(crlf(FILES));
 ok(r.code === 0 && /^ok /m.test(r.out), "the same files with a Windows checkout's line endings pass");
 for (const [files, ending] of [[broken, "either"], [crlf(broken), "a Windows"]]) {
@@ -45,10 +59,16 @@ r = run(bare);
 ok(r.code === 1 && mended(r.out) && /^FAIL: the project has no SECURITY\.md yet/m.test(r.out) && !/^\s+at /m.test(r.out), "a project with no SECURITY.md yet is told so in a line, with no stack");
 // a floor rule and an archive item, read in the project's copy of the core's floor and archive
 const CORE = { "core/floor/security.md": "# The floor\n\n**1. Nothing secret.** Text.\n\n**8. Reviews.** As rule 1 says.\n", "core/floor/topics.md": "# Topics\n\n**10. Licences.** Text.\n",
-  "core/archive/instructions/items-001.md": "# Items\n\n1. **1 November 2026**. Words.\n\n2. **2 November 2026**. Words.\n" };
+  "core/archive/instructions/items-001.md": "# Items\n\n1. **1 November 2026**. Words.\n\n2. **2 November 2026**. Words.\n",
+  "core/archive/instructions/issue-744.md": "# Item 744\n\n#744. **19 November 2026**. Words.\n",
+  "core/archive/instructions/issue-744.2.md": "# Item 744.2\n\n#744.2. **19 November 2026**. Words.\n" };
 const cites = text => ({ ...FILES, ...CORE, "AGENTS.md": `${FILES["AGENTS.md"]}\n${text}\n` });
 r = run(cites("As floor rules 8 and 10 say, and floor rule 1 (core archive 1 and 2; core archive 1 to 2)."));
 ok(r.code === 0 && !/floor rule|core archive/.test(r.out.split("\n").filter(l => l.startsWith("note")).join("\n")), "a floor rule is read in the floor's files, by its bold number, and an archive item in the archive's item files");
+r = run(cites("As core archive #744 and #744.2 say, beside core archive 1."));
+ok(r.code === 0 && !/core archive/.test(r.out.split("\n").filter(l => l.startsWith("note")).join("\n")), "an archive item keyed by its issue, or a point of it, is read in its own file (#744)", r.out);
+r = run(cites("As core archive #745 says, and core archive 1 to #9999, and core archive 1 to 9999999999."));
+ok(r.code === 0 && ["#745", "1 to #9999", "1 to 9999999999"].every(a => r.out.includes(`core archive ${a}: no such item in the archive`)), "and a keyed item that is not there is listed, named by its key, as are a range with a key in it and one too wide to build, never read as nothing nor crashing", r.out);
 r = run(cites("As floor rule 19 says (core archive 999)."));
 ok(r.code === 0 && /note .*floor rule 19: no such rule in the floor/.test(r.out) && /note .*core archive 999: no such item in the archive/.test(r.out), "in a project, a floor rule or an archive item that is not there is listed, each named, and fails nothing: a sync never fails a project over a citation of its own");
 ok(/read and not found/.test(r.out) && !/\(2 in forms it cannot read/.test(r.out), "and it is listed as read and not found, not as a form it cannot read", r.out);
@@ -68,8 +88,7 @@ try {
   const put = (f, body) => { fs.mkdirSync(path.join(tools, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(tools, f), body); };
   const g = (...args) => execFileSync("git", args, { cwd: tools, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   for (const [f, body] of Object.entries(FILES)) put(f, body);
-  fs.mkdirSync(path.join(tools, "core/scripts"), { recursive: true });
-  for (const f of ["pointers.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(tools, "core/scripts", f));
+  carry(path.join(tools, "core"));
   const OLD = "# Steering\n\nAs \"Shipping it\" in `docs/developing.md` says.\n";
   put(".kiro/steering/own.md", OLD);
   g("init", "-q"); g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "base");
@@ -139,8 +158,7 @@ try {
   put("floor/threat-model.md", "# The threat model\n\n19. A list item, no rule.\n");
   put("tasks/a.md", "# A module\n\nAs floor rule 19 says (core archive 999).\n");
   put("archive/instructions/items-001.md", "# Items\n\n1. **1 November 2026**. Words.\n");
-  fs.mkdirSync(path.join(coreDir, "scripts"));
-  for (const f of ["pointers.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(coreDir, "scripts", f));
+  carry(coreDir);
   for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: coreDir, stdio: "ignore" });
   const c = spawnSync(process.execPath, [path.join(coreDir, "scripts/pointers.mjs"), "--core"], { cwd: coreDir, encoding: "utf8" });
   ok(c.status === 1 && mended(c.stdout + c.stderr) && /FAIL: a broken pointer: tasks\/a\.md:3: floor rule 19/.test(c.stdout + c.stderr) && /core archive 999/.test(c.stdout + c.stderr) && !/floor\/security\.md/.test(c.stderr), "in the core's own run it fails, a list item numbered 19 is no rule, and a lone rule in the floor's own file is the floor's, wherever in the floor it stands", c.stdout + c.stderr);
@@ -151,6 +169,9 @@ try {
   const nineteen = core("floor/security.md", "# The floor\n\n**1. Nothing secret.** As rule 19 says.\n");
   ok(nineteen.status === 1 && mended(nineteen.out) && /FAIL: a broken pointer: floor\/security\.md:3: rule 19: no such rule in the floor\. Mend: point it at/.test(nineteen.out), "and one that no floor file holds fails", nineteen.out);
   put("floor/security.md", "# The floor\n\n**1. Nothing secret.** Text.\n");
+  const manifest = core("tasks/a.md", "# A module\n\nRead when a pull request changes the path `core-manifest.md`, or `core-manifests.md`.\n");
+  ok(manifest.status === 1 && !/`core-manifest\.md`/.test(manifest.out) && /`core-manifests\.md` is no tracked file/.test(manifest.out), "in the core's own run a project's manifest, which only a project has, is not looked for; a name beside it still is", manifest.out);
+  put("tasks/a.md", "# A module\n\nNothing cited.\n");
   // (a file that points from a path the rules left is read too: the path it names and its import line)
   const points = core("modules/a.md", "# Moved: A module\n\n[`tasks/a.md`](../tasks/a.md) holds these rules now: read it whole.\n\n@../tasks/a.md\n");
   ok(points.status === 0, "in the core's own run a file at a path the rules left is read: the path it names and its import line, each leading to a file", points.out);
@@ -166,4 +187,23 @@ try {
   const steering = core(".agents/rules/core.md", "# The core, for a tool\n\nAs \"Running it\" in `tasks/a.md` says.\n");
   ok(steering.status === 1 && mended(steering.out) && /FAIL: a broken pointer: \.agents\/rules\/core\.md:3: "running it" is no heading/.test(steering.out), "in the core's own run an agent tool's file is read, and a broken pointer in it fails", steering.out);
 } finally { fs.rmSync(coreDir, { recursive: true, force: true }); }
+// ---- what the check reads of Markdown (markdown.mjs, on the installed package; #530's held-out cases) ----
+{
+  const readMarkdown = await markdownReader();
+  const md = readMarkdown("---\nname: x\n# not a heading\n---\n# Real\n\n```\n# in code, `x.md`\n```\n\nText #123 goes on\nand on, rule 3 <!-- rule 4 -->.\n\n| **a** | b |\n| --- | --- |\n| c | **d** |\n");
+  ok(JSON.stringify(md.heads.map(h => [h.level, h.i, h.text])) === JSON.stringify([[1, 4, "Real"]]), "a heading is read where Markdown has one: none in front matter or code");
+  ok(!md.blocks.some(b => b.text.includes("x.md")) && md.blocks.some(b => b.i === 1 && b.text.includes("name: x")), "nothing in a code block is read, and front matter is text");
+  ok(md.blocks.some(b => b.i === 10 && b.text === " Text #123 goes on and on, rule 3 <!-- rule 4 -->."), "a line led by #123 goes on its paragraph, which is one block by its first line, and an HTML comment in it is read as written, as an agent reads the file");
+  ok(JSON.stringify(md.bolds.map(b => [b.i, b.text])) === JSON.stringify([[13, "a"], [15, "d"]]), "a bold lead-in in a table's row is read on that row's line");
+  // (what the search for differences found on the first build: HTML read as plain lines, a heading underlined over two
+  // lines whole, a lone carriage return a line's end, a bold lead-in only by two asterisks)
+  const html = readMarkdown("Before.\n<details>\n**Lead.** See `a.md`.\n</details>\n- after, rule 2\n\n<!-- `b.md`\n\nstill a comment, `c.md` -->\n\nLast.\n");
+  ok(["a.md", "b.md", "c.md"].every(f => html.blocks.some(b => b.text.includes(f))) && html.bolds.some(b => b.i === 2 && b.text === "Lead.") && html.blocks.some(b => b.i === 4 && b.text === " - after, rule 2") && html.blocks.some(b => b.i === 10 && b.text === " Last."), "what HTML holds, a comment over blank lines among it, is read as plain lines: its blocks, its bold lead-ins, and a list item after it a block of its own", JSON.stringify(html));
+  const setext = readMarkdown("A heading\nover two lines\n---\n\nText.\n");
+  ok(setext.heads.length === 1 && setext.heads[0].i === 0 && setext.blocks[0].text === "A heading over two lines" && setext.blocks.some(b => b.i === 4), "a heading underlined on the line after it is one block of all its lines, its underline left out", JSON.stringify(setext));
+  const cr = readMarkdown("# One\rText.\r\r# Two\r");
+  ok(JSON.stringify(cr.heads.map(h => [h.i, h.text])) === JSON.stringify([[0, "One"], [3, "Two"]]), "a lone carriage return ends a line, as the pointer check splits the file's lines", JSON.stringify(cr));
+  const under = readMarkdown("__Not a lead__ and **a lead** and ***both***.\n");
+  ok(JSON.stringify(under.bolds.map(b => b.text)) === JSON.stringify(["a lead", "both"]), "a bold lead-in is one written with two asterisks", JSON.stringify(under.bolds));
+}
 process.exit(failed ? 1 : 0);
