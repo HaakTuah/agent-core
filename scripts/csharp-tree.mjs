@@ -32,8 +32,9 @@
 // blank to the parser where it reads the rest, so that it reads both sides of an #if as code, as the lexer did. It
 // never guesses: a file the grammar cannot read whole (C# newer than the grammar the core installs, or no C#) has no
 // functions told, and the shape check counts it and says so, and fails one a pull request brings (shape.mjs, "lost");
-// its usings and declarations are those the grammar read whole. A file past LARGEST, or one it cannot read in time, has
-// none told. Proven old against new by tests/shape-readers-test.mjs, and against counts taken by hand.
+// its usings and declarations are those the grammar read whole, and the selection runs a test that reaches the file as
+// one that reaches every file, since the part lost may hold a using (shape.mjs, "unsure"). A file past LARGEST, or one
+// it cannot read in time, has none told. Proven old against new by tests/shape-readers-test.mjs, and against counts taken by hand.
 import { commentLines } from "./code-shape.mjs";
 import { inParser } from "./parser.mjs";
 import { LARGEST, walkFunctions } from "./tree-walk.mjs";

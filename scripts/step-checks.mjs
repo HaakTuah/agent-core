@@ -408,7 +408,7 @@ export function parserFirst(p) {
     const at = job.steps.findIndex(shapes);
     return at >= 0 && !job.steps.slice(0, at).some(st => installs(st, ["parser", "all"]));
   })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
-  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check or the selection of tests install the parser's too, \`node ${install} all\`, before either runs: they read the functions of JavaScript, TypeScript, C# and Python, and all of Python, on the parser, whose packages stand in a lock file of their own, and without them, after an install of the core's first lock alone, the shape check reads none of that, saying so as a warning, the selection runs each test of Python as one that reaches every file, and with no install of the core's at all either fails, saying so.` : null;
+  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check or the selection of tests install the parser's too, \`node ${install} all\`, before either runs: they read the functions of JavaScript, TypeScript, C# and Python, and all of C# and Python, on the parser, whose packages stand in a lock file of their own, and without them, after an install of the core's first lock alone, the shape check reads none of that, saying so as a warning, the selection runs each test of C# or Python as one that reaches every file, and with no install of the core's at all either fails, saying so.` : null;
 }
 
 // Where the project's call to the NuGet check starts only on the paths it names, each build file a build reads by

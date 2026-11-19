@@ -9,7 +9,8 @@
   reads C# and Python too. *Bugs:* 3. **Keep:** fitting costs more than keeping, each tool knowing one language or
   fixing its definitions; its readers go to the parser, as #486's group 3 and #519's path say, C#'s functions the first
   (`scripts/csharp-functions.mjs`, #529), then JavaScript's and TypeScript's (`scripts/javascript-functions.mjs`), then
-  Python's, then all of Python, its imports and tokens too (`scripts/python-tree.mjs`). *Tried:* 19 November 2026 (#723), tree-sitter's JavaScript grammar 0.25.0
+  Python's, then all of Python, its imports and tokens too (`scripts/python-tree.mjs`), then all of C#, its using
+  directives, namespaces and types too (`scripts/csharp-tree.mjs`). *Tried:* 19 November 2026 (#723), tree-sitter's JavaScript grammar 0.25.0
   and TypeScript's 0.23.2, on the core's 204 files of JavaScript and every case of the lexer's tests: the same where the
   lexer read by its definition, mended where it misread; the same day, its Python grammar 0.25.0, on 30,902 files of
   Python, likewise, and on 30,811 files of Python its imports, 180,814, and the runs of its clock the same in every file
