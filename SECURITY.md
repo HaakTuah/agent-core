@@ -12,29 +12,40 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      "Read for it:" by `scripts/reading.mjs`); hostile tests: `tests/hostile-pr-text-test.mjs`.
    - the comments and reviews on a pull request, their bodies and authors: read by the security-review check and
      the code-review wait (`scripts/security-review.mjs`, `scripts/code-review-wait.mjs`) and the size check's reader
-     of a "Leanness check:" answer (`scripts/size.mjs`), and, with the descriptions of merged pull requests, by the
-     tools reader (`scripts/tools-read.mjs`); hostile tests: `tests/hostile-pr-comments-test.mjs`.
+     of a "Leanness check:" answer (`scripts/size.mjs`), with the descriptions of merged pull requests by the tools
+     reader (`scripts/tools-read.mjs`), and, of any pull request's, by the scheduled look's reader of late review
+     findings (`scripts/look.mjs` through `scripts/review-marks.mjs`), which puts a replier's login in a request's
+     route; hostile tests: `tests/hostile-pr-comments-test.mjs`.
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
-     the selection of tests (`scripts/select.mjs`) and the tree a copy must be (`scripts/copy-tree.mjs`); hostile
-     tests: `tests/hostile-pr-changes-test.mjs`.
+     the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
+     a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`); hostile tests:
+     `tests/hostile-pr-changes-test.mjs`.
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the
      reviews' records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look
-     (`scripts/look.mjs`) and the inbox (`scripts/inbox.mjs`); hostile tests: `tests/hostile-issues-test.mjs`.
+     (`scripts/look.mjs`), the inbox (`scripts/inbox.mjs`) and the personal terms' take-out (`scripts/issue-terms.mjs`,
+     which edits only an insider's text); hostile tests: `tests/hostile-issues-test.mjs`, and for the take-out
+     `tests/issue-terms-test.mjs`.
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository
      (the workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`,
      `scripts/releases.mjs`, `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`,
-     `scripts/clean-merges.mjs` and `scripts/security-review.mjs`; hostile tests: `tests/hostile-github-test.mjs`.
+     `scripts/clean-merges.mjs`, `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs` and
+     `scripts/tools-offer.mjs`, and an account's rights by the code-review wait (`scripts/code-review-wait.mjs`), the
+     scheduled look (`scripts/look.mjs`) and the size check (`scripts/size.mjs`, from `size.yml`) through
+     `security-review.mjs`'s reader; hostile tests:
+     `tests/hostile-github-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
-     `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`) and the sync's steps
-     (`scripts/steps.mjs`); hostile tests: `tests/hostile-configs-test.mjs`.
+     `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`), the sync and its steps
+     (`scripts/sync.mjs`, `scripts/steps.mjs`) and the scheduled look (`scripts/look.mjs`); hostile tests:
+     `tests/hostile-configs-test.mjs`.
    - the files an agent tool takes its instructions from (`GEMINI.md`, an entry file, each file of a tool's folders), as
      the work tree and a pull request's base hold them: read by the copies and pointer checks (`scripts/copies.mjs`,
      `scripts/pointers.mjs`, through `scripts/rule-files.mjs`); hostile tests: `tests/copies-tools-test.mjs`.
    - a project's build, package and workflow files: read by the licence, exact-versions, NuGet, workflow and
-     agent-tools checks (`scripts/licences.mjs`, `scripts/exact-versions.mjs`, `scripts/nuget.mjs`,
-     `scripts/workflows.mjs`, `scripts/agent-tools.mjs`); hostile tests: `tests/hostile-build-files-test.mjs`.
+     agent-tools checks and the reader of where the tests run (`scripts/licences.mjs`, `scripts/exact-versions.mjs`,
+     `scripts/nuget.mjs`, `scripts/workflows.mjs`, `scripts/agent-tools.mjs`, `scripts/runners.mjs`) and the sync's move
+     of the pins (`scripts/sync.mjs`); hostile tests: `tests/hostile-build-files-test.mjs`.
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the

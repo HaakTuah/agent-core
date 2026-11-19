@@ -1,6 +1,6 @@
 # One versions check
 
-Tonight's audit of both games against the core (the owner's words: `reports/2026-11-11-shared-checks.md`) found two
+The audit of both games against the core (the owner's words: `reports/2026-11-11-shared-checks.md`) found two
 checks of their own for the versions Dependabot cannot see: Amarna's `scripts/versions.mjs` (one issue for all) and
 Snakes' `tools/versions.js` (one issue each, and a test). Amarna's watched only Node, now the core's one pin (core
 #68), which nothing watched; Snakes' watches PeerJS.

@@ -220,6 +220,11 @@ for (const [what, change, why] of [
       ok(linkedFile.some((m) => /^site\/tools\/linked\.js is a link that leads out of the project, so what it holds cannot be read\. Mend: /u.test(m)) && !linkedFile.some((m) => /carrying a licence notice/u.test(m)), "fails a tracked link that leads out of the project, never reading the file it leads to, saying its mend", linkedFile.join("\n"));
       const inside = run((dir) => { write("docs/vendor.txt", "/*! Copyright 2020 Mossgrip | GPL-3.0 */\n")(dir); fs.symlinkSync(path.join("..", "docs", "vendor.txt"), path.join(dir, "site", "vendor.js")); });
       ok(inside.some((m) => /^site\/vendor\.js \(a file carrying a licence notice\) is not in audit\.json/u.test(m)), "reads a tracked link inside the project as the file it leads to, in the link's own place, a skipped file's notice among them", inside.join("\n"));
+      // (a tracked link to a folder inside the project: its files are read in their own place, and the link fails with its
+      // mend, never with the error a read of a folder throws; #447)
+      const folder = run((dir) => { write("docs/vendor.txt", "x\n")(dir); fs.symlinkSync(path.join("..", "docs"), path.join(dir, "site", "docs-link")); });
+      ok(folder.some((m) => /^site\/docs-link is a link to no file of bytes \(a folder, a device or a pipe\)/u.test(m)) && mendSaid(folder.filter((m) => m.startsWith("site/docs-link"))) && !folder.some((m) => /EISDIR/u.test(m)),
+        "fails a tracked link to a folder inside the project with its mend, never with EISDIR", folder.join("\n"));
     }
   } finally { fs.rmSync(elsewhere, { recursive: true, force: true }); }
 }

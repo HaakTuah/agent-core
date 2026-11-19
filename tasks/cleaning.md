@@ -1,8 +1,9 @@
 # Cleaning, and the audit of how code is put together
 
 Read by a builder that takes a cleaning task, by the session that takes an audit's task or the state report and by its
-reader, and by the orchestrator when it hands out lanes: the kinds `cleaning` and `audit`. What the
-code is held to: `tasks/code-shape.md`.
+reader, by the orchestrator when it hands out lanes, and by whoever writes an issue that asks something of every or all
+of a kind, or builds what it asks (#593): the kinds `cleaning`, `audit` and `sweep`. What the code is held to:
+`tasks/code-shape.md`.
 
 - **The state of a codebase sets the dose.** By default a codebase is in one of three states, which
   `core/scripts/dose.mjs` reads from the shape check's baseline: the share of the functions and imports the check
@@ -55,7 +56,7 @@ code is held to: `tasks/code-shape.md`.
   last one's, and records the audit in the baseline (`core/scripts/dose.mjs --audited`), in one pull request.
   - **The brief:** the reader reads, and changes nothing. It answers for the project's owner and for the cleaning
     lane: where the code resists change, what to clean up first, and what no check sees.
-  - **Eight questions, the same at every audit,** each answered with its evidence (a file, a count, a pull request)
+  - **Nine questions, the same at every audit,** each answered with its evidence (a file, a count, a pull request)
     and on one scale, so that two audits can be set side by side: 0, nothing found; 1, found, and it costs no work
     yet; 2, it costs work today; 3, it stops a lane or makes work *one at a time*.
     1. Can what each system offers be said in a sentence, and do the others use only that?
@@ -64,8 +65,12 @@ code is held to: `tasks/code-shape.md`.
     4. Which files always change together and live apart?
     5. Can each part be tested alone, and how long does it take?
     6. Does any data have two owners?
-    7. What ties the code to one platform, and is each tie needed?
+    7. What ties the code to one platform, and is each tie needed? And where do the tests of the code outside the
+       domain `platform` run, and what does that cost beside the cheapest place they could run (#457)?
     8. What does a reader see that no check does?
+    9. Which of the project's *descriptions* (its README, its design notes, what it tells a user, the pointers in its
+       rule files) no longer say what the code does, each by its document and line and the file or behaviour it no
+       longer matches? Each it finds is a task of the cleaning lane, taken at the dose (#563).
   - **A limit on its own proposals:** it proposes a new check only where a finding came up at two audits or costs
     work today.
   - The tests are audited by the same reader. Where the project names a *mutation tool*, the session that takes the
@@ -77,10 +82,30 @@ code is held to: `tasks/code-shape.md`.
     puts its table in the report; the reader decides on each test it proposes (`tasks/tests.md`).
 
   It does not mean that the reader mends what it finds, nor that an audit made before these questions stood is made
-  again: what it left unanswered is answered at the next. Reason: what was measured was fixed and what was judged had
-  no standard, so two audits could not be compared; and checks piled on make code harder to change. Held by the
+  again: what it left unanswered is answered at the next. Nor does it mean that a dated record is brought up to date
+  (`roles/shared/how-to-work.md`, "No description left untrue"), or that a job is added for the ninth. Reason: what
+  was measured was fixed and what was judged had no standard, so two audits could not be compared; checks piled on make
+  code harder to change; and a description a change missed stays untrue until someone happens to read it. Held by the
   scheduled look, whose issue for an audit says this brief, and by the reviews of the pull request that holds the
   report, which read that each question is answered on the scale.
+- **A sweep's scope is read, not listed** (#593). By default an issue names what it covers. The one condition that
+  changes it: an issue asks something of every or all of a kind (an inventory, an audit, a sorting, a check of each
+  file), a *sweep*. The trigger is such an issue written: whoever writes it names the source a script counts that kind
+  from (the tracked files, a workflow's steps, the manifest's rows, `core/scripts/holders.json`), and whoever builds the
+  check that holds the sweep has it read its coverage from that source: each thing the source holds has its line in the
+  sweep, or lies under a path the sweep marks as left out, with the reason, and the check fails each that has neither,
+  saying the mend. It does not mean a sweep may leave nothing out: what it leaves out is said. Reason: a scope written
+  as a list is as complete as its writer's memory, and nothing reads what a list forgot. Held by each sweep's own check,
+  which reads from the source its issue names.
+- **An inventory or an audit is challenged once for what it missed** (#593). By default one session makes an inventory
+  or an audit. The trigger is its record written: the session that took its task then starts a fresh session that wrote
+  no part of it, which reads the whole once and asks what it lacks: a part not listed, a tool not weighed, a question
+  not put. Its finds are written into the record, with a line that opens `Challenged` and gives the day. It does not
+  mean the trials of a choice that is hard to undo (`tasks/choices.md`), which stay for such a choice, nor that the
+  audit's fixed questions change: the challenge asks what they did not. Reason: whoever builds a sweep builds what its
+  issue names, and nothing in the flow asks what the issue itself left out. Held, in part, where a check reads that the
+  line is there, as the core's does of its own inventory; whether the challenge was made, no check can read, and
+  `core/scripts/holders.mjs` counts it among the rules held in part.
 - **The state report leads with the outcomes** (#302). By default the monthly state report names the five outcomes the
   owner named, the product does what was asked, is fast, can be read and changed by a newcomer, can be used by a new
   user, does not break, each with its direct measure first or the words that it has none yet, every other number under
