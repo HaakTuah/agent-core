@@ -172,7 +172,7 @@ export function holders(root = ROOT, cases = CASES) {
     }
   }
   for (const c of cases) for (const key of c.holds) if (by.has(key)) by.get(key).push({ kind: "case", by: c.name, part: c.inPart.includes(key) });
-  wrong.push(...sharedFiles(all));
+  wrong.push(...sharedFiles(rules(root, { agents: true })));
   if (!read.wrong) wrong.push(...behindWrong(root, read.behind), ...numbersWrong(root, read.numbers));
   return { rules: all, by, wrong };
 }
