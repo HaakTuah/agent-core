@@ -8,7 +8,7 @@
 // namespace N; `using static N.T;` and an alias, the files that declare the type T in N. What a file sees by its own
 // namespace, and a name written out in full, it takes without a directive, and the reader does not read.
 import path from "node:path";
-import { NEST, append, holdsUnder, isId, isP, nameTree } from "./code-shape.mjs";
+import { NEST, append, commentLines, holdsUnder, isId, isP, nameTree } from "./code-shape.mjs";
 import { csharpFunctions } from "./csharp-functions.mjs";
 import { unreachedFor } from "./parser.mjs";
 
@@ -27,13 +27,14 @@ export function csTokens(src) {
   const lex = new Lexer(src);
   lex.code(false);
   lex.out.lost = lex.lost;
+  lex.out.comments = lex.comments;
   lex.out.directives = lex.directives;
   return lex.out;
 }
 
 class Lexer {
   // (fresh: nothing but white space stands before i on its line, where a # opens a preprocessor line)
-  constructor(src) { Object.assign(this, { src, n: src.length, i: 0, line: 1, out: [], gap: true, fresh: true, nest: 0, lost: false, directives: [] }); }
+  constructor(src) { Object.assign(this, { src, n: src.length, i: 0, line: 1, out: [], gap: true, fresh: true, nest: 0, lost: false, directives: [], comments: [] }); }
 
   push(t, v, l = this.line) { this.out.push({ t, v, line: l, gap: this.gap }); this.gap = false; this.fresh = false; }
   lines(a, b) { for (let k = a; k < b; k++) if (this.src[k] === "\n") this.line++; }
@@ -58,9 +59,14 @@ class Lexer {
     if (/\s/u.test(c) || c === "﻿") { this.i++; return (this.gap = true); }
     const preprocessor = c === "#" && this.fresh;
     if (preprocessor) this.directives.push(this.line);
-    if (preprocessor || (c === "/" && src[i + 1] === "/")) { while (this.i < n && src[this.i] !== "\n") this.i++; return (this.gap = true); }
+    if (preprocessor || (c === "/" && src[i + 1] === "/")) {
+      while (this.i < n && src[this.i] !== "\n") this.i++;
+      if (!preprocessor) commentLines(this.comments, src, i + 2, this.i, this.line);
+      return (this.gap = true);
+    }
     if (c !== "/" || src[i + 1] !== "*") return false;
     const e = src.indexOf("*/", i + 2), end = e < 0 ? n : e + 2;
+    commentLines(this.comments, src, i + 2, e < 0 ? n : e, this.line);
     this.lines(i, end);
     this.i = end;
     return (this.gap = true);
@@ -195,13 +201,14 @@ function typeAt(toks, k, frames, types) {
 }
 
 // A file read: { functions (null where its code nests past NEST; none where the parser could not be installed, the
-// registry not answering in a project's pull request, which the shape check says: shape-readers.mjs, unreachedReaders), usings: [{ target, static, alias }], namespaces, types, toks }.
+// registry not answering in a project's pull request, which the shape check says: shape-readers.mjs, unreachedReaders), usings: [{ target, static, alias }], namespaces, types, toks,
+// comments: [{ line, text }] }.
 export function readCsharp(src) {
   const toks = csTokens(src);
   const semi = new Array(toks.length + 1).fill(toks.length);
   for (let k = toks.length - 1; k >= 0; k--) semi[k] = isP(toks[k], ";") ? k : semi[k + 1];
   const usings = toks.map((_, k) => directive(toks, k, semi)).filter(Boolean);
-  return { functions: toks.lost ? null : unreachedFor("csharp") ? [] : csharpFunctions(src, toks.directives), usings, ...declared(toks), toks };
+  return { functions: toks.lost ? null : unreachedFor("csharp") ? [] : csharpFunctions(src, toks.directives), usings, ...declared(toks), toks, comments: toks.comments };
 }
 
 // Where the project's C# declares each namespace and type: { namespaces, types }, each a Map of a name to its files.

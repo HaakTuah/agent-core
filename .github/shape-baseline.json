@@ -15,7 +15,8 @@
     "scripts",
     "screens",
     "clocks",
-    "processes"
+    "processes",
+    "changes"
   ],
   "grown": {
     "timed: tests/stryker-test.mjs -> Date.now": "It holds Stryker's run to its budget and a test to its limit with a fault in, both measured on the clock the run itself reads, which is what the test guards (#581).",
