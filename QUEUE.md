@@ -9,20 +9,19 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
-| #783 | builder | #782 |
+| #783 | builder | |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
-| #773 | rule builder; it changes floor rule 4 | |
 | #704 | builder; `tests.yml` | #715 |
-| #770 | builder; `tests.yml` | #769 and #704 |
-| #772 | builder; `tests.yml` | #769 and #770 |
+| #770 | builder; `tests.yml` | #704 |
+| #772 | builder; `tests.yml` | #770 |
 | #530, step 5 | builder; licence readers | |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md` | |
-| #593, points 8 and 9 | rule builder | #577 |
+| #593, points 8 and 9 | rule builder | |
 | #625 | builder | #624 |
 | #626 | builder | #624 |
 | #627 | builder | #624 |
-| #628 | builder | #577 |
-| #629 | builder | #624 and #577 |
+| #628 | builder | |
+| #629 | builder | #624 |
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #579 | builder | |
 | #580 | builder | |
@@ -56,8 +55,8 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #542, point 5 | rule builder | #457 |
 | #337 | builder | |
 | #426 | builder | |
-| #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467 |
-| #492 | rule builder; it changes floor rule 4, who may start the orchestrator, and what every role reads at its start | #397 and #467 |
+| #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | |
+| #492 | rule builder; it changes floor rule 4, who may start the orchestrator, and what every role reads at its start | #397 |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 1 | rule builder | |
 | #486, point 5 | builder | the types record reopening |
@@ -75,11 +74,10 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #650 | rule builder | |
 | #661 | builder | |
 | #662 | rule builder | |
-| #679 to #682 | rule builder; one PR each | #467 |
+| #679 to #682 | rule builder; one PR each | |
 | #707 | rule builder | |
 | #701 | builder | |
 | #716 | builder | |
-| #551 | builder; #710 adds a line to `tasks/reviews.md` | #642 |
 | #739 | rule builder; it changes the game module (`tasks/game-design.md`) | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
@@ -90,8 +88,8 @@ They read and change no rule.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #550 | builder; a case a PR | |
-| #765 | builder | #756, whose #763 brings the rule |
-| #552 | builder | #551 |
+| #765 | builder | |
+| #552 | builder | #793 |
 | #553 | builder | #552 |
 | #554 | builder | #553 |
 | #555 | builder | #534's tools, and #554 |
