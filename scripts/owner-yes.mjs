@@ -12,6 +12,7 @@
 // copy, which a sync alone changes (floor rule 8), so a sync is never asked. gh, git and Node's own modules.
 import { spawnSync } from "node:child_process";
 import { under } from "./milestones.mjs";
+import { pathIn } from "./reading.mjs";
 
 export const WORD = "The owner's word";
 // The paths that ask for the yes, relative to the core's root.
@@ -24,6 +25,17 @@ export const MOST_ISSUES = 3, MOST_PAGES = 3;
 const flat = text => String(text ?? "").normalize("NFC").replace(/\s+/gu, " ").trim();
 // An issue's text as quotes are read in it: each line's ">" marks taken off, blanks as one.
 export const readable = text => flat(String(text ?? "").split(/\r\n|\r|\n/u).map(l => l.replace(/^\s{0,3}(?:>\s?)+/u, "")).join("\n"));
+
+// Where the core lies on the base (the merge's first parent, HEAD^1), as the base's manifest says, so that a pull request
+// cannot steer it by the manifest it brings: "" where the base holds no core-manifest.md (the core's own repository),
+// the manifest's path where it does, null where git cannot say.
+export function coreAtBase(dir, git = args => spawnSync("git", args, { cwd: dir, encoding: "utf8", maxBuffer: 1 << 24 })) {
+  const tree = git(["ls-tree", "--name-only", "HEAD^1", "--", "core-manifest.md"]);
+  if (tree.status !== 0) return null;
+  if (tree.stdout.trim() === "") return "";
+  const manifest = git(["show", "HEAD^1:core-manifest.md"]);
+  return manifest.status === 0 ? pathIn(manifest.stdout) : null;
+}
 
 // The paths of the change that ask for the yes: none where the change is not the core's own (`prefix` "" is the core's
 // root; a project's copy stands under another).
@@ -43,11 +55,23 @@ export function quoted(body) {
   return part.split("\n").filter(l => /^\s{0,3}>/u.test(l)).map(l => flat(l.replace(/^\s{0,3}(?:>\s?)+/u, ""))).filter(Boolean);
 }
 
+// The fewest words a quoted line holds, its pieces together, so that a letter or two found in any text is no yes.
+export const WORDS = 3;
+const WORDY = /[\p{L}\p{N}]/u;
+const words = piece => piece.split(" ").filter(w => WORDY.test(w)).length;
+// Whether `piece` stands in `text` as whole words: no letter or digit runs on into it at either end.
+const whole = (text, piece) => {
+  for (let at = text.indexOf(piece); at !== -1; at = text.indexOf(piece, at + 1)) {
+    const runs = (outside, inside) => outside !== undefined && WORDY.test(outside) && WORDY.test(inside);
+    if (!runs(text[at - 1], piece[0]) && !runs(text[at + piece.length], piece.at(-1))) return true;
+  }
+  return false;
+};
 // Whether a quoted line stands word for word in one of `texts` (each already readable()): every piece of it between
-// "[…]" marks in that one text.
+// "[…]" marks in that one text, as whole words, the pieces holding WORDS words or more together.
 export function found(line, texts) {
   const pieces = String(line).split(/\s*\[(?:…|\.\.\.)\]\s*/u).map(flat).filter(Boolean);
-  return pieces.length > 0 && texts.some(t => pieces.every(p => t.includes(p)));
+  return pieces.reduce((n, p) => n + words(p), 0) >= WORDS && texts.some(t => pieces.every(p => whole(t, p)));
 }
 
 // The mend for a pull request, or null where nothing is asked or the yes is found. `paths`: the paths the change asks
@@ -57,7 +81,7 @@ export function found(line, texts) {
 export function yesOf({ paths, body, texts, read = true }) {
   if (!paths.length) return { note: "the owner's yes is not asked here: the change touches neither the floor nor the review guidelines" };
   const lines = quoted(body), issues = issuesOf(body), named = `${paths.slice(0, 3).join(", ")}${paths.length > 3 ? ", …" : ""}`;
-  const how = `quote under a heading "## ${WORD}", in lines that open with ">", the owner's words word for word from the issue's text (its description or a comment) written by an account the host gives maintain or admin, details floor rule 11 keeps out written "[…]"`;
+  const how = `quote under a heading "## ${WORD}", in lines that open with ">", the owner's words word for word from the issue's text (its description or a comment) written by an account the host gives maintain or admin, whole words, ${WORDS} or more to a line, details floor rule 11 keeps out written "[…]"`;
   if (!issues.length) return { mend: `this pull request changes ${named}, which asks the owner's yes (floor rule 3), and names no issue. Mend: name the issue that holds the owner's yes ("Fixes #n" or "Part of #n"), and ${how}` };
   if (!lines.length) return { mend: `this pull request changes ${named}, which asks the owner's yes (floor rule 3), and quotes nothing under "${WORD}". Mend: ${how}; where the issue holds no yes for this change, file one asking the owner and leave this pull request unmerged meanwhile` };
   if (lines.some(l => found(l, texts))) return { note: `the owner's yes is quoted, found word for word on ${issues.map(n => `#${n}`).join(", ")}` };

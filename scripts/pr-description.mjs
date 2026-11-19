@@ -44,7 +44,7 @@ import { spawnSync } from "node:child_process";
 import { doneMends, ownerAt, queueAt, readItem, takesIt } from "./done-when.mjs";
 import { isPart, milestoneMends } from "./milestones.mjs";
 import { NUMBER } from "./outcomes.mjs";
-import { asking, issuesOf, textsOf, yesOf } from "./owner-yes.mjs";
+import { asking, coreAtBase, issuesOf, textsOf, yesOf } from "./owner-yes.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, pathIn, taken, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
 
@@ -219,7 +219,8 @@ if (started(import.meta.url)) {
     else if (parts.includes(HOLDS)) console.log(`ok   the number under "${HOLDS}" is not asked here: ${why}`);
     if (created >= YES_SINCE && then?.includes("export const YES_SINCE")) {
       const diff = spawnSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
-      const paths = diff.status === 0 ? asking(diff.stdout.split("\0").filter(Boolean), coreAt(process.cwd())) : null;
+      // (where the core lies is read from the base's manifest, never the head's, which the pull request could bring)
+      const at = coreAtBase(process.cwd()), paths = diff.status === 0 && at !== null ? asking(diff.stdout.split("\0").filter(Boolean), at) : null;
       if (paths === null) console.log("ok   the owner's yes is not asked here: the change could not be read against its base");
       else {
         const issues = issuesOf(process.env.PR_BODY), got = paths.length && issues.length ? textsOf(repo, issues) : { texts: [], read: true };

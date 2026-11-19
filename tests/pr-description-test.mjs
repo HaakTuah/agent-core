@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { asked, calledFor, copyAtBase, costMend, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, numberMend, PARTS, waitsMend, waitsOn } from "../scripts/pr-description.mjs";
 import { lineMend } from "../scripts/reading.mjs";
-import { asking, found, issuesOf, readable, textsOf, yesOf } from "../scripts/owner-yes.mjs";
+import { asking, coreAtBase, found, issuesOf, readable, textsOf, yesOf } from "../scripts/owner-yes.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -127,7 +127,15 @@ ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon"
   ok(yesOf({ paths: [], body: "x", texts: [] }).note && yesOf({ paths: floor, body: pr("> Not on the issue."), texts, read: false }).note && yesOf({ paths: floor, body: pr(said), texts, read: false }).note?.startsWith("the owner's yes is quoted"),
     "a change of no such file is asked nothing; where a text or a right could not be read the line is said, never failed, and a quote found in what was read still passes");
   ok(issuesOf("Fixes #548. Part of #545, closes #12, resolved #7, Fixes #548").join() === "548,545,12" && issuesOf("See #3 and #4.").length === 0, "the issues a description names as its own, at most three, each once; one only mentioned is none");
-  ok(found("a […] c", [readable("a b c")]) && !found("a […] c", [readable("a b"), readable("c")]) && !found("[…]", [readable("x")]), "the pieces of a quote stand in one text, and a quote of marks alone is none");
+  ok(found("my yes […] is given", [readable("my yes for the floor is given")]) && !found("my yes […] is given", [readable("my yes"), readable("is given")]) && !found("[…]", [readable("x")]), "the pieces of a quote stand in one text, and a quote of marks alone is none");
+  const later = [readable("We will look at this later.")];
+  ok(!found("e", later) && !found("will look", later) && !found("ill look at", later) && !found("at this late", later) && found("will look at", later) && found("We will look", later),
+    "a quote of fewer than three words, or one cut inside a word, is no yes: only whole words, three or more to a line, are found");
+  // where the core lies, from the base's manifest alone, never the head's
+  const git = answers => args => answers[args[0]] ?? { status: 1, stdout: "" };
+  ok(coreAtBase(".", git({ "ls-tree": { status: 0, stdout: "" } })) === "" && coreAtBase(".", git({ "ls-tree": { status: 0, stdout: "core-manifest.md\n" }, show: { status: 0, stdout: "Core: HaakTuah/agent-core at " + "a".repeat(40) + ", copied whole under core/\n" } })) === "core/"
+    && coreAtBase(".", git({})) === null && coreAtBase(".", git({ "ls-tree": { status: 0, stdout: "core-manifest.md\n" } })) === null,
+    "where the core lies is read from the base: its root where the base holds no manifest, the manifest's path where it does, and unread where git cannot say");
   // the texts, through a host that answers as gh would: the description and comments of each issue, those by an account with maintain or admin
   const host = { "repos/o/r/issues/9": { user: { login: "boss" }, body: record, node_id: "I_9" }, "repos/o/r/issues/9/comments?per_page=100&page=1": [{ user: { login: "writer" }, body: "> my yes, as a writer", node_id: "C_1" }, { user: { login: "helper[bot]" }, body: "> my yes, as a bot", node_id: "C_2" }, { user: { login: "app" }, body: "> my yes, as an app", node_id: "C_3" }, { user: { login: "keeper" }, body: "> my yes, as a maintainer", node_id: "C_4" }],
     "repos/o/r/collaborators/boss/permission": { role_name: "admin", user: { type: "User" } }, "repos/o/r/collaborators/writer/permission": { role_name: "write", user: { type: "User" } },
@@ -150,9 +158,9 @@ ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon"
   const blank = textsOf("o/r", [9], edited({ I_9: [] }));
   ok(!many.read && many.texts.length === 1 && !dark.read && dark.texts.length === 0 && !blank.read && blank.texts.length === 1,
     "a text whose editors run past the host's first hundred, are not given, or are none though it was edited, is unread, never counted", JSON.stringify([many, blank]));
-  const full = Array.from({ length: 100 }, (_, i) => ({ user: { login: "keeper" }, body: `> note ${i}`, node_id: `N_${i}` }));
+  const full = Array.from({ length: 100 }, (_, i) => ({ user: { login: "keeper" }, body: `> the owner's note ${i}`, node_id: `N_${i}` }));
   const long = textsOf("o/r", [9], (route, query) => (/comments\?per_page=100&page=\d$/.test(route) ? full : edited()(route, query)));
-  ok(!long.read && long.texts.length === 301 && yesOf({ paths: floor, body: pr("> note 7"), texts: long.texts, read: long.read }).note?.startsWith("the owner's yes is quoted") && yesOf({ paths: floor, body: pr("> not read"), texts: long.texts, read: long.read }).note,
+  ok(!long.read && long.texts.length === 301 && yesOf({ paths: floor, body: pr("> owner's note 7"), texts: long.texts, read: long.read }).note?.startsWith("the owner's yes is quoted") && yesOf({ paths: floor, body: pr("> a line not read"), texts: long.texts, read: long.read }).note,
     "comments past the pages read leave it unread, their texts asked of the host a hundred at a time: a quote found in them still passes, one not found is said, never failed", `${long.read} ${long.texts.length}`);
 }
 process.exit(failed ? 1 : 0);
