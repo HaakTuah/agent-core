@@ -29,7 +29,9 @@ export const KEY = /^#(\d+(?:\.\d+)?)$/u;
 const FILE = /^(?:items-\d+|issue-\d+(?:\.\d+)?)\.md$/u;
 const OPENS = /^(\d+|#\d+(?:\.\d+)?)\. /u;
 const keyOf = s => /^\d+$/u.test(s) ? Number(s) : s;
-const MARK = /^\s*(Changes|Changed by):(.*)$/u;
+// A line that marks an item, read by marksOf() and left out of its text where reasons.mjs prints it; every character
+// after the colon is read, so none hides what follows it.
+export const MARK = /^\s*(Changes|Changed by):([^\n]*)$/u;
 const KEYS = /^ ((?:\d+|#\d+(?:\.\d+)?)(?:, (?:\d+|#\d+(?:\.\d+)?))*)\.$/u;
 
 // The marks of an item's text, as itemsIn() gives it (#756, point 3): { changes, changedBy, wrong }, the keys its line

@@ -12,7 +12,7 @@
 //   node scripts/reasons.mjs "<the rule's file and lead, or a part of it>"
 //   node core/scripts/reasons.mjs "<...>"                               in a project, from its copy
 import path from "node:path";
-import { items, marksOf } from "./archive.mjs";
+import { items, MARK, marksOf } from "./archive.mjs";
 import { CORE } from "./core-address.mjs";
 import { named } from "./holders.mjs";
 import { ROOT, rules } from "./rules.mjs";
@@ -26,7 +26,7 @@ function itemOf(reasons, key) {
   const it = reasons.get(key);
   if (!it) return null;
   const { changedBy } = marksOf(it.text);
-  const text = it.text.split("\n").filter((l, i) => !i || !/^\s*(?:Changes|Changed by):/u.test(l)).join(" ").replace(/\s+/gu, " ").trim().replace(/^(?:\d+|#\d+(?:\.\d+)?)\. /u, "");
+  const text = it.text.split("\n").filter((l, i) => !i || !MARK.test(l)).join(" ").replace(/\s+/gu, " ").trim().replace(/^(?:\d+|#\d+(?:\.\d+)?)\. /u, "");
   const date = /^\*\*([^*]+)\*\*/u.exec(text)?.[1] ?? null;
   return { key, date, file: it.file, text: date ? text.slice(date.length + 4).replace(/^[\s,.]+/u, "") : text, issues: [...new Set([...text.matchAll(ISSUE)].map(m => Number(m[1])))], changedBy };
 }

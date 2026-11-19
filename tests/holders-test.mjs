@@ -114,6 +114,8 @@ ok(noMatch.length === 1 && /item 1 says item 2 changed it, but item 2 names no c
 const strays = inStep(marked("\n   Changes: 1.", "\n   Changes: 9, #4.", "\n   Changed by: 7."));
 ok(["item 1 says it changes 1, which is itself", "item 2 says it changes 9, which is no item", "item 2 says it changes #4, which is no item", "item 3 says 7 changed it, which is no item"].every(w => strays.some(x => x.includes(w))) && strays.every(w => /Mend: /u.test(w)), "a mark naming its own item or no item of the archive fails, saying the mend", strays.join("\n"));
 const forms = inStep(marked("\n   Changed by: 2", "\n   Changes: 1.\n   Changes: 1.", "\n   Changes: one."));
+const hidden = inStep(marked("\n   Changed by: 2.\rhidden", "\n   Changes: 1.\rX"));
+ok(hidden.filter(w => w.includes("a mark not in its form or given twice")).length === 2, "a mark that holds a lone carriage return is read whole, and fails its form", hidden.join("\n"));
 ok(forms.filter(w => w.includes("a mark not in its form or given twice")).length === 3 && forms.every(w => /Mend: /u.test(w)), "a mark with no stop, one given twice and one with no key each fail, saying the form", forms.join("\n"));
 ok(!inStep(marked("", "", "")).length && !inStep(archive({ "items-001.md": "1. **1 Nov**, #1: Changes: 2. on its opening line, which is prose.\n" })).length, "an item with no mark, and prose on an opening line, are no marks");
 const markKeyed = archive({ "items-001.md": "1. **1 Nov**, #1: a.\n   Changed by: #9.1.\n", "issue-9.1.md": "# Issue 9.1\n\n#9.1. **19 Nov**, #9: b.\n     Changes: 1.\n" });
