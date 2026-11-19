@@ -41,7 +41,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #325 | rule builder | |
 | #314 | rule builder | |
 | #457 | rule builder | |
-| #458 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose rule list it reads |
 | #469 | rule builder; it changes what every role reads at its start | |
