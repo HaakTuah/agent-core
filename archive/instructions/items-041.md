@@ -12,8 +12,8 @@ The index, and how an item is written: `archive/instructions.md`.
 
 43. **2 November 2026** (Amarna Letters, item 169; for both games). Asked: the owner raised that sessions must not be
     prompted with personal information, such as names and professions, which gets sensitive material into the codebase,
-    as had happened in the owner's other codebases. Decided: the codebase must be absolutely void of such personal
-    information, completely, zero.
+    as had happened before. Decided: the codebase must be absolutely void of such personal information, completely,
+    zero.
 
 44. **2 November 2026** (Amarna Letters, item 171; for both games). Asked: whether the session being discussed should
     not read the progress file. Decided: it reads it, if that is worth it in the session's own opinion.
@@ -28,10 +28,9 @@ The index, and how an item is written: `archive/instructions.md`.
     `.github/`. Decided: the session does it, that is, it makes those changes. Dependabot's pinned version updates of
     actions already used need no yes, always.
 
-47. **2 November 2026** (Amarna Letters, item 175; for both games). Asked: the owner noted that Claude and Codex had
-    spent roughly the same usage that day, both a little over 30%, so that reviewing alone takes about as much as all
-    that was done with Claude and Claude Code that day; one security review a PR, and no Codex review for docs-only PRs,
-    were put to the owner. Decided: both were agreed to.
+47. **2 November 2026** (Amarna Letters, item 175; for both games). Asked: the owner noted that reviewing alone had
+    taken about as much usage that day as all the building; one security review a PR, and no Codex review for docs-only
+    PRs, were put to the owner. Decided: both were agreed to.
 
 48. **2 November 2026** (Amarna Letters, item 177; for both games). Asked: whether a security review always makes sense.
     Decided: security reviews are done only for the risky kinds of change.
@@ -147,9 +146,9 @@ The index, and how an item is written: `archive/instructions.md`.
 
 74. **9 November 2026** (Amarna Letters, item 239; Barkstreet Snakes, 9 November 2026). Asked: later review rounds
     seeing only the change, a weekly workshop check, the owner's words quoted only in the archive, and trimming what
-    every session reads. Decided: all of them were agreed to. The owner added that Codex usage is still paid for, on a
-    different quota; the goal is still to maximise it, and Claude is the more important link, but that does not mean
-    waste there does not matter.
+    every session reads. Decided: all of them were agreed to. The owner added that Codex's usage has a cost too; the
+    goal is still to maximise it, and Claude is the more important link, but that does not mean waste there does not
+    matter.
 
 75. **9 November 2026** (Amarna Letters, item 240; Barkstreet Snakes, 9 November 2026). Asked: whether this repository
     is to be made. Decided: it must be done, though the owner wants to experiment with dynamic governance, maybe on one
@@ -162,13 +161,12 @@ The index, and how an item is written: `archive/instructions.md`.
     of it was agreed to as the design session advised: the three safety rules only one game had join the floor; where
     the games differ in substance, each keeps its own; the floor is in two files, the rules any task can break read at
     every start and the rest before a task touches them; Dependabot here is set to the workflow's actions; and a last
-    code review comes before the merge. The owner added that only Claude has to stop around 90%, since it is the only
-    licence the owner uses for other tasks, so Codex or whatever else is added will be for project work only. Ideally
-    they time so that 90% is never spent before 100% of them are spent, but that depends on their being in an
-    environment where they can track it, such as local on the owner's PC, or a server, even better on Herdr, where the
-    owner believes they can track and initiate one another directly; the rules are calibrated for that. Right now every
-    cloud session wastes time establishing that it can track its usage, and wastes tokens posting about it on every PR,
-    possibly more.
+    code review comes before the merge. The owner added that only Claude has to stop around 90%, since its remaining
+    usage is kept in reserve, so Codex or whatever else is added will be for project work only. Ideally they time so
+    that 90% is never spent before 100% of them are spent, but that depends on their being in an environment where they
+    can track it, such as the owner's own computer, where they can track and start one another directly; the rules are
+    calibrated for that. Right now every cloud session wastes time establishing that it can track its usage, and wastes
+    tokens posting about it on every PR, possibly more.
 
 77. **9 November 2026** (Amarna Letters, item 243; Barkstreet Snakes, 9 November 2026). Asked: the owner's yes was asked
     for on this repository's first pull request and on the personal-terms fix in both games; the design session relayed
