@@ -299,6 +299,18 @@ ok(is(pure([]), true, "a pure sync, as pure-sync.mjs proves") && is(pure([summar
 ok(is(pure([summary(running)]), false, "no security review") && is(pure([summary({ ...running, status: "queued" })]), false, "no security review") && is(pure([summary(open)], syncs), false, "Mend: fallback"), "a review that began by itself is waited for, and its open finding answered");
 ok(is(pure([summary(done)], syncs), true, `has run (on ${SEEN.slice(0, 7)}`) && is(judge(pull, [], [], [], undefined, true, { pure: false }), false, "no security review"), "one that has run, on any commit of the sync, is done with; not proved pure, it is any pull request");
 
+// A pull request its caller proved queue-only (#750): queue-only.mjs, which the caller runs, proves it, and the check
+// honours the proof only where GitHub's whole list of its files is one Markdown file that runs nothing (the fallback
+// review of 64361aa, 6).
+const lineOf = file("QUEUE.md", "@@ -1 +1 @@\n-| #1 | builder | |\n+| #2 | builder | |");
+const queued = (comments, files, p = counted(pull, files), proved = true) => judge(p, comments, [], [], [files], true, { queue: proved });
+ok(is(queued([], [lineOf]), true, "queue-only, as queue-only.mjs proves") && is(queued([], [lineOf], undefined, false), false, "no security review"),
+  "proved queue-only, its one file the progress file, it passes with no review; not proved, it is any pull request");
+ok(is(queued([], [lineOf, file("README.md", patch(["a", "b"]))]), false, "no security review") && is(queued([], [file("QUEUE.yml", patch(["a", "b"]))]), false, "no security review")
+  && is(queued([], [file(".github/workflows/x.md", patch(["a", "b"]))]), false, "no security review") && is(queued([], [lineOf], { ...pull, changed_files: 2 }), false, "no security review"),
+  "but not where its files are two, one is no Markdown, one runs by itself, or GitHub's list is cut short, whatever its caller says");
+ok(is(queued([summary(running)], [lineOf]), false, "no security review") && is(queued([summary(done)], [lineOf]), true, "has run"), "a review that began by itself is waited for, as of a pure sync");
+
 // From the command line, as the workflow runs it.
 const dir = mkdtempSync(join(tmpdir(), "security-review-"));
 try {
@@ -324,6 +336,9 @@ try {
     && ["2026-11-12T08:00:00Z", ""].every((since) => run({ ...counted(pull, [stepChange]), created_at: "2026-11-12T09:00:00Z" }, [[summary(onHead)]], { ADVISORY: "false", BOUND: "false", SINCE: since }, [], [], [[stepChange]]).status.state === "pending"),
   "given the files too, it asks two where what runs by itself changed, and says how to mend it; told the pull request is from before the check and opened before the script first came to the default branch, it waits not; opened since, or with no time for that, it waits");
   ok(run(pull, [], { ADVISORY: "false", PURE: HEAD }).status.description === "a pure sync, as pure-sync.mjs proves: no review needed, none begun by itself yet (floor rule 8)" && run(pull, [], { ADVISORY: "false", PURE: SEEN }).status.state === "pending" && run({ ...pull, head: { sha: "main" } }, [], { PURE: "main" }).sha === undefined, "told the workflow's proof holds for the head, a sync needs no review; for another commit it does");
+  ok(run(counted(pull, [lineOf]), [], { ADVISORY: "false", QUEUE: HEAD }, [], [], [[lineOf]]).status.state === "success" && run(counted(pull, [lineOf]), [], { ADVISORY: "false", QUEUE: SEEN }, [], [], [[lineOf]]).status.state === "pending"
+    && run(counted(pull, [lineOf]), [], { ADVISORY: "false", QUEUE: HEAD }).status.state === "pending",
+  "told the caller's proof holds for the head, a queue-only pull request needs no review; for another commit, or with no files to read, it does");
   ok(run(pull, [[as("helper")]], { ADVISORY: "false", REVIEWERS: "x helper" }).status.state === "success" && run(pull, [[as("helper")]], { ADVISORY: "false" }).status.state === "pending", "the accounts the workflow names count, and no others");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   ok(run(pull, [[real(REAL_CLEAN.replace("codex-review-state:v1", "codex-review-state:v2"))]]).warning === UNREAD && run(pull, [[real(REAL_CLEAN)]]).warning === undefined, "run as the workflow runs it, it prints the warning beside the status, for the workflow to show");
