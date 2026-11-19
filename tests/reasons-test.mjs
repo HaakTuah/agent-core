@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
+import { entryFile } from "../scripts/holders.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { lines, reasonsOf } from "../scripts/reasons.mjs";
 
@@ -26,10 +27,9 @@ write("archive/instructions/items-001.md", [
   "3. **22 October 2026**, #78. It changed item 2.", "   Changes: 2.", "   Changed by: 4.", "",
   "4. **23 October 2026**, #90. It changed item 3.", "   Changes: 3.", "",
 ].join("\n"));
-write("scripts/holders.json", JSON.stringify({
-  behind: { "tasks/x.md: A first rule": [1, 2], "tasks/x.md: A second rule": [2, 9], "tasks/x.md": [1], "AGENTS.md: An own rule": [2] },
-  numbers: { "tasks/x.md: A first rule": "findings; outcome: asked" },
-}));
+for (const [key, behind, number] of [["tasks/x.md: A first rule", [1, 2], "findings; outcome: asked"], ["tasks/x.md: A second rule", [2, 9]], ["tasks/x.md", [1]], ["AGENTS.md: An own rule", [2]]]) {
+  write(`scripts/holders/${entryFile(key)}`, JSON.stringify({ rule: key, behind, ...(number ? { number } : {}) }));
+}
 
 const first = reasonsOf(tmp, "tasks/x.md: A first rule");
 ok(first.rule === "tasks/x.md: A first rule" && first.items.map(it => it.key).join() === "1,2" && first.fileItems.map(it => it.key).join() === "1", "a rule named whole gives the items behind it, and those behind its file as a whole", JSON.stringify(first));

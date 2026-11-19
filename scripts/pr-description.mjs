@@ -136,7 +136,7 @@ export function numberMend(body) {
   if (part.every(l => /^None\b/u.test(l))) return null;
   const named = part.map(l => /(?:^|[\s*-])Number: (.*[^.\s])[.\s]*$/u.exec(l)?.[1]).filter(Boolean);
   if (named.some(n => NUMBER_FIRST.test(n))) return null;
-  return `the part "${HOLDS}" names no rule's number${named.length ? ` in its form (it reads "${named[0]}")` : ""}. Mend: under it, for each rule this pull request adds or widens, add a line "Number: <findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for, with "; rare harm" at its end where the rule guards against rare and severe harm, as scripts/holders.json keeps it under "numbers"; or write "None" alone under the heading where it adds no rule`;
+  return `the part "${HOLDS}" names no rule's number${named.length ? ` in its form (it reads "${named[0]}")` : ""}. Mend: under it, for each rule this pull request adds or widens, add a line "Number: <findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for, with "; rare harm" at its end where the rule guards against rare and severe harm, as the rule's entry in scripts/holders/ keeps it under "number"; or write "None" alone under the heading where it adds no rule`;
 }
 
 // The mend where a description has neither the line session-cost.mjs prints ("Session so far: ...") nor the mark that

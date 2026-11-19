@@ -49,7 +49,7 @@ those written before 12 November 2026, and the staged cases' record); the *audit
 `CHOICES.md`; the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
 the *mutation tool*: `node scripts/stryker.mjs --tool tests/mutation --report {report} {lines}`, Stryker at the version
 `tests/mutation/`'s lock file pins (#581), in `tests.yml`;
-the archive is `archive/instructions.md`, the items behind each rule listed in `scripts/holders.json`; the *settling references* and the *descriptions*:
+the archive is `archive/instructions.md`, the items behind each rule listed in `scripts/holders/`; the *settling references* and the *descriptions*:
 `README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
 `tests.yml`, its baseline empty (#259); the *owner's account*: `HaakTuah`; the *users get*:
 `releases`, its users taking the core from a release or, following `main`, from its newest commit whose checks all
@@ -334,7 +334,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `.github/workflows/core.yml`, which fails a copy that holds what `.gitattributes` keeps here; what is quoted, by what
   holds floor rule 4's "The owner's word".
 - **The archive is pointed to from the list,** not from the rule (#252). By default a rule file here (this file, the
-  floor's, the roles' and the modules') holds no "core archive N": `scripts/holders.json` names under "behind" the
+  floor's, the roles' and the modules') holds no "core archive N": `scripts/holders/` names under "behind" the
   items behind each rule, and a session that needs a rule's reason looks them up there. Whoever writes or changes a
   rule adds its items to that list in the same pull request. Nothing changes it. It does not mean a rule loses its
   one-line reason, which stays in it ("A rule is written to one pattern"), nor that a project's own rule files are
@@ -343,7 +343,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that is not in the archive.
 - **A new archive item is named by its issue** (#744). By default an item added to the archive is keyed by the issue
   that carries the owner's word and, where it records one point of several, by that point, as `#733.1`, and stands in
-  a file of its own named by its key (`archive/instructions/issue-733.1.md`; #750, point 1); `scripts/holders.json`
+  a file of its own named by its key (`archive/instructions/issue-733.1.md`; #750, point 1); `scripts/holders/`
   names it so under "behind", and a pointer to it gives that key where one to an older item gives its number. Items 1
   to 262 keep their numbers, so every "core archive N" that stands still leads where it did. Nothing changes it. It does not mean an item moves or
   is rewritten. Reason: on 19 November 2026 two pull requests merged in parallel took the same next number, and a
@@ -366,13 +366,13 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   a check that fails where it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no
   check can read its breach exactly, by a staged case, the holder of last resort, or by the scheduled audit; and where
   none holds it yet, it is listed. Whoever writes or changes a rule names its holder in that PR: in
-  `scripts/holders.json`, by the rule's file and bold lead, or in a staged case's own file; and under the PR's heading
+  `scripts/holders/`, a file by the rule's file and bold lead, or in a staged case's own file; and under the PR's heading
   "What holds it" (`.github/workflows/own-description.yml` fails one without it), for each rule it adds or widens, what
   went wrong or would without it (an incident, a review's finding, the owner's reason), its holder, or that it has
   none yet, and its number (#303): a line "Number:" with the count the rule is meant to lower (`findings`, the review
   findings that name it; `check fires`; or `correction: <kind>`, #302) and the one of the five outcomes it stands for
   (`; outcome: asked`, `fast`, `readable`, `usable` or `robust`), then `; rare harm` where it guards against rare and
-  severe harm, as `scripts/holders.json` keeps it under "numbers";
+  severe harm, as `scripts/holders/` keeps it under "number";
   "None" where it adds no rule. The rules that stood before are held the same way: `scripts/holders.mjs` lists each
   rule with no holder in the core's monthly state report, until it gains one or goes on the owner's word, and a
   review's finding seen twice moves its rule up (`tasks/reviews.md`, point 8). A line that only points elsewhere or
@@ -380,7 +380,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   with no holder fails anything or goes by itself, that a review is a holder, or that a count of a rule's citations is
   its number: a citation says a rule is applied, never that it helps. Reason: the audit of 13 November found 43 of 122
   rules held by nothing but a session reading them, and nothing listed them. Held by
-  `scripts/holders.mjs`, in `.github/workflows/tests.yml`, which fails where `holders.json` names a rule that no longer
+  `scripts/holders.mjs`, in `.github/workflows/tests.yml`, which fails where an entry names a rule that no longer
   stands, a check that is not there or a number in no form, and by the heading's check, which asks the line "Number:"
   where the heading holds more than "None".
 - **A project's own rules name what holds them** (#662). By default the rules a project writes for itself, in the
@@ -479,20 +479,23 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that rewords it. The owner is never "he" or "his" in new text: the same check reads each line a PR adds under
   `archive/` and `reports/` for a gendered pronoun, a line quoted with `>` (the owner's own words) and a record moved
   word for word aside, while the older records stay as they were.
-- **A record pull requests add to is a folder of one file per entry** (#750, point 1). By default each part of the
-  inventory (`INVENTORY.md`) stands in a file of its own under `inventory/`, and each entry of the sync notes
-  (`setup/sync-notes.md`) under `setup/sync-notes/`, its step in a file of the same name under `scripts/steps/` and,
-  where the step has a check, its stage for the tests under `scripts/stages/`, each read in the order of the files'
-  names (a stage whose mend reads what the others' mends write says `last`) by the scripts that read it
-  (`scripts/inventory.mjs`, `scripts/sync-notes.mjs`, `scripts/steps.mjs`, `scripts/steps-stage.mjs`), so that two pull
-  requests that add an entry never edit the same lines, as each archive item stands already ("A new archive item is
-  named by its issue"). Whoever adds an entry adds its file, named to stand between its neighbours. Nothing changes it.
-  It does not mean that what the record holds, or the order it is read in, changes. Reason: of 39 pull requests merged
-  between 18 and 19 November 2026, 8 changed `INVENTORY.md`, 10 `setup/sync-notes.md` and 7 `scripts/steps.mjs`, and
-  under merge-on-green pull requests that add to one file merge side by side and collide. Held by `tests/mend-test.mjs`,
-  which reads the inventory whole, and fails a folder `INVENTORY.md` does not name and a part's line written in
-  `INVENTORY.md` itself; and by `tests/steps-test.mjs`, which reads the notes whole, and fails an entry, a step or a
-  stage without its pair of the same name and an entry written in `setup/sync-notes.md` itself.
+- **A record pull requests add to is a folder of one file per entry** (#750, point 1; #853), as `tasks/planning.md` sets
+  out for any project's busy record. By default the core's are: each part of the inventory (`INVENTORY.md`) in a file of
+  its own under `inventory/`; each entry of the sync notes (`setup/sync-notes.md`) under `setup/sync-notes/`, its step
+  in a file of the same name under `scripts/steps/` and, where the step has a check, its stage for the tests under
+  `scripts/stages/` (a stage whose mend reads what the others' mends write says `last`); and what holds each rule (its
+  holder, the items behind it and its number), each rule's entry in a file under `scripts/holders/` that `entryFile` in
+  `scripts/holders.mjs` names from the rule's key. Each is read in the order of the files' names by the script that
+  reads it (`scripts/inventory.mjs`, `scripts/sync-notes.mjs`, `scripts/steps.mjs`, `scripts/steps-stage.mjs`,
+  `scripts/holders.mjs`), as each archive item stands already ("A new archive item is named by its issue"). Whoever adds
+  an entry adds its file. Nothing changes it, and what it does not mean stands there too. Reason: of 39 pull requests
+  merged between 18 and 19 November 2026, 8 changed `INVENTORY.md`, 10 `setup/sync-notes.md`, 7 `scripts/steps.mjs` and
+  6 `scripts/holders.json`, and under merge-on-green pull requests that add to one file merge side by side and collide.
+  Held by `tests/mend-test.mjs`, which reads the inventory whole, and fails a folder `INVENTORY.md` does not name and a
+  part's line written in `INVENTORY.md` itself; by `tests/steps-test.mjs`, which reads the notes whole, and fails an
+  entry, a step or a stage without its pair of the same name and an entry written in `setup/sync-notes.md` itself; and
+  by `tests/holders-test.mjs`, which with `scripts/holders.mjs` fails a file of the list not named from its rule, and
+  two rules whose entries would share a file.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
   `tests/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its

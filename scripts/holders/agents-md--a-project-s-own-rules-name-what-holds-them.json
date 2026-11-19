@@ -1,0 +1,5 @@
+{
+  "rule": "AGENTS.md: A project's own rules name what holds them",
+  "behind": ["#662"],
+  "number": "findings; outcome: robust"
+}

@@ -27,9 +27,17 @@
       "mark": 25832,
       "why": "#884: the text the parser reads (the preprocessor, C# 14's extension headers) apart from the reading of the tree."
     },
-    "scripts/holders.json": {
-      "mark": 51879,
-      "why": "A builder who writes a rule writes its line in each of the three lists, holders, behind and numbers, and holders.mjs reads them whole; split by list or by rule file, that builder opens more files, and a session finds one rule's key by searching."
+    "scripts/holders.mjs": {
+      "mark": 24459,
+      "why": "#888: the reader of a project's own list apart from the core's own list."
+    },
+    "scripts/pr-description.mjs": {
+      "mark": 27425,
+      "why": "#888: each line's check in a file of its own beside a short reader."
+    },
+    "scripts/pruning.mjs": {
+      "mark": 33545,
+      "why": "#888: the list it prints apart from what it reads from the host and its record."
     },
     "scripts/read-total.mjs": {
       "mark": 20690,

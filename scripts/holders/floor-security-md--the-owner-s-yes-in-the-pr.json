@@ -1,0 +1,5 @@
+{
+  "rule": "floor/security.md: The owner's yes in the PR",
+  "holder": "check: scripts/pr-description.mjs, in part",
+  "behind": [232]
+}
