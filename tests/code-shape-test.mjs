@@ -40,6 +40,9 @@ ok(same(fn("#!/usr/bin/env node\nexport default async function main() {\n  retur
 
 // Branch points: each if, loop, case and catch, and each and, or and choice within a line; a function within is its own.
 const br = src => functions(tokens(src)).map(f => `${f.name}:${f.branches}`);
+// (a large file is read in time, in step with its size, well within the suite's time mark)
+const unclosed = functions(tokens(`function f() {\n${"x =(:\n".repeat(100000)}${"[\n".repeat(100000)}${"]".repeat(50000)}}\n`));
+ok(same(unclosed.map(f => `${f.name}:${f.line}`), ["f:1"]), "a large file is read in time, in step with its size, and the function in it still found", JSON.stringify(unclosed.slice(0, 3)));
 const branching = [
   "function g(a, b) {",
   "  if (a && b || a?.c) { return a ? 1 : 2; } else if (b ?? a) { a ||= b; }",

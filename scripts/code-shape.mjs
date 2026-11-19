@@ -485,24 +485,28 @@ const countBranch = (toks, k, block, stack, lang) => { if (block?.fn && lang.bra
 // shape-csharp.mjs), what kind of block a { opens ("function", "control" or another), a function's name, and whether
 // a token branches.
 export function functions(toks, lang = JS) {
-  const found = [], stack = [];
+  const found = [], stack = [], opens = { "(": [], "[": [], "{": [] };
   const openAt = new Map();
   for (let k = 0; k < toks.length; k++) {
     const tok = toks[k];
-    countBranch(toks, k, innerBrace(stack), stack, lang);
+    countBranch(toks, k, innerBrace(stack, opens), stack, lang);
     if (tok.t !== "punct") continue;
-    if (tok.v === "(" || tok.v === "[") stack.push({ v: tok.v, k });
-    else if (tok.v === "{") stack.push(openBlock(toks, k, innerBrace(stack), openAt, lang, found));
-    else if (OPEN[tok.v]) closeBracket(toks, k, stack, openAt);
+    if (tok.v === "(" || tok.v === "[") push(stack, opens, { v: tok.v, k });
+    else if (tok.v === "{") push(stack, opens, openBlock(toks, k, innerBrace(stack, opens), openAt, lang, found));
+    else if (OPEN[tok.v]) closeBracket(toks, k, stack, opens, openAt);
   }
   return found;
 }
 
-// The innermost { still open, null where none is.
-function innerBrace(stack) {
-  for (let s = stack.length - 1; s >= 0; s--) if (stack[s].v === "{") return stack[s];
-  return null;
+// The open brackets are kept as a stack, and for each kind the places on it where one of that kind stands, so that
+// the innermost { and the bracket a closing one matches are found at once.
+function push(stack, opens, entry) {
+  opens[entry.v].push(stack.length);
+  stack.push(entry);
 }
+
+// The innermost { still open, null where none is.
+const innerBrace = (stack, opens) => stack[opens["{"].at(-1)] ?? null;
 
 // The entry of the block a { at k opens, a function's added to `found`: its depth of control blocks counts from the
 // function it lies in.
@@ -519,13 +523,14 @@ function openBlock(toks, k, parent, openAt, lang, found) {
   return entry;
 }
 
-// A closing bracket at k ends the open one it matches (none: it is passed over); a function's lines are told then.
-function closeBracket(toks, k, stack, openAt) {
-  let s = stack.length - 1;
-  while (s >= 0 && stack[s].v !== OPEN[toks[k].v]) s--;
-  if (s < 0) return;
+// A closing bracket at k ends the open one it matches, and every one opened after it (none: it is passed over); a
+// function's lines are told then.
+function closeBracket(toks, k, stack, opens, openAt) {
+  const s = opens[OPEN[toks[k].v]].at(-1);
+  if (s === undefined) return;
   const entry = stack[s];
   stack.length = s;
+  for (const at of Object.values(opens)) while (at.length && at.at(-1) >= s) at.pop();
   openAt.set(k, entry.k);
   if (entry.kind === "function") entry.fn.lines = toks[k].line - toks[entry.k].line + 1;
 }
