@@ -1,5 +1,5 @@
 {
-  "about": "What holds each rule of the floor and the modules (AGENTS.md, \"Every rule says what holds it\"; #235, part D), read by holders.mjs beside this file. Keyed by the rule's file and bold lead, as rules.mjs names it; each value one holder or a list of them (a staged case names the rules it holds in its own file, scripts/staged/): \"check: <the script, workflow or hook that fails a pull request or a step where the rule is broken, or opens an issue by itself; or GitHub's setting that refuses it>\", \"audit\" (the scheduled audit reads it), or \"describes\" (it only points elsewhere or says what is protected, and binds no one). \", in part\" after a holder: it holds some of the rule, and the rest has none. A rule not named here has no holder, and the monthly state report lists it. \"behind\": the core archive's items behind each rule, keyed the same way (with the rules of AGENTS.md), or by a rule file alone for its text outside any rule; a rule file names no item itself (AGENTS.md, \"The archive is pointed to from the list\"; #252), and a session that needs a rule's reason looks its items up here (archive/instructions.md). \"numbers\": the number each rule names, keyed the same way (AGENTS.md, \"Every rule says what holds it\"; #303), \"<findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>\", the count it is meant to lower and the outcome it stands for, which pruning.mjs, beside this file, reads.",
+  "about": "What holds each rule of the floor and the modules (AGENTS.md, \"Every rule says what holds it\"; #235, part D), read by holders.mjs beside this file. Keyed by the rule's file and bold lead, as rules.mjs names it; each value one holder or a list of them (a staged case names the rules it holds in its own file, scripts/staged/): \"check: <the script, workflow or hook that fails a pull request or a step where the rule is broken, or opens an issue by itself; or GitHub's setting that refuses it>\", \"audit\" (the scheduled audit reads it), or \"describes\" (it only points elsewhere or says what is protected, and binds no one). \", in part\" after a holder: it holds some of the rule, and the rest has none. A rule not named here has no holder, and the monthly state report lists it. \"behind\": the core archive's items behind each rule, each by its key (its number, up to 262, or \"#N\" or \"#N.P\" for one keyed by its issue; AGENTS.md, \"A new archive item is named by its issue\"), keyed the same way (with the rules of AGENTS.md), or by a rule file alone for its text outside any rule; a rule file names no item itself (AGENTS.md, \"The archive is pointed to from the list\"; #252), and a session that needs a rule's reason looks its items up here (archive/instructions.md). \"numbers\": the number each rule names, keyed the same way (AGENTS.md, \"Every rule says what holds it\"; #303), \"<findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>\", the count it is meant to lower and the outcome it stands for, which pruning.mjs, beside this file, reads.",
   "holders": {
     "floor/security.md: 3. The protected files": [
       "check: .github/workflows/security-review.yml, in part",
@@ -200,7 +200,11 @@
     ],
     "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part",
     "floor/security.md: The owner's yes in the PR": "check: scripts/pr-description.mjs, in part",
-    "roles/shared/teams.md: The higher right gives the floor's yeses": "check: scripts/pr-description.mjs, in part"
+    "roles/shared/teams.md: The higher right gives the floor's yeses": "check: scripts/pr-description.mjs, in part",
+    "roles/shared/review-guidelines.md: Every reviewer": "check: scripts/code-review-wait.mjs, in part",
+    "tasks/reviews.md: What a posted review declares": "check: scripts/code-review-wait.mjs, in part",
+    "tasks/reviews.md: The design check": "check: scripts/code-review-wait.mjs, in part",
+    "tasks/reviews.md: A late review is still read": "check: scripts/look.mjs, in part"
   },
   "behind": {
     "AGENTS.md": [208, 209, 213],
@@ -222,7 +226,8 @@
     "AGENTS.md: Rules are pruned by their numbers": [249, 254],
     "AGENTS.md: Proof is sized to what a thing costs others": [249],
     "AGENTS.md: The archive is pointed to from the list": [246],
-    "AGENTS.md: The archive keeps the reasoning; the owner's words stay here": [246, 266],
+    "AGENTS.md: The archive keeps the reasoning; the owner's words stay here": [246, "#744", "#773"],
+    "AGENTS.md: A new archive item is named by its issue": ["#744"],
     "AGENTS.md: The core abides by its own rules, to the full extent": [209, 213],
     "AGENTS.md: The core is measured as a feature is": [195, 199],
     "AGENTS.md: The core's address stands in one place": [192],
@@ -241,7 +246,7 @@
     "floor/security.md: Nothing is reviewed twice": [139],
     "floor/security.md: Nothing runs on the owner's computer unless the owner starts it": [52],
     "floor/security.md: Test data is never real": [29],
-    "floor/security.md: The owner's word": [134, 246, 266],
+    "floor/security.md: The owner's word": [134, 246, "#773"],
     "floor/security.md: The owner's yes in the PR": [232],
     "floor/topics/accounts.md: 19. Accounts, roles and a server": [227],
     "floor/topics/dependencies.md: 15. Dependencies": [76, 252],
@@ -295,7 +300,7 @@
     "roles/shared/inbox.md: Read every comment from the *owner's account*": [216],
     "roles/shared/inbox.md: The *progress file* holds order only": [216],
     "roles/shared/inbox.md: The core itself": [159],
-    "roles/shared/inbox.md: The owner's words are kept once": [131, 246, 266],
+    "roles/shared/inbox.md: The owner's words are kept once": [131, 246, "#773"],
     "roles/shared/inbox.md: The stand-in": [142, 166, 199],
     "roles/shared/review-guidelines.md": [56],
     "roles/shared/review-guidelines.md: A brief written in a pull request": [229],
@@ -327,7 +332,7 @@
     "tasks/choices.md": [222, 231],
     "tasks/choices.md: a long list before the options": [251],
     "tasks/choices.md: a drop says whether it rests on a fact": [251],
-    "tasks/choices.md: what a standard mechanism gave": [263],
+    "tasks/choices.md: what a standard mechanism gave": ["#652"],
     "tasks/choices.md: the same trial for each option kept": [251],
     "tasks/choices.md: the blind pick": [251],
     "tasks/choices.md: the case against": [251],
@@ -422,8 +427,8 @@
     "tasks/tools.md: One door in: `AGENTS.md`": [232],
     "tasks/tools.md: One script says what to read": [234],
     "tasks/tools.md: Proven by the staged cases, tool by tool": [232],
-    "tasks/tools.md: What the core offers one tool, it offers each": [265],
-    "tasks/roles.md: The rules name tiers, never a model": [265],
+    "tasks/tools.md: What the core offers one tool, it offers each": ["#467"],
+    "tasks/roles.md: The rules name tiers, never a model": ["#467"],
     "tasks/updates.md: Node": [39, 253],
     "tasks/updates.md: The newest stable version, unless there is a reason": [37, 65],
     "tools/claude.md: Name models by family alone": [80, 81],
@@ -433,11 +438,11 @@
     "tasks/tests.md: A test asserts no time measured on a real clock": [257],
     "tasks/tests.md: A test reaches a real clock or another process only where it guards it": [260],
     "tasks/tests.md: A tree that passed is not run again": [257],
-    "tasks/tests.md: A time mark measures and never fails": [264],
-    "tasks/tests.md: No test run on a draft": [264],
-    "tasks/tests.md: The default branch is tested at its newest commit": [264],
-    "tasks/tests.md: The slow suites run once per batch, wherever they run": [264],
-    "tasks/tests.md: A test that reaches the network runs once per batch": [267]
+    "tasks/tests.md: A time mark measures and never fails": ["#733.2"],
+    "tasks/tests.md: No test run on a draft": ["#733.2"],
+    "tasks/tests.md: The default branch is tested at its newest commit": ["#733.2"],
+    "tasks/tests.md: The slow suites run once per batch, wherever they run": ["#733.2"],
+    "tasks/tests.md: A test that reaches the network runs once per batch": ["#733.9"]
   },
   "numbers": {
     "floor/security.md: The owner's word": "findings; outcome: readable; rare harm",
@@ -447,6 +452,7 @@
     "tasks/updates.md: Node": "correction: does not work; outcome: robust",
     "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",
     "AGENTS.md: Every rule says what holds it": "findings; outcome: robust",
+    "AGENTS.md: A new archive item is named by its issue": "check fires; outcome: fast",
     "AGENTS.md: Rules are pruned by their numbers": "correction: misread; outcome: asked",
     "AGENTS.md: Proof is sized to what a thing costs others": "findings; outcome: robust",
     "roles/shared/teams.md: Who is an owner": "correction: misread; outcome: asked",
