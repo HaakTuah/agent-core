@@ -112,7 +112,7 @@ const broken = node => node.isError || node.isMissing || node.hasError;
 // functions' does, so that no nesting runs out of the call stack.
 // (only what can hold a statement is walked into: an expression holds none, and a file of one long expression is
 // read in the time its statements take)
-const HOLDS = new Set(["module", "block", "ERROR", "if_statement", "elif_clause", "else_clause", "for_statement", "while_statement", "try_statement", "except_clause", "except_group_clause", "finally_clause", "with_statement", "match_statement", "case_clause", "function_definition", "class_definition", "decorated_definition"]);
+const HOLDS = new Set(["module", "block", "ERROR", "if_statement", "elif_clause", "else_clause", "for_statement", "while_statement", "try_statement", "except_clause", "finally_clause", "with_statement", "match_statement", "case_clause", "function_definition", "class_definition", "decorated_definition"]);
 function importsOf(root) {
   const found = [], stack = [{ node: root, dynamic: false, types: false }];
   while (stack.length) {
@@ -121,9 +121,15 @@ function importsOf(root) {
     if (!HOLDS.has(node.type)) continue;
     const inDef = dynamic || node.type === "function_definition";
     const checking = node.type === "if_statement" && isTypeChecking(node.childForFieldName("condition"));
-    const consequence = checking ? node.childForFieldName("consequence")?.id : null;
-    const children = node.children;
-    for (let k = children.length - 1; k >= 0; k--) stack.push({ node: children[k], dynamic: inDef, types: types || children[k].id === consequence });
+    // (the children by the tree's cursor, a node made only of each that can hold or be an import: an ERROR may hold
+    // millions of leaves)
+    const kept = [], c = node.walk();
+    try {
+      for (let more = c.gotoFirstChild(); more; more = c.gotoNextSibling()) {
+        if (HOLDS.has(c.nodeType) || IMPORTS.has(c.nodeType)) kept.push({ node: c.currentNode, dynamic: inDef, types: types || (checking && c.currentFieldName === "consequence") });
+      }
+    } finally { c.delete(); }
+    for (let k = kept.length - 1; k >= 0; k--) stack.push(kept[k]);
   }
   return found;
 }

@@ -128,6 +128,12 @@ ok(same(pyStrings.toks.map(t => `${t.t}:${t.v}`), ["id:x", "punct:=", "str:", "i
 const pyToks = readPython("a = 1e-6 + 2.5E+3\nb = rf\"\\{time.time()}\"\nc = t\"{0}\"\nd = f\"{msg:=^80}{e}\"\n").toks.map(t => `${t.t[0]}${t.v}`).join(" ");
 ok(pyToks === "ia p= n1e-6 p+ n2.5E+3 ib p= s itime p. itime p( p) ic p= s n0 id p= s imsg ie",
   "Python: a number with its exponent is one token, a raw f-string's \\{ opens its code, a t-string is a string, and a format's fill of = is no code", pyToks);
+// (an import under each kind of block that can hold one: the walk goes only through those, `HOLDS` in python-tree.mjs)
+const pyBlocks = readPython(["try:\n    import a\nexcept E:\n    import b\nexcept* F:\n    import c\nelse:\n    import d\nfinally:\n    import e",
+  "with x:\n    import f", "async def g():\n    async with y:\n        import h\n    async for i in j:\n        import k", "for l in m:\n    import n\nelse:\n    import o",
+  "while p:\n    import q\nelse:\n    import r", "match s:\n    case 1:\n        import t", "@deco\nclass U:\n    import v", "if w:\n    pass\nelif x:\n    import y\nelse:\n    import z"].join("\n") + "\n");
+ok(same(pyBlocks.imports.map(i => `${i.module}${i.dynamic ? "!" : ""}`).join(" "), "a b c d e f h! k! n o q r t v y z"),
+  "Python: an import is read under each kind of block, a def's as dynamic", JSON.stringify(pyBlocks.imports));
 const pyBroken = readPython("import first\ndef f(:\n    import inside\nfrom later import (x,\n");
 ok(pyBroken.functions === null && same(pyBroken.imports.map(i => `${i.module}${i.dynamic ? " dynamic" : ""}`), ["first", "inside dynamic"]),
   "Python: a file the grammar cannot read whole has its imports read where it read them whole, and none from what it could not", JSON.stringify(pyBroken.imports));
