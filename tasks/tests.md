@@ -116,6 +116,25 @@ reads is the *shape check*'s config.
   network, by nothing yet, since the shape check's counts read what a test imports and calls, and these reach it through
   the programs they start (#770 would cut the network off for a pull request's run).
 
+- **A test that guards only what a release brings runs where the release is made** (#715). By default a test runs
+  where its suite does. The one condition that changes it: a test whose breach reaches users only through a release
+  (a project written by an older release passing every check once synced, what a release's tag holds) and whose job
+  sets the length of a pull request's run, the longest of its jobs, runs instead at the default branch's newest commit
+  once a day and before each release, never in a pull request's run; where minutes are billed, the runner is a machine
+  of the owner's or the tests run on a computer alone, before each release only, a daily run there the owner's choice,
+  since it costs; and where every merge goes live, on each pull request, since a merge there is the release. Where the
+  tests run, who pays and whether every merge goes live are read, never asked, as "The slow suites run once per batch,
+  wherever they run" says. The trigger is a pull request's run whose job times show such a test's job the longest: the
+  session that reads them, its builder or the orchestrator, moves the test to that run (in the core, the release
+  workflow's daily run, `.github/workflows/release.yml`), and a failure there is owned as "A check that fails on the
+  default branch has an owner" says, the release waiting for it to pass. It does not mean that the test is dropped,
+  that a release is cut without its pass on the release's commit, that a test that guards what a pull request brings
+  leaves that run, nor that one that sets no run's length moves. Reason: in the core the upgrade test on Windows set
+  every pull request's run at 13 to 22 minutes, while what it guards reaches a project only through a release. Held,
+  in the core, by `tests/workflows-test.mjs`, which reads that the release workflow runs the upgrade test on Windows
+  daily where the repository is public and before each release, and that no pull request's run does; in a project,
+  by nothing yet, since which tests guard only what a release brings cannot be read without guessing.
+
 - **A test that fails for no reason is mended or removed, never retried in silence.** By default a test passes or
   fails the same way each time it runs on the same commit. The trigger is a test that failed and then passed on the
   same commit in the same job, which the record names: the session that meets it, or the audit's next cleaning task,
