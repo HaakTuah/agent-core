@@ -65,7 +65,7 @@ const refused = (r) => r.status === 1 && mended(r.stdout) && !/\n\s+at /u.test(r
   ok(waitsOn("> Waits on: nothing") === null && waitsOn("<!-- Waits on: nothing -->") === null && waitsOn("**Waits on:** nothing") === null && waitsOn("`Waits on: nothing`") === null, "a waits line quoted with >, inside a comment on its line, bold or in code is no line");
   ok(waitsOn(`${whole}> Waits on: the owner: may it merge?\n`)?.kind === "nothing", "a quoted waits line after the real one does not stand in for it");
   ok(waitsOn("Waits on: <script>alert(1)</script>")?.kind === null && /in none of the forms/u.test(waitsMend("Waits on: <b>nothing</b>")), "markup in the waits line is in none of the forms");
-  ok(waitsOn("Waits on: nothing <!-- -->")?.kind === null && waitsOn("Waits on: #241 <img src=x>")?.kind === null, "markup after a right form spoils it");
+  ok(waitsOn("Waits on: nothing <!-- -->")?.kind === "nothing" && waitsOn("Waits on: #241 <img src=x>")?.said === "#241 <img src=x>", "markup after a right form is whatever follows it, kept as data (#750, point 4): the look quotes it in a code span");
   ok(listed("> Read for it: `core/floor/topics/input.md`") === null && /is missing/u.test(lineMend("<!-- Read for it: `core/floor/topics/input.md` -->", called, "cmd")), "a 'Read for it' line quoted or in a comment on its line lists nothing");
   ok(/does not list/u.test(lineMend("Read for it: <code>core/floor/topics/input.md</code>", called, "cmd")), "a file in a code tag, not backticks, is not listed");
   const r = run("<script>alert(1)</script>\n<h2>Readings taken</h2>\n");
@@ -85,7 +85,7 @@ const refused = (r) => r.status === 1 && mended(r.stdout) && !/\n\s+at /u.test(r
 
 // ---- a number out of range ----
 {
-  ok(["#-1", "#1.5", "#1e9", "#", "#0x10", "# 241", "#\u0661\u0662", "#0", "#007", "#1234567890"].every(w => waitsOn(`Waits on: ${w}`)?.kind === null), "an item that is negative, a fraction, an exponent, empty, hex, spaced, in other digits, nought, led by a nought or past nine digits is in none of the forms");
+  ok(["#-1", "#1e9", "#", "#0x10", "# 241", "#\u0661\u0662", "#0", "#007", "#1234567890", "#1-2"].every(w => waitsOn(`Waits on: ${w}`)?.kind === null), "an item that is negative, an exponent, empty, hex, spaced, in other digits, nought, led by a nought, past nine digits or a range is in none of the forms");
   ok(missing("####### What the owner can try\n####### Readings taken\n").length === 2, "seven # are no heading");
   ok(both(42e300) && both(-Infinity), "a body that is a huge or infinite number is no body");
   // (the commits' dates heldAt() reads are GitHub's, never the body's: no case of this input)

@@ -99,7 +99,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   hand. *Runs:* any session and the runners. *Else:* a task runner (npm scripts, just, make), dropped on fact: a project
   in another stack has none of npm's, and the others are installs. *Bugs:* 2. **Keep:** small and stable glue.
 - `scripts/pr-description.mjs`, `.github/workflows/pr-description.yml`, `.github/workflows/own-description.yml`: fail a
-  ready pull request whose description lacks a heading the project names, and, here, the lines the core asks. *Runs:*
+  ready pull request whose description lacks a heading the project names, and, here, the lines the core asks, saying so
+  of a draft. *Runs:*
   the runners, where the description is; any session given it. *Else:* Danger JS (MIT), its rules written in JavaScript
   and run with a token, dropped on a measure: 14.1.0 installs 86 packages (34 MB), and the check's rules, the headings
   and lines the core asks, would be written again in its file, Danger giving only the description the workflow already
