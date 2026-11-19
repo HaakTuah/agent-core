@@ -125,19 +125,19 @@ one declared entrance.
   "One fact, one place" forbids a second copy of a fact, and code joined too early is harder to change than two plain
   pieces. Reason: exact copies were held, and copies that differ only in their names were up to 2.5% of a codebase
   that nothing saw. Held by the copies check's report.
-- **A part whose gaps repeat is read for its whole input** (#593). By default a bug is mended at its cause, its fix
-  adding the test of its case. The trigger is the third bug filed against one part that was a kind of input, of project
-  or of platform the part did not read, counted from the issues labelled `bug` that name the part's files: the builder
-  that mends it lists every kind the part's job covers, from the source that defines them (the project's kinds and its
-  manifest's slots, the platforms it builds and tests on, a format a standard or the host defines), and gives each a
-  test, in that pull request or, where that is large, as a task it files, the pull request holding the list. Where an
-  authority says the whole set (a build tool for what a build brings in, git for a rename, the host for a pull request's
-  reviews), that builder, or whoever writes such a part anew, has the part's test run the part and the authority on the
-  same inputs (in the core, the projects its upgrade test builds) and fail on any difference, and whether the part gives
-  way to it is weighed as for a maintained package. Three is a first guess. It does not mean a bug waits for the list,
-  that a part with three bugs is replaced, that a kind no source names is guessed, nor a comparison where nothing
-  defines the whole set or on another owner's project. Reason: mended one case at a time, four of the core's parts took
-  22 bugs of the same kind by 17 November 2026, and kinds listed by hand are as complete as their writer's memory.
+- **A part whose gaps repeat is read for its whole input** (#593). By default a bug is mended at its cause (#308). The
+  trigger is the third bug filed against one part that was a kind of input, of project or of platform the part did not
+  read, counted from the issues labelled `bug` that name the part's files: the builder that mends it lists every kind
+  the part's job covers, from the source that defines them (the project's kinds and its manifest's slots, the platforms
+  it builds and tests on, a format a standard or the host defines), and gives each a test, in that pull request or,
+  where that is large, as a task it files, the pull request holding the list. Where an authority says the whole set (a
+  build tool for what a build brings in, git for a rename, the host for a pull request's reviews), that builder, or in
+  the core whoever writes such a part anew, has the part's test run the part and the authority on the same inputs (in
+  the core, the projects its upgrade test builds) and fail on any difference, and whether the part gives way to it is
+  weighed as for a maintained package. Three is a first guess. It does not mean a bug waits for the list, that a part
+  with three bugs is replaced, that a kind no source names is guessed, nor a comparison where nothing defines the whole
+  set or on another owner's project. Reason: mended one case at a time, four of the core's parts took 22 bugs of the
+  same kind by 17 November 2026, and kinds listed by hand are as complete as their writer's memory.
 
 **What has no mark here.** A hub, a file most others import: one that holds one small fact is as it should be, and
 the audit's reader judges the others. The time a user waits on gets its own measure as its rule comes (#318).
