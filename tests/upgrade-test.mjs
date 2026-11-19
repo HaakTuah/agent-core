@@ -252,20 +252,27 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
       for (const r of runWorkflow(git(p.dir, "show", `${sha}:.github/workflows/${file}`), { github, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp })) out.push([`${file}/${r.job}`, { ...r, own: true }]);
       continue;
     }
+    // (each call's outputs, as its workflow's `workflow_call` names them from its jobs' own, empty where a job was
+    // skipped, for the calls that need it: the security review is handed the queue-only proof's head, #750)
+    const needs = {};
     for (const [id, job] of Object.entries(wf.jobs ?? {})) {
       const call = new RegExp(`^${CORE.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&")}/\\.github/workflows/([\\w.-]+)@([0-9a-f]{40})$`, "i").exec(job.uses ?? "");
       if (!call) { out.push([`${file}/${id}`, { job: id, ran: true, passed: true, steps: [], own: true }]); continue; }
       // (a call whose own condition is false starts no job, as a call skipped on a draft: #375)
-      if (job.if !== undefined && !evaluate(String(job.if).trim().replace(/^\$\{\{|\}\}$/g, ""), { github, inputs: {}, secrets: {}, vars: {} })) { out.push([`${file}/${id}`, { job: id, ran: false, passed: true, steps: [] }]); continue; }
+      if (job.if !== undefined && !evaluate(String(job.if).trim().replace(/^\$\{\{|\}\}$/g, ""), { github, inputs: {}, secrets: {}, vars: {}, needs })) { out.push([`${file}/${id}`, { job: id, ran: false, passed: true, steps: [] }]); continue; }
       // (the NuGet check as a step of core.yml's one job, #376: its input left out where there is no SDK, and said so)
       if (call[1] === "core.yml" && !sdk && job.with?.nuget) { job.with = { ...job.with }; delete job.with.nuget; console.log(`note ${p.name}: no .NET SDK here, so core.yml's NuGet step is not run`); }
       if (call[1] === "nuget.yml" && !sdk) { out.push([`${file}/${id}`, { job: id, ran: true, passed: true, steps: [] }]); console.log(`note ${p.name}: no .NET SDK here, so the NuGet check is not run`); continue; }
       const text = git(theCore, "show", `${call[2]}:.github/workflows/${call[1]}`);
-      const callerCtx = { github, inputs: {}, secrets: { PERSONAL_TERMS: terms }, vars: {} };
+      const callerCtx = { github, inputs: {}, secrets: { PERSONAL_TERMS: terms }, vars: {}, needs };
       const inputs = Object.fromEntries(Object.entries(job.with ?? {}).map(([k, v]) => [k, typeof v === "string" && v.includes("${{") ? evaluate(v.replace(/^\$\{\{|\}\}$/g, ""), callerCtx) : v]));
       const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, evaluate(String(v).replace(/^\$\{\{|\}\}$/g, ""), callerCtx)]));
       const caller = { ...github, workflow_ref: `${p.repo}/.github/workflows/${file}@${github.ref}` };
-      for (const r of runWorkflow(text, { inputs, secrets, github: caller, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp })) out.push([`${file}/${id}/${r.job}`, r]);
+      const called = parseYaml(text), ran = runWorkflow(text, { inputs, secrets, github: caller, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp });
+      for (const r of ran) out.push([`${file}/${id}/${r.job}`, r]);
+      const jobs = Object.fromEntries(ran.map(r => [r.job, { outputs: Object.fromEntries(Object.entries(called.jobs?.[r.job]?.outputs ?? {})
+        .map(([k, v]) => [k, evaluate(String(v).trim().replace(/^\$\{\{|\}\}$/g, ""), { steps: r.outputs ?? {} }) ?? ""])) }]));
+      needs[id] = { outputs: Object.fromEntries(Object.entries(called.on?.workflow_call?.outputs ?? {}).map(([k, o]) => [k, evaluate(String(o.value).trim().replace(/^\$\{\{|\}\}$/g, ""), { jobs }) ?? ""])) };
     }
   }
   return out;
@@ -447,8 +454,8 @@ function parserUnnamed(p) {
   const shapeOut = results => results.flatMap(([, r]) => r.steps.map(x => x.out ?? "")).join("\n");
   const unnamed = pr(main0, "its own job that runs the shape check", dir => { STAGES[PARSER_LEAD].stage(dir); write(dir, "src/App/More.cs", "class More { void M(bool x) { if (x) { } } }\r\n"); });
   const warned = checks(p, "pull_request", unnamed, { baseSha: main0, only: "shape-staged.yml", ownToo: true });
-  ok(!failures(warned) && warned.some(([, r]) => r.ran) && /^::warning::The shape check did not read (?:JavaScript and TypeScript, their functions by the parser \(the reader javascript-tree\), )?C#, its functions by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone.*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(shapeOut(warned)),
-    `${p.name}: its own job that runs the shape check after the first install alone passes, reading no function of C# and saying so as a warning with the mend`, `${failures(warned)}\n${shapeOut(warned).slice(-1500)}`);
+  ok(!failures(warned) && warned.some(([, r]) => r.ran) && /^::warning::The shape check did not read (?:JavaScript and TypeScript, their functions by the parser \(the reader javascript-tree\), )?C#, by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone.*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(shapeOut(warned)),
+    `${p.name}: its own job that runs the shape check after the first install alone passes, reading nothing of C# and saying so as a warning with the mend`, `${failures(warned)}\n${shapeOut(warned).slice(-1500)}`);
   const mended = pr(unnamed, "the mend as the warning words it", dir => STAGES[PARSER_LEAD].mend(dir));
   const read = checks(p, "pull_request", mended, { baseSha: main0, only: "shape-staged.yml", ownToo: true });
   ok(!failures(read) && read.some(([, r]) => r.ran) && !/::warning::The shape check did not read/u.test(shapeOut(read)),

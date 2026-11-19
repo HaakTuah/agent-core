@@ -246,7 +246,7 @@ try {
   fs.rmSync(path.join(project, ".codex"), { recursive: true, force: true });
   fs.rmSync(path.join(project, "licences.json"));
   // (the shape check's reader of C#, which reads on the parser's files (installedFile), with nothing installed: it did
-  // not run, saying the mend; where the job's install could not reach the registry, it reads no function of C#, says so
+  // not run, saying the mend; where the job's install could not reach the registry, it reads nothing of C#, says so
   // as a warning and fails nothing by that alone, and writes no baseline then (#654, point 4))
   {
     const cs = path.join(tmp, "cs");
@@ -265,13 +265,14 @@ try {
     ok(refusedWrite.status === 1 && /cannot be read and a baseline written now would leave out/u.test(refusedOut) && !fs.existsSync(path.join(cs, "shape-baseline.json")) && mended(refusedOut), "where the registry did not answer, it writes no baseline, saying the mend", refusedOut);
     fs.writeFileSync(path.join(cs, "shape-baseline.json"), JSON.stringify({ reads: ["javascript", "jsx", "csharp", "csharp-tree", "python", "scripts", "screens"], listed: { "function: Program.cs#A.M": { lines: 99 }, "lost: Bad.cs": true } }));
     const skipped = shape([], { CORE_PACKAGES_UNREACHED: "1" }), skippedOut = `${skipped.stdout}${skipped.stderr}`;
-    ok(skipped.status === 0 && /^::warning::The shape check did not read C#, its functions by the parser \(the reader csharp-tree\): the core's packages could not be installed, the registry not answering, .*the 2 entries its baseline lists there \(functions, files the grammar cannot read, and all of a file of Python\) are kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut), "and where it did not answer, the check reads no function of C#, says which reader it skipped and why as a warning, and fails nothing by that alone, its baseline's function and its file the grammar cannot read kept as listed", skippedOut);
-    // (what the reader of C# finds without the parser, here a cycle of using directives, still fails under the flag)
+    ok(skipped.status === 0 && /^::warning::The shape check did not read C#, by the parser \(the reader csharp-tree\): the core's packages could not be installed, the registry not answering, .*the 2 entries its baseline lists there \(functions, files the grammar cannot read, and all of a file of C# or Python\) are kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut), "and where it did not answer, the check reads nothing of C#, says which reader it skipped and why as a warning, and fails nothing by that alone, its baseline's function and its file the grammar cannot read kept as listed", skippedOut);
+    // (and a cycle of using directives, which only the parser reads now that C# is read on it whole (#530, item 6), is
+    // reported, never failed, as Python's is below)
     fs.writeFileSync(path.join(cs, "X.cs"), "using B;\nnamespace A { class X { } }\n");
     fs.writeFileSync(path.join(cs, "Y.cs"), "using A;\nnamespace B { class Y { } }\n");
     execFileSync("git", ["add", "-A"], { cwd: cs });
     const cycle = shape([], { CORE_PACKAGES_UNREACHED: "1" }), cycleOut = `${cycle.stdout}${cycle.stderr}`;
-    ok(cycle.status === 1 && /FAIL: 2 imports lie on a cycle/u.test(cycleOut) && mended(cycleOut), "and what the reader of C# finds without the parser, a cycle of its using directives, fails all the same", cycleOut);
+    ok(cycle.status === 0 && !/FAIL/u.test(cycleOut), "and a cycle of C#'s using directives, which only the parser reads, is reported, never failed", cycleOut);
   }
   {
     // (and so of JavaScript's functions, read on the parser too: where the registry did not answer, none is read, a
@@ -286,7 +287,7 @@ try {
     execFileSync("git", ["add", "-A"], { cwd: js });
     const shape = () => spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json"], { cwd: js, encoding: "utf8", timeout: 120000, env: { ...env, SHAPE_BASE: "", CORE_PACKAGES_UNREACHED: "1" } });
     const skipped = shape(), skippedOut = `${skipped.stdout}${skipped.stderr}`;
-    ok(skipped.status === 0 && /^::warning::The shape check did not read JavaScript and TypeScript, their functions by the parser \(the reader javascript-tree\): the core's packages could not be installed, .*1 entry its baseline lists there \(functions, files the grammar cannot read, and all of a file of Python\) is kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut),
+    ok(skipped.status === 0 && /^::warning::The shape check did not read JavaScript and TypeScript, their functions by the parser \(the reader javascript-tree\): the core's packages could not be installed, .*1 entry its baseline lists there \(functions, files the grammar cannot read, and all of a file of C# or Python\) is kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut),
       "where the registry did not answer, the check reads no function of JavaScript, says so as a warning naming the reader, and keeps its baseline's function", skippedOut);
     fs.writeFileSync(path.join(js, "b.mjs"), "import './c.mjs';\n");
     fs.writeFileSync(path.join(js, "c.mjs"), "import './b.mjs';\n");
@@ -315,7 +316,7 @@ try {
     const unreachedEnv = { ...env, SHAPE_BASE: "", CORE_PACKAGES_UNREACHED: "1" };
     const shape = () => spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json"], { cwd: py, encoding: "utf8", timeout: 120000, env: unreachedEnv });
     const skipped = shape(), skippedOut = `${skipped.stdout}${skipped.stderr}`;
-    ok(skipped.status === 0 && /^::warning::The shape check did not read Python, by the parser \(the reader python-tree\): the core's packages could not be installed, .*the 3 entries its baseline lists there \(functions, files the grammar cannot read, and all of a file of Python\) are kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut),
+    ok(skipped.status === 0 && /^::warning::The shape check did not read Python, by the parser \(the reader python-tree\): the core's packages could not be installed, .*the 3 entries its baseline lists there \(functions, files the grammar cannot read, and all of a file of C# or Python\) are kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut),
       "where the registry did not answer, the check reads nothing of Python, says so as a warning naming the reader, and keeps its baseline's cycle and its comment that marks a change", skippedOut);
     fs.writeFileSync(path.join(py, "d.py"), "# Changed: y\nimport e\n");
     fs.writeFileSync(path.join(py, "e.py"), "import d\n");
@@ -395,7 +396,7 @@ try {
     "in a copy whose job installed the first install alone, a package of the parser's reads as unreached, so its reader warns and fails nothing; in the core, never", `${asked.stdout}${asked.stderr}${askedInCore.stdout}${askedInCore.stderr}`);
   {
     // (the shape check in such a job, its copy's parser list naming the parser's own packages, as the core's does: it
-    // reads no function of C#, and its warning names the install step's mend, not a run again)
+    // reads nothing of C#, and its warning names the install step's mend, not a run again)
     const cs = path.join(tmp, "cs-unnamed");
     fs.mkdirSync(cs);
     fs.cpSync(copy, path.join(cs, "core"), { recursive: true });
@@ -406,8 +407,8 @@ try {
     execFileSync("git", ["init", "-q"], { cwd: cs });
     execFileSync("git", ["add", "-A"], { cwd: cs });
     const r = spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json"], { cwd: cs, encoding: "utf8", timeout: 120000, env: { ...env, SHAPE_BASE: "" } }), out = `${r.stdout}${r.stderr}`;
-    ok(r.status === 0 && /^::warning::The shape check did not read C#, its functions by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone, .*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(out),
-      "and the shape check there reads no function of C#, failing nothing, and its warning says to name every install in the job's install step", out);
+    ok(r.status === 0 && /^::warning::The shape check did not read C#, by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone, .*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(out),
+      "and the shape check there reads nothing of C#, failing nothing, and its warning says to name every install in the job's install step", out);
   }
   const parser = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
   const named = loadParser();

@@ -20,7 +20,7 @@ import { toolOf } from "./strength.mjs";
 import { Unread, calls, commands, uncommented, copiesConfig, folded, given, licenceConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { draftHoles, reads } from "./workflows.mjs";
-import { DEEPEST, twice } from "./yaml-keys.mjs";
+import { DEEPEST, LONGEST, twice } from "./yaml-keys.mjs";
 import { releaseAge, WAIT } from "./licences.mjs";
 import { codeOf, covers, pinFault, pinRead } from "./licence-scan.mjs";
 import { npmPackages, offRegistry } from "./lookup.mjs";
@@ -102,10 +102,11 @@ export function keysOnce(p) {
   if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`node ${corePath(p.root) || "core/"}scripts/install.mjs\`, then \`node ${corePath(p.root) || "core/"}scripts/steps.mjs\` again.`;
   const read = reads(p.files).map(f => [f, twice(p.read(f) ?? "")]);
   const found = read.flatMap(([f, keys]) => keys.filter(k => k.key !== null).map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
-  const deep = read.filter(([, keys]) => keys.some(k => k.key === null)).map(([f]) => `\`${f}\``);
+  const unread = by => read.filter(([, keys]) => keys.some(k => k.key === null && Boolean(k.size) === by)).map(([f]) => `\`${f}\``), deep = unread(false), long = unread(true);
   const said = [
     found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : "",
-    deep.length ? `In one pull request, nest the lists and mappings of these workflows or actions no deeper than a workflow needs, a few levels, since past ${DEEPEST} deep a key given twice in them cannot be read: ${deep.join("; ")}.` : ""];
+    deep.length ? `In one pull request, nest the lists and mappings of these workflows or actions no deeper than a workflow needs, a few levels, since past ${DEEPEST} deep a key given twice in them cannot be read: ${deep.join("; ")}.` : "",
+    long.length ? `In one pull request, cut these workflows or actions to under ${LONGEST} characters, the steps they repeat moved to a script or a workflow of their own, since past that a key given twice in them cannot be read: ${long.join("; ")}.` : ""];
   return said.filter(Boolean).join(" ") || null;
 }
 
@@ -192,7 +193,7 @@ const RUN_IN_RUN = /\$\{?RUN\}?(?![\w])/u, RUN_IN_IF = /\benv\.RUN\b/u;
 const SAFE_TERM = /^(env\.RUN\s*==\s*'all'|contains\(\s*env\.RUN\s*,\s*' [^' ]+ '\s*\))$/u;
 const RUN_LINE = /^if \[ "\$RUN" = all \]; then [^;\n]+; elif \[ "\$RUN" != none \]; then [^;\n]+ \$RUN; fi$/u;
 // (an expression split at its top level by `op`, its parentheses kept whole; null where they do not pair)
-function topLevel(text, op) {
+export function topLevel(text, op) {
   const parts = [];
   let depth = 0, from = 0, quoted = false;
   for (let i = 0; i < text.length; i++) {
@@ -204,7 +205,7 @@ function topLevel(text, op) {
   }
   return depth === 0 && !quoted ? [...parts, text.slice(from).trim()] : null;
 }
-const unwrapped = t => { let x = t.trim(); while (x.startsWith("(") && x.endsWith(")") && topLevel(x.slice(1, -1), "&&")) x = x.slice(1, -1).trim(); return x; };
+export const unwrapped = t => { let x = t.trim(); while (x.startsWith("(") && x.endsWith(")") && topLevel(x.slice(1, -1), "&&")) x = x.slice(1, -1).trim(); return x; };
 function ifKeepsNone(expression) {
   const body = expression.trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1");
   const ands = topLevel(unwrapped(body), "&&");
@@ -409,7 +410,7 @@ export function parserFirst(p) {
     const at = job.steps.findIndex(shapes);
     return at >= 0 && !job.steps.slice(0, at).some(st => installs(st, ["parser", "all"]));
   })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
-  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check or the selection of tests install the parser's too, \`node ${install} all\`, before either runs: they read the functions of JavaScript, TypeScript, C# and Python, and all of Python, on the parser, whose packages stand in a lock file of their own, and without them, after an install of the core's first lock alone, the shape check reads none of that, saying so as a warning, the selection runs each test of Python as one that reaches every file, and with no install of the core's at all either fails, saying so.` : null;
+  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check or the selection of tests install the parser's too, \`node ${install} all\`, before either runs: they read the functions of JavaScript, TypeScript, C# and Python, and all of C# and Python, on the parser, whose packages stand in a lock file of their own, and without them, after an install of the core's first lock alone, the shape check reads none of that, saying so as a warning, the selection runs each test of C# or Python as one that reaches every file, and with no install of the core's at all either fails, saying so.` : null;
 }
 
 // Where the project's call to the NuGet check starts only on the paths it names, each build file a build reads by

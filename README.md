@@ -91,7 +91,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    `.packages/parser/`, installed only where a job names it (`install.mjs parser`, or `all`, as the sync runs it and
    the copies check's job, which runs the shape check; #719): a session's start installs the first alone, and a check
    that needs the parser says so, with its mend; in a project's own job that installs the first alone, the shape check
-   reads no function of C# and says so as a warning, failing nothing by that. Its
+   reads nothing of C# or Python, nor any function of JavaScript or TypeScript, and says so as a warning, failing
+   nothing by that. Its
    devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
    copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
@@ -336,7 +337,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      where updates from `main` alone follow it, each the merge git makes of its parents (the check running
      `clean-merges.mjs` on the head's commits, #323), and the status says so, any other later commit needing such a
      comment naming the head, or the merge where that stops, by its whole SHA; a pure sync passes with none where no review starts by itself, the check running
-     `pure-sync.mjs` on its head; where the pull request changes what runs by itself beyond its pins, both, or two such
+     `pure-sync.mjs` on its head, and so does a pull request of the *progress file* alone that a job of the caller's proves with
+     `queue-only.mjs`, whose token may read issues, handing the head to the input `queue` (the core's own caller does;
+     #750); where the pull request changes what runs by itself beyond its pins, both, or two such
      comments (floor rule 3), or one holding what `comment-only.mjs` printed on the head. Where a summary of Codex's is
      there but its state cannot be read, a form nobody documents having changed, the status says so, the run warns, and
      the check waits or passes as it would with no summary (a summary whose first line itself changed is not known as

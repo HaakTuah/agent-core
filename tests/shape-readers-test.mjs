@@ -1,13 +1,13 @@
 // Tests the shape check's readers of C# and Python (scripts/shape-csharp.mjs and scripts/shape-python.mjs, their
-// functions on the parser: csharp-functions.mjs, and Python's functions, imports and tokens: python-tree.mjs) on files
-// made for them: the functions each finds, with their lines, depth and branch points; what a brace or a keyword in a
+// functions, and of C# and Python all they read, on the parser: csharp-tree.mjs and python-tree.mjs) on files made for
+// them: the functions each finds, with their lines, depth and branch points; what a brace or a keyword in a
 // string or a comment is; what each file imports and where it leads; and the packages a project declares. The check's
 // own use of them, and of the readers of JSX and of the shared space: shape-test.mjs. Run by the core's tests workflow
 // (.github/workflows/tests.yml).
 //
 //   node tests/shape-readers-test.mjs
 import { Worker } from "node:worker_threads";
-import { csTokens, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "../scripts/shape-csharp.mjs";
+import { csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "../scripts/shape-csharp.mjs";
 import { STDLIB, pythonPackages, readPython, resolvePython } from "../scripts/shape-python.mjs";
 import { ParserFailed, inParser } from "../scripts/parser.mjs";
 import { LARGEST } from "../scripts/tree-walk.mjs";
@@ -59,13 +59,46 @@ ok(same(shown(cs.functions), ["Board:14:1:0:1", "get:15:1:0:1", "set:15:1:0:0", 
 ok(same(shown(readCsharp("class A {\n  void B() {\n    if (a) { while (b) { lock (c) { using (d) { x(); } } } }\n  }\n}\n").functions), ["B:2:3:4:2"]), "C#: depth counts each control block, lock and using among them");
 ok(same(shown(readCsharp("class A {\n  void B() {\n    int? a = b ?c : d;\n    var e = f?[0] ?? g;\n    List<int?>? h = i ? j : k;\n  }\n}\n").functions), ["B:2:5:0:3"]),
   "C#: a ? that marks a type that may be null, or chains, is no choice; one with space before it, and ??, are");
-ok(csTokens("var a = $\"{b}\" + $@\"{c}\";\n").filter(t => t.t === "id").map(t => t.v).join() === "var,a,b,c", "C#: an interpolated string's code is read as code");
+ok(readCsharp("var a = $\"{b}\" + $@\"{c}\";\n").toks.filter(t => t.t === "id").map(t => t.v).join() === "var,a,b,c", "C#: an interpolated string's code is read as code");
 ok(same(cs.usings.map(u => `${u.target}${u.static ? " static" : ""}${u.alias ? " alias" : ""}`), ["System", "Game.Rules.Dice static", "Newtonsoft.Json alias", "System.Collections.Generic.List alias", "Game.Debug"]) && same(cs.namespaces, ["Game.View"]) && same(cs.types, ["Game.View.Point", "Game.View.Board"]),
   "C#: its using directives, global, static and aliased, its namespace and its types are read", JSON.stringify([cs.usings, cs.namespaces, cs.types]));
 ok(readCsharp("class A { void B() { using (var x = y) { } using var z = w; using Q q = new(); } }\n").usings.length === 0, "C#: a using statement is no directive");
 ok(readCsharp(`using A = X.Y.T<${"int, ".repeat(100)}int>;\nusing B = X.Z;\n`).usings.map(u => u.target).join() === "X.Y.T,X.Z", "C#: an alias of a type with many arguments is read whole");
 const nested = readCsharp("namespace A {\n  namespace B { class C { } }\n  class D { }\n}\nnamespace E;\nrecord struct F(int x);\n");
 ok(same(nested.namespaces, ["A", "A.B", "E"]) && same(nested.types, ["A.B.C", "A.D", "E.F"]), "C#: nested namespaces are joined, a file-scoped one holds the rest of the file", JSON.stringify(nested));
+// C#'s usings, declarations, tokens and comments on the parser (#530, item 6): where the lexer misread, as the trial old
+// against new found, and where the grammar cannot read a file whole
+const csMisread = readCsharp("namespace N {\n  class A<T> where T : class\n  {\n    void M() { foreach (var x in y) { } var s = @\"\"\"q\"\"\"; DateTime.Now.ToString(); }\n    double d = 1e-9 + 1.5.GetHashCode();\n  }\n}\n");
+ok(same(csMisread.types, ["N.A"]) && csMisread.toks.some(t => t.v === "1e-9") && csMisread.toks.filter(t => t.v === "DateTime").length === 1 && csMisread.functions.length === 1,
+  "C#: a class constraint before in names no type, a verbatim string that opens with escaped quotes is no raw string, and a number with its exponent is one token", JSON.stringify([csMisread.types, csMisread.functions]));
+const csLines = readCsharp("var s = @\"\n#not a directive\n\";\n#if A\nint x = 1; // one\n#else\nint x = 2; /* two\r\n   lines */\n#endif\nusing global::G.H;\n");
+ok(same(csLines.comments.map(c => `${c.line}:${c.text}`), ["5: one", "7: two\r", "8:   lines "]) && csLines.usings.length === 0 && csLines.toks.filter(t => t.v === "x").length === 2,
+  "C#: a # inside a verbatim string is no directive; both sides of an #if are read; a comment's lines are read as the lexer read them; a using of global:: names nothing", JSON.stringify(csLines));
+// (the review's three cases: a hole right after an escaped brace, which the grammar reads as text, is read as code; a
+// global:: in a type argument leaves the target named; a comment of 600,000 lines is read whole, overflowing nothing)
+const escaped = readCsharp("class C { void M() { var s = $\"{{{DateTime.Now}}}\"; var e = $\"{{{{q}}}}\"; var f = $\"{{{Task.Delay(1):N0}}}\"; var g = $\"{{{1 /* Clock.Now */ + 2}}}\"; } }\n");
+const escapedWords = escaped.toks.map(t => t.v).filter(Boolean).join(" ");
+ok(escapedWords.includes("= DateTime . Now ;") && !escaped.toks.some(t => t.v === "q") && escapedWords.includes("= Task . Delay ( 1 ) ;") && !escaped.toks.some(t => ["N0", "Clock"].includes(t.v) || /^\/[*/]/u.test(t.v)),
+  "C#: a hole right after an escaped brace is read as code, to its format, its comments no tokens; an even run of braces is text", JSON.stringify(escaped.toks.map(t => t.v)));
+// (the fallback reviewer's cases: a raw interpolated string's code is not read, as the reader's definition says, and no
+// text of one is taken for a hole; the holes after escaped braces are read in time linear in the string, each on its line)
+const rawHoles = readCsharp("class C { void M() { var s = $$\"\"\"{y} {{Clock.Now}}\"\"\"; var t = $\"\"\"a{Task.Delay(1)}\"\"\"; } }\n");
+ok(!rawHoles.toks.some(t => ["y", "Clock", "Task"].includes(t.v)), "C#: a raw interpolated string's code is not read, and none of its text is taken for a hole", JSON.stringify(rawHoles.toks.map(t => t.v).filter(Boolean)));
+const holesStarted = Date.now(), manyHoles = readCsharp(`class C { string s = $@"${"\n{{{x}}}".repeat(40000)}"; }`), holesTook = Date.now() - holesStarted, xs = manyHoles.toks.filter(t => t.v === "x");
+ok(xs.length === 40000 && xs.at(-1).line === 40001 && holesTook < 5000, `C#: 40,000 holes after escaped braces, a line each, are read in time, each on its line (${holesTook} ms)`, JSON.stringify({ n: xs.length, last: xs.at(-1)?.line }));
+// (the fallback reviewer's cases at 63c974eb: a hole's unclosed quote, before many escaped quotes, is split in time
+// linear in the hole; and a raw string's $ signs are read whatever their count, so one of 70 has no hole misread)
+const quotesStarted = Date.now(), manyQuotes = readCsharp(`class C { string s = $"{{{${'\\"'.repeat(128000)}}}}"; }`), quotesTook = Date.now() - quotesStarted;
+ok(manyQuotes.toks.length > 0 && quotesTook < 5000, `C#: a hole after escaped braces holding 128,000 escaped quotes and no closing one is read in time (${quotesTook} ms)`, String(manyQuotes.toks.length));
+const manySigns = readCsharp(`class C { void M() { var s = ${"$".repeat(70)}"""{y} {{Clock.Now}}"""; } }\n`);
+ok(!manySigns.toks.some(t => ["y", "Clock"].includes(t.v)), "C#: a raw interpolated string of 70 $ signs is read as raw, none of its text taken for a hole", JSON.stringify(manySigns.toks.map(t => t.v).filter(Boolean)));
+const typeArg = readCsharp("using Alias = Game.Rules.Box<global::System.String>;\nusing B = global::M.N;\nclass C {}\n");
+ok(same(typeArg.usings.map(u => u.target), ["Game.Rules.Box"]), "C#: a global:: inside the target's type arguments leaves the target named; one that qualifies the target names nothing", JSON.stringify(typeArg.usings));
+const manyLines = readCsharp(`/*${"\n".repeat(600000)}*/ class C { void M() { } }\n`);
+ok(manyLines.functions?.length === 1 && manyLines.comments.length === 600001, "C#: a comment of 600,000 short lines is read whole, its lines passed one at a time", JSON.stringify({ functions: manyLines.functions?.length, comments: manyLines.comments.length }));
+const csBroken = readCsharp("using A.B;\nnamespace N;\nclass Kept { }\nclass Lost { void M() { return x is [.., 1]; } }\n");
+ok(csBroken.functions === null && same(csBroken.usings.map(u => u.target), ["A.B"]) && same(csBroken.namespaces, ["N"]) && csBroken.types.includes("N.Kept"),
+  "C#: a file the grammar cannot read whole has no functions told, and its usings and declarations are those the grammar read whole", JSON.stringify(csBroken));
 const idx = csharpIndex([["src/Rules/Dice.cs", readCsharp("namespace Game.Rules;\npublic static class Dice { }\n")], ["src/Rules/Deck.cs", readCsharp("namespace Game.Rules { class Deck { } }\n")]]);
 ok(same(resolveCsharp({ target: "Game.Rules" }, idx).to, ["src/Rules/Dice.cs", "src/Rules/Deck.cs"]) && same(resolveCsharp({ target: "Game.Rules.Dice", static: true }, idx).to, ["src/Rules/Dice.cs"])
   && same(resolveCsharp({ target: "Game" }, idx).to, []) && resolveCsharp({ target: "Newtonsoft.Json" }, idx).outside === "Newtonsoft.Json",
@@ -192,7 +225,7 @@ const pyPackages = pythonPackages({
 ok(same([...pyPackages.ships.values()], ["requests", "PyYAML", "flask", "numpy", "scikit_learn"]) && same([...pyPackages.declared.keys()].sort(), ["black", "flask", "numpy", "pytest", "pyyaml", "requests", "ruff", "scikit-learn"]),
   "Python: the packages pyproject.toml and requirements files declare are read, those of development apart, by the name pip compares", JSON.stringify([[...pyPackages.ships.values()], [...pyPackages.declared.keys()]]));
 
-// ---- C#'s functions on the parser (csharp-functions.mjs; #529): the cases above, read as the lexer read them, held
+// ---- C#'s functions on the parser (csharp-tree.mjs; #529): the cases above, read as the lexer read them, held
 // the port's behaviour to the old reader's; these hold it to counts taken by hand ----
 // Held out: written and counted by hand by a fresh session that never saw the reader, from its definition frozen first
 // (17 November 2026); the lexer's reader counted it the same.
@@ -492,7 +525,7 @@ ok(sized(LARGEST / 9).length <= LARGEST && same(shown(readCsharp(sized(LARGEST /
 // The parser's thread: a call that fails there is told as the file's ("read"), and the next call gets its own answer,
 // never an earlier one's.
 let failedAs = null;
-try { inParser(new URL("../scripts/csharp-functions.mjs", import.meta.url).href, "no such reader", "class A { }", []); } catch (e) { failedAs = e instanceof ParserFailed ? e.kind : String(e); }
+try { inParser(new URL("../scripts/csharp-tree.mjs", import.meta.url).href, "no such reader", "class A { }"); } catch (e) { failedAs = e instanceof ParserFailed ? e.kind : String(e); }
 ok(failedAs === "read" && same(shown(readCsharp("class A { void M() { if (a) { } } }").functions), ["M:1:1:1:1"]), "C#: a call that fails in the parser's thread is a failure to read the file, and the next call gets its own answer", failedAs);
 // A type named extension: its constructor `extension() { }` is read as a constructor, never as an extension block's
 // header (Codex's finding on #605).
@@ -514,7 +547,7 @@ const deepPy = `x = ${'f"{'.repeat(5000)}1${'}"'.repeat(5000)}\ndef f():\n    re
 let threw = "";
 try { ok(readCsharp(deepCs).functions === null && readPython(deepPy).functions === null, "code nested past the readers' limit loses the file's functions, and throws nothing"); } catch (e) { threw = e.message; ok(false, "code nested past the readers' limit throws nothing", threw); }
 const started = Date.now();
-csTokens(`${"#".repeat(400000)}\n`);
+readCsharp(`${"#".repeat(400000)}\n`);
 readCsharp(`${"using A = B<".repeat(40000)}\n`);
 csharpPackages({ "x.csproj": "<PackageReference Include=\"a\" ".repeat(100000) });
 ok(Date.now() - started < 5000, `a line of #, aliases that never close and references that never close are read in time linear in their length (${Date.now() - started} ms)`);
@@ -528,6 +561,10 @@ readCsharp(`class A {${"x; extension(".repeat(5000)}}`);
 readCsharp(`class A { int x = extension ${"+ a ".repeat(40000)}; }`);
 readCsharp(`class A { void M() { var f = (() => { })${" + a".repeat(40000)}; } }`);
 ok(deepIfs?.depth === 20000 && deepIfs.branches === 20000 && Date.now() - walked < 5000, `C#: code nested twenty thousand deep, headers that never end and the left ends of long chains are read on the parser in time linear in their length (${Date.now() - walked} ms)`, JSON.stringify(deepIfs));
+// (the security review's case: many lines of the preprocessor deep in nested namespaces, under 2 MB, read in time, each
+// # looked up among the file's strings and comments rather than by walking up from it)
+const ppStarted = Date.now(), deepDirectives = readCsharp(`${"namespace A{".repeat(2000)}\n${"#region x\n".repeat(100000)}${"}".repeat(2000)}\n`);
+ok(deepDirectives.functions !== null && Date.now() - ppStarted < 5000, `C#: 100,000 lines of the preprocessor two thousand namespaces deep are read in time (${Date.now() - ppStarted} ms)`);
 
 // (code run with --input-type=module, as a script started with node -e and that flag is, reads C# on the parser all the
 // same: the parser's thread is not handed that flag, which Node refuses for a module file, where the thread would die

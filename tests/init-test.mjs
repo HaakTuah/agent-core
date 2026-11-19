@@ -60,12 +60,13 @@ const names = fs.readdirSync(path.join(root, ".github/workflows"));
 for (const [template] of FILES.filter(([t]) => t.startsWith("workflows/"))) {
   const text = fs.readFileSync(path.join(root, TEMPLATES, template), "utf8");
   const calls = [...text.matchAll(/^\s+uses: (\S+)$/gm)].map(m => m[1]);
-  const name = /^\{\{core\}\}\/\.github\/workflows\/([\w.-]+\.yml)@\{\{pin\}\}$/.exec(calls[0] ?? "")?.[1];
-  ok(calls.length === 1 && name && names.includes(name), `${template} makes one call, to a workflow of the core's, at the pin`, calls.join());
-  if (!name || !names.includes(name)) continue;
-  const called = fs.readFileSync(path.join(root, ".github/workflows", name), "utf8");
-  const required = [...called.matchAll(/^ {6}(\w+):\r?\n(?: {8}.*\r?\n)*? {8}required: true/gm)].map(m => m[1]);
-  ok(/^ {2}workflow_call:/m.test(called) && required.every(input => new RegExp(`^ {6}${input}: \\S`, "m").test(text)), `${template} calls a workflow that can be called, and gives it ${required.join(", ") || "nothing, as it requires nothing"}`);
+  const callees = calls.map(call => /^\{\{core\}\}\/\.github\/workflows\/([\w.-]+\.yml)@\{\{pin\}\}$/.exec(call)?.[1]);
+  ok(calls.length > 0 && callees.every(name => name && names.includes(name)), `${template} makes its calls each to a workflow of the core's, at the pin`, calls.join());
+  for (const name of callees.filter(name => name && names.includes(name))) {
+    const called = fs.readFileSync(path.join(root, ".github/workflows", name), "utf8");
+    const required = [...called.matchAll(/^ {6}(\w+):\r?\n(?: {8}.*\r?\n)*? {8}required: true/gm)].map(m => m[1]);
+    ok(/^ {2}workflow_call:/m.test(called) && required.every(input => new RegExp(`^ {6}${input}: \\S`, "m").test(text)), `${template} calls a workflow that can be called, and gives it ${required.join(", ") || "nothing, as it requires nothing"}`);
+  }
   ok(!/pull_request_target/.test(text) && /^permissions:\r?\n {2}contents: read\r?\n\r?\njobs:/m.test(text), `${template} gives the whole workflow contents: read and nothing more; what a job needs beyond it, the job asks for`);
 }
 // what the README leaves to the templates to say (its point 5 points here for them): each workflow's triggers and permissions
