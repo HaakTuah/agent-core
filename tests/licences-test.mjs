@@ -190,14 +190,16 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
   try {
     // (with no packages here, both readings would be the fallback and agree with themselves)
     ok(installed("ajv"), "the core's packages are installed, so the schema is read against the fallback", "Mend: run node scripts/install.mjs, then this test again");
-    cpSync(new URL("../scripts/", import.meta.url), join(bare, "scripts"), { recursive: true });
-    cpSync(new URL("../floor/", import.meta.url), join(bare, "floor"), { recursive: true });
-    const [withAjv, without] = await Promise.all([import("../scripts/licences.mjs"), import(pathToFileURL(join(bare, "scripts", "licences.mjs")).href)]);
-    const said = (m, c) => { writeFileSync(file, JSON.stringify(c)); try { m.loadConfig(file); return null; } catch (e) { return e.message; } };
-    const apart = configs.map((c) => [c, said(withAjv, c), said(without, c)]).filter(([, a, b]) => (a === null) !== (b === null) || [a, b].some((m) => m !== null && !/ Mend: \S/u.test(m)));
-    const passed = configs.filter((c) => said(withAjv, c) === null).length;
-    ok(!apart.length && passed > 10 && passed < configs.length - 100, `the config's schema and the check's own checks of its form refuse the same ${configs.length - passed} of ${configs.length} configs, each saying its mend, and pass the same ${passed}`,
-      apart.slice(0, 5).map((x) => JSON.stringify(x)).join("\n"));
+    if (installed("ajv")) {
+      cpSync(new URL("../scripts/", import.meta.url), join(bare, "scripts"), { recursive: true });
+      cpSync(new URL("../floor/", import.meta.url), join(bare, "floor"), { recursive: true });
+      const [withAjv, without] = await Promise.all([import("../scripts/licences.mjs"), import(pathToFileURL(join(bare, "scripts", "licences.mjs")).href)]);
+      const said = (m, c) => { writeFileSync(file, JSON.stringify(c)); try { m.loadConfig(file); return null; } catch (e) { return e.message; } };
+      const apart = configs.map((c) => [c, said(withAjv, c), said(without, c)]).filter(([, a, b]) => (a === null) !== (b === null) || [a, b].some((m) => m !== null && !/ Mend: \S/u.test(m)));
+      const passed = configs.filter((c) => said(withAjv, c) === null).length;
+      ok(!apart.length && passed > 10 && passed < configs.length - 100, `the config's schema and the check's own checks of its form refuse the same ${configs.length - passed} of ${configs.length} configs, each saying its mend, and pass the same ${passed}`,
+        apart.slice(0, 5).map((x) => JSON.stringify(x)).join("\n"));
+    }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
