@@ -4,7 +4,7 @@
 // where a job names it (install.mjs parser, or all; packages.mjs; #654, #719). Each
 // file is read from there and handed to the parser as bytes, so nothing is fetched or built while a file is read.
 // A grammar comes only with the reader that needs it: C#'s, for the functions the shape check's reader of C# finds
-// (csharp-functions.mjs).
+// (csharp-functions.mjs); bash's, for the commands of a workflow's step, which the steps read (bash-commands.mjs).
 //
 // The parser starts only where a file is read with it, so that a script that reads none, as most that load the shape
 // check's readers, pays nothing for it: in a worker thread of its own (parser-worker.mjs), which the reader's call
@@ -16,7 +16,7 @@ import { MessageChannel, Worker, receiveMessageOnPort } from "node:worker_thread
 import { installedFile, unnamed, unreached } from "./packages.mjs";
 
 // Each language read, by the name a reader asks for, and its grammar's package and file.
-const GRAMMARS = { csharp: ["tree-sitter-c-sharp", "tree-sitter-c_sharp.wasm"] };
+const GRAMMARS = { csharp: ["tree-sitter-c-sharp", "tree-sitter-c_sharp.wasm"], bash: ["tree-sitter-bash", "tree-sitter-bash.wasm"] };
 // Whether the parser or the grammar of `language` could not be installed, the registry not answering, in a project's
 // pull request (install.mjs), or was never installed, a project's own job naming only the core's first install
 // (unnamedFor; #719): its reader then reads no file of it, and the check that runs it says so as a warning, failing
@@ -33,23 +33,31 @@ export class ParserFailed extends Error {
   constructor(message, kind) { super(message); this.kind = kind; }
 }
 
-/** The parser loaded, in the thread that calls this: { parse(language, text) }, a tree its caller frees with
- *  tree.delete() once read, its memory the parser's own. Used by the worker. */
+/** The parser loaded, in the thread that calls this: { parse(language, text, budget) }, a tree its caller frees with
+ *  tree.delete() once read, its memory the parser's own, or null where a budget was given and the parse ran past it.
+ *  Used by the worker. */
 export async function load() {
   const { default: TreeSitter } = await import(pathToFileURL(installedFile("web-tree-sitter", "web-tree-sitter.cjs")).href);
   const { Parser, Language } = TreeSitter;
   await Parser.init({ wasmBinary: bytes("web-tree-sitter", "web-tree-sitter.wasm") });
   const languages = new Map();
   for (const [name, [pkg, file]] of Object.entries(GRAMMARS)) languages.set(name, await Language.load(bytes(pkg, file)));
+  // (one parser for each language, kept for the thread's life: a reader that reads many short texts, as the steps of
+  // a workflow, pays for none but the first)
+  const parsers = new Map();
   return {
-    parse(language, text) {
+    // (with `budget`, in milliseconds, a parse that runs past it is stopped and gives null, so that a reader of short
+    // texts is never held by one the grammar recovers from slowly)
+    parse(language, text, budget = null) {
       const grammar = languages.get(language);
       if (!grammar) throw new Error(`No grammar for ${language} is installed. Mend: add its package to the core's .packages/package.json at one exact version with the reader that needs it, write its entry in .packages/package-lock.json by npm's own install there, and name it in GRAMMARS in scripts/parser.mjs`);
-      const parser = new Parser();
-      try {
-        parser.setLanguage(grammar);
-        return parser.parse(text);
-      } finally { parser.delete(); }
+      if (!parsers.has(language)) { const parser = new Parser(); parser.setLanguage(grammar); parsers.set(language, parser); }
+      const parser = parsers.get(language);
+      if (budget === null) return parser.parse(text);
+      const until = performance.now() + budget;
+      const tree = parser.parse(text, null, { progressCallback: () => performance.now() > until });
+      if (!tree) parser.reset();
+      return tree;
     },
   };
 }

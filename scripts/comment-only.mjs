@@ -1,13 +1,14 @@
 // Is this pull request's change to what runs by itself only comments and steps' names (floor rule 3)? Such a change
 // passes one security review, floor rule 8's, instead of rule 3's two. Its builder runs it from a checkout of the
 // core's `main`, never from the pull request's own copy, which the pull request could change, in the pull request's
-// clone with the head that merges checked out, up to date with `main` (floor rule 12):
+// clone with the head that merges checked out, brought up to date with `main` for it:
 //
 //   node <the core's main>/scripts/comment-only.mjs [<a commit already reviewed>]
 //
 // It reads the head commit, not the working tree, against the merge base with the project's main (fetched), or against
 // the commit given, one before the head that it grew from, for a later commit reviewed only for what it changes (floor
-// rule 8); a head not up to date with main is refused, being no head that merges. It reads every file the pull request
+// rule 8); a head not up to date with main is refused, since it reads the change against main only where the head
+// holds it. It reads every file the pull request
 // changes under .github/ or .claude/ (the folders themselves too, any case, at any depth), and every action.yml, a
 // project's own action: each must be a YAML file changed in place, its mode kept, no link or submodule there on either
 // side, whose two versions differ only in YAML comments, blank lines between entries, and the `name` of a job's steps.
