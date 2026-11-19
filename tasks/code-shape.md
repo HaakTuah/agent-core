@@ -18,7 +18,8 @@ one declared entrance.
   next pull request that changes the baseline, or a cleaning task, writes (#750, point 5), since improving pull
   requests that each rewrote the one baseline collided; meanwhile an entry the base's code no longer holds covers no
   breach against the base, in its own place or elsewhere (told no base, the check cannot see that, and a mended
-  breach could come back unseen), and one that changes the baseline writes it whole. An entry joins it in two cases only: the check reads more than it did (a system named, a mark lowered, the first
+  breach could come back unseen), and one that changes the baseline writes it whole, as does one that leaves a breach
+  where the check on the push, told no base, would find it no entry (one moved to where another's is listed). An entry joins it in two cases only: the check reads more than it did (a system named, a mark lowered, the first
   baseline), where the base branch held the breach already; or there was no other way, where the baseline gives the
   entry's reason under "grown", the pull request gives it too, and a fresh session says there that it found no other
   way. A mark rises the same way. It does not mean that code which stands is rewritten on demand: the baseline is a

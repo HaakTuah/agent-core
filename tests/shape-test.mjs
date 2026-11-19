@@ -330,6 +330,17 @@ const second = judge({ now: { "src/g.js": long("tall", 250), "src/z.js": long("t
 v = adds({ "src/z.js": long("tall", 200) }, []);
 ok(mended(said(v)) && /1 function passes/.test(said(v)) && /src\/z\.js#tall/.test(said(v)) && adds({ "src/t.js": long("tall", 140) }, [fn("src/t.js#tall", 140)]).fail.length === 0 && raised.fail.length === 0 && /1 function passes/.test(said(second)) && /src\/z\.js#tall/.test(said(second)),
   "one the change adds with its reason covers its own breach and no second in the place of a breach of the base's that the change mended; one of the base's that moved and shrank beside it is covered by the entry listed for it, as is one that moved beside an entry raised with its reason, whose breach of the base's backs no second entry", `${said(v)}\n${said(raised)}\n${said(second)}`);
+// (a pull request that passes leaves the check told no base passing, as the push to the branch runs it: #751's seventh round)
+{
+  const two = listed([dn("src/a.js#tall", 100, 1), dn("src/x.js#tall", 65, 6)]), first = { "src/a.js": nested("tall", 100, 1), "src/c.js": nested("tall", 62, 6) }, then = { "src/x.js": nested("tall", 90, 1), "src/c.js": nested("tall", 62, 6) };
+  // (the last: a breach of a reader the baseline does not name, which the check told no base says and does not fail)
+  const other = JSON.stringify({ reads: ["javascript"], listed: Object.fromEntries([dn("src/a.js#tall", 100, 1), dn("src/z.py#tall", 65, 6)]) }), flatter = { "src/c.js": nested("tall", 62, 1) };
+  const steps = [[first, { "src/a.js": nested("tall", 100, 1), "src/x.js": nested("tall", 65, 6) }, two], [then, first, two], [then, first, listed([dn("src/c.js#tall", 62, 6), dn("src/x.js#tall", 90, 1)])], [{ ...flatter, "src/z.py": py(90) }, { ...flatter, "src/a.js": nested("tall", 100, 1) }, other, other]]
+    .map(([now, was, baseline, before = two]) => [judge({ now, baseline, base: baseOf(before, was) }), judge({ now, baseline })]);
+  v = steps[1][0];
+  ok(steps.every(([told, untold]) => (told.fail.length === 0) === (untold.fail.length === 0)) && [0, 2, 3].every(n => steps[n][0].fail.length === 0) && v.fail.length === 1 && mended(said(v)) && /told no base/.test(said(v)) && /SHAPE_BASE=origin\/main node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(said(v)) && /src\/c\.js#tall \(line 1\): 62 lines, 6 deep/.test(said(v)),
+    "a breach the baseline covers against the base and would not cover told no base, a moved one that stands at another's listed id, fails, with --write as its mend, and nothing else does that the check told no base passes: after two pull requests that only improve, the push's own check passes (the fallback reviewer's finding on #751's seventh round)", steps.map(([told, untold]) => `${said(told)}\n${said(untold)}`).join("\n"));
+}
 v = judge({ now: { "src/b.js": long("tall", 100) }, baseline: listed([f100]) });
 ok(v.fail.length === 0 && /gone or moved/.test(noted(v)) && !/functions? pass/.test(said(v)), "a listed function that moved is no new breach: its old entry is said, for --write to list where it stands", noted(v));
 ok(mended(`FAIL: ${(() => { try { judge({ now: {}, baseline: "{}" }); return ""; } catch (e) { return e.message; } })()}`), "a baseline that is none is refused, with its mend");

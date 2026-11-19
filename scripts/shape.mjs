@@ -24,7 +24,9 @@
 // numbers that fell too. A pull request that only improves on the baseline passes and says what --write would take
 // out, which the next pull request that changes the baseline, or a cleaning task, writes; one that changes the
 // baseline and leaves such an entry standing fails, so the baseline it writes lists the debt as it is (#750, point
-// 5: improving pull requests had to rewrite this shared file, and collided); until it is written, an entry the base's
+// 5: improving pull requests had to rewrite this shared file, and collided), and so does one that leaves a breach
+// where the check told no base, as the push to the branch runs it, would find it no entry (`untold`), so that the
+// push's run passes after every pull request that passed; until it is written, an entry the base's
 // code no longer holds covers no breach, in its own place or elsewhere, where the base is told (`heldAt`), and with
 // no base told the mended one could come back unseen, the cost the owner accepted. A baseline names the readers
 // whose finds it lists ("reads"): what a reader it does not name finds is said, never failed, where the base held it
@@ -687,6 +689,15 @@ function againstBase({ config, at, self, baseline, base, found, then, old, held 
   return fail;
 }
 
+// The breaches the baseline covers against the base that a check told no base would fail, as the push to the branch
+// runs it, reading the baseline as listed: one that moved, and stands where an entry of another's is listed, which a
+// breach that stands there lends to no other (`claims`). They fail, so a pull request that passes leaves that run
+// passing (floor rule 12), and --write, told the base, lists each where it stands.
+function untold({ config, at, self, baseline, base, current, news, unread }) {
+  const apart = unclaimed(current, baseline.listed, config.marks).filter(id => !unread(id) && !news.includes(id)), n = apart.length;
+  return n ? [[`FAIL: ${plural(n, "breach", "breaches")} that ${config.baseline} ${n === 1 ? "covers" : "cover"} against ${base.name} would fail the check told no base, as the push to the branch runs it: the entry of each is listed under another id, where another breach stands now. Mend: list each where it stands with SHAPE_BASE=${base.name} node ${self} ${at} --write, and commit the baseline`, ...some(apart, current)]] : [];
+}
+
 // What the check read and does not hold, each said, never failed.
 function notesOf(read) {
   const notes = [];
@@ -721,7 +732,7 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   const { fail, later } = fresh({ config, at, self, found, current, base, news, unread });
   const lowered = staleOf({ config, at, self, baseline, wrote: told?.wrote, gone });
   fail.push(...lowered.fail);
-  if (told) fail.push(...againstBase({ config, at, self, baseline, base, found, ...told }));
+  if (told) fail.push(...againstBase({ config, at, self, baseline, base, found, ...told }), ...untold({ config, at, self, baseline, base, current, news, unread }));
   const reread = [...baseline.listed.keys()].filter(id => !current.has(id) && unread(id) && !kept(id)).length;
   return { fail, notes: [...notesOf(found.read), ...lowered.notes, ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read, kept: [...baseline.listed.keys()].filter(kept).length };
 }
