@@ -20,6 +20,8 @@ export const READERS = {
   python: "Python",
   scripts: "scripts that share one global space",
   screens: "the tests that open a screen, a window or a device",
+  clocks: "the tests that reach a real clock",
+  processes: "the tests that start another process",
 };
 // What a baseline that names no reader was written with: the check as #246 built it.
 export const FIRST_READS = ["javascript"];
@@ -33,6 +35,28 @@ export const PACKAGE_FILES = [":(glob)**/package.json", ":(glob)**/pyproject.tom
 // The clock and randomness a system of rules may not take for itself in JavaScript: each a run of tokens.
 const JS_OWN = [["Math", ".", "random"], ["Date", ".", "now"], ["performance", ".", "now"], ["new", "Date", "(", ")"], ["crypto", ".", "randomUUID"], ["crypto", ".", "getRandomValues"], ["crypto", ".", "randomBytes"], ["crypto", ".", "randomInt"]]
   .map(run => ({ run, what: run.join("").replace("new", "new ") }));
+
+// What a test reaches that costs the most time (tasks/tests.md, "A test reaches a real clock or another process only
+// where it guards it"; #457): a real clock (a sleep, a timed wait, a read of the time) and another process, each by
+// the language's own names, as runs of tokens it calls and as modules it imports; the config's "clocks" and
+// "processes" add names of a project's own. A test's code only, never what the helpers it imports reach.
+const dotted = name => name.split(".").flatMap((part, k) => (k ? [".", part] : [part]));
+const runsOf = names => names.map(what => ({ run: what.startsWith("new ") ? ["new", ...dotted(what.slice(4).replace(/\(\)$/u, "")), ...(what.endsWith("()") ? ["(", ")"] : [])] : dotted(what), what }));
+export const REACH = {
+  javascript: {
+    clock: { runs: runsOf(["setTimeout", "setInterval", "Date.now", "performance.now", "new Date()", "Atomics.wait"]), imports: ["timers", "node:timers"] },
+    process: { runs: [], imports: ["child_process", "node:child_process", "execa", "cross-spawn"] },
+  },
+  csharp: {
+    clock: { runs: runsOf(["Thread.Sleep", "Task.Delay", "DateTime.Now", "DateTime.UtcNow", "DateTimeOffset.Now", "DateTimeOffset.UtcNow", "Stopwatch.StartNew", "Environment.TickCount", "Environment.TickCount64"]), imports: [] },
+    process: { runs: runsOf(["Process.Start", "new Process", "new ProcessStartInfo"]), imports: [] },
+  },
+  python: {
+    clock: { runs: runsOf(["time.sleep", "asyncio.sleep", "time.time", "time.monotonic", "time.perf_counter", "datetime.now", "datetime.utcnow", "datetime.datetime.now", "datetime.datetime.utcnow"]), imports: [] },
+    process: { runs: runsOf(["os.system", "os.popen"]), imports: ["subprocess", "multiprocessing"] },
+  },
+};
+export const reachRuns = runsOf;
 
 const JSX_FILES = [".jsx", ".tsx"];
 // (files that are modules by their extension, whatever they hold; and types alone, which no page loads)

@@ -106,6 +106,7 @@
     "tasks/tests.md: The tests have a time mark, which never gets worse": "check: scripts/shape.mjs",
     "tasks/tests.md: A test that fails for no reason is mended or removed, never retried in silence": "audit",
     "tasks/tests.md: A test opens a screen only where the screen is what it guards": "check: scripts/shape.mjs",
+    "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check: scripts/shape.mjs",
     "tasks/tests.md: A test asserts no time measured on a real clock": "audit",
     "tasks/tests.md: A tree that passed is not run again": "check: scripts/steps.mjs, in part",
     "tasks/tests.md: What a push waits on has a time mark": [
@@ -408,6 +409,7 @@
     "tools/claude.md: Who to call": [70, 71, 73],
     "tools/codex.md: On GitHub": [169],
     "tasks/tests.md: A test asserts no time measured on a real clock": [257],
+    "tasks/tests.md: A test reaches a real clock or another process only where it guards it": [259],
     "tasks/tests.md: A tree that passed is not run again": [257]
   },
   "numbers": {
@@ -439,6 +441,7 @@
     "floor/topics/dependencies.md: Code of another publisher is named in a lock file": "correction: rule missing; outcome: robust; rare harm",
     "floor/topics/what-ships.md: A package found bad goes at once": "correction: rule missing; outcome: robust; rare harm",
     "tasks/tests.md: A test asserts no time measured on a real clock": "findings; outcome: robust",
-    "tasks/tests.md: A tree that passed is not run again": "check fires; outcome: fast"
+    "tasks/tests.md: A tree that passed is not run again": "check fires; outcome: fast",
+    "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check fires; outcome: fast"
   }
 }

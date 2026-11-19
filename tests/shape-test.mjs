@@ -13,6 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { fileOf, groupOf, LONG, MARKS, notLinked, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
+import { READERS } from "../scripts/shape-readers.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -51,6 +52,8 @@ const BAD = {
   "a package wrapped twice": config(two({ wraps: ["lodash"] }, { wraps: ["lodash"] })),
   "a circle of uses": config(two({ uses: ["view"] }, { uses: ["rules"] })),
   "screens that are no list": config({ screens: "playwright" }),
+  "clocks that are no list": config({ clocks: "Clock.Wait" }),
+  "processes that are no list": config({ processes: [3] }),
   "a selection that is no object": config({ select: ["test/a.test.js"] }),
   "a selection's unknown key": config({ select: { always: ["test/a.test.js"] } }),
   "a selection's list that is no list": config({ select: { proof: "test/a.test.js" } }),
@@ -75,7 +78,7 @@ const lostJsx = `const cast = <T>(x: T) => x;\n${long("lost", 200)}`;
 let found = survey({ "src/a.js": long("tall", 61) + long("fine", 60) + branchy + deep, "src/a.test.js": long("inATest", 200), "src/b.jsx": `export const B = () => <p>{x}</p>;\n${long("inJsx", 200)}`, "src/c.tsx": lostJsx }, cfg({ tests: ["src/a.test.js"] }), new Set(["src/a.test.js"]));
 ok(same(ids(found), ["function: src/a.js#many", "function: src/a.js#nest", "function: src/a.js#tall", "function: src/b.jsx#inJsx", "lost: src/c.tsx"]) && found.entries.get("function: src/a.js#tall").n.lines === 61 && found.entries.get("function: src/a.js#many").n.branches === 16 && found.entries.get("function: src/a.js#nest").n.depth === 5 && found.read.jsx === 1 && found.read.functions === 5,
   "a function past a mark is found: its lines, its depth, its branch points, in a file with JSX too; one at the mark and a test's are not; a file whose JSX the reader cannot follow is found as such, its functions not", ids(found));
-const lostSaid = verdict({ config: cfg({}), at: "c.json", self: "s", found, baselineText: JSON.stringify({ reads: ["javascript", "jsx", "csharp", "python", "scripts", "screens"], listed: {} }) }).fail.flat().join("\n");
+const lostSaid = verdict({ config: cfg({}), at: "c.json", self: "s", found, baselineText: JSON.stringify({ reads: Object.keys(READERS), listed: {} }) }).fail.flat().join("\n");
 ok(found.readers.get("src/a.js") === "javascript" && found.readers.get("src/b.jsx") === "jsx" && found.readers.get("src/c.tsx") === "jsx" && mended(lostSaid) && /1 file of code holds what the reader cannot follow/.test(lostSaid) && /src\/c\.tsx/.test(lostSaid),
   "each file's reader is known, and a new file the reader cannot follow fails, with its mend, so that no line hides a file's functions", lostSaid);
 found = survey({ "src/a.js": long("same", 70) + long("same", 80) }, cfg({}));
@@ -127,6 +130,25 @@ const screened = survey({
 ok(same(ids(screened).filter(id => id.startsWith("screen: ")), ["screen: Tests/FormTests.cs -> System.Windows.Forms", "screen: src/e2e/c.test.js -> @testing-library", "screen: src/e2e/c.test.js -> playwright"])
   && screened.read.screens === 2 && readerOf("screen: src/e2e/c.test.js -> playwright", screened.readers) === "screens" && fileOf("screen: src/e2e/c.test.js -> playwright") === "src/e2e/c.test.js",
   "a test that imports what opens a screen (a package named, a module under it, in C# a namespace) is an entry of the reader \"screens\"; a test of the display's own code, one of the rules, code that is no test and a package that only starts with a name are not", ids(screened));
+
+// ---- the tests that reach a real clock or start another process (#457, point 1) ----
+const reachCfg = cfg({ tests: ["src/**/*.test.js", "Tests/**", "tests/**"], clocks: ["Clock.wait"], processes: ["runTool", "spawnly"] });
+const reachTests = ["src/a.test.js", "src/b.test.js", "src/c.test.js", "src/d.test.js", "src/e.test.js", "Tests/WaitTests.cs", "tests/test_run.py"];
+const reaching = survey({
+  "src/a.test.js": "import { spawnSync } from 'node:child_process';\nconst t0 = Date.now();\n",
+  "src/b.test.js": "const said = 'Date.now and setTimeout';\nconst o = { x: 1 };\no.setTimeout(1);\n// performance.now()\n",
+  "src/c.test.js": "import { setTimeout as sleep } from 'node:timers/promises';\nawait Clock.wait(5);\nrunTool('x');\n",
+  "src/d.test.js": "import { run } from 'spawnly/sync';\nconst d = new Date();\nconst e = new Date(0);\n",
+  "src/e.test.js": "export const plain = 1;\n", "src/tool.js": "setTimeout(() => {}, 5);\nimport { exec } from 'child_process';\n",
+  "Tests/WaitTests.cs": "namespace T;\nclass WaitTests { void A() { Thread.Sleep(5); Process.Start(\"git\"); } }\n",
+  "tests/test_run.py": "import subprocess\nimport time\n\ndef test_a():\n    time.sleep(1)\n",
+}, reachCfg, new Set(reachTests));
+ok(same(ids(reaching).filter(id => /^(timed|process): /.test(id)), ["process: Tests/WaitTests.cs -> Process.Start", "process: src/a.test.js -> node:child_process", "process: src/c.test.js -> runTool", "process: src/d.test.js -> spawnly",
+  "process: tests/test_run.py -> subprocess", "timed: Tests/WaitTests.cs -> Thread.Sleep", "timed: src/a.test.js -> Date.now", "timed: src/c.test.js -> Clock.wait", "timed: src/d.test.js -> new Date()", "timed: tests/test_run.py -> time.sleep"])
+  && reaching.read.timed === 5 && reaching.read.processes === 5,
+  "a test that calls or imports what reaches a real clock or starts another process, by its language's names or the config's, is one entry of each kind, its first name in order; a name in a string, a comment, after a dot or with what follows it, and code that is no test, are none", ids(reaching).filter(id => /^(timed|process): /.test(id)));
+ok(readerOf("timed: src/a.test.js -> Date.now", reaching.readers) === "clocks" && readerOf("process: src/a.test.js -> node:child_process", reaching.readers) === "processes" && fileOf("timed: src/a.test.js -> Date.now") === "src/a.test.js",
+  "each kind is the entry of a reader of its own, \"clocks\" and \"processes\", in the test's file");
 ok(screened.reach.get("src/e2e/d.test.js") === undefined && same([...screened.reach.get("src/rules/a.test.js")], ["src/rules/a.js"]), "each file's imports of the project's own files are told, for the selection", JSON.stringify([...screened.reach]));
 
 // ---- the readers of other code ----
@@ -219,8 +241,17 @@ const screenJudge = (now, reads, baseTexts) => verdict({ config: screenCfg, at: 
   base: { name: "origin/main", baseline: JSON.stringify({ reads, listed: {} }), config: JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"] }), standing: () => ({ texts: baseTexts, tests: new Set(Object.keys(baseTexts).filter(f => f.endsWith(".test.js"))) }) } });
 v = screenJudge(viewTest, ["javascript", "jsx", "csharp", "python", "scripts"], viewTest);
 ok(v.fail.length === 0 && v.notes.some(n => /1 test file of 1 opens a screen/.test(n)) && v.notes.some(n => /tests that open a screen.*1 breach that stood before/.test(n)), "a test that opened a screen before the baseline named the reader is counted and said, never failed", JSON.stringify(v));
-v = screenJudge(viewTest, ["javascript", "jsx", "csharp", "python", "scripts", "screens"], view);
+v = screenJudge(viewTest, Object.keys(READERS), view);
 ok(mended(said(v)) && /1 test imports what opens a screen/.test(said(v)) && /beneath the screen/.test(said(v)), "once it does, a new test that opens one fails, its mend to test beneath the screen or give its reason", said(v));
+const timedTest = { "src/view/b.js": "export const b = 1;\n", "src/view/b.test.js": "import { b } from './b.js';\nimport { execFileSync } from 'node:child_process';\nconst t = Date.now();\n" };
+const reachJudge = (now, reads, baseTexts) => verdict({ config: reachCfg, at: "checks/shape.json", self: "core/scripts/shape.mjs", found: survey(now, reachCfg, new Set(Object.keys(now).filter(f => f.endsWith(".test.js")))), baselineText: JSON.stringify({ reads, listed: {} }),
+  base: { name: "origin/main", baseline: JSON.stringify({ reads, listed: {} }), config: JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"] }), standing: () => ({ texts: baseTexts, tests: new Set(Object.keys(baseTexts).filter(f => f.endsWith(".test.js"))) }) } });
+const before = reachJudge(timedTest, Object.keys(READERS).filter(r => r !== "clocks" && r !== "processes"), timedTest);
+ok(before.fail.length === 0 && before.notes.some(n => /1 test file of 1 reaches a real clock/.test(n)) && before.notes.some(n => /1 test file of 1 starts another process/.test(n)) && before.notes.some(n => /reach a real clock, the tests that start another process: 2 breaches that stood before/.test(n)),
+  "a test that reached a clock or started a process before the baseline named the readers is counted and said, never failed (a sync turns nothing red)", JSON.stringify(before));
+const after = said(reachJudge(timedTest, Object.keys(READERS), { "src/view/b.js": timedTest["src/view/b.js"] }));
+ok(mended(after) && /1 test reaches a real clock/.test(after) && /beneath the clock/.test(after) && /1 test starts another process/.test(after) && /beneath the process/.test(after),
+  "once it does, a new one of each fails, its mend to test beneath the clock or the process, or give its reason under \"grown\"", after);
 v = judge({ now: {}, conf: cfg({ marks: { lines: 80 } }), baseline: JSON.stringify({ grown: { "mark: lines": "the generated tables run to 75 lines each" }, listed: {} }), base: baseOf(listed([]), {}, config({})) });
 ok(v.fail.length === 0, "and pass where \"grown\" gives the raise its reason");
 const named = cfg({ systems: { rules: { paths: ["src/rules/"] } } });
@@ -233,9 +264,9 @@ ok(v.fail.length === 0, "a use declared in the config with its first import pass
 ok(parseBaseline(JSON.stringify({ audited: { day: "2026-11-15", listed: 3, read: 90 }, listed: {} }), "b.json", "").audited.listed === 3, "a baseline keeps the day and the counts of its last audit");
 
 // a reader the baseline does not name yet: what the base held of it is said, never failed (a sync turns nothing red)
-const csBig = { "src/A.cs": `namespace N;\nclass A {\n${csLong("Big", 70)}}\n` }, allReads = { reads: ["javascript", "jsx", "csharp", "python", "scripts", "screens"] };
+const csBig = { "src/A.cs": `namespace N;\nclass A {\n${csLong("Big", 70)}}\n` }, allReads = { reads: Object.keys(READERS) };
 v = judge({ now: csBig, baseline: listed([]), base: baseOf(listed([]), csBig) });
-ok(v.fail.length === 0 && v.notes.some(n => /written before the check read files that hold JSX, C#, Python, scripts that share one global space, the tests that open a screen, a window or a device: 1 breach that stood before is not listed yet/.test(n) && /--write/.test(n)),
+ok(v.fail.length === 0 && v.notes.some(n => /written before the check read files that hold JSX, C#, Python, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process: 1 breach that stood before is not listed yet/.test(n) && /--write/.test(n)),
   "a baseline written before a reader came: what the base held of it is said, not failed", JSON.stringify(v));
 v = judge({ now: { ...csBig, "src/B.cs": `namespace N;\nclass B {\n${csLong("New", 70)}}\n` }, baseline: listed([]), base: baseOf(listed([]), csBig) });
 ok(mended(said(v)) && v.fail.length === 1 && /1 function passes/.test(said(v)) && /B\.cs#New/.test(said(v)) && !/A\.cs/.test(said(v)), "and what is new of it fails, from the sync on", said(v));
@@ -250,7 +281,7 @@ ok(mended(said(v)) && /src\/b\.tsx/.test(said(v)) && /cannot follow/.test(said(v
 const refusedReads = reads => { try { parseBaseline(JSON.stringify({ reads, listed: {} }), "b.json", ""); return ""; } catch (e) { return `FAIL: ${e.message}`; } };
 ok(mended(refusedReads("all")) && mended(refusedReads(["javascript", "cobol"])), "readers that are no list, or a name no reader has, are refused, with their mend");
 v = judge({ now: csBig, baseline: JSON.stringify({ reads: ["javascript"], listed: {} }), base: baseOf(JSON.stringify({ ...allReads, listed: { "function: src/A.cs#Big": { lines: 70, depth: 0, branches: 0 } } }), csBig) });
-ok(mended(said(v)) && /no longer names 5 readers that origin\/main's names: jsx, csharp, python, scripts, screens/.test(said(v)), "a baseline that drops a reader its base named fails, so that what it lists cannot go unlisted while it stands", said(v));
+ok(mended(said(v)) && /no longer names 7 readers that origin\/main's names: jsx, csharp, python, scripts, screens, clocks, processes/.test(said(v)), "a baseline that drops a reader its base named fails, so that what it lists cannot go unlisted while it stands", said(v));
 
 // ---- whole runs, in a scratch repository ----
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shape-test-"));
@@ -362,14 +393,14 @@ git("checkout", "-q", "--", ".");
 put("checks/shape.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"checks/shape-baseline.json"', '"checks/moved.json"'));
 put("checks/moved.json", JSON.stringify({ reads: ["javascript"], listed: {} }));
 r = run([], { SHAPE_BASE: "base" });
-ok(r.status === 1 && mended(r.out) && /no longer names 5 readers/.test(r.out), "a baseline moved to a new path is compared with the one the base's config names: its readers too only grow", r.out);
+ok(r.status === 1 && mended(r.out) && /no longer names 7 readers/.test(r.out), "a baseline moved to a new path is compared with the one the base's config names: its readers too only grow", r.out);
 fs.rmSync(path.join(dir, "checks/moved.json"));
 git("checkout", "-q", "--", ".");
 put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/other.json` |\n");
 put("checks/other.json", fs.readFileSync(path.join(dir, "checks/shape.json"), "utf8").replace('"checks/shape-baseline.json"', '"checks/moved.json"'));
 put("checks/moved.json", JSON.stringify({ reads: ["javascript"], listed: {} }));
 r = run([], { SHAPE_BASE: "base" });
-ok(r.status === 1 && mended(r.out) && /no longer names 5 readers/.test(r.out), "a config moved by the manifest is compared with the one the base's own manifest names, its baseline too", r.out);
+ok(r.status === 1 && mended(r.out) && /no longer names 7 readers/.test(r.out), "a config moved by the manifest is compared with the one the base's own manifest names, its baseline too", r.out);
 for (const f of ["core-manifest.md", "checks/other.json", "checks/moved.json"]) fs.rmSync(path.join(dir, f));
 git("checkout", "-q", "--", ".");
 put("core-manifest.md", "| *shape check* | `core/scripts/shape.mjs` with `checks/gone.json` |\n");
