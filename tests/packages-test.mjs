@@ -221,6 +221,12 @@ try {
     "install.mjs parser installs the parser's alone, and its package then loads from there", `${parser.stdout}${parser.stderr}${named.stdout}${named.stderr}`);
   fs.rmSync(path.join(pp, "node_modules"), { recursive: true, force: true });
   const every = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "all"], { cwd: project, encoding: "utf8", timeout: 300000, env });
+  // (what the sync and the starter kit hand a copy's installer: `all` where the copy holds the parser's package list,
+  // nothing for an older copy's, which knows no other word: #719)
+  const { everyInstall } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href);
+  const older = path.join(tmp, "older-copy");
+  fs.mkdirSync(path.join(older, ".packages"), { recursive: true });
+  ok(JSON.stringify(everyInstall(copy)) === '["all"]' && JSON.stringify(everyInstall(older)) === "[]", "the sync and the starter kit name every install to a copy that holds the parser's package list, and none to an older copy's installer");
   ok(every.status === 0 && /into \.packages\/node_modules\//u.test(every.stdout) && /into \.packages\/parser\/node_modules\//u.test(every.stdout) && loadParser().status === 0, "and install.mjs all installs every one, as the sync and the starter kit run it", `${every.stdout}${every.stderr}`);
   // (an install npm recorded for another lock file is no install of this one: the package did not run)
   const record = path.join(pk, "node_modules/.package-lock.json"), kept = fs.readFileSync(record, "utf8");

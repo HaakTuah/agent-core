@@ -21,6 +21,13 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 export const INSTALLS = { npm: ".packages", parser: ".packages/parser" };
 
 const FIRST = Object.keys(INSTALLS)[0];
+
+// What to hand the installer of a copy of the core at `copy` (a folder holding scripts/install.mjs) so that it installs
+// every one of its installs, as the sync and the starter kit run it: `all`, where the copy holds the parser's package
+// list, which came with that word (#719); nothing, for an older copy's installer, which knows no word but its first.
+export function everyInstall(copy) {
+  return fs.existsSync(path.join(copy, INSTALLS.parser, "package.json")) ? ["all"] : [];
+}
 // The install whose package list names `name`, the first where none does; and, of each, its folder and how a package
 // is found from there.
 const lists = {};
