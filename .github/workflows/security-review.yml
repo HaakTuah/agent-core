@@ -293,7 +293,7 @@ jobs:
           # (a summary of Codex's it cannot read: the check's own fixed words, never the comment's)
           if jq -e '.warning' "$d/out.json" > /dev/null; then echo "::warning::$(jq -r '.warning' "$d/out.json")"; fi
           if ! jq '.status' "$d/out.json" | timeout 20 gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then
-            echo "::error::FAIL the security-review status of $sha could not be posted: the host refused it or gave no answer within 20 seconds (its error, if any, is above), so the code-review status was not posted either. Mend: where the error above is a timeout, a lost connection or a 5xx, run this job again from the pull request's checks; otherwise mend what it names, then run it again."
+            echo "::error::FAIL the security-review status of $sha could not be posted: the host refused it or gave no answer within 20 seconds (its error, if any, is above), so the code-review status was not posted either. Mend: where no error shows above (the 20 seconds ran out), or it is a lost connection, a 5xx or a rate limit, run this job again from the pull request's checks; otherwise mend what it names, then run it again."
             false
           fi
           # the second status, code-review: whether a code review running on that commit has finished (a default branch
