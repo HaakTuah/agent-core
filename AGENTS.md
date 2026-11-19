@@ -471,7 +471,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   the order it is read in, changes. Reason: of 39 pull requests merged between 18 and 19 November 2026, 8 changed
   `INVENTORY.md`, and under merge-on-green pull requests that add to one file merge side by side and collide. Held by
   `tests/mend-test.mjs`, which reads the inventory whole, and fails a folder `INVENTORY.md` does not name and a part's
-  line written in `INVENTORY.md` itself under a heading whose parts stand in a folder.
+  line written in `INVENTORY.md` itself.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
   `tests/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its
