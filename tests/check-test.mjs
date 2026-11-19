@@ -21,14 +21,36 @@ const { ok, done } = tally();
 const { tmp, git, core, project } = scratch("check-test-");
 // (the core's packages installed by the real npm once, and linked into each job's clone after: npm-once.mjs)
 const env = npmOnce(scratchEnv(core, tmp), tmp);
-// (the licence scan passes npm-once.mjs over, so what it may run is held here: Node's own modules alone, one process
-// started, the real npm's, and nothing fetched by name or address)
+// (the licence scan passes npm-once.mjs over, so what it may run is held here: Node's own modules alone, loaded by
+// name; one process started, the real npm's; and, run against a real npm that logs what it is given, every command
+// passed on as it came, and npm ci's run with its files unchanged)
 {
   const text = fs.readFileSync(path.join(root, "scripts", "npm-once.mjs"), "utf8");
-  const loads = [...text.matchAll(/\bfrom\s+["']([^"']+)["']|\b(?:require|import)\(\s*["'`]([^"'`]+)["'`]/gu)].map(m => (m[1] ?? m[2]).replace(/^node:/u, ""));
-  ok(loads.length > 0 && loads.every(m => ["fs", "path", "child_process", "crypto"].includes(m)), "npm-once.mjs, which the licence scan passes over, loads Node's fs, path, child_process and crypto alone", loads.join(", "));
-  ok((text.match(/\b(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|fork)\s*\(/gu) ?? []).length === 1 && /\breal = cwd => spawnSync\(/u.test(text), "and it starts one process, the real npm, with the arguments it was given");
-  ok(!/\bnpx\b|https?:|\bfetch\s*\(|\bcurl\b|\bwget\b/iu.test(text), "and it fetches nothing by name or address");
+  const loads = [...text.matchAll(/\bfrom\s+["']([^"']+)["']|\b(?:require|import)\(\s*["'`]([^"'`$]+)["'`]\s*\)/gu)].map(m => (m[1] ?? m[2]).replace(/^node:/u, ""));
+  const calls = (text.match(/\b(?:require|import)\s*\(/gu) ?? []).length, froms = (text.match(/\bfrom\s+["']/gu) ?? []).length;
+  ok(loads.length === calls + froms && loads.every(m => ["fs", "path", "child_process", "crypto"].includes(m)), "npm-once.mjs, which the licence scan passes over, loads Node's fs, path, child_process and crypto alone, each by its name", loads.join(", "));
+  ok((text.match(/(?<![.\w$])(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|fork)\s*\(/gu) ?? []).length === 1, "and it starts one process");
+  ok(!/(?<![.\w$])(?:fetch\s*\(|WebSocket\b|EventSource\b)/u.test(text), "and it reaches the network by none of Node's own globals");
+  const probe = path.join(tmp, "npm-once-probe"), fake = path.join(probe, "real"), log = path.join(probe, "log.jsonl"), work = path.join(probe, "work");
+  fs.mkdirSync(fake, { recursive: true }); fs.mkdirSync(work);
+  const logger = path.join(fake, "log.cjs");
+  fs.writeFileSync(logger, `const fs = require("fs"), path = require("path"), files = {};
+for (const f of ["package.json", "package-lock.json", ".npmrc"]) if (fs.existsSync(f)) files[f] = fs.readFileSync(f, "utf8");
+fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd(), files }) + "\\n");
+if (process.argv[2] === "ci") fs.mkdirSync("node_modules", { recursive: true });
+`);
+  if (process.platform === "win32") fs.writeFileSync(path.join(fake, "npm.cmd"), `@"${process.execPath}" "${logger}" %*\r\n`);
+  else fs.writeFileSync(path.join(fake, "npm"), `#!/bin/sh\nexec '${process.execPath}' '${logger}' "$@"\n`, { mode: 0o755 });
+  const PATHKEY = Object.keys(process.env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
+  const probed = npmOnce({ ...process.env, [PATHKEY]: `${fake}${path.delimiter}${process.env[PATHKEY]}` }, probe);
+  const shim = path.join(probe, "npm-once", process.platform === "win32" ? "npm.cmd" : "npm");
+  const files = { "package.json": '{"name":"p"}\n', "package-lock.json": '{"lockfileVersion":3}\n', ".npmrc": "ignore-scripts=true\n" };
+  for (const [f, body] of Object.entries(files)) fs.writeFileSync(path.join(work, f), body);
+  const asked = [["view", "left-pad", "version"], ["ci", "--ignore-scripts", "--no-audit"]];
+  for (const args of asked) spawnSync(shim, args, { cwd: work, env: probed, stdio: "ignore", shell: process.platform === "win32" });
+  const got = fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim().split("\n").map(l => JSON.parse(l)) : [];
+  ok(got.length === 2 && got.every((g, i) => JSON.stringify(g.args) === JSON.stringify(asked[i])), "and run with a command, it runs the real npm once with exactly the arguments it was given, npm ci's too", JSON.stringify(got.map(g => g.args)));
+  ok(got[1] && path.resolve(got[1].cwd) !== path.resolve(work) && JSON.stringify(got[1].files) === JSON.stringify(files) && fs.existsSync(path.join(work, "node_modules")), "and npm ci runs in a folder of its own with the package list, lock file and .npmrc unchanged, linked back as node_modules", JSON.stringify(got[1] ?? null));
 }
 const check = (dir, ...args) => { const r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), ...args], { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 const commit = (dir, what) => { git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", what); };
