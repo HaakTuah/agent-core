@@ -55,8 +55,8 @@ its links to #41 and #42 name `HaakTuah/agent-core`; its pointer to the README's
   one number the measurement itself sets, which "a time, a cost, a chance" does not plainly name; "Using a feature must
   pay" and "No solutions, only trade-offs" both naming the group that never uses it: each is its own principle's check.
 - `setup/server.md`: step 9's "on Sonnet" beside `claude.md`'s orchestrator row, step 6's high effort beside
-  `codex-building.md`'s step 2, and "a clone of its own" in the agents' instructions beside `orchestrating.md`: the
-  owner's own steps, and a block he copies by hand outside every repository.
+  `codex-building.md`'s step 2, and "a clone of its own" in the agents' instructions beside `orchestrating.md`: set-up
+  steps for a machine, which stay as they are.
 - The *Codex environment* slot, used only in the README: "Status" says every project has one today; the slot says what
   each has, filled at step 3.
 - `reviews.md`, point 6, and the README's setup both saying a request runs a code review alone: the builders' rule and

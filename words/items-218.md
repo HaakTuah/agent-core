@@ -95,10 +95,9 @@ What these are and how they are kept: `words/README.md`.
      says when the review saw an earlier commit; that a posted review counts from the *owner's account* by default, and
      from another account only where the project names it, and only after what it settles; and that the status is
      required in the core first, then in the owner's own projects once the count is made there, and elsewhere only where
-     that project's owner makes it so. Told those answers, the owner asked of a project of another owner, built on that
-     owner's own computer:
+     that project's owner makes it so. Told those answers, the owner asked of a project of another owner:
 
-     > 3. But what about […]? […] does the reviews through the plug-in? Our system is not cloud and gihub only.
+     The owner's reason: where the reviews do not all run through GitHub, the status must still count them.
 
      So where no review starts by itself, every security review is a posted comment from that project's *owner's
      account*, counted with nothing to set; a pure sync passes by the proof alone; in a private repository the job
@@ -128,7 +127,7 @@ What these are and how they are kept: `words/README.md`.
      > HaakTuah is not nessecarily a permanent name, while […] more probably is. […] So I favor a solution which
      > excempts just this kind of file.
 
-     and, of a project of another owner, held by a company:
+     and, of a project of another owner:
 
      > […] also ought to be able to do that in such an file.
 
@@ -171,14 +170,14 @@ What these are and how they are kept: `words/README.md`.
      So a tripped sign, and a pass twice a year, each ending in a suggestion to the owner, never an act. Of a feature
      and another language:
 
-     > New features, does it ever evaluate another stack or code language? Like many godot games write much of their
-     > code in rust for performance? Or does it always stick religiously to what is already there
+     > New features, does it ever evaluate another stack or code language? […] Or does it always stick religiously to
+     > what is already there
 
-     > Seems sensible to me to just let them write the consuming parts in rust forexample, without having to try to fit
-     > it into say c# first or something. And not wait on me to make it good?
+     > Seems sensible to me to just let them write the consuming parts in […] forexample, without having to try to fit
+     > it into […] first or something. And not wait on me to make it good?
 
-     > And a split should maybe preferably be decided earlier, from the start? Like if you have a godot project? Write
-     > it some in this and some in that based on cealr sensible criterias, that anchors why there is such a division?
+     > And a split should maybe preferably be decided earlier, from the start? […] Write it some in this and some in
+     > that based on cealr sensible criterias, that anchors why there is such a division?
 
      So the stack is kept by default and left for a part only on a measured miss, the trial a benchmark of the heavy
      path, the session deciding, the owner asked in two cases only, and a split decided at the start where a project's
@@ -280,7 +279,7 @@ What these are and how they are kept: `words/README.md`.
 
      > Is the auditor aware of its mandate, and does it have clear, sensible, standardized criterias
 
-     Of a part that is rewritten, and of a project bound to one platform from its start on a tool's advice:
+     Of a part that is rewritten, and of a platform choice made at a project's start:
 
      > what about what you said about not keeping everything the same when rewriting parts of a project?
 

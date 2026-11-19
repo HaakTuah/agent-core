@@ -51,14 +51,16 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
 ## The checks on a pull request
 
 - `scripts/copies.mjs`, `.github/workflows/copies.yml`, `scripts/blobs.mjs`, `scripts/whole-output.mjs`,
-  `.github/copies.json`, `.github/copies-baseline.json`, `tests/copies-tools-test.mjs`: fails a run of code (8 lines) or
+  `scripts/schemas.mjs`, `scripts/schemas/`, `.github/copies.json`, `.github/copies-baseline.json`,
+  `tests/copies-tools-test.mjs`: fails a run of code (8 lines) or
   of the rule files' prose (12 words) that stands in two places, unless its baseline lists it; `copies.yml` runs it and
   the other checks of the part "copies" through `scripts/checks.mjs`. *Runs:* any session and the runners. *Else:* jscpd
   (MIT, maintained, a program for each system, 224 languages, Markdown among them), kept, tried above; PMD's CPD,
   dropped on fact: a Java runtime; Simian, dropped on fact: no licence the Open Source Initiative approves. *Bugs:* 9,
   and 4 naming `copies.yml`, the most of any check. **Try** jscpd for the finding, its definition taking the core's
   place by default (#534, point 3); the baseline and the near-copies the audit reads stay the core's glue. This weighs
-  again the "Kept" of #486's inventory, whose reason was the core's own definition.
+  again the "Kept" of #486's inventory, whose reason was the core's own definition. Its config's shape is held by a
+  schema and ajv (`scripts/schemas.mjs`; #530, item 7).
 - `scripts/pointers.mjs`, `scripts/rule-files.mjs`, `scripts/markdown.mjs`: fails a pointer in the rule files, to a
   file, a section, a numbered point, a floor rule or an archive item, that leads nowhere. *Runs:* any session and the
   runners. *Else:* lychee (offline, with Markdown's anchors), remark-validate-links, markdown-link-check and linkinator,
@@ -107,10 +109,10 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   reads each sign written in a measure. *Runs:* any session and the runners. *Else:* none found; the decision records'
   tools (adr-tools, log4brains) write records and check no form. *Bugs:* 1. **Keep:** nothing fits; the form is the
   core's.
-- `scripts/checks.mjs`, `scripts/check.mjs`, `scripts/guards.mjs`, `scripts/started.mjs`: runs the checks that need no
-  secret, part by part, as the workflows do and as a session may by hand. *Runs:* any session and the runners. *Else:* a
-  task runner (npm scripts, just, make), dropped on fact: a project in another stack has none of npm's, and the others
-  are installs. *Bugs:* 2. **Keep:** small and stable glue.
+- `scripts/checks.mjs`, `scripts/check.mjs`, `scripts/guards.mjs`, `scripts/started.mjs`, `scripts/npm-once.mjs`: runs
+  the checks that need no secret, part by part, as the workflows do and as a session may by hand. *Runs:* any session
+  and the runners. *Else:* a task runner (npm scripts, just, make), dropped on fact: a project in another stack has none
+  of npm's, and the others are installs. *Bugs:* 2. **Keep:** small and stable glue.
 - `scripts/pr-description.mjs`, `.github/workflows/pr-description.yml`, `.github/workflows/own-description.yml`,
   `scripts/milestones.mjs`, `scripts/done-when.mjs`, `scripts/owner-yes.mjs`: fail a ready pull request whose
   description lacks a heading the project names, and, here, the lines the core asks, saying so of a draft. *Runs:* the
@@ -210,7 +212,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   a subtree, a package, a fetched release, the host's reusable workflows, vendir), each weighed there. *Bugs:* 3 and 1.
   **Keep:** #519's record, judged on merit on 17 November.
 - `.github/workflows/security-review.yml`, `.github/workflows/own-security-review.yml`, `scripts/security-review.mjs`,
-  `scripts/code-review-wait.mjs`, `scripts/clean-merges.mjs`, `scripts/pure-sync.mjs`, `scripts/comment-only.mjs`: give
+  `scripts/code-review-wait.mjs`, `scripts/review-marks.mjs`, `scripts/clean-merges.mjs`, `scripts/pure-sync.mjs`,
+  `scripts/comment-only.mjs`: give
   each pull request's head the statuses that say whether its security review has run and a running code review has
   finished, and prove a sync pure. *Runs:* the runners, with the host's statuses. *Else:* the host's required reviews,
   dropped on fact: they wait for a person's approval; hosted review bots, dropped on fact: paid on a private repository,
