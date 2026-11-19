@@ -16,7 +16,7 @@ import { CORE } from "../scripts/core-address.mjs";
 import { coreIsFolder, entries } from "../scripts/copy-tree.mjs";
 import { MANIFEST_MAX, UNREADABLE, differencesAdded, reasonsMend } from "../scripts/pr-description.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { conditions, cuts, total } from "../scripts/read-total.mjs";
+import { LIMITS, conditions, cuts, total, tree as readTree } from "../scripts/read-total.mjs";
 import { scratchDir, scratchEnv, root } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
@@ -280,6 +280,39 @@ ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "co
   ok(!binary.cut && !binary.failures.length, "read-total: a file of binary text is no cut, and fails nothing");
   ok(!run({ ...base, "tasks/../../etc.md": base["tasks/s.md"] }).failures.some(f => /[\u0000-\u001f]/u.test(f)), "read-total: a path that climbs out of its folder is a name, printed as it is, and opens nothing");
   ok(!run(base).cut && !run({}).failures.some(f => !mended(`FAIL: ${f}`)) && JSON.stringify(cuts(total(memory({}), []), total(memory({}), []))) === JSON.stringify({ added: [], gone: [] }), "read-total: nothing at all is no cut, and each failure on an empty tree says its mend");
+}
+
+// read-total.mjs's reader of the working tree, as the size workflow reads a fork's checkout (#469): a link to a pipe, to
+// an endless device or out of the tree, a file past its limit in bytes, and more files or kinds than it reads; each is
+// read as no file or refused with its mend, within the 5 s SECURITY.md allows
+{
+  const dir = path.join(tmp, "read-total"), put = (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
+  put("floor/security.md", "# F\n");
+  put("roles/builder.md", "# B\n\nRead at the start by the role `builder`.\n\n**Reads at its start:** `roles/shared/w.md`.\n");
+  put("roles/shared/w.md", "# W\n\nRead at the start of every task.\n");
+  put("tasks/s.md", "# S\n\nRead when a screen changes: the kind `screen`.\n");
+  put("outside.md", "# O\n\nRead when a screen changes: the kind `screen`.\n");
+  const link = (to, f) => { try { fs.symlinkSync(to, path.join(dir, f)); return true; } catch { return false; } };
+  const linked = [link(path.join(dir, "outside.md"), "tasks/out.md"), link("/dev/zero", "tasks/zero.md"), link(path.join(dir, "roles"), "tasks/folder.md")];
+  if (NAMES && spawnSync("mkfifo", [path.join(dir, "tasks/pipe.md")]).status === 0) linked.push(true);
+  link(path.join(dir, "roles"), "tools");
+  put("tasks/big.md", `# G\n\nRead when a screen changes: the kind \`screen\`.\n\n${"x".repeat(LIMITS.bytes + 10)}\n`);
+  let slow = Date.now();
+  const t = readTree(null, dir), files = t.list("tasks");
+  ok(linked.every(Boolean) ? files.join() === "tasks/big.md,tasks/s.md" && t.read("tasks/zero.md") === null && t.size("tasks/out.md") === null && t.list("tools").length === 0 && Date.now() - slow < 5000 : true,
+    "read-total: a link to a pipe, to an endless device, out of the tree or to a folder, and a folder that is a link, are read as no file, in no time");
+  ok(t.read("tasks/big.md") === null && t.size("tasks/big.md") > LIMITS.bytes, "read-total: a file past its limit in bytes is counted by its size, its text never read");
+  put("tasks/kinds.md", `# K\n\nRead when anything changes: ${Array.from({ length: 40000 }, (_, i) => `the kind \`k${i}\``).join(", ")}.\n`);
+  slow = Date.now();
+  let thrown = null;
+  try { total(readTree(null, dir), []); } catch (e) { thrown = e; }
+  ok(thrown && mended(`FAIL: ${thrown.message}`) && Date.now() - slow < 5000, "read-total: a module of under a megabyte naming forty thousand kinds is refused with its mend, within 5 s");
+  fs.rmSync(path.join(dir, "tasks/kinds.md"));
+  for (let i = 0; i < 5000; i++) put(`tasks/m${i}.md`, "# M\n\nRead when a screen changes: the kind `screen`.\n");
+  slow = Date.now();
+  thrown = null;
+  try { total(readTree(null, dir), []); } catch (e) { thrown = e; }
+  ok(thrown && mended(`FAIL: ${thrown.message}`) && Date.now() - slow < 5000, "read-total: five thousand modules added are refused with their mend, within 5 s");
 }
 
 process.exit(failed ? 1 : 0);

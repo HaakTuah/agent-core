@@ -51,19 +51,28 @@ const git = (args, encoding = "utf8") => execFileSync("git", ["--no-optional-loc
 // Each line printed, its control characters written out, so that no name a pull request gives starts a line of its own.
 const safe = s => String(s).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
 
-// A tree to read: the working tree (rev null) or a commit's. { read(f) → text | null, list(folder) → [path], size(f) → bytes }
-export function tree(rev = null) {
+// What the total read reads at most, on either tree: a file of this many bytes (past it, its size alone is counted, and
+// its text is not read), and this many rule files and kinds of task, past which it fails, saying so. The core holds
+// about a hundred files of 150 KB at most, and about fifty kinds.
+export const LIMITS = { bytes: 1 << 20, files: 1000, kinds: 500 };
+
+// A tree to read: the working tree at `root` (rev null) or a commit's. { read(f) → text | null, list(folder) → [path],
+// size(f) → bytes }. Of the working tree it reads only regular files and folders of the tree's own: a link, which could
+// lead out of it or to a pipe or a device that never ends, is read as no file (#446).
+export function tree(rev = null, root = ROOT) {
   if (!rev) {
-    const read = f => { try { return fs.readFileSync(path.join(ROOT, f), "utf8"); } catch { return null; } };
-    const list = folder => { try { return fs.readdirSync(path.join(ROOT, folder)).filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`); } catch { return []; } };
-    const size = f => { try { return counted(fs.readFileSync(path.join(ROOT, f))); } catch { return null; } };
+    const real = fs.realpathSync(root);
+    const own = (f, kind) => { try { const p = path.join(root, f); if (fs.realpathSync(p) !== path.join(real, f)) return null; const st = fs.statSync(p); return st[kind]() ? st : null; } catch { return null; } };
+    const read = f => { const st = own(f, "isFile"); if (!st || st.size > LIMITS.bytes) return null; try { return fs.readFileSync(path.join(root, f), "utf8"); } catch { return null; } };
+    const list = folder => { if (!own(folder, "isDirectory")) return []; try { return fs.readdirSync(path.join(root, folder)).filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`).filter(f => own(f, "isFile")); } catch { return []; } };
+    const size = f => { const st = own(f, "isFile"); if (!st) return null; if (st.size > LIMITS.bytes) return st.size; try { return counted(fs.readFileSync(path.join(root, f))); } catch { return null; } };
     return { read, list, size };
   }
   const texts = new Map();
   const blob = f => { if (!texts.has(f)) { try { texts.set(f, git(["show", `${rev}:${f}`], "buffer")); } catch { texts.set(f, null); } } return texts.get(f); };
-  const read = f => blob(f)?.toString("utf8") ?? null;
+  const read = f => { const b = blob(f); return b && b.length <= LIMITS.bytes ? b.toString("utf8") : null; };
   const list = folder => { try { return git(["ls-tree", "-z", "--name-only", `${rev}:${folder}`]).split("\0").filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`); } catch { return []; } };
-  const size = f => { const b = blob(f); return b ? counted(b) : null; };
+  const size = f => { const b = blob(f); return b ? (b.length > LIMITS.bytes ? b.length : counted(b)) : null; };
   return { read, list, size };
 }
 
@@ -92,6 +101,8 @@ const filesOf = (lib, r) => (r.error ? [] : [ENTRY, ...r.start, ...Object.entrie
 // on both, as what it reads where its file or its kind's last module is gone.
 export function total(t, given, like = null) {
   const lib = gather(t.read, t.list), readers = new Map();
+  const files = Object.keys(lib.roles).length + Object.keys(lib.modules).length, many = kindsOf(lib).size;
+  if (files > LIMITS.files || many > LIMITS.kinds) throw new Error(`the rule files name ${files} files and ${many} kinds of task, past the ${LIMITS.files} files and ${LIMITS.kinds} kinds the total read reads. Mend: keep the rule files to what the core holds, a module for each subject, each naming the few kinds of task that read it`);
   const roles = [...new Set([...Object.values(lib.roles).map(r => r.name), ...(like?.roles ?? [])])].sort();
   const kinds = [...new Set([...kindsOf(lib).keys(), ...(like?.kinds ?? [])])].sort();
   for (const role of roles) readers.set(`the role ${role}, at its start`, cost(t, filesOf(lib, { ...reading(lib, { role }), task: [] })));
@@ -106,9 +117,10 @@ const kb = n => `${(n / 1024).toFixed(1)} KB`;
 // A text's sentences, its lines joined and its list marks and spacing set aside, so that a move whose lines are wrapped
 // anew is still seen.
 const linesOf = text => new Set(textOf(text).replace(/^\s*(?:[-*+]|\d+\.)\s+/gmu, "").replace(/\s+/gu, " ").split(/(?<=[.;:!?])\s/u).map(l => l.trim()).filter(l => l.length >= CUT.long));
-// The share of `mine`'s long lines that stand in `others`' texts, and how many.
-function standIn(mine, others) {
-  const there = new Set(others.flatMap(t => [...linesOf(t)]));
+// The sentences of all the texts given, gathered once.
+const allOf = texts => new Set(texts.flatMap(t => [...linesOf(t)]));
+// The share of `mine`'s sentences that stand in `there` (a set of sentences), and how many.
+function standIn(mine, there) {
   const hit = [...mine].filter(l => there.has(l)).length;
   return { hit, share: mine.size ? hit / mine.size : 0 };
 }
@@ -118,12 +130,13 @@ const moved = s => s.hit >= CUT.lines && s.share >= CUT.share;
 // text left out (CUT).
 export function cuts(base, head) {
   const added = [...head.named].filter(f => !base.named.has(f)), gone = [...base.named].filter(f => !head.named.has(f));
-  const rename = (a, g) => { const la = linesOf(head.read(a)), lg = linesOf(base.read(g)); return la.size && standIn(la, [base.read(g)]).share >= CUT.rename && standIn(lg, [head.read(a)]).share >= CUT.rename; };
+  const of = new Map([...added.map(f => [`+${f}`, linesOf(head.read(f))]), ...gone.map(f => [`-${f}`, linesOf(base.read(f))])]);
+  const rename = (a, g) => of.get(`+${a}`).size && standIn(of.get(`+${a}`), of.get(`-${g}`)).share >= CUT.rename && standIn(of.get(`-${g}`), of.get(`+${a}`)).share >= CUT.rename;
   const renamed = new Set(added.flatMap(a => gone.filter(g => rename(a, g)).flatMap(g => [a, g])));
-  const baseTexts = [...base.named].map(f => base.read(f)), headTexts = [...head.named].map(f => head.read(f));
+  const baseAll = allOf([...base.named].map(f => base.read(f))), headAll = allOf([...head.named].map(f => head.read(f)));
   return {
-    added: added.filter(a => !renamed.has(a) && moved(standIn(linesOf(head.read(a)), baseTexts))),
-    gone: gone.filter(g => !renamed.has(g) && moved(standIn(linesOf(base.read(g)), headTexts))),
+    added: added.filter(a => !renamed.has(a) && moved(standIn(of.get(`+${a}`), baseAll))),
+    gone: gone.filter(g => !renamed.has(g) && moved(standIn(of.get(`-${g}`), headAll))),
   };
 }
 
@@ -189,6 +202,8 @@ if (started(import.meta.url)) {
   if (!/^\w[\w./^~-]*$/u.test(rev)) { console.error(safe(`FAIL: ${rev} is no revision's name. Mend: name the pull request's base, as a commit or a branch`)); process.exit(1); }
   try { git(["rev-parse", "--verify", "-q", `${rev}^{commit}`]); } catch { console.error(safe(`FAIL: ${rev} is not a commit here. Mend: fetch it (git fetch origin ${rev}), or name the pull request's base`)); process.exit(1); }
   const given = tasks(rev);
+  // (rule files past what the total read reads: said with the mend, never a stack)
+  process.on("uncaughtException", e => { console.error(safe(`FAIL: ${e?.message ?? e}`)); process.exit(1); });
   if (args.includes("--candidates")) {
     const list = candidates(tree(), given);
     for (const [f, kinds, read] of list) console.log(safe(`${f}: ${kb(read)} read of it in the total, opened by ${kinds.length} kinds of task (${kinds.join(", ")})`));

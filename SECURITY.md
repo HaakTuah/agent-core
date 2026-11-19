@@ -28,9 +28,11 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
      a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`), and the rule files the
      total read sums and reads for a cut or a join (`scripts/read-total.mjs`, which prints each name with its control
-     characters written out); limits: 64 MB of git's answer (256 MB for the comments proof, the selection and the
-     total read, 16 MB for the manifest, past which it is reported unread), and none in count, since every changed
-     path is read; hostile tests: `tests/hostile-pr-changes-test.mjs`.
+     characters written out, and reads a link or what is no regular file of the checkout's own as no file); limits:
+     64 MB of git's answer (256 MB for the comments proof, the selection and the total read, 16 MB for the manifest,
+     past which it is reported unread), and none in count, since every changed path is read, save the total read's 1 MB
+     of a file's text, past which its size alone is counted, and 1,000 rule files and 500 kinds of task, past which it
+     fails with its mend; hostile tests: `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`); limits: 1 MB of the file, past
      which it is refused unread; 64 MB of an answer and 100 pages of 100 for the open issues, past which it stops;
