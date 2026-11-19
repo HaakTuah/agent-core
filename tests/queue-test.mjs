@@ -129,6 +129,7 @@ ok(cleared("- #12, 13 and 14: parts\n- #12/13 x\n- #12 & 13\n| #12\u2212#14 | b 
 const under = "- #12 the menu\n  - then #16, the sound\n  - **#17** bold\n  - [#18](u) link\n  - a note\n- #14 the save\n  - a note, with\n    #18 the load\n\t- tabbed, of #14\n- #19 x\n";
 ok(cleared(under, n => n === 12) === under.replace("- #12 the menu\n", "") && cleared(under, n => n === 14) === under.replace("- #14 the save\n  - a note, with\n", "") && cleared("- #12 a\n\t- a note\n- #13 b\n", n => n === 12) === "- #13 b\n",
   "a line under an item that names an issue anywhere ends its span and stays; a tab counts as an indent (the fallback reviewer's check of 5d45e56)");
+ok(cleared("\t- #12 a\n\t- a sibling\n\t\t- under it\n- #13 b\n", n => n === 12) === "\t- a sibling\n\t\t- under it\n- #13 b\n", "a tab counts four in an item's own indent as in the lines under it, so a tab-indented sibling stays (the fallback reviewer's check of c2c351c)");
 ok(cleared("- #12\u2212#14 x\n- #12\u2010#14 y\n", n => n !== 13) === "- #12\u2212#14 x\n- #12\u2010#14 y\n", "a minus sign or a hyphen of Unicode joins a range, in an item too");
 const big = "| #1 | b | |\n".repeat(20000) + "| #2 | b | |\n";
 linesOf(big);

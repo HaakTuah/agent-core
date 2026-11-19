@@ -67,7 +67,7 @@ export function linesOf(text) {
   const raw = String(text ?? "").split("\n"), all = raw.map(l => l.replace(/\r$/u, ""));
   return all.map((plain, at) => {
     const row = ROW.exec(plain), item = row ? null : ITEM.exec(plain);
-    const { span, wraps } = item ? wrapped(all, at, item[1].length) : { span: 1, wraps: 1 }, whole = all.slice(at, at + wraps).join(" ");
+    const { span, wraps } = item ? wrapped(all, at, item[1].replace(/\t/gu, "    ").length) : { span: 1, wraps: 1 }, whole = all.slice(at, at + wraps).join(" ");
     const head = row ? (/^\s*#\d/u.test(row[1]) ? named(row[1], true) : null) : item ? named(whole.replace(/\bwaits\s+on\b.*$/iu, ""), false) : null;
     if (!head?.issues.length) return null;
     const cells = row ? plain.split("|").slice(1, -1) : [];
@@ -77,7 +77,7 @@ export function linesOf(text) {
 }
 // What an item at `at` spans: { span, wraps }, `span` itself and each line after it indented past its bullet (its
 // wrapped text, and the lines under it that name no issue, which leave with it; one that names an issue anywhere, a
-// heading or a fence ends the span; a tab counts four), `wraps` how many of those are its own text, wrapped,
+// heading or a fence ends the span; a tab counts four, in the item's own indent too), `wraps` how many of those are its own text, wrapped,
 // before the first line that is a bullet of its own.
 const BULLET = /^\s*(?:[-*+]|\d{1,9}[.)])\s/u;
 function wrapped(all, at, indent) {
