@@ -7,8 +7,9 @@
 // and every file the base's config, and the base's SECURITY.md where it is asked, read is read still, as the same kind,
 // one renamed by its new name, or by the file that took in most of its lines (#348, #371, #434); a path may be
 // added; and a config moved, with the call that names it, is held to the one the base called (#370). It also lists the near-copies, the runs of code that match once names and numbers are set aside, and fails
-// none of them. Node's own modules only, so the check needs no install. It runs from the project's root, whatever the
-// directory it is started from.
+// none of them. Node's own modules, and the schemas' checker (schemas.mjs) for its config's shape, which where the core's
+// packages are not installed it leaves unchecked, saying so, so the check needs no install. It runs from the project's
+// root, whatever the directory it is started from.
 // The files an agent tool takes its instructions from are rule files too, read since #405 (rule-files.mjs, `toolFiles`),
 // and a project may hold copies in them from before. Nothing locks a project (AGENTS.md of the core): until the
 // baseline lists it, a copy in one of those files that the pull request's base held, in as many places, is noted and
@@ -37,6 +38,7 @@ import { inProject, leadsOut, logged, unrooted } from "./guards.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { readBlobs } from "./blobs.mjs";
 import { projectAt } from "./core-path.mjs";
+import { shapeFaults } from "./schemas.mjs";
 import { uncommented } from "./yaml-keys.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
 // core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
@@ -59,22 +61,19 @@ try { CONFIG_AT = git(["ls-files", "-z", "--full-name", "--error-unmatch", "--",
 let config;
 try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
 process.chdir(ROOT);
-// A key it does not know, or one of the wrong shape, would check less without a word, so it fails.
-const KEYS = ["baseline", "code", "prose", "proseFromSecurity"];
-const unknown = Object.keys(config || {}).filter(k => !KEYS.includes(k));
-if (!config || typeof config !== "object" || Array.isArray(config)) fail(`the config is not a JSON object. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`);
-if (unknown.length) fail(`the config holds keys it does not know: ${unknown.join(", ")}. Mend: take them out; it reads "baseline", "code", "prose" and "proseFromSecurity" alone`);
-const list = (v, key) => {
-  if (v === undefined) return [];
-  if (!Array.isArray(v) || v.some(x => typeof x !== "string" || !x)) fail(`the config's "${key}" is not a list of paths. Mend: write it as a list of git pathspecs, each a non-empty string`);
-  return v;
-};
-if (typeof config.baseline !== "string" || !config.baseline) fail(`the config names no "baseline". Mend: name the baseline's path in "baseline", as the starter kit writes it (${TEMPLATE})`);
-if (config.proseFromSecurity !== undefined && typeof config.proseFromSecurity !== "boolean") fail('the config\'s "proseFromSecurity" is not true or false. Mend: set it to true, to read the project\'s rule files, or false');
+// A key it does not know, or one of the wrong shape, would check less without a word, so it fails: its schema holds
+// the config's shape (scripts/schemas/copies.json, schemas.mjs). Where the core's packages are not installed, as in a
+// job of a project's own that ran the check before they came, the shape is not checked, said as a warning, and the
+// check goes on (AGENTS.md of the core, "Nothing locks a project"; steps.mjs asks the install).
+const faults = shapeFaults("copies", config, CORE);
+if (faults === null) console.log(`::warning::The config's shape was not checked: the package ajv is not installed beside the core's copy. Mend: in a pull request of its own, add the step node ${CORE}scripts/install.mjs to this job before the step that runs this check`);
+for (const f of faults ?? []) console.error(`FAIL: ${logged(f)}`);
+if (faults?.length) process.exit(1);
+const list = v => (Array.isArray(v) ? v : []);
 // (the baseline is read, and written, only inside the project, as a file of its own reached through no link out of it)
 if (!inProject(config.baseline) || leadsOut(ROOT, path.join(ROOT, config.baseline))) fail(`the config's "baseline", ${config.baseline}, lies outside the project. Mend: name the baseline by its path from the project's root, with no ".." that leads above it, as a file of the project's own reached through no link that leads out of it (${TEMPLATE})`);
 const BASELINE = config.baseline;
-const CODE_SPECS = list(config.code, "code"), PROSE_SPECS = list(config.prose, "prose");
+const CODE_SPECS = list(config.code), PROSE_SPECS = list(config.prose);
 let fromSecurity = null;
 // The project's rule files, as `read` and `list` find them (rule-files.mjs): those SECURITY.md lists, each a pathspec as
 // it is written there, and an agent tool's, each a literal path, so that a name of a glob's form names itself alone.

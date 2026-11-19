@@ -187,11 +187,17 @@ try {
   fs.writeFileSync(path.join(pp, "package.json"), JSON.stringify(parserList, null, 2));
   fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license, dependencies: parserList.dependencies }, "node_modules/is-number": staged } }, null, 2));
   // (each script that loads a package, by the call that loads it; a script that loads one and has no case here fails)
-  const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")`, "markdown.mjs": "markdownReader()" };
+  const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")`, "markdown.mjs": "markdownReader()", "schemas.mjs": `shapeFaults("copies", {})` };
+  // (a reader whose caller goes on without the package, saying so as a warning: it answers null, and loads nothing)
+  const ANSWERS_NULL = new Set(["schemas.mjs"]);
   const loads = fs.readdirSync(path.join(root, "scripts")).filter(f => f.endsWith(".mjs") && f !== "packages.mjs" && /\bload(?:Sync)?\("/u.test(fs.readFileSync(path.join(root, "scripts", f), "utf8")));
   ok(loads.length > 0 && loads.every(f => CALLS[f]), "each script that loads a package has its call here", loads.filter(f => !CALLS[f]).join(", "));
   const call = (f, expr) => spawnSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts", f)).href)}); console.log(JSON.stringify(m.${expr}));`], { cwd: project, encoding: "utf8", timeout: 60000, env });
-  for (const f of loads) {
+  for (const f of loads.filter(x => ANSWERS_NULL.has(x))) {
+    const r = call(f, CALLS[f]);
+    ok(r.status === 0 && r.stdout.trim() === "null", `${f}, with nothing installed beside the copy, answers null for its caller to say, and does not take the project's own package of the name`, `${r.stdout}${r.stderr}`);
+  }
+  for (const f of loads.filter(x => !ANSWERS_NULL.has(x))) {
     const r = call(f, CALLS[f]), out = `${r.stdout}${r.stderr}`;
     ok(r.status === 1 && /did not run: the package \S+ is not installed/u.test(out) && /install\.mjs/u.test(out) && mended(out), `${f}, with nothing installed beside the copy, says it did not run and how to install, and does not take the project's own package of the name`, out);
   }
