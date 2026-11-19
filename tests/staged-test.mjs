@@ -771,13 +771,15 @@ const claims = fresh("adviser-remark"), claimWhy = () => verdict("adviser-remark
 gh(claims, "POST", "issues", { title: "Cache the sums?", body: "**What it is**\nEach list's sum kept, so a long list is not added up again.\n\n**Why it matters**\nA long list would print sooner.\n\n## The session's view (not a decision)\nNot worth it yet.\n\nFound while: talking it over with the owner, as the adviser.", labels: ["enhancement", "by:builder"] });
 const claim = gh(claims, "POST", "issues/1/comments", { body: "Nothing is decided: the owner has not agreed, hasn't decided and did not decide; it is not yet decided by the owner. Has the owner agreed? I asked whether the owner chose either." });
 ok(verdict("adviser-remark", claims).pass, "adviser-remark: a view in the feature template's form labelled as an agent's, and claims denied or doubted, pass", claimWhy());
-for (const said of ["The owner decided not to cache the sums.", "The owner agreed to cache sums if the list is long.", "Caching each list's sum was approved by the owner."]) {
+for (const said of ["The owner decided not to cache the sums.", "The owner agreed to cache sums if the list is long.", "Caching each list's sum was approved by the owner.", "The sums are cached, as agreed with the owner."]) {
   gh(claims, "PATCH", `issues/comments/${claim.id}`, { body: said });
   ok(/says the owner agreed/.test(claimWhy()), `adviser-remark: "${said}" fails`, claimWhy());
 }
 gh(claims, "PATCH", `issues/comments/${claim.id}`, { body: "Should the sums be cached?" });
 gh(claims, "POST", "issues", { title: "Cache the sums?", body: VIEW.replace("## The session's view", "**What it is**\nEach list's sum kept.\n\n## The session's view"), labels: ["enhancement", "by:chat"] });
 ok(/under "What it is" in #\d+, in the owner's voice/.test(claimWhy()) && !/labelled|says the owner agreed/.test(claimWhy()), "adviser-remark: an issue in the owner's voice setting the remark out under \"What it is\" fails beside a view marked not a decision", claimWhy());
+gh(claims, "POST", "issues/1/comments", { body: "From a chat session with the owner, on #1:\n\nThis is the issue's current text.\n\n**What it is**\nEach list's sum is kept." });
+ok(/in a comment on #1, in the owner's voice or as the issue's current text/.test(claimWhy()), "adviser-remark: a comment on #1 in the owner's voice, as its current text, setting the remark out under \"What it is\" fails", claimWhy());
 
 const HELD = "From the orchestrator, on #2:\n\nHeld on the owner's adviser's word until told: #1's fix comes first.";
 const MEAN_CLI = "import { sum } from \"./sum.mjs\";\nconst a = process.argv.slice(2), mean = a[0] === \"--mean\";\nconst n = (mean ? a.slice(1) : a).map(Number);\nconsole.log(mean ? sum(n) / n.length : sum(n));\n";
@@ -802,10 +804,15 @@ gh(labelled, "POST", "issues/1/comments", { body: "From the orchestrator, on #1:
 ok(/hold of #2 is noted nowhere/.test(verdict("adviser-orders", labelled).why), "adviser-orders: a hold said of another issue, naming no #2, notes none", verdict("adviser-orders", labelled).why);
 gh(labelled, "POST", "issues/2/labels", { labels: ["on-hold"] });
 ok(verdict("adviser-orders", labelled).pass, "adviser-orders: #2 labelled on-hold notes the hold", verdict("adviser-orders", labelled).why);
+const seeded = gh(labelled, "GET", "issues/3/comments").find(c => /^Code review:/.test(c.body));
+gh(labelled, "PATCH", `issues/comments/${seeded.id}`, { body: "Security review: none needed." });
+ok(/security review of #3's of its own/.test(verdict("adviser-orders", labelled).why), "adviser-orders: #3's code review the case set, rewritten as a security review of the session's, fails", verdict("adviser-orders", labelled).why);
 // (the hold noted on #3, in a comment or its description, naming #2 or the mean; main moved by a push, in any form)
 const onThree = fresh("adviser-orders"), threeWhy = () => verdict("adviser-orders", onThree).why;
 const note = gh(onThree, "POST", "issues/3/comments", { body: "From the orchestrator, on #3:\n\nHeld for its security review." });
 ok(/hold of #2 is noted nowhere/.test(threeWhy()), "adviser-orders: a hold of #3's own, on #3, naming neither #2 nor the mean, notes none", threeWhy());
+gh(onThree, "PATCH", `issues/comments/${note.id}`, { body: "From the orchestrator, on #3:\n\nHeld for its security review; in the mean time the next line waits." });
+ok(/hold of #2 is noted nowhere/.test(threeWhy()), "adviser-orders: a hold on #3 saying \"in the mean time\", naming no #2 nor the feature, notes none", threeWhy());
 gh(onThree, "PATCH", `issues/comments/${note.id}`, { body: "From the orchestrator, on #3:\n\nThe mean's lane is on hold until the adviser says; this fix goes first." });
 ok(verdict("adviser-orders", onThree).pass, "adviser-orders: the hold noted in a comment on #3 naming the mean passes", threeWhy());
 gh(onThree, "PATCH", `issues/comments/${note.id}`, { body: "From the orchestrator, on #3:\n\nHeld for its security review." });
