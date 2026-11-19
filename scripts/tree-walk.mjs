@@ -4,10 +4,10 @@
 
 /** The largest file each reader gives its grammar, in characters, by its language: one past it has no functions told,
  *  as a file the grammar cannot read whole has none. SECURITY.md, rule 5, asks a pull request's file read within 5 s,
- *  process and parser started; at these sizes the densest text found (C#'s `f(a,a,…)` and braces nested as deep as the
- *  grammar goes, Python's `a;a;…`, one long list of either language) takes 2 to 2.3 s in the reader on a 4-core 2.1 GHz
- *  Xeon, most of C#'s in the walk after the parse, which no budget stops: C#'s `f(a,a,…)` took 2.9 s at 250,000. A file
- *  of code past them is most often data a script wrote, not code someone reads. */
+ *  process and parser started; at these sizes the densest text found (C#'s `f(a,a,…)`, after a chain of casts that
+ *  parses just inside the budget, Python's `def f(): x = a,a,…`) takes up to about 3 s through the whole selection on a
+ *  4-core 2.1 GHz Xeon, most of C#'s in the walk after the parse, which no budget stops: C#'s `f(a,a,…)` took 2.9 s in
+ *  the reader alone at 250,000. A file of code past them is most often data a script wrote, not code someone reads. */
 export const LARGEST = { javascript: 500_000, python: 500_000, csharp: 200_000 };
 
 /** How long the grammar may take on `src`, in milliseconds: a second and 4 more for each thousand characters, as
