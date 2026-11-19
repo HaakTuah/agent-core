@@ -10,8 +10,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
 | #778, point 2 | rule builder | #774 |
-| #782 | rule builder | |
-| #783 | builder | #782 |
 | #756 | rule builder | |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
 | #773 | rule builder; it changes floor rule 4 | |
@@ -57,7 +55,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #441, with #484, points 6 and 7 | rule builder; the file stays whole where #469's measure finds no kind of task reads less | #469 |
 | #471 | rule builder; it changes what the orchestrator reads at its start | |
 | #355 | builder | #530: the readers left go on the parser #529 brings |
-| #542 | rule builder; it changes what the orchestrator reads at its start | #457 |
+| #542, point 5 | rule builder | #457 |
 | #337 | builder | |
 | #426 | builder | |
 | #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467 |
