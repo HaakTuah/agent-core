@@ -97,8 +97,14 @@ ok(files(testsChanged(tmp, "HEAD^1")) === "test/sum.test.mjs", "on a branch head
 const head = testsChanged(tmp, baseOf(tmp));
 ok(files(head) === "test/q\"b.test.mjs,test/sum.test.mjs" && head.find(f => f.file === "test/sum.test.mjs").skips.length === 1, "on a branch head that is no merge, it is read whole, against where it left origin/main", JSON.stringify(head));
 ok(files(testsChanged(tmp, baseOf(tmp, "main"))) === files(head), "--base <ref> reads it against where it left that ref");
-git("checkout", "-q", "main"); git("merge", "-q", "--no-ff", "-m", "merge", "pr");
-ok(baseOf(tmp) === git("rev-parse", "HEAD^1").trim(), "a merge commit is read against its first parent, the base");
+// (a branch head that merged its base in: main gains a test of its own, which the pull request's reading leaves out)
+git("checkout", "-q", "main"); put("test/main.test.mjs", "assert.equal(1, 1);\n"); git("add", "-A"); git("commit", "-q", "-m", "main's own");
+put("test/main.test.mjs", ""); git("commit", "-q", "-am", "main empties its own test");
+git("update-ref", "refs/remotes/origin/main", "main");
+git("checkout", "-q", "pr"); git("merge", "-q", "--no-ff", "-m", "merge main into pr", "main");
+ok(files(testsChanged(tmp, baseOf(tmp))) === files(head), "a branch head that merged its base in is read against where it left origin/main: its own lines, none of its base's", JSON.stringify(testsChanged(tmp, baseOf(tmp))));
+git("checkout", "-q", "main"); git("update-ref", "-d", "refs/remotes/origin/main"); git("merge", "-q", "--no-ff", "-m", "merge", "pr");
+ok(baseOf(tmp) === git("rev-parse", "HEAD^1").trim(), "where origin/main cannot be read, a merge commit is read against its first parent, the base");
 const read = testsChanged(tmp, baseOf(tmp));
 ok(read?.map(f => f.file).sort().join() === "test/q\"b.test.mjs,test/sum.test.mjs" && read.every(f => f.asserts.length === 1 && f.weaker), "a merge commit is read against its base: the tests the base's config names, never a file outside them, not as the pull request's own config would have it, a name git would quote read as its own, and as text whatever the pull request's attributes say", JSON.stringify(read));
 git("checkout", "-q", "-b", "untested");

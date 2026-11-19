@@ -100,17 +100,17 @@ makes a process measure its goal (`tasks/cleaning.md`).
 
 Each kind of blocking point above, one that blocks, then one that does not (#307):
 - departure: a PR said to fix a sum also drops negative numbers; not: a local variable renamed.
-- broken rule: a live key in a test's fixture; not: a fake key built from pieces as the test runs.
+- broken rule: a live key in a test's fixture; not: a fake key built from pieces at run time.
 - quote: the owner's praise kept beside a decision, or a typo left; not: the reason alone, or a floor yes as recorded.
 - mark: a cap raised with no "Leanness check:"; not: one beside a fresh session's answer.
-- baseline: an entry under "grown" with the reason "it reads YAML"; not: one whose fault changes nothing the program
-  does, a fresh session's word beside it.
+- baseline: an entry under "grown" with the reason "it reads YAML"; not: one whose reason is that its fault changes
+  nothing the program does, a fresh session's word beside it.
 - test: an assertion taken out, named nowhere; not: one named on `Tests changed:`, the case moved.
-- second copy: a new loop summing where `sum()` stands; not: two tests that set up the same three numbers.
+- second copy: a new loop summing where `sum()` stands; not: two tests setting up the same three numbers.
 - package: a YAML reader by hand with no `Looked for:`; not: ten lines splitting a format the project defines.
-- text users read: a button reading "Click here to proceed"; not: "Save".
+- text users read: a button "Click here to proceed"; not: "Save".
 - trim: one cutting a rule's reason since the archive holds it; not: one cutting what floor rule 4 says alike.
-- brief: one giving its reader a title it does not hold, or counting its own goal; not: one naming its role.
+- brief: one giving its reader a title it lacks, or counting its own goal; not: one naming its role.
 - screen: one changed with no critique; not: one with no pictures where no browser ran, so said, the tool's issue filed.
 - rule file: a rule its issue never asked for; not: one narrower, with why. A core rule with no reason; not: one whose
   reason could be shorter. One no agent can carry out; not: one an agent does. A fact read from nowhere; not: one

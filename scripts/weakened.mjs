@@ -10,10 +10,9 @@
 // and a line that only looks like one is listed too: the reviewer rules on it. An assertion spread over several lines
 // is read by the line that holds its call alone. Git and Node's own modules.
 //
-//   node core/scripts/weakened.mjs                 each line, by its file: in a checkout of a pull request's merge
-//                                                  commit, against its base; on a branch head, against origin/main
-//   node core/scripts/weakened.mjs --base <ref>    on a branch head, against where it left <ref>: one that merged
-//                                                  its base in, or whose base is not origin/main, names it
+//   node core/scripts/weakened.mjs                 each line, by its file, against where HEAD left origin/main
+//                                                  (with none, a merge commit against its first parent)
+//   node core/scripts/weakened.mjs --base <ref>    against where HEAD left <ref>, a base other than origin/main
 import { spawnSync } from "node:child_process";
 import { parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
@@ -76,13 +75,14 @@ export function changedMend(body, found, list = "node core/scripts/weakened.mjs"
 
 const gitIn = dir => (...args) => { const r = spawnSync("git", args, { cwd: dir, encoding: "utf8", maxBuffer: 1 << 28 }); return r.status === 0 ? r.stdout : null; };
 
-// The commit the checkout at `dir` is read against: where `ref` is given, where HEAD left it; otherwise a merge
-// commit's first parent, which is the base in a checkout of a pull request's merge, or, where HEAD is no merge, where
-// it left origin/main, since a branch head's parent is only its last commit. Null where none can be read.
+// The commit the checkout at `dir` is read against: where HEAD left `ref`, origin/main where none is given, so that a
+// branch head, one that merged its base in among them, is read whole and its base's lines are not; where that cannot
+// be read and no `ref` was given, a merge commit's first parent, which is the base in a checkout of a pull request's
+// merge. Null where none can be read.
 export function baseOf(dir = ".", ref = null) {
-  const git = gitIn(dir);
-  if (!ref && git("rev-parse", "-q", "--verify", "HEAD^2^{commit}") !== null) return git("rev-parse", "HEAD^1")?.trim() || null;
-  return git("merge-base", "HEAD", ref ?? "origin/main")?.trim() || null;
+  const git = gitIn(dir), left = git("merge-base", "HEAD", ref ?? "origin/main")?.trim();
+  if (left || ref) return left || null;
+  return git("rev-parse", "-q", "--verify", "HEAD^2^{commit}") !== null ? git("rev-parse", "HEAD^1")?.trim() || null : null;
 }
 
 // What the pull request in the checkout at `dir` does to its tests against the commit `base`, as weakened() gives it;

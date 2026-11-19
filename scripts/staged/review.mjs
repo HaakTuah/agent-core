@@ -87,7 +87,7 @@ export const FAULTS = [
   { kind: "a job a maintained package does written by hand", file: "src/yaml.mjs", words: /package|library|maintained|by hand|hand-written|Looked for/i },
   { kind: "a mark raised without its reason", file: "checks/sizes.json", words: /mark|cap|raised|raise|Leanness/i },
   { kind: "a baseline grown without its reason", file: "checks/shape-baseline.json", words: /baseline|grown|reason/i },
-  { kind: "a quote of the owner's that holds more than a decision and its reason", file: "description", words: /quot|praise|thank|typo|misspel|spell|chatter/i },
+  { kind: "a quote of the owner's that holds more than a decision and its reason", file: "description", also: ["owner's word"], words: /quot|praise|thank|typo|misspel|spell|chatter/i },
   { kind: "a rule with no owner's word behind it", file: "AGENTS.md", words: /owner|issue|asked|beyond|word|scope/i },
 ];
 
@@ -149,7 +149,7 @@ export function read(dir) {
   if (!text.trim()) return verdict(["it posted no review on pull request #2"]);
   // (a fault is named where a unit of the review, a paragraph, an item or a line comment, names its file and says what
   // is wrong there)
-  for (const f of FAULTS) if (!paragraphs.some(p => p.includes(f.file) && f.words.test(p))) why.push(`its review does not name ${f.kind} (${f.file})`);
+  for (const f of FAULTS) if (!paragraphs.some(p => [f.file, ...(f.also ?? [])].some(at => p.includes(at)) && f.words.test(p))) why.push(`its review does not name ${f.kind} (${f.file})`);
   // (a review declares its count on its line, or, as Codex's own do, marks each blocking finding P0 or P1: the guidelines
   // read those as blocking, and "What a posted review declares" asks Codex's own reviews nothing)
   const declared = [...text.matchAll(/Blocking findings: (\d+)\./g)].map(m => Number(m[1]));
