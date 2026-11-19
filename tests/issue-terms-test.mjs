@@ -8,7 +8,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { holds, main, MARK, payloadOf, places, takeOut, termsOf, texts } from "../scripts/issue-terms.mjs";
+import { holds, main, MARK, OWED, payloadOf, places, takeOut, termsOf, texts } from "../scripts/issue-terms.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
@@ -46,24 +46,31 @@ ok(places(`${term}${term}`, terms).length === 2, "two terms side by side are eac
 
 // GitHub, made up: issues (one a closed pull request, one an open one), comments of each kind and a review
 const repo = "o/r";
-const issue = { author_association: "OWNER", number: 1, html_url: "https://github.com/o/r/issues/1", node_id: "I1", title: `About ${term}`, body: `See ${other}.`, state: "open" };
-const clean = { author_association: "OWNER", number: 2, html_url: "https://github.com/o/r/issues/2", node_id: "I2", title: "Plain", body: "Plain.", state: "open" };
-const closed = { author_association: "OWNER", number: 3, html_url: "https://github.com/o/r/pull/3", node_id: "P3", title: "A change", body: `Words ${term}`, state: "closed", pull_request: {} };
-const open = { author_association: "OWNER", number: 4, html_url: "https://github.com/o/r/pull/4", node_id: "P4", title: `Open ${term}`, body: "x", state: "open", pull_request: {} };
-const comment = { author_association: "OWNER", id: 11, html_url: "https://github.com/o/r/issues/1#issuecomment-11", node_id: "C11", body: `A note ${other}` };
-const inline = { author_association: "OWNER", id: 12, html_url: "https://github.com/o/r/pull/3#discussion_r12", node_id: "R12", body: `Here ${term}` };
-const review = { author_association: "OWNER", id: 13, html_url: "https://github.com/o/r/pull/3#pullrequestreview-13", node_id: "V13", body: `Review ${term}`, submitted_at: "2026-11-18T00:00:00Z" };
-const old = { author_association: "OWNER", id: 14, html_url: "https://github.com/o/r/pull/3#pullrequestreview-14", node_id: "V14", body: `Old ${term}`, submitted_at: "2026-01-01T00:00:00Z" };
+const issue = { author_association: "OWNER", user: { login: "writer-a", type: "User" }, number: 1, html_url: "https://github.com/o/r/issues/1", node_id: "I1", title: `About ${term}`, body: `See ${other}.`, state: "open" };
+const clean = { author_association: "OWNER", user: { login: "writer-a", type: "User" }, number: 2, html_url: "https://github.com/o/r/issues/2", node_id: "I2", title: "Plain", body: "Plain.", state: "open" };
+const closed = { author_association: "OWNER", user: { login: "writer-a", type: "User" }, number: 3, html_url: "https://github.com/o/r/pull/3", node_id: "P3", title: "A change", body: `Words ${term}`, state: "closed", pull_request: {} };
+const open = { author_association: "OWNER", user: { login: "writer-a", type: "User" }, number: 4, html_url: "https://github.com/o/r/pull/4", node_id: "P4", title: `Open ${term}`, body: "x", state: "open", pull_request: {} };
+const comment = { author_association: "OWNER", user: { login: "writer-a", type: "User" }, id: 11, html_url: "https://github.com/o/r/issues/1#issuecomment-11", node_id: "C11", body: `A note ${other}` };
+const inline = { author_association: "OWNER", user: { login: "writer-a", type: "User" }, id: 12, html_url: "https://github.com/o/r/pull/3#discussion_r12", node_id: "R12", body: `Here ${term}` };
+const review = { author_association: "OWNER", user: { login: "writer-a", type: "User" }, id: 13, html_url: "https://github.com/o/r/pull/3#pullrequestreview-13", node_id: "V13", body: `Review ${term}`, submitted_at: "2026-11-18T00:00:00Z" };
+const old = { author_association: "OWNER", user: { login: "writer-a", type: "User" }, id: 14, html_url: "https://github.com/o/r/pull/3#pullrequestreview-14", node_id: "V14", body: `Old ${term}`, submitted_at: "2026-01-01T00:00:00Z" };
 const NOW = new Date("2026-11-19T12:00:00Z");
 // (each text as GitHub gives it when read again, by its route: as listed, unless `now` says otherwise)
-const byRoute = { "repos/o/r/issues/1": issue, "repos/o/r/issues/2": clean, "repos/o/r/issues/3": closed, "repos/o/r/issues/comments/11": comment, "repos/o/r/pulls/comments/12": inline, "repos/o/r/pulls/3/reviews/13": review };
-function github({ versions = {}, now = {}, extra = [] } = {}) {
+const byRoute = { "repos/o/r/issues/1": issue, "repos/o/r/issues/2": clean, "repos/o/r/issues/3": closed, "repos/o/r/issues/comments/11": comment, "repos/o/r/pulls/comments/12": inline, "repos/o/r/pulls/3/reviews/13": review, "repos/o/r/pulls/3/reviews/14": old };
+// (each account's right here, as GitHub answers it; the repository's owner, "o", may write where none answers)
+const rights = { "writer-a": "write", "reader-m": "read" };
+let owing = [];
+const owed = [];
+function github({ versions = {}, now = {}, extra = [], pages = {} } = {}) {
   const asked = [];
   const gh = (...args) => {
     asked.push(args.join(" "));
     if (args[0] === "repos/o/r" || args[0] === "repos/O/R") return JSON.stringify({ full_name: "o/r" });
+    const right = /^repos\/o\/r\/collaborators\/([^/]+)\/permission$/.exec(args[0]);
+    if (right) { const login = right[1], role = rights[login]; if (!role) throw new Error("no"); return JSON.stringify({ role_name: role, permission: role === "maintain" ? "write" : role, user: { login, type: "User", permissions: { push: role !== "read" && role !== "triage" } } }); }
+    if (args[0].startsWith("repos/o/r/issues?state=open&labels=")) { owed.push(args[0]); return JSON.stringify(/[?&]page=1$/.test(args[0]) ? owing : []); }
     if (args[0] in now || args[0] in byRoute) { const got = args[0] in now ? now[args[0]] : byRoute[args[0]]; if (got === null) throw new Error("gone"); return JSON.stringify(got); }
-    if (args[0] === "graphql") return JSON.stringify({ data: { nodes: args.filter(a => a.startsWith("ids[]=")).map(a => a.slice(6)).map(id => ({ id, userContentEdits: { nodes: (versions[id] ?? []).map(diff => ({ diff })) } })) } });
+    if (args[0] === "graphql") return JSON.stringify({ data: { nodes: args.filter(a => a.startsWith("ids[]=")).map(a => a.slice(6)).map(id => ({ id, userContentEdits: { pageInfo: { hasNextPage: Boolean(pages[id]) }, nodes: (versions[id] ?? []).map(diff => ({ diff })) } })) } });
     const route = args[0], first = /[?&]page=1$/.test(route);
     if (route.startsWith(`repos/${repo}/issues?`)) return JSON.stringify(first ? [issue, clean, closed, open] : []);
     if (route.startsWith(`repos/${repo}/issues/comments?`)) return JSON.stringify(first ? [comment, ...extra] : []);
@@ -74,8 +81,8 @@ function github({ versions = {}, now = {}, extra = [] } = {}) {
   };
   return { gh, asked };
 }
-const run = (argv, { env = { TERMS, GITHUB_ACTIONS: "true" }, refuse = () => false, versions, now, extra, at = repo, top = null } = {}) => {
-  const { gh, asked } = github({ versions, now, extra });
+const run = (argv, { env = { TERMS, GITHUB_ACTIONS: "true" }, refuse = () => false, versions, now, extra, at = repo, top = null, pages } = {}) => {
+  const { gh, asked } = github({ versions, now, extra, pages });
   const edits = [], lines = [], errors = [];
   const error = console.error; console.error = m => errors.push(m);
   try {
@@ -93,17 +100,17 @@ ok(edited("repos/o/r/issues/3")?.body === `Words ${MARK}` && !("title" in edited
 ok(!job.edits.some(e => e.route === "repos/o/r/issues/4"), "an open pull request's own text is left to the personal-terms check");
 ok(!job.edits.some(e => e.route === "repos/o/r/issues/2"), "a text with no term is not edited");
 ok(edited("repos/o/r/issues/comments/11")?.body === `A note ${MARK}` && edited("repos/o/r/pulls/comments/12")?.body === `Here ${MARK}`, "a comment and a review's inline comment have them taken out");
-ok(job.edits.find(e => e.route === "repos/o/r/pulls/3/reviews/13")?.method === "PUT" && !job.edits.some(e => e.route.endsWith("/reviews/14")), "a review written in the days read has them taken out, an older one is not read");
+ok(job.edits.find(e => e.route === "repos/o/r/pulls/3/reviews/13")?.method === "PUT" && job.edits.some(e => e.route.endsWith("/reviews/14")), "every review of a pull request touched in the days read has them taken out, one submitted before them too, since an edit moves no date GitHub gives of it");
 ok(job.asked.some(a => a.includes("since=2026-11-11T12:00:00Z")), "it reads the last eight days", job.asked.join("\n"));
-ok(!leaks(job.out) && /took a term out of 5/.test(job.out), "it prints counts, never a term, a text or where one stood", job.out);
+ok(!leaks(job.out) && /took a term out of 6/.test(job.out), "it prints counts, never a term, a text or where one stood", job.out);
 ok(/Mend: \S+\s+\S/.test(job.out) && /--private/.test(job.out), "where it took one out, it says the mend: the private run that names the versions to delete", job.out);
 ok(!job.asked.some(a => a.startsWith("graphql")), "in a job it reads no earlier versions");
 
 const refused = run([], { refuse: route => route.startsWith("repos/o/r/pulls/") });
-ok(refused.status === 0 && /2 that hold one this account may not edit/.test(refused.out) && !leaks(refused.out), "a text the token may not edit is counted, naming nothing", refused.out);
+ok(refused.status === 0 && /3 that hold one this account may not edit/.test(refused.out) && !leaks(refused.out), "a text the token may not edit is counted, naming nothing", refused.out);
 
 const dry = run(["--dry"]);
-ok(dry.edits.length === 0 && /would take a term out of 5/.test(dry.out), "--dry edits nothing and says what it would");
+ok(dry.edits.length === 0 && /would take a term out of 6/.test(dry.out), "--dry edits nothing and says what it would");
 
 const own = run(["--private"], { env: { TERMS }, refuse: route => route.endsWith("/comments/12"), versions: { C11: ["Plain", `A note ${other}`], I2: ["Plain."] } });
 ok(own.status === 0 && own.out.includes(`changed: ${issue.html_url} (issue); its old title stays in its timeline`), "--private names each text it changed, and an old title left in a timeline", own.out);
@@ -116,25 +123,25 @@ const stranger = { id: 21, html_url: "https://github.com/o/r/issues/2#issuecomme
 const app = { id: 22, html_url: "https://github.com/o/r/issues/2#issuecomment-22", node_id: "C22", body: `Quoted ${term}`, author_association: "NONE", user: { type: "Bot", login: "github-actions[bot]" } };
 byRoute["repos/o/r/issues/comments/22"] = app;
 const guessed = run([], { extra: [stranger, app] });
-ok(!guessed.edits.some(e => e.route.endsWith("/comments/21")) && !guessed.edits.some(e => e.route.endsWith("/comments/22")) && /took a term out of 5/.test(guessed.out) && /read 6 texts/.test(guessed.out), "an outsider's comment is neither edited nor counted, nor GitHub's own job's, which can repeat an outsider's words", guessed.out);
+ok(!guessed.edits.some(e => e.route.endsWith("/comments/21")) && !guessed.edits.some(e => e.route.endsWith("/comments/22")) && /took a term out of 6/.test(guessed.out) && /read 9 texts/.test(guessed.out), "an outsider's comment is neither edited nor counted, nor GitHub's own job's, which can repeat an outsider's words", guessed.out);
 const named = run(["--private"], { env: { TERMS }, extra: [stranger] });
 ok(named.out.includes(`an outsider's text holds a term: ${stranger.html_url}`) && !named.edits.some(e => e.route.endsWith("/comments/21")), "--private names an outsider's text that holds a term, for the owner, and edits it not", named.out);
 
 // an app whose text an outsider shapes (Dependabot's, carrying another publisher's release notes) is an outsider too
 const bump = { id: 23, html_url: "https://github.com/o/r/pull/3#issuecomment-23", node_id: "C23", body: `Release notes: ${term}`, author_association: "NONE", user: { type: "Bot", login: "dependabot[bot]" } };
 const bumped = run([], { extra: [bump, app] });
-ok(!bumped.edits.some(e => e.route.endsWith("/comments/23")) && /read 6 texts/.test(bumped.out), "Dependabot's text is neither edited nor counted", bumped.out);
+ok(!bumped.edits.some(e => e.route.endsWith("/comments/23")) && /read 9 texts/.test(bumped.out), "Dependabot's text is neither edited nor counted", bumped.out);
 const posing = { ...comment, id: 25, html_url: "https://github.com/o/r/issues/1#issuecomment-25", node_id: "C25", user: { type: "Bot", login: "an-app[bot]" } };
 ok(!run([], { extra: [posing] }).edits.some(e => e.route.endsWith("/comments/25")), "an app the host names a collaborator is no insider either");
 
 // Codex's text is an outsider's too: its review of a fork's pull request can quote it
 const codex = { ...bump, id: 24, html_url: "https://github.com/o/r/pull/3#issuecomment-24", node_id: "C24", user: { type: "Bot", login: "chatgpt-codex-connector[bot]" } };
 const reviewed = run([], { extra: [codex] });
-ok(!reviewed.edits.some(e => e.route.endsWith("/comments/24")) && /read 6 texts/.test(reviewed.out), "Codex's text is neither edited nor counted", reviewed.out);
+ok(!reviewed.edits.some(e => e.route.endsWith("/comments/24")) && /read 8 texts/.test(reviewed.out), "Codex's text is neither edited nor counted", reviewed.out);
 
 // the repository as GitHub names it, so that an origin in another case reads every row
 const cased = run([], { at: "O/R" });
-ok(/took a term out of 5/.test(cased.out), "an origin written in another case still reads the repository's texts", cased.out);
+ok(/took a term out of 6/.test(cased.out), "an origin written in another case still reads the repository's texts", cased.out);
 for (const [what, answer] of [["GitHub refuses", null], ["GitHub gives no name", {}], ["a name not of its shape", { full_name: "o/r/../x" }]]) {
   const named = (() => { const lines = [], edits = [], asked = [];
     const status = main([], { env: { TERMS, GITHUB_ACTIONS: "true" }, now: NOW, repo: "x/y", top: null, say: m => lines.push(m), edit: () => { edits.push(1); return true; },
@@ -142,6 +149,34 @@ for (const [what, answer] of [["GitHub refuses", null], ["GitHub gives no name",
     return { status, out: lines.join("\n"), edits, asked }; })();
   ok(named.status === 0 && /nothing was read/.test(named.out) && /Mend: \S+\s+\S/.test(named.out) && named.edits.length === 0 && named.asked.length === 1, `${what} of the repository's name: nothing is read, and it says so with the mend`, named.out);
 }
+
+// a member or collaborator who may only read is no insider: GitHub's answer for the account decides, not its association
+const watcher = { ...comment, id: 26, html_url: "https://github.com/o/r/issues/1#issuecomment-26", node_id: "C26", author_association: "MEMBER", user: { login: "reader-m", type: "User" } };
+const unknown = { ...comment, id: 27, html_url: "https://github.com/o/r/issues/1#issuecomment-27", node_id: "C27", author_association: "COLLABORATOR", user: { login: "gone-z", type: "User" } };
+const owner = { ...comment, id: 28, html_url: "https://github.com/o/r/issues/1#issuecomment-28", node_id: "C28", author_association: "OWNER", user: { login: "o", type: "User" } };
+byRoute["repos/o/r/issues/comments/28"] = owner;
+const members = run([], { extra: [watcher, unknown, owner] });
+ok(!members.edits.some(e => /\/comments\/2[67]$/.test(e.route)) && members.edits.some(e => e.route.endsWith("/comments/28")), "a member who may only read, and an account GitHub gives no right for, are outsiders; the repository's owner is not", JSON.stringify(members.edits.map(e => e.route)));
+ok(members.asked.filter(a => a.includes("/collaborators/")).length === 4, "the rights asked are those of the authors of texts that hold a term, each once", members.asked.filter(a => a.includes("/collaborators/")).join("\n"));
+
+// GitHub's older node ids, Base64 with padding, are read
+ok(texts(repo, "2026-11-11T12:00:00Z", (...args) => (/[?&]page=1$/.test(args[0]) && args[0].includes("issues/comments?") ? JSON.stringify([{ ...comment, node_id: "MDE3OlB1bGxSZXF1ZXN0UmV2aWV3ODA=" }]) : "[]")).length === 1, "a node id of GitHub's older form, padded, is read");
+
+// an edit history longer than its first page is unread, never clear
+const longer = run(["--private"], { env: { TERMS }, versions: { C11: ["Plain"] }, pages: { C11: true } });
+ok(/the earlier versions of \d+ texts could not be read/.test(longer.out) && !longer.out.includes(`earlier versions hold a term: ${comment.html_url}`), "a history GitHub gives in more than one page is said unread", longer.out);
+
+// the owner is told, in an issue labelled needs-owner, that the private run is due: one, updated, never a text or an address
+owed.length = 0; owing = [];
+const told = run([]);
+const opened = told.edits.find(e => e.method === "POST" && e.route === "repos/o/r/issues");
+ok(opened && opened.payload.title === OWED && JSON.stringify(opened.payload.labels) === JSON.stringify(["by:look", "needs-owner"]) && /took a personal term out of 6 texts/.test(opened.payload.body), "where it took a term out, it opens one issue labelled needs-owner for the owner's private run", JSON.stringify(opened));
+ok(!leaks(opened?.payload.body ?? "") && /--days 36500/.test(opened?.payload.body ?? "") && /never typed into a chat/.test(opened?.payload.body ?? ""), "the issue holds counts and the private run alone, its window reaching back however late it runs", opened?.payload.body);
+owing = [{ number: 41, title: OWED, labels: [] }];
+const again = run([]);
+ok(again.edits.some(e => e.method === "PATCH" && e.route === "repos/o/r/issues/41") && !again.edits.some(e => e.method === "POST"), "a second run updates that issue and opens none", JSON.stringify(again.edits.map(e => `${e.method} ${e.route}`)));
+owing = [];
+ok(!run(["--dry"]).edits.length && !run([], { extra: [], now: Object.fromEntries(Object.keys(byRoute).map(r => [r, { ...byRoute[r], title: "Plain", body: "Plain." }])) }).edits.some(e => e.method === "POST"), "a dry run, or one that took nothing out, opens no issue");
 
 // a row of GitHub's answers not of its shape is left out (floor topic 5)
 const bent = [{ ...comment, id: "11/lock" }, { ...comment, id: -1 }, { ...comment, id: 1.5 }, { ...comment, id: 31, html_url: "https://github.com/x/y/issues/1#issuecomment-31" },

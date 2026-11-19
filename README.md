@@ -236,7 +236,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      moved past the project's pin (point 1; `core/scripts/core-moved.mjs`), then runs the scheduled look
      (`core/scripts/look.mjs`, `roles/orchestrator.md`), and opens no pull request, since one a workflow opens gets
      no checks. Once a month, with the state report, the look asks the registries again of every package the project
-     holds (`core/scripts/held.mjs`) and keeps the issue "Packages gone stale". A project whose daily job still calls the core's `core-moved.yml` runs both there too, the look
+     holds (`core/scripts/held.mjs`) and keeps the issue "Packages gone stale". Given the secret `PERSONAL_TERMS`,
+     which the template's call passes, it last takes the personal terms out of the issues and comments written in the
+     week before (`core/scripts/issue-terms.mjs`; floor rule 11). A project whose daily job still calls the core's `core-moved.yml` runs both there too, the look
      reading no pull request, check or status with that job's token, until it moves to the template's. A builder
      session started with no orchestrator asks the same at its start
      (`core/scripts/core-moved.mjs`, with `--dry`) and syncs first where the core has moved ("Sessions" in
