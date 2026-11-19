@@ -68,8 +68,8 @@ sessions.
   session per task, continued for its review fixes while its context is under an hour old and small; otherwise a fresh
   one.
 - **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can:
-  once its task merged, or it stopped with its work pushed and its note in its PR's description (for usage too: a fresh
-  builder, of any tool, picks up from the branch), its last message read and nothing scheduled bound to it.
+  once its task merged, or it stopped with its hand-off note in its PR, its last message read and nothing scheduled
+  bound to it.
   - It first checks that the session cleaned up and does so for one that could not.
   - Never deleted; never one the owner works in or that waits only on the owner's yes.
 - **A new lane only where it merges sooner** (#702). By default each independent entry gets a lane, cleaning its share
@@ -83,8 +83,8 @@ sessions.
   that measure.
 - **A stalled lane,** found on every wake by `scripts/stalled.mjs`, never by a session's word
   that it runs: an open PR with no push to its branch for a few hours, whose session has ended, cannot be reached
-  (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, the old session
-  told to stop; not one that waits only on the owner's yes.
+  (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, which reads its
+  hand-off note first, the old session told to stop; not one that waits only on the owner's yes.
   - Handed over once: where the fresh builder pushes nothing either (its usage spent, say), it goes to a builder of
     another tool, or waits, marked in the *progress file*, tried once a day, named to the owner once.
 - **The pace is the owner's** (#249). By default no session slows or stops work to save usage by its

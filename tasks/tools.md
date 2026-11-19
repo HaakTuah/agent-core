@@ -1,7 +1,8 @@
 # Agent tools
 
 Read when a project sets up an agent tool, hands a role to one or changes its tool mid-task, and when a tool's staged
-run is due: the kind `tool`; the paths `CLAUDE.md`, `.claude/`, `.kiro/`, `.agents/` and `.codex/`. Which tool takes
+run is due: the kind `tool`; by a session that stops a task before its end, for its hand-off note: the kind
+`hand-off`; the paths `CLAUDE.md`, `.claude/`, `.kiro/`, `.agents/` and `.codex/`. Which tool takes
 which role: `tasks/roles.md`, "Tools are preferences".
 
 **One door in: `AGENTS.md`** (#249). By default every rule a session must know is reachable from the
@@ -38,11 +39,15 @@ whose hooks would run as they stand there: it reads the diff. Reason: a session 
 same rules.
 
 **A change of tool loses nothing.** The state of a task is in the repository and never only in a
-session: its branch, pushed after every commit, its pull request's description with the note where to pick up, its
-line in the *progress file* and what it waits on (`roles/shared/work-flow.md`). Where a builder's tool stops (its usage spent,
-say), a fresh builder of any tool picks up from the branch (`roles/orchestrator.md`, "A stalled lane"). It does not
-mean that the tool that stopped hands over by itself. Reason: when one provider's usage ran out, everything held only
-in its sessions stopped with them. Held, in part, by `scripts/stalled.mjs`, which the look and the orchestrator run.
+session: its branch, pushed after every commit, its pull request's description with its hand-off note, its line in the
+*progress file* and what it waits on (`roles/shared/work-flow.md`). A session that stops mid-task, at a passed gate, a
+limit or the stop switch, writes the note (#306): a line "Hand-off:", then what is done, what was tried and failed,
+what is next, and how to check it. Where a builder's tool stops (its usage spent, say), a fresh builder of any tool
+picks up from the branch, reading the note first (`roles/orchestrator.md`, "A stalled lane"). It does not mean that
+the tool that stopped hands over by itself, nor a note where the task ends merged. Reason: when one provider's usage ran
+out, everything held only in its sessions stopped with them, and a lane handed over from its branch alone shows the
+code and none of what was tried and failed, so the next builder tries it again. Held, in part,
+by `scripts/stalled.mjs`, which the look and the orchestrator run, and which marks a stalled lane with no note.
 
 **Proven by the staged cases, tool by tool** (`AGENTS.md`, "Staged cases hold what no check
 reads"). A tool works with the core once a session of it has passed every staged case (`node scripts/staged.mjs

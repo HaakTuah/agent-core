@@ -131,6 +131,7 @@ The index, and how an item is written: `archive/instructions.md`.
      (an optimization changes nothing a player would notice; a feature too rare to change whole games judged per use and
      against its counter; no refuges; a long task may end its session at a passed gate). Decided: The owner agreed to
      all of it.
+     Changed by: #306.
 
 144. **28 October 2026** (Amarna Letters, in the design chat). Asked: The words behind a reading listed with what
      it rests on, which that game's design document had written as part of its "Reason from the pillars"; moved here

@@ -279,9 +279,9 @@
     "floor/topics/what-ships.md: A package found bad goes at once": [252],
     "floor/topics/what-ships.md: A program installed on a user's machine": [227],
     "roles/builder.md: Read by task, twice": [234],
-    "roles/orchestrator.md: A finished session is archived": [185],
+    "roles/orchestrator.md: A finished session is archived": [185, "#306"],
     "roles/orchestrator.md: A new lane only where it merges sooner": [11, 259],
-    "roles/orchestrator.md: A stalled lane": [133, 200],
+    "roles/orchestrator.md: A stalled lane": [133, 200, "#306"],
     "roles/orchestrator.md: Hand over at once": [10],
     "roles/orchestrator.md: It asks the owner nothing": [133, 134, 137],
     "roles/orchestrator.md: It builds nothing itself": [27],
@@ -337,7 +337,7 @@
     "roles/shared/work-flow.md: Push after every commit": [6, 15],
     "roles/shared/work-flow.md: Ready pull requests merge in a line": [259],
     "roles/shared/work-flow.md: Review in the background": [135],
-    "roles/shared/work-flow.md: Sessions": [143, 178, 187],
+    "roles/shared/work-flow.md: Sessions": [143, 178, 187, "#306"],
     "roles/shared/work-flow.md: The owner's stop switch": [201],
     "roles/shared/work-flow.md: The polish lane": [145],
     "roles/shared/work-flow.md: Work from `main`": [5, 113],
@@ -438,7 +438,7 @@
     "tasks/screens.md: An accessibility floor, in numbers": [112, 204, 205],
     "tasks/screens.md: Readable and true": [112, 114, 204, 205],
     "tasks/screens.md: Words": [84, 90, 112, 204, 205],
-    "tasks/tools.md: A change of tool loses nothing": [232],
+    "tasks/tools.md: A change of tool loses nothing": [232, "#306"],
     "tasks/tools.md: Each tool's part": [232, "#397.1"],
     "tasks/reviews.md: Ask by the first way there is": ["#397.1"],
     "tasks/reviews.md: A review's stance follows the kind of change": ["#397.1"],
@@ -530,6 +530,8 @@
     "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": "findings; outcome: fast",
     "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check fires; outcome: fast",
     "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": "check fires; outcome: fast",
-    "tasks/reviews.md: What a posted review declares": "check fires; outcome: readable"
+    "tasks/reviews.md: What a posted review declares": "check fires; outcome: readable",
+    "roles/shared/work-flow.md: Sessions": "correction: does not work; outcome: fast",
+    "tasks/tools.md: A change of tool loses nothing": "correction: does not work; outcome: fast"
   }
 }
