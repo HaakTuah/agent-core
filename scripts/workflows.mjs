@@ -13,6 +13,9 @@
 // the copies workflow sets it), a key twice that the base already held in the same file is noted and fails nothing;
 // with no base, as on a push to main, each is noted; and the sync's step "16 November 2026, no workflow gives a key
 // twice" (steps.mjs) names each old one at every sync until it is gone. In the core's own repository (`--core`) each fails.
+// A text longer than LONGEST (yaml-keys.mjs) is never given to the parser, so a base that long lists nothing it held:
+// such a file unchanged is noted, and one a pull request changes is judged as new, failing where it is still that long
+// and for each breach it shows once cut under it (baseOf() below; #752).
 // It fails, too, a call to one of the core's pull-request checks that is skipped on a draft while its pull_request
 // trigger leaves out ready_for_review (floor rule 8, a weakened check; #375, #502): its job's if: names the draft, or the
 // check skips a draft by itself (the description check, called on its own or by core.yml's `description:`). Once such a
@@ -36,7 +39,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
-import { DEEPEST, pruned, twice } from "./yaml-keys.mjs";
+import { DEEPEST, LONGEST, pruned, twice } from "./yaml-keys.mjs";
 import { loadSync, unreached } from "./packages.mjs";
 import { projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
@@ -83,20 +86,42 @@ export const reads = files => files.filter(f => !f.startsWith("core/") && !f.spl
 // What may be no link, of those git tracks: what the check reads, and .github itself with everything in it.
 export const unlinked = files => { const read = new Set(reads(files)); return files.filter(f => read.has(f) || /^\.github(\/|$)/iu.test(f)); };
 
+// What a file past the depth or the length read is said to hold unseen, and its mend.
+const NOT_READ = [ // (by `size`: 0 for a part nested too deep, 1 for a text too long)
+  { said: `the file nests its lists or mappings more than ${DEEPEST} deep, past what this check reads, so a key given twice in that part would go unseen`, mend: "nest it no deeper than a workflow needs, a few levels" },
+  { said: `the file is longer than ${LONGEST} characters, past what this check reads, so a key given twice in it would go unseen`, mend: `cut the file to under ${LONGEST} characters, the steps it repeats moved to a script or a workflow of their own` },
+];
+
+// What the base's own entry is counted as: a key by its name, a part not read by its reason, so that a file nested too
+// deep on the base does not hold the entry of one that has grown too long (#752).
+const heldAs = ({ key, size }) => (key === null ? (size ? 1 : 0) : `k:${key}`);
+
+// A file's text on the base, for what the base held (#752): `read`, the text the readers take, where the base's text is
+// within the length read ("" where the base holds no such file); `same` where the base's text is past the length read
+// and the file's is that text unchanged. A text past the length read is never given to the parser, and no count of its
+// words can show that a change to it made nothing worse, so its breaches cannot be listed: a file unchanged from such a
+// base is only noted, and a file changed from it is judged as one the base did not hold, each breach it shows failing,
+// and the file itself where it is still past the length, the mend being to cut it under the length and mend what it
+// then shows, in that pull request.
+const baseOf = (before, file, text) => {
+  const was = before ? before(file) ?? "" : null, long = was !== null && was.length > LONGEST;
+  return { read: was === null || long ? null : was, same: long && was === text };
+};
+
 // The keys given twice (yaml-keys.mjs) in files, each { file, text }, as { fails, notes }, each a line with its mend.
 // `before` gives a file's text on the base (null where it held none), or is null where there is no base to read
 // against: then each is a note. Of each key in each file, as many as the base held twice are noted, and the rest fail.
 export function repeated(files, before) {
   const fails = [], notes = [];
   for (const { file, text } of files) {
-    const held = new Map();
-    for (const { key } of before ? twice(before(file) ?? "") : []) held.set(key, (held.get(key) ?? 0) + 1);
-    for (const { line, key, first } of twice(text)) {
-      const old = !before || held.get(key) > 0;
-      held.set(key, (held.get(key) ?? 0) - 1);
+    const held = new Map(), base = baseOf(before, file, text);
+    for (const found of base.read === null ? [] : twice(base.read)) held.set(heldAs(found), (held.get(heldAs(found)) ?? 0) + 1);
+    for (const { line, key, first, size } of twice(text)) {
+      const id = heldAs({ key, size }), old = !before || base.same || held.get(id) > 0;
+      held.set(id, (held.get(id) ?? 0) - 1);
       const was = old ? (before ? ", as it did on the base" : "") : "";
       (old ? notes : fails).push(key === null
-        ? `${old ? "note" : "FAIL"} ${file}:${line}: the file nests its lists or mappings more than ${DEEPEST} deep, past what this check reads, so a key given twice in that part would go unseen${was}. Mend: nest it no deeper than a workflow needs, a few levels`
+        ? `${old ? "note" : "FAIL"} ${file}:${line}: ${NOT_READ[+Boolean(size)].said}${was}. Mend: ${NOT_READ[+Boolean(size)].mend}`
         : `${old ? "note" : "FAIL"} ${file}:${line}: the key ${JSON.stringify(key)} is given twice in one mapping (first on line ${first}), so GitHub refuses the whole file and runs none of its jobs${was}. Mend: keep one of the two keys, with what both said in it (two if: conditions joined by &&, two env: mappings as one)`);
     }
   }
@@ -134,7 +159,7 @@ function yamlOf(text) {
 // draft while the trigger never starts it once the pull request is marked ready: [] where none, or where the text is
 // no YAML (GitHub's own reader then refuses it).
 export function draftHoles(yaml) {
-  if (typeof yaml === "string") yaml = yamlOf(yaml);
+  if (typeof yaml === "string") yaml = yaml.length > LONGEST ? null : yamlOf(yaml); // (a text past the length read is not given to the parser: #752)
   const types = typesOf(yaml?.on);
   if (types === null || types.includes("ready_for_review")) return [];
   const prefix = `${CORE}/`.toLowerCase();
@@ -152,7 +177,14 @@ export function draftHoles(yaml) {
 export function unreadied(files, before) {
   const fails = [], notes = [];
   for (const { file, text } of files) {
-    const held = new Set(before ? draftHoles(before(file) ?? "") : []);
+    // (a text past the length read cannot be read for this: one that differs from the base fails, since a call may have
+    // lost ready_for_review behind the length; one unchanged, or read with no base, is noted by repeated(): #752)
+    const base = baseOf(before, file, text);
+    if (text.length > LONGEST) {
+      if (before && !base.same) fails.push(`FAIL ${file}: the file is longer than ${LONGEST} characters and differs from the base, so this check cannot tell whether a call of one of the core's checks that is skipped on a draft has ready_for_review among its types. Mend: cut the file to under ${LONGEST} characters, the steps it repeats moved to a script or a workflow of their own, and mend what this check then says of it`);
+      continue;
+    }
+    const held = new Set(base.read === null ? [] : draftHoles(base.read));
     for (const job of draftHoles(text)) {
       const old = !before || held.has(job);
       (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}: its job ${JSON.stringify(job)} calls one of the core's checks that is skipped on a draft, and its pull_request trigger leaves out ready_for_review, so once a pull request is marked ready the check runs on no head and the draft's skip reads as passed${old && before ? ", as on the base" : ""}. Mend: add ready_for_review to the types: under pull_request: (where it lists none, types: [opened, reopened, synchronize, ready_for_review])`);
@@ -167,14 +199,18 @@ if (started(import.meta.url)) {
   process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
   const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean), files = reads(tracked);
   const core = process.argv.includes("--core"), base = core ? "" : process.env.WORKFLOWS_BASE ?? "";
-  const show = file => { try { return git(["show", `${base}:${file}`]); } catch { return null; } };
+  // (both texts with their line ends as "\n": git may convert them on checkout, so the working tree's file and the base's
+  // blob of one text must read as equal and as one length, #752)
+  const plain = text => text.replace(/\r\n?/gu, "\n");
+  const show = file => { try { return plain(git(["show", `${base}:${file}`])); } catch { return null; } };
   const links = new Set(unlinked(tracked).filter(f => fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()));
   let failed = links.size;
   const texts = [];
   for (const file of links) console.log(`FAIL ${logged(file)}: a link, not a file, and the check reads the project's own text only. Mend: put the file itself there in place of the link`);
   for (const file of files) {
     if (links.has(file)) continue;
-    const text = fs.readFileSync(file, "utf8"), found = lines(text);
+    const raw = fs.readFileSync(file, "utf8"), found = lines(raw);
+    const text = plain(raw);
     texts.push({ file, text });
     if (!readable(text)) { failed++; console.log(`FAIL ${logged(file)}: not UTF-8 text, so it cannot be searched. Mend: save it as UTF-8`); }
     failed += found.length;
