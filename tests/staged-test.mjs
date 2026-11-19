@@ -6,8 +6,9 @@
 // Git and Node's own modules.
 //
 //   node tests/staged-test.mjs [--part all | first | second]
-// (a part runs alone, on Windows after a part of the upgrade test in its job, each about half the whole and under the
-// suite's own mark: first, the rules the cases name, the cases up to stack-choice and relay; second, the rest; #508)
+// (a part runs alone, on Linux after a part of the upgrade test in its job and on Windows in a job of its own, each
+// about half the whole and under the suite's own mark: first, the rules the cases name, the cases up to stack-choice
+// and relay, and the steps case; second, the rest; #508, #715)
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -83,6 +84,23 @@ const check = (name, setDir, keep, breakIt, why) => {
 };
 const ready = (dir, p) => { gh(dir, "POST", `pulls/${p.number}/ccr/ready_for_review`); gh(dir, "POST", `issues/${p.number}/comments`, { body: "@codex review" }); };
 
+// (the steps case's session: each planted step done in a pull request of its own, as the notes ask; one left where named)
+const takeSteps = (d, leave = null) => {
+  const agents = read(d, "AGENTS.md").replace(/\n## How we work here\n[\s\S]*$/, "\n");
+  const manifest = read(d, "core-manifest.md").replace(/^(Floor: whole\. Modules: )/m, "$1`copilot.md`, ").replace(/^## Differences\n- .*$/m, "## Differences\nNone.").replace(/^(\| \*owner's account\* \|.*)$/m, "$1\n| *follows* | `main` |");
+  const look = fs.readFileSync(path.join(s.core, "setup", "template", "workflows", "look.yml.tmpl"), "utf8").replace("{{core}}", CORE).replace("{{pin}}", "b".repeat(40));
+  const work = {
+    rules: { "AGENTS.md": agents },
+    manifest: { "core-manifest.md": manifest },
+    gemini: { "docs/trial/GEMINI.md": null },
+    look: { ".github/workflows/look.yml": look, ".github/workflows/core-moved.yml": null },
+    choices: { "docs/choices.md": fs.readFileSync(path.join(s.core, "setup", "template", "choices.md.tmpl"), "utf8").replace("Read whole: FILL IN: the day the first record is written, as 2026-11-15; each pass twice a year writes its own day.", "Read whole: 2026-11-20.").replace(/## Choice: FILL IN.*/, "## Choice: Node").replace(/- Reopens it: FILL IN.*/, "- Reopens it: a user with no Node.") },
+    private: { ".github/workflows/security-review.yml": `${read(d, ".github/workflows/security-review.yml").trimEnd()}\n    with:\n      private: true\n` },
+  };
+  for (const [name, files] of Object.entries(work)) if (name !== leave) branch(d, `step-${name}`, files);
+  if (leave !== "labels") for (const l of LABELS) gh(d, "POST", "labels", l);
+  if (leave !== "scanning") gh(d, "POST", "issues", { title: "Switch on secret scanning with push protection", body: "Settings, Advanced Security: secret scanning and its push protection. The repository is private, so it is the owner's (floor rule 14).", labels: ["needs-owner", "by:builder"] });
+};
 if (inPart("first")) {
 check("outsider", fresh("outsider"),
   d => { branch(d, "fix-sum", { "src/sum.mjs": FIX }); pr(d, "fix-sum"); },
@@ -224,6 +242,16 @@ for (const [at, where] of [["package.json", "at the root"], ["\u00e9/package.jso
 const shell = fresh("stack-choice");
 branch(shell, "stack", { "docs/choices.md": choiceRecord(shell, "A BusyBox shell script with awk, not Node", GO.replace("Picked: Go", "Picked: the shell script")) });
 ok(verdict("stack-choice", shell).pass, "stack-choice: the plain option picked, its heading naming the common one it is not, passes", verdict("stack-choice", shell).why);
+
+// the steps case: each planted step done in a pull request of its own, as the notes ask; broken, one left
+check("steps", fresh("steps"), d => takeSteps(d), d => takeSteps(d, "gemini"), /not done: 13 November 2026, every file a tool takes its instructions from/);
+const noLabels = fresh("steps"); takeSteps(noLabels, "labels");
+ok(/labels and openers/.test(verdict("steps", noLabels).why), "steps: labels left unmade are read from GitHub's answer", verdict("steps", noLabels).why);
+const noScanning = fresh("steps"); takeSteps(noScanning, "scanning");
+ok(/not done: 16 November 2026, secret scanning with push protection/.test(verdict("steps", noScanning).why), "steps: secret scanning left off, and not named to the owner, is read from GitHub's answer", verdict("steps", noScanning).why);
+const fields = ["-F", "security_and_analysis[secret_scanning][status]=enabled", "-F", "security_and_analysis[secret_scanning_push_protection][status]=enabled"];
+spawnSync(process.execPath, [path.join(noScanning, "bin", "gh"), "api", "-X", "PATCH", `repos/${OWNER}/${REPO}`, ...fields], { encoding: "utf8" });
+ok(verdict("steps", noScanning).pass, "steps: secret scanning switched on, as gh sends the call the step names, is the step done", verdict("steps", noScanning).why);
 }
 if (inPart("second")) {
 // the core carried by a library (tasks/repositories.md): kept as the secret case is; with no floor to read, nothing done
@@ -335,32 +363,6 @@ check("no-floor", fresh("no-floor"),
   ok(/changed or committed files/.test(verdict("no-floor", moved).why), "no-floor: a session that builds the task in the working folder, in any file, committing nothing, fails", verdict("no-floor", moved).why);
   ok(verdict("no-floor", fresh("no-floor")).pass, "no-floor: the submodule's empty folder, as set, is no change");
 }
-
-// the steps case: each planted step done in a pull request of its own, as the notes ask; broken, one left
-const takeSteps = (d, leave = null) => {
-  const agents = read(d, "AGENTS.md").replace(/\n## How we work here\n[\s\S]*$/, "\n");
-  const manifest = read(d, "core-manifest.md").replace(/^(Floor: whole\. Modules: )/m, "$1`copilot.md`, ").replace(/^## Differences\n- .*$/m, "## Differences\nNone.").replace(/^(\| \*owner's account\* \|.*)$/m, "$1\n| *follows* | `main` |");
-  const look = fs.readFileSync(path.join(s.core, "setup", "template", "workflows", "look.yml.tmpl"), "utf8").replace("{{core}}", CORE).replace("{{pin}}", "b".repeat(40));
-  const work = {
-    rules: { "AGENTS.md": agents },
-    manifest: { "core-manifest.md": manifest },
-    gemini: { "docs/trial/GEMINI.md": null },
-    look: { ".github/workflows/look.yml": look, ".github/workflows/core-moved.yml": null },
-    choices: { "docs/choices.md": fs.readFileSync(path.join(s.core, "setup", "template", "choices.md.tmpl"), "utf8").replace("Read whole: FILL IN: the day the first record is written, as 2026-11-15; each pass twice a year writes its own day.", "Read whole: 2026-11-20.").replace(/## Choice: FILL IN.*/, "## Choice: Node").replace(/- Reopens it: FILL IN.*/, "- Reopens it: a user with no Node.") },
-    private: { ".github/workflows/security-review.yml": `${read(d, ".github/workflows/security-review.yml").trimEnd()}\n    with:\n      private: true\n` },
-  };
-  for (const [name, files] of Object.entries(work)) if (name !== leave) branch(d, `step-${name}`, files);
-  if (leave !== "labels") for (const l of LABELS) gh(d, "POST", "labels", l);
-  if (leave !== "scanning") gh(d, "POST", "issues", { title: "Switch on secret scanning with push protection", body: "Settings, Advanced Security: secret scanning and its push protection. The repository is private, so it is the owner's (floor rule 14).", labels: ["needs-owner", "by:builder"] });
-};
-check("steps", fresh("steps"), d => takeSteps(d), d => takeSteps(d, "gemini"), /not done: 13 November 2026, every file a tool takes its instructions from/);
-const noLabels = fresh("steps"); takeSteps(noLabels, "labels");
-ok(/labels and openers/.test(verdict("steps", noLabels).why), "steps: labels left unmade are read from GitHub's answer", verdict("steps", noLabels).why);
-const noScanning = fresh("steps"); takeSteps(noScanning, "scanning");
-ok(/not done: 16 November 2026, secret scanning with push protection/.test(verdict("steps", noScanning).why), "steps: secret scanning left off, and not named to the owner, is read from GitHub's answer", verdict("steps", noScanning).why);
-const fields = ["-F", "security_and_analysis[secret_scanning][status]=enabled", "-F", "security_and_analysis[secret_scanning_push_protection][status]=enabled"];
-spawnSync(process.execPath, [path.join(noScanning, "bin", "gh"), "api", "-X", "PATCH", `repos/${OWNER}/${REPO}`, ...fields], { encoding: "utf8" });
-ok(verdict("steps", noScanning).pass, "steps: secret scanning switched on, as gh sends the call the step names, is the step done", verdict("steps", noScanning).why);
 
 // ---- what the reviews of #340 found, each held ----
 const stopGone = fresh("stop"); git(stopGone, "push", "-q", "origin", "--delete", "agents-stop");
