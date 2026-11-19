@@ -1,6 +1,7 @@
 // The parser the core reads other publishers' languages with (CHOICES.md, "one parser, tree-sitter"; #529):
 // web-tree-sitter, and one grammar for each language a reader built on it reads, each a package of the core's lock file
-// at one exact version, installed from the registry into .packages/node_modules/ (install.mjs, packages.mjs; #654). Each
+// at one exact version in the parser's own lock file, installed from the registry into .packages/parser/node_modules/ only
+// where a job names it (install.mjs parser, or all; packages.mjs; #654, #719). Each
 // file is read from there and handed to the parser as bytes, so nothing is fetched or built while a file is read.
 // A grammar comes only with the reader that needs it: C#'s, for the functions the shape check's reader of C# finds
 // (csharp-functions.mjs).
@@ -12,14 +13,16 @@
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import { MessageChannel, Worker, receiveMessageOnPort } from "node:worker_threads";
-import { installedFile, unreached } from "./packages.mjs";
+import { installedFile, unnamed, unreached } from "./packages.mjs";
 
 // Each language read, by the name a reader asks for, and its grammar's package and file.
 const GRAMMARS = { csharp: ["tree-sitter-c-sharp", "tree-sitter-c_sharp.wasm"] };
 // Whether the parser or the grammar of `language` could not be installed, the registry not answering, in a project's
-// pull request (install.mjs): its reader then reads no file of it, and the check that runs it says so as a warning,
-// failing nothing by that alone (#654, point 4).
+// pull request (install.mjs), or was never installed, a project's own job naming only the core's first install
+// (unnamedFor; #719): its reader then reads no file of it, and the check that runs it says so as a warning, failing
+// nothing by that alone (#654, point 4).
 export const unreachedFor = language => ["web-tree-sitter", GRAMMARS[language][0]].some(unreached);
+export const unnamedFor = language => ["web-tree-sitter", GRAMMARS[language][0]].some(unnamed);
 const bytes = (name, rel) => fs.readFileSync(installedFile(name, rel));
 // (how long a call waits on the worker: a file the parser takes longer on is one its reader cannot follow)
 const WAIT = 120000;

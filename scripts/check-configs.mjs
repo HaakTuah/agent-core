@@ -9,6 +9,7 @@
 import path from "node:path";
 import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
+import { installed } from "./packages.mjs";
 import { parseYaml } from "./workflow-run.mjs";
 
 // A config, or a workflow, the reader cannot read: a step that would need it throws this, naming why, so the step is
@@ -17,7 +18,8 @@ export class Unread extends Error {}
 // (`mentions` says, from a workflow's text, whether the check would read it)
 export const readable = (p, mentions) => {
   const unread = Object.entries(p.workflows).filter(([, w]) => !w.yaml && mentions(w.text ?? "")).map(([f]) => `.github/workflows/${f}`);
-  if (unread.length) throw new Unread(`the core's reader cannot read ${unread.join(", ")}, in a form it does not know`);
+  if (unread.length) throw new Unread(installed("yaml") ? `the core's reader cannot read ${unread.join(", ")}, in a form it does not know`
+    : `the core's packages are not installed, so ${unread.join(", ")} could not be read: run \`node ${corePath(p.root) || "core/"}scripts/install.mjs\`, then this again`);
 };
 
 // A project's calls to a workflow of the core's, by the workflow's name: each as [where, job] (its file and its job,
