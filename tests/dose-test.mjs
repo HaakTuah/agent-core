@@ -36,8 +36,8 @@ ok(due("in standard", { day: day(400), listed: 0, read: 1000 }) === null && due(
 ok(auditOf({ day: "2026-11-15", listed: 3, read: 9 }) !== null && auditOf({ day: "2026-11-15", listed: -1, read: 9 }) === null && auditOf({ day: "15 November", listed: 3, read: 9 }) === null && auditOf(null) === null, "an audit's record is read only where it holds a day and two counts");
 
 // ---- what is cleaned first ----
-ok(same(["function: src/a.js#f#2", "crossing: rules -> view: src/r/a.js -> src/v/b.js", "inside: (no system) -> rules: main.js -> src/r/x.js", "cycle: a.js -> b.js", "platform: src/x.js -> electron", "package: src/y.js -> @x/y", "clock: src/r/t.js: new Date()"].map(fileOf),
-  ["src/a.js", "src/r/a.js", "main.js", "a.js", "src/x.js", "src/y.js", "src/r/t.js"]), "an entry's file is the function's own, or the importing one");
+ok(same(["function: src/a.js#f#2", "crossing: rules -> view: src/r/a.js -> src/v/b.js", "inside: (no system) -> rules: main.js -> src/r/x.js", "cycle: a.js -> b.js", "platform: src/x.js -> electron", "package: src/y.js -> @x/y", "clock: src/r/t.js: new Date()", "change: src/a.js: a change's heading", "screen: src/t.test.js -> playwright"].map(fileOf),
+  ["src/a.js", "src/r/a.js", "main.js", "a.js", "src/x.js", "src/y.js", "src/r/t.js", "src/a.js", "src/t.test.js"]), "an entry's file is the function's own, or the importing one, or a comment's or a test's");
 const first = worstFirst(["function: a.js#f", "function: a.js#g", "function: b.js#f", "cycle: c.js -> a.js", "function: d.js#f"], new Map([["a.js", 1], ["b.js", 9], ["c.js", 0]]));
 ok(same(first.map(f => f.file), ["b.js", "a.js", "c.js", "d.js"]) && first[1].entries === 2 && first[0].changes === 9, "worst first is where change meets tangle: what is listed of a file, times how often it changed", JSON.stringify(first));
 

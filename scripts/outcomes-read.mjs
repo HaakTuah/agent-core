@@ -125,13 +125,13 @@ export function firstOf(repo, root = ".") {
 
 // The lines for the state report of `repo` for `month`, the owner's account its manifest's (`manifest`; null in the
 // core, whose account is its own); one line that says why where GitHub did not answer.
-export function report({ repo, month, manifest = null, root = ".", previous = null, share = null, gh = ghApi }) {
+export function report({ repo, month, manifest = null, root = ".", previous = null, share = null, blind = null, gh = ghApi }) {
   let data;
   try { data = read(repo, windowOf(month, MONTHS).from, windowOf(month).to, ownerOf(manifest ?? "") ?? repo.split("/")[0], gh); }
   catch (e) { return [e instanceof RangeError ? `- Not read: the pull requests and issues of the months to ${month} took more than the ${CALLS} calls and ${SECONDS} seconds a run may spend.` : `- Not read: GitHub did not answer for the pull requests, issues and events of ${month} (the look's job needs \`issues: read\` and \`pull-requests: read\`).`]; }
   let grown = null;
   try { grown = growth(shapeReading(rulesOf(manifest, root).rules, root), root); } catch { grown = null; }
-  return lines({ rows: measure(data, month), grown, share, first: manifest ? null : firstOf(repo, root), previous });
+  return lines({ rows: measure(data, month), grown, share, first: manifest ? null : firstOf(repo, root), previous, blind });
 }
 
 // How the code grows in the project at `root` (its manifest's shape check, or the core's AGENTS.md where it has no

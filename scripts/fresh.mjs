@@ -63,10 +63,10 @@ export function kind(p) {
   // the core's checks: a project that lost such a call still shows as one that needs it)
   const own = ownFiles(p);
   const shallowest = re => own.filter(f => re.test(f)).sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b))[0];
-  const lock = shallowest(/(^|\/)package-lock\.json$/);
+  const lock = shallowest(/(^|\/)(?:package-lock|npm-shrinkwrap)\.json$/);
   const folder = signedIn(p, lock);
   if (folder !== undefined) o.packages = String(folder).replace(/\/+$/, "") || ".";
-  const built = shallowest(/\.(sln|slnx|csproj|fsproj|vbproj)$/);
+  const built = shallowest(/\.(sln|slnx|csproj|fsproj|vbproj)$/i);
   const named = /package-ecosystem:\s*"?nuget"?\s*\n\s*directory:\s*"?\/?([^"\n]*)"?/.exec(p.read(".github/dependabot.yml") ?? "");
   if (nugetCalled(p) || built) o.nuget = nugetFolder(named, built);
   if (!p.workflows["codeql.yml"] && !p.workflows["licences.yml"]) o.private = true;

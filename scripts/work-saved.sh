@@ -4,7 +4,7 @@
 # and says in a line where Node is not on the path, so the helper hook is off, what the branch's changed paths call
 # for (core archive 234), and whether the owner's stop switch is set (core archive 201);
 # stop keeps the reply from ending while any is, once: a second stop in a row goes through, so a push that cannot be
-# made never traps a session. It only reads the repository, with the git settings that run commands (fsmonitor, hooks)
+# made never traps a session. At the start it installs the core's packages from main's own npm files where what is installed is not what they name (below); else it only reads the repository, with the git settings that run commands (fsmonitor, hooks)
 # turned off; the start asks origin for the switch with the user's own SSH and sign-in setup, never a prompt, and with
 # origin's settings that run commands set aside. Claude Code runs the copy merged into main (the project's
 # .claude/settings.json; floor rule 3), never the working tree's, so an edit runs once it is reviewed.
@@ -29,6 +29,43 @@ if [ "$mode" = start ]; then
     echo "The floor's own copy under $copy differs from the floor under ${at}floor/, the core's that the library carries. Mend: copy ${at}floor/ over it, whole, in a pull request of its own."
   fi
 fi
+# The core's packages (#654): at the start, where main's copy holds a lock file in .packages/ and what is installed
+# there is not what it names, and main's scripts/packages.mjs finds them all from npm's registry, npm installs them from
+# main's package list, lock file and .npmrc alone, written into a folder of its own outside the checkout, so that
+# nothing of the branch's is read or run (a shrinkwrap, a config, a link); then the folder it installed takes the place
+# of the copy's .packages/node_modules/, only where .packages/ is a folder of the checkout's own and node_modules/ in it
+# no link and nothing git tracks. No install script runs, and it gives up after 20 seconds, inside the hook's 30. A
+# note, never a block: a check that needs a package says so, with its mend.
+if [ "$mode" = start ] && command -v npm >/dev/null 2>&1 && command -v node >/dev/null 2>&1 \
+  && g cat-file -e "refs/remotes/origin/main:${at}.packages/package-lock.json" 2>/dev/null; then
+  w=$(mktemp -d 2>/dev/null) || w=""
+  # (main's three npm files at the folder's top, where npm runs, and its scripts/packages.mjs beside them)
+  if [ -n "$w" ] && (for f in .packages/package.json .packages/package-lock.json .packages/.npmrc scripts/packages.mjs; do t="$w/${f#.packages/}"; mkdir -p "$(dirname "$t")" && g --no-replace-objects show "refs/remotes/origin/main:${at}$f" >"$t" 2>/dev/null || exit 1; done); then
+    # (whether the folder holds what main's lock file names, by each entry's version, address and integrity: node reads
+    # the two files as data, and runs nothing of either)
+    if ! node -e 'const fs=require("fs");const read=f=>{try{return JSON.parse(fs.readFileSync(f,"utf8")).packages||{}}catch{return null}};const [w,h]=process.argv.slice(1).map(read);process.exit(w&&h&&Object.keys(w).filter(k=>k&&!w[k].dev).every(k=>h[k]&&["version","resolved","integrity"].every(f=>w[k][f]===h[k][f]))?0:1)' "$w/package-lock.json" "${at}.packages/node_modules/.package-lock.json" 2>/dev/null; then
+      dest="${at}.packages/node_modules"
+      here=$(pwd -P)
+      if [ "$(cd "./${at}.packages" 2>/dev/null && pwd -P)" != "$here/${at}.packages" ]; then
+        echo "The core's packages are not installed: ${at}.packages is not a folder of this checkout's own. Mend: put the core's files there in place of the link, then run node ${at}scripts/install.mjs."
+      # (a link as the shell sees one, or as Node does, which reads a Windows junction as one too)
+      elif [ -L "$dest" ] || node -e 'process.exit(require("fs").lstatSync(process.argv[1],{throwIfNoEntry:false})?.isSymbolicLink()?0:1)' "$dest" 2>/dev/null \
+        || [ -n "$(g ls-files -- "$dest" 2>/dev/null | head -n 1)" ]; then
+        echo "The core's packages are not installed: ${dest} is a link or holds files git tracks, which the install would replace. Mend: take it out of git and remove the link, then run node ${at}scripts/install.mjs."
+      # (main's own reading of its package list, lock file and .npmrc, as install.mjs reads them before npm runs: only
+      # npm's registry, and its own two settings; the npm that comes with the least Node reads no setting that says so)
+      elif ! node --input-type=module -e 'const fs=await import("node:fs"),{pathToFileURL}=await import("node:url");const w=process.argv[1],p=await import(pathToFileURL(w+"/scripts/packages.mjs").href),r=f=>fs.readFileSync(w+"/"+f,"utf8");process.exit(p.lockFaults(JSON.parse(r("package.json")),JSON.parse(r("package-lock.json"))).length||p.npmrcOthers(r(".npmrc")).length?1:0)' "$w" >/dev/null 2>&1; then
+        echo "The core's packages are not installed: main's ${at}.packages/package.json, ${at}.packages/package-lock.json or ${at}.packages/.npmrc names a source or a setting the core's install does not take. Mend: run node ${at}scripts/install.mjs, which says what it refuses."
+      else
+        omit=--omit=dev; [ -z "$at" ] && [ -d tests ] && omit= # (a copy installs no package only the core's own tests run)
+        if (cd "$w" && timeout 20 npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none --allow-directory=none --workspaces=false $omit >/dev/null 2>&1) && rm -rf "$dest" && mv "$w/node_modules" "$dest"; then :; else
+          echo "The core's packages are not installed: npm could not install them from main's ${at}.packages/package-lock.json. Mend: run node ${at}scripts/install.mjs before running a check."
+        fi
+      fi
+    fi
+  fi
+  [ -n "$w" ] && rm -rf "$w"
+fi
 # (a note, never a block: the helper hook is started by node, so without it there the hook stops nothing)
 if [ "$mode" = start ] && ! command -v node >/dev/null 2>&1; then
   echo "The helper hook is off here: Node is not on the path, and Claude Code starts that hook with node (the core's README.md, \"On Windows\")."
@@ -49,6 +86,16 @@ if [ "$mode" = start ] && command -v node >/dev/null 2>&1; then
     r=$(GIT_NO_LAZY_FETCH=1 GIT_TERMINAL_PROMPT=0 g -C "$lib" --no-replace-objects show "$pin:${reading#"$lib"}" 2>/dev/null)
   fi
   [ -n "$r" ] && printf '%s' "$r" | node --input-type=module - --hook 2>/dev/null
+fi
+# The quick check (the core's roles/shared/work-flow.md, "Sessions"; #306): named, never run, since a hook that ran the
+# project's code would run it outside a box the owner set up for it (floor rule 18) and past the hook's time; the
+# command as main's manifest gives it in its row *quick check*, the row's second cell (a pipe escaped there, \|, read
+# as one), kept to printable ASCII (no control, bidirectional or line-separating character of any encoding), or else
+# the slot named with its default.
+if [ "$mode" = start ]; then
+  quick=$(printf '%s\n' "$manifest" | sed -n -E 's#^\|[[:space:]]*\*quick check\*[[:space:]]*\|[[:space:]]*(([^|\\]|\\.)*)\|.*$#\1#p' | head -n 1 | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/\\\|/|/g' | LC_ALL=C tr -cd '\040-\176' | cut -c1-300)
+  [ -n "$quick" ] || quick="the *quick check* its AGENTS.md names, or else its *other builders' checks*, by default its own tests"
+  echo "Before your first change, run the quick check ($quick): a failure there is a bug of its own, filed, and the task goes on with what does not hang on it (the core's roles/shared/work-flow.md, \"Sessions\")."
 fi
 issues=()
 dirty=$(g status --porcelain 2>/dev/null)
@@ -97,7 +144,7 @@ asking=$! waited=0 rc=timeout
 while kill -0 "$asking" 2> /dev/null && [ $waited -lt 16 ]; do sleep 0.5; waited=$((waited + 1)); done
 if kill -0 "$asking" 2> /dev/null; then kill "$asking" 2> /dev/null; else wait "$asking"; rc=$?; fi
 if grep -q "$(printf '\t')refs/heads/agents-stop\$" "$asked" 2> /dev/null; then
-  echo "The owner's stop switch is set (the branch agents-stop on origin): start no task; commit and push what you have, and stop, saying so."
+  echo "The owner's stop switch is set (the branch agents-stop on origin): start no task; commit and push what you have, write the hand-off note in its pull request (the core's tasks/tools.md, \"A change of tool loses nothing\"), and stop, saying so."
 elif [ "$rc" != 0 ]; then
   echo "The owner's stop switch could not be read (origin did not answer in time): say so before starting a task, and read it again before each commit (the core's roles/shared/work-flow.md)."
 fi

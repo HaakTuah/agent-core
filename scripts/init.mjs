@@ -23,12 +23,13 @@
 //              steps of core.yml's one job (oneJob), and each pull-request check started only once a pull request is
 //              no draft (READY_ONLY)
 //   --game     a game: the module game-design.md with the others
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { sizeOf } from "./file-size.mjs";
+import { everyInstall } from "./packages.mjs";
 import { MODULES } from "./reading.mjs";
 import { plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
@@ -82,7 +83,7 @@ export const FILES = [
   ["workflows/nuget.yml.tmpl", ".github/workflows/nuget.yml", o => o.nuget !== undefined && !o.private],
 ];
 // What the script makes itself, beside the templates' files: none of these may exist either.
-const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "core"];
+const MADE = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", "checks/holders.json", "core"];
 // What a builder's session reads at its start in a project the kit writes at any commit, as the kit's own entry files
 // there name it: the files of READ that are the project's own, each file of the core its AGENTS.md and CLAUDE.md pull
 // in on a line of its own, and the part for every tool but Claude beside Claude's: the reading-size check's marks. For
@@ -240,12 +241,16 @@ export function licences(o, has) {
 }
 
 // The first baselines of the copies check and the shape check: what stands today, which each reads from the files git
-// knows of, so the kit's own are added first.
+// knows of, so the kit's own are added first; and the first list of what holds the project's own rules (#662).
 function firstBaselines(here) {
   for (const check of ["copies", "shape"]) {
     execFileSync(process.execPath, [`core/scripts/${check}.mjs`, `checks/${check}.json`, "--first"], { cwd: here, env: guarded(), stdio: ["ignore", "ignore", "inherit"] });
     git(["add", "--", `checks/${check}-baseline.json`], here, guarded());
   }
+  // (a pin from before #662 holds a holders.mjs with no --own: the list is then the sync's step, and nothing is run)
+  if (!fs.readFileSync(path.join(here, "core/scripts/holders.mjs"), "utf8").includes("--own")) return;
+  execFileSync(process.execPath, ["core/scripts/holders.mjs", "--own", "--write"], { cwd: here, env: guarded(), stdio: ["ignore", "ignore", "inherit"] });
+  git(["add", "--", "checks/holders.json"], here, guarded());
 }
 
 // The project the kit is run in, held to what the kit writes into: the root of its git repository, not the core, a
@@ -294,6 +299,14 @@ function writeKit(o, here, pin, out) {
   fs.mkdirSync(path.join(here, "core"));
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
   execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: here, input: execFileSync("git", ["archive", pin], { cwd: ROOT, env: plainEnv(), maxBuffer: 1 << 28 }) });
+  // (and its packages, installed from its lock file as the sync installs them, into core/.packages/node_modules/, which the copy's
+  // own .gitignore keeps out of the commit; a failure leaves the kit written and says the mend: #654)
+  const installer = path.join(here, "core", "scripts", "install.mjs");
+  if (fs.existsSync(installer)) {
+    // (every install of the copy's, an older pin's (--at) as its installer knows them: #719)
+    const r = spawnSync(process.execPath, [installer, ...everyInstall(path.join(here, "core"))], { cwd: here, encoding: "utf8" });
+    if (r.status !== 0) console.log(`note the core's packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node core/scripts/install.mjs before running a check`);
+  }
   const marks = sizes(Object.fromEntries(startOf(Object.fromEntries(out)).map(f => [f, sizeOf(path.join(here, f))])));
   write("checks/sizes.json", `${JSON.stringify(marks, null, 2)}\n`);
   write("checks/licences.json", `${JSON.stringify(licences(o, f => fs.existsSync(path.join(here, f))), null, 2)}\n`);
@@ -303,7 +316,8 @@ function writeKit(o, here, pin, out) {
 
 // What the kit wrote, and what it leaves for the project and for the owner.
 function sayLeft(o, pin, out) {
-  console.log(`The starter kit is written: ${out.length + 4} files (the last four checks/sizes.json, checks/licences.json, checks/copies-baseline.json and checks/shape-baseline.json), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
+  const made = ["checks/sizes.json", "checks/licences.json", "checks/copies-baseline.json", "checks/shape-baseline.json", ...(fs.existsSync("checks/holders.json") ? ["checks/holders.json"] : [])];
+  console.log(`The starter kit is written: ${out.length + made.length} files (the last ${made.length === 5 ? "five" : "four"} ${made.slice(0, -1).join(", ")} and ${made.at(-1)}), and core/ at ${pin.slice(0, 7)}. All of it is staged; nothing is committed.`);
   const open = out.flatMap(([to, text]) => text.split("\n").map((line, i) => line.includes("FILL IN:") ? `  ${to}:${i + 1}: ${line.slice(line.indexOf("FILL IN:") + 9).replace(/\s*\|\s*$/, "").trim()}` : null).filter(Boolean));
   console.log(`\nLeft for the project, each marked FILL IN:\n${open.join("\n")}`);
   console.log(`  checks/copies.json: "code", the project's own code as git pathspecs, once it has any`);

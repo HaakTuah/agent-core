@@ -33,8 +33,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { THIRD_PARTY } from "./core-path.mjs";
 import { MEND } from "./mend.mjs";
+import { installed } from "./packages.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./workflow-run.mjs";
 
@@ -136,6 +136,8 @@ function callsHere(root) {
 // By hand, with no part named: what the project's own calls to the core's workflows run, each call's part with its own
 // inputs, a part run once for each distinct call (runsOf), what the command line gives winning.
 export function fromCalls(root, given) {
+  // (the calls are read with the YAML package: with it not installed, none could be read, which is no "calls none")
+  if (!installed("yaml")) fail("no part is named, and the project's calls to the core's workflows cannot be read: the core's packages are not installed.", `run node ${path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)))}, then this again, or name a part (${PARTS.join(", ")})`);
   const runs = [];
   for (const [part, settings] of callsHere(root).flatMap(([which, w]) => FROM[which](w))) {
     const set = Object.fromEntries(Object.entries(settings).filter(([, v]) => v !== undefined && v !== null && v !== "").map(([k, v]) => [k, k === "advisory" ? v === true : String(v)]));
@@ -220,13 +222,13 @@ const RUN = {
   },
 
   // npm's own install from the lock file and its own check of the registry's signatures (.github/workflows/signatures.yml
-  // says what it holds and why), where the change touches what it reads: never the folder of packages the core's copy
-  // carries (third-party.mjs), whose package.json is no list of the project's.
+  // says what it holds and why), where the change touches what it reads: never the core's own package list, lock file
+  // and .npmrc in its copy's .packages/, which the core's own repository checks (#654), and which a sync alone changes.
   signatures(o, { coreAt, check }) {
     const dir = o.signatures || ".";
     console.log("== Does the pull request change what this check reads?");
     const look = changes(process.env.BASE_SHA || baseCommit(o.base), [":(glob)**/package.json", ":(glob)**/package-lock.json", ":(glob)**/npm-shrinkwrap.json",
-      ":(glob)**/.npmrc", `${coreAt}.node-version`, ".github/workflows/signatures.yml", ...caller(), `:(exclude)${coreAt}${THIRD_PARTY}`],
+      ":(glob)**/.npmrc", `${coreAt}.node-version`, ".github/workflows/signatures.yml", ...caller(), ...["package.json", "package-lock.json", ".npmrc"].flatMap(f => [`:(exclude)${coreAt}.packages/${f}`, `:(exclude)${coreAt}.packages/parser/${f}`])],
     "No package list, lock file, .npmrc, Node version or calling workflow changed: nothing to verify.");
     if (!look) return;
     if (!check("Install from the lock file, from the registry alone, running no package's install script",
