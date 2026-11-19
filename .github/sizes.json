@@ -51,12 +51,16 @@
       "mark": 23288,
       "why": "#884: the measures of code-shape.mjs apart from the JavaScript functions read on the parser."
     },
+    "tests/holders-test.mjs": {
+      "mark": 30947,
+      "why": "Split by the reader each case tests in #852: its archive cases apart from the rest."
+    },
     "tests/hostile-configs-test.mjs": {
       "mark": 24643,
       "why": "Split by the reader each case tests in #852."
     },
     "tests/hostile-pr-changes-test.mjs": {
-      "mark": 34591,
+      "mark": 44725,
       "why": "Split by the reader each case tests in #852."
     },
     "tests/init-test.mjs": {

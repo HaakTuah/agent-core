@@ -27,9 +27,11 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
      a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`), the rule files a checkout
-     holds, the manifest too (`scripts/reading.mjs`, which reads a rule file that is a link, a pipe or a device as no
-     file, and tries the changed paths on the path patterns within 16 million steps for each reading, a run of it or a
-     pull request's description, each with a budget of its own, past which every pattern left matches), and the rule
+     holds, the manifest too (`scripts/reading.mjs`, and `scripts/rules.mjs` for the rules in them, which read only
+     regular files in real folders of the checkout's own, a pipe or device as no file and a link at any depth refused
+     with its mend, and the first tries the changed paths on the path patterns within 16 million steps for each
+     reading, a run of it or a pull request's description, each with a budget of its own, past which every pattern
+     left matches), and the rule
      files the total read sums and reads for a cut or a join (`scripts/read-total.mjs`, which prints each name with its
      control characters written out, and reads a link, what is no regular file of the checkout's own, and a name a rule
      file gives that is absolute or holds a ".." segment as no file); limits: 64 MB of git's answer (256 MB for the

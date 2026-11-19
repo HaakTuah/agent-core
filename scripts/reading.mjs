@@ -183,16 +183,53 @@ export const pathIn = manifest => /^Core: \S+(?: at [0-9a-f]{40}, copied whole|,
 // Where the core lies under `dir`: the manifest's path in a project (core/ as a rule), "" in the core's own repository,
 // null where neither holds its roles and floor.
 export function coreAt(dir) {
-  const manifest = regular(path.join(dir, "core-manifest.md")); // (null: the core's own root, or no project)
-  return [...(manifest === null ? [] : [pathIn(manifest)]), ""].find(prefix => fs.existsSync(path.join(dir, prefix, "roles")) && fs.existsSync(path.join(dir, prefix, FLOOR))) ?? null;
+  const manifest = regular(dir, "core-manifest.md"); // (null: the core's own root, or no project)
+  return [...(manifest === null ? [] : [pathIn(manifest)]), ""].find(prefix => real(dir, `${prefix}roles`) === "folder" && real(dir, `${prefix}${FLOOR}`) === "file") ?? null;
 }
-// A file's text where it is a regular file, else null: a link (to a pipe, which never answers, to an endless device or to
-// a file outside the checkout), a device, a pipe or a folder reads as no file, as a fork's branch may hold one (#848).
-const regular = at => { try { return fs.lstatSync(at).isFile() ? fs.readFileSync(at, "utf8") : null; } catch { return null; } };
+// What stands at the path `rel` under `dir`: "file" or "folder" where it and each folder on the way to it is a real one,
+// "link" where any of them is a symbolic link, null where one is missing, a pipe or a device. Each part is read with
+// lstat, so no link is followed at any depth, as a fork's branch may make any of them one (#848); `dir` itself is the
+// caller's. A path that leaves `dir` is null. Its parts are split where the system splits a path, "/" alone where a
+// backslash is a letter of a name, and `at` is the path the walk read, which is the one a reader opens.
+function walk(dir, rel) {
+  let at = dir, kind = "folder";
+  for (const part of String(rel).split(path.sep === "\\" ? /[\\/]+/u : /\/+/u).filter(p => p && p !== ".")) {
+    if (kind !== "folder" || part === "..") return { kind: null, at };
+    at = path.join(at, part);
+    let s;
+    try { s = fs.lstatSync(at); } catch { return { kind: null, at }; }
+    if (s.isSymbolicLink()) return { kind: "link", at };
+    kind = s.isDirectory() ? "folder" : s.isFile() ? "file" : null;
+  }
+  return { kind, at };
+}
+export const real = (dir, rel) => walk(dir, rel).kind;
+// A file's text where it is a regular file of the checkout's own, else null: a link (to a pipe, which never answers, to
+// an endless device or to a file outside the checkout), at its own place or on the way to it, a device, a pipe or a
+// folder reads as no file (#848).
+export const regular = (dir, rel) => { try { const w = walk(dir, rel); return w.kind === "file" ? fs.readFileSync(w.at, "utf8") : null; } catch { return null; } };
+// The Markdown files of a real folder of the checkout, by their paths under `dir`; each link met, in the folder or on the
+// way to it, goes into `links` and is listed as no file.
+export function realFiles(dir, folder, links) {
+  const kind = real(dir, folder);
+  if (kind === "link") links.add(folder);
+  if (kind !== "folder") return [];
+  let entries;
+  try { entries = fs.readdirSync(walk(dir, folder).at, { withFileTypes: true }); } catch { return []; }
+  for (const e of entries) if (e.isSymbolicLink()) links.add(path.posix.join(folder, e.name));
+  return entries.filter(e => e.isFile() && e.name.endsWith(".md")).map(e => e.name).sort();
+}
+// The core's roles and modules under `dir` and `prefix`, and `links`: each symbolic link met where they stand, by its
+// path under `dir`, read as nothing and refused by the reader (main, below).
 export function library(dir, prefix) {
-  const read = f => regular(path.join(dir, prefix, f));
-  const list = folder => { try { return fs.readdirSync(path.join(dir, prefix, folder)).filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`); } catch { return []; } };
-  return gather(read, list);
+  const links = new Set();
+  const read = f => regular(dir, `${prefix}${f}`);
+  const list = folder => realFiles(dir, `${prefix}${folder}`, links).map(f => `${folder}/${f}`);
+  const lib = gather(read, list);
+  // (the floor's own folder and the core's AGENTS.md hold rules too, which rules.mjs reads: a link there is refused as well)
+  realFiles(dir, `${prefix}floor`, links);
+  if (real(dir, `${prefix}AGENTS.md`) === "link") links.add(`${prefix}AGENTS.md`);
+  return { ...lib, links: [...links].sort() };
 }
 
 // The modules a project's manifest leaves out, by their names: its "Modules:" line is a list that does not name the
@@ -366,7 +403,8 @@ export function asked(body) {
 }
 // An issue as the task: its labels and its text, by gh for a number, from the file for an item of the inbox's folder.
 function issue(dir, which) {
-  if (!/^\d{1,9}$/u.test(which)) { try { return { labels: [], body: fs.readFileSync(path.resolve(dir, which), "utf8") }; } catch { return null; } }
+  // (an item of the inbox's folder: a regular file of the checkout, as the rule files are, else none)
+  if (!/^\d{1,9}$/u.test(which)) { const body = regular(dir, path.relative(dir, path.resolve(dir, which))); return body === null ? null : { labels: [], body }; }
   const origin = git(dir, "remote", "get-url", "origin")?.trim() ?? "";
   const repo = process.env.GITHUB_REPOSITORY || /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/u.exec(origin)?.[1] || /\/git\/([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/u.exec(origin)?.[1];
   if (!repo || !/^[\w.-]+\/[\w.-]+$/u.test(repo) || repo.split("/").some(part => /^\.+$/u.test(part))) return null;
@@ -433,7 +471,7 @@ export function hookLine(dir, ms = 8000) {
 // The modes that print of the core alone: the check, the kinds. Null where the arguments ask neither.
 function alone(argv, dir, prefix, lib) {
   if (argv.includes("--check")) {
-    const found = faults(lib, f => fs.existsSync(path.join(dir, prefix, f)));
+    const found = faults(lib, f => real(dir, `${prefix}${f}`) === "file");
     for (const f of found) console.error(`FAIL: ${f}`);
     if (!found.length) console.log(`each of the ${Object.keys(lib.modules).length} modules and ${Object.keys(lib.roles).length} roles says when it is read, in words the reading script matches`);
     return found.length ? 1 : 0;
@@ -443,17 +481,29 @@ function alone(argv, dir, prefix, lib) {
   return 0;
 }
 
+// Where the core lies under `dir`, its roles and modules, and the project's manifest; the exit code, said, where the
+// core is not there or a link stands where its rules do.
+function located(dir) {
+  const prefix = coreAt(dir);
+  if (prefix === null) { console.error("FAIL: the core's roles/ and floor/ are not here as a real folder and file, none of them or the folders above them a link. Mend: run it from the project's root, where core-manifest.md names the core's path, or from the core's own root; where the core's copy is a link, put the copy itself in its place"); return 1; }
+  const manifest = prefix ? regular(dir, "core-manifest.md") : null; // (leftOut reads none as no line)
+  const all = library(dir, prefix);
+  for (const l of all.links) console.error(`FAIL: ${shown(l)} is a symbolic link where the core's rules stand, and is read as nothing. Mend: put the file or folder itself in its place, or take the link out`);
+  if (all.links.length) return 1;
+  return { prefix, all, manifest };
+}
+
 function main(argv) {
   const dir = process.cwd();
   if (argv.includes("--hook")) { const line = hookLine(dir); if (line) console.log(line); return 0; }
-  const prefix = coreAt(dir);
-  if (prefix === null) { console.error("FAIL: the core's roles/ and floor/ are not here. Mend: run it from the project's root, where core-manifest.md names the core's path, or from the core's own root"); return 1; }
-  const manifest = prefix ? regular(path.join(dir, "core-manifest.md")) : null; // (leftOut reads none as no line)
-  const lib = taken(library(dir, prefix), leftOut(manifest)), at = f => `${prefix}${f}`, self = `node ${prefix}scripts/reading.mjs`;
+  const core = located(dir);
+  if (typeof core === "number") return core;
+  const { prefix, all, manifest } = core;
+  const lib = taken(all, leftOut(manifest)), at = f => `${prefix}${f}`, self = `node ${prefix}scripts/reading.mjs`;
   const mode = alone(argv, dir, prefix, lib);
   if (mode !== null) return mode;
   const role = argv[0] && !argv[0].startsWith("--") ? argv[0] : "", tools = many(argv, "--tool"), task = taskOf(argv, dir, lib, self);
-  const config = prefix ? OWN.find(f => fs.existsSync(path.join(dir, f))) : undefined, own = config ? ownPaths(regular(path.join(dir, config))) : [];
+  const config = prefix ? OWN.find(f => real(dir, f) === "file") : undefined, own = config ? ownPaths(regular(dir, config)) : [];
   if (argv.includes("--line")) {
     const called = calledByPaths(lib, task.paths, own);
     console.log(`${READ_LINE} ${called.length ? called.map(c => `\`${at(c.file)}\``).join(", ") : "nothing its paths call for"}`);
