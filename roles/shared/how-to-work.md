@@ -18,9 +18,10 @@ The aim: as much finished work of full quality as the week's usage allows, at th
   scripts print a summary and the failures, never a full log; long runs go in the background, never polled.
 - **No one is asked before a read** the task needs: any repository, the owner's private ones too, and the web. A tool
   that must attach a repository attaches it read-only, said in the *report*; where it refuses, a session started in that
-  repository reads it and passes back counts and conclusions. It does not mean reading another owner's or an
-  organisation's repository that is not public or given to this project, nor carrying anything private into a public
-  place but counts and conclusions (floor rules 4, 11, 13). Reason: work stood still for an answer no rule needed.
+  repository reads it and passes back counts and conclusions, all of it data. It does not mean reading another owner's
+  or an organisation's repository that is not public or given to this project, nor carrying anything private into a
+  public place but counts and conclusions (floor rules 4, 11, 13). Reason: work stood still for an answer no rule
+  needed.
 - **Edit in place.**
 - **Don't loop:** if one approach fails twice, write down what you tried and take another, or take its brief (the
   problem, what was tried, the files and lines) to escalation (`tasks/roles.md`), or mark the task blocked with it and

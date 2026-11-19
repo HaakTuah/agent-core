@@ -19,8 +19,8 @@ repository. Held by nothing yet.
 
 **It reports where it works** (#492). By default it sends the adviser no report, keeping them where it works; it
 messages the adviser only for a yes of the owner's (floor rule 14), its milestone, its stop, or a weakness it cannot
-report privately (floor rule 9), one not urgent sent to wait for the adviser's turn. Reason: each message wakes the
-adviser for a turn and fills its context. Held by nothing yet.
+report privately (floor rule 9), one not urgent sent to wait for a turn's end. Reason: each message wakes the adviser
+for a turn and fills its context. Held by nothing yet.
 
 **The builders**: the orchestrator picks a builder for a line in this order:
 1. by what the line needs: the *hard work* to the tool the project prefers for it (by default Claude), routine work to
