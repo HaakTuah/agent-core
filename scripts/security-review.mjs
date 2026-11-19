@@ -66,7 +66,7 @@
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its review comments, the same> [<its commits, the same> [<its files, the same> [<the merges proved>]]]]
 //         ADVISORY=false for a status that waits; BOUND=false for a pull request from before the check, with SINCE
-//         the host's time the default branch's copy of the script came, which it was opened before (boundOf); RUN_URL for
+//         the host's time the script first came to the default branch, which it was opened before (boundOf); RUN_URL for
 //         the link the status carries; REVIEWERS for the accounts named; RIGHTS for a file of GitHub's answers on
 //         their rights (collaborators/<login>/permission, as a JSON list); PURE for the head pure-sync.mjs proved.
 import { readFileSync } from "node:fs";
