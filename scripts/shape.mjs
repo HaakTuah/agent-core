@@ -588,10 +588,11 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   const baseline = parseBaseline(baselineText, config.baseline, restore);
   const current = new Map([...found.entries].map(([id, e]) => [id, e.n]));
   if (base) { base.standing = once(base.standing); base.stood = once(() => stoodAt(base, config)); }
-  // (a reader that could not run, its packages not installed for the registry not answering, is read as one the baseline
-  // does not name, so that nothing of it fails: #654, point 4)
+  // (the functions of a reader that read them on the parser and could not run, its packages not installed for the
+  // registry not answering, are read as a reader's the baseline does not name, so that none of them fails; what the
+  // same reader finds without the parser, its imports, cycles and clock, is held as ever: #654, point 4)
   const reads = new Set(baseline.reads), skipped = unreachedReaders();
-  const unread = id => { const r = readerOf(id, found.readers); return r !== null && (!reads.has(r) || skipped.includes(r)); };
+  const unread = id => { const r = readerOf(id, found.readers); return r !== null && (!reads.has(r) || (skipped.includes(r) && groupOf(id).kind === "function")); };
   const news = unclaimed(current, baseline.listed, config.marks);
   const { fail, later } = fresh({ config, at, self, found, current, base, news, unread });
   // (one that only shrank passes as it is listed: --write lowers its numbers whenever it is run)

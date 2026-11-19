@@ -204,6 +204,12 @@ try {
     fs.writeFileSync(path.join(cs, "shape-baseline.json"), JSON.stringify({ reads: ["javascript", "jsx", "csharp", "csharp-tree", "python", "scripts", "screens"], listed: { "function: Program.cs#A.M": { lines: 99 } } }));
     const skipped = shape([], { CORE_PACKAGES_UNREACHED: "1" }), skippedOut = `${skipped.stdout}${skipped.stderr}`;
     ok(skipped.status === 0 && /^::warning::The shape check did not read C#, its functions by the parser: .*Mend: run this job again/mu.test(skippedOut), "and where it did not answer, the check reads no function of C#, says so as a warning, and fails nothing by that alone, its baseline's entries of C# kept", skippedOut);
+    // (what the reader of C# finds without the parser, here a cycle of using directives, still fails under the flag)
+    fs.writeFileSync(path.join(cs, "X.cs"), "using B;\nnamespace A { class X { } }\n");
+    fs.writeFileSync(path.join(cs, "Y.cs"), "using A;\nnamespace B { class Y { } }\n");
+    execFileSync("git", ["add", "-A"], { cwd: cs });
+    const cycle = shape([], { CORE_PACKAGES_UNREACHED: "1" }), cycleOut = `${cycle.stdout}${cycle.stderr}`;
+    ok(cycle.status === 1 && /FAIL: 2 imports lie on a cycle/u.test(cycleOut) && mended(cycleOut), "and what the reader of C# finds without the parser, a cycle of its using directives, fails all the same", cycleOut);
   }
   // (and the install puts each package where the scripts load it from, untracked)
   // (a project whose own .gitignore leaves out an .npmrc, a lock file and every dot folder still tracks the copy's)
