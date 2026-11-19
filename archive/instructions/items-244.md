@@ -187,6 +187,7 @@ The index, and how an item is written: `archive/instructions.md`.
      found missing later, one at a time. The owner agreed to it in a chat session, asked what the core had lacked for
      the carried packages to stand outside the host's alerts. It stands behind "what a standard mechanism gave" in
      `tasks/choices.md`.
+
 264. **19 November 2026**, #733, points 2 to 6. No test run on a draft; a pull request's run on one platform, the suites
      its change reaches; the default branch tested at its newest commit, a run giving way to a newer merge's and a red
      one narrowed by its files' history and then by halving; the slow and platform suites run once per batch at the
