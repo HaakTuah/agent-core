@@ -30,39 +30,56 @@ export function override(manifest, slot, values) {
   return m && values.includes(m[1]) ? m[1] : undefined;
 }
 
-// The three facts of `repo`, read through `gh`, and overridden by `manifest`'s rows: { upToDate (true, false or null
-// where it could not be read), queue ("on", "offered", "none" or null), billed (true or false), branch, said }, `said`
-// how each was read.
-export function facts({ repo, manifest = null, gh = ghApi }) {
-  const r = json(gh(`repos/${repo}`));
-  const branch = r.default_branch, said = [];
+// Whether a branch must be up to date with `branch` before it merges, read from its rules and its classic protection:
+// { upToDate (true, false, or null where neither answered), queued (a merge queue in its rules), said }.
+function upToDateOf(repo, branch, gh) {
   let rules = null, classic = null;
   try { rules = json(gh(`repos/${repo}/rules/branches/${encodeURIComponent(branch)}`)); } catch { /* (not read) */ }
   try { classic = json(gh(`repos/${repo}/branches/${encodeURIComponent(branch)}/protection/required_status_checks`)).strict === true; }
   // (only the host's own "Branch not protected" is read as no protection: a 404 may also be a sign-in short of the right)
   catch (e) { classic = /Branch not protected/u.test(e.message) ? false : null; }
-  const strict = Array.isArray(rules) && rules.some(x => x.type === "required_status_checks" && x.parameters?.strict_required_status_checks_policy === true);
-  const queued = Array.isArray(rules) && rules.some(x => x.type === "merge_queue");
-  const upToDate = strict || classic === true || queued ? true : Array.isArray(rules) && classic === false ? false : null;
-  said.push(upToDate === null ? "whether a branch must be up to date before it merges: not read (its rules or its protection did not answer), so the line is kept"
-    : `a branch must be up to date before it merges: ${upToDate ? "yes" : "no"}, by its ${strict || queued ? "rules" : "protection"} on \`${branch}\``);
-  let queue, plan;
-  if (queued) queue = "on";
-  else if (r.owner?.type !== "Organization") queue = "none";
-  else if (!r.private) queue = "offered";
-  else {
-    try { plan = json(gh(`orgs/${r.owner.login}`))?.plan?.name; } catch { plan = undefined; }
-    // (the plans whose names it knows; any other is not read, never guessed)
-    queue = { free: "none", team: "none", enterprise: "offered" }[String(plan).toLowerCase()] ?? null;
-  }
+  const listed = Array.isArray(rules) ? rules : [];
+  const strict = listed.some(x => x.type === "required_status_checks" && x.parameters?.strict_required_status_checks_policy === true);
+  const queued = listed.some(x => x.type === "merge_queue");
+  const byRules = strict || queued;
+  const upToDate = byRules || classic === true ? true : Array.isArray(rules) && classic === false ? false : null;
+  const said = upToDate === null ? "whether a branch must be up to date before it merges: not read (its rules or its protection did not answer), so the line is kept"
+    : `a branch must be up to date before it merges: ${upToDate ? "yes" : "no"}, by its ${byRules ? "rules" : "protection"} on \`${branch}\``;
+  return { upToDate, queued, said };
+}
+
+// The organisation's plan where a private repository of one is offered a queue only on the largest: "none",
+// "offered", or null where the plan did not answer or is one whose name it does not know (never guessed); and the plan.
+function planQueue(r, gh) {
+  let plan;
+  try { plan = json(gh(`orgs/${r.owner.login}`))?.plan?.name; } catch { plan = undefined; }
+  return { queue: { free: "none", team: "none", enterprise: "offered" }[String(plan).toLowerCase()] ?? null, plan };
+}
+
+// Whether the host offers `r` a merge queue and whether it is on: { queue, said }.
+function queueOf(r, queued, gh) {
+  const org = r.owner?.type === "Organization";
+  const { queue, plan } = queued ? { queue: "on" } : !org ? { queue: "none" } : !r.private ? { queue: "offered" } : planQueue(r, gh);
+  const named = plan === undefined ? "did not answer" : `is ${JSON.stringify(oneLine(plan).slice(0, 40))}, a name this script does not know`;
+  const what = { on: "on", offered: "offered and off", none: "not offered" }[queue] ?? `not read (the organisation's plan ${named}), so taken as not offered`;
+  const holder = org ? `an organisation's${plan ? ` on the plan ${oneLine(plan).slice(0, 40)}` : ""}` : "a person's account's";
+  const why = queued ? "by its rules on the default branch" : `the repository being ${r.private ? "private" : "public"} and ${holder}`;
+  return { queue, said: `its merge queue: ${what}, ${why}` };
+}
+
+// The three facts of `repo`, read through `gh`, and overridden by `manifest`'s rows: { upToDate (true, false or null
+// where it could not be read), queue ("on", "offered", "none" or null), billed (true or false), branch, said }, `said`
+// how each was read.
+export function facts({ repo, manifest = null, gh = ghApi }) {
+  const r = json(gh(`repos/${repo}`)), branch = r.default_branch;
+  const up = upToDateOf(repo, branch, gh), q = queueOf(r, up.queued, gh);
   const queueOver = override(manifest, "merge queue", ["on", "offered", "none"]);
-  said.push(queueOver ? `its merge queue: ${queueOver}, as the manifest's row *merge queue* says (read: ${queue ?? "not read"})`
-    : `its merge queue: ${queue === "on" ? "on" : queue === "offered" ? "offered and off" : queue === "none" ? "not offered" : `not read (the organisation's plan ${plan === undefined ? "did not answer" : `is ${JSON.stringify(oneLine(plan).slice(0, 40))}, a name this script does not know`}), so taken as not offered`}, ${queued ? "by its rules on the default branch" : `the repository being ${r.private ? "private" : "public"} and ${r.owner?.type === "Organization" ? `an organisation's${plan ? ` on the plan ${oneLine(plan).slice(0, 40)}` : ""}` : "a person's account's"}`}`);
   const billedOver = override(manifest, "billed minutes", ["yes", "no"]);
-  const billed = billedOver ? billedOver === "yes" : r.private === true;
   const billedRead = r.private === true ? "yes, the repository being private" : "no, the repository being public";
-  said.push(billedOver ? `its runner minutes billed: ${billedOver}, as the manifest's row *billed minutes* says (read: ${billedRead})` : `its runner minutes billed: ${billedRead}`);
-  return { upToDate, queue: queueOver ?? queue, billed, branch, said };
+  const said = [up.said,
+    queueOver ? `its merge queue: ${queueOver}, as the manifest's row *merge queue* says (read: ${q.queue ?? "not read"})` : q.said,
+    billedOver ? `its runner minutes billed: ${billedOver}, as the manifest's row *billed minutes* says (read: ${billedRead})` : `its runner minutes billed: ${billedRead}`];
+  return { upToDate: up.upToDate, queue: queueOver ?? q.queue, billed: billedOver ? billedOver === "yes" : r.private === true, branch, said };
 }
 
 // What follows from the facts, as tasks/hosts.md says: who keeps the line, and the one line of advice to the owner.
