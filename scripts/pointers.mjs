@@ -38,15 +38,21 @@ import { fileURLToPath } from "node:url";
 import { corePath, projectAt } from "./core-path.mjs";
 import { logged } from "./guards.mjs";
 import { markdownReader } from "./markdown.mjs";
-import { unreached } from "./packages.mjs";
+import { installed, unreached } from "./packages.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
-// (where the job's install could not reach the registry, in a project's pull request, the check did not run, said as a
-// warning that fails nothing (#654, point 4); anywhere else a package not installed fails, saying the mend: packages.mjs)
-if (unreached("marked")) { console.log("::warning::The pointer check did not run: the package marked could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault"); process.exit(0); }
+// (in a project, where the package is not installed, the check did not run, said as a warning that fails nothing: a job
+// of the project's own that ran it before the core's packages came installs nothing yet, and the sync never turns it
+// red (AGENTS.md of the core, "Nothing locks a project"; steps.mjs asks the step), nor does a registry that did not
+// answer (#654, point 4); in the core's own run a package not installed fails, saying the mend: packages.mjs)
+if (!process.argv.includes("--core") && !installed("marked")) {
+  console.log(unreached("marked") ? "::warning::The pointer check did not run: the package marked could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault"
+    : `::warning::The pointer check did not run: the package marked is not installed beside the core's copy. Mend: in a pull request of its own, add the step node ${corePath(".") || "core/"}scripts/install.mjs to this job before the step that runs this check`);
+  process.exit(0);
+}
 const readMarkdown = await markdownReader();
 // (`--tools-at <commit>`, which this script gives itself alone: it reads that commit's tree, as git holds it, and prints
 // the broken pointers in its agent tools' files, each by its file and its words, as one JSON list; #405)

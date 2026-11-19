@@ -26,11 +26,12 @@ const FILES = {
   "SECURITY.md": "# Security\n\n**3. The protected files,** here, **the rule files:** `docs/developing.md`;\n",
   "docs/developing.md": "# Developing\n\n## Running it\n\nAs \"Where things are\" in `AGENTS.md` says.\n",
 };
-function run(files) {
+function run(files, { installed = true } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pointers-test-"));
   try {
     for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
     carry(path.join(dir, "core"));
+    if (!installed) fs.rmSync(path.join(dir, "core/.packages/node_modules"), { recursive: true, force: true });
     for (const args of [["init", "-q"], ["add", "-A"]]) execFileSync("git", args, { cwd: dir, stdio: "ignore" });
     const r = spawnSync(process.execPath, [path.join(dir, "core/scripts/pointers.mjs")], { cwd: dir, encoding: "utf8" });
     return { code: r.status, out: r.stdout + r.stderr };
@@ -42,6 +43,9 @@ const { "SECURITY.md": _, ...bare } = FILES;
 
 let r = run(FILES);
 ok(r.code === 0 && /^ok /m.test(r.out), "rule files whose pointers all lead somewhere pass");
+// (a project's own job that ran the check before the core's packages came installs nothing: the sync never turns it red)
+r = run(broken, { installed: false });
+ok(r.code === 0 && /::warning::The pointer check did not run: the package marked is not installed[^\n]*Mend: /.test(r.out) && /core\/scripts\/install\.mjs/.test(r.out), "in a project with the core's packages not installed, the check says as a warning that it did not run, with the install step as its mend, and fails nothing", r.out);
 r = run(crlf(FILES));
 ok(r.code === 0 && /^ok /m.test(r.out), "the same files with a Windows checkout's line endings pass");
 for (const [files, ending] of [[broken, "either"], [crlf(broken), "a Windows"]]) {
