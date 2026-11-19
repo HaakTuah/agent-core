@@ -76,29 +76,43 @@ export function joinFault(issue, owner) {
   return "carries no owner's word that can be read, and is no bug or task of the look";
 }
 
+// why the pull request's files are not the progress file alone, changed in place, or null
+function fileFault(pull, list, progress) {
+  if (!Number.isInteger(pull.changed_files) || pull.changed_files !== 1 || list.length !== 1) return "it changes more than one file";
+  const [file] = list;
+  if (file.filename !== progress || file.status !== "modified" || file.previous_filename !== undefined) return `its one file is not ${progress}, changed in place`;
+  return null;
+}
+
+// why an issue a line adds cannot join, or one a line removes is not closed, or null
+function itemFault(adds, removes, read, owner) {
+  for (const item of new Set(adds)) {
+    const fault = joinFault(read(item), owner);
+    if (fault) return `${item}, which a line it adds names, ${fault}`;
+  }
+  for (const item of new Set(removes.filter((item) => !adds.includes(item)))) {
+    const issue = read(item);
+    if (!issue || issue.limited || issue.state !== "closed" || issue.pull) return `${item}, whose line it removes, is not a closed issue`;
+  }
+  return null;
+}
+
 // { head, why }: head the pull request's SHA where it is queue-only, else null, and why. `progress` the progress file's
 // path, `owner` the owner's account, `read(item)` an issue as done-when.mjs's readItem gives it.
 export function judge(pull, files, { progress, owner, read }) {
   const head = pull?.head?.sha;
   if (pull?.state !== "open" || typeof head !== "string" || !SHA.test(head)) return { head: null, why: "no open pull request with a head to prove" };
   const list = flat(files);
-  if (!Number.isInteger(pull.changed_files) || pull.changed_files !== 1 || list.length !== 1) return { head: null, why: "it changes more than one file" };
-  const [file] = list;
-  if (file.filename !== progress || file.status !== "modified" || file.previous_filename !== undefined) return { head: null, why: `its one file is not ${progress}, changed in place` };
-  const lines = changed(file.patch);
+  const bad = fileFault(pull, list, progress);
+  if (bad) return { head: null, why: bad };
+  const lines = changed(list[0].patch);
   if (lines === null) return { head: null, why: "GitHub gives no patch of its lines" };
   const adds = lines.added.map(itemOf), removes = lines.removed.map(itemOf);
   if ([...adds, ...removes].some((item) => item === null || !item.startsWith("#"))) return { head: null, why: "a line it changes names no issue" };
   const items = [...new Set([...adds, ...removes])];
   if (items.length > MOST) return { head: null, why: `it names more than ${MOST} issues` };
-  for (const item of new Set(adds)) {
-    const fault = joinFault(read(item), owner);
-    if (fault) return { head: null, why: `${item}, which a line it adds names, ${fault}` };
-  }
-  for (const item of new Set(removes.filter((item) => !adds.includes(item)))) {
-    const issue = read(item);
-    if (!issue || issue.limited || issue.state !== "closed" || issue.pull) return { head: null, why: `${item}, whose line it removes, is not a closed issue` };
-  }
+  const fault = itemFault(adds, removes, read, owner);
+  if (fault) return { head: null, why: fault };
   return { head, why: `queue-only: ${adds.length} line${adds.length === 1 ? "" : "s"} added, ${removes.length} removed, each issue as floor rule 8 asks` };
 }
 

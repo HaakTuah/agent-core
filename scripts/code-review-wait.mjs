@@ -62,12 +62,15 @@ export function judge(pull, comments, commits, files, rules = [], bound = true, 
   // (a summary whose state cannot be read is no review of Codex's, running or done: the check warns, and goes on)
   return read.unread ? { ...verdict, warning: UNREAD } : verdict;
 }
+// the whole SHAs a posted code review names, never a prefix: an old review naming the first characters of another
+// commit must not stand for this one; and only as it was first posted, where the pull request is held (bound)
+function postedShas(list, bound) {
+  return new Set(list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && (!bound || asPosted(comment)))
+    .flatMap((comment) => (comment.body.match(/(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/giu) ?? []).map((found) => found.toLowerCase())));
+}
 function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges, copy, queue) {
   const short = sha.slice(0, 7);
-  // the whole SHAs a posted code review names, never a prefix: an old review naming the first characters of another
-  // commit must not stand for this one; and only as it was first posted, where the pull request is held (bound)
-  const posted = new Set(list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && (!bound || asPosted(comment)))
-    .flatMap((comment) => (comment.body.match(/(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/giu) ?? []).map((found) => found.toLowerCase())));
+  const posted = postedShas(list, bound);
   const running = review !== null && typeof review === "object" && review.commit_sha === sha && RUNNING.includes(review.status);
   if (running) {
     if (posted.has(sha)) return { sha, done: true, why: `a code review of ${short} is posted, so Codex's running one is not waited for` };

@@ -15,6 +15,9 @@
     "clocks",
     "processes"
   ],
+  "grown": {
+    "process: tests/queue-only-test.mjs -> node:child_process": "The test guards the command's own exit code and usage line (no files named: status 2, \"usage:\" on stderr), which only starting scripts/queue-only.mjs as a process shows."
+  },
   "listed": {
     "function: scripts/licence-commands.mjs#atCommand": {
       "lines": 43,
@@ -104,6 +107,7 @@
     "process: tests/pr-description-test.mjs -> node:child_process": true,
     "process: tests/pruning-test.mjs -> node:child_process": true,
     "process: tests/pure-sync-test.mjs -> node:child_process": true,
+    "process: tests/queue-only-test.mjs -> node:child_process": true,
     "process: tests/reading-test.mjs -> node:child_process": true,
     "process: tests/releases-test.mjs -> node:child_process": true,
     "process: tests/screens-test.mjs -> node:child_process": true,

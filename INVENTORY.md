@@ -195,7 +195,7 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   pinned elsewhere. *Runs:* the runners, where nothing of the project's runs before it; any session by hand. *Else:* the
   options of #519's record (a submodule, a subtree, a package, a fetched release, the host's reusable workflows,
   vendir), each weighed there. *Bugs:* 3 and 1. **Keep:** #519's record, judged on merit on 17 November.
-- `.github/workflows/security-review.yml`, `.github/workflows/own-security-review.yml`, `scripts/security-review.mjs`,
+- `.github/workflows/security-review.yml`, `.github/workflows/own-security-review.yml`, `.github/workflows/queue-only.yml`, `scripts/security-review.mjs`,
   `scripts/code-review-wait.mjs`, `scripts/clean-merges.mjs`, `scripts/pure-sync.mjs`, `scripts/queue-only.mjs`: give
   each pull request's head the statuses that say whether its security review has run and a running code review has
   finished, and prove a sync pure or a pull request queue-only.

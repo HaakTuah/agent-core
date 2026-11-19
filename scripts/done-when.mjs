@@ -196,6 +196,18 @@ export const takesIt = (manifest, prefix, name = "done-when.md") => !prefix || !
 export const PAGES = 3;
 const LIMITED = Symbol("rate limit");
 
+// the newest PAGES hundred of an issue's notes as { author, body }, oldest first, stopping at the owner's current text; null where one cannot be read
+function readNotes(gh, repo, n, got, owner) {
+  const last = Math.max(1, Math.ceil(Number(got.comments ?? 0) / 100)), notes = [];
+  for (let page = last; page >= 1 && page > last - PAGES; page--) {
+    const one = gh(`repos/${repo}/issues/${n}/comments?per_page=100&page=${page}`);
+    if (!Array.isArray(one)) return null;
+    notes.unshift(...one.map(c => ({ author: String(c.user?.login ?? ""), body: c.body })));
+    if (one.some(c => same(c.user?.login, owner) && String(c.body ?? "").includes(CURRENT))) break;
+  }
+  return notes;
+}
+
 // An item as { labels, body, state, author, pull }, its body the current text, its state GitHub's ("open" or "closed"),
 // and, of an issue, the login that opened it and whether it is a pull request: an issue
 // by gh from `repo`, an inbox file, "open" while it stands, as the head's commit holds it in the checkout at `dir` (from
@@ -214,13 +226,8 @@ export function readItem(repo, item, dir = ".", owner = String(repo).split("/")[
   try {
     const n = item.slice(1), got = gh(`repos/${repo}/issues/${n}`);
     if (!got) return null;
-    const last = Math.max(1, Math.ceil(Number(got.comments ?? 0) / 100)), notes = [];
-    for (let page = last; page >= 1 && page > last - PAGES; page--) {
-      const one = gh(`repos/${repo}/issues/${n}/comments?per_page=100&page=${page}`);
-      if (!Array.isArray(one)) return null;
-      notes.unshift(...one.map(c => ({ author: String(c.user?.login ?? ""), body: c.body })));
-      if (one.some(c => same(c.user?.login, owner) && String(c.body ?? "").includes(CURRENT))) break;
-    }
+    const notes = readNotes(gh, repo, n, got, owner);
+    if (notes === null) return null;
     return { labels: (got.labels ?? []).map(l => String(l?.name ?? "")), body: currentText(got.body, notes, owner), state: got.state,
       author: String(got.user?.login ?? ""), pull: got.pull_request !== undefined };
   } catch (e) { return e === LIMITED ? { limited: true } : null; }
