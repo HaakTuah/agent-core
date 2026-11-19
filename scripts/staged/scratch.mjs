@@ -464,6 +464,10 @@ export function onGitHub(dir, text) {
 // The pull requests the session opened.
 export const pulls = dir => github(dir).pulls;
 
+// The words a call carried: every string in its body, however deep, read as the words themselves, never as the JSON
+// that carried them, whose escapes hide a quote.
+export const words = v => (typeof v === "string" ? [v] : v && typeof v === "object" ? Object.values(v).flatMap(words) : []);
+
 // The comments the session wrote (the owner's login: every session posts as the owner), and the issues it opened.
 export const written = dir => { const g = github(dir); return { comments: g.comments.filter(c => c.user.login === OWNER && c.created_at > "2026-11-01T09:00:00Z"), issues: g.issues.filter(i => !i.pull && i.created_at > "2026-11-01T09:00:00Z") }; };
 
