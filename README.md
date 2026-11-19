@@ -197,10 +197,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `SELECT_BASE` the pull request's base, selects the tests the change can reach, with the project's proof, never
      selected out, and the whole suite where a changed file's reach cannot be told or no base is told; the job runs
      those it names. At the audit, `test-record.mjs` reads each test's time, its failures and what it alone catches;
-     each month the state report gives what a push waits on (`wait.mjs`) beside its mark. The shape check counts the
-     tests that open a screen, reach a real clock or start another process, and the record the share of the tests' time
-     each takes; it measures each suite against its time mark, a warning past it and never a failure, holds the marks
-     and a push's never worse, and reads the selection's lists from its config.
+     each month the state report gives what a push waits on (`wait.mjs`) beside its mark, and the minutes GitHub bills a
+     pull request, the median of the last 30 merged, each job rounded up, which the core's report carries for each
+     project it reads. The shape check counts the tests that open a screen, reach a real clock or start another process,
+     and the record the share of the tests' time each takes; it measures each suite against its time mark, a warning
+     past it and never a failure, holds the marks and a push's never worse, and reads the selection's lists from its
+     config.
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `roles/shared/work-flow.md` names (or those the project gives it), the line that says
      what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`), or the cost
