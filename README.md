@@ -376,8 +376,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    sync. And each is filed with the core as an idea ("Reporting to the core"): a rule a project had to differ from may
    not be general enough. Before it proposes one, a session reads the reasons behind the rule, which
    `core/scripts/reasons.mjs` prints in one step, and says which of them does not hold for the project, the pull request
-   on its line "Reasons read:" (`tasks/updates.md`, "A question or difference about a rule of the core starts from its
-   reasons"; #756).
+   on its line "Reasons read:" (`tasks/updates.md`, its rule on a question or difference; #756).
 8. **A project in several repositories** takes the core once (`tasks/repositories.md`): a repository's manifest names
    where its copy stands (`core/` as a rule, and so a project in one repository changes in nothing), and a repository
    that depends on a library of the project's that holds a copy takes the core with it, at the path the library brings
