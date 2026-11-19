@@ -3,18 +3,19 @@
 // point 3)? The review statuses (scripts/security-review.mjs and scripts/code-review-wait.mjs) let a review of an
 // earlier commit stand for the head where only updates from main follow it, merges whose second parent is no commit of
 // the pull request's; read by their parents alone, such a merge could carry a change of its own that no review saw.
-// This proves, of each merge that walk passes (standsFrom), that its tree is git's own merge of its two parents
-// (`git merge-tree --write-tree`, git 2.38 and later, the strategy GitHub's "Update branch" uses too), with each file in
+// This proves, of each merge that walk passes (standsFrom), that its tree is git's own merge of its two parents (`git
+// merge-tree --write-tree`, git 2.38 and later, the strategy GitHub's "Update branch" uses too), with each file in
 // conflict, where there are any, settled by keeping both sides' lines whole, one side's after the other's in either
-// order (`git merge-file --union`, git 2.43 and later): so two pull requests that add to the same place in a file bring
-// in no new content when the second is brought up to date. A merge it cannot prove so (a conflict settled any other
-// way, which changes the pull request's own lines or main's, a file added, deleted or moved on one side in conflict, a
-// change of its own, parents other than GitHub says, an object missing, a git too old) is left out, and the statuses
-// stop there: a review of that merge or of a later commit is then what stands. Run by the core's workflow
-// security-review.yml from the default branch's copy, inside a clone of its own that holds the head's commits and
-// checks nothing out, so that nothing of the pull request's runs; it reads git's objects and writes only the trees and
-// files git's merge makes into that clone. It prints, as JSON, the SHAs of the merges proved ([] where none is). Git and
-// Node's own modules only.
+// order (`git merge-file --union`, git 2.43 and later), where in each conflict both sides only added lines, none taken
+// from the base: so two pull requests that add to the same place in a file bring in no new content when the second is
+// brought up to date. A merge it cannot prove so (a conflict where either side changed or deleted a line, which a union
+// would settle for one side, any conflict settled another way, which changes the pull request's own lines or main's, a
+// file added, deleted or moved on one side in conflict, a change of its own, parents other than GitHub says, an object
+// missing, a git too old) is left out, and the statuses stop there: a review of that merge or of a later commit is then
+// what stands. Run by the core's workflow security-review.yml from the default branch's copy, inside a clone of its own
+// that holds the head's commits and checks nothing out, so that nothing of the pull request's runs; it reads git's
+// objects and writes only the trees and files git's merge makes into that clone. It prints, as JSON, the SHAs of the
+// merges proved ([] where none is). Git and Node's own modules only.
 //
 // Usage (in that clone):  node scripts/clean-merges.mjs <the pull request, as GitHub's API gives it> <its commits, the same>
 import { execFileSync, spawnSync } from "node:child_process";
@@ -27,7 +28,7 @@ const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry
 const git = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 }).trim();
 
 // whether the commit's tree is git's merge of its two parents, as the pull request's list gives them, each file in
-// conflict settled by keeping both sides' lines whole
+// conflict, where both sides only added lines, settled by keeping both sides' lines whole
 export function isGits(at, parents, cwd) {
   if (![at, ...parents].every((sha) => typeof sha === "string" && SHA.test(sha)) || parents.length !== 2) return false;
   try {
@@ -48,7 +49,7 @@ export function isGits(at, parents, cwd) {
 
 // whether a tree differs from git's merge (made, its files in conflict written with markers) only in those files, each
 // of them, as git's merge left it in conflict (listed: its three stages, as merge-tree's `-z` gives them), both sides'
-// lines whole in either order and the mode both sides give it
+// lines whole in either order and the mode both sides give it, where each conflict in it only adds lines on both sides
 const STAGE = /^(100644|100755) ([0-9a-f]{40}) ([123])\t(.+)$/su;
 function bothKept(made, tree, listed, cwd) {
   const stages = new Map();
@@ -63,10 +64,28 @@ function bothKept(made, tree, listed, cwd) {
   const raw = git(["diff-tree", "-r", "-z", "--no-renames", made, tree], cwd).split("\0").filter((field) => field !== "");
   for (let i = 0; i < raw.length; i += 2) if (!stages.has(raw[i + 1]) || !/^:(\d{6}) \1 /u.test(raw[i])) return false;
   for (const [file, { 1: base, 2: ours, 3: theirs }] of stages) {
-    if (!base || !ours || !theirs || ours.mode !== theirs.mode) return false;
-    const kept = git(["ls-tree", "-z", tree, "--", file], cwd).split("\0")[0];
+    if (!base || !ours || !theirs || ours.mode !== theirs.mode || !addsAlone(base.blob, ours.blob, theirs.blob, cwd)) return false;
+    const kept = git(["--literal-pathspecs", "ls-tree", "-z", tree, "--", file], cwd).split("\0")[0];
     const both = [[ours, theirs], [theirs, ours]].map(([first, second]) => git(["merge-file", "--object-id", "--union", first.blob, base.blob, second.blob], cwd));
     if (!both.some((blob) => SHA.test(blob) && kept === `${ours.mode} blob ${blob}\t${file}`)) return false;
+  }
+  return true;
+}
+
+// whether, in each conflict git's merge of the three blobs leaves, the base's part is empty: both sides only added
+// lines there, so that keeping both is neither side's change undone (#750, point 3). Read from git's diff3 form with
+// markers longer than any line of the blobs holds, so a marker is never a line of the file's own.
+const MARK = 41;
+function addsAlone(base, ours, theirs, cwd) {
+  const marker = (c) => c.repeat(MARK);
+  for (const blob of [base, ours, theirs]) if (git(["cat-file", "blob", blob], cwd).split("\n").some((line) => /^([<|=>])\1{40}/u.test(line))) return false;
+  const run = spawnSync("git", ["merge-file", "-p", "--object-id", "--diff3", `--marker-size=${MARK}`, ours, base, theirs], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
+  if (run.error || !(run.status > 0) || typeof run.stdout !== "string") return false;
+  let inBase = false;
+  for (const line of run.stdout.split("\n")) {
+    if (line.startsWith(marker("|"))) inBase = true;
+    else if (line === marker("=")) inBase = false;
+    else if (inBase) return false;
   }
   return true;
 }

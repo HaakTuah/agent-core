@@ -14,8 +14,9 @@
 // one by a commit it names by its whole SHA; any other later commit needs a posted review, or the note that none is
 // needed, naming the head, and the status says when the review it passes on saw an earlier commit than the head. Given
 // too the merges scripts/clean-merges.mjs proved, the tree of each the merge git makes of its two parents, any file in
-// conflict settled by keeping both sides' lines whole (#323, #750), an update from main is only such a merge: one whose
-// tree carries a change of its own, or whose conflict is settled any other way, needs a review naming it or a later
+// conflict where both sides only added lines, settled by keeping both sides' lines whole (#323, #750), an update from
+// main is only such a merge: one whose tree carries a change of its own, or whose conflict is settled any other way,
+// needs a review naming it or a later
 // commit, and the status names it. Where
 // Codex's summary says its security review is running, only such a comment posted after it began ends the wait for it
 // (that review is waited for: core archive 206), never one posted before, a note that none is needed among them: it

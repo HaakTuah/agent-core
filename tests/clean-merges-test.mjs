@@ -1,7 +1,8 @@
 // Tests of the proof that an update from main is the merge git makes (clean-merges.mjs, #323), on merges git really
 // makes in a scratch repository: one as git makes it, one with a change of its own, one whose conflict was resolved by
-// hand, one whose conflict keeps both sides' lines whole, in either order, and one that does so and changes a line
-// besides (#750, point 3), two in a row, and a list whose parents are not git's; and, end to end, the core's security-review.yml run as
+// hand, one whose conflict, both sides adding lines, keeps both whole, in either order, ones whose sides changed or
+// deleted a line, and one that does so and changes a line besides (#750, point 3), two in a row, and a list whose
+// parents are not git's; and, end to end, the core's security-review.yml run as
 // GitHub runs it (workflow-run.mjs) on a pull request whose head is such a merge, GitHub's API a stand-in that gives the
 // pull request and logs the statuses it is given: the review of the commit before a merge git makes stands for the
 // head, and one before a merge with a change of its own waits, both statuses naming that merge and the mend; and a
@@ -90,6 +91,24 @@ git(r, "checkout", "-q", "-B", "markers", ADDS);
 const MARKERS = merge(r, MAIN_ADDS); // (committed as git's merge left it, its markers in a.txt)
 ok([CHANGED, DROPPED, BESIDE, MARKERS].every((at) => proved(pullOf(at, [ADDS, at]), listed(r, ADDS, at), r).length === 0),
   "  but not one that changes the pull request's line, drops main's, changes another file besides, or keeps git's conflict markers");
+// a conflict where either side changed or deleted a line: a union keeps one side's change and undoes the other's, so
+// no such merge is proved, however it is settled (the fallback reviewer's finding on #753)
+const branch = (name, from, text) => { git(r, "checkout", "-q", "-B", name, from); write(r, "e.txt", text); return commit(r, name); };
+git(r, "checkout", "-q", "-B", "e-base", B0);
+write(r, "e.txt", "a\nrun dangerous\nb\n");
+const E0 = commit(r, "a file both sides change");
+const E_PR = branch("e-pr", E0, "a\nrun dangerous --verbose\nb\n"), E_DEL = branch("e-del", E0, "a\nb\n"), E_MAIN = branch("e-main", E0, "a\nrun safely\nb\n");
+const E_ADD = branch("e-add", E0, "a\nrun dangerous\nadded\nb\n");
+const kept = (name, ours, theirs, text) => { git(r, "checkout", "-q", "-B", name, ours); return merge(r, theirs, () => write(r, "e.txt", text)); };
+const undone = [
+  kept("pr-over-delete", E_PR, E_DEL, "a\nrun dangerous --verbose\nb\n"),
+  kept("delete-over-pr", E_DEL, E_PR, "a\nrun dangerous --verbose\nb\n"),
+  kept("both-changed", E_PR, E_MAIN, "a\nrun dangerous --verbose\nrun safely\nb\n"),
+  kept("both-changed-other", E_PR, E_MAIN, "a\nrun safely\nrun dangerous --verbose\nb\n"),
+  kept("delete-beside-add", E_ADD, E_DEL, "a\nadded\nb\n"),
+];
+ok(undone.every((at) => proved(pullOf(at, [at]), listed(r, at), r).length === 0),
+  "  nor one whose conflict a union settles where a side changed or deleted a line: modify against delete either way, the same line changed on both sides in either order, a delete beside an add");
 git(r, "checkout", "-q", "-B", "mode", ADDS);
 const MODE = merge(r, MAIN_ADDS, () => { write(r, "a.txt", "one\ntwo\nthree\nmain's line\nthe pull request's line\n"); fs.chmodSync(path.join(r, "a.txt"), 0o755); git(r, "update-index", "--add", "--chmod=+x", "a.txt"); });
 git(r, "checkout", "-q", "-B", "gone", B0);
