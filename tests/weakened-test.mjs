@@ -21,13 +21,14 @@ for (const l of ["const total = sum([1, 2]);", "import assert from \"node:assert
   ok(!ASSERT.test(l), `no assertion: ${l.trim()}`);
 for (const l of ["it.skip(\"sums\", () => {", "test.only(\"sums\", () => {", "xit(\"sums\", () => {", "[Fact(Skip = \"later\")]", "[Ignore]", "@pytest.mark.skip(reason=\"later\")", "#[ignore]", "    pytest.skip(\"later\")", "\tt.Skip(\"later\")", "@Disabled", "test(\"sums\", { skip: !hasGit }, () => {", "test(\"sums\", { skip: true }, () => {", "test(\"sums\", { timeout: 1000, skip: true }, () => {", "  skip: \"until #9\",", "this.skip();"])
   ok(SKIP.test(l), `a skip is read: ${l.trim()}`);
-for (const l of ["test(\"sums\", { timeout: 1000, skip: false }, () => {", "test(\"sums\", { skip: false }, () => {", "it(\"skips the blank lines\", () => {", "const skipped = rows.filter(r => r.skip);"])
+for (const l of ["test(\"sums\", { timeout: 1000, skip: false }, () => {", "test(\"sums\", { skip: false }, () => {", "it(\"skips the blank lines\", () => {", "const skipped = rows.filter(r => r.skip);", "ok(x, \"comment-only: a step\", y);", "const o = { only: \"copies.yml\" };", "const kept = { skip: [] };", "// todo: later"])
   ok(!SKIP.test(l), `no skip: ${l.trim()}`);
 
 {
   const long = `${".assert".repeat(100000)}`;
   ASSERT.test(long.slice(0, 1000)); SKIP.test(long.slice(0, 1000));
   ok(weakened(`diff --git a/t.test.mjs b/t.test.mjs\n--- a/t.test.mjs\n+++ b/t.test.mjs\n@@ -1 +0,0 @@\n-${long}`).length === 0, "a line of 700 KB is read by its first part");
+  ok(weakened(`diff --git a/t.test.mjs b/t.test.mjs\n--- a/t.test.mjs\n+++ b/t.test.mjs\n@@ -1 +0,0 @@\n-${" ".repeat(1000)}assert(x)`).length === 0, "an assertion past the part of a line that is read is not read");
 }
 
 // ---- a diff ----
