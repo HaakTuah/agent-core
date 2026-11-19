@@ -63,6 +63,11 @@ The calls from a cloud session: `tasks/github-calls.md`.
 - **Nothing waits silently:** above that line stands one that says what the PR waits on, `Waits on:`
   `nothing`, `a review`, `checks`, `#<n>` or `the owner: <the question, in one sentence>?`, with the label
   `needs-owner` on the PR where it is the owner; its builder edits it whenever that changes. Reason: a finished draft stood still and no one was shown it.
+- **A description is written once its work is done** (#829). By default a draft opens with its first line and
+  `Waits on:` alone; its builder writes the rest in one edit after its last push, before marking it ready, then edits
+  it only where what it says changes, changes that come together in one edit. It does not mean a line left untrue, or
+  stale, to save an edit. Reason: each edit starts the checks that read it, about 76 jobs an hour in the core on 19
+  November 2026 (#820), each billed a whole minute on a private repository's free plan. Held by nothing yet.
 - **Push after every commit,** even before the PR opens (a draft if not ready).
   - Before pushing to a branch whose PR you opened earlier, check whether it merged; if it did, start a new branch and
     PR.
