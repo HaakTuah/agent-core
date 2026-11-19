@@ -52,7 +52,7 @@ function upToDateOf(repo, branch, gh) {
 // "offered", or null where the plan did not answer or is one whose name it does not know (never guessed); and the plan.
 function planQueue(r, gh) {
   let plan;
-  try { plan = json(gh(`orgs/${r.owner.login}`))?.plan?.name; } catch { plan = undefined; }
+  try { plan = json(gh(`orgs/${encodeURIComponent(String(r.owner.login))}`))?.plan?.name; } catch { plan = undefined; }
   return { queue: { free: "none", team: "none", enterprise: "offered" }[String(plan).toLowerCase()] ?? null, plan };
 }
 
@@ -117,7 +117,7 @@ function pushesRun(repo, p, gh) {
 export function measure({ repo, count = COUNT, gh = ghApi }) {
   if (!aRepository(repo)) refuse(`${JSON.stringify(String(repo)).slice(0, 80)} names no repository`, "name it as <owner>/<name>");
   const branch = json(gh(`repos/${repo}`)).default_branch;
-  const merged = lastMerged(repo, count + 1, gh).filter(p => p.base?.ref === branch && timeOf(p.merged_at) !== null && typeof p.head?.ref === "string")
+  const merged = lastMerged(repo, count + 1, gh).filter(p => Number.isSafeInteger(p.number) && p.base?.ref === branch && timeOf(p.merged_at) !== null && typeof p.head?.ref === "string")
     .sort((a, b) => timeOf(a.merged_at) - timeOf(b.merged_at));
   const pushes = [], minutes = [];
   merged.forEach((p, i) => {
@@ -137,26 +137,43 @@ export function line(m) {
   return `- the merge line: of the last ${m.read} merged pull requests, ${all} pushes whose checks ran (a median of ${median(m.pushes)} each), and a median of ${mins.toFixed(1)} min from a pull request's turn to its merge, its turn the later of the merge before it and its last marking ready (\`merge-line.mjs --measure\`).`;
 }
 
-// Point 5: where the front's run stands queued, the queued runs of pull requests other than `keep` (the front, then
-// the next in line) are cancelled, never one of the default branch's: the lines it prints.
-export function cancel({ repo, keep, gh = ghApi }) {
-  const branch = json(gh(`repos/${repo}`)).default_branch;
-  const heads = keep.map(n => json(gh(`repos/${repo}/pulls/${n}`)));
-  if (heads[0]?.state !== "open") refuse(`#${keep[0]}, named as the front, is no open pull request`, "name the open pull request at the front of the line first");
-  const spared = new Set(heads.map(h => h.head?.sha)), queued = [];
+// Whether a queued run is of the pull requests in `keep`: by the pull requests GitHub names on it, so that a run of
+// theirs started after their heads (`heads`) were read is still theirs, or by those heads.
+const theirs = (run, keep, heads) => (run.pull_requests ?? []).some(p => keep.includes(p?.number)) || heads.some(h => h.head?.sha === run.head_sha);
+
+// Whether a queued run may be cancelled: a run of a pull request into `branch`, the default branch, and none of the
+// front's or the next's, nor of the default branch itself. (A fork's run names no pull request, so none is cancelled.)
+const farFromTurn = (run, branch, keep, heads) => ["pull_request", "pull_request_target"].includes(run.event) && run.head_branch !== branch
+  && Number.isSafeInteger(run.id) && (run.pull_requests ?? []).some(p => p?.base?.ref === branch) && !theirs(run, keep, heads);
+
+// The runs queued now, page by page.
+function queuedRuns(repo, gh) {
+  const queued = [];
   for (let page = 1; page <= 10; page++) {
     const got = json(gh(`repos/${repo}/actions/runs?status=queued&per_page=100&page=${page}`))?.workflow_runs ?? [];
     queued.push(...got);
     if (got.length < 100) break;
   }
-  if (!queued.some(run => run.head_sha === heads[0].head.sha)) return [`The front's run (#${keep[0]}) is not queued: nothing is cancelled.`];
+  return queued;
+}
+
+// Point 5: where the line is kept by hand and the front's run stands queued, the queued runs of pull requests into the
+// default branch other than `keep` (the front, then the next in line) are cancelled, each of which runs again when its
+// pull request is brought up to date in its turn: the lines it prints. Where no up-to-date branch is asked, or the
+// host's merge queue keeps the line, it refuses: no turn would run those checks again.
+export function cancel({ repo, keep, gh = ghApi }) {
+  const f = facts({ repo, gh });
+  if (f.upToDate === false || f.queue === "on") refuse(`the line of ${repo} is not kept by hand (${f.upToDate === false ? f.said[0] : "the host's merge queue keeps it"}), so a run cancelled would not run again in a turn`, "cancel nothing: tasks/hosts.md's point 5 has nothing to act on here");
+  const branch = f.branch, heads = keep.map(n => json(gh(`repos/${repo}/pulls/${n}`)));
+  if (heads[0]?.state !== "open") refuse(`#${keep[0]}, named as the front, is no open pull request`, "name the open pull request at the front of the line first");
+  const queued = queuedRuns(repo, gh);
+  if (!queued.some(run => theirs(run, keep.slice(0, 1), heads.slice(0, 1)))) return [`The front's run (#${keep[0]}) is not queued: nothing is cancelled.`];
   const out = [];
-  for (const run of queued) {
-    if (!["pull_request", "pull_request_target"].includes(run.event) || run.head_branch === branch || spared.has(run.head_sha) || !Number.isSafeInteger(run.id)) continue;
+  for (const run of queued.filter(run => farFromTurn(run, branch, keep, heads))) {
     try { gh("-X", "POST", `repos/${repo}/actions/runs/${run.id}/cancel`); out.push(`cancelled: run ${run.id} (${oneLine(run.name).slice(0, 80)}) on ${oneLine(run.head_branch).slice(0, 80)}`); }
     catch (e) { out.push(`FAIL: run ${run.id} could not be cancelled (${oneLine(e.message).slice(0, 160)}). Mend: where the sign-in may not cancel runs, say so in the report and go on; nothing waits on it`); }
   }
-  return out.length ? out : ["The front's run is queued, but no run of another pull request is queued: nothing is cancelled."];
+  return out.length ? out : ["The front's run is queued, but no run of another pull request into the default branch is queued: nothing is cancelled."];
 }
 
 // The script's run: its exit code, what it prints through `say` (and failures through `warn`), read through `gh`.

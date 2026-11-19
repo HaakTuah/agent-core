@@ -96,20 +96,29 @@ ok(extra.read === 2 && extra.minutes.join() === "30,40", "with one more read tha
 timeline[3] = [filler, [{ event: "ready_for_review", created_at: at(70) }, { event: "commented", created_at: at(90) }]];
 ok(/of the last 2 merged pull requests, 4 pushes whose checks ran \(a median of 2 each\), and a median of 30\.0 min/.test(line(m)) && /not read/.test(line({ read: 0 })), "the state report's line, and with nothing read, that", line(m));
 
-// The cancelling: the front #1 (head a) and the next #2 (head b); runs queued of #1, #2, #3 (head c), main's, and a push's.
+// The cancelling: the front #1 (head a) and the next #2 (head b); runs queued of #1, #2, #3 (head c), main's, and a
+// push's; and, spared, a run on the front's branch at a newer head, one of a pull request into another branch, and a
+// fork's, which names no pull request.
 const cancelled = [];
-const queue = ({ frontQueued = true, refuse = false }) => (...a) => {
+const pr = (n, base = "main") => [{ number: n, base: { ref: base } }];
+const queue = ({ frontQueued = true, refuse = false, rules = strict }) => (...a) => {
   const route = a.at(-1);
   if (a[0] === "-X") { if (refuse) throw new Error("HTTP 403: Resource not accessible by integration"); cancelled.push(route); return ""; }
-  if (route === "repos/o/n") return JSON.stringify({ default_branch: "main" });
+  if (route === "repos/o/n" || route.startsWith("repos/o/n/rules/") || route.includes("/protection/")) return host({ rules })(route);
   const p = /pulls\/(\d+)$/.exec(route);
-  if (p) return JSON.stringify({ state: p[1] === "8" ? "closed" : "open", head: { sha: sha({ 1: "a", 2: "b" }[p[1]] ?? "d") } });
-  if (route.includes("actions/runs?status=queued&per_page=100&page=2")) return JSON.stringify({ workflow_runs: [{ id: 16, event: "pull_request", head_sha: sha("g"), head_branch: "g", name: "tests" }] });
+  if (p) return JSON.stringify({ state: p[1] === "8" ? "closed" : "open", head: { sha: sha({ 1: "a", 2: "b" }[p[1]] ?? "d"), ref: { 1: "a", 2: "b" }[p[1]] ?? "d", repo: { full_name: "o/n" } } });
+  if (route.includes("actions/runs?status=queued&per_page=100&page=2")) return JSON.stringify({ workflow_runs: [{ id: 16, event: "pull_request", head_sha: sha("g"), head_branch: "g", name: "tests", pull_requests: pr(6) }] });
   if (route.includes("actions/runs?status=queued")) return JSON.stringify({ workflow_runs: [
-    ...Array.from({ length: 95 }, (_, k) => ({ id: 100 + k, event: "schedule", head_sha: sha("m"), head_branch: "main", name: "look" })),
-    ...(frontQueued ? [{ id: 11, event: "pull_request", head_sha: sha("a"), head_branch: "a", name: "tests" }] : []),
-    { id: 12, event: "pull_request", head_sha: sha("b"), head_branch: "b", name: "tests" },
-    { id: 13, event: "pull_request", head_sha: sha("c"), head_branch: "c", name: "tests" },
+    ...Array.from({ length: 89 }, (_, k) => ({ id: 100 + k, event: "schedule", head_sha: sha("m"), head_branch: "main", name: "look" })),
+    ...(frontQueued ? [{ id: 11, event: "pull_request", head_sha: sha("a"), head_branch: "a", name: "tests", pull_requests: pr(1) }] : []),
+    { id: 12, event: "pull_request", head_sha: sha("b"), head_branch: "b", name: "tests", pull_requests: pr(2) },
+    { id: 13, event: "pull_request", head_sha: sha("c"), head_branch: "c", name: "tests", pull_requests: pr(3) },
+    ...(frontQueued ? [{ id: 17, event: "pull_request", head_sha: sha("n"), head_branch: "a", name: "tests", pull_requests: pr(1) }] : []),
+    { id: 18, event: "pull_request", head_sha: sha("p"), head_branch: "p", name: "tests", pull_requests: pr(5, "release") },
+    { id: 20, event: "pull_request", head_sha: sha("r"), head_branch: "b-renamed", name: "tests", pull_requests: pr(2) },
+    ...(frontQueued ? [{ id: 21, event: "pull_request", head_sha: sha("a"), head_branch: "elsewhere", name: "tests", pull_requests: pr(9) }] : []),
+    { id: 22, event: "pull_request", head_sha: sha("s"), head_branch: "a", head_repository: { full_name: "fork/n" }, name: "tests", pull_requests: pr(10) },
+    { id: 19, event: "pull_request", head_sha: sha("q"), head_branch: "q", head_repository: { full_name: "fork/n" }, name: "tests", pull_requests: [] },
     { id: 14, event: "push", head_sha: sha("m"), head_branch: "main", name: "tests" },
     { id: 15, event: "pull_request", head_sha: sha("m"), head_branch: "main", name: "tests" },
   ] });
@@ -118,10 +127,16 @@ const queue = ({ frontQueued = true, refuse = false }) => (...a) => {
 let out = cancel({ repo: "o/n", keep: [1, 2], gh: queue({ frontQueued: false }) });
 ok(cancelled.length === 0 && /not queued: nothing is cancelled/.test(out[0]), "while the front's run is not queued, nothing is cancelled", out.join(" | "));
 out = cancel({ repo: "o/n", keep: [1, 2], gh: queue({}) });
-ok(cancelled.join() === "repos/o/n/actions/runs/13/cancel,repos/o/n/actions/runs/16/cancel", "where it is, only the queued run of a pull request neither the front nor the next is cancelled, never main's", cancelled.join());
+ok(cancelled.join() === "repos/o/n/actions/runs/13/cancel,repos/o/n/actions/runs/22/cancel,repos/o/n/actions/runs/16/cancel", "where it is, only the queued runs of pull requests into main neither the front nor the next are cancelled: never main's, the front's at a newer head, one into another branch or a fork's", cancelled.join());
+cancelled.length = 0;
+for (const [what, rules, why] of [["no up-to-date branch is asked", [], /before it merges: no,/], ["the host's merge queue keeps the line", [{ type: "merge_queue" }], /merge queue keeps it/]]) {
+  let said = "";
+  try { cancel({ repo: "o/n", keep: [1], gh: queue({ rules }) }); } catch (e) { said = e.message; }
+  ok(cancelled.length === 0 && mended(`FAIL: ${said}`) && /not kept by hand/.test(said) && why.test(said), `where ${what}, nothing is cancelled and it says why`, said);
+}
 cancelled.length = 0;
 cancel({ repo: "o/n", keep: [1], gh: queue({}) });
-ok(cancelled.join() === "repos/o/n/actions/runs/12/cancel,repos/o/n/actions/runs/13/cancel,repos/o/n/actions/runs/16/cancel", "with the front alone named, the front's run is spared and the rest cancelled", cancelled.join());
+ok(cancelled.join() === "repos/o/n/actions/runs/12/cancel,repos/o/n/actions/runs/13/cancel,repos/o/n/actions/runs/20/cancel,repos/o/n/actions/runs/22/cancel,repos/o/n/actions/runs/16/cancel", "with the front alone named, the front's run is spared and the rest cancelled", cancelled.join());
 out = cancel({ repo: "o/n", keep: [1], gh: queue({ refuse: true }) });
 ok(mended(out.join("\n")), "a cancel the sign-in is refused fails with its mend", out.join(" | "));
 let thrown = "";
@@ -136,7 +151,7 @@ r = run(["--repo", "o/n", "--measure", "--count", "2"], measured);
 ok(r.code === 0 && /of the last 2 merged pull requests/.test(r.out), "--measure reads the count it is given", r.out);
 cancelled.length = 0;
 r = run(["--repo", "o/n", "--cancel", "1,2"], queue({}));
-ok(r.code === 0 && cancelled.length === 2 && /cancelled: run 13/.test(r.out), "--cancel spares the front and the next it is given", r.out);
+ok(r.code === 0 && cancelled.length === 3 && /cancelled: run 13/.test(r.out), "--cancel spares the front and the next it is given", r.out);
 r = run(["--repo", "o/n", "--cancel", "1"], queue({ refuse: true }));
 ok(r.code === 1 && mended(r.err) && r.out === "", "a cancel refused fails the run, its mend said", r.err);
 for (const argv of [["--repo", "o/n", "--count", "0"], ["--repo", "o/n", "--count", "2.5"], ["--repo", "o/n", "--cancel", "0"], ["--repo", "o/n", "--cancel", "1,1.5"], ["--repo", "o/n", "--cancel"]]) {

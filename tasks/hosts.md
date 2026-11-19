@@ -47,12 +47,14 @@ repository (a person's public one has free minutes and no queue, an organisation
 private one pays for its minutes), and no project should make a worse choice for what fits another. Held by
 `tests/merge-line-test.mjs`, which reads each kind, in `.github/workflows/tests.yml`.
 
-**Where the front waits behind the cap, runs far from their turn are cancelled** (#702). By default no run is
-cancelled. Where the front pull request's run stands queued behind the host's cap on jobs at once, the orchestrator
-cancels the queued runs of the pull requests not next in line: `node core/scripts/merge-line.mjs --repo
-<owner>/<name> --cancel <front>,<next>`, which cancels nothing while the front's run is not queued. It does not mean a
-check is skipped: each runs again when its pull request is brought up to date in its turn, and nothing merges without
-every check passed on its head; a run of the front's, the next's or the default branch's is never cancelled, and where
-the sign-in may not cancel, the session says so and the line goes on. Reason: a run on a branch that will be brought
-up to date again is thrown away, and while it holds a slot the whole line waits. Held by `tests/merge-line-test.mjs`,
-for the runs it spares; when to cancel, by nothing yet: a queued run is no breach a check reads.
+**Where the front waits behind the cap, runs far from their turn are cancelled** (#702). By default no run is cancelled.
+Where the line is kept by hand and the front pull request's run stands queued behind the host's cap on jobs at once, the
+orchestrator cancels the queued runs of the pull requests into the default branch not next in line: `node
+core/scripts/merge-line.mjs --repo <owner>/<name> --cancel <front>,<next>`, which cancels nothing while the front's run
+is not queued, and nothing where no up-to-date branch is asked or a merge queue keeps the line, since no turn would run
+those checks again. It does not mean a check is skipped: each runs again when its pull request is brought up to date in
+its turn, and nothing merges without every check passed on its head; a run of the front's, the next's or the default
+branch's is never cancelled, and where the sign-in may not cancel, the session says so and the line goes on. Reason: a
+run on a branch that will be brought up to date again is thrown away, and while it holds a slot the whole line waits.
+Held by `tests/merge-line-test.mjs`, for the runs it spares; when to cancel, by nothing yet: a queued run is no breach a
+check reads.
