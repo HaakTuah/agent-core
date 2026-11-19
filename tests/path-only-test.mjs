@@ -24,7 +24,7 @@ ok(refused(one("Rule 3: `scripts/kit/a.mjs` proves it; see scripts/tools/ and sc
 ok(refused(verdicts({ changed: [{ path: FLOOR, status: "M", modes: ["100644", "100644"], before: "see `scripts/new.mjs`", after: "see `scripts/old.mjs`" }], moves }), /not where the pull request moves it/u), "a new path turned back to its old one is refused");
 ok(refused(one("Rule 3: `scripts/old.mjs` proves it; see scripts/kit/ and scripts/kit/a.mjs.\n", { status: "A" }), /added, deleted or moved/u), "a file that asks the yes and is added, deleted or moved itself is refused");
 ok(refused(one(before.replace("old", "new"), { modes: ["100644", "100755"] }), /not a regular file/u) && refused(one(before.replace("old", "new"), { modes: ["120000", "120000"] }), /not a regular file/u), "a mode changed, or a link, is refused");
-ok(refused(verdicts({ changed: [{ path: GUIDE, status: "M", modes: ["100644", "100644"], before, after: before.replace("old", "new") }, { path: "scripts/path-only.mjs", status: "M" }], moves, self: true }), /cannot prove itself/u), "where the pull request changes the proof itself, nothing is proven");
+ok(refused(verdicts({ changed: [{ path: GUIDE, status: "M", modes: ["100644", "100644"], before, after: before.replace("old", "new") }, { path: "scripts/path-only.mjs", status: "M" }], moves, self: true }), /is not main.s/u), "where the pull request changes the proof or what it imports, nothing is proven");
 ok(verdicts({ changed: [{ path: "tasks/x.md", status: "M", before: "a", after: "b" }], moves }).refused.length === 0 && verdicts({ changed: [{ path: "tasks/x.md", status: "D" }], moves }).proven.length === 0, "a file that asks no yes is neither proven nor refused");
 
 const intoFloor = [{ from: "floor/topics/a.md", to: "tasks/a.md" }];

@@ -13,13 +13,16 @@
 // and that move's new path in the same place in the new; a path stands where no letter, digit, "_", ".", "/" or "-"
 // comes before it and no letter, digit, "_" or "-", nor "." or "/" before one, comes after. It refuses, never guessing,
 // a file that asks the yes and is added, deleted or moved itself, a move into or out of such a path, every other change
-// of a word, and every file where the pull request changes this script, which then cannot prove itself. Git and Node's
+// of a word, and every file where the pull request changes this script or owner-yes.mjs, so that the code that
+// proves is always `main`'s, as floor rule 3 asks, though the description check runs the pull request's copy. Git and Node's
 // own modules; it changes nothing.
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { asks } from "./owner-yes.mjs";
 
 export const SELF = "scripts/path-only.mjs";
+// the files whose code the proof runs: where the pull request changes one, the copy that runs is not `main`'s
+export const OWN = [SELF, "scripts/owner-yes.mjs"];
 const REGULAR = "100644";
 
 const escape = s => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
@@ -71,7 +74,7 @@ export function verdicts({ changed, moves, self = false }) {
   const pairs = spellings(moves), proven = [], refused = [];
   for (const f of changed) {
     if (!asks(f.path)) continue;
-    const why = self ? `the pull request changes ${SELF}, which then cannot prove itself`
+    const why = self ? `the pull request changes ${OWN.join(" or ")}, so the proof that would run is not main's`
       : f.status !== "M" ? "it is added, deleted or moved, not changed in place"
       : f.modes?.[0] !== REGULAR || f.modes?.[1] !== REGULAR ? "it is not a regular file on both sides, its mode kept"
       : follows(f.before, f.after, pairs);
@@ -123,7 +126,7 @@ export function read(cwd, base, head) {
   const names = fields(all), changed = [];
   for (let i = 0; i + 1 < names.length; i += 2) changed.push(fileOf(cwd, base, head, names[i], names[i + 1]));
   if (changed.some(f => f.status === "M" && asks(f.path) && (f.before === null || f.after === null))) return null;
-  return { changed, moves, self: changed.some(f => f.path === SELF) };
+  return { changed, moves, self: changed.some(f => OWN.includes(f.path)) };
 }
 
 // The paths of `asked` (the files that ask the yes) that the change from base to head proves only follow moves: [] where
