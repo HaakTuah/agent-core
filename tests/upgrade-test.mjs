@@ -63,6 +63,21 @@ const inPart = part => PART === "all" || PART === part;
 const yaml = parseYaml("name: x # a comment\non:\n  workflow_call:\n    inputs:\n      a:\n        type: boolean\n        default: true\njobs:\n  j:\n    if: >-\n      ${{ a\n      && b }}\n    steps:\n      - uses: x@1 # v1\n        with:\n          k: 'it''s'\n      - name: run\n        run: |\n          one\n            two # kept\n\n          three\n      - run: echo \"#\" plain\n    types: [opened, edited]\n");
 ok(yaml.name === "x" && yaml.on.workflow_call.inputs.a.default === true && yaml.jobs.j.if === "${{ a && b }}" && yaml.jobs.j.steps[0].uses === "x@1" && yaml.jobs.j.steps[0].with.k === "it's"
   && yaml.jobs.j.steps[1].run === "one\n  two # kept\n\nthree\n" && yaml.jobs.j.steps[2].run === 'echo "#" plain' && yaml.jobs.j.types.join() === "opened,edited", "the runner reads the YAML the core's workflows are written in", JSON.stringify(yaml));
+// (on the YAML package, #530: a flow mapping and an anchor read as GitHub reads them, a key given twice refused, as
+// GitHub refuses it, a key __proto__ the mapping's own, and a text with no value an empty mapping)
+{
+  const flow = parseYaml("on: [push]\nenv: {A: '1', B: x}\nbase: &b {runs-on: ubuntu-latest}\njobs:\n  j: *b\n__proto__: p\n");
+  let twice = false;
+  try { parseYaml("a: 1\na: 2\n"); } catch { twice = true; }
+  // (a warning, as of an unknown tag, prints nothing: it would print the project's own line into a job's log)
+  const emit = process.emitWarning;
+  let warned = 0;
+  process.emitWarning = () => { warned++; };
+  try { parseYaml("a: !foo x\n"); } catch { /* (an error throws, for the caller) */ } finally { process.emitWarning = emit; }
+  ok(warned === 0, "the reader prints no warning of the package's, as of an unknown tag", `${warned} warnings`);
+  ok(flow.on[0] === "push" && flow.env.A === "1" && flow.env.B === "x" && flow.jobs.j["runs-on"] === "ubuntu-latest" && Object.hasOwn(flow, "__proto__") && Object.getPrototypeOf(flow) === Object.prototype
+    && twice && JSON.stringify(parseYaml("# only a comment\n")) === "{}", "the reader reads a flow mapping and an anchor, refuses a key given twice, keeps __proto__ a key, and reads no value as an empty mapping", JSON.stringify(flow));
+}
 const c = { github: { event_name: "pull_request", event: { pull_request: { draft: false, user: { login: "Dependabot[bot]" } }, issue: null } }, inputs: { private: false, advisory: true } };
 ok(evaluate("github.event_name == 'PULL_REQUEST' && !github.event.pull_request.draft", c) === true && evaluate("github.event.issue.pull_request || 'x'", c) === "x" && evaluate("github.event.pull_request.user.login != 'dependabot[bot]'", c) === false
   && evaluate("contains(fromJSON('[\"OWNER\",\"MEMBER\"]'), 'member') && startsWith('abc', 'A')", c) === true && evaluate("!inputs.private || !inputs.advisory", c) === true, "and evaluates GitHub's expressions as GitHub does: case-blind strings, || giving a value, a missing property null");
@@ -821,9 +836,15 @@ function preRelease(name, { windows }) {
 
   // the steps and the differences name the configs where the project holds them, and read no comment as a run
   git(dir, "checkout", "-q", "main");
+  // (with nothing installed, as its own old sync script left it, the steps that read its workflows say so and go on;
+  // then installed, as a session's start installs, they read them)
+  const bare = node(dir, "core/scripts/steps.mjs");
+  ok(bare.status === 0 && /the core's packages are not installed, so \.github\/workflows\/\S+ could not be read: run `node core\/scripts\/install\.mjs`/u.test(bare.out),
+    `${name}: with the core's packages not installed, the steps that read its workflows say so, with the install as the mend, and the rest go on`, bare.out);
+  const installed = node(dir, "core/scripts/install.mjs");
   const steps = node(dir, "core/scripts/steps.mjs"), fresh = node(dir, "core/scripts/fresh.mjs");
   const tools = steps.out.split("\n").find(l => l.startsWith("- 16 November 2026, an agent's own tools listed:")) ?? "";
-  ok(steps.status === 0 && tools.includes("`node core/scripts/agent-tools.mjs config/licences.json`") && !/checks\/(licences|copies)/.test(steps.out) && !/`(reads|takes)`/.test(steps.out),
+  ok(installed.status === 0 && steps.status === 0 && tools.includes("`node core/scripts/agent-tools.mjs config/licences.json`") && !/checks\/(licences|copies)/.test(steps.out) && !/`(reads|takes)`/.test(steps.out),
     `${name}: steps.mjs names the licence config the project's own workflow passes, never a comment's word or the starter kit's path`, steps.out);
   ok(fresh.status === 0 && !/^- checks\/(copies|copies-baseline|licences|licences-audit|sizes)\.json:/m.test(fresh.out) && !/^- config\/[\w-]+\.json: missing/m.test(fresh.out),
     `${name}: fresh.mjs compares the configs where the project holds them, and calls none at the starter kit's paths missing`, fresh.out);

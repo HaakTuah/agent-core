@@ -284,11 +284,11 @@ found = differences(project(plainProject), fresh(project(plainProject)));
 ok(found.includes("checks/sizes.json: missing (the starter kit writes it today)") && found.some(d => d.startsWith("checks/copies-baseline.json: lacks the key \"windows\"")) && found.length === 2,
   "a config the kit writes beside its templates, missing or lacking a key, is listed", found.join("\n"));
 const secWorkflow = path.join(plainProject, ".github/workflows/security-review.yml");
-fs.writeFileSync(secWorkflow, fs.readFileSync(secWorkflow, "utf8").replace(/^jobs:/m, "env: {SAMPLE: value}\n\njobs:"));
+fs.writeFileSync(secWorkflow, fs.readFileSync(secWorkflow, "utf8").replace(/^jobs:/m, "env: [SAMPLE\n\njobs:"));
 const unread = notDone(plainProject);
 const unreadSec = unread.find(m => m.lead.endsWith("the security review shown on every pull request"));
 ok(unreadSec?.mend.includes("could not read the project") && unreadSec.mend.includes("security-review.yml") && unread.every(m => m.mend.includes("could not read the project")),
-  "a workflow in a form the core's reader does not know is reported as not read, never as a call that is missing or a step done", report(unread));
+  "a workflow the core's reader cannot read, a flow sequence never closed, is reported as not read, never as a call that is missing or a step done", report(unread));
 
 // ---- a path a project's own file names is read only inside the project ----
 fs.writeFileSync(path.join(plainProject, "checks/copies.json"), JSON.stringify({ baseline: "../a-game/checks/copies-baseline.json", code: [], prose: [], proseFromSecurity: true }));

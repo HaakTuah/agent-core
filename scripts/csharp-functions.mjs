@@ -57,18 +57,33 @@ export function read(parse, src, directives) {
 // line breaks kept, so that the members inside are read as a type's are, and the block itself is no function, as the
 // language makes it none. Each header's [start, end) in the text.
 function extensionHeaders(text, root) {
-  const found = [], all = leaves(root), own = typesNamedExtension(text, root);
+  const found = [], all = leaves(root), own = outermost(typesNamedExtension(text, root));
+  let at = 0;
   for (let k = 0; k < all.length; k++) {
     const node = all[k];
     if (node.type !== "identifier" || node.text !== "extension" || !["{", "}", ";", "]"].includes(all[k - 1]?.type)) continue;
-    // (in a type named extension, `extension(...) { }` is its constructor, never a block of C# 14's)
-    if (own.some(([start, end]) => node.startIndex > start && node.startIndex < end)) continue;
+    // (in a type named extension, `extension(...) { }` is its constructor, never a block of C# 14's; the leaves come
+    // in the text's order, so the bodies are passed by once each)
+    while (at < own.length && own[at][1] <= node.startIndex) at++;
+    if (at < own.length && node.startIndex > own[at][0] && node.startIndex < own[at][1]) continue;
     const end = headerEnd(text, node.endIndex);
     if (end !== null) found.push([node.startIndex, end]);
   }
   // (where code that does not build gives two headers that overlap, the later goes)
   let reached = 0;
   return found.sort((a, b) => a[0] - b[0]).filter(([start, end]) => start >= reached && (reached = end) >= 0);
+}
+
+// Spans [start, end) as a word strictly inside one of them reads them, in the text's order and none inside another: a
+// body inside another adds nothing, and two that touch are kept apart, since where one ends and the next begins is in
+// neither.
+function outermost(spans) {
+  const out = [];
+  for (const [start, end] of spans.sort((a, b) => a[0] - b[0])) {
+    const last = out.at(-1);
+    if (last && start < last[1]) last[1] = Math.max(last[1], end); else out.push([start, end]);
+  }
+  return out;
 }
 
 // The bodies of the types the file names `extension` ([start, end) in the text), found only where its text declares
