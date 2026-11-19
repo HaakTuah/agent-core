@@ -878,6 +878,10 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
     "a here-document with no line that ends it leaves its lines read as commands, so that no run is missed");
   ok(JSON.stringify(shown('echo "$(node a.mjs)" `node b.mjs`')) === JSON.stringify(['echo $(node a.mjs)* `node b.mjs`*', "node a.mjs", "node b.mjs"]),
     "a command inside $( ) or ` ` is a command of its own, its output a word filled when it runs");
+  // (Codex's security review of 76119ae: "!" turns a command's status over, so a check run under it cannot fail)
+  ok(JSON.stringify(shown("! node core/scripts/lookup.mjs c.json\nif ! node a.mjs; then x; fi")) === JSON.stringify(["! node core/scripts/lookup.mjs c.json", "! node a.mjs", "x"])
+    && notRead("copies", { "a.yml": stepped("! node core/scripts/copies.mjs config/c.json") }),
+    "a command led by \"!\" keeps it as its first word, and a check's run under it is not read as its run");
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);

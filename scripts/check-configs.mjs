@@ -133,7 +133,9 @@ function located(word, dir, shell) {
 const NODE = /(?:^|\/)node(?:\.exe)?$/iu;
 const WRAPPERS = new Set(["env", "exec", "time", "command", "nohup", "sudo"]);
 // The shell's words that start a command's place without being one (if …; then node …), passed over as wrappers are.
-const KEYWORDS = new Set(["if", "then", "else", "elif", "do", "while", "until", "!", "{"]);
+// ("!" is none of them: it turns the status of the command after it over, so a check run under it cannot fail, and
+// is no run of the check; Codex's security review of 76119ae)
+const KEYWORDS = new Set(["if", "then", "else", "elif", "do", "while", "until", "{"]);
 // A shell given its commands as one word (`bash -c "…"`), whose commands are read as the step's own.
 const SHELL = /^(?:.*\/)?(?:(?:ba|z|da)?sh|pwsh|powershell)(?:\.exe)?$/iu;
 // Node's options that take the next word as their value, so that it is no script.
