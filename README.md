@@ -97,8 +97,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
    core files the sync moved or removed is reviewed like any PR. Where a change to the core asks something of the
-   project itself (a row of its manifest, a line of a rule file, a workflow), `setup/sync-notes.md` says so, and
-   `scripts/steps.mjs` tells each such step done or not; the sync script prints the entries a sync brings, then every
+   project itself (a row of its manifest, a line of a rule file, a workflow), an entry of the sync notes says so
+   (`setup/sync-notes.md`, each entry a file of `setup/sync-notes/`, read whole by `scripts/sync-notes.mjs`), and its
+   step of the same name in `scripts/steps/` tells it done or not (`scripts/steps.mjs`); the sync script prints the entries a sync brings, then every
    step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`), where the owner's
    inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`) and the line `Read for it:`
    (`scripts/reading.mjs`), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A

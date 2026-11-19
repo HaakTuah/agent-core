@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
 import { STEPS } from "../scripts/steps.mjs";
+import { FOLDER, POINTER, entries, notesAt } from "../scripts/sync-notes.mjs";
 import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
 
 let failed = 0, count = 0;
@@ -107,6 +108,21 @@ ok(!newestRelease(c3, dir).moved && !newestRelease(c4, dir).moved, "a pin at the
 ok(!newestRelease(side, dir).moved && !newestRelease("f".repeat(40), dir).moved, "a pin that is no commit of main moves nowhere (core.yml fails such a project by itself)");
 ok(asksBetween(c1, c3, dir).join("|") === "- **First.** Done when one.|- **Second.** Done when two." && asksBetween(c3, c4, dir).length === 0, "a sync asks what the notes gained between the two commits");
 ok(asksBetween("f".repeat(40), c3, dir) === null, "notes that cannot be read give no all-clear");
+{
+  // (#750, point 1: the notes' entries move from the file into a folder, a file each; a sync across the move asks
+  // nothing it did not, and one past it asks what the folder gained, in the order of the files' names)
+  const notes = path.join(tmp, "notes"), at = (f, text) => { fs.mkdirSync(path.dirname(path.join(notes, f)), { recursive: true }); if (text === null) fs.rmSync(path.join(notes, f)); else fs.writeFileSync(path.join(notes, f), text); };
+  const save = (files) => { for (const [f, text] of Object.entries(files)) at(f, text); git(notes, "add", "-A"); git(notes, "commit", "-q", "--allow-empty", "-m", "notes"); return git(notes, "rev-parse", "HEAD"); };
+  fs.mkdirSync(notes); git(notes, "init", "-q", "-b", "main");
+  const one = "- **First.** Done when one.", two = "- **Second.** Done when two.", three = "- **Third.** Done when three.";
+  const filed = save({ [NOTES]: `${head}${one}\n${two}\n` });
+  const foldered = save({ [NOTES]: `${head}${POINTER}\n`, [`${FOLDER}/010-first.md`]: `${one}\n`, [`${FOLDER}/020-second.md`]: `${two}\n` });
+  const gained = save({ [`${FOLDER}/015-third.md`]: `${three}\n` });
+  const bare = fs.mkdtempSync(path.join(tmp, "notes-")); fetchCore(bare, notes);
+  ok(asksBetween(filed, foldered, bare).length === 0, "a sync across the notes' move into a folder asks nothing the file did not hold", asksBetween(filed, foldered, bare).join("\n"));
+  ok(asksBetween(filed, gained, bare).join("|") === three && asksBetween(foldered, gained, bare).join("|") === three, "an entry the folder gains is asked, from a commit before the move or after it");
+  ok(entries(notesAt(gained, args => git(notes, ...args))).join("|") === [one, three, two].join("|"), "the notes read whole at a commit hold the folder's entries in the order of the files' names");
+}
 const coming = next(dir);
 ok(coming.name === "release-4" && coming.sha === c4 && coming.before.name === "release-2" && coming.asks.length === 0, "the next release stands on main's newest commit, numbered after every tag with a release's name, the one that is no release too, so its name is never taken");
 

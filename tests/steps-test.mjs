@@ -12,7 +12,7 @@ import { differences, fresh, kind, report as freshReport } from "../scripts/fres
 import { CORE } from "../scripts/core-address.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "../scripts/init.mjs";
 import { notes as manifestNotes } from "../scripts/manifest-reads.mjs";
-import { NOTES } from "../scripts/releases.mjs";
+import { FOLDER, NOTES, POINTER, entries, notes as notesWhole } from "../scripts/sync-notes.mjs";
 import { READERS } from "../scripts/shape-readers.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { parseYaml, pathsLetThrough } from "../scripts/workflow-run.mjs";
@@ -29,9 +29,19 @@ const modules = ["roles/shared", "tasks", "tools"].flatMap(d => fs.readdirSync(p
 const texts = dir => Object.fromEntries(fs.readdirSync(path.join(root, dir)).filter(n => n.endsWith(".md")).map(n => [n, fs.readFileSync(path.join(root, dir, n), "utf8")]));
 
 // ---- every entry of the sync notes has its step, and each step is told done one way ----
-const notes = leads(fs.readFileSync(path.join(root, NOTES), "utf8"));
-ok(notes.length > 0 && JSON.stringify(notes) === JSON.stringify(STEPS.map(s => s.lead)), `every entry of ${NOTES} has its step in steps.mjs, in the same order, and no step stands without one`,
+const notes = leads(notesWhole(root));
+ok(notes.length > 0 && JSON.stringify(notes) === JSON.stringify(STEPS.map(s => s.lead)), `every entry of ${NOTES} has its step in scripts/steps/, in the same order, and no step stands without one`,
   `entries without a step: ${notes.filter(l => !STEPS.some(s => s.lead === l)).join("; ") || "none"}\nsteps without an entry: ${STEPS.filter(s => !notes.includes(s.lead)).map(s => s.lead).join("; ") || "none"}`);
+// (#750, point 1: each entry in a file of its own, its step in a file of the same name, and none in the notes' file)
+const noteFiles = fs.readdirSync(path.join(root, FOLDER)), stepFiles = fs.readdirSync(path.join(root, "scripts", "steps"));
+const named = f => f.replace(/\.(md|mjs)$/u, "");
+const unpaired = [...noteFiles.filter(f => !f.endsWith(".md") || !stepFiles.includes(`${named(f)}.mjs`)).map(f => `${FOLDER}/${f}`),
+  ...stepFiles.filter(f => !f.endsWith(".mjs") || !noteFiles.includes(`${named(f)}.md`)).map(f => `scripts/steps/${f}`)];
+ok(noteFiles.length === STEPS.length && !unpaired.length, `each entry stands in a file of ${FOLDER}/ and its step in a file of scripts/steps/ of the same name, NNN-<name>`, `without its pair: ${unpaired.join(", ")}`);
+const notOne = noteFiles.filter(f => !/^- \*\*[^\n]+\n$/u.test(fs.readFileSync(path.join(root, FOLDER, f), "utf8")));
+ok(!notOne.length, `each file of ${FOLDER}/ holds one entry, on one line`, notOne.join(", "));
+const own = fs.readFileSync(path.join(root, NOTES), "utf8");
+ok(!entries(own).length && own.split("\n").filter(l => l === POINTER).length === 1, `${NOTES} holds no entry of its own, and names the folder once: a new entry is a file of ${FOLDER}/, named to stand after the one before it`, entries(own).join("\n"));
 const ways = STEPS.filter(s => [s.check, s.held, s.unread].filter(Boolean).length !== 1 || !Object.values(COST).includes(s.cost));
 ok(!ways.length, "each step is told done one way (a check, a check of the project's that holds it, or why none reads it) and says what it costs", ways.map(s => s.lead).join("\n"));
 const unstaged = STEPS.filter(s => s.check && !STAGES[s.lead]).map(s => s.lead);
