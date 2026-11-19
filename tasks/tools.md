@@ -53,14 +53,17 @@ a scratch project opened in Kiro. It does not mean a tool is refused a role befo
 documentation says what it reads, not whether its model keeps the rules, and the tools change monthly. Held by
 `scripts/staged.mjs`, which says each tool's standing, the release's notes too, and names the cases due for each.
 
-**Each tool's part:** how it is handed a task, how it is asked for a review, what it cannot do that a
+**Each tool's part:** how it is handed a task, how it is asked for a review by each way in the order of
+`tasks/reviews.md`, point 1, a label in italics for each (*Side by side:*, *Through a plug-in:*, *On the host:*; the
+project's own way stands there alone), what it cannot do that a
 rule needs, its own folders, which floor rule 3 protects by name, and its map of the tiers (`tasks/roles.md`, "The
 rules name tiers, never a model"), where it has one. A tool with no review app on the host is asked for a review by a
 fresh session of it given the review's brief (`tasks/reviews.md`, point 7) and told to change nothing; its answer is posted on the PR in a
 comment that opens "Code review:" or "Security review:". The parts: `tools/claude.md`, `tools/codex.md`,
 `tools/copilot.md`, `tools/kiro.md` and `tools/antigravity.md`. A project whose tool has none names in its
 manifest's "Tools" table how it is reached, and files the part with the core (`README.md`, "Reporting to the core").
-Reason: a project with only that tool otherwise had no word on how to reach it. Held by nothing yet.
+Reason: a project with only that tool otherwise had no word on how to reach it. Held, in part, by
+`scripts/tools-offer.mjs`, which fails a part with a way's label left out or the labels out of order.
 
 **What the core offers one tool, it offers each** (#467). By default nothing the core gives a session of one agent tool
 is given to that tool alone: each thing it offers is a row of the table below, and each tool of the list a column,

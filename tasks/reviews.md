@@ -19,8 +19,8 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    read (floor rule 8): the order decides how a session asks, and replaces no review. It does not mean a second review
    of the same kind by another way. Reason: on 15 November the merge line lost about 20 minutes at each conflict, the
    sessions asking the host's app and waiting while a faster way stood open (#395). Held, in part, by
-   `core/scripts/tools-offer.mjs`, which fails a tool's part with no line for each way; that the first was taken, by
-   nothing.
+   `core/scripts/tools-offer.mjs`, which fails a tool's part with a way left out or the ways out of order; that the
+   first was taken, by nothing.
    - **A review's stance follows the kind of change** (#397). By default the code review's brief is regular, a review
      against the guidelines; where the PR does the *hard work*, its brief says adversarial
      (`roles/shared/review-guidelines.md`, "Its stance is its brief's"). Only where the code reviewer takes a brief: a

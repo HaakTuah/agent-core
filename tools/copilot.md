@@ -2,10 +2,13 @@
 
 Read by a session of the tool `copilot`, and by whoever hands Copilot a task or asks its code review.
 
-Asking Copilot's code review, unless the ruleset does: `gh api -X POST
-repos/<owner>/<repo>/pulls/<n>/copilot-code-review`. It marks nothing blocking: what "What blocks" in
-`roles/shared/review-guidelines.md` names does. Its login is read from a review it gave (`.user.login` under
-`pulls/<n>/reviews`).
+Asked for a review, by the first way there is (`tasks/reviews.md`, point 1):
+- *Side by side:* not yet: the pages read below name no command line of its.
+- *Through a plug-in:* none the core knows.
+- *On the host:* its code review, unless the ruleset asks it, by `gh api -X POST
+  repos/<owner>/<repo>/pulls/<n>/copilot-code-review`, which takes no brief. It marks nothing blocking: what "What
+  blocks" in `roles/shared/review-guidelines.md` names does. Its login is read from a review it gave (`.user.login`
+  under `pulls/<n>/reviews`).
 
 As a builder (from its documentation, docs.github.com, its pages "Adding repository custom instructions", "About
 GitHub Copilot cloud agent", "Using Copilot in the cloud on GitHub", "Hooks for GitHub Copilot" and "GitHub Copilot

@@ -44,7 +44,6 @@ sessions.
     builders in one message;
   - each step `core/scripts/steps.mjs` reports not done, and each difference `core/scripts/fresh.mjs` lists, gets a
     lane, one only the owner can do labelled `needs-owner`;
-  - sync the core in a routine lane, as "Sessions" in `roles/shared/work-flow.md` says;
   - run the scheduled look, which does nothing more where it ran less than 20 hours before;
   - turn back on any scheduled workflow GitHub switched off for want of activity (`gh workflow enable`);
   - act on what is new in the *progress file*, planned as `tasks/planning.md` says;

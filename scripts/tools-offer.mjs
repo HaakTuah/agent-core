@@ -7,8 +7,9 @@
 // tiers whose part says no day it was read, and a file of a tool's own that no cell names: each part under tools/, each
 // template of the starter kit (init.mjs, beside this file) written into a tool's folder or as a tool's entry file, each
 // hook script (holders.mjs's HOOKS), and each file the core holds in a tool's folder, named by itself or by the template
-// that writes it. With --open it asks gh, as the account it answers for, whether each issue a "not yet" names is open,
-// and fails one that is not; where gh cannot answer, it says so and fails nothing for it. The core's own repository
+// that writes it; and a part a column's heading names that does not say how the tool is asked for a review by each way,
+// in the order of tasks/reviews.md, point 1 (WAYS; #397). With --open it asks gh, as the account it answers for,
+// whether each issue a "not yet" names is open, and fails one that is not; where gh cannot answer, it says so and fails nothing for it. The core's own repository
 // alone, run by its tests workflow. Git, gh and Node's own modules.
 //
 //   node scripts/tools-offer.mjs [--open]
@@ -31,6 +32,17 @@ const DAY = String.raw`\d{1,2}\s+(?:January|February|March|April|May|June|July|A
 const FORMS = [/^carried: \S.*$/u, new RegExp(String.raw`^cannot: \S.*, read ${DAY}$`, "u"), /^not yet(?:: #\d+)?$/u];
 const ISSUES = /^Its issue for what is not yet carried$/u;
 const MAP = /^The map of the tiers/u;
+// The ways a review is asked, in the order a session takes them (tasks/reviews.md, point 1; #397): each a label in
+// italics in each tool's part, the project's own way named in tasks/reviews.md alone.
+export const WAYS = ["*Side by side:*", "*Through a plug-in:*", "*On the host:*"];
+
+// What is wrong with a tool's part, `text`, on the ways: a label of WAYS it leaves out, or the labels out of order.
+export function ways(part, text) {
+  const at = WAYS.map(w => String(text).indexOf(w));
+  const missing = WAYS.filter((_, i) => at[i] < 0);
+  if (missing.length) return [`${part} does not say how the tool is asked for a review by the way${missing.length > 1 ? "s" : ""} ${missing.map(w => `"${w}"`).join(", ")}. Mend: add the label in italics, in the order ${WAYS.join(" ")}, saying how a code review and a security review are asked of the tool that way, what comes back and whether it takes a brief, or "none" where the tool has no such way`];
+  return at.every((n, i) => !i || n > at[i - 1]) ? [] : [`${part} names the ways a review is asked out of order. Mend: put its labels in the order ${WAYS.join(" ")}, the order a session asks in (tasks/reviews.md, point 1)`];
+}
 
 // The table: { tools: [{ name, part, issue }], rows: [{ what, cells: [text] }] }, `issue` the column's cell of the row
 // ISSUES ("#<n>", "none", or "" where there is no such row), which is no row of what is offered; or null where TABLE
@@ -62,13 +74,14 @@ export function toolFiles(root, tracked) {
 
 // What is wrong with the table at `root`, each a line with its mend. `tools`: the list; `tracked`: the files git holds;
 // `isOpen(n)`: whether issue n is open, null where it cannot be read (no --open: never asked).
-// `text`: the table's file as it stands, read from `root` where left out.
-export function wrong({ root = ROOT, text = fs.readFileSync(path.join(root, TABLE), "utf8"), tools, tracked, isOpen = () => null }) {
+// `text`: the table's file as it stands, read from `root` where left out; `read(file)`: a tool's part, read from `root`
+// where left out.
+export function wrong({ root = ROOT, text = fs.readFileSync(path.join(root, TABLE), "utf8"), tools, tracked, isOpen = () => null, read = f => fs.readFileSync(path.join(root, f), "utf8") }) {
   const t = table(text);
   if (!t) return { wrong: [`${TABLE} holds no table whose first heading is "What the core offers". Mend: put back the table of "What the core offers one tool, it offers each", a row for each thing the core offers and a column for each tool of scripts/staged-tools.json`], unread: [] };
   const out = [], unread = [], named = new Set();
   for (const name of tools.filter(n => !t.tools.some(x => x.name === n))) out.push(`${TABLE}: the tool ${name}, of scripts/staged-tools.json, has no column in the table. Mend: add its column, its part in the heading ("${name} (\`tools/<its part>.md\`)"), and fill each cell as carried, cannot or not yet`);
-  for (const x of t.tools) if (x.part) named.add(x.part);
+  for (const x of t.tools) if (x.part) { named.add(x.part); if (fs.existsSync(path.join(root, x.part))) out.push(...ways(x.part, read(x.part))); }
   for (const r of t.rows) r.cells.forEach((cell, i) => {
     const where = `${TABLE}, the row "${r.what}", the column ${t.tools[i].name}`;
     for (const m of cell.matchAll(/`([^`]+)`/gu)) named.add(m[1]);
