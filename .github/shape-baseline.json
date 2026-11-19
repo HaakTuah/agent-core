@@ -71,6 +71,7 @@
     "process: tests/code-shape-test.mjs -> node:child_process": true,
     "process: tests/comment-only-test.mjs -> node:child_process": true,
     "process: tests/copies-tools-test.mjs -> node:child_process": true,
+    "process: tests/copy-left-out-test.mjs -> node:child_process": true,
     "process: tests/copy-tree-test.mjs -> node:child_process": true,
     "process: tests/core-moved-test.mjs -> node:child_process": true,
     "process: tests/core-path-test.mjs -> node:child_process": true,
