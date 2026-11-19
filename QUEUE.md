@@ -67,6 +67,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #831 | rule builder; a page for owners beside the floor, with the rule and check that keep it in step; the floor's wording unchanged | |
 | #886, point 1 | rule builder; it changes the floor (rule 3) and adds a script beside `scripts/comment-only.mjs` | |
 | #886, point 2 | rule builder; it changes the floor (rules 3 and 14), `AGENTS.md`'s queue gate, the review guidelines and the state report | #886, point 1 |
+| #887 | rule builder; it changes `AGENTS.md`, the review guidelines and `scripts/pruning.mjs` | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
