@@ -174,16 +174,19 @@ try {
   fs.cpSync(path.join(root, "scripts"), path.join(copy, "scripts"), { recursive: true });
   for (const f of [".packages/package.json", ".packages/package-lock.json", ".gitignore", ".packages/.npmrc"]) fs.cpSync(path.join(root, f), path.join(copy, f));
   // (each script that loads a package, by the call that loads it; a script that loads one and has no case here fails)
-  const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")` };
+  const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")`, "workflow-run.mjs": `parseYaml("a: 1\\n")` };
+  // (parseYaml throws where the package is not installed, and each of its callers says so as a failure or an unread file:
+  // here as a check would, so its words are read as one)
+  const callOf = f => (f === "workflow-run.mjs" ? `(() => { try { return m.${CALLS[f]}; } catch (e) { console.error(\`FAIL: \${e.message}\`); process.exit(1); } })()` : `m.${CALLS[f]}`);
   const loads = fs.readdirSync(path.join(root, "scripts")).filter(f => f.endsWith(".mjs") && f !== "packages.mjs" && /\bload(?:Sync)?\("/u.test(fs.readFileSync(path.join(root, "scripts", f), "utf8")));
   ok(loads.length > 0 && loads.every(f => CALLS[f]), "each script that loads a package has its call here", loads.filter(f => !CALLS[f]).join(", "));
-  const call = (f, expr) => spawnSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts", f)).href)}); console.log(JSON.stringify(m.${expr}));`], { cwd: project, encoding: "utf8", timeout: 60000, env });
+  const call = (f, expr) => spawnSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts", f)).href)}); console.log(JSON.stringify(${expr}));`], { cwd: project, encoding: "utf8", timeout: 60000, env });
   for (const f of loads) {
-    const r = call(f, CALLS[f]), out = `${r.stdout}${r.stderr}`;
+    const r = call(f, callOf(f)), out = `${r.stdout}${r.stderr}`;
     ok(r.status === 1 && /did not run: the package \S+ is not installed/u.test(out) && /install\.mjs/u.test(out) && mended(out), `${f}, with nothing installed beside the copy, says it did not run and how to install, and does not take the project's own package of the name`, out);
   }
   // (a script that imports one of them for what needs no package runs with nothing installed: the copies check)
-  const plain = call("yaml-keys.mjs", `uncommented("a: 1 # b")`);
+  const plain = call("yaml-keys.mjs", `m.uncommented("a: 1 # b")`);
   ok(plain.status === 0 && plain.stdout.trim() === JSON.stringify("a: 1"), "what needs no package runs with nothing installed, so a project's own workflow that runs the copies check is not stopped", `${plain.stdout}${plain.stderr}`);
   // (the shape check's reader of C#, which reads on the parser's files (installedFile), with nothing installed: it did
   // not run, saying the mend; where the job's install could not reach the registry, it reads no function of C#, says so
@@ -234,7 +237,7 @@ try {
   const other = JSON.parse(kept);
   other.packages["node_modules/yaml"].resolved = "https://example.invalid/yaml.tgz";
   fs.writeFileSync(record, JSON.stringify(other));
-  const stale = call("yaml-keys.mjs", CALLS["yaml-keys.mjs"]);
+  const stale = call("yaml-keys.mjs", callOf("yaml-keys.mjs"));
   ok(stale.status === 1 && /did not run: the package yaml is not installed .* as \.packages\/package-lock\.json names it/u.test(stale.stderr) && mended(stale.stderr), "a package installed from another lock file than the copy's is never loaded: the check did not run, with its mend", `${stale.stdout}${stale.stderr}`);
   // (where the job's install could not reach the registry, a script is told so, and loading the package still fails)
   const unreached = spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(p.unreached("yaml")); p.loadSync("yaml");`], { cwd: project, encoding: "utf8", env: { ...env, CORE_PACKAGES_UNREACHED: "1" } });

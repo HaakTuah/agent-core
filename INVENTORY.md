@@ -232,7 +232,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   for the selection, Jest's related tests, Vitest's changed mode and Nx's affected, dropped on fact: each needs its
   framework and reads JavaScript alone, where `select.mjs` reads C# and Python too. *Bugs:* 17 naming `tests.yml`, 2
   `select.mjs`. **Keep** the selection: nothing fits. The upgrade test's runner of workflows
-  (`scripts/workflow-run.mjs`) stays as #486 says: `act`, dropped on fact, needs a container a session cannot start.
+  (`scripts/workflow-run.mjs`) stays as #486 says: `act`, dropped on fact, needs a container a session cannot start;
+  its YAML is read by the YAML package (#530).
 - `scripts/mutate.mjs`, `scripts/strength.mjs`: the mutation tool puts faults into the lines a change touches, one at a
   time, and writes the open mutation report, which the strength check reads to say how strong the tests are. *Runs:* any
   session and the runners. *Else:* StrykerJS (Apache-2.0, 176 packages) and Stryker.NET, kept, tried above; mutmut and
