@@ -192,13 +192,14 @@ try {
 // ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
 // Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and
 // the pull request, cancelled once a newer run starts for it; a run on main, a schedule or a start by hand is a group of
-// its own (its run id), and never cancelled. Left out, each for its reason: the security-review check, whose runs go one
-// at a time in order so the last has read the newest comments, the release, the preview's queue and the deletion of
+// its own (its run id), and never cancelled. Left out, each for its reason: the security-review check, whose runs go
+// one at a time in order so the last has read the newest comments, and the queue-only proof that feeds it, which keeps
+// no group, so that no comment's run cancels one waiting to record a review (read below), the release, the preview's queue and the deletion of
 // merged branches, which no pull request starts and which never cancel, the scheduled ones, and the core's tests, read
 // below for their own groups (#733).
 const KEY = "${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}";
 const CANCEL = "${{ github.event_name == 'pull_request' }}";
-const APART = new Set(["security-review.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml", "tests.yml"]);
+const APART = new Set(["security-review.yml", "queue-only.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml", "tests.yml"]);
 const wfDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".github", "workflows");
 const loose = [];
 // (a workflow in a form the test's reader does not know, a flow mapping say, is read for its group at the top, by its
@@ -240,8 +241,22 @@ const ownReview = parseYaml(fs.readFileSync(path.join(wfDir, "own-security-revie
 // (the template's own {{core}} and {{pin}} filled in, which init.mjs writes when it makes the project)
 const kitReview = parseYaml(fs.readFileSync(path.join(core, TEMPLATES, "workflows/security-review.yml.tmpl"), "utf8").replace(/\{\{\w+\}\}/g, "x"));
 ok(JSON.stringify(ownReview.on) === JSON.stringify(kitReview.on), `the core's own security-review check is started by what the template's is, and nothing more${JSON.stringify(ownReview.on) === JSON.stringify(kitReview.on) ? "" : `: ${JSON.stringify(ownReview.on)}`}`);
+// (its two calls: the review's, and the queue-only proof's that feeds it, #750)
 const ownCall = Object.values(ownReview.jobs ?? {});
-ok(ownCall.length === 1 && ownCall[0].uses === "./.github/workflows/security-review.yml" && ownCall[0].with?.root === "." && ownCall[0].with?.advisory === false, "and calls the core's workflow with its scripts at the root and advisory turned off");
+const callOf = (name) => ownCall.filter((job) => job.uses === `./.github/workflows/${name}`);
+ok(ownCall.length === 2 && ["security-review.yml", "queue-only.yml"].every((name) => callOf(name).length === 1 && callOf(name)[0].with?.root === ".") && callOf("security-review.yml")[0].with?.advisory === false,
+  "and calls the core's workflow, and the queue-only proof before it, with its scripts at the root and advisory turned off");
+// (no group holds a whole run of the check, nor its proof: GitHub cancels a waiting run or job once a newer one of its
+// group queues, so any comment's run would lose the one that records a review)
+const queueProof = parseYaml(fs.readFileSync(path.join(wfDir, "queue-only.yml"), "utf8"));
+ok(ownReview.concurrency === undefined && kitReview.concurrency === undefined && Object.values(queueProof.jobs).every((job) => job.concurrency === undefined),
+  "and neither caller holds its whole run in a group, nor the proof its job, so no comment's run cancels one waiting to record a review");
+// (the proof compares from the default branch's commit it checked out, whose progress file gives the form, and proves
+// only files that are those GitHub lists for the pull request, which the review job reads: the answer's base.sha can
+// stand behind where the head leaves that branch)
+const proveRun = String(queueProof.jobs.prove.steps.find((step) => step.id === "prove")?.run);
+ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.sha") && /compare\/\$base\.\.\.\$tip/u.test(proveRun) && /pulls\/\$NUMBER\/files/u.test(proveRun),
+  "and the proof compares the head from the default branch's commit it checked out, its files held to those GitHub lists for the pull request");
 
 // ---- when the core's tests run (#733, points 2 to 4 and 6) ----
 // A pull request's run starts once it is ready, never on a draft, on Linux alone; main is tested on Linux at its newest

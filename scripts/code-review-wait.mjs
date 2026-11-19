@@ -20,7 +20,9 @@
 // and .agent/, and those the project's
 // SECURITY.md adds; never in the core's own repository, where every file is protected), nor where the pull request has
 // a sync's shape: the copy at that path, the manifest's pin and workflows whose pins alone move (floor rule 8: a pure
-// sync gets no review; that its copy is the core's is scripts/pure-sync.mjs's to prove, not this check's). Given
+// sync gets no review; that its copy is the core's is scripts/pure-sync.mjs's to prove, not this check's), nor where
+// the caller proved it queue-only with the default branch's queue-only.mjs (QUEUE, its files one Markdown file: floor
+// rule 8, #750). Given
 // neither list, it waits only for a review running, as it did before it read them. A list GitHub cut short (3000
 // files, 250 commits) is read as needing a review and as proving no update from main. A pull request that leaves this
 // script alone and whose head does not hold it as the default branch does (BOUND=false, which the workflow sets), and
@@ -42,14 +44,15 @@
 //           [<its commits, the same> <its files, the same> [<the merges clean-merges.mjs proved>]]
 //         ADVISORY=false for a status that waits; BOUND=false and SINCE for a pull request from before the check; RUN_URL for
 //         the link the status carries; REVIEWERS, the accounts the project names, and RIGHTS, the host's rights of
-//         those who posted a review (a JSON list), as security-review.mjs reads them.
+//         those who posted a review (a JSON list), as security-review.mjs reads them; QUEUE for the head the
+//         caller's queue-only.mjs proved.
 import { existsSync, readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
 import { copyOf } from "./core-path.mjs";
 import { formOf, marksWait } from "./review-marks.mjs";
 import { RULES, ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
-import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, counted, pinsAlone, reviewersOf, standsFrom, status, unproved, whole, writersOf } from "./security-review.mjs";
+import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, counted, pinsAlone, queueOnly, reviewersOf, standsFrom, status, unproved, whole, writersOf } from "./security-review.mjs";
 
 export const CONTEXT = "code-review";
 const SHA = /^[0-9a-f]{40}$/u;
@@ -79,20 +82,25 @@ function withMarks(verdict, pull, list, commits, files, bound, merges, more) {
   if (why === null) return verdict;
   return bound ? { sha: verdict.sha, done: false, why } : { sha: verdict.sha, done: true, why: `before this check came, so not waited for: ${why}` };
 }
+// the whole SHAs a posted code review names, never a prefix: an old review naming the first characters of another
+// commit must not stand for this one; only from an account security-review.mjs counts (more: the accounts the
+// project names, and the host's rights read); and, where the pull request is held (bound), only as it was first posted
+function postedShas(list, pull, bound, more) {
+  const whose = counted(pull, more?.reviewers, writersOf(more?.rights));
+  return new Set(list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && whose(comment.user) && (!bound || asPosted(comment)))
+    .flatMap((comment) => (comment.body.match(/(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/giu) ?? []).map((found) => found.toLowerCase())));
+}
 function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges, copy, more) {
   const short = sha.slice(0, 7);
-  // the whole SHAs a posted code review names, never a prefix: an old review naming the first characters of another
-  // commit must not stand for this one; only from an account security-review.mjs counts (more: the accounts the
-  // project names, and the host's rights read); and, where the pull request is held (bound), only as it was first posted
-  const whose = counted(pull, more?.reviewers, writersOf(more?.rights));
-  const posted = new Set(list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && whose(comment.user) && (!bound || asPosted(comment)))
-    .flatMap((comment) => (comment.body.match(/(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/giu) ?? []).map((found) => found.toLowerCase())));
+  const posted = postedShas(list, pull, bound, more);
   const running = review !== null && typeof review === "object" && review.commit_sha === sha && RUNNING.includes(review.status);
   if (running) {
     if (posted.has(sha)) return { sha, done: true, why: `a code review of ${short} is posted, so Codex's running one is not waited for` };
     return { sha, done: false, why: `Codex's code review of ${short} is still running. Mend: wait for it` };
   }
   if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules, copy))) return { sha, done: true, why: "no code review is running" };
+  // (one its caller proved queue-only, its files as queueOnly reads them, needs none: floor rule 8, #750)
+  if (more?.queue === true && queueOnly(pull, files)) return { sha, done: true, why: "queue-only, as queue-only.mjs proves: no code review needed" };
   return reviewRan(sha, posted, review, pull, commits, bound, merges);
 }
 // whether a code review has run on the head, or on a commit only updates from main follow: posted, or Codex's completed
@@ -151,7 +159,8 @@ if (started(import.meta.url)) {
   // (and the core's copy, at the path the default branch's manifest names, checked out here: core-path.mjs)
   const copy = existsSync("core-manifest.md") ? copyOf(".") : null;
   const pull = read(pullFile);
-  const more = { reviewers: reviewersOf(process.env.REVIEWERS), rights: process.env.RIGHTS ? read(process.env.RIGHTS) : undefined };
+  const more = { reviewers: reviewersOf(process.env.REVIEWERS), rights: process.env.RIGHTS ? read(process.env.RIGHTS) : undefined,
+    queue: typeof pull?.head?.sha === "string" && /^[0-9a-f]{40}$/u.test(pull.head.sha) && process.env.QUEUE === pull.head.sha };
   const verdict = judge(pull, read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, boundOf(process.env.BOUND, pull, process.env.SINCE), mergesFile ? read(mergesFile) : undefined, copy, more);
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL, CONTEXT), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }

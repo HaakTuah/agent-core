@@ -150,7 +150,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **Whoever builds a change finishes it,** the design session and a builder alike: the branch, the draft PR and the
   push after every commit, then ready, its reviews, their findings fixed and the merge, as `roles/shared/work-flow.md`
   says ("Git and GitHub", and point 1). A PR that changes a rule says what it changes in every project.
-- **Every PR gets Codex's code and security reviews;** one that changes the floor or the review guidelines needs the
+- **Every PR gets Codex's code and security reviews,** save one of queue lines alone that `scripts/queue-only.mjs`
+  proves (floor rule 8; `tasks/reviews.md`, point 3); one that changes the floor or the review guidelines needs the
   owner's yes in it: that of its queued issue ("Queued means wanted"), or, for one that goes beyond it, a new yes, for
   which it waits unmerged while its builder takes the next line.
 - **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`).

@@ -50,10 +50,14 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      scheduled look's reader of the default branch's newest commit, read as a time alone (`scripts/look.mjs`), and
      an account's rights by the code-review wait (`scripts/code-review-wait.mjs`), the scheduled look
      (`scripts/look.mjs`) and the size check (`scripts/size.mjs`, from `size.yml`) through `security-review.mjs`'s
-     reader; limits: 1 MB of an answer to `core-moved.mjs`, `releases.mjs` and `tools-offer.mjs`, 64 MB or 256 MB to the
-     others, 30 commits and 30 s each for the green main of `releases.mjs`, 30 merged pull requests for the wait, 50
-     pages for the stalled look, 200 for the cost, 10 for the merge line, 20 s for the tools' offer, 30 s for the host's
-     account; hostile tests: `tests/hostile-github-test.mjs`.
+     reader, and a pull request's one file and the issues its lines name, by `scripts/queue-only.mjs`; limits: 1 MB of
+     an answer to `core-moved.mjs`, `releases.mjs` and `tools-offer.mjs`, 64 MB or 256 MB to the others, 30 commits and
+     30 s each for the green main of `releases.mjs`, 30 merged pull requests for the wait, 50 pages for the stalled
+     look, 200 for the cost, 10 for the merge line, 20 s for the tools' offer, 30 s for the host's account, and for
+     `queue-only.mjs` 16 MB of an issue's answer and 3 pages of its notes, 12 issues, the pull request's answer, the
+     first page of its files and the comparison that gives them read whole, at GitHub's own size (its count of one
+     file read first), 1 MB of the progress file, 240 characters of a line it adds, 90 s and a job of 3 minutes;
+     hostile tests: `tests/hostile-github-test.mjs`, and for the last `tests/queue-only-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`), the sync and its steps

@@ -186,6 +186,18 @@ const unreadable = had([garbled]);
 ok(unreadable.done === false && unreadable.warning === UNREAD && had([garbled, said(`Code review: of ${HEAD}`)]).done === true, "a summary that cannot be read is no review: the gate still holds, warning, and a posted review settles it");
 ok(is(had([summary(running)]), false, "still running") && is(had([summary(running), said(`Code review: of ${HEAD}`)]), true, "is posted"), "a running review is still waited for, and ended by one posted of the head");
 
+// A pull request its caller proved queue-only (#750): in the core, where every pull request needs its code review, it
+// needs none where GitHub's whole list of its files is one Markdown file that runs nothing, since a proof handed by a
+// caller changed in the pull request itself must wave through nothing more.
+const lineOf = { filename: "QUEUE.md", status: "modified", patch: "@@ -1 +1 @@\n-| #1 | builder | |\n+| #2 | builder | |" };
+const queued = (comments, files, p = inCore, proved = true) => judge({ commits: line.length, changed_files: files.length, ...p }, comments, line, [files], [], true, undefined, null, { queue: proved });
+ok(is(queued([], [lineOf]), true, "queue-only, as queue-only.mjs proves") && is(queued([], [lineOf], inCore, false), false, "no code review"),
+  "proved queue-only, its one file the progress file, it needs no code review; not proved, it is any pull request");
+ok(is(queued([], [lineOf, { ...lineOf, filename: "README.md" }]), false, "no code review") && is(queued([], [{ ...lineOf, filename: "QUEUE.yml" }]), false, "no code review")
+  && is(queued([], [{ ...lineOf, filename: ".github/workflows/x.md" }]), false, "no code review") && is(queued([], [lineOf], { ...inCore, changed_files: 2 }), false, "no code review"),
+  "but not where its files are two, one is no Markdown, one runs by itself, or GitHub's list is cut short, whatever its caller says");
+ok(is(queued([summary(running)], [lineOf]), false, "still running"), "a code review of Codex's running on the head is still waited for");
+
 // From the command line, as the workflow runs it.
 const dir = mkdtempSync(join(tmpdir(), "code-review-wait-"));
 try {
@@ -207,6 +219,9 @@ try {
     && run({ ...counts, created_at: "2026-11-14T09:00:00Z" }, [], { ADVISORY: "false", BOUND: "false", SINCE: "2026-11-14T10:00:00Z" }, [line], [code]).status.state === "success"
     && run({ ...counts, created_at: "2026-11-14T11:00:00Z" }, [], { ADVISORY: "false", BOUND: "false", SINCE: "2026-11-14T10:00:00Z" }, [line], [code]).status.state === "pending",
   "given the commits and files too, it waits for a code review that has not run, and says how to mend it; told the pull request is from before the check and opened before the script first came to the default branch, it waits not; opened since, it waits");
+  const proved = { ...inCore, commits: line.length, changed_files: 1 };
+  ok(run(proved, [], { ADVISORY: "false", QUEUE: HEAD }, [line], [lineOf]).status.state === "success" && run(proved, [], { ADVISORY: "false", QUEUE: OLD }, [line], [lineOf]).status.state === "pending",
+    "told the caller's proof holds for the head, a queue-only pull request needs no code review; for another commit it does");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   let usage = 0;
   try { execFileSync(process.execPath, [script], { stdio: "ignore" }); } catch (e) { usage = e.status; }
