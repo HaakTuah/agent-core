@@ -3,11 +3,11 @@
 *Hammurabi's Agentic Code: one floor, many laws.*
 
 The rules shared by the owner's agent-built projects, written once so a change is made once and every project takes it
-alike (core archive 68). The reasoning behind each rule: `archive/instructions.md`, in the core's words; the owner's own
-words stay in this repository alone (`words/`; #252). A project of another owner takes the core the same way, its
-*owner's account* its own (read, or filled in: "Slots"), and in its copy "the owner" is its own (core archive 148),
-save in `archive/`, whose reasoning stays the core's owner's: its stand-in weighs it after its own owner's words, and
-marks an answer that rests on it alone unsure (`roles/shared/inbox.md`; core archive 166).
+alike (core archive 68). The reasoning behind each rule: `archive/instructions.md`, in the core's words; the record of
+the owner's word, cut to reasoning, stays in this repository alone (`words/`; #252; #778). A project of another owner
+takes the core the same way, its *owner's account* its own (read, or filled in: "Slots"), and in its copy "the owner" is
+its own (core archive 148), save in `archive/`, whose reasoning stays the core's owner's: its stand-in weighs it after
+its own owner's words, and marks an answer that rests on it alone unsure (`roles/shared/inbox.md`; core archive 166).
 
 A person who owns a project that takes the core reads `setup/owner-guide.md` first: one plain page on what it does for
 the project, the yeses it asks, the stop switch, what it costs and the settings that are theirs.
@@ -60,9 +60,21 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
 1. **An exact copy under `core/`** (or the folder the manifest's `Core:` line names, or carried by a library of the
    project's: point 8), pinned to one commit of this repository and never edited by hand: everything but
-   `reports/`, the dated reports of this repository's own changes, `words/`, the owner's own words behind the
+   `reports/`, the dated reports of this repository's own changes, `words/`, the record of the owner's word behind the
    archive, and `tests/`, the tests of the core's own scripts, which stay here alone (`.gitattributes`; core archive
-   165; #252; #527). A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
+   165; #252; #527). The packages of other publishers its scripts run are never in the copy: its
+   `.packages/package-lock.json` names each, at one exact version, and `core/scripts/install.mjs` installs them from
+   npm's registry into `core/.packages/node_modules/`, which the copy's `.gitignore` keeps out of git (a dot folder, so
+   that no workspace pattern of the project's own package list takes the copy's package list in): the sync runs it after
+   it writes the copy, a session's start runs npm's own install where what is installed is not what the lock file names
+   and the copy's npm files are `main`'s own (the work-saved hook), and each of the core's workflows a project calls
+   runs it before its checks; a check that finds a package missing says it did not run, with that command (#654). The
+   parser's packages, whose grammars carry far more than a reader runs, have a lock file of their own in
+   `.packages/parser/`, installed only where a job names it (`install.mjs parser`, or `all`, as the sync runs it and
+   the copies check's job, which runs the shape check; #719): a session's start installs the first alone, and a check
+   that needs the parser says so, with its mend; in a project's own job that installs the first alone, the shape check
+   reads no function of C# and says so as a warning, failing nothing by that. Its
+   devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
    copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
@@ -84,7 +96,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    have passed (`AGENTS.md`, "A release is cut on the owner's word"; `scripts/release.mjs`). A project whose *owner's
    account* is not the account the core is under follows the releases, unless its manifest's *follows* row says `main`;
    the projects of the core's own owner follow `main`, unless theirs says `releases` (`scripts/releases.mjs`). Following
-   the releases, the sync script takes the newest release past the project's pin and nothing in between, and wherever
+   `main`, the sync script and the core-moved check take its newest commit whose checks all passed, never one ahead of
+   them, since a pull request merges here without being brought up to date (floor rule 12; `greenMain` in
+   `scripts/releases.mjs`; #733). Following the releases, the sync script takes the newest release past the project's pin and nothing in between, and wherever
    this README or a script says the core has moved, it has moved only when such a release is cut and asks a sync of the
    project (below); a full SHA still takes any commit of `main`, but such a sync is no pure sync there: it is reviewed
    like any PR (core archive 201). Why: a pure sync brings scripts, hooks and workflows that no review in the project
@@ -153,8 +167,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents, in
      Claude Code's, Kiro's or Codex's files, whatever their letter case or git stores at them, that the config's
      "agentTools" does not list, with its publisher and version, a plug-in or tool server at the version its
-     configuration pins where it pins one: floor topic 15; and a hook whose command is not the starter kit's form,
-     which alone shows it runs its copy on `main`, or a variable a tool's settings set but those it keeps, any other of
+     configuration pins where it pins one: floor topic 15; and a hook, or a command a tool runs by itself from its
+     settings or a skill's, subagent's or command's frontmatter, or a Codex model provider, not in the starter kit's form, which alone shows it runs its copy on `main`, or a variable a tool's settings set but those it keeps, any other of
      which may change how the programs a hook runs start: floor rule 3). A package or
      an audit entry off its list that the owner wants anyway is named in the config's "accepted" with the owner's
      words (`licence-yes.mjs`; floor rule 10), and passes only as it was accepted: that version, that licence, a
@@ -183,13 +197,16 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      selected out, and the whole suite where a changed file's reach cannot be told or no base is told; the job runs
      those it names. At the audit, `test-record.mjs` reads each test's time, its failures and what it alone catches;
      each month the state report gives what a push waits on (`wait.mjs`) beside its mark. The shape check counts the
-     tests that open a screen, holds the suites' and a push's time marks, and reads the selection's lists from its
-     config.
+     tests that open a screen, reach a real clock or start another process, and the record the share of the tests' time
+     each takes; it measures each suite against its time mark, a warning past it and never a failure, holds the marks
+     and a push's never worse, and reads the selection's lists from its config.
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `roles/shared/work-flow.md` names (or those the project gives it), the line that says
      what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`), or the cost
      line, or in its place "No cost line: the script printed none.", or, where it asks the part "What holds it", a
-     line there "Number:" in its form; the lines only of a pull request opened since the project's copy held them.
+     line there "Number:" in its form, or, where it adds a line under the manifest's "Differences", the line "Reasons
+     read:"; the lines only of a pull request opened since the project's copy held them. A line passes where it begins
+     in its form, whatever follows: it fails what is missing, never phrasing (#750).
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
      spent so far, where Claude Code's own record of it can be read, and nothing where it cannot. It keeps a tally of
      its own beside that record (ids, counts and the models' families), so the line does not drop where the record
@@ -231,11 +248,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      project of each of the last two releases synced to the change (`AGENTS.md`, "Nothing locks a
      project"): so the project's own suites run on one only for what they take from the copy (all of them where they run
      on its Node version and `core/.node-version` changed; those that read its scripts for a change under
-     `core/scripts/` or `core/third-party/`, whose packages those scripts run), never for the rest of the copy, which
-     `core.yml` checks, nor for a workflow in which only such a pin moved (`tasks/tests.md`, "A pull request runs the
-     tests its change can reach"; core archive 167). A path filter sees which files changed, not what changed in them,
-     so a suite filtered by `paths-ignore` names there each file that holds only calls to the core's workflows by its
-     exact path (`core/scripts/steps.mjs` reports one that does not).
+     `core/scripts/` or `core/.packages/package-lock.json`, whose packages those scripts run), never for the rest of the
+     copy, which `core.yml` checks, nor for a workflow in which only such a pin moved (`tasks/tests.md`, "A pull request
+     runs the tests its change can reach"; core archive 167). A path filter sees which files changed, not what changed
+     in them, so a suite filtered by `paths-ignore` names there each file that holds only calls to the core's workflows
+     by its exact path (`core/scripts/steps.mjs` reports one that does not).
    - **Dependabot:** its `.github/dependabot.yml` ignores `HaakTuah/agent-core*`.
    - **Every action a workflow uses,** GitHub's own included, is pinned to a full commit SHA with its version in a
      comment after it, which Dependabot keeps current: a security fix in an action reaches a workflow by that weekly
@@ -304,12 +321,16 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      who made it, since builder and reviewer may post under one login. Dependabot's own pull request passes it (floor
      rule 17); one that needs no security review and gets none by itself (floor rule 8) says so in such a comment.
      Beside it, in the same job, the status `code-review` waits while Codex's code review runs on the head commit, until
-     it finishes or a comment that opens "Code review:" from the owner, a member or a collaborator names that commit by
-     its whole SHA (`tasks/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
-     nor a sync's shape) has had none on its head, or on a commit only such updates from `main` follow; it advises as the
-     first does. It runs a short job at each push and each such comment, a dozen or so a pull request, which a private
-     repository pays for: there the job is skipped, and so not billed, unless the project turns it on (the input
-     `private`) or has turned advisory off, since a ruleset may then wait for it.
+     it finishes or a comment that opens "Code review:", from an account the security review counts, names that commit
+     by its whole SHA (`tasks/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
+     nor a sync's shape) has had none on its head, or on a commit only such updates from `main` follow; while the newest
+     "Security review:", "Code review:" or "Design check:" posted from 18 November lacks its lines "Blocking findings:"
+     and "Other findings:" (`tasks/reviews.md`, point 3); and, in the core's own repository, while a pull request opened
+     from that day that changes `floor/`, `roles/`, `tasks/` or `tools/` has no "Design check:" naming its head, or a
+     commit only such updates follow (point 4); it advises as the first does. It runs a short job at each push and each
+     "Code review:" or "Design check:" comment, a dozen or so a pull request, which a private repository pays for:
+     there the job is skipped, and so not billed, unless the project turns it on (the input `private`) or has turned
+     advisory off, since a ruleset may then wait for it.
    - **A private repository** has GitHub's dependency review and CodeQL only with its paid code security, so without
      it it calls neither `licences.yml` nor `codeql.yml`: a workflow of its own runs `core/scripts/licences.mjs` for
      what no package list holds, `core/scripts/exact-versions.mjs` and `core/scripts/lookup.mjs` for its lockfiles and
@@ -336,7 +357,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      missing, the hook stops nothing, and where Node is missing the work-saved hook says so in a line at the start,
      where it also names what the paths changed on the branch call for (`reading.mjs`, from the copy merged into `main`,
      by `main`'s own roles and modules). The
-     core's own tests run the scripts and both hooks there on every change (`.github/workflows/tests.yml`).
+     core's own tests run the scripts and both hooks there once an hour where `main` moved, and in full before each
+     release (`.github/workflows/tests.yml`; #733).
    - **Another tool's session** reads what `AGENTS.md` names through its own entry file, and runs the work-saved
      hook where its tool has the event (Kiro and Codex at a session's start and stop, from the hook files the starter
      kit writes); no rule rests on a hook alone (`tasks/tools.md`).
@@ -359,7 +381,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    for the plain case, while what holds the rule is the reviews every change to the manifest gets, as a protected file.
    The pointer check fails a difference whose rule the core has since renamed or removed, so it is read again at that
    sync. And each is filed with the core as an idea ("Reporting to the core"): a rule a project had to differ from may
-   not be general enough.
+   not be general enough. Before it proposes one, a session reads the reasons behind the rule, which
+   `core/scripts/reasons.mjs` prints in one step, and says which of them does not hold for the project, the pull request
+   on its line "Reasons read:" (`tasks/updates.md`, its rule on a question or difference; #756).
 8. **A project in several repositories** takes the core once (`tasks/repositories.md`): a repository's manifest names
    where its copy stands (`core/` as a rule, and so a project in one repository changes in nothing), and a repository
    that depends on a library of the project's that holds a copy takes the core with it, at the path the library brings
@@ -403,6 +427,10 @@ for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit
 | *other builders' checks* | what a session of another tool than Claude Code runs before it finishes (`tools/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync | choice: left out, the project's own tests |
 | *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so (`tasks/roles.md`, "Tools are preferences") | read: from the last merged pull requests, as `tasks/roles.md` says ("Tools are preferences") (`scripts/tools-read.mjs`) |
 | *pace* | the manifest's lines under "Pace", each a pace the owner sets, of the kinds `roles/orchestrator.md`, "The pace is the owner's", names | choice: left out, no pace but the default |
+| *users get* | `merges` or `releases`, in backticks: whether the project's users get each merge to its default branch (a site deployed on each push) or a release cut from it (floor rule 12; `tasks/hosts.md`) | cannot be read: a deploy on each push and a release workflow each say it only in part; left out, `merges`, under which a pull request is brought up to date first |
+| *merge queue* | `on`, `offered` or `none`, in backticks: whether the host offers the repository a merge queue and whether it is on (`tasks/hosts.md`, "The merge line follows the host") | read: from who holds the repository, whether it is private and its rules on the default branch (`scripts/merge-line.mjs`) |
+| *test runners* | `hosted`, `self-hosted` or `local`, in backticks: where the project's tests run, the host's runners, a runner of the owner's own, or a session's or the owner's computer alone (`tasks/tests.md`, "The slow suites run once per batch, wherever they run") | read: from the project's workflows, the jobs on a pull request or a push that start a suite through the shape check, and the runner each takes (`scripts/runners.mjs`) |
+| *billed minutes* | `yes` or `no`, in backticks: whether the host bills the repository's runner minutes (`tasks/hosts.md`, "The merge line follows the host") | read: whether the repository is private (`scripts/merge-line.mjs`) |
 | *other builders*, *code reviewers*, *security reviewer* | rows of the *tools* table, "Builder", "Code reviewer" and "Security reviewer"; one still standing among the slots is read as that row | read: as the *tools* (`scripts/tools-read.mjs`) |
 | *direction* | the file that holds what the project's screens are held to: who uses it, its main size, what each screen is for, its mood, its references, what it uses and never uses, and where its system's values and its reference screen stand (`tasks/screens.md`, points 1 and 2) | choice: left out, `docs/direction.md`, written before its first screen |
 | *screen sizes* | the sizes its screens are used at, in pixels, the smallest first (`tasks/screens.md`) | choice: left out, 360, 768 and 1280 wide |
@@ -456,9 +484,10 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   the commit it was cut on (core archive 195).
 - This repository's own `main`: a ruleset as each project's has, deletions restricted, force pushes blocked, a pull
   request required, and the checks `tests`, `size`, `own-description` and the Personal terms workflow's `check`
-  required, branches up to date (core archive 201).
+  required, and branches not asked to be up to date, which floor rule 12 lets where users get a release, as the core's
+  do (#733, #738).
 - Each project's ruleset on its default branch: deletions restricted, force pushes blocked; a pull request required, no
-  approvals (a team's project may ask some: `roles/shared/teams.md`); status checks required (the project's CI and `core / core`), branches up to date; where the repository has
+  approvals (a team's project may ask some: `roles/shared/teams.md`); status checks required (the project's CI and `core / core`), branches up to date where every merge goes live (floor rule 12); where the repository has
   them, code scanning results required from CodeQL, blocking on security alerts High or higher and alerts Errors, code
   quality results required at Errors, and Copilot's review requested automatically, advisory (core archive 130).
 - Each repository's Actions settings (Settings, Actions, General): "Require actions to be pinned to a full-length commit
@@ -520,7 +549,8 @@ an issue on one of this repository's three forms (`.github/ISSUE_TEMPLATE/`, whi
 `core/.github/ISSUE_TEMPLATE/`): a bug, an idea or a question (`roles/shared/inbox.md`, "The core itself"). This repository
 is public, and so is every word of an issue, so a report holds only what the light of day can take.
 
-- **It says:** which rule, hook, check or script of the core (its file, and its section or line); the commit of the core
+- **It says:** which rule, hook, check or script of the core (its file, and its section or line), and, of a rule it
+  questions, which of the reasons `core/scripts/reasons.mjs` prints for it does not hold, and why; the commit of the core
   the project holds; what happened; what was expected; and the kind of project, no closer than this: public or private,
   the platform it is built on (Node, .NET on Windows), the cloud or the owner's own computer. A bug names, where it is
   known, the core's merged pull request that brought it in, on the form's last line, "Brought in by: #N".
@@ -556,9 +586,12 @@ changed or not, passes on with it, marking the files they changed (#257; core ar
 repository, the floor, the modules, the scripts and workflows, the starter kit and the rule files, but `archive/`,
 `words/` and `reports/`: the owner's decisions, own words and records, all rights reserved. Both files travel in each
 project's copy under `core/`, and they license the core alone: a project keeps the terms its own owner gives its own work, and nothing here
-adds or changes them (floor rule 10). Nor do they cover `third-party/`, the packages of other publishers the scripts
-run, each under its own licence, whose text travels in its folder (`third-party/NOTICES.md`; `scripts/third-party.mjs`
-says how one is carried). Nothing of the core ships, so no project's audit or notices file asks for it.
+adds or changes them (floor rule 10). Nor do they cover the packages of other publishers the scripts run, each under its
+own licence: none is carried, each an entry of `.packages/package-lock.json` or the parser's
+`.packages/parser/package-lock.json`, installed from npm's registry into the `node_modules/` beside it, which git does
+not track (`scripts/install.mjs`; #654, #719), and held to floor rule 10's list by the core's own licence check, which
+reads both lock files. Nothing of the core ships, so no project's audit or notices
+file asks for it.
 `NOTICE` names the work, with its other name, which renames nothing, and as the holder the account in the core's
 address, until the core's owner types another name there by hand (floor rule 11).
 

@@ -8,8 +8,8 @@ The index, and how an item is written: `archive/instructions.md`.
 
 2. **26 October 2026** (Amarna Letters, item 11; for both games). Asked: a break had been suggested for the two
    sessions. Decided: The owner disagreed with the break: the two sessions work continually until they reach about 90%
-   usage. At that point they take on no bigger task, since the owner wants the bulk of the remaining usage for the
-   owner's own use.
+   usage. At that point they take on no bigger task, since the bulk of the remaining usage is kept for the owner's own
+   use.
 
 3. **26 October 2026** (Amarna Letters, item 12). Asked: the proposed setup itself. Decided: All of it is done, with a
    condition: nothing important is lost along the way and nothing is duplicated without need, since duplication creates
@@ -56,12 +56,11 @@ The index, and how an item is written: `archive/instructions.md`.
     available yet.
 
 14. **29 October 2026** (Amarna Letters, item 54). Asked: a builder had stopped at the app's usage warning. Decided: The
-    owner corrected this: the sessions were not supposed to stop before 90%, and usage stood at only 76%.
+    owner corrected this: the sessions were not supposed to stop before 90%, and usage stood well below that.
 
 15. **31 October 2026** (Amarna Letters, item 84; for both games). Asked: whether the sessions had been told to push
-    every single commit, as they were running out of their allocated usage for the next couple of hours. Decided: The
-    sessions are not to stop, but the owner hoped they had pushed everything they could. The rule to push after every
-    commit was adopted.
+    every single commit, as their usage was running low. Decided: The sessions are not to stop, but the owner hoped they
+    had pushed everything they could. The rule to push after every commit was adopted.
 
 16. **31 October 2026** (Amarna Letters, item 86). Asked: the owner raised that the README of both projects should
     probably be queued for an update; a standing rule that a change a player sees updates the README in the same pull
@@ -100,6 +99,7 @@ The index, and how an item is written: `archive/instructions.md`.
     whether it abides by personal preference or repository rules; a security policy for both repositories, Codex's
     findings counted by priority and a scored design check on the big items were proposed. Decided: All of it was agreed
     to, with a condition: it is done taking account of all attack vectors and security concerns.
+    Changed by: 155.
 
 22. **1 November 2026** (Amarna Letters, item 131; for both games). Asked: Codex as the gatekeeper for faults and
     security and a short scored design check on the big items, after Codex found every planted fault. Decided: The owner

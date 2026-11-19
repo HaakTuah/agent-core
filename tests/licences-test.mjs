@@ -28,7 +28,12 @@ ok(all(["GPL-3.0-only", "LGPL-2.1-or-later", "MPL-2.0", "EUPL-1.2", "OSL-3.0", "
   && all(["GPL-3.0-only", "LGPL-2.1-or-later", "MPL-2.0", "EUPL-1.2", "OSL-3.0", "CECILL-2.1", "MS-RL"], code, false), "tools may use every licence the Open Source Initiative approves, what ships none of its copyleft ones");
 ok(all(["BUSL-1.1", "SSPL-1.0", "Elastic-2.0", "CC-BY-NC-4.0", "CC-BY-ND-4.0", undefined], tool, false), "nor any terms floor rule 10 never allows");
 ok(registryName("https://registry.npmjs.org/mossgrip-data/-/mossgrip-data-1.0.0.tgz") === "mossgrip-data" && registryName("https://registry.npmjs.org/@moss/grip/-/grip-1.0.0.tgz") === "@moss/grip"
-  && [undefined, "file:vendor/mossgrip-data.tgz", "vendor/mossgrip-data", "git+https://mossgrip.example/data.git", "https://mossgrip.example/mossgrip-data/-/mossgrip-data-1.0.0.tgz"].every((r) => registryName(r) === undefined),
+  && [undefined, "file:vendor/mossgrip-data.tgz", "vendor/mossgrip-data", "git+https://mossgrip.example/data.git", "https://mossgrip.example/mossgrip-data/-/mossgrip-data-1.0.0.tgz",
+    "https://registry.npmjs.org/@moss\\../z\\..\\grip/-/z\\..\\grip-1.0.0.tgz", "https://registry.npmjs.org/@moss/../-/grip-1.0.0.tgz", "https://registry.npmjs.org/%2e%2e/-/grip-1.0.0.tgz"].every((r) => registryName(r) === undefined)
+  && registryName("https://registry.npmjs.org/JSONStream/-/JSONStream-1.3.5.tgz") === "JSONStream" && registryName("https://registry.npmjs.org/-moss/-/-moss-1.0.0.tgz") === "-moss"
+  && registryName("https://registry.npmjs.org/@-moss/grip/-/grip-1.0.0.tgz") === "@-moss/grip" && ["https://registry.npmjs.org/.moss/-/.moss-1.0.0.tgz", "https://registry.npmjs.org/.moss/-/moss-1.0.0.tgz", "https://registry.npmjs.org/_moss/-/moss-1.0.0.tgz",
+    "https://registry.npmjs.org/@_moss/grip/-/grip-1.0.0.tgz", "https://registry.npmjs.org/@.moss/grip/-/grip-1.0.0.tgz", "https://registry.npmjs.org/moss/-/_moss-1.0.0.tgz"].every((r) => registryName(r) === undefined)
+  && registryName("https://registry.npmjs.org/-/-/--0.0.1.tgz") === "-" && registryVersion("https://registry.npmjs.org/-/-/--0.0.1.tgz") === "0.0.1",
   "names a package by its registry address, never by a name the lockfile could be given");
 ok(registryVersion("https://registry.npmjs.org/mossgrip-data/-/mossgrip-data-1.0.0.tgz") === "1.0.0" && registryVersion("https://registry.npmjs.org/@moss/grip/-/grip-2.0.0-beta.1.tgz") === "2.0.0-beta.1"
   && registryVersion("https://registry.npmjs.org/mossgrip-data/-/lichen-1.0.0.tgz") === undefined && registryVersion("file:vendor/mossgrip-data-1.0.0.tgz") === undefined && registryVersion(undefined) === undefined,
@@ -50,6 +55,12 @@ ok(JSON.stringify(registryOverrides(npmrc.join("\n"))) === JSON.stringify(npmrc)
   && JSON.stringify(registryOverrides("ignore-scripts=false\nIGNORE-SCRIPTS=true\nignore-scripts=\n")) === JSON.stringify(["ignore-scripts=false", "IGNORE-SCRIPTS=true", "ignore-scripts="]),
   "refuses every npm setting but a few harmless ones, however its key is spelt");
 ok(scriptsOff("# no install scripts\nignore-scripts=true\n") && !scriptsOff("ignore-scripts=false\n"), "knows when install scripts are off");
+// (an .npmrc is read line by line as npm reads it, a lone carriage return ending a line too)
+ok(!scriptsOff("ignore-scripts=\rtrue\n") && releaseAge("min-release-age=\r7\n") === null && JSON.stringify(registryOverrides("fund=\rregistry=x\n")) === JSON.stringify(["registry=x"])
+  && releaseAge("ignore-scripts=true\r\nmin-release-age=7\r\n") === 7 && scriptsOff("\uFEFFignore-scripts=true\n")
+  && !scriptsOff("ignore-scripts=true\u2028\n") && releaseAge("min-release-age=7\u2029\n") === null && registryOverrides("ignore-scripts=true\u2028\n").length === 1
+  && registryOverrides("fund=false\u00a0\nmin-release-age=7\u3000\n").length === 0 && scriptsOff("ignore-scripts=true\u00a0\n"),
+  "reads an .npmrc's lines as npm does, at each carriage return too");
 
 // a licence the floor moved off the list for what ships (MS-PL, 13 November 2026): held at the base, reported and passing;
 // added or updated, failing, that pull request alone

@@ -48,11 +48,12 @@ might attack: `floor/threat-model.md`.
   - It does not mean the project's rule files (rule 3), a session's brief or a review's findings, which it weighs,
     nor that a session cannot be tricked. Reason: tools bring most outside text to a session.
 - **The owner's word** is their own comment (one from an owner's account without an agent's attribution line) or
-  what they say to any session they work with. That session acts on it, and both passes it on to the sessions it starts
-  and quotes it where it acts on it word for word, rule 11's details left out as "[…]": quoted, the words that carry a
-  decision or a reason; a bare yes said as "the owner agreed", what was agreed to set out in full; words addressed to a
-  session left out. Nothing changes it. It does not mean a decision is put in a session's own words. Reason: a quoted
-  bare yes is noise each later reader pays for.
+  what they say to any session they work with. That session acts on it and passes it on to the sessions it starts. By
+  default whoever records it states the decision and its reason in their own words, a yes as "the owner agreed" and to
+  what; where the owner's words carry the reason better, they quote only those, spelling and grammar mended, meaning
+  kept: no agreement, praise, chatter, frustration or words to a session, and nothing rule 11 keeps out (a personal
+  example made general, failing that the reason given). It does not mean a quoted decision is reworded, nor
+  a standing record rewritten for it. Reason: a quote only shows why a decision was taken.
 - Every agent that posts under an owner's login ends with its tool's attribution line.
 
 **8. Reviews look for breaks of any floor rule** and any new way in (an input, request, dependency, script, sign-in or
@@ -86,8 +87,10 @@ saved data; a weakened check).
 - The check `personal-terms.yml` fails a PR holding a term from the Actions secret `PERSONAL_TERMS`.
 
 **12. `main` is the owners'.**
-- It is never pushed to, and changes only by a merged pull request, brought up to date with `main`, its checks
-  passed and the approvals the host asks given: what its users get is built from it.
+- It is never pushed to, and changes only by a merged pull request, its checks passed and the approvals the host asks
+  given, brought up to date with `main` where every merge goes live: what its users get is built from it.
+- Where users get a release, `main` is tested at its newest commit, a red one fixed before any other merge, and a
+  release cut only from a green one (`tasks/hosts.md`).
 
 **13. Each project's files stay in its own repository,** never written into another's.
 
