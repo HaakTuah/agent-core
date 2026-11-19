@@ -28,7 +28,8 @@
 // and where the grammar misreads, the reader mends it from the tree (signsInFormats, below). It never guesses: a file the
 // grammar cannot read whole (Python newer than the grammar the core installs, or no Python) has no functions told, and
 // the shape check counts it and says so (shape.mjs, "lost"); its imports are those the grammar read whole, outside what
-// it could not. A file it cannot read within its time, or past LARGEST, has none of the three told.
+// it could not, and the selection runs a test that reaches the file as one that reaches every file, since the part lost
+// may import (shape.mjs, "unsure"). A file it cannot read within its time, or past LARGEST, has none of the three told.
 import { inParser } from "./parser.mjs";
 import { COMMENT_READ } from "./code-shape.mjs";
 import { LARGEST, walkFunctions } from "./tree-walk.mjs";

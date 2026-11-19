@@ -531,10 +531,10 @@ counter and its commands are in the pull request that adds this record (#487).
   format's fill of `=` (`f"{t:=^80}"`) for `:=`: an error in an f-string's `{ }` that is signs alone leaves the
   functions around it told. The imports and the tokens the clock's runs are read from moved the same day (#530's item
   6), and the lexer of Python went: on 30,811 files of Python, every file read the same 180,814 imports, with where each
-  stands (in a def, under `TYPE_CHECKING`), and the same runs of the clock and of a test's reach; the tokens of 174
+  stands (in a def, under `TYPE_CHECKING`), and the same runs of the clock and of a test's reach; the tokens of 173
   differ, each a misread of the lexer's mended (a number's exponent split from it, 165; a hole after `\` in a raw
-  f-string taken for text, 6; a t-string's `t` taken for a name, 2) or the grammar's fill of `=` mended to the code
-  before it (1). Where the parser is not installed, nothing of a file of Python is read: the shape check keeps what its
+  f-string taken for text, 6; a t-string's `t` taken for a name, 2), and the grammar's fill of `=` is mended to the
+  code before it, as the lexer read it. Where the parser is not installed, nothing of a file of Python is read: the shape check keeps what its
   baseline lists there, and the selection of tests runs a test of Python as one that reaches every file. 6 generated
   files past 2 MB have no imports told, where the lexer read theirs.
 - Reopens it: the counts of a reader built this way differ from a count by hand on code it was not written against,
