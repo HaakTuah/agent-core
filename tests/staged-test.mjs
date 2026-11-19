@@ -1002,6 +1002,11 @@ each({ model: "sonnet" }, /its model is sonnet, not the strongest tier/, "an orc
 each({ effort: "medium" }, /its effort is medium, not high/, "an orchestrator at an effort other than high");
 each({ text: STARTED.replace("core/roles/orchestrator.md", "the rules") }, /brief does not name its role's file/, "a brief that leaves out the role's file");
 each({ text: "Work the queue." }, /brief does not name its role, its role's file .*, the project, the owner's word/, "a brief that names none of them");
+each({ model: "fable" }, /its model is fable, not the strongest tier \(Opus\)/, "an orchestrator on a tier above the strongest");
+each({ model: "default" }, /its model is default, not the strongest tier/, "a model that names no tier");
+each({ text: `You are the orchestrator of ${OWN}: read core/roles/orchestrator.md at your start.` }, /brief does not name the owner's word that started it$/, "a brief that names the owner only in the project's address");
+each({ text: STARTED.replace(`of ${OWN}`, `beside ${NOTES}`) }, /brief does not name the project$/, "a brief that names the other project alone");
+{ const d = fresh("adviser-starts"); start(d, { model: "claude-opus-5-5" }); ok(verdict("adviser-starts", d).pass, "adviser-starts: a model of the strongest tier by its full name passes", verdict("adviser-starts", d).why); }
 ok(brief(caseOf("adviser-starts"), labelled).split("\n")[1] === `This machine starts a session of your own, and lists those that run, only with ${path.join(bin, "session")} (\`session --help\` says how): start none another way, and set no scheduled task, wake or check-in.`,
   "the brief of a case that reads the sessions one starts names the stand-in, the only way it starts one");
 }

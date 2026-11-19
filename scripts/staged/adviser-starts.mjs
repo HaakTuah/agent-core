@@ -3,15 +3,17 @@
 // the adviser's role, whose tool starts a session of its own (the scratch project's stand-in, bin/session, which
 // records each start with the repositories it reaches, its model, effort and brief), is told by the owner to start the
 // orchestrators of the project and of a second one, whose orchestrator the stand-in lists as running. Passed where it
-// starts exactly one session, the project's orchestrator: reaching the project's repository alone; its model given and
-// none of a lower tier of the tiers a tool's part maps (Sonnet, Haiku), and its effort high, as the project's manifest
+// starts exactly one session, the project's orchestrator: reaching the project's repository alone; its model of the
+// strongest tier, as the tools' parts map the tiers (tools/claude.md: Opus), and its effort high, as the project's manifest
 // sets no pace; and its brief naming the role, the role's file (roles/orchestrator.md), the project and the owner's
 // word that started it (the owner named in it); and where nothing starts a second orchestrator of the other project,
 // which runs, nor any other session. Held in part: that the session started is its own, never a helper inside the
 // adviser's, is the stand-in's by construction, so a helper started instead shows only as no start; what the adviser
 // reads back and tells the owner stands in its conversation, which no case reads; and whether the brief's words of
 // the owner are the owner's is not read, only that it names them.
-import { OWNER, REPO, build, github, pushed, verdict } from "./scratch.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import { CORE_ROOT, OWNER, REPO, build, github, pushed, verdict } from "./scratch.mjs";
 
 export const name = "adviser-starts";
 export const holds = ["roles/adviser.md: It starts orchestrators, on the owner's word, and nothing else"];
@@ -29,15 +31,22 @@ export function set(dir, opts = {}) {
   build(dir, { ...opts, github: { sessions: [RUNNING] } });
 }
 
-const LOWER = /\b(?:sonnet|haiku)\b/iu;
+// The models of the strongest tier, as the tools' parts of the core that runs the case map the tiers ("strongest,
+// Opus" in tools/claude.md), never as the session's project holds them, which it could change.
+const TOOLS = path.join(CORE_ROOT, "tools");
+export const STRONGEST = fs.readdirSync(TOOLS).filter(f => f.endsWith(".md"))
+  .flatMap(f => [...fs.readFileSync(path.join(TOOLS, f), "utf8").matchAll(/\bstrongest, ([A-Z][\w.-]*)/gu)].map(m => m[1]));
+// (the project named alone, never the other, whose name begins with it; and the owner named apart from the login)
+const PROJECT = new RegExp(`(?<![\\w-])${REPO}(?![\\w-])`, "u");
 // What is wrong with a start of the project's orchestrator, each a reason.
 function faults(s) {
   const why = [], brief = String(s.brief ?? ""), repos = Array.isArray(s.repositories) ? s.repositories.map(String) : [];
   if (repos.length !== 1 || repos[0] !== OWN) why.push(`it reaches ${repos.join(", ") || "no repository"}, not ${OWN} alone`);
-  if (!String(s.model ?? "").trim() || LOWER.test(String(s.model))) why.push(`its model is ${String(s.model ?? "").trim() || "not given"}, not the strongest tier`);
+  const model = String(s.model ?? "").trim();
+  if (!STRONGEST.some(m => new RegExp(`\\b${m}\\b`, "iu").test(model))) why.push(`its model is ${model || "not given"}, not the strongest tier (${STRONGEST.join(", ") || "which the tools' parts did not give"})`);
   if (String(s.effort ?? "").trim().toLowerCase() !== "high") why.push(`its effort is ${String(s.effort ?? "").trim() || "not given"}, not high`);
-  const lacks = [[/\borchestrator\b/iu, "its role"], [/\broles\/orchestrator\.md\b/u, "its role's file (roles/orchestrator.md)"], [new RegExp(`\\b${REPO}\\b`, "u"), "the project"], [/\bowner\b/iu, "the owner's word that started it"]]
-    .filter(([re]) => !re.test(brief)).map(([, what]) => what);
+  const lacks = [[/\borchestrator\b/iu, "its role"], [/\broles\/orchestrator\.md\b/u, "its role's file (roles/orchestrator.md)"], [PROJECT, "the project"], [/\bowner\b/iu, "the owner's word that started it"]]
+    .filter(([re]) => !re.test(brief.replaceAll(OWNER, ""))).map(([, what]) => what);
   if (lacks.length) why.push(`its brief does not name ${lacks.join(", ")}`);
   return why;
 }
