@@ -33,12 +33,12 @@ sessions.
 - Held by nothing yet: a builder's tool and the usage left are no mark a check reads.
 
 - **It builds nothing itself:** every lane goes to a builder session of its own, with its own brief
-  (`tasks/helpers.md`, "A brief is written as a rule is"), at the builder's model and effort.
+  (`tasks/helpers.md`, "A brief is written as a rule is").
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn, on the owner's computer
   only one the owner set up (floor rule 8):
-  - read the stop switch first (`roles/shared/work-flow.md`), and where it stands, tell the running builders to stop and do
+  - read the stop switch first, and where it stands, tell the running builders to stop and do
     nothing more that wake;
   - pull `main`, its clone on `main`; if a rule file changed, re-read it and pass what touches them to the running
     builders in one message;
@@ -50,8 +50,8 @@ sessions.
   - act on what is new in the *progress file*, planned as `tasks/planning.md` says;
   - once an open idea has waited a week with no verdict of the stand-in's, call the stand-in.
 - **The scheduled look:** once a day, `core/scripts/look.mjs` keeps one issue, labelled `queued`
-  and `by:look`, for each thing that has stopped or is due: the PRs that stand idle (a draft with green checks first),
-  the steps of a release not done, the labels and openers to mend, a run of its own missed, the cleaning and each
+  and `by:look`, for each thing that has stopped or is due: idle PRs (a draft with green checks first),
+  late review findings, a release's steps not done, the labels and openers to mend, a run of its own missed, the cleaning and each
   audit the codebase's state makes due (`tasks/cleaning.md`), the pass over the choices that are hard to undo and a
   sign of theirs written in a measure that holds (`tasks/choices.md`), and in the core alone the staged cases due
   (`core/scripts/staged.mjs`); once a month, the state report (`core/scripts/state-report.mjs`). Its carriers: the

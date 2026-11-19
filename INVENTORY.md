@@ -54,7 +54,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   Simian, dropped on fact: no licence the Open Source Initiative approves. *Bugs:* 9, and 4 naming `copies.yml`, the
   most of any check. **Try** jscpd for the finding, its definition taking the core's place by default (#534, point 3);
   the baseline and the near-copies the audit reads stay the core's glue. This weighs again the "Kept" of #486's
-  inventory, whose reason was the core's own definition.
+  inventory, whose reason was the core's own definition. Its config's shape is held by a schema and ajv (`scripts/schemas.mjs`;
+  #530, item 7).
 - `scripts/pointers.mjs`: fails a pointer in the rule files, to a file, a section, a numbered point, a floor rule or an
   archive item, that leads nowhere. *Runs:* any session and the runners. *Else:* lychee (offline, with Markdown's
   anchors), remark-validate-links, markdown-link-check and linkinator, each kept for Markdown's own links and dropped,
@@ -79,6 +80,12 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   *Runs:* any session and the runners. *Else:* the generators of each tool's rule files (ruler, rulesync), dropped on
   fact: the core keeps one `AGENTS.md` that each tool's file imports, and needs nothing generated. *Bugs:* 0. **Keep:**
   nothing fits; the list of entry files is the core's own.
+- `scripts/tools-offer.mjs`: fails the table of what the core offers each agent tool where a cell is empty or in no
+  form, names a file not there or an issue not open, a tool of the list has no column, a map says no day, or a file of a
+  tool's own is named by no cell (#467). *Runs:* any session and the runners. *Else:* the linters of agent tools'
+  instruction files (agnix, agentlint, agent-context-lint, instruction-lint), found on 18 November 2026, dropped on
+  fact: each reads a tool's own files against that tool's form, and none reads what the core offers one tool against
+  each other tool. *Bugs:* 0. **Keep:** nothing fits; the table is the core's own.
 - `scripts/manifest-reads.mjs`: reports the manifest against the modules, and the README's slots against their marks.
   *Runs:* any session and the runners. *Else:* a schema and one checker of schemas, as #486's last group weighs for the
   settings. *Bugs:* 1. **Keep:** nothing fits; the manifest's form is the core's. Its checks of shape go with #486's
@@ -99,7 +106,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   hand. *Runs:* any session and the runners. *Else:* a task runner (npm scripts, just, make), dropped on fact: a project
   in another stack has none of npm's, and the others are installs. *Bugs:* 2. **Keep:** small and stable glue.
 - `scripts/pr-description.mjs`, `.github/workflows/pr-description.yml`, `.github/workflows/own-description.yml`: fail a
-  ready pull request whose description lacks a heading the project names, and, here, the lines the core asks. *Runs:*
+  ready pull request whose description lacks a heading the project names, and, here, the lines the core asks, saying so
+  of a draft. *Runs:*
   the runners, where the description is; any session given it. *Else:* Danger JS (MIT), its rules written in JavaScript
   and run with a token, dropped on a measure: 14.1.0 installs 86 packages (34 MB), and the check's rules, the headings
   and lines the core asks, would be written again in its file, Danger giving only the description the workflow already

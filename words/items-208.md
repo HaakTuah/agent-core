@@ -126,7 +126,7 @@ What these are and how they are kept: `words/README.md`.
 214. **15 November 2026** (the core; in a chat with a session the owner works with, not the design session, as that
      session recorded it on issue #277, labelled `by:chat`; and to the orchestrator, which passed it on word for word to
      the builder of this rule). The session had proposed one pattern for writing a rule, after three rules of the core
-     had been read against what the owner meant that evening, each for want of an observable trigger or a reason. The
+     had been read against what the owner meant that day, each for want of an observable trigger or a reason. The
      owner asked:
 
      > Is this the optimal way for development, and how to phrase the rules

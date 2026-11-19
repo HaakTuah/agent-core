@@ -204,7 +204,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      description lacks one of the headings `roles/shared/work-flow.md` names (or those the project gives it), the line that says
      what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`), or the cost
      line, or in its place "No cost line: the script printed none.", or, where it asks the part "What holds it", a
-     line there "Number:" in its form; the lines only of a pull request opened since the project's copy held them.
+     line there "Number:" in its form; the lines only of a pull request opened since the project's copy held them. A
+     line passes where it begins in its form, whatever follows: it fails what is missing, never phrasing (#750).
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
      spent so far, where Claude Code's own record of it can be read, and nothing where it cannot. It keeps a tally of
      its own beside that record (ids, counts and the models' families), so the line does not drop where the record
@@ -321,10 +322,14 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      Beside it, in the same job, the status `code-review` waits while Codex's code review runs on the head commit, until
      it finishes or a comment that opens "Code review:" from the owner, a member or a collaborator names that commit by
      its whole SHA (`tasks/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
-     nor a sync's shape) has had none on its head, or on a commit only such updates from `main` follow; it advises as the
-     first does. It runs a short job at each push and each such comment, a dozen or so a pull request, which a private
-     repository pays for: there the job is skipped, and so not billed, unless the project turns it on (the input
-     `private`) or has turned advisory off, since a ruleset may then wait for it.
+     nor a sync's shape) has had none on its head, or on a commit only such updates from `main` follow; while the newest
+     "Security review:", "Code review:" or "Design check:" posted from 18 November lacks its lines "Blocking findings:"
+     and "Other findings:" (`tasks/reviews.md`, point 3); and, in the core's own repository, while a pull request opened
+     from that day that changes `floor/`, `roles/`, `tasks/` or `tools/` has no "Design check:" naming its head, or a
+     commit only such updates follow (point 4); it advises as the first does. It runs a short job at each push and each
+     "Code review:" or "Design check:" comment, a dozen or so a pull request, which a private repository pays for:
+     there the job is skipped, and so not billed, unless the project turns it on (the input `private`) or has turned
+     advisory off, since a ruleset may then wait for it.
    - **A private repository** has GitHub's dependency review and CodeQL only with its paid code security, so without
      it it calls neither `licences.yml` nor `codeql.yml`: a workflow of its own runs `core/scripts/licences.mjs` for
      what no package list holds, `core/scripts/exact-versions.mjs` and `core/scripts/lookup.mjs` for its lockfiles and

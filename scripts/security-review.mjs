@@ -238,7 +238,7 @@ function floorTwo(verdict, { sha, pull, files, posted, review, bound, pure }) {
 // the builder's work and its review alike: that this tells no one apart stays with the reviews (#187)
 const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})(?:\[bot\])?$/u;
 export const reviewersOf = (text) => (typeof text === "string" ? text.split(/[\s,]+/u) : []).filter((name) => LOGIN.test(name));
-function counted(pull, reviewers, writers) {
+export function counted(pull, reviewers, writers) {
   const names = new Set([pull.base?.repo?.owner?.login, ...(Array.isArray(reviewers) ? reviewers : [])].filter((name) => typeof name === "string" && LOGIN.test(name)).map((name) => name.toLowerCase()));
   return (user) => typeof user?.login === "string" && (names.has(user.login.toLowerCase()) || (user.type === "User" && writers.has(user.login.toLowerCase())));
 }
