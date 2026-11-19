@@ -110,6 +110,7 @@ The index, and how an item is written: `archive/instructions.md`.
      every later PR keeping its test green; never a release cut by a session, the owner told when one is ready. Behind:
      in `AGENTS.md`, "Nothing locks another owner's project", held by `scripts/upgrade-test.mjs`; and each section's own
      change, in the PR that cites this item.
+     Changed by: 202.
 
 202. **14 November 2026** (the core, chat with the outside session of item 201, which the owner had asked to audit what
      that item built, at d76174c, and then to fix what it found). Asked: the session reported that every section was
@@ -135,6 +136,7 @@ The index, and how an item is written: `archive/instructions.md`.
      `.github/workflows/core.yml`, the reports left out by the pin's tree's own entry; in `scripts/upgrade-test.mjs`, a
      start from each of the last two releases, its private project's commits made under a listed name and its sync
      mended so; and in item 201, that description taken out, the one change to a dated record here, on the owner's word.
+     Changes: 201.
 
 203. **14 November 2026** (the core, the same chat as item 202). Asked: while the fixes of item 202 were under way, why
      secondary security reviews are needed, and whether they only waste usage; then, once the session quoted a cheaper
