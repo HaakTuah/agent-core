@@ -158,3 +158,9 @@ The index, and how an item is written: `archive/instructions.md`.
      pull requests merge in a line" in `roles/shared/work-flow.md`, "A new lane only where it merges sooner" in
      `roles/orchestrator.md`, and "The merge line follows the host" and "Where the front waits behind the cap, runs far
      from their turn are cancelled" in `tasks/hosts.md`.
+260. **19 November 2026**, #457, point 1, built as #715 orders it. A test reaches a real clock or another process
+     only where the clock or the process is what it guards, counted by the shape check with the share of the tests'
+     time each takes, those that stood listed and a new one failing, since in another owner's suite counted for #426 the
+     6% of tests that started a process took 66% of its time and the 21% that reached a real clock took 89%. The owner
+     agreed to the issue's points, and asked on 19 November that #715's work, the count first, be a priority. It stands
+     behind "A test reaches a real clock or another process only where it guards it" in `tasks/tests.md`.
