@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { CAPS, DUE_TITLE, QUEUE, answered, capsOf, counted, due, judged, raised, rolesAt } from "../scripts/size.mjs";
+import { CAPS, DUE_TITLE, QUEUE, answered, capsAt, capsOf, counted, due, judged, raised, rolesAt } from "../scripts/size.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -72,7 +72,9 @@ ok(judged(past, { builder: 90 }).fail.length === 1 && /is 10 bytes over its cap\
 ok(judged(past, { builder: 105 }).fail.length === 1 && /5 of them this change's own/.test(judged(past, { builder: 105 }).fail[0]), "against a base past the cap already, a change that grows it fails, saying how much is its own");
 ok(judged(past, { builder: 100 }).fail.length === 1 && !/this change's own/.test(judged(past, { builder: 100 }).fail[0]), "a base exactly at the cap was not past it");
 ok(eq(judged(past, { builder: 110 }).fail, []) && eq(judged(past, { builder: 120 }).fail, []) && /as it stood before this change/.test(judged(past, { builder: 120 }).task[0]), "one that does not grow it is a task");
-ok(judged(past, { builder: 110 }, { builder: 120 }).fail.length === 1 && /which this change lowers from 120 to 100\. Mend:/.test(judged(past, { builder: 110 }, { builder: 120 }).fail[0]) && eq(judged(past, { builder: 110 }, { builder: 100 }).fail, []) && eq(judged(past, { builder: 110 }, {}).fail, []), "a change that lowers a cap below what stands fails, where the base set a higher one (the design check of 9bfbe79)");
+ok(judged(past, { builder: 110 }, { builder: 120 }).fail.length === 1 && /which this change lowers from 0\.1171875 KB to 0\.09765625 KB\. Mend: set it to 1 \* 1024 or more/.test(judged(past, { builder: 110 }, { builder: 120 }).fail[0]) && eq(judged(past, { builder: 110 }, { builder: 100 }).fail, []) && eq(judged(past, { builder: 110 }, {}).fail, []), "a change that lowers a cap below what stands fails, where the base set a higher one (the design check of 9bfbe79)");
+{ const lowered = [{ what: QUEUE.file, said: QUEUE.file, total: 6000, cap: 5 * 1024, kind: "queue" }], f = judged(lowered, { [QUEUE.file]: 6000 }, { [QUEUE.file]: 6 * 1024 }).fail[0];
+  ok(mended(`FAIL: ${f}`) && /over its mark, which this change lowers from 6 KB to 5 KB\. Mend: set it to 6 \* 1024 or more/.test(f) && eq(capsAt("HEAD"), { ...CAPS, [QUEUE.file]: QUEUE.mark }) && eq(capsAt("--output=x"), {}), "the queue's mark lowered below what stands fails with its mend, and capsAt reads the caps and the mark a revision sets, and nothing from a revision it refuses (the fallback reviewer's check of 94d700d)"); }
 ok(due({ manifest: "a project's manifest" }) === null, "the scheduled look keeps no such issue in a project");
 const here = process.cwd(), empty = fs.mkdtempSync(path.join(os.tmpdir(), "size-empty-"));
 try { process.chdir(empty); ok(due({ manifest: null }) === null, "nor where no roles/ or queue stands to count"); } finally { process.chdir(here); fs.rmSync(empty, { recursive: true, force: true }); }
