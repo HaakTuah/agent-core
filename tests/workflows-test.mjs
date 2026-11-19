@@ -187,11 +187,18 @@ ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] =
 }
 
 // (#802: the copy's check removes the folders it fetched into, so no fetch there may leave git's own upkeep running
-// behind the step, which raced that removal on main)
+// behind the step, which raced that removal on main: each fetch in a step's script, its lines joined where a line ends
+// in a backslash and a comment taken off only where the shell reads one, and the checkout of the core into a folder)
 {
-  const fetches = fs.readFileSync(path.join(wfDir, "core.yml"), "utf8").split("\n").filter(l => /\bgit\b[^#|;&]*\bfetch\b/.test(l.replace(/#.*/, "")));
-  ok(fetches.length >= 3 && fetches.every(l => l.includes("--no-auto-maintenance")),
-    "each fetch of the copy's check starts no upkeep of git's own, which would race the check's removal of what it fetched (#802)", fetches.filter(l => !l.includes("--no-auto-maintenance")).join(" | "));
+  const core = parseYaml(fs.readFileSync(path.join(wfDir, "core.yml"), "utf8"));
+  const steps = Object.values(core.jobs).flatMap(j => j.steps ?? []);
+  const commands = steps.flatMap(s => String(s.run ?? "").replace(/\\\n/g, " ").split("\n").map(l => l.replace(/(^|\s)#.*$/, "")));
+  const fetches = commands.flatMap(l => l.split(/\|\||&&|[|;]/)).filter(c => /\bgit\b.*\sfetch\s/.test(c));
+  const checkouts = steps.filter(s => String(s.uses ?? "").startsWith("actions/checkout@") && s.with?.path);
+  const off = s => s.env?.GIT_CONFIG_COUNT === "1" && s.env?.GIT_CONFIG_KEY_0 === "maintenance.auto" && s.env?.GIT_CONFIG_VALUE_0 === "false";
+  ok(fetches.length >= 3 && fetches.every(l => l.includes("--no-auto-maintenance")) && checkouts.length >= 1 && checkouts.every(off),
+    "each fetch of the copy's check, and its checkout of the core into a folder, starts no upkeep of git's own, which would race the check's removal of what it fetched (#802)",
+    [...fetches.filter(l => !l.includes("--no-auto-maintenance")), ...checkouts.filter(s => !off(s)).map(s => s.with.path)].join(" | "));
 }
 
 process.exit(failed ? 1 : 0);

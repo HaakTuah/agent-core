@@ -194,6 +194,12 @@ jobs:
           [ -n "$copy" ] || copy="HEAD:${at%/}" # (where the copy is read: a repository's git folder, and a commit's folder)
           { echo "sha=$pin"; echo "at=$at"; echo "library=$library"; echo "floor=$floor"; echo "src=$src"; echo "copy=$copy"; } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # (its fetch of the core's whole history starts no upkeep of git's own, which would go on writing the folder behind
+        # the check and race the step that removes it; #802)
+        env:
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: maintenance.auto
+          GIT_CONFIG_VALUE_0: "false"
         with:
           repository: ${{ env.CORE }}
           ref: ${{ steps.pin.outputs.sha }}
