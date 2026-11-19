@@ -9,8 +9,9 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
-| #810 | rule builder; it changes `tests.yml` and `tasks/tests.md` | |
+| #810 | the orchestrator, for its done-when: reads `main`'s runs, then closes it | a stretch of merges landing faster than a run; at the batch's end, if none came, the orchestrator reads `main`'s runs since #813 and closes #810 on that |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | #715 |
+| #829 | rule builder; it changes what the builder, the design session and the orchestrator read at their start | |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
 | #704 | builder; `tests.yml` | #715 |
 | #770 | builder; `tests.yml` | #704 |
@@ -39,7 +40,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #310 | rule builder | |
 | #325 | rule builder | |
 | #314 | rule builder | |
-| #456 | rule builder; it changes the floor (rules 5 and 10) | |
 | #457 | rule builder | |
 | #458 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
