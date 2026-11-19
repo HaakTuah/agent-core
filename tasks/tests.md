@@ -126,15 +126,15 @@ reads is the *shape check*'s config.
   "processes", and the record gives the share of the tests' time each takes. What stood is held as the screens' is,
   above; a new one fails, and its builder hands the time in or calls the code itself, or gives the test's reason under
   "grown". It does not mean that such tests go, since they guard what only a running program shows, nor that what a
-  test's helpers reach is counted. Reason: in the counts of #426, 6% of a suite's tests started another process and
-  took 66% of its time, and 21% reached a real clock and took 89%. Held by the shape check.
+  test's helpers reach is counted. Reason: in one project's suite (#426), the few tests that started another process,
+  or reached a real clock, took most of its time. Held by the shape check.
 - **A test asserts no time measured on a real clock.** By default a test that needs time has it handed in, as the
   rules of a program do (`tasks/code-shape.md`), and asserts on that. The one exception is a measure of speed, which
   keeps room above its floor so that a slow machine fails nothing (#318). The trigger is a test that reads the time,
   sleeps or waits on a timer and then asserts a duration: its builder hands the time in instead. It does not mean a
-  test never waits for a program it starts. Reason: in the counts of #426, the one failure at random in 26,518 runs of a
-  suite came from a test that asserted a duration on a real clock. Held by the record's list of tests that failed for no
-  reason, at the audit.
+  test never waits for a program it starts. Reason: in one project's suite (#426), the one failure at random in many
+  thousands of runs came from a test that asserted a duration on a real clock. Held by the record's list of tests that
+  failed for no reason, at the audit.
 - **A tree that passed is not run again.** By default, where a pull request's head was up to date with the default
   branch and its whole suite passed on that tree, the run on the default branch for the same tree runs no test again:
   whoever writes a job of tests that a pull request and a push both run gives its selection, on a push, `--passed` with
@@ -145,8 +145,9 @@ reads is the *shape check*'s config.
   to date where users get a release. A test that reads what no tree holds
   (a release's tag, the day) stays out of the skip. The trigger is a push that merges a pull request with a merge commit. It does not
   mean a run is skipped where the pull request ran a selection only, where it was merged by a squash or a rebase, on a
-  re-run, on a schedule or before a release, nor that a job a pull request does not run is skipped. Reason: in #426's
-  counts every push to the default branch ran the whole suite again after its pull request had run it on the same tree.
+  re-run, on a schedule or before a release, nor that a job a pull request does not run is skipped. Reason: in one
+  project (#426) every push to the default branch ran the whole suite again after its pull request had run it on the
+  same tree.
   Held by the selection's own test, and by `core/scripts/steps.mjs`, which reports a job that selects on a push without
   it.
 - **What a push waits on has a time mark.** By default the checks of one push, from the first job's start to the

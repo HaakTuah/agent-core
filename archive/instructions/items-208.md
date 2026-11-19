@@ -101,7 +101,7 @@ The index, and how an item is written: `archive/instructions.md`.
      issue #277, and the orchestrator, which passed it on word for word to the builder of this rule). Asked: whether the
      session's proposed pattern is the optimal way for development and for phrasing the rules. The session had proposed
      one pattern for writing a rule, after three rules of the core had been read against what the owner meant that
-     evening, each for want of an observable trigger or a reason. Decided: The owner agreed to the six points the
+     day, each for want of an observable trigger or a reason. Decided: The owner agreed to the six points the
      session set out: the default first, then the exception; a trigger someone can observe; one actor and one action;
      what it does not mean; its reason in one line; and what holds it. The owner agreed to what is kept out of a rule
      (adjectives that measure nothing, "should consider", lists of preferred technologies, and what a check's failure
