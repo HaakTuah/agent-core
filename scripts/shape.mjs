@@ -374,9 +374,9 @@ function computed(r, text) {
 }
 
 // Whether a file's imports are as ones the readers cannot follow: a reader could not read them, its parser not installed
-// or the file past it; and in Python, read on the parser alone, those of a file the grammar could not read whole, which
-// may stand in the part it lost.
-const unfollowed = r => !r.imports || (!r.functions && r.lang === "python");
+// or the file past it; and in C# and Python, read on the parser alone, those of a file the grammar could not read whole,
+// which may stand in the part it lost.
+const unfollowed = r => !r.imports || (!r.functions && ["csharp", "python"].includes(r.lang));
 
 function oneFile(ctx, file, r) {
   const system = systemOf(ctx.config, file), domain = system ? ctx.config.systems[system].domain ?? null : null, from = { file, system, domain };
@@ -765,8 +765,8 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   // (what a reader finds on the parser, where it could not run, its packages not installed for the registry not
   // answering: its functions are read as a reader's the baseline does not name, so that none fails, and a file its
   // baseline lists as lost, which only the parser tells, is kept, never gone; what the same reader finds without the
-  // parser, the imports, cycles and clock of JavaScript and C#, and a file new to the baseline, are held as ever; of a
-  // file the parser reads whole (Python's), each entry is so: #654, point 4; #530, item 6)
+  // parser, the imports, cycles and clock of JavaScript, and a file new to the baseline, are held as ever; of a file the
+  // parser reads whole (C#'s and Python's), each entry is so: #654, point 4; #530, item 6)
   const reads = new Set(baseline.reads), skipped = unreachedReaders();
   const wholly = id => { const r = found.readers.get(fileOf(id)); return skipped.includes(r) && WHOLE_ON_PARSER.includes(r); };
   const unread = id => { const r = readerOf(id, found.readers); return r !== null && (!reads.has(r) || (skipped.includes(r) && groupOf(id).kind === "function") || wholly(id)); };
@@ -926,7 +926,7 @@ function check(config, at, self, found, base, named) {
   const unnamed = skipped.length && unnamedReaders().length, install = path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)));
   const why = unnamed ? "the parser's packages are not installed, this job's install step naming the core's first install alone" : "the core's packages could not be installed, the registry not answering";
   const mend = unnamed ? `make this job's install step node ${install} all, which installs the parser's packages too` : "run this job again before the pull request merges; if it fails again, file it as a fault";
-  if (skipped.length) console.log(`::warning::The shape check did not read ${skipped.map(r => `${READERS[r]} (the reader ${r})`).join(", ")}: ${why}, so what it would find there on the parser is reported, never failed${v.kept ? `, and the ${plural(v.kept, "entry", "entries")} its baseline lists there (functions, files the grammar cannot read, and all of a file of Python) ${v.kept === 1 ? "is" : "are"} kept as listed, never failed as gone` : ""}; what it reads without the parser is held as ever. Mend: ${mend}`);
+  if (skipped.length) console.log(`::warning::The shape check did not read ${skipped.map(r => `${READERS[r]} (the reader ${r})`).join(", ")}: ${why}, so what it would find there on the parser is reported, never failed${v.kept ? `, and the ${plural(v.kept, "entry", "entries")} its baseline lists there (functions, files the grammar cannot read, and all of a file of C# or Python) ${v.kept === 1 ? "is" : "are"} kept as listed, never failed as gone` : ""}; what it reads without the parser is held as ever. Mend: ${mend}`);
   if (!base) console.log("note no base to compare with (set SHAPE_BASE to the branch the work started from), so the baseline was not checked for what joined it, and what the config newly reads is not told from what is new");
   for (const line of v.fail.flat()) console.error(logged(line));
   if (v.fail.length) return 1;

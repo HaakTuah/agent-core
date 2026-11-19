@@ -137,12 +137,13 @@ ok(same(changes, ["change: src/a.js: \"Ticket:\\u0020ABC-\"", "change: src/a.js:
   && marked.entries.get("change: src/a.js: a change's heading").n.count === 2 && marked.entries.get("change: src/a.js: the task that changed it").n.count === 1 && marked.entries.get("change: src/a.js: a change's date").n.count === 1 && readerOf("change: src/a.js: a change's date", marked.readers) === "changes" && fileOf("change: src/a.js: what the code was") === "src/a.js"
   && groupOf("change: src/a.js: \"Ticket:\\u0020ABC-\"").group === "\"Ticket:\\u0020ABC-\"",
   "a comment line that marks a change is an entry of the reader \"changes\", counted by file and mark, in JavaScript, C# and Python, a mark of the config's too; a string, a line going on in small letters, a reason and a pointer to an issue are none", changes.join("\n"));
-// (a block comment of 300,000 lines, in JavaScript and C#, read whole and overflowing nothing; a file whose JSX the
-// reader cannot follow gives no marks, since what it would take for a comment may be the element's text)
+// (a block comment of 300,000 lines in JavaScript, and of 150,000 in C#, whose parser reads no file past 2 MB, read
+// whole and overflowing nothing; a file whose JSX the reader cannot follow gives no marks, since what it would take for
+// a comment may be the element's text)
 const tall = `/*\n * Changed: x\n${" * a line\n".repeat(300000)} */\nconst t = 1;\n`;
-const longMarked = survey({ "src/t.js": tall, "src/t.cs": `${tall.replace("const t = 1;", "class T {}")}`, "src/l.jsx": "const cast = <T>(x: T) => x;\nconst p = <p>// Changed: the text</p>;\n" }, cfg({}));
+const longMarked = survey({ "src/t.js": tall, "src/t.cs": `/*\n * Changed: x\n${" * a line\n".repeat(150000)} */\nclass T {}\n`, "src/l.jsx": "const cast = <T>(x: T) => x;\nconst p = <p>// Changed: the text</p>;\n" }, cfg({}));
 ok(longMarked.entries.get("change: src/t.js: a change's heading")?.n.count === 1 && longMarked.entries.get("change: src/t.cs: a change's heading")?.n.count === 1 && !ids(longMarked).some(id => id.startsWith("change: src/l.jsx")),
-  "a block comment of 300,000 lines is read whole in JavaScript and C#, and a file whose JSX the reader cannot follow gives no marks", ids(longMarked).join("\n"));
+  "a block comment of 300,000 lines is read whole in JavaScript, and of 150,000 in C#, and a file whose JSX the reader cannot follow gives no marks", ids(longMarked).join("\n"));
 // (a minified file of 100,000 inline comments on one line, read in time: each comment's lines found within it alone)
 const minStart = Date.now(), minified = survey({ "src/min.js": `var a=${"/*#__PURE__*/f()+".repeat(100000)}1;\n` }, cfg({}));
 ok(Date.now() - minStart < 5000 && !ids(minified).some(id => id.startsWith("change: ")), "a minified file of 100,000 inline comments on one line is read in time", `${Date.now() - minStart} ms`);
@@ -227,8 +228,10 @@ for (let i = 0; i < 3000; i++) { many[`src/Rules/R${i}.cs`] = "using Pkg;\n"; ma
 ok(ids(survey(many, cfg(layered))).filter(id => id.startsWith("package: ")).length === 6000, "a package imported from many files in two systems is found once in each file");
 const large = [
   [{ "package.json": JSON.stringify({ dependencies: { dep: "1" } }), "src/a.mjs": 'import "dep";\n'.repeat(130000) }, f => f.read.imports === 130000],
-  [{ "src/a.cs": `using ${Array(130000).fill("a").join(".")};\n` }, f => f.read.nowhere === 1],
-  [{ "src/a.cs": `${Array.from({ length: 80000 }, (_, i) => `using Z${i};`).join("\n")}\n${Array.from({ length: 80000 }, (_, i) => `namespace N${i} { }`).join("\n")}\n` }, f => f.read.nowhere === 80000],
+  // (C#'s grammar nests a dotted name a part a level, so one of 130,000 parts is past what its reader follows: the file is
+  // counted as lost, and its usings as ones the readers cannot follow)
+  [{ "src/a.cs": `using ${Array(130000).fill("a").join(".")};\n` }, f => f.unsure.has("src/a.cs") && ids(f).includes("lost: src/a.cs")],
+  [{ "src/a.cs": `${Array.from({ length: 50000 }, (_, i) => `using Z${i};`).join("\n")}\n${Array.from({ length: 50000 }, (_, i) => `namespace N${i} { }`).join("\n")}\n` }, f => f.read.nowhere === 50000],
   [{ "src/a.py": `from ${Array(32500).fill("a").join(".")} import ${Array(32500).fill("b").join(", ")}\n` }, f => f.read.nowhere === 1],
 ];
 ok(large.every(([texts, holds]) => holds(survey(texts, cfg({})))), "a large file of each kind of import is read in time, in step with its size, and what it holds still counted");
@@ -445,7 +448,7 @@ ok(parseBaseline(JSON.stringify({ audited: { day: "2026-11-15", listed: 3, read:
 // a reader the baseline does not name yet: what the base held of it is said, never failed (a sync turns nothing red)
 const csBig = { "src/A.cs": `namespace N;\nclass A {\n${csLong("Big", 70)}}\n` }, allReads = { reads: Object.keys(READERS) };
 v = judge({ now: csBig, baseline: listed([]), base: baseOf(listed([]), csBig) });
-ok(v.fail.length === 0 && v.notes.some(n => /written before the check read files that hold JSX, C#, its functions by the lexer, C#, its functions by the parser, Python, its functions by the lexer, Python, by the parser, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process, the comments that mark a change: 1 breach that stood before is not listed yet/.test(n) && /--write/.test(n)),
+ok(v.fail.length === 0 && v.notes.some(n => /written before the check read files that hold JSX, C#, its functions by the lexer, C#, by the parser, Python, its functions by the lexer, Python, by the parser, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process, the comments that mark a change: 1 breach that stood before is not listed yet/.test(n) && /--write/.test(n)),
   "a baseline written before a reader came: what the base held of it is said, not failed", JSON.stringify(v));
 v = judge({ now: { ...csBig, "src/B.cs": `namespace N;\nclass B {\n${csLong("New", 70)}}\n` }, baseline: listed([]), base: baseOf(listed([]), csBig) });
 ok(mended(said(v)) && v.fail.length === 1 && /1 function passes/.test(said(v)) && /B\.cs#New/.test(said(v)) && !/A\.cs/.test(said(v)), "and what is new of it fails, from the sync on", said(v));

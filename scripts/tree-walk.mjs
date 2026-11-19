@@ -1,4 +1,4 @@
-// The walk over a parsed file's tree that the shape check's readers on the parser share (csharp-functions.mjs,
+// The walk over a parsed file's tree that the shape check's readers on the parser share (csharp-tree.mjs,
 // javascript-functions.mjs and python-tree.mjs, beside this file): each function found with its name, its body's line
 // and lines, the depth its control blocks reach and its branch points, by the reader's own parts. Node's own modules only: none.
 
