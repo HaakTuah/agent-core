@@ -2,10 +2,11 @@
 # built there runs the scripts and both hooks (in Git Bash, as Claude Code does). When each runs (#733): on a pull
 # request once it is marked ready and on each push after, never on a draft, on Linux alone, the suites its change can
 # reach; on each push to main, on Linux, main tested at its newest commit, a run giving way to the next merge's; once an
-# hour, on Windows, at main's newest commit where its full run has not already passed there; and in full on both, on
-# a start by hand. A release waits on the tests' full runs on its commit, hourly or by hand: none unfinished, the newest
-# passed (.github/workflows/release.yml, scripts/release.mjs). Every suite runs though another failed, so one run
-# shows them all. This repository only; no project calls it. Reads only, with no secret; nothing is installed but the
+# hour, on Windows, at main's newest commit where its full run has not already passed there, with the tests that reach
+# the network on both, which no pull request's run or push's carries (tasks/tests.md, "A test that reaches the network
+# runs once per batch"; #733, point 9); and in full on both, on a start by hand. A release waits on the tests' full
+# runs on its commit, hourly or by hand: none unfinished, the newest passed (.github/workflows/release.yml,
+# scripts/release.mjs). Every suite runs though another failed, so one run shows them all. This repository only; no project calls it. Reads only, with no secret; nothing is installed but the
 # core's own packages, below. The suites run on the core's one exact Node, the pin
 # (.node-version), and on the least long-term Node its scripts promise to run on (.node-least, which scripts/node.sh
 # keeps on a machine that holds it; #526); the upgrade test and the staged cases on the pin alone. One suite writes and
@@ -25,9 +26,9 @@
 # tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
 # Once, on Linux, the core's own lock files are held as a project's are: each package it brings looked up in npm's
 # registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures).
-# Each job of the suites, three on Linux and eight on Windows on each Node, and the upgrade test, are measured against a
-# time mark (the "suites" of .github/shape.json, by scripts/shape.mjs), which a job past it says as a warning and never
-# fails on (tasks/tests.md, "A time mark measures and never fails"; #733, point 5).
+# Each job of the suites, three on Linux and eight on Windows on each Node, the network's on both, and the upgrade
+# test, are measured against a time mark (the "suites" of .github/shape.json, by scripts/shape.mjs), which a job past
+# it says as a warning and never fails on (tasks/tests.md, "A time mark measures and never fails"; #733, point 5).
 # On a pull request each job runs only the suites its change can reach, against the merge's first parent, its base, and
 # says on its summary what it ran; a push to main, the hourly run, a start by hand and a re-run run every suite
 # (scripts/select.mjs; tasks/tests.md, "A pull request runs the tests its change can reach"), but a push's first run
@@ -98,9 +99,10 @@ jobs:
   # Windows in two halves of its test, the faults it names and where the copy stands (faults, places); the
   # personal-terms check's own job (terms); the licence, NuGet and lookup (and its lookup again) checks, with the hostile
   # tests of build files and packages (licences); the agent-tools check (tools), on Windows alone, since its cases
-  # outgrew the licences' mark there (#603) and then, beside the rest, the rest's (#647); and the rest (rest). Each
-  # step's condition names its part in the job's list "parts", read by substring: no name holds another, but that core
-  # is named beside its half. On Windows, where a suite that starts many processes runs several times slower, a job
+  # outgrew the licences' mark there (#603) and then, beside the rest, the rest's (#647); the tests that reach the
+  # network, in a job of their own on each system once an hour (network); and the rest (rest). Each step's condition
+  # names its part in the job's list "parts", read by substring: no name holds another, but that core is named beside
+  # its half. On Windows, where a suite that starts many processes runs several times slower, a job
   # takes kit with steps, the second half with terms, and each other part alone; on Linux three jobs
   # take them, kit, core, licences, terms and tools in one, projects and sync in the second, which keeps the name of the
   # suite that was whole and so its mark, lowered, and rest and steps, the steps run once on Linux, in the third, since
@@ -118,12 +120,12 @@ jobs:
     strategy:
       fail-fast: false
       # (each job on the pin and on the least long-term Node, the file setup-node reads, #526; on a pull request and a
-      # push to main the three on Linux alone, on the hourly run the eight on Windows alone, and on a start by hand or
-      # the eleven; #733, points 3 and 6)
+      # push to main the three on Linux alone, on the hourly run the eight on Windows and the network's on both, and on
+      # a start by hand all of them; #733, points 3, 6 and 9)
       # (set whole for each event, since GitHub adds back an entry of `include` that matches no combination left after
       # `exclude`: each job named with its Node, its suite, its runner and its parts)
       matrix:
-        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"}]' || github.event_name == 'schedule' && '[{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"}]' || '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"}]') }}
+        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"}]' || github.event_name == 'schedule' && '[{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-version","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-version","suite":"suites-network","os":"windows-latest","parts":"network"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-least","suite":"suites-network","os":"windows-latest","parts":"network"}]' || '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-version","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-version","suite":"suites-network","os":"windows-latest","parts":"network"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-least","suite":"suites-network","os":"windows-latest","parts":"network"}]') }}
     # (the run's token reads the checks too: the selection asks whether "tests" passed on the merged head, on a push)
     permissions:
       contents: read
@@ -173,7 +175,7 @@ jobs:
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-test.mjs ')) }}
         run: node tests/nuget-test.mjs
       - name: The NuGet check's fetch before the restore, against each package's content hash
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-fetch-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-fetch-test.mjs ')) }}
         run: node tests/nuget-fetch-test.mjs
       - name: The hand-written readers, against SPDX's own parser and an XML parser (on Linux, where tar unpacks them)
         if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/readers-test.mjs ')) }}
@@ -188,7 +190,7 @@ jobs:
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/held-test.mjs ')) }}
         run: node tests/held-test.mjs
       - name: The core's packages, from its lock file alone
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/packages-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/packages-test.mjs ')) }}
         run: node tests/packages-test.mjs
       - name: The agent-tools check
         if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-test.mjs ')) }}
@@ -348,7 +350,7 @@ jobs:
           PART: ${{ contains(matrix.parts, 'faults') && 'faults' || contains(matrix.parts, 'places') && 'places' || 'all' }}
         run: node tests/core-yml-test.mjs --part "$PART"
       - name: The core's checks from plain git (check.mjs), on scratch projects
-        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/check-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/check-test.mjs ')) }}
         run: node tests/check-test.mjs
       - name: The sync, and the proof that a sync is pure, against every way a sync branch can carry more
         if: ${{ !cancelled() && contains(matrix.parts, 'sync') && (env.RUN == 'all' || contains(env.RUN, ' tests/pure-sync-test.mjs ')) }}
@@ -363,7 +365,7 @@ jobs:
         if: ${{ !cancelled() && contains(matrix.parts, 'kit') && (env.RUN == 'all' || contains(env.RUN, ' tests/init-test.mjs ')) }}
         run: node tests/init-test.mjs
       - name: The starter kit on a .NET project, cloned as Windows clones it, and built
-        if: ${{ !cancelled() && contains(matrix.parts, 'kit') && (env.RUN == 'all' || contains(env.RUN, ' tests/init-dotnet-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/init-dotnet-test.mjs ')) }}
         run: node tests/init-dotnet-test.mjs
       - name: The NuGet check's own steps, its first look and its whole job
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-gate-test.mjs ')) }}
