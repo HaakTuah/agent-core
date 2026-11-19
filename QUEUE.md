@@ -12,6 +12,8 @@ it merges last.
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one, 2 security reviews | |
 | #733 | rule builder; it changes the floor (rule 12), with the owner's yes on the issue; two security reviews | |
+| #744 | rule builder; it changes the archive's key and its check | |
+| #750 | rule builder; it changes floor rule 8 (point 2), with the owner's yes on the issue; two security reviews | |
 | #530, step 5 | builder; licence readers | |
 | #593, points 1 to 3 | rule builder | |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | |
@@ -72,7 +74,6 @@ it merges last.
 | #594 | rule builder; it changes the README | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
-| #652 | rule builder | |
 | #650 | rule builder | |
 | #661 | builder | |
 | #662 | rule builder | |
@@ -80,6 +81,7 @@ it merges last.
 | #707 | rule builder | |
 | #701 | builder | |
 | #716 | builder | |
+| #739 | rule builder; it changes the game module (`tasks/game-design.md`) | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
@@ -88,7 +90,6 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #549 | builder; a workflow, two security reviews | |
 | #550 | builder; a case a PR | |
 | #551 | builder | #549 |
 | #552 | builder | #551 |

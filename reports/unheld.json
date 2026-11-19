@@ -1,11 +1,6 @@
 {
   "about": "The rules of the floor and the modules that scripts/holders.mjs counts as having no holder, each with its proposal (AGENTS.md, \"Rules are pruned by their numbers\"; #545), worst first: a rule read at a role's start before one read on need. \"mark\": \"check\" (a check that never guesses could hold it, a maintained linter's rule first where one reads the breach), \"case\" (only a staged case could), \"move\" (to a module read on need), \"goes\" (kept in the archive with its reason, free to return), or \"describes\" (it binds no one, and holders.json should say so). \"by\": the queued issue that builds the check or case, or \"project\" for a check a project of that kind keeps; a check or case with none has no issue filed yet, since its upkeep does not pay yet or the owner's answer comes first; the owner decides moves and removals, a few at a time. A floor rule is never proposed to go. Sorted first on 17 November 2026; each pruning's session brings it up to date.",
   "proposals": {
-    "floor/security.md: The owner's yes in the PR": {
-      "mark": "check",
-      "by": "#549",
-      "why": "the PR's description check fails a PR that changes `floor/` or the review guidelines and quotes under \"The owner's word\" no words found word for word in its issue's text from the owner's account; whether the quote covers the change stays the design check's"
-    },
     "floor/security.md: Nothing is reviewed twice": {
       "mark": "case",
       "by": "#550",
@@ -278,11 +273,6 @@
       "mark": "check",
       "by": "#556",
       "why": "CodeQL's unsafe-deserialization queries read a loader that builds the type a file names; rights and signing stay unread, so in part"
-    },
-    "roles/shared/teams.md: The higher right gives the floor's yeses": {
-      "mark": "check",
-      "by": "#549",
-      "why": "the owner's-yes check reads the quoting account's permission from the host (`maintain` or `admin`), in the same step"
     },
     "roles/shared/teams.md: Owners who disagree": {
       "mark": "goes",
