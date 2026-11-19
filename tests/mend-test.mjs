@@ -178,9 +178,13 @@ ok(inPlace("# I\n\n- `t`: above.\n\n## A\n\nIts parts stand in `inventory/a/`, a
 const written = inPlace(fs.readFileSync(path.join(root, "INVENTORY.md"), "utf8"));
 ok(written.length === 0, `no part's line stands in INVENTORY.md itself under a heading whose parts stand in a folder${written.length ? `: not so for ${written.join("; ")}. Mend: move each such line, byte for byte, into a file of its own in the folder that heading names, named to stand in order between its neighbours (NNN-<name>.md)` : ""}`);
 const inventoryText = whole(root);
-const stray = [...fs.readdirSync(path.join(root, "inventory")).filter(d => !folders(root).includes(`inventory/${d}`)),
-  ...folders(root).flatMap(f => fs.readdirSync(path.join(root, f), { withFileTypes: true }).filter(e => !e.isFile() || !e.name.endsWith(".md")).map(e => `${f}/${e.name}`))];
-ok(stray.length === 0 && folders(root).every(f => partsIn(root, f).length > 0), `each folder of inventory/ is named in INVENTORY.md, and holds its parts, each a file of Markdown directly in it${stray.length ? `: not so for ${stray.join(", ")}. Mend: name a folder under its heading in INVENTORY.md with the line "Its parts stand in \`inventory/<folder>/\`, a file each, read in the order of their names.", and make each part a file NNN-<name>.md directly in a folder named there` : ""}`);
+// each folder of inventory/ named in INVENTORY.md, each named folder there with its parts, each a file of Markdown
+const entries = at => { try { return fs.readdirSync(path.join(root, at), { withFileTypes: true }); } catch { return null; } };
+const named = folders(root);
+const stray = [...(entries("inventory") ?? []).filter(d => !named.includes(`inventory/${d.name}`)).map(d => `inventory/${d.name}, named nowhere`),
+  ...named.filter(f => !entries(f)?.length).map(f => `${f}, named but not there or empty`),
+  ...named.flatMap(f => (entries(f) ?? []).filter(e => !e.isFile() || !e.name.endsWith(".md")).map(e => `${f}/${e.name}, no file of Markdown`))];
+ok(stray.length === 0, `each folder of inventory/ is named in INVENTORY.md, and holds its parts, each a file of Markdown directly in it${stray.length ? `: not so for ${stray.join("; ")}. Mend: name each folder under its heading in INVENTORY.md with the line "Its parts stand in \`inventory/<folder>/\`, a file each, read in the order of their names.", or take it out where it holds no part; and make each part a file NNN-<name>.md directly in a folder named there` : ""}`);
 const inv = inventoryOf(inventoryText);
 const left = unclaimed(tracked ?? [], inv);
 ok(left.length === 0, `each tracked file is claimed by a part of the inventory or left out there with its reason${left.length

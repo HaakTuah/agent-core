@@ -15,7 +15,7 @@ const POINTER = /^Its parts stand in `(inventory\/[a-z0-9-]+)\/`, a file each, r
 // The parts a folder of inventory/ holds, in order: [{ file, text }], each text without its last line ending.
 export function partsIn(root, folder) {
   const at = path.join(root, folder);
-  const names = fs.existsSync(at) ? fs.readdirSync(at).filter(f => f.endsWith(".md")).sort() : [];
+  const names = fs.existsSync(at) ? fs.readdirSync(at, { withFileTypes: true }).filter(e => e.isFile() && e.name.endsWith(".md")).map(e => e.name).sort() : [];
   return names.map(f => ({ file: `${folder}/${f}`, text: fs.readFileSync(path.join(at, f), "utf8").replace(/\r?\n$/u, "") }));
 }
 
