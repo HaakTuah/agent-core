@@ -11,6 +11,9 @@ import { started } from "./started.mjs";
 
 export const NOTES = "setup/sync-notes.md", FOLDER = "setup/sync-notes";
 export const POINTER = "Its entries stand in `setup/sync-notes/`, a file each, read in the order of their names.";
+// How the notes' one line that is no entry opens: the notice that a sync from a copy older than the folder prints, its
+// reader taking what a diff of the file alone adds, which sends the session that syncs to the folder.
+export const NOTICE = "- A copy of the core older than 19 November 2026 syncs with a script that reads what a sync asks from this file alone";
 
 // The notes whole, from `read(file)` (its text, null where it is not there) and `list(folder)` (the names of the files
 // in it): the file's text, the line naming the folder replaced by the folder's entries; null where the file is not.

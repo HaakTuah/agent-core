@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
 import { STEPS } from "../scripts/steps.mjs";
-import { FOLDER, POINTER, entries, notesAt } from "../scripts/sync-notes.mjs";
+import { FOLDER, NOTICE, POINTER, entries, notesAt } from "../scripts/sync-notes.mjs";
 import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
 
 let failed = 0, count = 0;
@@ -277,7 +277,7 @@ ok(!inTheCore(path.join(nested, "core", "scripts", "release.mjs")), "nor is a cl
 // what a release asks, each with roughly what it costs a project where it is not done yet (steps.mjs)
 const owners = STEPS.find(s => s.owner);
 ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[0].cost}.`) && costed(`- **${owners.lead}.** Done when two.`).includes("(the owner's)")
-  && costed("- **No such entry.** Done when three.").includes("unknown") && costed("- A notice, no entry.").endsWith("a notice and no entry."), "each ask of a release says what it costs, the owner's marked so, one with no step says so, and a notice asks nothing beyond reading it");
+  && costed("- **No such entry.** Done when three.").includes("unknown") && costed(`${NOTICE}: and so on.`).includes("each entry it sends the session to") && costed("- A line of no form.").includes("unknown"), "each ask of a release says what it costs, the owner's marked so, one with no step or of no form says so, and the notice costs what it sends to");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the core's releases`);
 process.exitCode = failed ? 1 : 0;

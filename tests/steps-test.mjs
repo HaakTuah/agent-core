@@ -12,7 +12,7 @@ import { differences, fresh, kind, report as freshReport } from "../scripts/fres
 import { CORE } from "../scripts/core-address.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "../scripts/init.mjs";
 import { notes as manifestNotes } from "../scripts/manifest-reads.mjs";
-import { FOLDER, NOTES, POINTER, entries, notes as notesWhole } from "../scripts/sync-notes.mjs";
+import { FOLDER, NOTES, NOTICE, POINTER, entries, notes as notesWhole } from "../scripts/sync-notes.mjs";
 import { READERS } from "../scripts/shape-readers.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { parseYaml, pathsLetThrough } from "../scripts/workflow-run.mjs";
@@ -41,7 +41,7 @@ ok(noteFiles.length === STEPS.length && !unpaired.length, `each entry stands in 
 const notOne = noteFiles.filter(f => !/^- \*\*[^\n]+\n$/u.test(fs.readFileSync(path.join(root, FOLDER, f), "utf8")));
 ok(!notOne.length, `each file of ${FOLDER}/ holds one entry, on one line`, notOne.join(", "));
 const own = fs.readFileSync(path.join(root, NOTES), "utf8");
-ok(!leads(own).length && entries(own).length === 1 && own.split("\n").filter(l => l === POINTER).length === 1, `${NOTES} holds no entry of its own, only the notice to a sync from an older copy, and names the folder once: a new entry is a file of ${FOLDER}/, named to stand after the one before it`, entries(own).join("\n"));
+ok(!leads(own).length && entries(own).length === 1 && entries(own)[0].startsWith(NOTICE) && entries(own)[0].includes("`core/setup/sync-notes/`") && own.split("\n").filter(l => l === POINTER).length === 1, `${NOTES} holds no entry of its own, only the notice to a sync from an older copy, and names the folder once: a new entry is a file of ${FOLDER}/, named to stand after the one before it`, entries(own).join("\n"));
 const ways = STEPS.filter(s => [s.check, s.held, s.unread].filter(Boolean).length !== 1 || !Object.values(COST).includes(s.cost));
 ok(!ways.length, "each step is told done one way (a check, a check of the project's that holds it, or why none reads it) and says what it costs", ways.map(s => s.lead).join("\n"));
 const unstaged = STEPS.filter(s => s.check && !STAGES[s.lead]).map(s => s.lead);

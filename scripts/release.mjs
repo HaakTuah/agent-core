@@ -27,6 +27,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
+import { NOTICE } from "./sync-notes.mjs";
 import { NOTES, OWN, RELEASE, asksBetween, fetchCore, held, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
 import { atRelease } from "./staged.mjs";
 import { started } from "./started.mjs";
@@ -51,10 +52,9 @@ export function next(dir, at = null) {
 }
 
 // An entry the release asks, with its step's cost (steps.mjs) on the line below it; an entry with no step says so, and
-// a line of the notes that is no entry (the notice to a sync from a copy older than the folder, sync-notes.mjs) asks
-// nothing beyond reading it.
+// the notes' notice to a sync from a copy older than the folder (sync-notes.mjs) costs what the entries it sends to do.
 export const costed = entry => {
-  if (!/^- \*\*[^*]+?\.\*\*/u.test(entry)) return `${entry}\n  Cost: nothing beyond reading it, a notice and no entry.`;
+  if (entry.startsWith(NOTICE)) return `${entry}\n  Cost: that of each entry it sends the session to, as its step says.`;
   const step = STEPS.find(s => entry.startsWith(`- **${s.lead}.**`));
   return `${entry}\n  Cost: ${step ? `${step.cost}${step.owner ? " (the owner's)" : ""}` : "unknown: the entry has no step in scripts/steps/"}.`;
 };
