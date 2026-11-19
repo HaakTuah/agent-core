@@ -102,6 +102,8 @@ else {
   ok(r.status === 0 && /issue create/.test(r.calls) && r.out.includes(`the project holds ${c1.slice(0, 7)}, the core's main is at ${c2.slice(0, 7)}`), "main red at its newest commit: the newest that passed is what the project is behind", r.out);
   r = program(c3, "", "", [], undefined, main, "", undefined, { [c3]: red });
   ok(r.status === 0 && r.out.includes("none of the last 3 commits") && !/gh issue/.test(r.calls), "a project past every commit that passed is never sent back", r.out);
+  r = program(c1, "", line(12, BOT, TITLE), [], undefined, main, "", undefined, { [c3]: "fail" });
+  ok(r.status === 0 && !/gh issue (close|edit)/.test(r.calls), "and where no commit was read to pass, an open issue is left as it stands, never closed as if the project held main", r.out + r.calls);
   r = program(c1, "", "", [], undefined, main, "", undefined, { [c3]: "fail" });
   ok(r.status === 0 && r.out.includes("could not be asked") && r.out.endsWith(": nothing\n") && !/gh issue/.test(r.calls), "where the host cannot be asked of the checks, no commit is taken, and that is said", r.out);
   r = program(c1, "", "", [], undefined, path.join(main, "none"), "", undefined, {});

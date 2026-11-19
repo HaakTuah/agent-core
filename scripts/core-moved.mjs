@@ -98,6 +98,7 @@ function newestOf(follows, pin, manifest) {
     if (!green) fail("the core's main could not be fetched");
     console.log(green.said);
     newest = green.sha ?? pin;
+    if (!green.sha) return { newest, moved: false, release, stays, unread: true };
   } else {
     // (which commit is past which takes the core's history: fetched into a folder of its own, removed again)
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "core-releases-"));
@@ -145,7 +146,8 @@ function main(dry) {
   const open = dry ? null : openIssue(run("gh", ["api", "--paginate",
     `repos/${repo}/issues?state=open&labels=enhancement&per_page=100`,
     "--jq", ISSUES]));
-  const what = plan(found.moved, open);
+  // (where no commit of main was read to pass, an open issue is left as it stands: nothing says the project holds it)
+  const what = found.unread ? "nothing" : plan(found.moved, open);
   console.log(standing(follows, pin, found, what));
   if (dry || what === "nothing") return;
   settle(what, { pin, manifest, repo, open, found });
