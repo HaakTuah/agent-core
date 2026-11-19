@@ -249,16 +249,20 @@ export function installNot(root, base = null) {
   return null;
 }
 
+/** The folder of the installed engine; null where the job's install could not reach the registry, in a project's pull
+ *  request, so that the scan did not run, said as a warning, neither failed nor passed (#654, point 4). */
+function engineDir() {
+  const engine = `semgrep/bin/semgrep-core${exe()}`;
+  return pypiUnreached(engine) ? null : path.dirname(pypiFile(engine));
+}
+
 /** The scan: { lines, failed }, each line to print. */
 export function scan(root, { base = null, description = "", dir = null } = {}) {
   if (hostScans(root, base)) return { lines: ["code scan: not run: a workflow calls the core's codeql.yml, so the host's CodeQL scans this project"], failed: false };
   const files = targets(root, base);
   if (!files.length) return { lines: [`code scan: no file of the kinds it reads ${base ? "changed" : "tracked"}`], failed: false };
-  // (where the job's install could not reach the registry, in a project's pull request, the scan did not run, said as a
-  // warning, neither failed nor passed: #654, point 4)
-  const engine = `semgrep/bin/semgrep-core${exe()}`;
-  if (!dir && pypiUnreached(engine)) return { lines: [`::warning::The code scan did not run: Semgrep's engine could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`], failed: false };
-  dir ??= path.dirname(pypiFile(engine));
+  dir ??= engineDir();
+  if (!dir) return { lines: [`::warning::The code scan did not run: Semgrep's engine could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`], failed: false };
   const listed = base ? unreadListed(description) : new Set();
   const { got, held, read } = answer(dir, root, files, listed);
   if (got.failed) return base

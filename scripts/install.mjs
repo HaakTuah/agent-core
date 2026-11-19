@@ -72,9 +72,13 @@ function refusal(lock, into) {
 }
 
 // Whether the install's failure is a registry that did not answer: a network error, or a server's own error, never another
-// (a lock file npm cannot read, an integrity that does not match), which a pull request could bring about.
-// (pip says it in Python's words: a connection it could not make, or a read that timed out, retried until it gave up)
-const unanswered = text => /\b(?:ETIMEDOUT|ESOCKETTIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|E5\d\d)\b|\b(?:NewConnectionError|ConnectTimeoutError|ReadTimeoutError|ProtocolError)\b|Max retries exceeded/u.test(String(text ?? ""));
+// (a lock file npm cannot read, an integrity that does not match), which a pull request could bring about. Read from
+// the program's own line alone, never from a message that echoes what the lock file holds (a version, an integrity),
+// which could name such an error (#714): npm's line "npm error code <code>" ("npm ERR!" before npm 10), and pip's
+// retry, in Python's words, of a connection it could not make or a read that timed out.
+const NPM_UNANSWERED = /^npm (?:ERR!|error) code (?:ETIMEDOUT|ESOCKETTIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|E5\d\d)$/mu;
+const PIP_UNANSWERED = /^WARNING: Retrying \(Retry\([^)]*\)\) after connection broken by '(?:NewConnectionError|ConnectTimeoutError|ReadTimeoutError|ProtocolError)\(/mu;
+const unanswered = text => NPM_UNANSWERED.test(String(text ?? "")) || PIP_UNANSWERED.test(String(text ?? ""));
 
 const named = process.argv.slice(2);
 const unknown = named.filter(n => !Object.hasOwn(REGISTRIES, n));

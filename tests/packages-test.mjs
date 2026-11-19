@@ -243,6 +243,14 @@ try {
   const inPr = { ...env, GITHUB_EVENT_NAME: "pull_request", GITHUB_ENV: jobEnv };
   const mismatched = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: inPr });
   ok(mismatched.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "in a project's pull request an install that fails for anything but the registry not answering fails, and tells the job nothing", `${mismatched.status} ${mismatched.stdout}${mismatched.stderr}`);
+  // (nor where npm's message echoes a network error's name from what the lock file holds, a version here: #714)
+  const echoing = JSON.parse(fs.readFileSync(path.join(root, ".packages/package-lock.json"), "utf8")), y = echoing.packages["node_modules/yaml"];
+  const odd = `${y.version}-${["ETIME", "DOUT"].join("")}`;
+  Object.assign(y, { version: odd, resolved: `https://registry.npmjs.org/yaml/-/yaml-${odd}.tgz` });
+  fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify(echoing, null, 2));
+  fs.writeFileSync(jobEnv, "");
+  const echoed = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: inPr });
+  ok(echoed.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "and one whose message names a network error only as it echoes the lock file fails too, the job told nothing", `${echoed.status} ${echoed.stdout}${echoed.stderr}`);
   // (a registry that does not answer, in a project's pull request, fails nothing: the job is told, and each check after it says it did not run)
   fs.copyFileSync(path.join(root, ".packages/package-lock.json"), path.join(pk, "package-lock.json"));
   const warned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...inPr, [["npm_config_regi", "stry"].join("")]: "http://127.0.0.1:9/", npm_config_fetch_retries: "0", npm_config_cache: path.join(tmp, "empty-cache") } });
