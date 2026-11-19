@@ -5,6 +5,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "marked": "18.2.0",
+    "smol-toml": "1.9.1",
     "yaml": "2.9.1"
   },
   "devDependencies": {
