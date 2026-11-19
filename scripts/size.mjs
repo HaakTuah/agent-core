@@ -239,7 +239,7 @@ function main([flag, baseFile, commentsFile, rightsFile]) {
   if (flag === "--raise") return raise(baseFile, commentsFile, rightsFile);
   const roles = rolesAt();
   if (!roles.length || !fs.existsSync(QUEUE.file)) { console.error(`FAIL: what each role reads at its start cannot be counted: ${roles.length ? QUEUE.file : "roles/"} is not here. Mend: run it from the core's root, where roles/ and ${QUEUE.file} stand, or put back what was moved or taken out`); return 1; }
-  if (flag !== undefined && flag !== "--base") { console.error(`FAIL: ${flag} is no option of this check. Mend: run node scripts/size.mjs, with --base <the pull request's base> on a pull request, or --raise <base> <comments>`); return 1; }
+  if (flag !== undefined && flag !== "--base") { console.error(`FAIL: ${flag} is no option of this check. Mend: run node scripts/size.mjs, with --base <the pull request's base> on a pull request, or --raise <base> <comments> [<rights>]`); return 1; }
   const base = flag === "--base" ? sizesAt(baseFile) : null;
   if (flag === "--base" && base === null) { console.error(`FAIL: git cannot read the base ${baseFile ?? "(none named)"}. Mend: name a revision git holds here (the workflow fetches the merge commit's parents: HEAD^1)`); return 1; }
   const wrong = [], { fail, task } = judged(measured(roles, wrong), base, base ? capsAt(baseFile) : {});
