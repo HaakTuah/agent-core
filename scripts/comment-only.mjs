@@ -1,13 +1,14 @@
 // Is this pull request's change to what runs by itself only comments and steps' names (floor rule 3)? Such a change
 // passes one security review, floor rule 8's, instead of rule 3's two. Its builder runs it from a checkout of the
 // core's `main`, never from the pull request's own copy, which the pull request could change, in the pull request's
-// clone with the head that merges checked out, up to date with `main` (floor rule 12):
+// clone with the head that merges checked out, brought up to date with `main` for it:
 //
 //   node <the core's main>/scripts/comment-only.mjs [<a commit already reviewed>]
 //
 // It reads the head commit, not the working tree, against the merge base with the project's main (fetched), or against
 // the commit given, one before the head that it grew from, for a later commit reviewed only for what it changes (floor
-// rule 8); a head not up to date with main is refused, being no head that merges. It reads every file the pull request
+// rule 8); a head not up to date with main is refused, since it reads the change against main only where the head
+// holds it. It reads every file the pull request
 // changes under .github/ or .claude/ (the folders themselves too, any case, at any depth), and every action.yml, a
 // project's own action: each must be a YAML file changed in place, its mode kept, no link or submodule there on either
 // side, whose two versions differ only in YAML comments, blank lines between entries, and the `name` of a job's steps.
@@ -25,12 +26,13 @@
 // the rest: it exits 0 where there are none, 1 where it refuses, and 2 where others changed, which the session's
 // "Security review:" comment says of, file by file, why each runs neither by itself nor with credentials
 // (tasks/reviews.md, point 3). It prints the head it checked, for that comment and the merge. Git, Node's own modules
-// and the lexer of the YAML package the core carries (third-party/yaml), which says where each token of a line and each
+// and the lexer of the YAML package the core installs from its lock file (packages.mjs; #654), which says where each token of a line and each
 // block scalar's text ends, this proof deciding what it reads (#530); it changes nothing.
 import "./whole-output.mjs";
 import { execFileSync } from "node:child_process";
-import { Lexer } from "../third-party/yaml/dist/index.js";
+import { loadSync } from "./packages.mjs";
 import { started } from "./started.mjs";
+
 
 export const RUNS = /(?:^|\/)(?:\.(?:github|claude)(?:\/|$)|action\.ya?ml$)/iu; // what runs by itself, as far as this proof reads it
 const YAML = /\.ya?ml$/iu;
@@ -52,12 +54,13 @@ const DIRECTIVE = /\b(?:ignore|disable|suppress|skip|allowlist|nosec|noqa|nosemg
 // a plain step's name YAML 1.1 or 1.2 reads as no string
 const NOT_TEXT = /^(?:~|null|true|false|yes|no|on|off|y|n)$/iu;
 
-// The text's tokens as the YAML package the core carries reads them (its lexer, third-party/yaml; #530), each
+// The text's tokens as the YAML package the core installs reads them (its lexer; #530, #654), each
 // { src, at, content }: its text, its offset in the text, and whether it is a block scalar's text, the lines after its
 // header, which hold no YAML. The lexer's own marks, which stand for no text, are left out.
 function tokensOf(text) {
   const out = [];
   let at = 0, marked = false, header = false;
+  const { Lexer } = loadSync("yaml"); // (loaded where it is used: no import of this file needs it)
   for (const src of new Lexer().lex(text)) {
     if (src === "\x02" || src === "\x18") continue; // (a document's start; a [ ] or { } left open, read below)
     if (src === "\x1f") { marked = true; continue; }

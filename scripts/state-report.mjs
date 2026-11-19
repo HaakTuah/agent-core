@@ -5,7 +5,7 @@
 // due (pruning.mjs, beside this file; #303), which rules each role cited in
 // the month before (cited.mjs, beside this file), what the look keeps open past a week, and the step that files a check
 // for each rule the reviews found twice and the step that adds the rounds of review the pull requests took (#477), both
-// read by review-record.mjs. In a project it ends with its counts for the core,
+// read by review-record.mjs, and the step that adds the merge line's measure (merge-line.mjs, beside this file; #702). In a project it ends with its counts for the core,
 // counts and conclusions only: the commit its copy holds and how far behind the core's main that is, the steps of a
 // release not done, and of the pull requests merged the month before, how many were the core's upkeep (core-cost.mjs,
 // beside this file, sorts them). In the core it says that a session adds the projects' part, which --projects prints:
@@ -133,7 +133,9 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
   lines.push("", "**What the reviews found twice**",
     `- Not read by GitHub's job. The session that takes this report runs \`node ${scripts}/review-record.mjs --since ${before(month)}-01\` and, for each rule it lists under "Found twice" that no open issue takes, files an issue as \`${scripts.replace(/scripts$/u, "tasks")}/reviews.md\`, point 8, says.`,
     "", "**The rounds of review**",
-    `- Not read by GitHub's job. The same session adds, as a note, the last two lines that run printed under "Rounds of review": the median over the last 30 merged pull requests beside the last report's, and the five that took the most rounds.`);
+    `- Not read by GitHub's job. The same session adds, as a note, the last two lines that run printed under "Rounds of review": the median over the last 30 merged pull requests beside the last report's, and the five that took the most rounds.`,
+    "", "**The merge line**",
+    `- Not read by GitHub's job, whose token may not read the runs. The same session adds, as a note, the line \`node ${scripts}/merge-line.mjs --repo <this repository> --measure\` prints, the pushes whose checks ran for each merged pull request and the minutes from its turn to its merge, beside the last report's (#702).`);
   if (counts) lines.push("", `**${COUNTS}**`,
     `- copy: ${counts.pin ?? "not read"}${counts.behind === null ? "" : `, ${counts.behind} commits behind the core's main`}.`,
     `- steps not done: ${counts.steps ?? "not read"}.`,
