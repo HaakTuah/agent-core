@@ -337,7 +337,14 @@ export const STAGES = {
     stage: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: echo core/scripts/install.mjs\n      - if: false\n        run: node core/scripts/install.mjs\n      - run: node core/scripts/steps.mjs\n")),
     after: dir => fs.rmSync(at(dir, ".github/workflows/scripts-staged.yml"), { force: true }),
     mend: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\n      - run: node core/scripts/steps.mjs\n")),
+  },  "19 November 2026, the parser's packages installed where the shape check runs": {
+    // (a job of the project's own that runs the shape check after an install that names no lock but the first; the mend
+    // names every one, as the copies check's job does)
+    stage: dir => write(dir, ".github/workflows/shape-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\n      - run: node core/scripts/shape.mjs\n")),
+    after: dir => fs.rmSync(at(dir, ".github/workflows/shape-staged.yml"), { force: true }),
+    mend: dir => write(dir, ".github/workflows/shape-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs all; fi\n      - run: node core/scripts/shape.mjs\n")),
   },
+
   "18 November 2026, the shape check reads C#'s functions on the parser": {
     asked: true,
     // (a baseline written before the check read C# on the parser: that reader's name taken out of "reads")

@@ -570,9 +570,10 @@ repository, the floor, the modules, the scripts and workflows, the starter kit a
 `words/` and `reports/`: the owner's decisions, own words and records, all rights reserved. Both files travel in each
 project's copy under `core/`, and they license the core alone: a project keeps the terms its own owner gives its own work, and nothing here
 adds or changes them (floor rule 10). Nor do they cover the packages of other publishers the scripts run, each under its
-own licence: none is carried, each an entry of `.packages/package-lock.json`, installed from npm's registry into
-`.packages/node_modules/`, which git does not track (`scripts/install.mjs`; #654), and held to floor rule 10's list by
-the core's own licence check, which reads that lock file. Nothing of the core ships, so no project's audit or notices
+own licence: none is carried, each an entry of `.packages/package-lock.json` or the parser's
+`.packages/parser/package-lock.json`, installed from npm's registry into the `node_modules/` beside it, which git does
+not track (`scripts/install.mjs`; #654, #719), and held to floor rule 10's list by the core's own licence check, which
+reads both lock files. Nothing of the core ships, so no project's audit or notices
 file asks for it.
 `NOTICE` names the work, with its other name, which renames nothing, and as the holder the account in the core's
 address, until the core's owner types another name there by hand (floor rule 11).

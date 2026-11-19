@@ -25,7 +25,7 @@ try {
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
   for (const f of ["copies.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
   fs.cpSync(path.join(here, "..", ".packages"), path.join(dir, "core/.packages"), { recursive: true });
-  put("core/.gitignore", "/.packages/node_modules/\n"); // (as the copy holds it: the installed packages are no file of the project's)
+  fs.copyFileSync(path.join(here, "..", ".gitignore"), path.join(dir, "core/.gitignore")); // (the copy's own: the installed packages, each install's, are no file of the project's)
   put("AGENTS.md", `# A project\n\n${SAID}.\n`);
   put("SECURITY.md", "# Security\n\n**3. The protected files,** here, **the rule files:** `docs/a.md`;\n");
   put("docs/a.md", `# Developing\n\n${OTHER}.\n`);

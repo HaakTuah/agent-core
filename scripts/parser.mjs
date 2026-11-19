@@ -1,6 +1,7 @@
 // The parser the core reads other publishers' languages with (CHOICES.md, "one parser, tree-sitter"; #529):
 // web-tree-sitter, and one grammar for each language a reader built on it reads, each a package of the core's lock file
-// at one exact version, installed from the registry into .packages/node_modules/ (install.mjs, packages.mjs; #654). Each
+// at one exact version in the parser's own lock file, installed from the registry into .packages/parser/node_modules/ only
+// where a job names it (install.mjs parser, or all; packages.mjs; #654, #719). Each
 // file is read from there and handed to the parser as bytes, so nothing is fetched or built while a file is read.
 // A grammar comes only with the reader that needs it: C#'s, for the functions the shape check's reader of C# finds
 // (csharp-functions.mjs).
