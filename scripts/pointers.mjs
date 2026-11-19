@@ -15,7 +15,8 @@
 //   ("Section"), point 6       with no file: the file the pointer is in; a lone point: its own section's list
 //   floor rule 3               a rule of the floor, by its bold number in any of the floor's files (floor rules 3 and 10
 //                              too); in the floor's own files, a lone rule is the floor's
-//   core archive 134           an item of the core's archive, by its number in its item files (134 and 138, 118 to 120)
+//   core archive 134           an item of the core's archive, by its key in its item files (134 and 138, 118 to 120; an
+//                              item keyed by its issue, #744 or #733.1, since #744)
 // A run of these joined only by a comma, "and", "in", "of" or an opening bracket is one pointer: one file, its sections
 // and its points; a floor rule and an archive item stand alone. One of those two that leads nowhere fails the core's
 // own run, and is listed in a project's, so that a sync never fails a project's check over a citation of its own
@@ -83,7 +84,7 @@ const plain = s => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g
 // manifest names (core-path.mjs)
 const HOME = CORE ? "" : corePath(".") || "core/";
 const FLOOR = tracked.filter(f => f.startsWith(`${HOME}floor/`) && f.endsWith(".md"));
-const ITEMS = tracked.filter(f => new RegExp(`^${HOME}archive/instructions/items-\\d+\\.md$`).test(f));
+const ITEMS = tracked.filter(f => new RegExp(`^${HOME}archive/instructions/(?:items|issue)-\\d+\\.md$`).test(f));
 
 // A file's anchors: its headings and bold lead-ins, as Markdown reads them (markdown.mjs), each with the lines it spans
 // (to the next heading of its level or above), its blocks, and its lines, where its numbered points are read (a list
@@ -127,10 +128,11 @@ const hasPoint = (file, from, to, n) => parse(file).lines.slice(from, to).some(l
 
 // The atoms of a block (a paragraph or a list item, its lines joined): files, quoted titles and numbered points.
 // (a range written backwards is kept as written, so it leads nowhere and is named)
-const numbers = text => text.split(/, | and | or /).flatMap(s => s.includes(' to ') ? (([a, b]) => b < a ? [s] : Array.from({ length: b - a + 1 }, (_, k) => a + k))(s.split(' to ').map(Number)) : [Number(s)]);
+// (an archive item keyed by its issue, "#744" or "#733.1", is kept as written)
+const numbers = text => text.split(/, | and | or /).flatMap(s => s.startsWith('#') ? [s] : s.includes(' to ') ? (([a, b]) => b < a ? [s] : Array.from({ length: b - a + 1 }, (_, k) => a + k))(s.split(' to ').map(Number)) : [Number(s)]);
 function atoms(text) {
   const out = [];
-  const re = /\b[Ff]loor (rules?) (\d+(?:(?:, | and | to | or )\d+)*)\b|\b[Cc]ore archive (\d+(?:(?:, | and | to | or )\d+)*)\b|`([^`\s]+)`|"([A-Z][^"]{1,60})"|“([A-Z][^”]{1,60})”|\b(rules?|points?) (\d+(?:(?:, | and | to | or )\d+)*)\b/g;
+  const re = /\b[Ff]loor (rules?) (\d+(?:(?:, | and | to | or )\d+)*)\b|\b[Cc]ore archive ((?:#\d+(?:\.\d+)?|\d+)(?:(?:, | and | to | or )(?:#\d+(?:\.\d+)?|\d+))*)\b|`([^`\s]+)`|"([A-Z][^"]{1,60})"|“([A-Z][^”]{1,60})”|\b(rules?|points?) (\d+(?:(?:, | and | to | or )\d+)*)\b/g;
   for (const m0 of text.matchAll(re)) {
     const at = { start: m0.index, end: m0.index + m0[0].length };
     if (m0[2] !== undefined) { out.push({ ...at, floor: numbers(m0[2]), word: `floor ${m0[1]}` }); continue; }
