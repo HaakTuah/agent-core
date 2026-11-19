@@ -162,7 +162,7 @@ export function policy(config = {}) {
  * needed. AND and OR mixed without brackets (which SPDX reads with AND first, a reader perhaps not), an exception
  * (WITH) or anything unreadable is refused: a blank but a space within it, a character beyond printable ASCII, or a
  * WITH with no exception's name after it. A space, a tab or a line's end at its ends is read past, as before, so that
- * no lock file's field written with one newly fails. scripts/readers-test.mjs, in the core's own tests, holds it to SPDX's own parser.
+ * no lock file's field written with one newly fails. tests/readers-test.mjs, in the core's own tests, holds it to SPDX's own parser.
  */
 export function licenceOk(expression, allow) {
   if (typeof expression !== "string") return false;
@@ -205,10 +205,15 @@ export function licenceOk(expression, allow) {
   }
 }
 
-/** The package a registry tarball address names (`https://registry.npmjs.org/<name>/-/<file>.tgz`), or undefined. */
+/** The package a registry tarball address names (`https://registry.npmjs.org/<name>/-/<file>.tgz`), or undefined: only
+ *  an address in its one plain form, which a URL parser reads as it is written, and a name of the characters npm's
+ *  names are spelled in, never starting with a dot or an underscore, so the name read is the package the address
+ *  fetches. The pattern alone refuses every address a URL parser would rewrite; the parser's own reading is asked as
+ *  well, so that a change to the pattern cannot let one through. */
 export function registryName(resolved) {
-  const match = /^https:\/\/registry\.npmjs\.org\/((?:@[^/]+\/)?[^/@]+)\/-\/[^/]+\.tgz$/u.exec(resolved ?? "");
-  return match?.[1];
+  const match = /^https:\/\/registry\.npmjs\.org\/((?:@[A-Za-z0-9~-][\w.~-]*\/)?[A-Za-z0-9~-][\w.~-]*)\/-\/[A-Za-z0-9~-][\w.~+-]*\.tgz$/u.exec(resolved ?? "");
+  if (!match) return undefined;
+  try { return new URL(resolved).href === resolved ? match[1] : undefined; } catch { return undefined; }
 }
 
 /** The version a registry tarball address names (`.../-/<name>-<version>.tgz`, the name without its scope), or undefined. */
@@ -250,6 +255,13 @@ export function shippedPaths(packages, workspaces, manifest) {
   return seen;
 }
 
+// The lines of an `.npmrc` as npm reads them: split at each line feed and each carriage return, alone or together,
+// after a leading byte-order mark. A line that holds a line or paragraph separator reads otherwise to npm than to the
+// patterns below, so it is never one of the settings they vouch for: listed, and never counted as set. Every other
+// space npm trims as they do, so a line that holds neither separator nor a lone carriage return reads as before.
+const npmrcLines = (npmrc) => npmrc.replace(/^\uFEFF/u, "").split(/[\r\n]+/u);
+const plain = (line) => !/[\u2028\u2029]/u.test(line);
+
 /**
  * The lines of an `.npmrc` that are not one of a few settings known to leave where npm fetches from alone: npm reads
  * keys in many spellings (quoted, scoped, from variables), so anything else, a registry or `replace-registry-host` above
@@ -257,18 +269,18 @@ export function shippedPaths(packages, workspaces, manifest) {
  */
 export function registryOverrides(npmrc) {
   const harmless = /^((fund|audit|update-notifier|engine-strict|save-exact|progress|loglevel)\s*=\s*[\w.-]*|ignore-scripts\s*=\s*true|min-release-age\s*=\s*\d{1,5})$/u;
-  return npmrc.split(/\r?\n/u).map((l) => l.trim()).filter((l) => l && !/^[#;]/u.test(l) && !harmless.test(l));
+  return npmrcLines(npmrc).filter((l) => l.trim() && !/^[#;]/u.test(l.trim()) && !(plain(l) && harmless.test(l.trim()))).map((l) => l.trim());
 }
 
 /** Whether an `.npmrc` keeps packages' own install scripts off (floor rule 15): `ignore-scripts=true`, never undone. */
 export function scriptsOff(npmrc) {
-  return npmrc.split(/\r?\n/u).some((l) => /^ignore-scripts\s*=\s*true$/u.test(l.trim()));
+  return npmrcLines(npmrc).some((l) => plain(l) && /^ignore-scripts\s*=\s*true$/u.test(l.trim()));
 }
 
 /** The week's wait an `.npmrc` sets (floor rule 7: a new release is taken once it is WAIT days old): the days its last
  *  `min-release-age` line gives, which npm reads from version 11.10 on, or null where it gives none. */
 export function releaseAge(npmrc) {
-  const days = npmrc.split(/\r?\n/u).map((l) => /^min-release-age\s*=\s*(\d{1,5})$/u.exec(l.trim())?.[1]).filter(Boolean).at(-1);
+  const days = npmrcLines(npmrc).map((l) => (plain(l) ? /^min-release-age\s*=\s*(\d{1,5})$/u.exec(l.trim())?.[1] : undefined)).filter(Boolean).at(-1);
   return days === undefined ? null : Number(days);
 }
 export const WAIT = 7;

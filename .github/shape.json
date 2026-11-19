@@ -1,18 +1,19 @@
 {
   "baseline": ".github/shape-baseline.json",
   "code": ["scripts"],
-  "tests": ["scripts/*-test.mjs"],
+  "tests": ["tests/*-test.mjs"],
   "select": {
-    "whole": ["scripts/init-test.mjs", "scripts/init-dotnet-test.mjs", "scripts/upgrade-test.mjs", "scripts/staged-test.mjs", "scripts/core-yml-test.mjs", "scripts/pure-sync-test.mjs", "scripts/copy-tree-test.mjs"],
+    "whole": ["tests/init-test.mjs", "tests/init-dotnet-test.mjs", "tests/upgrade-test.mjs", "tests/staged-test.mjs", "tests/core-yml-test.mjs", "tests/pure-sync-test.mjs", "tests/copy-tree-test.mjs"],
     "none": ["QUEUE.md", "archive/", ":(glob)reports/*.md"]
   },
   "wait": 1200,
   "systems": {
-    "tools": { "domain": "tools", "paths": ["scripts/"] }
+    "tools": { "domain": "tools", "paths": ["scripts/", "tests/"] }
   },
   "suites": {
     "suites-kit-core-licences": { "linux": 240 },
     "suites": { "linux": 240 },
+    "suites-rest-steps": { "linux": 240 },
     "suites-projects": { "win32": 600 },
     "suites-sync": { "win32": 300 },
     "suites-kit": { "win32": 600 },
@@ -20,6 +21,7 @@
     "suites-core-places": { "win32": 450 },
     "suites-licences": { "win32": 450 },
     "suites-rest": { "win32": 480 },
+    "suites-tools": { "win32": 450 },
     "upgrade": { "linux": 240, "win32": 700 },
     "staged": { "linux": 240, "win32": 900 }
   }
