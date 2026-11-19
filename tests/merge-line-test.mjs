@@ -77,7 +77,7 @@ ok(/merges on its own green checks/.test(follows(f)) && /nothing to act on/.test
 f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: null, classic: null }) });
 ok(/was not read, so the line is kept/.test(follows(f)) && !/needs-owner/.test(follows(f)), "users get a release, and the host's rules cannot be read: the line is kept, no advice", follows(f));
 ok(facts({ repo: "o/n", manifest: "| *users get* | `sometimes` |\n", gh: host({ rules: strict }) }).users === "merges", "a row *users get* with no value it takes is read as each merge");
-// The default branch's newest commit, read where users get a release: a failed check stops every merge but the fix.
+// The default branch's newest commit, read in every project: a failed check stops every merge but the fix.
 const runsOf = (...rs) => ({ total_count: rs.length, workflow_runs: rs.map(([conclusion, status = "completed"]) => ({ name: "tests", path: ".github/workflows/tests.yml", status, conclusion })) });
 f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: [], newest: runsOf(["success"]) }) });
 ok(f.newest.state === "passed" && /cccccc.: its checks all passed/.test(f.said.at(-1)) && !/auto-merge off/.test(follows(f)), "the newest commit passed: merging goes on", f.said.at(-1));
@@ -87,7 +87,8 @@ f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: [], newest: runsO
 ok(f.newest.state === "failed" && /a check failed \(tests: failure\)/.test(f.said.at(-1)) && /no pull request but its fix merges/.test(follows(f)) && /auto-merge off on every other open pull request/.test(follows(f)), "a failed check: no pull request but its fix merges, auto-merge turned off on the others", follows(f));
 f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: [], newest: "not json" }) });
 ok(f.newest.state === null && /read them before a merge/.test(follows(f)), "checks that cannot be read are said so, and read before a merge", follows(f));
-ok(facts({ repo: "o/n", gh: host({ rules: [], newest: runsOf(["failure"]) }) }).newest === null, "where users get each merge, the newest commit is not read here");
+f = facts({ repo: "o/n", gh: host({ rules: [], newest: runsOf(["failure"]) }) });
+ok(f.users === "merges" && f.newest.state === "failed" && /published on a merge alone/.test(follows(f)) && /no pull request but its fix merges/.test(follows(f)) && /auto-merge off on every other open pull request/.test(follows(f)), "where users get each merge, a failed check on the newest commit stops every merge but the fix all the same", follows(f));
 // The core's own row, read from its AGENTS.md where no manifest stands.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "merge-line-core-"));
 fs.mkdirSync(path.join(root, "scripts"));

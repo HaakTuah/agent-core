@@ -71,7 +71,8 @@ function queueOf(r, queued, gh) {
   return { queue, said: `its merge queue: ${what}, ${why}` };
 }
 
-// Where users get a release: whether the checks of the default branch's newest commit all passed, as the host lists
+// Whether the checks of the default branch's newest commit all passed (floor rule 12: a red one is fixed first, in every
+// project), as the host lists
 // the runs its push started (held, in releases.mjs, as a release reads them): { sha, state ("passed", "running",
 // "failed" or null where it could not be read), said }. A run still going is "running"; any other reason "failed".
 function newestOf(repo, branch, gh) {
@@ -96,7 +97,7 @@ export function facts({ repo, manifest = null, gh = ghApi }) {
   const billedOver = override(manifest, "billed minutes", ["yes", "no"]);
   const billedRead = r.private === true ? "yes, the repository being private" : "no, the repository being public";
   const users = override(manifest, "users get", ["merges", "releases"]);
-  const newest = users === "releases" ? newestOf(repo, branch, gh) : null;
+  const newest = newestOf(repo, branch, gh);
   const said = [up.said,
     queueOver ? `its merge queue: ${queueOver}, as the manifest's row *merge queue* says (read: ${q.queue ?? "not read"})` : q.said,
     billedOver ? `its runner minutes billed: ${billedOver}, as the manifest's row *billed minutes* says (read: ${billedRead})` : `its runner minutes billed: ${billedRead}`,
@@ -107,16 +108,16 @@ export function facts({ repo, manifest = null, gh = ghApi }) {
 
 // What follows from the facts, as tasks/hosts.md says: who keeps the line, and the one line of advice to the owner.
 export function follows(f) {
+  const red = f.newest?.state === "failed" ? " The default branch's newest commit has a failed check: no pull request but its fix merges. Turn auto-merge off on every other open pull request (the core's tasks/github-calls.md), and give the fix the first lane, or take it as a bug where no open pull request says it fixes it." : f.newest?.state === null ? " Whether the default branch's newest commit's checks passed could not be read: read them before a merge." : "";
   if (f.users === "releases") {
-    const own = "Its users get a release: a pull request merges on its own green checks, up to date or not, while no check on the default branch's newest commit failed (floor rule 12; the core's tasks/hosts.md)."
-      + (f.newest?.state === "failed" ? " That commit has a failed check: no pull request but its fix merges. Turn auto-merge off on every other open pull request (the core's tasks/github-calls.md), and give the fix the first lane, or take it as a bug where no open pull request says it fixes it." : f.newest?.state === null ? " Whether that commit's checks passed could not be read: read them before a merge." : "");
+    const own = "Its users get a release: a pull request merges on its own green checks, up to date or not, while no check on the default branch's newest commit failed (floor rule 12; the core's tasks/hosts.md)." + red;
     if (f.upToDate === false) return `${own} No up-to-date branch is asked: the line has nothing to act on.`;
     if (f.upToDate === null) return `${own} Whether the host asks an up-to-date branch was not read, so the line is kept by hand meanwhile, as the core's roles/shared/work-flow.md says.`;
     return `${own} The host still asks an up-to-date branch, a setting of the default branch's rules only the owner changes: where no open issue names it, file one for the owner, labelled needs-owner, to switch it off, and nothing waits on it. Until then the line is kept${f.queue === "on" ? " by the host's merge queue" : " by hand, as the core's roles/shared/work-flow.md says"}.`;
   }
   // (where users get each merge, its publishing waits on no green branch yet: the step of the sync notes makes it, and
-  // the row *users get* then says releases; #733, point 8)
-  const pub = "Its users get each merge, published on a merge alone: a pull request is brought up to date first, until its agents make its publishing wait on a green default branch, a step of the core's sync notes, and the manifest's row *users get* then says `releases` (floor rule 12; the core's tasks/hosts.md).";
+  // the row *users get* then says releases; #733, point 8; a red default branch is fixed first all the same)
+  const pub = "Its users get each merge, published on a merge alone: a pull request is brought up to date first, until its agents make its publishing wait on a green default branch, a step of the core's sync notes, and the manifest's row *users get* then says `releases` (floor rule 12; the core's tasks/hosts.md)." + red;
   if (f.upToDate === false) return `${pub} No up-to-date branch is asked before a merge: the line has nothing to act on, and nothing waits.`;
   if (f.queue === "on") return `${pub} The host's merge queue keeps the line: bringing branches up to date by hand has nothing to act on.`;
   const line = `${pub} The line is kept by hand, as the core's roles/shared/work-flow.md says: only the first ready pull request is brought up to date.`;
