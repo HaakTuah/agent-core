@@ -239,6 +239,12 @@ try {
   fs.writeFileSync(path.join(pp, "package.json"), keptList);
   fs.writeFileSync(path.join(pp, "package-lock.json"), keptLock);
   ok(empty.status === 0 && /parser\/package-lock\.json names no package: nothing to install/u.test(empty.stdout) && !fs.existsSync(path.join(pp, "node_modules")), "an install whose lock file names no package starts no npm, and says so", `${empty.stdout}${empty.stderr}`);
+  // (but a lock whose root and package list name a package it holds no entry for is no empty one: npm runs, and refuses it,
+  // so an install left from before is never taken as current)
+  fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license, dependencies: parserList.dependencies } } }, null, 2));
+  const unentered = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
+  fs.writeFileSync(path.join(pp, "package-lock.json"), keptLock);
+  ok(unentered.status === 1 && !/nothing to install/u.test(unentered.stdout) && mended(unentered.stderr), "and a lock whose root names a package it holds no entry for is no empty one: npm is run, and the install fails, saying the mend", `${unentered.status} ${unentered.stdout}${unentered.stderr}`);
   // (an install npm recorded for another lock file is no install of this one: the package did not run)
   const record = path.join(pk, "node_modules/.package-lock.json"), kept = fs.readFileSync(record, "utf8");
   const other = JSON.parse(kept);

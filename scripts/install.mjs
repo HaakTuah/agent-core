@@ -90,9 +90,12 @@ for (const name of named.length ? named : [first]) {
   if (!fs.existsSync(path.join(root, lock))) continue; // (a copy whose core holds no lock file of this registry)
   const refused = refusal(name);
   if (refused) { console.error(`FAIL: the core's packages were not installed: ${refused}`); process.exit(1); }
-  // (a lock file that names no package has nothing to install, and npm is not started for it: the parser's, until its
-  // packages move in, which every job that names `all` would otherwise pay a run of npm for; #719)
-  if (Object.keys(JSON.parse(fs.readFileSync(path.join(root, lock), "utf8")).packages ?? {}).every(k => !k)) { console.log(`ok   ${lock} names no package: nothing to install`); continue; }
+  // (a lock file that names no package, neither as an entry nor in its root's lists, which refusal() holds to the package
+  // list's, has nothing to install, and npm is not started for it: the parser's, until its packages move in, which
+  // every job that names `all` would otherwise pay a run of npm for; a lock whose root names a package it holds no entry
+  // for goes to npm, which refuses it; #719)
+  const { packages: entries = {} } = JSON.parse(fs.readFileSync(path.join(root, lock), "utf8"));
+  if (Object.keys(entries).every(k => !k) && !Object.keys({ ...entries[""]?.dependencies, ...entries[""]?.devDependencies }).length) { console.log(`ok   ${lock} names no package: nothing to install`); continue; }
   const began = Date.now();
   let r = run();
   if (r.status !== 0) {
