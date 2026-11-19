@@ -179,10 +179,12 @@ The index, and how an item is written: `archive/instructions.md`.
      happens to read it. The owner agreed to it in a chat session, as the third of three ways to gain on what the
      core already has. It stands behind "The audit's reader has a fixed brief and fixed questions" in
      `tasks/cleaning.md`.
-263. **19 November 2026**, #750, point 1, its queue's part. A line of the core's queue no longer leaves in the pull
-     request that closes its issue: the readers of the queue skip the line of a closed issue, and the next pull request
-     that changes the queue takes such lines out together. Of the 39 pull requests merged between 18 and 19 November,
-     12 changed `QUEUE.md`, and under merge-on-green pull requests that change the same file merge side by side and
-     collide. The owner agreed to the issue's seven points, found by an audit of those pull requests, and asked that
-     they be a priority. It stands behind "An idea is built only from a line, and a line joins in a PR of its own" in
-     `AGENTS.md`.
+263. **19 November 2026**, #750, point 1, its part on the *progress file*. A line of the core's queue, and of a
+     project's progress file, no longer leaves in the pull request that closes its issue: the readers of the file skip
+     the line of a closed issue, and the next pull request that changes the file takes such lines out together. Of the
+     core's 39 pull requests merged between 18 and 19 November, 12 changed `QUEUE.md`; in the owner's two games, 55 of
+     255 commits since 1 November touched one's progress file and 90 of 326 the other's; and under merge-on-green pull
+     requests that change the same file merge side by side and collide. The owner agreed to the issue's seven points,
+     and to point 1's widening to every project, and asked that they be a priority. It stands behind "An idea is built
+     only from a line, and a line joins in a PR of its own" in `AGENTS.md` and "The *progress file* holds order only" in
+     `roles/shared/inbox.md`.

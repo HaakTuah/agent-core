@@ -1,32 +1,37 @@
-// The core's queue (QUEUE.md; AGENTS.md, "The queue"), read as its readers read it: its lines in order, a line whose
-// issue has closed skipped, since a line no longer leaves in the pull request that closes its issue, where pull
-// requests merging side by side collided on the one file, and the next pull request that changes the queue clears
-// such lines together (#750, point 1). A line is a row of the table whose first cell names its issue first ("#n");
-// what it waits on is its last cell, and an issue or pull request named there that has closed is waited on no more.
-// This repository only; no project calls it. Reads the issues through gh (GITHUB_REPOSITORY and GH_TOKEN where GitHub's
-// job sets them; else the core's own address and gh's sign-in); writes QUEUE.md with --clear alone.
+// The *progress file* (in the core, QUEUE.md; AGENTS.md, "The queue"; in a project, the file its manifest's slot
+// names: roles/shared/inbox.md, "The progress file holds order only"), read as its readers read it: its lines in order,
+// a line whose issue has closed skipped, since a line no longer leaves in the pull request that closes its issue,
+// where pull requests merging side by side collided on the one file, and the next pull request that changes the file
+// clears such lines together (#750, point 1). A line is a row of a table or an item of a list that names its issue
+// first ("#n"); what it waits on is a row's last cell, or what an item names after "waits on", and an issue or pull
+// request named there that has closed is waited on no more. Reads the issues through gh (GITHUB_REPOSITORY and
+// GH_TOKEN where GitHub's job sets them; else the repository origin names, or, in the core, its own address, and gh's
+// sign-in); writes the progress file with --clear alone.
 //
-//   node scripts/queue.mjs           the open lines in order, and the next: the first that waits on nothing open
-//   node scripts/queue.mjs --clear   takes out the line of each closed issue, in the pull request that changes the queue
-//   node scripts/queue.mjs --check   on a pull request that changes the queue: fails where a line of a closed issue
-//                                    stands, saying the mend (own-description.yml runs it)
+//   node core/scripts/queue.mjs           the open lines in order, and the next: the first that waits on nothing open
+//   node core/scripts/queue.mjs --clear   takes out the line of each closed issue, in the pull request that changes
+//                                         the file
+//   node core/scripts/queue.mjs --check   on a pull request that changes the file: fails where a line of a closed issue
+//                                         stands, saying the mend (in the core, own-description.yml runs it)
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { CORE } from "./core-address.mjs";
+import { progressOf } from "./done-when.mjs";
+import { repoOf } from "./inbox.mjs";
 import { started } from "./started.mjs";
 
 export const FILE = "QUEUE.md";
-const ROW = /^\|\s*#(\d+)\b[^|]*\|/u;
+const ROW = /^\|\s*#(\d+)\b[^|]*\|/u, ITEM = /^\s*[-*]\s+(?:\[[ xX]\]\s+)?#(\d+)\b/u;
 
 // The lines of a queue's text, in order: { at, text, issue, waits }, `at` its index among the text's lines, `waits`
 // the numbers its last cell names.
 export function linesOf(text) {
   return String(text ?? "").split("\n").map((line, at) => {
-    const m = ROW.exec(line);
-    if (!m) return null;
-    const cells = line.replace(/\r$/u, "").split("|").slice(1, -1);
-    const waits = [...String(cells.at(-1) ?? "").matchAll(/#(\d+)\b/gu)].map(w => Number(w[1]));
-    return { at, text: line, issue: Number(m[1]), waits, words: String(cells.at(-1) ?? "").trim() };
+    const row = ROW.exec(line), item = row ? null : ITEM.exec(line);
+    if (!row && !item) return null;
+    const plain = line.replace(/\r$/u, ""), words = (row ? plain.split("|").slice(1, -1).at(-1) ?? "" : /\bwaits on\b(.*)$/iu.exec(plain)?.[1] ?? "").trim();
+    const waits = [...words.matchAll(/#(\d+)\b/gu)].map(w => Number(w[1]));
+    return { at, text: line, issue: Number((row ?? item)[1]), waits, words };
   }).filter(Boolean);
 }
 
@@ -60,10 +65,10 @@ export function statesOf(numbers, repo, gh = route => {
 // the queue's text or null, write(text), closed(numbers) a reader of each one's state, which throws where GitHub
 // cannot answer }.
 export function command(flag, at) {
-  const out = [], said = (status, ...lines) => ({ status, out: [...out, ...lines].join("\n") });
+  const out = [], said = (status, ...lines) => ({ status, out: [...out, ...lines].join("\n") }), FILE = at.file ?? "QUEUE.md";
   if (flag !== undefined && !["--clear", "--check"].includes(flag)) return said(1, `FAIL: ${flag} is no option of this script. Mend: run node scripts/queue.mjs, with --clear or --check, or with nothing`);
   const text = at.read();
-  if (text === null) return said(1, `FAIL: ${FILE} is not here. Mend: run it from the core's root`);
+  if (text === null) return said(1, `FAIL: ${FILE} is not here. Mend: run it from the repository's root, where the progress file its manifest names stands (in the core, QUEUE.md)`);
   const lines = linesOf(text);
   let closed;
   try { closed = at.closed(lines.flatMap(l => [l.issue, ...l.waits])); } catch (e) { return said(1, `FAIL: the issues the queue names could not be read: ${e.message}. Mend: run it again; where gh is not signed in, sign it in, or set GH_TOKEN`); }
@@ -73,16 +78,22 @@ export function command(flag, at) {
     return said(0, gone.length ? `${FILE}: took out the lines of ${named}, closed` : `${FILE}: no line of a closed issue`);
   }
   if (flag === "--check") {
-    if (gone.length) return said(1, `FAIL: ${FILE} holds the line of ${gone.length === 1 ? "an issue" : "issues"} closed: ${named}, and this pull request changes the queue. Mend: run node scripts/queue.mjs --clear and commit ${FILE}`);
+    if (gone.length) return said(1, `FAIL: ${FILE} holds the line of ${gone.length === 1 ? "an issue" : "issues"} closed: ${named}, and this pull request changes the queue. Mend: run node ${at.file ? "core/" : ""}scripts/queue.mjs --clear and commit ${FILE}`);
     return said(0, `ok   ${FILE} holds no line of a closed issue`);
   }
   out.push(...open.map(l => l.text));
   return said(0, `${open.length} open lines${gone.length ? `, ${gone.length} of closed issues skipped (${named}), which the next pull request that changes the queue takes out` : ""}`, next ? `next: #${next.issue}` : "next: none waits on nothing open");
 }
 
+// The progress file where the command runs: a project's, as its manifest names it; the core's own where none stands.
+export const fileAt = manifest => (manifest === null ? FILE : progressOf(manifest));
+
 function main([flag]) {
-  const repo = /^[\w.-]+\/[\w.-]+$/u.test(process.env.GITHUB_REPOSITORY ?? "") ? process.env.GITHUB_REPOSITORY : CORE;
-  const { status, out } = command(flag, { read: () => (fs.existsSync(FILE) ? fs.readFileSync(FILE, "utf8") : null), write: text => fs.writeFileSync(FILE, text), closed: numbers => statesOf(numbers, repo) });
+  const manifest = fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null, file = fileAt(manifest);
+  const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout;
+  const repo = /^[\w.-]+\/[\w.-]+$/u.test(process.env.GITHUB_REPOSITORY ?? "") ? process.env.GITHUB_REPOSITORY : repoOf(origin) ?? (manifest === null ? CORE : null);
+  if (repo === null) { console.error("FAIL: which repository on GitHub this is cannot be told: its origin is no address on github.com. Mend: set GITHUB_REPOSITORY to its owner/name, and run it again"); return 1; }
+  const { status, out } = command(flag, { file, read: () => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null), write: text => fs.writeFileSync(file, text), closed: numbers => statesOf(numbers, repo) });
   (status ? console.error : console.log)(out);
   return status;
 }

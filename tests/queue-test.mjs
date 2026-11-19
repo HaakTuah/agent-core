@@ -1,10 +1,10 @@
 // Tests of the queue's reader (scripts/queue.mjs; AGENTS.md, "The queue"; #750, point 1): a line whose issue has
 // closed is skipped, waited on no more, cleared together by the next pull request that changes the queue, and fails
-// that pull request while it stands. Node's own modules only; GitHub and the file stand in as functions.
+// that pull request while it stands; a project's progress file, a list, read the same way. Node's own modules only; GitHub and the file stand in as functions.
 //
 //   node tests/queue-test.mjs
 import { mended } from "../scripts/mend.mjs";
-import { cleared, command, linesOf, read, statesOf } from "../scripts/queue.mjs";
+import { cleared, command, fileAt, linesOf, read, statesOf } from "../scripts/queue.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -19,6 +19,13 @@ const queue = [
   "",
 ].join("\n");
 const shut = new Set([10, 9]), closed = n => shut.has(n);
+// a project's progress file, a list (#750, point 1, in every project)
+const list = "# Progress\n\n- #20 the menu, builder\n- [ ] #21 sound, waits on #20 and #9\n  - a note under it\n* #22 the save, waits on the owner's word\nNot a line: #23\n";
+const items = linesOf(list);
+ok(items.map(l => l.issue).join() === "20,21,22" && items[1].waits.join() === "20,9" && items[0].waits.length === 0 && items[2].words === "the owner's word", "in a list, an item that names its issue first is a line, what it waits on read after \"waits on\"");
+ok(read(list, n => n === 20 || n === 9).next?.issue === 21 && cleared(list, n => n === 20) === list.replace("- #20 the menu, builder\n", ""), "a list is read and cleared as the core's table is");
+ok(fileAt(null) === "QUEUE.md" && fileAt("| *progress file* | `docs/PLAN.md` |\n") === "docs/PLAN.md" && fileAt("no slot\n") === "docs/PROGRESS.md", "the progress file is the core's queue, or the one a project's manifest names, else the starter kit's");
+
 
 const lines = linesOf(queue);
 ok(lines.map(l => l.issue).join() === "10,11,12,13,14" && lines[1].waits.join() === "10" && lines[2].waits.join() === "9,13" && lines[0].waits.length === 0 && lines[4].words === "on hold", "each row of the table is a line, its issue the first it names, what it waits on read from its last cell");
