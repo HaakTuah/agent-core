@@ -13,7 +13,11 @@ one declared entrance.
 
 - **Never worse.** By default a pull request that adds a breach of a rule below fails, in every project, and its
   session mends it there. What stood before the check read it is listed in the check's baseline and never fails: a
-  listed function may shrink and may not grow, and a listed import may go. The baseline shrinks freely (`--write`). An
+  listed function may shrink and may not grow, and a listed import may go. The baseline shrinks freely
+  (`--write`): a pull request that only improves on it passes, never one that makes anything worse, the check
+  printing what the lowered baseline leaves out, which the next pull request that changes the baseline, or a
+  cleaning task, writes whole (#750, point 5), since improving pull requests that each rewrote the one baseline
+  collided; the cost is that, until it is written, a later change could slip back to the old level unseen. An
   entry joins it in two cases only: the check reads more than it did (a system named, a mark lowered, the first
   baseline), where the base branch held the breach already; or there was no other way, where the baseline gives the
   entry's reason under "grown", the pull request gives it too, and a fresh session says there that it found no other
@@ -143,12 +147,12 @@ one declared entrance.
 the audit's reader judges the others. The time a user waits on gets its own measure as its rule comes (#318).
 
 **What the check reads.** JavaScript and TypeScript, JSX among them, C# and Python, each by a reader of its own
-(`core/scripts/shape-readers.mjs`), the functions of each but Python by the parser the core installs; in C# what a file
+(`core/scripts/shape-readers.mjs`), the functions of each by the parser the core installs; in C# what a file
 takes from another is read from its using directives alone. Of scripts that share one global space (no import, no
 export), it holds that each file adds at most one name there and no two declare the same. It never runs the code it
 reads, and never guesses: an import that leads nowhere it can tell and a file in another language are counted and said
-on every run, never failed; a file of JavaScript, TypeScript or C# its grammar cannot read whole, and one of them past 2
-MB, is counted and said too, and one a pull request adds fails, saying its mend; the audit's reader holds all that code
-to these rules. A baseline names the readers whose finds it lists, so a reader that comes later turns nothing red: what
+on every run, never failed; a file of JavaScript, TypeScript, C# or Python its grammar cannot read whole, and one of
+them past 2 MB, is counted and said too, and one a pull request adds fails, saying its mend; the audit's reader holds
+all that code to these rules. A baseline names the readers whose finds it lists, so a reader that comes later turns nothing red: what
 stood is said until `--write` lists it. A project that has not written its config yet is held to the starter kit's own,
 with each pull request's base as its baseline, from the sync that brings the check.

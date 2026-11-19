@@ -92,7 +92,7 @@ ok(!redBody([job("x`\n@team", "failure")], "ma`in").includes("\n@team") && redBo
 // ---- the idle list ----
 const lane = (number, draft, checks, waited, bodyText, labels = []) => ({ number, draft, checks, waited, body: bodyText, labels });
 const idle = idleBody([
-  lane(1, false, "red", 30, "x\n\nWaits on: a review\n"),
+  lane(1, false, "red", 30, "x\n\nHand-off: done a; tried b; next c; check d\nWaits on: a review\n"),
   lane(2, true, "green", 5, "x"),
   lane(3, true, "red", 50, "Waits on: the owner: may the old saves go?"),
   lane(4, false, "green", 8, "Waits on: soon", ["needs-owner"]),
@@ -100,8 +100,8 @@ const idle = idleBody([
 ], 3);
 const lines = idle.split("\n").filter(l => l.startsWith("- #"));
 ok(lines.map(l => l.slice(3, 4)).join() === "5,2,3,1,4", "drafts with green checks first, longest idle first; then the rest, longest idle first", lines.join("\n"));
-ok(lines[1] === "- #2 (draft, checks green): says nothing of what it waits on; 5.0 h since its last push." && lines[3].includes("(ready, checks red): waits on `a review`; 30.0 h"),
-  "each says draft or ready, its checks, what it waits on and how long", lines.join("\n"));
+ok(lines[1] === "- #2 (draft, checks green): says nothing of what it waits on; 5.0 h since its last push; no hand-off note." && lines[3].endsWith("(ready, checks red): waits on `a review`; 30.0 h since its last push."),
+  "each says draft or ready, its checks, what it waits on and how long, and that it has no hand-off note where its description holds none (#306)", lines.join("\n"));
 ok(lines[2].endsWith("; to label needs-owner.") && lines[4].includes("its line `Waits on: soon` is in none of the forms") && lines[4].endsWith("; to take needs-owner off, or say the owner's question in its line."),
   "where its line and the label needs-owner disagree, the mend; a line in none of the forms is named so", lines.join("\n"));
 ok(!/\u001b/.test(idle), "no control character of a description reaches the issue");

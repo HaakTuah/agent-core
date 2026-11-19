@@ -7,7 +7,7 @@ sessions.
 `roles/shared/work-flow.md`.
 
 **Hands over, gets back:**
-- a builder: a line and its brief; back, word when its pull request is ready and when it merges.
+- a builder: a line and its brief; back, word when its PR is ready and when it merges.
 - the stand-in: the call; back, a verdict on each open idea.
 - the design session: nothing; back, the lines it adds to the *progress file*.
 
@@ -39,8 +39,7 @@ sessions.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn, on the owner's computer
   only one the owner set up (floor rule 8):
-  - read the stop switch first, and where it stands, tell the running builders to stop and do
-    nothing more that wake;
+  - read the stop switch first, and where it stands, tell the running builders to stop and do nothing more that wake;
   - pull `main`, its clone on `main`; if a rule file changed, re-read it and pass what touches them to the running
     builders in one message;
   - each step `core/scripts/steps.mjs` reports not done, and each difference `core/scripts/fresh.mjs` lists, gets a
@@ -69,8 +68,8 @@ sessions.
   session per task, continued for its review fixes while its context is under an hour old and small; otherwise a fresh
   one.
 - **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can:
-  once its task merged, or it stopped with its work pushed and its note in its PR's description (for usage too: a fresh
-  builder, of any tool, picks up from the branch), its last message read and nothing scheduled bound to it.
+  once its task merged, or it stopped with its hand-off note in its PR, its last message read and nothing scheduled
+  bound to it.
   - It first checks that the session cleaned up and does so for one that could not.
   - Never deleted; never one the owner works in or that waits only on the owner's yes.
 - **A new lane only where it merges sooner** (#702). By default each independent entry gets a lane, cleaning its share
@@ -84,8 +83,8 @@ sessions.
   that measure.
 - **A stalled lane,** found on every wake by `scripts/stalled.mjs`, never by a session's word
   that it runs: an open PR with no push to its branch for a few hours, whose session has ended, cannot be reached
-  (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, the old session
-  told to stop; not one that waits only on the owner's yes.
+  (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, which reads its
+  hand-off note first, the old session told to stop; not one that waits only on the owner's yes.
   - Handed over once: where the fresh builder pushes nothing either (its usage spent, say), it goes to a builder of
     another tool, or waits, marked in the *progress file*, tried once a day, named to the owner once.
 - **The pace is the owner's** (#249). By default no session slows or stops work to save usage by its
@@ -95,8 +94,7 @@ sessions.
   - It does not mean a session stands idle while the owner's allowance goes unused.
   - Reason: no session decides by itself to stand idle, and the pace of the owner's usage is the owner's to set.
   - Held by nothing yet: the usage left is no mark a check reads.
-- **It asks the owner nothing** but floor rule 14's yeses: it does it and reports it in a
-  line.
+- **It asks the owner nothing** but floor rule 14's yeses: it does it and reports it in a line.
   - Before it reports anything as waiting on the owner, it checks GitHub: a yes already in the PR (the owner's or the
     design session's relay), a branch already deleted or a setting already made is never reported again.
 - **Where the agents run side by side** (floor rule 18), it starts every session through the tool that runs them, each

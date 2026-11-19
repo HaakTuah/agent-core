@@ -34,7 +34,7 @@ where that tool is not at hand, to the next it names:
 
 - Where a project's manifest has a table under "Tools", each row it holds replaces the default's for that role; a row
   it lacks keeps the default's, save what the record is read for (#481): with no "Builder" row, the tools that built
-  the last merged pull requests come first, most first, and a tool the record shows reviewing is at hand, both as
+  the last merged PRs come first, most first, and a tool the record shows reviewing is at hand, both as
   `scripts/tools-read.mjs` prints them.
 - A tool is not at hand where it is not installed or set up for the project, its usage window is spent, or it gives no
   sign as `tasks/reviews.md`, point 2, says. Whoever hands out the role (the orchestrator, or the session that needs

@@ -1,16 +1,15 @@
 // The shape check's reader of Python (shape.mjs and shape-readers.mjs, beside this file; #354). It reads a file's
 // logical lines, as Python joins them inside brackets and after a \ at a line's end, with its strings (an f-string's
-// code in its { } read as code); from them, each function a def opens and what each file imports. It never runs the
-// code. Node's own modules only.
+// code in its { } read as code); from them, what each file imports, and its tokens, for the runs of the clock. Its
+// functions are read on the parser the core installs (python-functions.mjs, which says how each is measured; #530,
+// item 6). It never runs the code. Node's own modules, and the parser's installed packages.
 //
-// A function spans its def's line to its body's last line, a def within it measured on its own. Its depth is how deep
-// its control blocks nest (if, elif, else, for, while, try, except, finally, with, case; a match is the case's one
-// level, as a switch is in JavaScript), and it branches at each if, elif, for, while and except, a case at a line's
-// start, and each and and or, those of a comprehension and of a choice (a if b else c) too.
 // An import is read with where it stands: in a def, it runs when the function is called (as a dynamic import does in
 // JavaScript), and under `if TYPE_CHECKING:` it takes types alone; neither makes a cycle.
 import path from "node:path";
 import { NEST } from "./code-shape.mjs";
+import { unreachedFor } from "./parser.mjs";
+import { pythonFunctions } from "./python-functions.mjs";
 
 // The standard library's modules, which lead to no file of the project and no package: Python 3.13's, with those that
 // earlier versions still hold.
@@ -177,8 +176,8 @@ class Lexer {
 
 const isId = (tok, v) => tok?.t === "id" && tok.v === v;
 const isP = (tok, v) => tok?.t === "punct" && tok.v === v;
+// (the words that open a block, beside def, class and match)
 const CONTROL = new Set(["if", "elif", "else", "for", "while", "try", "except", "finally", "with", "case"]);
-const BRANCH = new Set(["if", "elif", "for", "while", "except", "and", "or"]);
 
 // Where a compound statement's header ends: the index of its first : outside brackets; -1 where it has none.
 function headerColon(toks) {
@@ -203,22 +202,6 @@ function statement(toks) {
   return { word: opens ? word : null, at, colon };
 }
 
-const branchAt = (toks, k, first) => {
-  const tok = toks[k];
-  if (tok.t !== "id" || isP(toks[k - 1], ".")) return false;
-  return BRANCH.has(tok.v) || (tok.v === "case" && k === first);
-};
-
-// The innermost function open on the stack, and how many control blocks stand above it.
-function around(stack) {
-  let cd = 0;
-  for (let s = stack.length - 1; s >= 0; s--) {
-    if (stack[s].fn) return { fn: stack[s].fn, cd };
-    if (stack[s].control) cd++;
-  }
-  return { fn: null, cd };
-}
-
 // What a logical line imports: [{ level, module, names, line }], level the count of its leading dots.
 function importsOf(toks) {
   if (isId(toks[0], "import")) {
@@ -236,22 +219,19 @@ const split = toks => toks.reduce((parts, t) => (isP(t, ",") ? parts.push([]) : 
 // (a dotted name, up to its `as`)
 const dotted = toks => { const end = toks.findIndex(t => isId(t, "as")); return (end < 0 ? toks : toks.slice(0, end)).filter(t => t.t === "id").map(t => t.v).join("."); };
 
-// A file read: { functions: [{ name, line, lines, depth, branches }], null where its code nests past NEST, imports: [{ level, module, names, line, dynamic,
+// A file read: { functions: [{ name, line, lines, depth, branches }] (null where its code nests past NEST or the parser
+// cannot read it whole; none where the parser could not be installed), imports: [{ level, module, names, line, dynamic,
 // types }], toks }.
 export function readPython(src) {
-  const lines = logicalLines(src), stack = [], functions = [], imports = [];
+  const lines = logicalLines(src), stack = [], imports = [];
   for (const ln of lines) {
     while (stack.length && stack.at(-1).indent >= ln.indent) stack.pop();
-    for (const s of stack) if (s.fn) s.fn.end = ln.end;
-    const { fn, cd } = around(stack), st = statement(ln.toks);
-    const inner = oneLine(ln, st, fn, cd);
-    if (inner) functions.push(inner);
-    const dynamic = !!fn || !!inner, types = stack.some(s => s.types) || (st.word === "if" && isTypeChecking(ln.toks.slice(0, st.colon + 1)));
+    const st = statement(ln.toks);
+    const dynamic = st.word === "def" || stack.some(s => s.def), types = stack.some(s => s.types) || (st.word === "if" && isTypeChecking(ln.toks.slice(0, st.colon + 1)));
     for (const part of statements(ln.toks, st)) for (const imp of importsOf(part)) imports.push({ ...imp, dynamic, types });
-    if (st.word) stack.push({ indent: ln.indent, fn: inner, control: CONTROL.has(st.word), types: st.word === "if" && isTypeChecking(ln.toks) });
+    if (st.word) stack.push({ indent: ln.indent, def: st.word === "def", types: st.word === "if" && isTypeChecking(ln.toks) });
   }
-  for (const f of functions) { f.lines = f.end - f.line + 1; delete f.end; }
-  return { functions: lines.lost ? null : functions, imports, toks: lines.flatMap(l => l.toks) };
+  return { functions: lines.lost ? null : unreachedFor("python") ? [] : pythonFunctions(src), imports, toks: lines.flatMap(l => l.toks) };
 }
 
 // A logical line's simple statements: those after `;`, and of a compound statement those after its header's colon
@@ -262,19 +242,6 @@ function statements(toks, st) {
 }
 
 const isTypeChecking = toks => /^if (typing \. )?TYPE_CHECKING :$/u.test(toks.map(t => t.v).join(" "));
-
-// A logical line's branches and depth, counted to the function it lies in; the function a def opens, where it does,
-// its own tokens after the header counted to it.
-function oneLine(ln, st, fn, cd) {
-  const first = st.at, toks = ln.toks;
-  const def = st.word === "def" ? { name: toks[st.at + 1]?.v ?? "(anonymous)", line: ln.line, end: ln.end, depth: 0, branches: 0 } : null;
-  for (let k = 0; k < toks.length; k++) {
-    const to = def && k > st.colon ? def : fn;
-    if (to && branchAt(toks, k, first)) to.branches++;
-  }
-  if (fn && CONTROL.has(st.word)) fn.depth = Math.max(fn.depth, cd + 1);
-  return def;
-}
 
 // ---- where an import leads ----
 

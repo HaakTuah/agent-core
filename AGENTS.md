@@ -59,7 +59,7 @@ queue's order; the
 issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`tasks/roles.md`,
 `roles/orchestrator.md`); the *hard work*: a new or changed rule; the *size marks*: the caps of
 `scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*:
-the suites of `.github/workflows/tests.yml`; *planning design*: none; the *other builders' checks*: those suites, which any tool's
+the suites of `.github/workflows/tests.yml`; *planning design*: none; the *quick check*: `node scripts/holders.mjs && node scripts/size.mjs && node scripts/reading.mjs --check && node tests/holders-test.mjs && node tests/manifest-reads-test.mjs && node tests/general-test.mjs`; the *other builders' checks*: those suites, which any tool's
 session here runs before it finishes, every file here being protected (`SECURITY.md`).
 
 ## The queue
@@ -72,16 +72,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   joins only where that PR relays the owner's yes to its issue, as the chat session records it ("Whose words an issue
   holds"): that PR is the gate, so no verdict of the stand-in's queues one here, a difference from `roles/shared/inbox.md`.
   A test, a check for a rule that already stands, a task the scheduled look opens (#248) and a small finding of an
-  audit (#259) join without the owner's word. A bug waits for no line, as that module says. A line leaves in the PR
-  that closes its issue.
+  audit (#259) join without the owner's word. A bug waits for no line, as that module says. A line does not leave in
+  the PR that closes its issue: the readers of the file skip the line of a closed issue, and the next PR that changes
+  the file takes such lines out together (`node scripts/queue.mjs --clear`; #750, point 1), as that module says, since
+  PRs merging side by side collided on it. Held here by `own-description.yml`, which fails a ready PR that changes the
+  file and leaves one.
 - **Queued means wanted: nothing queued waits for a second word.** Where the floor asks the owner's
   yes in a PR (floor rule 3: a change to the floor or the review guidelines), the yes the owner gave when its issue was
   queued is that yes: the builder relays it into the PR word for word as it was recorded (floor rule 3), and it covers
   the change as the issue describes it. A PR that goes beyond its issue is not covered by it, and the design check
   says so.
 - **The file holds no note.** Where a module asks for one in the *progress file* (a lane that waits), it goes in the
-  description of the line's own PR, which the next builder reads with the branch, as a passed gate's note does
-  (`roles/shared/work-flow.md`).
+  description of the line's own PR, which the next builder reads with the branch, as a hand-off note does
+  (`tasks/tools.md`, "A change of tool loses nothing").
 - **Whose words an issue holds.** Of the issues open on 14 November 2026 and labelled `queued` and `by:chat`, the owner
   said the decisions quoted in them are the owner's, and so are the answers on other issues that their notes name.
   What the chat session records is the owner's word on any day: an issue or note from the

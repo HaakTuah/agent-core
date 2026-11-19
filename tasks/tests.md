@@ -229,8 +229,8 @@ reads is the *shape check*'s config.
 - **A long measurement runs outside the session.** By default a measurement that may run for "long" seconds or more
   (the config's, an hour where it gives none: a first guess) runs neither in a suite nor in the checks of a pull
   request, nor while a session waits on it. The trigger is such a run: its session starts it as a job of the
-  project's own, which posts its result on the pull request, then ends at a passed gate with its note
-  (`roles/shared/work-flow.md`), and the session that picks the work up reads the result there. It does not mean that the
+  project's own, which posts its result on the pull request, then ends at a passed gate with its hand-off note
+  (`tasks/tools.md`), and the session that picks the work up reads the result there. It does not mean that the
   core adds a billed job to a project: the job is the project's own to turn on, and with none the measurement runs on
   a machine its owner starts (floor rule 18). Reason: one entry of a project held 130 minutes of measuring inside one
   session. Held by nothing yet: no check can tell how long a run would have taken, so it is listed.

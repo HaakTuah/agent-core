@@ -1,7 +1,8 @@
 // The shape check's readers (shape.mjs, beside this file; tasks/code-shape.md, "What the check reads"; #354): which
 // files it reads, and each file as its reader reads it, in one form whatever its language. JavaScript and TypeScript,
 // JSX among them, by the readers of the measures (code-shape.mjs), their functions on the parser the core installs
-// (javascript-functions.mjs); C# by shape-csharp.mjs, its functions on the parser too (csharp-functions.mjs); Python by shape-python.mjs; and the scripts that share one global space,
+// (javascript-functions.mjs); C# by shape-csharp.mjs, its functions on the parser too (csharp-functions.mjs); Python by
+// shape-python.mjs, its functions on the parser too (python-functions.mjs); and the scripts that share one global space,
 // those of JavaScript or TypeScript with no import or export, by the names their top level declares. None runs the code
 // it reads. Node's own modules, and the parser's installed packages.
 //
@@ -26,7 +27,10 @@ export const READERS = {
   // names it stays one the check reads)
   csharp: "C#, its functions by the lexer",
   "csharp-tree": "C#, its functions by the parser",
-  python: "Python",
+  // (Python as its functions were read by a lexer written here, until #530's item 6: no file is read so now, and a
+  // baseline that names it stays one the check reads)
+  python: "Python, its functions by the lexer",
+  "python-tree": "Python, its functions by the parser",
   scripts: "scripts that share one global space",
   screens: "the tests that open a screen, a window or a device",
   clocks: "the tests that reach a real clock",
@@ -37,7 +41,7 @@ export const READERS = {
 // unnamedFor): the check reads their finds as a reader's the baseline does not name, reported and never failed, and
 // says so (#654, point 4; #719).
 // (each reader on the parser, by the grammars it reads with)
-const ON_PARSER = { "javascript-tree": ["javascript", "typescript", "tsx"], "csharp-tree": ["csharp"] };
+const ON_PARSER = { "javascript-tree": ["javascript", "typescript", "tsx"], "csharp-tree": ["csharp"], "python-tree": ["python"] };
 const readersWhere = gone => Object.keys(ON_PARSER).filter(r => ON_PARSER[r].some(gone));
 export const unreachedReaders = () => readersWhere(unreachedFor);
 export const unnamedReaders = () => readersWhere(unnamedFor);
@@ -93,7 +97,7 @@ function javascript(file, text) {
 export function reading(file, text) {
   const ext = path.posix.extname(file);
   if (ext === ".cs") { const r = readCsharp(text); return { ...r, reader: "csharp-tree", imports: r.usings, own: CS_OWN, lang: "csharp" }; }
-  if (ext === ".py") return { ...readPython(text), reader: "python", own: PY_OWN, lang: "python" };
+  if (ext === ".py") return { ...readPython(text), reader: "python-tree", own: PY_OWN, lang: "python" };
   return javascript(file, text);
 }
 
