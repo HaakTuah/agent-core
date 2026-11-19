@@ -84,7 +84,7 @@
     ],
     "tasks/reviews.md: A review already running is waited for": "check: scripts/code-review-wait.mjs, in part",
     "tasks/reviews.md: Security": "check: scripts/security-review.mjs, in part",
-    "tasks/reviews.md: What a posted review stands for": ["check: scripts/security-review.mjs", "check: scripts/clean-merges.mjs, in part"],
+    "tasks/reviews.md: What a posted review stands for": ["check: scripts/security-review.mjs, in part", "check: scripts/clean-merges.mjs, in part"],
     "tasks/choices.md: A choice that is hard to undo gets a record": "check: scripts/choices.mjs, in part",
     "tasks/choices.md: the blind pick": "check: scripts/choices.mjs, in part",
     "tasks/choices.md: the case against": "check: scripts/choices.mjs, in part",

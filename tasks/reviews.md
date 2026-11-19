@@ -64,7 +64,7 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      check reads.
    - **What a posted review stands for** (#99): by default the commit it names, and the head only
      where nothing but merges from `main` follow that commit, each the merge git makes of its parents with no conflict,
-     as `scripts/clean-merges.mjs` proves (#323, #750), and the builder asks Codex, or any reviewer, again only for new
+     as `scripts/clean-merges.mjs` proves (#323, #750). The builder asks Codex, or any reviewer, again only for new
      content. A merge with a conflict is new content however it is settled, since its settling is a choice no review
      saw (an order of lines can change what they do). After any other commit, where no review of the head has run,
      the fallback reviewer checks it and posts one naming the head, or the session posts the note that none is needed,
@@ -77,10 +77,10 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      under one login (#187), and an account the agents sign in with that the host lets write counts as a person's,
      since the host tells it from no owner's. Reason: a review of
      one commit stood for later commits no one checked, and any collaborator's comment passed a pull request; and a
-     fresh review was asked of every head, about 150 of Codex's on 39 pull requests, 113 finding nothing (#750). Held by
-     the `security-review` status through `scripts/clean-merges.mjs` and its test, by which the `code-review` status
-     carries a code review over the same way; the status waits where the rule is broken, in the core, and holds the
-     merge once a ruleset requires it (#320).
+     fresh review was asked of every head, about 150 of Codex's on 39 pull requests, 113 finding nothing (#750). Held,
+     in part, by the `security-review` status through `scripts/clean-merges.mjs` and its test, by which the `code-review`
+     status carries a code review over the same way; the status waits where the rule is broken, in the core, and holds
+     the merge once a ruleset requires it (#320).
    - **What a posted review declares** (#299): by default a review posted in a comment that opens "Security review:",
      "Code review:" or "Design check:" covers one kind of review, and declares what it found on two lines of their own:
      "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other finding.", and its score
