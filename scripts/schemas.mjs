@@ -5,22 +5,28 @@
 // the copy's folder; each failure says where and what, then "Mend:" and that, as every check of the core does (#254).
 // What a schema cannot say (a path that lies outside the project, a file that is not there) stays with the script.
 //
-//   import { shapeFaults } from "./schemas.mjs";   shapeFaults("copies", config, "core/") -> ["the config's ...", ...],
-//                                                  [] where it holds; null where ajv is not installed, which the caller says
+//   import { keysOf, shapeFaults } from "./schemas.mjs";   shapeFaults("copies", config, "core/") -> ["the config's ...",
+//                                                  ...], [] where it holds; null where ajv is not installed, which the
+//                                                  caller says; keysOf("copies") -> the keys its schema gives
 import fs from "node:fs";
 import { installed, loadSync } from "./packages.mjs";
 
+const schemaOf = name => JSON.parse(fs.readFileSync(new URL(`./schemas/${name}.json`, import.meta.url), "utf8"));
 const checkers = new Map();
 function checker(name) {
   if (!checkers.has(name)) {
     const Ajv = loadSync("ajv"), ajv = new Ajv({ allErrors: true, strict: true });
     ajv.addKeyword({ keyword: "mend", schemaType: "string" });
     ajv.addKeyword({ keyword: "mendFor", schemaType: "object" });
-    const schema = JSON.parse(fs.readFileSync(new URL(`./schemas/${name}.json`, import.meta.url), "utf8"));
+    const schema = schemaOf(name);
     checkers.set(name, { validate: ajv.compile(schema), schema });
   }
   return checkers.get(name);
 }
+
+/** The keys the schema `name` gives its file, read from the schema alone, with no package: for a script that tells its
+ *  own file from another's by them. */
+export const keysOf = name => Object.keys(schemaOf(name).properties ?? {});
 
 // The mend of a failing rule: the nearest "mendFor" of its keyword, else "mend", up its schema's path.
 function mendOf(schema, schemaPath, keyword) {

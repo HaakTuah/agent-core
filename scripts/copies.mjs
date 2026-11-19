@@ -38,7 +38,7 @@ import { inProject, leadsOut, logged, unrooted } from "./guards.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { readBlobs } from "./blobs.mjs";
 import { projectAt } from "./core-path.mjs";
-import { shapeFaults } from "./schemas.mjs";
+import { keysOf, shapeFaults } from "./schemas.mjs";
 import { uncommented } from "./yaml-keys.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
 // core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
@@ -65,7 +65,7 @@ process.chdir(ROOT);
 // the config's shape (scripts/schemas/copies.json, schemas.mjs). Where the core's packages are not installed, as in a
 // job of a project's own that ran the check before they came, the shape is not checked, said as a warning, and the
 // check goes on (AGENTS.md of the core, "Nothing locks a project"; steps.mjs asks the install).
-const faults = shapeFaults("copies", config, CORE);
+const KEYS = keysOf("copies"), faults = shapeFaults("copies", config, CORE);
 if (faults === null) console.log(`::warning::The config's shape was not checked: the package ajv is not installed beside the core's copy. Mend: in a pull request of its own, add the step node ${CORE}scripts/install.mjs to this job before the step that runs this check`);
 for (const f of faults ?? []) console.error(`FAIL: ${logged(f)}`);
 if (faults?.length) process.exit(1);
