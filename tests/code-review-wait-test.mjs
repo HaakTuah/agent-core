@@ -114,7 +114,9 @@ ok(is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but 
   ok(is(had([summary(running), review], line, code, org, [], true, null, writes), true, "is posted") && is(had([review], line, code, org, [], true, null, writes), true, "a code review has run")
     && is(had([review], line, code, org, [], true, null, { reviewers: ["reader"] }), true, "a code review has run") && is(had([member(`Code review: of ${HEAD}\n${lines}`, "some-org")], line, code, org), true, "a code review has run"),
     "one from a member the host's rights let write, an account the project names, or the repository's owner does");
-  ok(is(had([summary(running), review], line, code, org, [], false, null, reads), true, "is posted"), "on a pull request from before the check, a member's posted code review counts as it did");
+  ok(is(had([summary(running), review], line, code, org, [], false, null, reads), false, "still running") && is(had([summary(running), review], line, code, org, [], false, null, writes), true, "is posted")
+    && is(had([summary(running), { ...review, updated_at: "2026-11-18T10:00:00Z" }], line, code, org, [], false, null, writes), true, "is posted"),
+    "on a pull request from before the check, a posted code review counts only from an account counted, as on any other, an edited one too");
   // each mend says the whole form of what is to be posted within GitHub's 140 characters, advisory or waiting
   const kinds = [["Security review", "Security review"], ["Code review", "Code review"], ["Design check", "Design check"]];
   const rendered = kinds.map(([kind]) => had([...ran, now(`${kind}: ${HEAD}`)])).concat([had(ran, line, tasks, core)]);
