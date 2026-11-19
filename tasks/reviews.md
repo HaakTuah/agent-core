@@ -43,29 +43,23 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      head so (the code reviewer checks that), in a comment that opens "Security review:", which the `security-review`
      check reads.
    - **What a posted review stands for** (#99): by default the commit it names, and the head only
-     where nothing but updates from `main` follow that commit; after any other commit, where no review of the head has
+     where nothing but merges from `main` follow that commit, each the merge git makes of its parents with no conflict,
+     as `scripts/clean-merges.mjs` proves (#323, #750), and the builder asks Codex, or any reviewer, again only for new
+     content; after any other commit, a merge with a conflict among them however it is settled, since its settling is a
+     choice no review saw (an order of lines can change what they do), where no review of the head has
      run, the fallback reviewer checks it and posts one naming the head, or the session posts the note that none is
      needed, naming the head. It counts from the repository's owner (the *owner's account*, where that owns it), from
      a person's account the host lets write, each owner of a team's project (`roles/shared/teams.md`), whose rights
      the check reads from the host each run (#412), and from another account only where the project names it to the
      check (its input `reviewers`). A pure sync needs none: the check proves it with `pure-sync.mjs` and waits only for
-     a review that started by itself. It does not mean an update from `main` is reviewed again (point 6), that a review
+     a review that started by itself. It does not mean a merge git makes from `main` is reviewed again (point 6), that a review
      Codex completed on the head needs a posted one, nor that the status shows who reviewed: builder and reviewer post
      under one login (#187), and an account the agents sign in with that the host lets write counts as a person's,
      since the host tells it from no owner's. Reason: a review of
-     one commit stood for later commits no one checked, and any collaborator's comment passed a pull request. Held by
+     one commit stood for later commits no one checked, and any collaborator's comment passed a pull request; and a
+     fresh review was asked of every head, about 150 of Codex's on 39 pull requests, 113 finding nothing (#750). Held by
      the `security-review` status, which waits where it is broken, in the core, and holds the merge once a ruleset
      requires it (#320).
-   - **A review carries over to a commit that adds nothing new of the pull request's own** (#750). By default the
-     `security-review` and `code-review` statuses read a review of the head. Where `scripts/clean-merges.mjs` proves
-     that the commits since the review only bring in `main`, each the merge git makes of its parents with no conflict,
-     the statuses pass on that review with no new one, and the builder asks Codex, or any reviewer, again only for new
-     content. It does not mean a merge with a conflict carries a review over, however it is settled, both sides' lines
-     kept included: an order of lines can change what they do (a guard of main's then guards the pull request's line),
-     so it is new content, and a review naming it stands from then on. Reason: floor rule 8 says nothing is reviewed
-     twice, and the check asked a fresh review of every head: about 150 requests for Codex's review on 39 pull
-     requests, 113 of them finding nothing. Held by `scripts/clean-merges.mjs`, which the `security-review` workflow
-     runs, and its test.
    - **What a posted review declares** (#299): by default a review posted in a comment that opens
      "Security review:", "Code review:" or "Design check:" covers one kind of review, and declares what it found on two
      lines of their own: "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other
