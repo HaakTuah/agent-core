@@ -87,7 +87,7 @@ saved data; a weakened check).
 
 **12. `main` is the owners'.**
 - It is never pushed to, and changes only by a merged pull request, its checks passed and the approvals the host asks
-  given, brought up to date with `main` first where every merge goes live.
+  given, brought up to date with `main` where every merge goes live: what its users get is built from it.
 - Where users get a release, `main` is tested at its newest commit, a red one fixed before any other merge, and a
   release cut only from a green one (`tasks/hosts.md`).
 
