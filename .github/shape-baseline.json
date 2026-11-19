@@ -15,9 +15,6 @@
     "clocks",
     "processes"
   ],
-  "grown": {
-    "mark: suite suites-projects": "ajv and the four packages it brings join the first lock (#530, item 7), and each case of tests/check-test.mjs runs the workflows' install, an npm ci of that lock, on a scratch project: on Windows the suite took 614 s against 600, check-test 544 s where it took 330 on main (locally 117 s against 96). The split the mark's failure asks waits for #737, which runs Windows hourly and makes a suite's time mark warn; until then the mark rises one step, to 750."
-  },
   "listed": {
     "function: scripts/licence-commands.mjs#atCommand": {
       "lines": 43,
