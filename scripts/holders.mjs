@@ -82,17 +82,30 @@ export function named(root) {
   try { files = fs.readdirSync(dir).sort(); }
   catch (e) { return { named: {}, behind: {}, numbers: {}, faults, wrong: `${FILE}/ cannot be read (${e.message}). Mend: write one file for each rule in it, as the ones that stand there are written` }; }
   for (const f of files) {
-    if (!f.endsWith(".json")) { faults.push(`${FILE}/${f} is no entry, which is a file of JSON. Mend: move it out of ${FILE}/, or write the rule's entry in a file named ${f.replace(/\.[^.]*$/u, "")}.json`); continue; }
-    let e;
-    try { e = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); }
-    catch (x) { faults.push(`${FILE}/${f} cannot be read (${String(x.message).split("\n")[0]}). Mend: write it as JSON, an object with the rule's "rule" and its "holder", "behind" and "number"`); continue; }
-    if (e === null || typeof e !== "object" || Array.isArray(e) || typeof e.rule !== "string" || !e.rule) { faults.push(`${FILE}/${f} is no object with a "rule". Mend: write it as {"rule": "<the rule's file and lead>", "holder": ..., "behind": [...], "number": "..."}, each but "rule" only where the rule has one`); continue; }
-    const extra = Object.keys(e).filter(k => !ENTRY_FIELDS.includes(k));
-    if (extra.length) faults.push(`${FILE}/${f} has "${extra.join('", "')}", which an entry does not read. Mend: keep "rule", "holder", "behind" and "number", and take the rest out`);
-    if (f !== entryFile(e.rule)) faults.push(`${FILE}/${f} holds the rule "${e.rule}", which stands in ${entryFile(e.rule)}. Mend: rename the file to ${entryFile(e.rule)}, so that two pull requests that add a rule never write the same file`);
-    for (const [from, to] of [["holder", "holders"], ["behind", "behind"], ["number", "numbers"]]) if (from in e) json[to][e.rule] = e[from];
+    const { entry, fault } = entryOf(dir, f);
+    if (fault) { faults.push(fault); continue; }
+    faults.push(...entryFaults(f, entry));
+    for (const [from, to] of [["holder", "holders"], ["behind", "behind"], ["number", "numbers"]]) if (from in entry) json[to][entry.rule] = entry[from];
   }
   return { json, named: json.holders, behind: json.behind, numbers: json.numbers, faults };
+}
+
+// The entry the file `f` of FILE/ holds, or the line of why it is none, with its mend.
+function entryOf(dir, f) {
+  if (!f.endsWith(".json")) return { fault: `${FILE}/${f} is no entry, which is a file of JSON. Mend: move it out of ${FILE}/, or write the rule's entry in a file named ${f.replace(/\.[^.]*$/u, "")}.json` };
+  let e;
+  try { e = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); }
+  catch (x) { return { fault: `${FILE}/${f} cannot be read (${String(x.message).split("\n")[0]}). Mend: write it as JSON, an object with the rule's "rule" and its "holder", "behind" and "number"` }; }
+  if (e === null || typeof e !== "object" || Array.isArray(e) || typeof e.rule !== "string" || !e.rule) return { fault: `${FILE}/${f} is no object with a "rule". Mend: write it as {"rule": "<the rule's file and lead>", "holder": ..., "behind": [...], "number": "..."}, each but "rule" only where the rule has one` };
+  return { entry: e };
+}
+
+// What is wrong with an entry that is one: a part it does not read, a file not named from its rule.
+function entryFaults(f, e) {
+  const faults = [], extra = Object.keys(e).filter(k => !ENTRY_FIELDS.includes(k));
+  if (extra.length) faults.push(`${FILE}/${f} has "${extra.join('", "')}", which an entry does not read. Mend: keep "rule", "holder", "behind" and "number", and take the rest out`);
+  if (f !== entryFile(e.rule)) faults.push(`${FILE}/${f} holds the rule "${e.rule}", which stands in ${entryFile(e.rule)}. Mend: rename the file to ${entryFile(e.rule)}, so that two pull requests that add a rule never write the same file`);
+  return faults;
 }
 
 // (a part of the file as it holds its form, an object, else none: the schema says what it is)
@@ -140,6 +153,13 @@ function numbersWrong(root, numbers) {
   return wrong;
 }
 
+// The rules whose entries would stand in one file, each set a line with its mend.
+function sharedFiles(all) {
+  const files = new Map();
+  for (const r of all) files.set(entryFile(r.key), [...(files.get(entryFile(r.key)) ?? []), r.key]);
+  return [...files].filter(([, ks]) => ks.length > 1).map(([f, ks]) => `${FILE}/${f} would be the entry of ${ks.map(k => `"${k}"`).join(" and ")}. Mend: reword the lead of one of them so that their file names differ`);
+}
+
 // Each rule with its holders ([{ kind, by, part }]), and what is wrong with the entries, each a line with its mend.
 export function holders(root = ROOT, cases = CASES) {
   const all = rules(root), keys = new Set(all.map(r => r.key)), read = named(root), wrong = read.wrong ? [read.wrong] : [...read.faults];
@@ -152,9 +172,7 @@ export function holders(root = ROOT, cases = CASES) {
     }
   }
   for (const c of cases) for (const key of c.holds) if (by.has(key)) by.get(key).push({ kind: "case", by: c.name, part: c.inPart.includes(key) });
-  const files = new Map();
-  for (const r of all) files.set(entryFile(r.key), [...(files.get(entryFile(r.key)) ?? []), r.key]);
-  for (const [f, ks] of files) if (ks.length > 1) wrong.push(`${FILE}/${f} would be the entry of ${ks.map(k => `"${k}"`).join(" and ")}. Mend: reword the lead of one of them so that their file names differ`);
+  wrong.push(...sharedFiles(all));
   if (!read.wrong) wrong.push(...behindWrong(root, read.behind), ...numbersWrong(root, read.numbers));
   return { rules: all, by, wrong };
 }
