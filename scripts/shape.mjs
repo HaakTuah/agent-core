@@ -442,7 +442,7 @@ export function survey(texts, config, tests = new Set()) {
   read.unnamed = ctx.unnamed.length;
   read.tests = tests.size;
   for (const [k, kind] of [["screens", "screen"], ["timed", "timed"], ["processes", "process"]]) read[k] = new Set([...ctx.entries.keys()].filter(id => id.startsWith(`${kind}: `)).map(fileOf)).size;
-  return { entries: ctx.entries, read, unnamed: ctx.unnamed, readers: ctx.readers, reach: ctx.reach, scripts: new Set(ctx.scripts.keys()), unsure: ctx.unsure };
+  return { entries: ctx.entries, read, unnamed: ctx.unnamed, readers: ctx.readers, reach: ctx.reach, scripts: new Set(ctx.scripts.keys()), unsure: ctx.unsure, texts };
 }
 
 // ---- the baseline ----
@@ -631,18 +631,21 @@ const SAID = {
 // breach's place that covers itself. Of a reader the baseline does not list (`unread`), one the base held, or any where
 // no base is told, is `later`: reported, never failed, until --write lists it. The rest are new, each kind with its mend.
 function fresh({ config, at, self, found, current, base, news, unread }) {
-  // (a file the readers cannot follow that the base held, or any where no base is told, is said, never failed: a reader
-  // that comes to take less, a file past a smaller size or one a newer grammar reads otherwise, turns nothing that stood
-  // red, and only one a pull request adds fails: tasks/code-shape.md, "What the check reads"; AGENTS.md, "Nothing locks
-  // a project")
+  // (a file the readers cannot follow that the base held, its text as the base holds it, or any where no base is told,
+  // is said, never failed: a reader that comes to take less, a file past a smaller size or one a newer grammar reads
+  // otherwise, turns nothing that stood red, and only one a pull request adds or changes fails: tasks/code-shape.md,
+  // "What the check reads"; AGENTS.md, "Nothing locks a project". Its text is compared, since whether a file is lost can
+  // hang on the parser's time: a base read past its budget on one run excuses nothing a change brings to the file)
   const lost = id => groupOf(id).kind === "lost" && !unread(id);
+  const unchanged = id => base.standing().texts[fileOf(id)] === found.texts[fileOf(id)];
   const later = base ? [] : news.filter(unread), unfollowed = base ? [] : news.filter(lost);
   if (!base) news = news.filter(id => !unread(id) && !lost(id));
   const fail = [];
   if (base && news.length) {
     const left = new Set(unclaimedOf(news, current, base.stood(), config.marks));
-    unfollowed.push(...news.filter(id => !left.has(id) && lost(id)));
-    const readMore = news.filter(id => !left.has(id) && !unread(id) && !lost(id));
+    const excused = id => lost(id) && unchanged(id);
+    unfollowed.push(...news.filter(id => !left.has(id) && excused(id)));
+    const readMore = news.filter(id => !left.has(id) && !unread(id) && !excused(id));
     later.push(...news.filter(id => !left.has(id) && unread(id)));
     news = news.filter(id => left.has(id));
     if (readMore.length) fail.push([`FAIL: ${plural(readMore.length, "breach", "breaches")} that ${base.name} held already ${readMore.length === 1 ? "is" : "are"} not in ${config.baseline}: the config reads more than it did, the baseline was lowered past what stands, or the entry is listed under another id, where a breach stands now. Mend: list them where they stand with SHAPE_BASE=${base.name} node ${self} ${at} --write, and commit the baseline`, ...some(readMore, current)]);

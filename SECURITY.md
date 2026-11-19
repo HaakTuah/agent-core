@@ -30,8 +30,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      comments proof and the selection, 16 MB for the manifest, past which it is reported unread), none in count, since
      every changed path is read, of each file of code the selection reads through the shape check's readers
      (`scripts/shape-readers.mjs`) 500,000 characters of JavaScript, TypeScript or Python and 250,000 of C#, past which
-     its functions are not read, and 2 s for the parser on each (`scripts/tree-walk.mjs`), and of the rule files only a
-     regular file of the checkout's own, a link, pipe or device read as no file; hostile tests:
+     the parser reads none of it (of Python and C#, neither functions, imports nor tokens; of JavaScript and TypeScript,
+     no functions, their imports read without it), and 2 s for the parser on each (`scripts/tree-walk.mjs`), and of the
+     rule files only a regular file of the checkout's own, a link, pipe or device read as no file; hostile tests:
      `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader

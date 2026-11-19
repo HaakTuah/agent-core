@@ -462,6 +462,10 @@ ok(v.fail.length === 0 && v.notes.some(n => /1 breach that stood before/.test(n)
 const lostLarge = { "src/Big.cs": `class Big { int[] W = { ${"1, ".repeat(LARGEST.csharp / 3)}1 }; void M() { } }\n`, "src/a.js": long("fine", 10) };
 const lostThen = [{ base: baseOf(lostBaseline, lostLarge) }, {}].map(b => judge({ now: lostLarge, baseline: lostBaseline, ...b }));
 v = judge({ now: { ...lostLarge, "src/New.cs": lostLarge["src/Big.cs"] }, baseline: lostBaseline, base: baseOf(lostBaseline, lostLarge) });
+// (the fallback security review of #879: a file the base held lost, whether by its size or by a parse past its budget
+// on that run, excuses nothing a change brings to it)
+const grownLost = judge({ now: { ...lostLarge, "src/Big.cs": lostLarge["src/Big.cs"].replace("void M() { }", `void M() {\n${"  x++;\n".repeat(400)}}`) }, baseline: lostBaseline, base: baseOf(lostBaseline, lostLarge) });
+ok(grownLost.fail.length === 1 && /held already/.test(said(grownLost)) && /src\/Big\.cs/.test(said(grownLost)) && mended(said(grownLost)), "a file lost that the base held, its text changed, fails as a breach the base held, with its mend", said(grownLost));
 ok(lostThen.every(t => t.fail.length === 0 && t.notes.some(n => /1 file of code holds what the reader cannot follow/.test(n) && /src\/Big\.cs/.test(n) && /--write/.test(n))) && v.fail.length === 1 && /src\/New\.cs/.test(said(v)) && !/Big\.cs/.test(said(v)),
   "a file lost that the base held, or with no base told, is said, never failed, and one a pull request adds fails", JSON.stringify([...lostThen.map(t => t.notes), said(v)]));
 v = judge({ now: { "src/v.js": `export const V = () => <p>{x}</p>;\n${long("tall", 70)}` }, baseline: JSON.stringify({ listed: { "function: src/v.js#V": { lines: 90, depth: 0, branches: 0 } } }), base: baseOf(listed([]), {}) });
