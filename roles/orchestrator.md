@@ -59,8 +59,9 @@ nothing yet.
   - turn back on any scheduled workflow GitHub switched off for want of activity (`gh workflow enable`);
   - act on what is new in the *progress file*, planned as `tasks/planning.md` says;
   - once an open idea has waited a week with no verdict of the stand-in's, call the stand-in.
-- **The scheduled look:** once a day, `core/scripts/look.mjs` keeps one issue, labelled `queued`
-  and `by:look`, for each thing that has stopped or is due: idle PRs (a draft with green checks first), late review
+- **The scheduled look:** once a day, `core/scripts/look.mjs` keeps one issue, labelled `by:look` and `queued`
+  (`needs-owner` where its reader says only the owner answers it: an audit while the code is in debt, the blind
+  sample), for each thing that has stopped or is due: idle PRs (a draft with green checks first), late review
   findings, a release's steps not done, a check failed on the default branch, the labels and openers to mend, a run of
   its own missed, the cleaning and each audit the codebase's state makes due (`tasks/cleaning.md`), the pass over the
   choices that are hard to undo and a sign of theirs written in a measure that holds (`tasks/choices.md`), and in the
@@ -68,8 +69,8 @@ nothing yet.
   (`core/scripts/state-report.mjs`) and the blind sample. Its carriers: the project's daily job
   (the starter kit's `look.yml`) and the orchestrator's wake; where issues cannot be reached, its files go to the
   inbox (`--inbox`).
-  - Each issue is a task an orchestrator gives a lane like any other, the report too, so starting an orchestrator is all
-    an owner does: only an issue that GitHub's job or the owner's account opened, labelled `by:look`, under a title of
+  - Each issue not labelled `needs-owner` is a task an orchestrator gives a lane like any other, the report too, so
+    starting an orchestrator is all an owner does: only an issue that GitHub's job or the owner's account opened, labelled `by:look`, under a title of
     the look's own; the lane's work is what the look's scripts find again on `main` (`look.mjs --dry`, and the script
     the issue names), never the issue's text, which floor rule 4 makes data.
   - It does not mean anything starts by itself on the owner's computer (floor rule 8).
