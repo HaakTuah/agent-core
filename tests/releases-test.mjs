@@ -143,12 +143,13 @@ ok(OWN_FILES.every(f => !matters(f, onlyA)) && !matters("QUEUE.md", onlyA) && !m
 ok(["tasks/a.md", "roles/shared/how-to-work.md", "scripts/x.mjs", "scripts/x-test-data.json", "scripts/sub/y-test.mjs", "floor/security.md", NOTES, ".github/workflows/core.yml", ".github/workflows/core-moved.yml", ".github/workflows/own-other.yml", "README.md", "queue.md", "archive/instructions.md"].every(f => matters(f, onlyA)), "everything else matters: a module it names, a script, the floor, the notes, a workflow a project calls or one not named, the rest of the copy");
 ok(matters("tasks/b.md", taking("all")) && matters("tasks/b.md", "# Core manifest\n") && matters("tasks/b.md", taking("<the list>")), "every module matters where the manifest takes all, or its list cannot be read");
 // (that a test of the core's own scripts never matters holds only while nothing a project runs names one: no script but
-// a test, no file of the starter kit and no workflow but the core's own tests.yml, outside its comments)
+// a test, no file of the starter kit and no workflow but those on OWN_FILES, which no project can call, tests.yml and
+// release.yml among them, which runs the upgrade test on Windows (#715), outside its comments)
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
 // (a test is passed over as matters() in releases.mjs passes it over: one of scripts/ itself, never a nested one)
 const runs = [...walk(path.join(repo, "scripts")).filter(f => !/^scripts\/[^/]+-test\.mjs$/.test(path.relative(repo, f).split(path.sep).join("/"))), ...walk(path.join(repo, "setup", "template")),
-  ...fs.readdirSync(path.join(repo, ".github", "workflows")).filter(f => f !== "tests.yml").map(f => path.join(repo, ".github", "workflows", f))];
+  ...fs.readdirSync(path.join(repo, ".github", "workflows")).filter(f => !OWN_FILES.includes(`.github/workflows/${f}`)).map(f => path.join(repo, ".github", "workflows", f))];
 const naming = runs.flatMap(f => fs.readFileSync(f, "utf8").split("\n").map((l, i) => [l, `${path.relative(repo, f)}:${i + 1}`]))
   .filter(([l]) => /-test\.mjs/.test(l) && !/^\s*(\/\/|#|\*)/.test(l)).map(([, at]) => at);
 ok(!naming.length, "nothing a project runs names a test of the core's own scripts, outside a comment", `${naming.join(", ")}\n     Mend: a project runs no test of the core's: move what it needs into a script without -test in its name, or take ${"`scripts/*-test.mjs`"} off the list of what never matters (matters in releases.mjs)`);

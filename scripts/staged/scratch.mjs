@@ -491,14 +491,18 @@ export function testPasses(dir, ref) {
 }
 
 // What the program prints at a ref of the origin, given `args`; null where it cannot run.
-export function runAt(dir, ref, args) {
+export const runAt = (dir, ref, args) => printed(dir, ref, args)?.out ?? null;
+
+// What the program prints at a ref of the origin, given `args`, to its output and to its errors: { out, err }, each
+// trimmed; null where it cannot run.
+export function printed(dir, ref, args) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "staged-run-"));
   try {
     if (!writeSrc(dir, ref, tmp, "src/cli.mjs")) return null;
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
     // (killed outright at the time limit: code of the session's could keep a gentler signal from ending it)
     const r = spawnSync(process.execPath, ["src/cli.mjs", ...args], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run, killSignal: "SIGKILL" });
-    return r.status === 0 ? r.stdout.trim() : null;
+    return r.status === 0 ? { out: r.stdout.trim(), err: String(r.stderr ?? "").trim() } : null;
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); afresh(); }
 }
 

@@ -4,8 +4,9 @@
 // and when last, how often it failed for no reason (it failed, and passed, on the same commit in the same job), what it
 // alone catches of the faults put in on purpose (a mutation report whose faults name every test that caught them:
 // mutate.mjs --every, beside this file, or Stryker's with its bail turned off), whether it guards a rule the project
-// states (a rule file names its path, or its opening line names a rule file or an issue), whether it is the project's proof (the shape check's config, "select.proof") and whether it opens a screen (the
-// shape check's entries of the reader "screens"). A test that none of the three keeps (it alone catches a fault, it
+// states (a rule file names its path, or its opening line names a rule file or an issue), whether it is the project's proof (the shape check's config, "select.proof") and whether it opens a screen, reaches a real clock or starts
+// another process (the shape check's entries of the readers "screens", "clocks" and "processes"), with the share of the
+// tests' time each of those three takes (#457). A test that none of the three keeps (it alone catches a fault, it
 // guards a stated rule, it failed for a real reason) is proposed for removal or for merging with its neighbour; the reader of the
 // audit decides, never by coverage alone, and one whose faults are not counted yet is never proposed. A test that
 // failed for no reason is named, to be mended or removed. It reports and fails nothing.
@@ -107,8 +108,9 @@ export function alone(report) {
 // ---- the record ----
 
 // Each test's numbers and its verdict. `tests` the project's test files, `runs` the observations, `alone` the faults
-// each alone catches (null where not counted), `named` the tests a rule names, `proof` and `screens` sets of tests.
-export function record({ tests, runs, alone: caught, named, proof, screens }) {
+// each alone catches (null where not counted), `named` the tests a rule names, `proof`, `screens`, `clocks` and
+// `processes` sets of tests (the last two: those that reach a real clock and that start another process; #457).
+export function record({ tests, runs, alone: caught, named, proof, screens, clocks = new Set(), processes = new Set() }) {
   const passedOn = new Set(runs.filter(r => r.passed).map(r => `${r.test}\n${r.key}`));
   return [...new Set([...tests, ...runs.map(r => r.test)])].sort().map(test => {
     const mine = runs.filter(r => r.test === test), fails = mine.filter(r => !r.passed);
@@ -116,18 +118,22 @@ export function record({ tests, runs, alone: caught, named, proof, screens }) {
     const only = caught === null ? null : caught.get(test) ?? 0;
     const keeps = [only ? `alone catches ${only}` : "", named.has(test) ? "it guards a stated rule" : "", real.length ? "failed for a real reason" : "", proof.has(test) ? "the project's proof" : ""].filter(Boolean);
     const verdict = keeps.length ? `kept: ${keeps.join(", ")}` : only === null ? "not weighed: no run counted what it alone catches" : "proposed: for removal, or for merging with its neighbour";
-    return { test, runs: mine.length, seconds: median(mine.map(r => r.seconds)), real: real.length, last: real.map(r => r.at).sort().at(-1) ?? null, flaky: flaky.length, alone: only, screen: screens.has(test), verdict };
+    return { test, runs: mine.length, seconds: median(mine.map(r => r.seconds)), real: real.length, last: real.map(r => r.at).sort().at(-1) ?? null, flaky: flaky.length, alone: only, screen: screens.has(test), clock: clocks.has(test), process: processes.has(test), verdict };
   });
 }
 
 // The table the audit's report shows, and what it asks.
 export function table(rows) {
   const cell = v => (v === null ? "-" : String(v));
-  const lines = ["| Test | Runs | Seconds (median) | Real failures (last) | For no reason | Alone catches | Screen | Verdict |", "| --- | --- | --- | --- | --- | --- | --- | --- |",
-    ...rows.map(r => `| \`${r.test}\` | ${r.runs} | ${cell(r.seconds === null ? null : Math.round(r.seconds * 10) / 10)} | ${r.real}${r.last ? ` (${String(r.last).slice(0, 10)})` : ""} | ${r.flaky} | ${cell(r.alone)} | ${r.screen ? "yes" : ""} | ${r.verdict} |`)];
+  const lines = ["| Test | Runs | Seconds (median) | Real failures (last) | For no reason | Alone catches | Screen | Clock | Process | Verdict |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...rows.map(r => `| \`${r.test}\` | ${r.runs} | ${cell(r.seconds === null ? null : Math.round(r.seconds * 10) / 10)} | ${r.real}${r.last ? ` (${String(r.last).slice(0, 10)})` : ""} | ${r.flaky} | ${cell(r.alone)} | ${r.screen ? "yes" : ""} | ${r.clock ? "yes" : ""} | ${r.process ? "yes" : ""} | ${r.verdict} |`)];
   const flaky = rows.filter(r => r.flaky), proposed = rows.filter(r => r.verdict.startsWith("proposed")), screened = rows.filter(r => r.screen);
   const time = rs => Math.round(rs.reduce((s, r) => s + (r.seconds ?? 0), 0));
-  lines.push("", `${rows.length} tests, ${time(rows)} s in all by their medians. ${screened.length} open a screen, ${time(screened)} s of it.`);
+  // (each share from the summed medians as they stand, rounded only as it is shown)
+  const sum = rs => rs.reduce((s, r) => s + (r.seconds ?? 0), 0);
+  const share = rs => (sum(rows) ? ` (${Math.round(100 * sum(rs) / sum(rows))}%)` : "");
+  const clocked = rows.filter(r => r.clock), spawning = rows.filter(r => r.process);
+  lines.push("", `${rows.length} tests, ${time(rows)} s in all by their medians. ${screened.length} open a screen, ${time(screened)} s of it. ${clocked.length} reach a real clock, ${time(clocked)} s of it${share(clocked)}; ${spawning.length} start another process, ${time(spawning)} s of it${share(spawning)}.`);
   if (flaky.length) lines.push(`Failed for no reason, each to be mended or removed, never retried in silence: ${flaky.map(r => `\`${r.test}\` (${r.flaky})`).join(", ")}.`);
   if (proposed.length) lines.push(`Proposed for removal or merging, for the reader to decide, each in a small pull request that leaves the tests' strength no worse: ${proposed.map(r => `\`${r.test}\``).join(", ")}.`);
   return lines;
@@ -177,9 +183,10 @@ function main(argv) {
   const config = parseConfig(fs.readFileSync(at, "utf8"), at), now = standing(config);
   let mutation = null;
   if (opts["--mutation"]) try { mutation = JSON.parse(fs.readFileSync(opts["--mutation"], "utf8")); } catch { refuse(`the mutation report ${opts["--mutation"]} could not be read as JSON`, "name the report of a whole run, in the mutation-testing-elements schema"); }
-  const screens = new Set([...survey(now.texts, config, now.tests).entries.keys()].filter(id => id.startsWith("screen: ")).map(id => id.slice(8, id.indexOf(" -> "))));
+  const ids = [...survey(now.texts, config, now.tests).entries.keys()];
+  const of = kind => new Set(ids.filter(id => id.startsWith(`${kind}: `)).map(id => id.slice(kind.length + 2, id.indexOf(" -> "))));
   const proof = matcher(config.select.proof);
-  const rows = record({ tests: now.tests, runs: runsOf(opts, now.tests), alone: alone(mutation), named: guarding(now.tests, now.texts), proof: new Set([...now.tests].filter(proof)), screens });
+  const rows = record({ tests: now.tests, runs: runsOf(opts, now.tests), alone: alone(mutation), named: guarding(now.tests, now.texts), proof: new Set([...now.tests].filter(proof)), screens: of("screen"), clocks: of("timed"), processes: of("process") });
   console.log(table(rows).join("\n"));
   return 0;
 }

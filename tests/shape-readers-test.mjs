@@ -5,8 +5,10 @@
 // (.github/workflows/tests.yml).
 //
 //   node tests/shape-readers-test.mjs
+import { Worker } from "node:worker_threads";
 import { csTokens, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "../scripts/shape-csharp.mjs";
 import { STDLIB, logicalLines, pythonPackages, readPython, resolvePython } from "../scripts/shape-python.mjs";
+import { ParserFailed, inParser } from "../scripts/parser.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -130,6 +132,311 @@ const pyPackages = pythonPackages({
 ok(same([...pyPackages.ships.values()], ["requests", "PyYAML", "flask", "numpy", "scikit_learn"]) && same([...pyPackages.declared.keys()].sort(), ["black", "flask", "numpy", "pytest", "pyyaml", "requests", "ruff", "scikit-learn"]),
   "Python: the packages pyproject.toml and requirements files declare are read, those of development apart, by the name pip compares", JSON.stringify([[...pyPackages.ships.values()], [...pyPackages.declared.keys()]]));
 
+// ---- C#'s functions on the parser (csharp-functions.mjs; #529): the cases above, read as the lexer read them, held
+// the port's behaviour to the old reader's; these hold it to counts taken by hand ----
+// Held out: written and counted by hand by a fresh session that never saw the reader, from its definition frozen first
+// (17 November 2026); the lexer's reader counted it the same.
+const heldOutCs = String.raw`// held-out.cs: an invented order-routing service, not compiled against anything real.
+// Braces in comments { } and keywords if while case && must not count.
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace Shop.Routing
+{
+    /* A block comment: if (x) { while (y) { } } && || ?? */
+    public record Order(int Id, string? Note, decimal Total)
+    {
+        public bool IsLarge => Total > 1000m && Note != null;
+
+        public string Describe()
+        {
+            return $"Order {Id}: {(IsLarge ? "large" : "small")} {{literal}}";
+        }
+    }
+
+    public class Ledger(int capacity)
+    {
+        private readonly List<decimal> _items = new List<decimal> { 1m, 2m, 3m };
+        public int Capacity { get; } = capacity;
+
+        public decimal this[int index]
+        {
+            get { return index < _items.Count ? _items[index] : 0m; }
+            set
+            {
+                if (index >= 0 && index < _items.Count)
+                {
+                    _items[index] = value;
+                }
+            }
+        }
+    }
+
+    public abstract class RouterBase
+    {
+        protected RouterBase(string name) { Name = name; }
+        public string Name { get; }
+    }
+
+    public sealed class Router : RouterBase, IDisposable
+    {
+        private readonly object _gate = new object();
+        private EventHandler? _changed;
+        private int? _limit;
+        private string? _label;
+
+        #region Construction
+
+        public Router(string name, int limit) : base(name)
+        {
+            _limit = limit > 0 ? limit : null;
+        }
+
+        public Router() : this("default", 10)
+        {
+        }
+
+        ~Router()
+        {
+            Dispose();
+        }
+
+        #endregion
+
+        public event EventHandler Changed
+        {
+            add { lock (_gate) { _changed += value; } }
+            remove
+            {
+                lock (_gate)
+                {
+                    _changed -= value;
+                }
+            }
+        }
+
+        public string Label
+        {
+            get => _label ?? "none";
+            set { _label = value?.Trim(); _changed?.Invoke(this, EventArgs.Empty); }
+        }
+
+        public int Limit => _limit ?? 0;
+
+        public static Router operator +(Router a, Router b)
+        {
+            return new Router(a.Name + b.Name, a.Limit + b.Limit) { Label = a.Label };
+        }
+
+        public static explicit operator int(Router r)
+        {
+            return r.Limit;
+        }
+
+        public void Dispose()
+        {
+            _changed = null;
+        }
+
+        public T Pick<T, K>(IEnumerable<T> items, K key)
+            where T : class, IComparable<T>
+            where K : notnull
+        {
+            T? best = null;
+            foreach (var item in items)
+            {
+                if (best == null || item.CompareTo(best) > 0)
+                {
+                    best = item;
+                }
+            }
+            return best ?? throw new InvalidOperationException("empty { }");
+        }
+
+        public string Route(Order order, int code)
+        {
+            string path = @"C:\orders\{0}\if\while";
+            string raw = """
+                { "route": "if (a && b) { c ?? d }" }
+                """;
+            char open = '{';
+            string result = "";
+            switch (code)
+            {
+                case 1:
+                case 2:
+                    result = "local";
+                    break;
+                case 3 when order.Total > 50m:
+                    result = "express";
+                    break;
+                case 4:
+                    goto case 1;
+                default:
+                    result = order.IsLarge?"freight":"post";
+                    break;
+            }
+#if DEBUG
+            Console.WriteLine($"{path} {raw.Length} {open}");
+#else
+            _label ??= result;
+#endif
+            return result;
+        }
+
+        public Func<int, int> Rule(string kind) => kind switch
+        {
+            "double" => x => x * 2,
+            "clamp" => x => { return x > 100 ? 100 : x; },
+            _ => x => x,
+        };
+
+        public int Process(IList<Order> orders)
+        {
+            int total = 0;
+            int Weigh(Order o)
+            {
+                if (o is Order { Note: "fragile" })
+                {
+                    return 3;
+                }
+                else if (o.Total > 500m)
+                {
+                    return 2;
+                }
+                else
+                {
+                    return 1;
+                }
+            }
+            Func<Order, bool> heavy = o => o.Total > 200m;
+            Action<Order> log = o =>
+            {
+                if (o.Note != null) if (o.Id > 0) { Console.WriteLine(o.Describe()); }
+            };
+            Func<int, int> square = delegate (int x) { return x * x; };
+            Action ping = delegate { Console.WriteLine(total > 0 ? "ping" : "idle"); };
+            orders.ToList().ForEach(o =>
+            {
+                total += Weigh(o) + (heavy(o) ? 1 : 0);
+            });
+            try
+            {
+                using (var ledger = new Disposer())
+                {
+                    int i = 0;
+                    do
+                    {
+                        log(orders[i]);
+                        i++;
+                    } while (i < orders.Count && i < Limit);
+                }
+            }
+            catch (ArgumentOutOfRangeException e) when (e.ParamName != null)
+            {
+                total = -1;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+            finally
+            {
+                ping();
+            }
+            return square(total);
+        }
+    }
+
+    public sealed class Disposer : IDisposable
+    {
+        public void Dispose() { }
+    }
+}
+`;
+const heldOutByHand = [
+  "Describe:15:3:0:1",
+  "get:27:1:0:1",
+  "set:29:6:1:2",
+  "RouterBase:40:1:0:0",
+  "Router:54:3:0:1",
+  "Router:59:2:0:0",
+  "Router:63:3:0:0",
+  "add:71:1:1:0",
+  "remove:73:6:1:0",
+  "set:84:1:0:0",
+  "operator:90:3:0:0",
+  "int:95:3:0:0",
+  "Dispose:100:3:0:0",
+  "Pick:107:11:2:4",
+  "Route:120:29:1:6",
+  "(anonymous):153:1:0:1",
+  "Process:158:54:3:5",
+  "Weigh:161:14:1:2",
+  "log:177:3:1:2",
+  "(anonymous):180:1:0:0",
+  "(anonymous):183:3:0:1",
+  "Dispose:216:1:0:0",
+];
+ok(same(shown(readCsharp(heldOutCs).functions), heldOutByHand), "C#, held out: each function as a fresh session counted it by hand (22 functions, 153 lines, 26 branches)", shown(readCsharp(heldOutCs).functions));
+// What the lexer misread, by its own definition, and the parser reads as the definition says: a choice with no spaces,
+// a goto case (no case), a lambda in a switch expression's arm (no arm), the operator >>>, a property pattern (no
+// function), a choice in a raw string's hole.
+const misread = String.raw`class Q {
+  int A(bool a) {
+    var x = a?1:2;
+    return x;
+  }
+  void B(int s) {
+    switch (s) { case 1: goto case 2; case 2: break; }
+  }
+  void C() {
+    Action d = delegate { if (true) { } };
+  }
+  Func<int, Func<int,int>> D(int v) {
+    return v switch { 1 => y => y, _ => z => z };
+  }
+  public static Q operator >>>(Q a, int b) { return a; }
+  bool E(object o) {
+    return o is Foo(1) { P: 2 };
+  }
+  string F(int n) {
+    return $"""{(n > 1 ? "a" : "b")}""";
+  }
+  void G() {
+    if (a) if (b) { }
+  }
+}
+`;
+ok(same(shown(readCsharp(misread).functions), ["A:2:4:0:1", "B:6:3:1:2", "C:9:3:1:1", "D:12:3:0:2", "operator:15:1:0:0", "E:16:3:0:0", "F:19:3:0:1", "G:22:3:1:2"]),
+  "C#: what the lexer misread is read as the definition says", shown(readCsharp(misread).functions));
+// C# 14's extension blocks, which the grammar predates: no function themselves, their members read; the generic form too.
+const extension = "static class P\n{\n    extension<T>(IEnumerable<T> s) where T : class\n    {\n        public static int X { get { return 1; } }\n        public int Y() { if (a) { } return 2; }\n    }\n    extension(char c)\n    {\n        public bool Z(int n) { return n > 0 && c != 'x'; }\n    }\n}\n";
+ok(same(shown(readCsharp(extension).functions), ["get:5:1:0:0", "Y:6:1:1:1", "Z:10:1:0:1"]), "C#: an extension block of C# 14 is no function, and its members are read", shown(readCsharp(extension).functions));
+// What stands outside a function's body is read where the function stands, as the lexer read it: a lambda passed to
+// : this(...) is a function of its own, opening before the constructor's body; a default's choice counts for the
+// function around the local function.
+const outside = "class C {\n  public C() : this(() => {\n    if (a) { if (b) {} }\n  }) {}\n  void L() { int F(int x = a ? 1 : 2) { return x; } }\n}\n";
+ok(same(shown(readCsharp(outside).functions), ["(anonymous):2:3:2:2", "C:4:1:0:0", "L:5:1:0:1", "F:5:1:0:0"]), "C#: a lambda in a constructor's initializer is a function, and what stands outside a body counts where its function stands", shown(readCsharp(outside).functions));
+// A file the grammar cannot read whole has no functions told: a method that holds C# 14's null-conditional assignment
+// (a?.b += 1), which the grammar installed predates, reads as no method at all, so the file is lost, counted and said
+// (shape.mjs), where measuring what the grammar read would have passed a long function in silence (#605's fallback
+// review).
+const newer = `class A\n{\n    void Long()\n    {\n${"        x++;\n".repeat(100)}        a?.b += 1;\n    }\n}\n`;
+ok(readCsharp(newer).functions === null, "C#: a file the grammar cannot read whole has no functions told, so that the check counts it and says so");
+// The parser's thread: a call that fails there is told as the file's ("read"), and the next call gets its own answer,
+// never an earlier one's.
+let failedAs = null;
+try { inParser(new URL("../scripts/csharp-functions.mjs", import.meta.url).href, "no such reader", "class A { }", []); } catch (e) { failedAs = e instanceof ParserFailed ? e.kind : String(e); }
+ok(failedAs === "read" && same(shown(readCsharp("class A { void M() { if (a) { } } }").functions), ["M:1:1:1:1"]), "C#: a call that fails in the parser's thread is a failure to read the file, and the next call gets its own answer", failedAs);
+// A type named extension: its constructor `extension() { }` is read as a constructor, never as an extension block's
+// header (Codex's finding on #605).
+ok(same(shown(readCsharp("class extension\n{\n    extension() { int x = 0; }\n}\nstatic class P\n{\n    extension(char c) { public int Y() { return 1; } }\n}\n").functions), ["extension:3:1:0:0", "Y:7:1:0:0"]), "C#: a type named extension keeps its constructor, and an extension block beside it is still read as one", shown(readCsharp("class extension\n{\n    extension() { int x = 0; }\n}\n").functions));
+// Both sides of an #if read as code, as the lexer read them: an if on each side, one block after.
+const sides = "class S\n{\n    void M()\n    {\n#if WINDOWS\n        if (a)\n#else\n        if (b)\n#endif\n        {\n            Go();\n        }\n    }\n}\n";
+ok(same(shown(readCsharp(sides).functions), ["M:4:10:1:2"]), "C#: both sides of an #if are read as code, the block after them the second if's", shown(readCsharp(sides).functions));
+
 // ---- what no file can do to the readers: overflow their stack, or take time past its length ----
 const deepCs = `class A { string s = ${"$\"{".repeat(5000)}x${"}\"".repeat(5000)}; void B() { } }\n`;
 const deepPy = `x = ${'f"{'.repeat(5000)}1${'}"'.repeat(5000)}\ndef f():\n    return 1\n`;
@@ -140,6 +447,32 @@ csTokens(`${"#".repeat(400000)}\n`);
 readCsharp(`${"using A = B<".repeat(40000)}\n`);
 csharpPackages({ "x.csproj": "<PackageReference Include=\"a\" ".repeat(100000) });
 ok(Date.now() - started < 5000, `a line of #, aliases that never close and references that never close are read in time linear in their length (${Date.now() - started} ms)`);
+// (the parser's walk: blocks and ifs nested twenty thousand deep, a text of headers of C# 14's extension blocks that
+// never end, and a word or a lambda at the left end of a chain forty thousand long, each read in time linear in its
+// length; #605's fallback review)
+const walked = Date.now();
+const deepIfs = readCsharp(`class A { void M() {${"if (a) {".repeat(20000)}${"}".repeat(20000)}} }`).functions?.[0];
+readCsharp(`class A { void M() {${"{".repeat(40000)}${"}".repeat(40000)}} }`);
+readCsharp(`class A {${"x; extension(".repeat(5000)}}`);
+readCsharp(`class A { int x = extension ${"+ a ".repeat(40000)}; }`);
+readCsharp(`class A { void M() { var f = (() => { })${" + a".repeat(40000)}; } }`);
+ok(deepIfs?.depth === 20000 && deepIfs.branches === 20000 && Date.now() - walked < 5000, `C#: code nested twenty thousand deep, headers that never end and the left ends of long chains are read on the parser in time linear in their length (${Date.now() - walked} ms)`, JSON.stringify(deepIfs));
+
+// (code run with --input-type=module, as a script started with node -e and that flag is, reads C# on the parser all the
+// same: the parser's thread is not handed that flag, which Node refuses for a module file, where the thread would die
+// at once and every file wait out the parser's wait. A thread of this process's own, given the flag, is such code, so no
+// other process is started for it)
+{
+  const at = new URL("../scripts/shape-csharp.mjs", import.meta.url).href;
+  const code = `const { parentPort } = await import("node:worker_threads"); const { readCsharp } = await import(${JSON.stringify(at)}); parentPort.postMessage({ argv: process.execArgv, functions: readCsharp("class A { void M() { } }\\n").functions });`;
+  const got = await new Promise(resolve => {
+    const w = new Worker(code, { eval: true, execArgv: ["--input-type=module"] });
+    w.once("message", m => { resolve(m); w.terminate(); });
+    w.once("error", e => resolve({ error: String(e?.message ?? e) }));
+    w.once("exit", c => resolve({ error: `the thread exited with ${c} and sent nothing` }));
+  });
+  ok(got.argv?.includes("--input-type=module") && got.functions?.[0]?.name === "M", "code run with --input-type reads C#'s functions on the parser at once", JSON.stringify(got));
+}
 
 console.log(`${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

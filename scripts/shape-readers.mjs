@@ -1,8 +1,9 @@
 // The shape check's readers (shape.mjs, beside this file; tasks/code-shape.md, "What the check reads"; #354): which
 // files it reads, and each file as its reader reads it, in one form whatever its language. JavaScript and TypeScript,
-// JSX among them, by the reader of the measures (code-shape.mjs); C# by shape-csharp.mjs; Python by shape-python.mjs;
-// and the scripts that share one global space, those of JavaScript or TypeScript with no import or export, by the
-// names their top level declares. None runs the code it reads. Node's own modules only.
+// JSX among them, by the reader of the measures (code-shape.mjs); C# by shape-csharp.mjs, its functions on the parser
+// the core installs (csharp-functions.mjs); Python by shape-python.mjs; and the scripts that share one global space,
+// those of JavaScript or TypeScript with no import or export, by the names their top level declares. None runs the code
+// it reads. Node's own modules, and the parser's installed packages.
 //
 // Each reader has a name, which a baseline lists under "reads" once it lists what that reader finds: a baseline written
 // before a reader came lists none of it, and what the pull request's base held of it is reported, never failed, until
@@ -10,17 +11,27 @@
 import path from "node:path";
 import { CODE, functions, globals, imports, isModule, isP, jsxIn, tokens } from "./code-shape.mjs";
 import { OWN as CS_OWN, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "./shape-csharp.mjs";
+import { unreachedFor } from "./parser.mjs";
 import { OWN as PY_OWN, STDLIB, normal, pythonPackages, readPython, resolvePython } from "./shape-python.mjs";
 
 // Each reader by its name, with what it reads, as a note says it.
 export const READERS = {
   javascript: "JavaScript and TypeScript",
   jsx: "files that hold JSX",
-  csharp: "C#",
+  // (C# as its functions were read by a lexer written here, until #529: no file is read so now, and a baseline that
+  // names it stays one the check reads)
+  csharp: "C#, its functions by the lexer",
+  "csharp-tree": "C#, its functions by the parser",
   python: "Python",
   scripts: "scripts that share one global space",
   screens: "the tests that open a screen, a window or a device",
+  clocks: "the tests that reach a real clock",
+  processes: "the tests that start another process",
 };
+// The readers that read on the parser and could not run, its packages not installed for the registry not answering in
+// a project's pull request (parser.mjs, unreachedFor): the check reads their finds as a reader's the baseline does not
+// name, reported and never failed, and says so (#654, point 4).
+export const unreachedReaders = () => (unreachedFor("csharp") ? ["csharp-tree"] : []);
 // What a baseline that names no reader was written with: the check as #246 built it.
 export const FIRST_READS = ["javascript"];
 
@@ -33,6 +44,28 @@ export const PACKAGE_FILES = [":(glob)**/package.json", ":(glob)**/pyproject.tom
 // The clock and randomness a system of rules may not take for itself in JavaScript: each a run of tokens.
 const JS_OWN = [["Math", ".", "random"], ["Date", ".", "now"], ["performance", ".", "now"], ["new", "Date", "(", ")"], ["crypto", ".", "randomUUID"], ["crypto", ".", "getRandomValues"], ["crypto", ".", "randomBytes"], ["crypto", ".", "randomInt"]]
   .map(run => ({ run, what: run.join("").replace("new", "new ") }));
+
+// What a test reaches that costs the most time (tasks/tests.md, "A test reaches a real clock or another process only
+// where it guards it"; #457): a real clock (a sleep, a timed wait, a read of the time) and another process, each by
+// the language's own names, as runs of tokens it calls and as modules it imports; the config's "clocks" and
+// "processes" add names of a project's own. A test's code only, never what the helpers it imports reach.
+const dotted = name => name.split(".").flatMap((part, k) => (k ? [".", part] : [part]));
+const runsOf = names => names.map(what => ({ run: what.startsWith("new ") ? ["new", ...dotted(what.slice(4).replace(/\(\)$/u, "")), ...(what.endsWith("()") ? ["(", ")"] : [])] : dotted(what), what }));
+export const REACH = {
+  javascript: {
+    clock: { runs: runsOf(["setTimeout", "setInterval", "Date.now", "performance.now", "new Date()", "Atomics.wait"]), imports: ["timers", "node:timers"] },
+    process: { runs: [], imports: ["child_process", "node:child_process", "execa", "cross-spawn"] },
+  },
+  csharp: {
+    clock: { runs: runsOf(["Thread.Sleep", "Task.Delay", "DateTime.Now", "DateTime.UtcNow", "DateTimeOffset.Now", "DateTimeOffset.UtcNow", "Stopwatch.StartNew", "Environment.TickCount", "Environment.TickCount64"]), imports: [] },
+    process: { runs: runsOf(["Process.Start", "new Process", "new ProcessStartInfo"]), imports: [] },
+  },
+  python: {
+    clock: { runs: runsOf(["time.sleep", "asyncio.sleep", "time.time", "time.monotonic", "time.perf_counter", "datetime.now", "datetime.utcnow", "datetime.datetime.now", "datetime.datetime.utcnow"]), imports: ["time"] },
+    process: { runs: runsOf(["os.system", "os.popen"]), imports: ["subprocess", "multiprocessing"] },
+  },
+};
+export const reachRuns = runsOf;
 
 const JSX_FILES = [".jsx", ".tsx"];
 // (files that are modules by their extension, whatever they hold; and types alone, which no page loads)
@@ -51,7 +84,7 @@ function javascript(file, text) {
 // lang }, and of C# its namespaces and types.
 export function reading(file, text) {
   const ext = path.posix.extname(file);
-  if (ext === ".cs") { const r = readCsharp(text); return { ...r, reader: "csharp", imports: r.usings, own: CS_OWN, lang: "csharp" }; }
+  if (ext === ".cs") { const r = readCsharp(text); return { ...r, reader: "csharp-tree", imports: r.usings, own: CS_OWN, lang: "csharp" }; }
   if (ext === ".py") return { ...readPython(text), reader: "python", own: PY_OWN, lang: "python" };
   return javascript(file, text);
 }

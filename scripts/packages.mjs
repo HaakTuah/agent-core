@@ -219,3 +219,14 @@ function found(name) {
   }
   return file;
 }
+
+// The file `rel` of the package `name`, in the core's own .packages/node_modules/ alone and only where the install there is
+// what the lock file names, for a file that is no module (a WebAssembly file, a build of the module's own); where it is
+// not there, the failure's words with its mend, thrown and never an exit, so that a worker thread that asks tells its
+// caller.
+export function installedFile(name, rel) {
+  const own = path.join(packages, "node_modules"), file = path.join(own, name, rel);
+  try { if (matches() && fs.realpathSync(file).startsWith(fs.realpathSync(own) + path.sep)) return file; } catch { /* said below */ }
+  const install = path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"));
+  throw new Error(`the check did not run: the package ${name} is not installed in ${path.relative(process.cwd(), own)} as .packages/package-lock.json names it (${rel}). Mend: run node ${install}, which installs the core's packages from its lock file, then run the check again`);
+}
