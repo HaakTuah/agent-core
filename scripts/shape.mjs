@@ -25,7 +25,8 @@
 // out, which the next pull request that changes the baseline, or a cleaning task, writes; one that changes the
 // baseline and leaves such an entry standing fails, so the baseline it writes lists the debt as it is (#750, point
 // 5: improving pull requests had to rewrite this shared file, and collided); until it is written, an entry the base's
-// code no longer held covers no new breach. A baseline names the readers whose finds it lists ("reads"): what a reader it
+// code no longer held covers no breach elsewhere, though the mended one could come back unseen under its own id. A
+// baseline names the readers whose finds it lists ("reads"): what a reader it
 // does not name finds is said, never failed, where the base held it already or no base is told, until --write lists
 // it, so that a sync that brings a reader turns nothing red (AGENTS.md, "Nothing locks a project"). It never guesses:
 // an import that leads nowhere it can tell and a file whose JSX its reader cannot follow to its end are counted and
@@ -671,7 +672,7 @@ export function verdict({ config, at, self, found, baselineText, base }) {
 }
 
 // The entries of a baseline a new breach may claim, against the pull request's base: each but one gone now that the
-// base's code no longer held either, a mended entry an earlier pull request left listed, which covers nothing new
+// base's code no longer held either, a mended entry an earlier pull request left listed, which covers no breach elsewhere
 // (#750, point 5). The base's code is read only where an entry is gone now.
 function heldAt(listed, gone, base) {
   const kept = [...listed].filter(([id]) => !gone(id) || base.stood().has(id));
