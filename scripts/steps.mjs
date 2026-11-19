@@ -256,6 +256,31 @@ function passedRuns(p) {
   return missing.length ? `The selection runs on a push with nothing to say whether the merged tree passed already (${missing.join("; ")}): give its step \`--passed <the check that gates the tests>\` on a push's first run alone (the job's own check, such as \`tests\`, as a ruleset requires it; in bash, \`\${SELECT_PASSED:+--passed "$SELECT_PASSED"}\` with \`SELECT_PASSED\` set so on a push and empty otherwise), \`GH_TOKEN: \${{ github.token }}\` on that step on a push alone, and \`checks: read\` beside \`contents: read\` in the job's permissions; and have every step that reads \`RUN\` run nothing where it says \`none\` (\`if [ \"$RUN\" = all ]; then <the whole suite>; elif [ \"$RUN\" != none ]; then <the runner> $RUN; fi\`, or an \`if:\` whose parts joined by \`&&\` hold \`RUN\` in one part alone, nothing but \`env.RUN == 'all'\` and \`contains(env.RUN, ' <file> ')\` joined by \`||\`), since a runner given no file runs every test, and one given \`none\` fails; then a push that merges a pull request's head whose tree it holds, whose run selected the whole suite and passed that check, runs no test again. Leave it off any job, or entry of a job's matrix, that a pull request does not run, whose suite ran nowhere else, and any whose tests read what no tree holds (a release's tag, the day). Nothing fails meanwhile: the whole suite runs on a push as before.` : null;
 }
 
+// Each job of the project's own that starts a suite through the shape check on a pull request, as every suite is
+// started, starts once the pull request is marked ready and skips a draft (tasks/tests.md, "No test run on a draft";
+// #733, point 7): its trigger's types hold opened, synchronize, reopened and ready_for_review, and its job's `if:` skips
+// a draft: a condition of parts joined by && alone, one of them `!github.event.pull_request.draft` or
+// `github.event.pull_request.draft == false`, the others any, a status function such as `!cancelled()` among them,
+// its quoted strings read as one word each; any other shape (an ||, a negation of more, an index, text outside its
+// `${{ }}`, which GitHub reads as a string and so as true) is read as not done.
+const SUITE_RUN = /shape\.mjs\b[^\n]*--suite\b/u;
+const READY_TYPES = ["opened", "synchronize", "reopened", "ready_for_review"];
+const DRAFT_PART = /^(?:!\s*github\.event\.pull_request\.draft|github\.event\.pull_request\.draft\s*==\s*false)$/u;
+const skipsDraft = cond => {
+  const inner = String(cond ?? "").trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1").replace(/'(?:[^']|'')*'/gu, "text").replace(/!?\s*\b(?:always|success|cancelled|failure)\(\)/gu, "status");
+  return !/\|\||[()[\]'$]|\$\{\{|\}\}/u.test(inner) && inner.split("&&").some(part => DRAFT_PART.test(part.trim()));
+};
+function testsWhenReady(p) {
+  readable(p, text => SUITE_RUN.test(text));
+  const loose = Object.entries(p.workflows).filter(([, { yaml }]) => onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => {
+    const types = yaml.on?.pull_request?.types, ready = Array.isArray(types) && READY_TYPES.every(t => types.includes(t));
+    return Object.entries(yaml.jobs ?? {})
+      .filter(([, job]) => (Array.isArray(job?.steps) ? job.steps : []).some(st => typeof st?.run === "string" && SUITE_RUN.test(st.run)) && !(ready && skipsDraft(job?.if)))
+      .map(([name]) => `\`.github/workflows/${shown(file)}\`, its job \`${shown(name)}\``);
+  });
+  return loose.length ? `In one small pull request, with floor rule 3's two security reviews, bring the project's own test workflow to \`core/tasks/tests.md\` as its kind reads it (${loose.join("; ")}): give its \`pull_request\` trigger the types opened, synchronize, reopened and ready_for_review, and have each job that starts a suite skip a draft (\`if: \${{ !github.event.pull_request.draft }}\`, or that beside other parts joined by && alone), the check the ruleset requires failing on a draft rather than skipped, since a required check whose job is skipped passes (the core's own \`tests.yml\` shows it); then run the platform suites on the schedule \`node core/scripts/runners.mjs --repo <owner>/<name>\` prints from where the tests run, who pays and what users get (where every merge goes live, on each pull request, as now; where users get a release, at the default branch's newest commit), and give the runs on the default branch one concurrency group that cancels the run in progress. Where \`node core/scripts/merge-line.mjs --repo <owner>/<name>\` says the project's users get a release and the host still asks an up-to-date branch, file the issue it names for the owner, labelled needs-owner; nothing waits on it.` : null;
+}
+
 // The shape check's config and baseline as a project holds them: { at, config, reads } (the readers its baseline names),
 // or { mend } where the config or the baseline is not there or cannot be read.
 function shapeHeld(p) {
@@ -971,6 +996,8 @@ export const STEPS = [
   { lead: "18 November 2026, the shape check reads C#'s functions on the parser", cost: COST.config, check: shapeReadsParsed },
   { lead: "19 November 2026, the parser's packages installed where the shape check runs", cost: COST.workflow, check: parserFirst,
     partly: "that a job reaching the shape check through the project's own npm or shell script installs the parser's first is read by the review" },
+  { lead: "19 November 2026, the project's tests at the pace of a release", cost: COST.workflow, check: testsWhenReady,
+    partly: "that the check the ruleset requires fails on a draft rather than being skipped, a suite started inside a workflow a job calls, which suites are the platform suites and on what schedule they run, how the runs on the default branch give way to a newer merge, where the tests that guard only what a release brings run (#715), and whether the host still asks an up-to-date branch where users get a release are read by the session that syncs, with `core/scripts/runners.mjs` and `core/scripts/merge-line.mjs`, not by a file" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the
