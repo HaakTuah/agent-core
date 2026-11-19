@@ -50,10 +50,13 @@ export function next(dir, at = null) {
   return { name, sha: tip, before: before ?? null, asks: before ? asksBetween(before.sha, tip, dir) : [] };
 }
 
-// An entry the release asks, with its step's cost (steps.mjs) on the line below it; an entry with no step says so.
+// An entry the release asks, with its step's cost (steps.mjs) on the line below it; an entry with no step says so, and
+// a line of the notes that is no entry (the notice to a sync from a copy older than the folder, sync-notes.mjs) asks
+// nothing beyond reading it.
 export const costed = entry => {
+  if (!/^- \*\*[^*]+?\.\*\*/u.test(entry)) return `${entry}\n  Cost: nothing beyond reading it, a notice and no entry.`;
   const step = STEPS.find(s => entry.startsWith(`- **${s.lead}.**`));
-  return `${entry}\n  Cost: ${step ? `${step.cost}${step.owner ? " (the owner's)" : ""}` : "unknown: the entry has no step in scripts/steps.mjs"}.`;
+  return `${entry}\n  Cost: ${step ? `${step.cost}${step.owner ? " (the owner's)" : ""}` : "unknown: the entry has no step in scripts/steps/"}.`;
 };
 
 // What the core's owner tells a project whose copy is older than release-1 when handing a release on (#365): its own

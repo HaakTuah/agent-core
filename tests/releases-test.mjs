@@ -122,6 +122,12 @@ ok(asksBetween("f".repeat(40), c3, dir) === null, "notes that cannot be read giv
   ok(asksBetween(filed, foldered, bare).length === 0, "a sync across the notes' move into a folder asks nothing the file did not hold", asksBetween(filed, foldered, bare).join("\n"));
   ok(asksBetween(filed, gained, bare).join("|") === three && asksBetween(foldered, gained, bare).join("|") === three, "an entry the folder gains is asked, from a commit before the move or after it");
   ok(entries(notesAt(gained, args => git(notes, ...args))).join("|") === [one, three, two].join("|"), "the notes read whole at a commit hold the folder's entries in the order of the files' names");
+  // (a copy older than the folder syncs with its own script, whose reader took the lines a diff of the file alone
+  // added: across the move it reads the notice the core's file holds, which sends the session to the folder)
+  const notice = entries(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", NOTES), "utf8"));
+  const moved = save({ [NOTES]: `${head}${notice.join("\n")}\n\n${POINTER}\n` });
+  const oldReader = (a, b) => git(notes, "diff", "--unified=0", "--no-color", a, b, "--", NOTES).split("\n").filter(l => l.startsWith("+- ")).map(l => l.slice(1));
+  ok(notice.length === 1 && oldReader(filed, moved).join("|") === notice[0] && notice[0].includes("`core/setup/sync-notes/`"), "a sync from a copy older than the folder, by its own old reader, prints the notice that sends it to the folder", oldReader(filed, moved).join("\n"));
 }
 const coming = next(dir);
 ok(coming.name === "release-4" && coming.sha === c4 && coming.before.name === "release-2" && coming.asks.length === 0, "the next release stands on main's newest commit, numbered after every tag with a release's name, the one that is no release too, so its name is never taken");
@@ -271,7 +277,7 @@ ok(!inTheCore(path.join(nested, "core", "scripts", "release.mjs")), "nor is a cl
 // what a release asks, each with roughly what it costs a project where it is not done yet (steps.mjs)
 const owners = STEPS.find(s => s.owner);
 ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[0].cost}.`) && costed(`- **${owners.lead}.** Done when two.`).includes("(the owner's)")
-  && costed("- **No such entry.** Done when three.").includes("unknown"), "each ask of a release says what it costs, the owner's marked so, and one with no step says so");
+  && costed("- **No such entry.** Done when three.").includes("unknown") && costed("- A notice, no entry.").endsWith("a notice and no entry."), "each ask of a release says what it costs, the owner's marked so, one with no step says so, and a notice asks nothing beyond reading it");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the core's releases`);
 process.exitCode = failed ? 1 : 0;
