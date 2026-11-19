@@ -3,7 +3,7 @@
 // "nuget" and "agentTools", .github/workflows/*.yml, an agent tool's settings), which anyone who opens a pull request
 // writes. Read by licences.mjs (its lock and config readers), exact-versions.mjs, nuget.mjs (its lock and config
 // readers; its build files' XML has its own hostile block in nuget-test.mjs, "const hostile", near line 223, not
-// repeated here; its project readers' links out of the project), workflows.mjs with yaml-keys.mjs, sync.mjs (the move
+// repeated here; its project readers' links out of the project), workflows.mjs with yaml-keys.mjs, workflow-run.mjs (parseYaml, #864), sync.mjs (the move
 // of the pins in the workflows), runners.mjs (#733), and agent-tools.mjs (its links out of the checkout:
 // agent-tools-test.mjs, near line 119). Each case is refused: nothing of it is taken as a pass or a value, and a failure
 // says its mend. Run by the core's tests workflow (.github/workflows/tests.yml).
@@ -63,6 +63,14 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   ok(quick(() => JSON.stringify(twice(`a: ${"[".repeat(3e6)}\n`)) === '[{"line":1,"key":null,"first":null,"size":true}]' && draftHoles(`a: ${"[".repeat(3e6)}\n`).length === 0), "a text of three million opening brackets is said unread at once, by both readers of a workflow, never given to the parser");
   ok(quick(() => twice("]".repeat(100000)).length === 0 && twice(`{${",".repeat(100000)}`).length === 0 && twice("!t ".repeat(50000)).length === 0), "a text of a hundred thousand closing brackets or commas, or of fifty thousand tags, each an error the package reads, is read in a few seconds");
   ok(quick(() => [`a: ${"{b: ".repeat(50000)}`, Array.from({ length: 5000 }, (_, i) => `${" ".repeat(i)}k:`).join("\n")].every(t => JSON.stringify(twice(t).map(k => k.key)) === "[null]")), "a flow value fifty thousand deep, or keys indented five thousand deep, are read without a throw, and said to be read only in part");
+  // (the same text through parseYaml, which reads a project's own workflow for check.mjs, check-configs.mjs and steps.mjs: #864;
+  // it runs as its own process so that a reader that gave it to the package would end in the run's timeout or an exit
+  // with no mend, and no clock is read here)
+  const big = spawnSync(process.execPath, ["--input-type=module", "-e", `import { parseYaml } from ${JSON.stringify(new URL("../scripts/workflow-run.mjs", import.meta.url).href)};
+    const say = (t) => { try { parseYaml(t); return "read"; } catch (e) { return "FAIL: " + e.message; } };
+    console.log(say("a: " + "[".repeat(3e6) + "\\n")); console.log(say("# " + "x".repeat(262144) + "\\na: 1\\n")); console.log(say("# " + "x".repeat(262000) + "\\na: 1\\n"));`], { encoding: "utf8", timeout: 10000 });
+  const [huge, past, under] = big.stdout.split("\n");
+  ok(big.status === 0 && mended(huge) && /longer than 262144 characters/u.test(huge) && mended(past) && under === "read" && !/\n\s+at /u.test(big.stderr), "parseYaml refuses three million opening brackets, and a text one character past the length read, with its mend and never to the package, and reads one under it");
   ok(quick(() => settings(JSON.stringify({ hooks: { Stop: [{ hooks: many.map((m) => ({ type: "command", command: `echo ${m}` })) }] } })).tools.size === 30000), "thirty thousand agent hooks are read in a few seconds");
   ok(quick(() => (r = listed({ agentTools: many.map((m) => ({ kind: "plugin", name: m, publisher: "moss", version: "^1" })) }, "c.json")).problems.length === 30000 && said(r.problems)), "thirty thousand agentTools entries pinned to a range each fail with their mend");
 }
