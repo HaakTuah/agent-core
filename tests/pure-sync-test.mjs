@@ -79,8 +79,17 @@ const base = git(p, "rev-parse", "HEAD");
 ok(entries(git(p, "rev-parse", "HEAD:core"), path.join(p, ".git")) === entries(copyTree(A, coreRepo), coreRepo), "  core/ is the core's tree at A, without the folder it keeps to itself");
 
 // ---- the sync ----
+// (a project that follows main takes its newest commit whose checks all passed, as the host lists the runs its push
+// started: a gh of the test's own says each passed; floor rule 12, #733. That stand-in is a script Windows does not
+// start by its name, so there the sync is given B's full SHA, which takes the same commit; the green reading itself is
+// core-moved-test.mjs's)
+const greenBin = path.join(tmp, "green-bin");
+fs.mkdirSync(greenBin);
+fs.writeFileSync(path.join(greenBin, "gh"), `#!/usr/bin/env node\nconst route = process.argv.slice(2).find(x => x.includes("actions/runs")) ?? "";\nif (!route) { console.error("gh: Not Found (HTTP 404)"); process.exit(1); }\nconsole.log(JSON.stringify({ total_count: 1, workflow_runs: [{ name: "tests", path: ".github/workflows/tests.yml", status: "completed", conclusion: "success" }] }));\n`, { mode: 0o755 });
+const PATHKEY = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
+const greenEnv = { ...env, [PATHKEY]: `${greenBin}${path.delimiter}${env[PATHKEY]}` };
 git(p, "checkout", "-q", "-b", "sync");
-const s = node(p, "core/scripts/sync.mjs");
+const s = (r => ({ status: r.status, out: `${r.stdout}${r.stderr}` }))(spawnSync(process.execPath, ["core/scripts/sync.mjs", ...process.platform === "win32" ? [B] : []], { cwd: p, env: greenEnv, encoding: "utf8" }));
 const calls = read(p, ".github/workflows/core.yml");
 ok(s.status === 0 && s.out.includes(`${SHA(A)} -> ${SHA(B)}`) && read(p, "core-manifest.md") === manifest(OWNER, B), "the sync takes a project that follows main to the core's newest commit, and moves the manifest's pin", s.out);
 ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) && s.out.includes("personal-terms.yml"), "  it moves a call whose workflow changed, and leaves one whose workflow did not", calls);

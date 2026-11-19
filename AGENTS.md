@@ -50,7 +50,9 @@ those written before 12 November 2026, and the staged cases' record); the *audit
 the *mutation tool*: `node scripts/mutate.mjs --report {report} {lines}`, the core's own, in `tests.yml`;
 the archive is `archive/instructions.md`, the items behind each rule listed in `scripts/holders.json`; the *settling references* and the *descriptions*:
 `README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
-`tests.yml`, its baseline empty (#259); the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines
+`tests.yml`, its baseline empty (#259); the *owner's account*: `HaakTuah`; the *users get*:
+`releases`, its users taking the core from a release or, following `main`, from its newest commit whose checks all
+passed (#733); *one at a time*: the queue's lines
 that change the same file, and all that add to what a role reads at its start, whose caps they share, in the
 queue's order; the
 *design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
@@ -165,7 +167,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   asked to (`tasks/cleaning.md`). It does not mean that all a release brings arrives advisory or off, nor that old code is left
   alone. Reason: a project that takes the core on trust, from a release, never finds a pull request failing, or work
   waiting on its owner, for something it did not change. Held by `tests/upgrade-test.mjs`, in
-  `.github/workflows/tests.yml`: a project written by the starter kit of each of the last two releases (npm and .NET,
+  `.github/workflows/tests.yml` on Linux, and on Windows in `release.yml` daily and before each release: a project written by the starter kit of each of the last two releases (npm and .NET,
   the .NET one as Windows holds it, its commits made under a listed name), holding old content of each kind a check
   reads and synced to the commit under test, passes every check of the core unchanged, that mend made, starts no job
   it did not start before, and fails a pull request that adds a copy until the mend its failure words is made; by the
