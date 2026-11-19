@@ -122,7 +122,8 @@ ok(run("--raise").status === 1 && run("--raise", same).status === 1 && run("--ra
   const git = (...args) => spawnSync("git", args, { cwd: repo, encoding: "utf8" });
   git("init", "-q"); fs.mkdirSync(path.join(repo, "scripts")); fs.writeFileSync(path.join(repo, "scripts", "size.mjs"), own);
   for (const m of ["base", "head"]) { git("add", "-A"); git("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", m); }
-  const { env, ghData, ghLog } = ghStandIn(process.env, fs.mkdtempSync(path.join(tmp, "gh-")), repo);
+  // (git's config count given where the environment holds none, as on a runner, since the stand-in adds one to it)
+  const { env, ghData, ghLog } = ghStandIn({ ...process.env, GIT_CONFIG_COUNT: process.env.GIT_CONFIG_COUNT ?? "0" }, fs.mkdtempSync(path.join(tmp, "gh-")), repo);
   const says = (login, author_association) => ({ user: { login, type: "User" }, author_association, body: "Leanness check: too little room." });
   fs.writeFileSync(ghData, JSON.stringify({ "issues/1/comments": [says("SomeOne", "OWNER"), says("writer", "COLLABORATOR"), says("reader", "MEMBER"), says("silent", "MEMBER"), says("outsider", "NONE"), says("bad;name", "MEMBER")],
     "collaborators/writer/permission$": right("writer", "write", "write", true), "collaborators/reader/permission$": right("reader", "read", "read", false) }));
@@ -132,6 +133,7 @@ ok(run("--raise").status === 1 && run("--raise", same).status === 1 && run("--ra
   const script = path.join(runner, "step.sh");
   fs.writeFileSync(script, step.run);
   const r = spawnSync(onPath("bash", env), ["-e", script], { cwd: repo, encoding: "utf8", env: { ...env, ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}), GH_TOKEN: "not-a-token", NUMBER: "1", OWNER: "someone", RUNNER_TEMP: runner, GITHUB_REPOSITORY: "someone/project" } });
+  if (r.status !== 0) console.error(r.stdout + r.stderr);
   const rights = JSON.parse(fs.readFileSync(path.join(runner, "raise", "rights.json"), "utf8")), whose = whoseOf("someone", rights);
   ok(r.status === 0 && rights.length === 2 && whose({ login: "writer", type: "User" }) && !whose({ login: "reader", type: "User" }) && !whose({ login: "silent", type: "User" }) && whose({ login: "SomeOne", type: "User" })
     && r.stdout.includes("The host's rights of silent could not be read") && !/outsider|bad;name|someone\b/iu.test(r.stdout),
