@@ -1,0 +1,164 @@
+// The merge line (roles/shared/work-flow.md, "Ready pull requests merge in a line"; tasks/hosts.md; #702), read from
+// GitHub, for every project that takes the core. It reads three facts of the host, never declared: whether a branch
+// must be up to date with the default branch before it merges, whether the host offers a merge queue for the
+// repository and whether it is on, and whether the repository's runner minutes are billed, each following from who
+// holds the repository, whether it is private and its rules on the default branch; a row of the project's manifest
+// (*merge queue*, *billed minutes*) only overrides what was read, and it prints what it read. With --measure it counts
+// the line's measure, which the monthly state report gives (state-report.mjs, beside this file): of the last merged
+// pull requests, the pushes whose checks ran on each, and the minutes from its turn to its merge, its turn the later of
+// the merge before it and its last marking ready. With --cancel, where the front's run stands queued behind the host's
+// cap on jobs at once, it cancels the queued runs of the pull requests that are not the front or next in line, never
+// a run of theirs or of the default branch. gh and Node's own modules.
+//
+//   node core/scripts/merge-line.mjs --repo <owner>/<name>                     the three facts, and what follows
+//   node core/scripts/merge-line.mjs --repo <owner>/<name> --measure [--count <n>]   the measure (30 where none is given)
+//   node core/scripts/merge-line.mjs --repo <owner>/<name> --cancel <front>[,<next>]  the cancelling of point 5
+import fs from "node:fs";
+import { aRepository, oneLine } from "./guards.mjs";
+import { timeOf } from "./moment.mjs";
+import { ghApi } from "./labels.mjs";
+import { started } from "./started.mjs";
+import { COUNT, lastMerged, median } from "./wait.mjs";
+
+class Refused extends Error {}
+const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
+const json = text => JSON.parse(text || "null");
+
+// A row of the manifest that overrides a reading, `| *<slot>* | `<value>` |`: the value, or undefined where none.
+export function override(manifest, slot, values) {
+  const m = new RegExp(`^\\|[ \\t]*\\*${slot}\\*[ \\t]*\\|[ \\t]*\`([a-z]+)\``, "mu").exec(String(manifest ?? ""));
+  return m && values.includes(m[1]) ? m[1] : undefined;
+}
+
+// The three facts of `repo`, read through `gh`, and overridden by `manifest`'s rows: { upToDate (true, false or null
+// where it could not be read), queue ("on", "offered", "none" or null), billed (true or false), branch, said }, `said`
+// how each was read.
+export function facts({ repo, manifest = null, gh = ghApi }) {
+  const r = json(gh(`repos/${repo}`));
+  const branch = r.default_branch, said = [];
+  let rules = null, classic = null;
+  try { rules = json(gh(`repos/${repo}/rules/branches/${encodeURIComponent(branch)}`)); } catch { /* (not read) */ }
+  try { classic = json(gh(`repos/${repo}/branches/${encodeURIComponent(branch)}/protection/required_status_checks`)).strict === true; }
+  catch (e) { classic = /\b404\b|Not Found|not protected/iu.test(e.message) ? false : null; }
+  const strict = Array.isArray(rules) && rules.some(x => x.type === "required_status_checks" && x.parameters?.strict_required_status_checks_policy === true);
+  const queued = Array.isArray(rules) && rules.some(x => x.type === "merge_queue");
+  const upToDate = strict || classic === true || queued ? true : Array.isArray(rules) && classic === false ? false : null;
+  said.push(upToDate === null ? "whether a branch must be up to date before it merges: not read (its rules or its protection did not answer), so the line is kept"
+    : `a branch must be up to date before it merges: ${upToDate ? "yes" : "no"}, by its ${strict || queued ? "rules" : "protection"} on \`${branch}\``);
+  let queue, plan;
+  if (queued) queue = "on";
+  else if (r.owner?.type !== "Organization") queue = "none";
+  else if (!r.private) queue = "offered";
+  else {
+    try { plan = json(gh(`orgs/${r.owner.login}`))?.plan?.name; } catch { plan = undefined; }
+    queue = plan === undefined ? null : /enterprise/iu.test(plan) ? "offered" : "none";
+  }
+  const queueOver = override(manifest, "merge queue", ["on", "offered", "none"]);
+  said.push(queueOver ? `its merge queue: ${queueOver}, as the manifest's row *merge queue* says (read: ${queue ?? "not read"})`
+    : `its merge queue: ${queue === "on" ? "on" : queue === "offered" ? "offered and off" : queue === "none" ? "not offered" : "not read (the organisation's plan did not answer), so taken as not offered"}, ${queued ? "by its rules on the default branch" : `the repository being ${r.private ? "private" : "public"} and ${r.owner?.type === "Organization" ? `an organisation's${plan ? ` on the plan ${oneLine(plan).slice(0, 40)}` : ""}` : "a person's account's"}`}`);
+  const billedOver = override(manifest, "billed minutes", ["yes", "no"]);
+  const billed = billedOver ? billedOver === "yes" : r.private === true;
+  said.push(billedOver ? `its runner minutes billed: ${billedOver}, as the manifest's row *billed minutes* says` : `its runner minutes billed: ${billed ? "yes, the repository being private" : "no, the repository being public"}`);
+  return { upToDate, queue: queueOver ?? queue, billed, branch, said };
+}
+
+// What follows from the facts, as tasks/hosts.md says: who keeps the line, and the one line of advice to the owner.
+export function follows(f) {
+  if (f.upToDate === false) return "No up-to-date branch is asked before a merge: the line has nothing to act on, and nothing waits.";
+  if (f.queue === "on") return "The host's merge queue keeps the line: bringing branches up to date by hand has nothing to act on.";
+  const line = "The line is kept by hand, as the core's roles/shared/work-flow.md says: only the first ready pull request is brought up to date.";
+  return f.queue === "offered" ? `${line} Advice for the owner, named once, nothing waiting on it: the host offers a merge queue for this repository, a setting of the default branch's rules only the owner makes, which would keep the line.` : line;
+}
+
+// The times of a pull request's markings ready, read from its timeline: the last, or null where it was never a draft.
+function lastReady(repo, n, gh) {
+  let last = null;
+  for (let page = 1; page <= 10; page++) {
+    const rows = json(gh(`repos/${repo}/issues/${n}/timeline?per_page=100&page=${page}`)) ?? [];
+    for (const e of rows) if (e?.event === "ready_for_review" && timeOf(e.created_at) !== null) last = Math.max(last ?? 0, timeOf(e.created_at));
+    if (rows.length < 100) break;
+  }
+  return last;
+}
+
+// The head commits a pull request's checks were started on, from its branch's runs between its opening and its merge.
+function pushesRun(repo, p, gh) {
+  const from = timeOf(p.created_at), to = timeOf(p.merged_at), shas = new Set();
+  for (let page = 1; page <= 10; page++) {
+    const got = json(gh(`repos/${repo}/actions/runs?branch=${encodeURIComponent(p.head.ref)}&event=pull_request&per_page=100&page=${page}`))?.workflow_runs ?? [];
+    for (const run of got) { const at = timeOf(run.created_at); if (at !== null && at >= from && at <= to) shas.add(run.head_sha); }
+    if (got.length < 100) break;
+  }
+  return shas.size;
+}
+
+// The measure of the last `count` merged pull requests into the default branch: { read, pushes (each one's count),
+// minutes (each one's, from its turn to its merge) }.
+export function measure({ repo, count = COUNT, gh = ghApi }) {
+  if (!aRepository(repo)) refuse(`${JSON.stringify(String(repo)).slice(0, 80)} names no repository`, "name it as <owner>/<name>");
+  const branch = json(gh(`repos/${repo}`)).default_branch;
+  const merged = lastMerged(repo, count + 1, gh).filter(p => p.base?.ref === branch && timeOf(p.merged_at) !== null && typeof p.head?.ref === "string")
+    .sort((a, b) => timeOf(a.merged_at) - timeOf(b.merged_at));
+  const pushes = [], minutes = [];
+  merged.forEach((p, i) => {
+    if (i === 0 && merged.length > count) return;
+    const ready = lastReady(repo, p.number, gh) ?? timeOf(p.created_at);
+    const turn = Math.max(ready ?? 0, i > 0 ? timeOf(merged[i - 1].merged_at) : 0);
+    minutes.push(Math.max(0, (timeOf(p.merged_at) - turn) / 60000));
+    pushes.push(pushesRun(repo, p, gh));
+  });
+  return { read: pushes.length, pushes, minutes };
+}
+
+// The state report's line of the measure.
+export function line(m) {
+  if (!m?.read) return "- the merge line: not read (no merged pull request could be read).";
+  const all = m.pushes.reduce((a, b) => a + b, 0), mins = median(m.minutes.map(x => Math.round(x * 10))) / 10;
+  return `- the merge line: of the last ${m.read} merged pull requests, ${all} pushes whose checks ran (a median of ${median(m.pushes)} each), and a median of ${mins.toFixed(1)} min from a pull request's turn to its merge, its turn the later of the merge before it and its last marking ready (\`merge-line.mjs --measure\`).`;
+}
+
+// Point 5: where the front's run stands queued, the queued runs of pull requests other than `keep` (the front, then
+// the next in line) are cancelled, never one of the default branch's: the lines it prints.
+export function cancel({ repo, keep, gh = ghApi }) {
+  const branch = json(gh(`repos/${repo}`)).default_branch;
+  const heads = keep.map(n => json(gh(`repos/${repo}/pulls/${n}`)));
+  if (heads[0]?.state !== "open") refuse(`#${keep[0]}, named as the front, is no open pull request`, "name the open pull request at the front of the line first");
+  const spared = new Set(heads.map(h => h.head?.sha)), queued = [];
+  for (let page = 1; page <= 10; page++) {
+    const got = json(gh(`repos/${repo}/actions/runs?status=queued&per_page=100&page=${page}`))?.workflow_runs ?? [];
+    queued.push(...got);
+    if (got.length < 100) break;
+  }
+  if (!queued.some(run => run.head_sha === heads[0].head.sha)) return [`The front's run (#${keep[0]}) is not queued: nothing is cancelled.`];
+  const out = [];
+  for (const run of queued) {
+    if (!["pull_request", "pull_request_target"].includes(run.event) || run.head_branch === branch || spared.has(run.head_sha) || !Number.isSafeInteger(run.id)) continue;
+    try { gh("-X", "POST", `repos/${repo}/actions/runs/${run.id}/cancel`); out.push(`cancelled: run ${run.id} (${oneLine(run.name).slice(0, 80)}) on ${oneLine(run.head_branch).slice(0, 80)}`); }
+    catch (e) { out.push(`FAIL: run ${run.id} could not be cancelled (${oneLine(e.message).slice(0, 160)}). Mend: where the sign-in may not cancel runs, say so in the report and go on; nothing waits on it`); }
+  }
+  return out.length ? out : ["The front's run is queued, but no run of another pull request is queued: nothing is cancelled."];
+}
+
+function main(argv) {
+  const opt = k => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
+  const repo = opt("--repo"), count = Number(opt("--count") ?? COUNT), keep = opt("--cancel");
+  const usage = "run node core/scripts/merge-line.mjs --repo <owner>/<name>, with --measure [--count <n>] or --cancel <front>[,<next>]";
+  if (!aRepository(repo) || !(Number.isInteger(count) && count > 0)) refuse("no repository was named, or the count is no whole number", usage);
+  if (argv.includes("--cancel")) {
+    const nums = String(keep ?? "").split(",").map(Number);
+    if (!nums.length || nums.length > 2 || !nums.every(n => Number.isSafeInteger(n) && n > 0)) refuse("--cancel names no front, or more than the front and the next", usage);
+    const out = cancel({ repo, keep: nums });
+    for (const l of out) (l.startsWith("FAIL") ? console.error : console.log)(l);
+    return out.some(l => l.startsWith("FAIL")) ? 1 : 0;
+  }
+  if (argv.includes("--measure")) { console.log(line(measure({ repo, count }))); return 0; }
+  const manifest = fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null;
+  const f = facts({ repo, manifest });
+  console.log([`What ${repo}'s host says of the merge line:`, ...f.said.map(s => `- ${s}`), follows(f)].join("\n"));
+  return 0;
+}
+
+if (started(import.meta.url)) {
+  try { process.exitCode = main(process.argv.slice(2)); }
+  catch (e) { if (!(e instanceof Refused)) { console.error(`FAIL: GitHub did not answer (${oneLine(e.message).slice(0, 200)}). Mend: run it where gh answers for the repository, or say in the report that it was not read`); process.exitCode = 1; } else { console.error(`FAIL: ${e.message}`); process.exitCode = 1; } }
+}

@@ -10,11 +10,17 @@ Read at the start of every task.
      green and the branch is up to date. Where it refuses, the PR already `clean` or `unstable`,
      merge it yourself as floor rule 12 says.
    - A push after that turns auto-merge off first; bringing the branch up to date with `main` keeps it on.
+   - **Ready pull requests merge in a line** (#702). By default such PRs merge one at a time, in an order, and only
+     the first is brought up to date; one in a round of fixes keeps its place and lets the next go first. The
+     orchestrator keeps the order; with none, the oldest goes first, and each builder brings its own up to date once
+     the one ahead has merged. Where the host's merge queue is on, it keeps the line (`tasks/hosts.md`). It does not
+     mean a builder holds back its own fixes, nor that anything waits where no up-to-date branch is asked. Reason:
+     each merge makes every open PR stale and each brought up to date runs its tests again; a line waiting on its
+     front stands still while it is fixed. Held by the state report's measure (`scripts/merge-line.mjs`).
 2. **The next task** goes on while this one is reviewed, save under an orchestrator; no lane is stacked on another's.
 3. **Lanes beside the main lane:** independent work in different files from every open lane, with no
    shared measurement and no waiting on another's result; never what the project runs *one at a time*.
-   - Claim a lane with a draft PR from a fresh branch off `main`, after checking the open PRs; bring it up to date
-     before review.
+   - Claim a lane with a draft PR from a fresh branch off `main`, after checking the open PRs.
 4. **The polish lane,** where people use the project through a screen: what makes it feel finished
    without changing what it does (glitches, layout, tap targets, contrast, reduced motion, wording, console errors, slow
    spots), beside the main lane and never ahead of it.

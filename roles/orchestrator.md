@@ -65,17 +65,22 @@ sessions.
   - It does not mean anything waits on the owner, nor that anything starts by itself on the owner's computer (floor
     rule 8): the schedule lives in GitHub's job or in an orchestrator the owner started.
   - Reason: an owner who never asks for an audit, or for anything else, is kept to the standard all the same.
-- **Hand over at once:** start the next session as soon as a task merges. One session per task, continued for its review
+- **Hand over at once:** start the next session as soon as a task merges, where a lane merges sooner (below). One session per task, continued for its review
   fixes while its context is under an hour old and small; otherwise a fresh one.
 - **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can:
   once its task merged, or it stopped with its work pushed and its note in its PR's description (for usage too: a fresh
   builder, of any tool, picks up from the branch), its last message read and nothing scheduled bound to it.
   - It first checks that the session cleaned up and does so for one that could not.
   - Never deleted; never one the owner works in or that waits only on the owner's yes.
-- **A lane for every independent entry.** Where the look's cleaning issue stands, cleaning gets
-  the share of the lanes the codebase's state gives it (`tasks/cleaning.md`): most while it is in debt, a quarter
-  while it is paying down. It does not mean that an entry the owner asked for is held back for it: the share is a
-  target the look shows, and no check holds it. Reason: a share nobody hands out is never got.
+- **A new lane only where it merges sooner** (#702). By default each independent entry gets a lane, cleaning its share
+  by the codebase's state where the look's cleaning issue stands (`tasks/cleaning.md`): most while in debt, a quarter
+  while paying down. Where a PR opened now could not merge before the wait ahead is over (the ready PRs times what a
+  merge takes: `scripts/merge-line.mjs --measure`), it starts none and keeps its builders on the line: the next few
+  kept ready, what makes a merge faster, long or blocked work others wait on. It does not mean a session idles where a
+  lane would speed things up, that a bug waits or the owner's pace is passed over, nor that an entry the owner asked
+  for waits for cleaning's share, a target the look shows. Reason: a PR opened behind a day of line cannot merge for a
+  day, goes stale and starts runs that hold the front back; a share nobody hands out is never got. Held, in part, by
+  the merge line's measure.
 - **A stalled lane,** found on every wake by `scripts/stalled.mjs`, never by a session's word
   that it runs: an open PR with no push to its branch for a few hours, whose session has ended, cannot be reached
   (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, the old session
