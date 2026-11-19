@@ -64,16 +64,20 @@ reads is the *shape check*'s config.
   (`roles/shared/work-flow.md`). Reason: in the core 43% of the job-minutes of 24 hours went to runs that a newer push
   replaced before they finished. Held by `tests/workflows-test.mjs`, for the core's own workflow; in a project, by
   nothing yet: which of its workflows runs its tests cannot be read without guessing.
-- **The default branch is tested at its newest commit** (#733). By default a run of the tests on the default branch gives
-  way to the run of a newer merge, so that when merges come fast one run covers several: whoever writes the workflow
-  puts its runs there in one concurrency group that cancels the run in progress. Nothing changes it. The trigger is a
-  red run on the default branch: the session that reads it (`core/scripts/merge-line.mjs` says it, where users get a
-  release) narrows it, first by the history of the files its failing test names since the last green run, then by
-  halving the merges since that run, running the failing suite alone at each half's commit in its own working copy, and
-  fixes it before any other merge (floor rule 12; `tasks/hosts.md`). It does not mean a pull request's run, a start by
-  hand or the run before a release is cancelled, nor that a red run is merged past. Reason: a batch tested once costs
-  less than each merge tested alone, and a break between merges is rare and quickly found. Held, in the core, by the
-  concurrency its `tests.yml` gives the runs on main, which the workflows test reads; the narrowing, by nothing yet.
+- **The default branch is tested at its newest commit** (#733; #810). By default a run of the tests on the default
+  branch that has started runs to its end, and a newer merge's run waits behind it; of the runs waiting only the newest
+  is kept, so that when merges come fast one run covers every merge that landed while the one before it ran: whoever
+  writes the workflow puts its runs there in one concurrency group that does not cancel the run in progress, as the
+  host's groups replace a waiting run by a newer one. Nothing changes it. The trigger is a red run on the default
+  branch: the session that reads it (`core/scripts/merge-line.mjs` says it, where users get a release) narrows it, first
+  by the history of the files its failing test names since the last green run, then by halving the merges since that
+  run, running the failing suite alone at each half's commit in its own working copy, and fixes it before any other
+  merge (floor rule 12; `tasks/hosts.md`). It does not mean that every merge is tested alone, that a pull request's run
+  waits (a newer push still cancels it), that a start by hand or the run before a release is cancelled, nor that a red
+  run is merged past. Reason: a batch tested once costs less than each merge tested alone, and a break between merges is
+  rare and quickly found; a run that gave way to every newer merge's never finished while merges landed faster than a
+  run took, and on 19 November 2026 nine merges in a row were never tested whole. Held, in the core, by the concurrency
+  its `tests.yml` gives the runs on main, which the workflows test reads; the narrowing, by nothing yet.
 
 - **The slow suites run once per batch, wherever they run** (#733). By default a pull request's run holds the suites its
   change reaches on one platform, and the platform suites (those on any other platform) and the suites its builders move

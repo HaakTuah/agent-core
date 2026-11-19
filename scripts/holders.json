@@ -460,7 +460,7 @@
     "tasks/tests.md: A tree that passed is not run again": [257],
     "tasks/tests.md: A time mark measures and never fails": ["#733.2"],
     "tasks/tests.md: No test run on a draft": ["#733.2"],
-    "tasks/tests.md: The default branch is tested at its newest commit": ["#733.2"],
+    "tasks/tests.md: The default branch is tested at its newest commit": ["#733.2", "#810"],
     "tasks/tests.md: The slow suites run once per batch, wherever they run": ["#733.2"],
     "tasks/tests.md: A test that reaches the network runs once per batch": ["#733.9"]
   },

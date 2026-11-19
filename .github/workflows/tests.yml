@@ -56,12 +56,13 @@ permissions:
   contents: read
 
 # (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is, #388; a run on
-# main after a merge gives way to the next merge's, main being tested at its newest commit only, #733, point 4; the
-# hourly runs are one group that waits rather than cancels, so a long one finishes and the next, on the same commit,
-# skips itself where it passed; a start by hand is a group of its own and never cancelled)
+# main after a merge that has started finishes, and of the merges' runs waiting behind it only the newest is kept, so one
+# run covers every merge that landed meanwhile, #733, point 4, as #810 changed it; the hourly runs are one group that
+# waits rather than cancels, so a long one finishes and the next, on the same commit, skips itself where it passed; a
+# start by hand is a group of its own and never cancelled)
 concurrency:
   group: tests-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.event_name == 'push' || github.event_name == 'schedule') && format('{0}-main', github.event_name) || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # (the hourly run tests main's newest commit on Windows only where main moved: it skips only where no other full run
