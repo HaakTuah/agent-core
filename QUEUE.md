@@ -74,7 +74,6 @@ it merges last.
 | #594 | rule builder; it changes the README | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
-| #652 | rule builder | |
 | #650 | rule builder | |
 | #661 | builder | |
 | #662 | rule builder | |
