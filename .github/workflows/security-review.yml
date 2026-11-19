@@ -7,9 +7,9 @@
 # comment that opens "Code review:" naming the commit by its whole SHA, which ends the wait; such a comment starts the
 # job only where the check is not advisory, since an advisory status passes anyway and the next push or Codex's own
 # summary rewrites it, so that no project starts a job for it it did not start before). The same status waits, too,
-# while the newest posted review of a kind from such an account declares no line of its findings, and, in the core's
-# own repository, while a design-checked pull request has no "Design check:" of its head, which starts the job as
-# "Code review:" does (scripts/review-marks.mjs; tasks/reviews.md, points 3 and 4; #551).
+# while the newest posted review of a kind from such an account declares no line of its findings or of its score,
+# and, in the core's own repository, while a design-checked pull request has no "Design check:" of its head, which
+# starts the job as "Code review:" does (scripts/review-marks.mjs; tasks/reviews.md, points 3 and 4; #551, #710).
 # Proof is the summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment
 # that opens "Security review:" from the repository's owner, a person the host lets write (in a team's project, each
 # owner: roles/shared/teams.md; the job reads each such commenter's rights from GitHub, #412), or an account the caller
@@ -25,7 +25,7 @@
 # (scripts/security-review.mjs, whose header says what it does not hold). Where the pull request's files show a change
 # to what runs by itself beyond its pins, it asks floor rule 3's two security reviews (the same script says
 # which count, and when one is enough); of a pull request that leaves the check's scripts alone, whose head does
-# not hold them as the default branch does and that the host says was opened before the default branch's copy came,
+# not hold them as the default branch does and that the host says was opened before the script first came to the default branch,
 # which stood before the check came, what the check reads more is said, never waited for. A project
 # calls it (workflow_call) from
 # a workflow of its own of the same name, on pull_request (the types opened, reopened, synchronize and ready_for_review)
@@ -164,7 +164,7 @@ jobs:
           from_host files.json "list of files" --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100"
           # whether the pull request is held by what a script of the check reads more: not where it leaves the script
           # alone, its head holds it as it stood before this branch's, and the host says it was opened before the
-          # default branch's copy came (it stood before the check came, and is told, never waited for: AGENTS.md,
+          # script first came to the default branch (it stood before the check came, and is told, never waited for: AGENTS.md,
           # "Nothing locks a project"; the script decides that last from came, below); always where it changes the
           # script itself, where its list of files is cut short, or where the head's copy cannot be read for any reason
           # but its absence, or not by the step's 240th second, ten seconds at most (#632)
@@ -183,20 +183,42 @@ jobs:
             elif grep -q "HTTP 404" "$d/error"; then echo false # the head holds no such script: from before it came
             else echo true; fi
           }
-          # when the default branch's copy of a script of the check came, as the host dates it: the merge of the pull
-          # request that brought it; nothing where that cannot be read, or the time set aside for it (came_by, set by
-          # bound) is spent, and the script then holds the pull request (it holds one opened since then whatever its head holds:
+          # when a script of the check first came to the default branch, as the host dates it: the merge of the pull
+          # request that brought its first commit there, read against that branch's own line before it, never a later
+          # one, so no change to the script makes a pull
+          # request opened before it one from before the check; nothing where that cannot be read, where the history is
+          # longer than five pages of a hundred commits, or where the time set aside for it (came_by, set by bound) is
+          # spent, and the script then holds the pull request (it holds one opened since then whatever its head holds:
           # boundOf in security-review.mjs)
           came() {
-            local p="$ROOT/scripts/$1" c at= left
+            local p="$ROOT/scripts/$1" c= page n parent at= merged left
             p="${p#./}"
-            left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
-            c=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits?path=$(jq -rn --arg v "$p" '$v | @uri')&sha=$(jq -rn --arg v "$DEFAULT" '$v | @uri')&per_page=1" 2> /dev/null \
-              | jq -r '.[0].sha // empty' 2> /dev/null) || c=
+            for page in 1 2 3 4 5; do
+              left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
+              n=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits?path=$(jq -rn --arg v "$p" '$v | @uri')&sha=$(jq -rn --arg v "$DEFAULT" '$v | @uri')&per_page=100&page=$page" 2> /dev/null \
+                | jq -r 'if type == "array" then "\(length) \(.[-1].sha // "")" else empty end' 2> /dev/null) || return 0
+              [[ "$n" =~ ^([0-9]+)\ ([0-9a-f]{40})?$ ]] || return 0
+              [ "${BASH_REMATCH[1]}" -gt 0 ] && c=${BASH_REMATCH[2]}
+              [ "${BASH_REMATCH[1]}" -lt 100 ] && break
+              [ "$page" -lt 5 ] || return 0
+            done
             [[ "$c" =~ ^[0-9a-f]{40}$ ]] || return 0
+            # (the host lists a path's commits by the dates their authors set, so the oldest listed is dated by the first
+            # merge of a pull request into the default branch that holds it, and counts only where the default branch's
+            # own line, as it stood just before that merge (the merge's first parent), held no such script, so that the
+            # merge brought it there; else nothing is dated)
             left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
-            at=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits/$c/pulls" 2> /dev/null \
-              | jq -r --arg b "$DEFAULT" '[.[] | select(.merged_at != null and .base.ref == $b) | .merged_at] | min // empty' 2> /dev/null) || at=
+            n=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits/$c/pulls" 2> /dev/null \
+              | jq -r --arg b "$DEFAULT" '[.[] | select(.merged_at != null and .base.ref == $b)] | min_by(.merged_at) // empty | "\(.merged_at) \(.merge_commit_sha)"' 2> /dev/null) || return 0
+            [[ "$n" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)\ ([0-9a-f]{40})$ ]] || return 0
+            at=${BASH_REMATCH[1]} merged=${BASH_REMATCH[2]}
+            left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
+            parent=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits/$merged" 2> /dev/null \
+              | jq -r '.parents[0].sha // empty' 2> /dev/null) || return 0
+            [[ "$parent" =~ ^[0-9a-f]{40}$ ]] || return 0
+            left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
+            if timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/contents/$p?ref=$parent" > /dev/null 2> "$d/error"; then return 0; fi
+            grep -q "HTTP 404" "$d/error" || return 0
             echo "$at"
           }
           # held as the workflow reads it (BOUND), and, where not, when the script came (SINCE), for the script to decide

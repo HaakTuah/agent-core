@@ -7,8 +7,7 @@ The aim: as much finished work of full quality as the week's usage allows, at th
 - **The work never waits** (floor rule 14). Say each reading taken under "Readings taken" in the *report*
   with what it rests on.
 - **A question from the owner is a question:** answer it; act on it when the owner says so.
-- **Match effort to the task:** the cheapest approach that does it well; docs, small fixes and
-  config in one pass.
+- **Match effort to the task:** the cheapest approach that does it well; docs, small fixes and config in one pass.
 - **A choice that one pull request cannot reverse gets a record:** `tasks/choices.md`, read before one is made or
   advised.
 - **A need is stated in numbers where there is one:** whoever writes a task for a feature whose users will feel its

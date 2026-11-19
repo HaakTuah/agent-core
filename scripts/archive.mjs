@@ -9,10 +9,11 @@
 // words, each form keys each item once and in the file its key puts it in (#394), no item past LAST_NUMBERED is
 // numbered, no reasoning item quotes (a line opening with ">"), each that has words says what was decided ("Decided:"),
 // and each written since (point 6 of #252) names the issue that holds the owner's word ("#N"). Items 1 to LAST_NUMBERED
-// stand with none taken out; no number is added past it (#744). holders.mjs, beside this file, reads it for the items
-// its list names and fails what inStep() finds. Node's own modules.
+// stand with none taken out; no number is added past it (#744). An item that changes an earlier one says so on a line
+// "Changes: <keys>.", and each it names is marked back, "Changed by: <keys>." (marksOf(); #756, point 3). holders.mjs,
+// beside this file, reads it for the items its list names and fails what inStep() finds. Node's own modules.
 //
-//   import { items, inStep, KEY } from "./archive.mjs";
+//   import { items, inStep, KEY, MARK, marksOf } from "./archive.mjs";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -28,6 +29,26 @@ export const KEY = /^#(\d+(?:\.\d+)?)$/u;
 const FILE = /^(?:items-\d+|issue-\d+(?:\.\d+)?)\.md$/u;
 const OPENS = /^(\d+|#\d+(?:\.\d+)?)\. /u;
 const keyOf = s => /^\d+$/u.test(s) ? Number(s) : s;
+// A line that marks an item, read by marksOf() and left out of its text where reasons.mjs prints it; every character
+// after the colon is read, so none hides what follows it.
+export const MARK = /^\s*(Changes|Changed by):([^\n]*)$/u;
+const KEYS = /^ ((?:\d+|#\d+(?:\.\d+)?)(?:, (?:\d+|#\d+(?:\.\d+)?))*)\.$/u;
+
+// The marks of an item's text, as itemsIn() gives it (#756, point 3): { changes, changedBy, wrong }, the keys its line
+// "Changes:" names (the earlier items it changes) and those its line "Changed by:" names (the later items that changed
+// it), each line of its own below the opening one, its keys by number or issue joined by ", " and closed by a stop;
+// `wrong`, each such line not in that form or standing a second time.
+export function marksOf(text) {
+  const out = { changes: [], changedBy: [], wrong: [] };
+  for (const line of String(text).split("\n").slice(1)) {
+    const m = MARK.exec(line);
+    if (!m) continue;
+    const keys = KEYS.exec(m[2].trimEnd()), list = m[1] === "Changes" ? out.changes : out.changedBy;
+    if (!keys || list.length) out.wrong.push(line.trim());
+    else list.push(...keys[1].split(", ").map(keyOf));
+  }
+  return out;
+}
 
 // The items of one folder under `root`: a Map of key (a number, or "#N" or "#N.P") to { file, text }, in the order they
 // stand, and where each key stands (`places`: key to its "file:line"s and files, in the order they stand, more than one
@@ -93,6 +114,26 @@ function missing(r, last) {
   return wrong;
 }
 
+// Each "Changes:" whose item is not marked back, each "Changed by:" with no "Changes:" to match, a key in either that
+// is no item of the archive, and a mark not in its form, a line with its mend (#756, point 3).
+function unmarked(r) {
+  const wrong = [], marks = new Map([...r.items].map(([n, it]) => [n, marksOf(it.text)]));
+  const FORM = `write one line "Changes: <keys>." on the item that changes others and one "Changed by: <keys>." on each it changes, each below the item's opening line, the keys as the archive writes them (98, #744, #733.1), joined by ", "`;
+  for (const [n, m] of marks) {
+    const file = r.items.get(n).file;
+    for (const line of m.wrong) wrong.push(`${file}: item ${n} has the line ${JSON.stringify(line)}, a mark not in its form or given twice. Mend: ${FORM}`);
+    for (const e of m.changes) {
+      if (e === n || !marks.has(e)) wrong.push(`${file}: item ${n} says it changes ${e}, which is ${e === n ? "itself" : "no item of the archive"}. Mend: name the earlier item it changes by its key, or take ${e} out of its line "Changes:"`);
+      else if (!marks.get(e).changedBy.includes(n)) wrong.push(`${file}: item ${n} changes item ${e}, which is not marked so. Mend: give item ${e}, in ${r.items.get(e).file}, the line "Changed by: ${[...marks.get(e).changedBy, n].join(", ")}." in place of any it has, its text otherwise as it stands`);
+    }
+    for (const e of m.changedBy) {
+      if (!marks.has(e)) wrong.push(`${file}: item ${n} says ${e} changed it, which is no item of the archive. Mend: take ${e} out of its line "Changed by:"`);
+      else if (!marks.get(e).changes.includes(n)) wrong.push(`${file}: item ${n} says item ${e} changed it, but item ${e} names no change of it. Mend: give item ${e}, in ${r.items.get(e).file}, the line "Changes: ${[...marks.get(e).changes, n].join(", ")}." in place of any it has, or take ${e} out of this item's line "Changed by:" where it changed nothing of it`);
+    }
+  }
+  return wrong;
+}
+
 // What keeps the two forms out of step, each a line with its mend: an empty list where they are in step. `last` is the
 // last numbered item, LAST_NUMBERED but in a test.
 export function inStep(root, last = LAST_NUMBERED) {
@@ -101,6 +142,7 @@ export function inStep(root, last = LAST_NUMBERED) {
   for (const [n, it] of w.items) if (typeof n === "string" || n > LAST_WORDS) wrong.push(`${it.file}: item ${n} adds the owner's words here, where nothing is added after item ${LAST_WORDS}. Mend: take it out of ${WORDS}/ and write it in ${REASONS}/ alone, naming the issue that holds the words`);
   for (const [n, it] of w.items) if (!r.items.has(n)) wrong.push(`${it.file}: item ${n} has no reasoning under its number in ${REASONS}/. Mend: write it there, in the core's words, with what was asked, what was decided and what it stands behind (\`archive/instructions.md\`)`);
   wrong.push(...missing(r, last));
+  wrong.push(...unmarked(r));
   for (const [n, it] of r.items) {
     if (typeof n === "number" && n > last) wrong.push(`${it.file}: item ${n} is keyed by a running number, a key that names no issue, where items after ${last} are keyed by their issue (#744). Mend: key it "#N" by the issue that carries the owner's word, or "#N.P" by the one point of it the item records, move it to a file of its own, ${REASONS}/issue-N.md or issue-N.P.md, and write that key for ${n} under "behind" in ${FILE_LIST}`);
     if (/^\s*>/mu.test(it.text)) wrong.push(`${it.file}: item ${n} quotes (a line opening with ">"). Mend: say in the core's own words what was decided; the owner's words stay on the issue`);

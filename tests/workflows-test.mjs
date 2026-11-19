@@ -9,8 +9,10 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { parseYaml } from "../scripts/workflow-run.mjs";
-import { lines, readable, reads, repeated, unlinked } from "../scripts/workflows.mjs";
+import { TEMPLATES } from "../scripts/init.mjs";
+import { holds, parseYaml } from "../scripts/workflow-run.mjs";
+import { draftHoles, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { twice, uncommented } from "../scripts/yaml-keys.mjs";
 
 let failed = 0;
@@ -64,6 +66,24 @@ ok(base.notes.length === 2 && base.fails.length === 2 && base.notes.every(l => /
 const none = repeated([{ file: "a.yml", text: now }], null), fresh = repeated([{ file: "a.yml", text: now }], () => null);
 ok(none.fails.length === 0 && none.notes.length === 3 && !none.notes[0].includes("base") && fresh.fails.length === 3 && fresh.notes.length === 0, "with no base each is noted and none fails, and where nothing stood before (the core's own) each fails");
 
+// a call skipped on a draft whose trigger leaves out ready_for_review (#502): by its if:, or by a check that skips a draft
+// itself (the description check, or core.yml's description:); the full trigger, another's workflow and a call that
+// never skips a draft pass
+const call = (on, uses, extra = "") => `on:\n${on}\njobs:\n  check:\n    uses: ${CORE}/.github/workflows/${uses}@${"a".repeat(40)}\n${extra}`;
+const NOT_DRAFT = "    if: ${{ !github.event.pull_request.draft }}\n";
+const TYPES = "  pull_request:\n    types: [opened, synchronize]\n", FULL = "  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\n";
+ok(draftHoles(call(TYPES, "copies.yml", NOT_DRAFT)).join() === "check" && draftHoles(call("  pull_request:\n", "personal-terms.yml", NOT_DRAFT)).length === 1
+  && draftHoles(call(TYPES, "pr-description.yml")).length === 1 && draftHoles(call(TYPES, "core.yml", "    with:\n      description: true\n")).length === 1,
+  "a call skipped on a draft, by its if: or by a check that skips one itself, whose trigger leaves out ready_for_review is found");
+ok(!draftHoles(call(FULL, "copies.yml", NOT_DRAFT)).length && !draftHoles(call(TYPES, "copies.yml")).length && !draftHoles(call(TYPES, "core.yml", "    with:\n      copies: c.json\n")).length
+  && !draftHoles(call(TYPES, "copies.yml", NOT_DRAFT).replace(CORE, "someone/else")).length && !draftHoles("on: push\njobs: {}\n").length && !draftHoles("on: [unclosed\n  - :").length
+  && draftHoles(`on: {pull_request: {types: [opened, synchronize]}}\njobs: {check: {uses: "${CORE}/.github/workflows/pr-description.yml@${"a".repeat(40)}"}}\n`).length === 1,
+  "the full trigger, a call that never skips a draft, another's workflow, no pull_request trigger and text not read as YAML pass; a workflow in YAML's flow form is read");
+const holes = unreadied([{ file: "a.yml", text: call(TYPES, "copies.yml", NOT_DRAFT) }, { file: "b.yml", text: call(TYPES, "pr-description.yml") }], f => (f === "a.yml" ? call(TYPES, "copies.yml", NOT_DRAFT) : call(FULL, "pr-description.yml")));
+ok(holes.notes.length === 1 && /^note a\.yml: .*as on the base\. Mend: add ready_for_review/.test(holes.notes[0]) && holes.fails.length === 1 && /^FAIL b\.yml: its job "check"/.test(holes.fails[0]) && mended(holes.fails[0])
+  && unreadied([{ file: "b.yml", text: call(TYPES, "pr-description.yml") }], null).fails.length === 0,
+  "a call the base already held so is noted, a new one fails with its mend, and with no base each is noted", JSON.stringify(holes));
+
 const core = fileURLToPath(new URL("..", import.meta.url));
 const own = fs.readdirSync(`${core}.github/workflows`).filter(f => /\.ya?ml$/u.test(f));
 ok(own.length > 0 && own.every(f => !fails(fs.readFileSync(`${core}.github/workflows/${f}`, "utf8"))), "the core's own workflows pass");
@@ -95,13 +115,15 @@ try {
   ok(kGood, `run against a base, a key twice the base held is noted and a new one fails, with its mend${kGood ? "" : `:\n${kOut}`}`);
   const kNone = keyRun([]), kCore = keyRun(["--core"], { WORKFLOWS_BASE: "HEAD" });
   ok(kNone.status === 0 && /0 failing, 2 noted$/m.test(kNone.stdout) && kCore.status === 1 && /2 failing\. Mend:/.test(kCore.stdout), "run with no base, each is noted and it passes; in the core's own repository each fails, whatever the base");
-  // (where the job's install could not reach the registry, the keys given twice did not run, said so; every other failure
-  // still fails, so no pull request turns the check green by making the install fail: #654, point 4)
+  // (where the job's install could not reach the registry, the keys given twice and the calls a draft skips did not run,
+  // said so, and the package's absence fails nothing; every other failure still fails, so no pull request turns the check
+  // green by making the install fail: #654, point 4)
   fs.writeFileSync(path.join(tmp, ".github/workflows/d.yml"), "on:\n  pull_request_target:\n");
-  execFileSync("git", ["add", ".github/workflows/d.yml"], { cwd: tmp, stdio: "ignore" });
+  fs.writeFileSync(path.join(tmp, ".github/workflows/e.yml"), call(TYPES, "copies.yml", NOT_DRAFT));
+  execFileSync("git", ["add", ".github/workflows/d.yml", ".github/workflows/e.yml"], { cwd: tmp, stdio: "ignore" });
   fs.rmSync(path.join(tmp, "core/.packages/node_modules"), { recursive: true, force: true });
   const u = keyRun([], { CORE_PACKAGES_UNREACHED: "1" }), uOut = u.stdout + u.stderr;
-  ok(u.status === 1 && /^::warning::The check for a key given twice did not run/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && mended(uOut), `where the install could not reach the registry, the keys given twice did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
+  ok(u.status === 1 && /^::warning::The check for a key given twice did not run, nor the one for a call a draft skips/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && !/e\.yml|is not installed/.test(uOut) && mended(uOut), `where the install could not reach the registry, the keys given twice and the calls a draft skips did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 // ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
 // Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and
@@ -132,6 +154,30 @@ const groups = Object.fromEntries(["codeql.yml", "signatures.yml", "nuget.yml", 
 ok(Object.values(groups["codeql.yml"].jobs)[0].concurrency.group.includes("${{ matrix.language }}") && groups["signatures.yml"].jobs.signatures.concurrency.group.includes("${{ inputs.directory }}") && groups["nuget.yml"].jobs.nuget.concurrency.group.includes("${{ inputs.config }}"),
   "and jobs of one run that differ (a matrix, a call for each lock folder or config) are groups of their own, so none cancels another");
 ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] === false, "while the security-review check's runs go one at a time, never cancelled");
+
+// ---- the security-review job's condition, for each kind of event it is started by (#593, point 8) ----
+const REPO = "someone/project";
+const runs = ({ event = "pull_request", pr = {}, comment = {}, issue = {}, actor = "someone", priv = false, inputs = {} } = {}) => holds(groups["security-review.yml"].jobs.report.if, {
+  github: { event_name: event, repository: REPO, actor, event: { repository: { private: priv },
+    ...(event === "pull_request" ? { pull_request: { draft: false, head: { repo: { full_name: REPO } }, ...pr } }
+      : { issue: { pull_request: { url: "x" }, state: "open", ...issue }, comment: { user: { login: "someone" }, author_association: "OWNER", body: "Security review: none", ...comment } }) } },
+  inputs: { advisory: true, private: false, reviewers: "", root: "core", ...inputs } }, { failed: false });
+ok(runs() && !runs({ pr: { draft: true } }) && !runs({ pr: { head: { repo: { full_name: "outsider/project" } } } }) && !runs({ actor: "dependabot[bot]" }), "on a pull request it runs for one of the repository's own branches that is no draft, and not for a draft, a fork's or Dependabot's (E2, E3, E4)");
+const SUMMARY = "<!-- codex-pull-request-review-summary -->\nCodex's summary";
+ok(runs({ event: "issue_comment", comment: { user: { login: "chatgpt-codex-connector[bot]" }, author_association: "NONE", body: SUMMARY } }) && !runs({ event: "issue_comment", comment: { user: { login: "someone-else[bot]" }, author_association: "NONE", body: SUMMARY } }), "it runs for Codex's summary, and not for a look-alike from another login (E5)");
+const as = (body, author_association, inputs) => runs({ event: "issue_comment", comment: { body, author_association }, inputs });
+ok(["Security review: none needed", "**Security review:** none needed"].every(b => ["OWNER", "MEMBER", "COLLABORATOR"].every(a => as(b, a)) && ["CONTRIBUTOR", "NONE"].every(a => !as(b, a))), "it runs for \"Security review:\" and \"**Security review:\" from an owner, a member or a collaborator, and not from a contributor or anyone else (E6)");
+ok(!as("Code review: done", "OWNER") && as("Code review: done", "OWNER", { advisory: false }), "it runs for \"Code review:\" only where the check is not advisory (E7)");
+ok(!runs({ event: "issue_comment", issue: { pull_request: null } }) && !runs({ event: "issue_comment", issue: { state: "closed" } }), "it runs for no comment on an issue, nor on a closed pull request (E8)");
+ok(!runs({ priv: true }) && runs({ priv: true, inputs: { private: true } }) && runs({ priv: true, inputs: { advisory: false } }) && !runs({ event: "issue_comment", priv: true }) && runs({ event: "issue_comment", priv: true, inputs: { advisory: false } }), "in a private repository it runs only where the caller passes private or turns advisory off (E11, R3)");
+
+// ---- the core's own caller: the template's triggers, its scripts at the root, not advisory (E9, E12, R4) ----
+const ownReview = parseYaml(fs.readFileSync(path.join(wfDir, "own-security-review.yml"), "utf8"));
+// (the template's own {{core}} and {{pin}} filled in, which init.mjs writes when it makes the project)
+const kitReview = parseYaml(fs.readFileSync(path.join(core, TEMPLATES, "workflows/security-review.yml.tmpl"), "utf8").replace(/\{\{\w+\}\}/g, "x"));
+ok(JSON.stringify(ownReview.on) === JSON.stringify(kitReview.on), `the core's own security-review check is started by what the template's is, and nothing more${JSON.stringify(ownReview.on) === JSON.stringify(kitReview.on) ? "" : `: ${JSON.stringify(ownReview.on)}`}`);
+const ownCall = Object.values(ownReview.jobs ?? {});
+ok(ownCall.length === 1 && ownCall[0].uses === "./.github/workflows/security-review.yml" && ownCall[0].with?.root === "." && ownCall[0].with?.advisory === false, "and calls the core's workflow with its scripts at the root and advisory turned off");
 
 // ---- when the core's tests run (#733, points 2 to 4 and 6) ----
 // A pull request's run starts once it is ready, never on a draft, on Linux alone; main is tested on Linux at its newest
@@ -184,6 +230,32 @@ ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] =
   const cut = release.jobs.release.steps.at(-1).run;
   ok("workflow_dispatch" in tests.on && !("workflow_call" in tests.on) && /actions\/runs" -f head_sha="\$GITHUB_SHA" -f branch=main -f event=push /.test(cut) && /gh api --paginate -X GET "repos\/\$GITHUB_REPOSITORY\/actions\/workflows\/tests\.yml\/runs" -f head_sha="\$GITHUB_SHA"/.test(cut) && /jq -s '\{ workflow_runs: \. \}' "\$full\.pages" > "\$full"/.test(cut) && /--runs "\$runs" --full "\$full"/.test(cut),
     "and both in full by hand, which the release waits on: it reads the push's runs and, apart, the tests' runs on its commit, every page, none unfinished and the newest passed, and the tests stay a workflow no project calls (point 6; release.mjs, fullRun)", cut);
+  // (#715, point 2: the upgrade test guards only what a release brings, so on Windows, where its job set every pull
+  // request's run, it runs in the release workflow alone: daily where the repository is public, before each release)
+  const upgradeStep = release.jobs.upgrade?.steps?.find(s => /tests\/upgrade-test\.mjs/.test(s.run ?? ""));
+  const testsUpgrade = tests.jobs.upgrade.steps.find(s => /tests\/upgrade-test\.mjs/.test(s.run ?? ""));
+  ok(release.on.schedule?.length === 1 && /^\d{1,2} \d{1,2} \* \* \*$/.test(release.on.schedule[0].cron) && "workflow_dispatch" in release.on
+    && release.jobs.upgrade["runs-on"] === "windows-latest" && upgradeStep
+    && release.jobs.upgrade.if === "${{ github.event_name != 'schedule' || needs.main.outputs.public == 'true' }}"
+    && [release.jobs.release.needs].flat().includes("upgrade") && !Object.keys(release.on).some(e => e.startsWith("pull_request"))
+    && /^\$\{\{ runner\.os == 'Linux' && (matrix\.part != '[\w ]+' && )?\(env\.RUN == 'all' \|\| contains\(env\.RUN, ' tests\/upgrade-test\.mjs '\)\) \}\}$/.test(String(testsUpgrade?.if)),
+    "the upgrade test runs on Windows in the release workflow alone, once a day where minutes are free and before each release, never in a pull request's run (tasks/tests.md, \"A test that guards only what a release brings runs where the release is made\")",
+    JSON.stringify({ schedule: release.on.schedule, if: release.jobs.upgrade?.if, tests: testsUpgrade?.if }));
+}
+
+// (#802: the copy's check removes the folders it fetched into, so no fetch there may leave git's own upkeep running
+// behind the step, which raced that removal on main: each fetch in a step's script, its lines joined where a line ends
+// in a backslash and a comment taken off only where the shell reads one, and the checkout of the core into a folder)
+{
+  const core = parseYaml(fs.readFileSync(path.join(wfDir, "core.yml"), "utf8"));
+  const steps = Object.values(core.jobs).flatMap(j => j.steps ?? []);
+  const commands = steps.flatMap(s => String(s.run ?? "").replace(/\\\n/g, " ").split("\n").map(l => l.replace(/(^|\s)#.*$/, "")));
+  const fetches = commands.flatMap(l => l.split(/\|\||&&|[|;]/)).filter(c => /\bgit\b.*\sfetch\s/.test(c));
+  const checkouts = steps.filter(s => String(s.uses ?? "").startsWith("actions/checkout@") && s.with?.path);
+  const off = s => s.env?.GIT_CONFIG_COUNT === "1" && s.env?.GIT_CONFIG_KEY_0 === "maintenance.auto" && s.env?.GIT_CONFIG_VALUE_0 === "false";
+  ok(fetches.length >= 3 && fetches.every(l => l.includes("--no-auto-maintenance")) && checkouts.length >= 1 && checkouts.every(off),
+    "each fetch of the copy's check, and its checkout of the core into a folder, starts no upkeep of git's own, which would race the check's removal of what it fetched (#802)",
+    [...fetches.filter(l => !l.includes("--no-auto-maintenance")), ...checkouts.filter(s => !off(s)).map(s => s.with.path)].join(" | "));
 }
 
 process.exit(failed ? 1 : 0);

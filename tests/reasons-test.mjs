@@ -22,7 +22,9 @@ write("AGENTS.md", "# A core\n\n**An own rule.** Said here.\n");
 write("tasks/x.md", "# A module\n\nRead when needed.\n\n**A first rule.** Said.\n\n**A second rule.** Said too.\n\n**A rule with none.** Nothing behind it.\n");
 write("archive/instructions/items-001.md", [
   "# Items", "", "1. **20 October 2026** (a chat). Asked: why. Decided: so,", "   over two lines, as #12 says.", "",
-  "2. **21 October 2026**, #34, point 1. A line of reasoning, naming #12 again and #56.", "",
+  "2. **21 October 2026**, #34, point 1. A line of reasoning, naming #12 again and #56.", "   Changed by: 3.", "",
+  "3. **22 October 2026**, #78. It changed item 2.", "   Changes: 2.", "   Changed by: 4.", "",
+  "4. **23 October 2026**, #90. It changed item 3.", "   Changes: 3.", "",
 ].join("\n"));
 write("scripts/holders.json", JSON.stringify({
   behind: { "tasks/x.md: A first rule": [1, 2], "tasks/x.md: A second rule": [2, 9], "tasks/x.md": [1], "AGENTS.md: An own rule": [2] },
@@ -33,7 +35,9 @@ const first = reasonsOf(tmp, "tasks/x.md: A first rule");
 ok(first.rule === "tasks/x.md: A first rule" && first.items.map(it => it.key).join() === "1,2" && first.fileItems.map(it => it.key).join() === "1", "a rule named whole gives the items behind it, and those behind its file as a whole", JSON.stringify(first));
 ok(first.items[0].date === "20 October 2026" && first.items[0].text === "(a chat). Asked: why. Decided: so, over two lines, as #12 says." && first.items[0].file === "archive/instructions/items-001.md", "an item's date, its reasoning on one line and its file are read", JSON.stringify(first.items[0]));
 ok(first.items[1].text.startsWith("#34, point 1. A line") && first.items[1].issues.join() === "34,12,56", "each issue an item names is read once", JSON.stringify(first.items[1]));
+ok(first.items[1].text.endsWith("and #56.") && first.items[1].changedBy.join() === "3" && first.later.map(it => it.key).join() === "3,4", "an item's marks are no part of its text, and each later item that changed one listed is followed to the newest", JSON.stringify(first.later));
 const printed = lines(first, tmp, tmp).join("\n");
+ok(printed.includes("- Core archive 2, 21 October 2026 (archive/instructions/items-001.md): #34, point 1. A line of reasoning, naming #12 again and #56.\n  Changed by core archive 3: what it decided stands only as that changed it.") && printed.includes("Later items that changed one of these:\n- Core archive 3,") && printed.includes("issues/90"), "it prints, under an item, the items that changed it, then those items and their issues", printed);
 ok(printed.includes("Its number: findings; outcome: asked.\n") && printed.includes("- Core archive 1, 20 October 2026 (archive/instructions/items-001.md): (a chat).") && printed.includes("Behind tasks/x.md's text as a whole:"), "it prints the number once, each item with its date and file, and the file's own items", printed);
 ok([12, 34, 56].every(n => printed.includes(`- https://github.com/${CORE}/issues/${n}`)) && printed.indexOf("issues/12") < printed.indexOf("issues/34"), "it prints each issue's address once, in order", printed);
 ok(lines(first, path.join(tmp, "."), path.dirname(tmp)).join("\n").includes(`(${path.basename(tmp)}/archive/instructions/items-001.md)`) && lines(first, tmp, path.join(tmp, "tasks")).join("\n").includes(`(${path.join(tmp, "archive/instructions/items-001.md").replace(/\\/gu, "/")})`), "a path is printed from where it runs where it lies under it, as a project's root holds its copy, and whole elsewhere");

@@ -4,8 +4,11 @@
 // says ("mend"; for one keyword of a rule, "mendFor"), the nearest along the failing rule's path, {core} standing for
 // the copy's folder; each failure says where and what, then "Mend:" and that, as every check of the core does (#254).
 // What a schema cannot say (a path that lies outside the project, a file that is not there) stays with the script.
+// A definition a schema refers to holds no "$ref" of its own, so ajv writes it in place and its failure's path runs from
+// the schema's root, where the mend is looked up; one that held a "$ref" would be compiled apart, its path starting
+// again at the definition, and its mend missed. A failure is said of the file by its schema's "title", else "the config".
 //
-//   import { keysOf, shapeFaults } from "./schemas.mjs";   shapeFaults("copies", config, "core/") -> ["the config's ...",
+//   import { keysOf, shapeFaults } from "./schemas.mjs";   shapeFaults("copies", config, "core/"[, its path]) -> ["the config's ...",
 //                                                  ...], [] where it holds; null where ajv is not installed, which the
 //                                                  caller says; keysOf("copies") -> the keys its schema gives
 import fs from "node:fs";
@@ -39,20 +42,27 @@ function mendOf(schema, schemaPath, keyword) {
   return found;
 }
 
-// Where a failure lies, in words: the config itself, or the key or item the path names.
-const where = path => (path ? `the config's ${path.split("/").slice(1).map(k => (/^\d+$/u.test(k) ? `item ${k}` : JSON.stringify(k.replace(/~1/gu, "/").replace(/~0/gu, "~")))).join(", ")}` : "the config");
+// Where a failure lies, in words: the file itself, called by its schema's "title" ("the config" where it gives none), or
+// the key or item the path names.
+const where = (path, file) => (path ? `${file}'s ${path.split("/").slice(1).map(k => (/^\d+$/u.test(k) ? `item ${k}` : JSON.stringify(k.replace(/~1/gu, "/").replace(/~0/gu, "~")))).join(", ")}` : file);
 
-/** The failures of `value` against the schema `name`, each with its mend, {core} read as `core`; [] where it holds;
+/** The failures of `value` against the schema `name`, each with its mend, {core} read as `core`, said of `file` (its path)
+ *  where given, else of the schema's title; [] where it holds;
  *  null where ajv is not installed beside the core's copy, which the caller says as a warning. */
-export function shapeFaults(name, value, core = "") {
+export function shapeFaults(name, value, core = "", file = null) {
   if (!installed("ajv")) return null;
   const { validate, schema } = checker(name);
   if (validate(value)) return [];
+  file ??= schema.title ?? "the config";
+  // (a name's failure is said once, by the rule it breaks, naming the name: ajv adds a line of its own for the
+  // "propertyNames" around it, which says no more)
+  const errors = validate.errors.filter(e => e.keyword !== "propertyNames");
   // (the first SHOWN alone, and a count of the rest: a config of many bad items says each kind once, not a line each)
-  const left = validate.errors.length - SHOWN;
-  return validate.errors.slice(0, SHOWN).map(e => {
-    const extra = e.params?.additionalProperty !== undefined ? ` (${JSON.stringify(e.params.additionalProperty)})` : "";
-    return `${where(e.instancePath)} ${e.message}${extra}. Mend: ${String(mendOf(schema, e.schemaPath, e.keyword) ?? "write it as the starter kit does").replaceAll("{core}", core)}`;
-  }).concat(left > 0 ? [`the config holds ${left} more faults than those said. Mend: mend those said, then run the check again to see the rest`] : []);
+  const left = errors.length - SHOWN;
+  return errors.slice(0, SHOWN).map(e => {
+    const named = e.params?.additionalProperty ?? e.propertyName;
+    const extra = named !== undefined ? ` (${JSON.stringify(named)})` : "";
+    return `${where(e.instancePath, file)} ${e.propertyName !== undefined ? "names a key that " : ""}${e.message}${extra}. Mend: ${String(mendOf(schema, e.schemaPath, e.keyword) ?? "write it as the starter kit does").replaceAll("{core}", core)}`;
+  }).concat(left > 0 ? [`${file} holds ${left} more faults than those said. Mend: mend those said, then run the check again to see the rest`] : []);
 }
 const SHOWN = 20;

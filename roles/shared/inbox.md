@@ -44,12 +44,11 @@ Read at the start of every task.
 - **The *progress file* holds order only**: each item's issue, who builds it and what it waits on,
   nothing done; a stage of the project's design needs no issue, says what is next and points to its PRs for the rest.
   - Its one writer, the orchestrator or the design session, adds issues in a PR, the trust gate: no issue is built
-    before its line joins, save a bug ("Bugs don't wait"). Any other session
-    changes only its own line, taken out in the PR that finishes it. Bugs, tests, checks of standing rules and tasks the
-    scheduled look opens need no word of the owner's.
+    before its line joins, save a bug ("Bugs don't wait"). Any other session changes only its own line; a closed
+    issue's line stays, readers skip it, and the file's next PR takes it out. Bugs, tests, checks of standing rules
+    and tasks the scheduled look opens need no word of the owner's.
   - Reason: every session reads it at its start. Its own size mark comes with its first trim (`core/scripts/steps.mjs`).
-- **An obvious improvement is built at once,** in its own PR, save where the floor needs the owner's
-  yes.
+- **An obvious improvement is built at once,** in its own PR, save where the floor needs the owner's yes.
 - **Other ideas are cheap to file,** a line each, at most a couple per task.
   - A verdict the stand-in is sure of decides one: a yes is queued, behind what stands there, and
     marked `stand-in-yes` until the owner confirms or corrects it; a no closes it; each says why. Any other waits for

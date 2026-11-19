@@ -6,7 +6,7 @@ Read at its start by the role `orchestrator`: a session started on the owner's w
 `roles/shared/work-flow.md`.
 
 **Hands over, gets back:**
-- a builder: a line and its brief; back, word when its pull request is ready and when it merges.
+- a builder: a line and its brief; back, word when its PR is ready and when it merges.
 - the stand-in: the call; back, a verdict on each open idea.
 - the design session: nothing; back, the lines it adds to the *progress file*.
 - the adviser: the messages of "It reports where it works"; back, orders (floor rule 4).
@@ -49,8 +49,7 @@ nothing yet.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn, on the owner's computer
   only one the owner set up (floor rule 8):
-  - read the stop switch first, and where it stands, tell the running builders to stop and do
-    nothing more that wake;
+  - read the stop switch first, and where it stands, tell the running builders to stop and do nothing more that wake;
   - pull `main`, its clone on `main`; if a rule file changed, re-read it and pass what touches them to the running
     builders in one message;
   - each step `core/scripts/steps.mjs` reports not done, and each difference `core/scripts/fresh.mjs` lists, gets a
@@ -65,8 +64,8 @@ nothing yet.
   findings, a release's steps not done, a check failed on the default branch, the labels and openers to mend, a run of
   its own missed, the cleaning and each audit the codebase's state makes due (`tasks/cleaning.md`), the pass over the
   choices that are hard to undo and a sign of theirs written in a measure that holds (`tasks/choices.md`), and in the
-  core alone the staged cases due (`core/scripts/staged.mjs`); once a month, the state report
-  (`core/scripts/state-report.mjs`). Its carriers: the project's daily job (`look.yml`, as the starter kit writes it)
+  core alone staged cases due (`core/scripts/staged.mjs`) and caps passed; once a month, the state report
+  (`core/scripts/state-report.mjs`). Its carriers: the project's daily job (the starter kit's `look.yml`)
   and the orchestrator's wake; where issues cannot be reached, its files go to the inbox (`--inbox`).
   - Each issue is a task an orchestrator gives a lane like any other, the report too, so starting an orchestrator is all
     an owner does: only an issue that GitHub's job or the owner's account opened, labelled `by:look`, under a title of

@@ -63,31 +63,37 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      head so (the code reviewer checks that), in a comment that opens "Security review:", which the `security-review`
      check reads.
    - **What a posted review stands for** (#99): by default the commit it names, and the head only
-     where nothing but updates from `main` follow that commit; after any other commit, where no review of the head has
-     run, the fallback reviewer checks it and posts one naming the head, or the session posts the note that none is
-     needed, naming the head. It counts from the repository's owner (the *owner's account*, where that owns it), from
+     where nothing but merges from `main` follow that commit, each the merge git makes of its parents with no conflict,
+     as `scripts/clean-merges.mjs` proves (#323, #750). The builder asks Codex, or any reviewer, again only for new
+     content. A merge with a conflict is new content however it is settled, since its settling is a choice no review
+     saw (an order of lines can change what they do). After any other commit, where no review of the head has run,
+     the fallback reviewer checks it and posts one naming the head, or the session posts the note that none is needed,
+     naming the head. It counts from the repository's owner (the *owner's account*, where that owns it), from
      a person's account the host lets write, each owner of a team's project (`roles/shared/teams.md`), whose rights
      the check reads from the host each run (#412), and from another account only where the project names it to the
      check (its input `reviewers`). A pure sync needs none: the check proves it with `pure-sync.mjs` and waits only for
-     a review that started by itself. It does not mean an update from `main` is reviewed again (point 6), that a review
+     a review that started by itself. It does not mean a merge git makes from `main` is reviewed again (point 6), that a review
      Codex completed on the head needs a posted one, nor that the status shows who reviewed: builder and reviewer post
      under one login (#187), and an account the agents sign in with that the host lets write counts as a person's,
      since the host tells it from no owner's. Reason: a review of
-     one commit stood for later commits no one checked, and any collaborator's comment passed a pull request. Held by
-     the `security-review` status, which waits where it is broken, in the core, and holds the merge once a ruleset
-     requires it (#320).
-   - **What a posted review declares** (#299): by default a review posted in a comment that opens
-     "Security review:", "Code review:" or "Design check:" covers one kind of review, and declares what it found on two
-     lines of their own: "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other
-     finding.". Whoever posts it, session or reviewer, writes both. The one condition that changes it: a note that no
-     review is needed ("Security review: none needed") declares nothing. It does not mean that the lines change what
+     one commit stood for later commits no one checked, and any collaborator's comment passed a pull request; and a
+     fresh review was asked of every head, about 150 of Codex's on 39 pull requests, 113 finding nothing (#750). Held,
+     in part, by the `security-review` status through `scripts/clean-merges.mjs` and its test, by which the `code-review`
+     status carries a code review over the same way; the status waits where the rule is broken, in the core, and holds
+     the merge once a ruleset requires it (#320).
+   - **What a posted review declares** (#299): by default a review posted in a comment that opens "Security review:",
+     "Code review:" or "Design check:" covers one kind of review, and declares what it found on two lines of their own:
+     "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other finding.", and its score
+     ("Every reviewer" in `roles/shared/review-guidelines.md`) on a third: "Score: S of 10.", S a whole number from 1 to
+     10 (#710). Whoever posts it, session or reviewer, writes all three. The one condition that changes it: a note that
+     no review is needed ("Security review: none needed") declares nothing. It does not mean that the lines change what
      blocks or what a builder mends (point 5; #315), that they stand in for the findings written out, that Codex's own
      reviews, read by their badges, are asked anything, nor that a comment covering two kinds is read as both. Reason:
      run on 10 to 15 November 2026, the count of what the reviews find read 4 of 24 posted security reviews, their
-     wording varying, and the findings that do not block are to be counted before #315 is decided. Held by the
-     `code-review` status, which waits while the newest posted review of a kind declares no line
-     (`core/scripts/review-marks.mjs`; #551); `core/scripts/review-record.mjs` counts one without its line as "not
-     read".
+     wording varying, and the findings that do not block are to be counted before #315 is decided; the score was written
+     in as many forms, and no count read it. Held by the `code-review` status, which waits while the newest posted
+     review of a kind declares no line, its score asked from 20 November (`core/scripts/review-marks.mjs`; #551);
+     `core/scripts/review-record.mjs` counts one without its line as "not read".
 4. **The design check:** once before the merge, a fresh reviewer judges the work against the design alone, and its
    "Readings taken" as the stand-in would.
    - **It goes down the lines** (#305). By default, where the pull request's entry has "Done when"
@@ -106,7 +112,8 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    otherwise filed as a follow-up with the reason in the PR, or answered with why it is wrong (a security finding: only
    as floor rule 9 allows). A review from anyone else is advisory.
 6. **Rounds end:** after a fix, one request to its reviewer, and a security check only as point 3 says, and none for an
-   update from `main` without a conflict; a PR is never marked draft and ready again to rerun its reviews.
+   update from `main` that git merges with no conflict (point 3); a PR is never marked draft and ready again to rerun
+   its reviews.
    - After three rounds, what is still open goes to escalation (`tasks/roles.md`); a PR it cannot settle stays
      unmerged.
 7. **The fallback reviewer's brief,** written as `tasks/helpers.md` says, hands it the diff, the task's text, the
