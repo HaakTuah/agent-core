@@ -89,6 +89,9 @@ ok(said.includes("| `test/b-test.mjs` |") && /Failed for no reason, each to be m
   && /1 reach a real clock, 4 s of it \(\d+%\); 2 start another process, 7 s of it \(\d+%\)/.test(said) && row("test/a-test.mjs").clock && row("test/d-test.mjs").process && !row("test/d-test.mjs").clock,
   "the table names each test, what fails for no reason, what is proposed, and the share of the time the tests that open a screen, reach a real clock or start another process take (#457)", said);
 
+const short = (test, seconds, clock) => ({ test, runs: 1, seconds, real: 0, last: null, flaky: 0, alone: null, screen: false, clock, process: false, verdict: "kept: x" });
+ok(/1 reach a real clock, 1 s of it \(60%\)/.test(table([short("a", 0.6, true), short("b", 0.4, false)]).join("\n")), "a share is taken from the times as they stand, rounded only as it is shown", table([short("a", 0.6, true), short("b", 0.4, false)]).join("\n"));
+
 // ---- a whole run, on JUnit reports in a scratch folder ----
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "test-record-test-"));
 process.on("exit", () => fs.rmSync(dir, { recursive: true, force: true }));

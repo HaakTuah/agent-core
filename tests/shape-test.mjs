@@ -132,7 +132,7 @@ ok(same(ids(screened).filter(id => id.startsWith("screen: ")), ["screen: Tests/F
   "a test that imports what opens a screen (a package named, a module under it, in C# a namespace) is an entry of the reader \"screens\"; a test of the display's own code, one of the rules, code that is no test and a package that only starts with a name are not", ids(screened));
 
 // ---- the tests that reach a real clock or start another process (#457, point 1) ----
-const reachCfg = cfg({ tests: ["src/**/*.test.js", "Tests/**", "tests/**"], clocks: ["Clock.wait"], processes: ["runTool", "spawnly"] });
+const reachCfg = cfg({ tests: ["src/**/*.test.js", "Tests/**", "tests/**"], clocks: ["Clock.wait"], processes: ["runTool", "spawnly", "src/helpers/run.js"] });
 const reachTests = ["src/a.test.js", "src/b.test.js", "src/c.test.js", "src/d.test.js", "src/e.test.js", "Tests/WaitTests.cs", "tests/test_run.py"];
 const reaching = survey({
   "src/a.test.js": "import { spawnSync } from 'node:child_process';\nconst t0 = Date.now();\n",
@@ -152,9 +152,11 @@ ok(readerOf("timed: src/a.test.js -> Date.now", reaching.readers) === "clocks" &
 const faked = survey({
   "src/f.test.js": "vi.useFakeTimers();\nsetTimeout(() => {}, 5);\nimport { spawnSync } from 'node:child_process';\n",
   "tests/test_sleep.py": "from time import sleep\n\ndef test_a():\n    sleep(1)\n",
-}, reachCfg, new Set(["src/f.test.js", "tests/test_sleep.py"]));
-ok(same(ids(faked).filter(id => /^(timed|process): /.test(id)), ["process: src/f.test.js -> node:child_process", "timed: tests/test_sleep.py -> time"]),
-  "a test that installs a fake clock reaches no real one, and a module of the clock imported by name counts (Python's from time import sleep)", ids(faked));
+  "src/g.test.js": "const options = { setTimeout: false };\nDate.now = () => 42;\n",
+  "src/helpers/run.js": "export const run = () => 1;\n", "src/h.test.js": "import { run } from './helpers/run.js';\nrun();\n",
+}, reachCfg, new Set(["src/f.test.js", "tests/test_sleep.py", "src/g.test.js", "src/h.test.js"]));
+ok(same(ids(faked).filter(id => /^(timed|process): /.test(id)), ["process: src/f.test.js -> node:child_process", "process: src/h.test.js -> src/helpers/run.js", "timed: tests/test_sleep.py -> time"]),
+  "a test that installs a fake clock reaches no real one, nor does one that names a clock as a property's key or assigns to it; a module of the clock imported by name counts (Python's from time import sleep), and so does a module of the project's own that the config names", ids(faked));
 ok(unclaimed(new Map([["timed: src/a.test.js -> Date.now", true]]), new Map([["timed: src/a.test.js -> setTimeout", true]])).length === 0
   && unclaimed(new Map([["process: src/a.test.js -> runTool", true]]), new Map([["process: src/a.test.js -> node:child_process", true]])).length === 0
   && unclaimed(new Map([["timed: src/b.test.js -> setTimeout", true]]), new Map([["timed: src/a.test.js -> setTimeout", true]])).length === 1,

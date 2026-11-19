@@ -129,7 +129,9 @@ export function table(rows) {
     ...rows.map(r => `| \`${r.test}\` | ${r.runs} | ${cell(r.seconds === null ? null : Math.round(r.seconds * 10) / 10)} | ${r.real}${r.last ? ` (${String(r.last).slice(0, 10)})` : ""} | ${r.flaky} | ${cell(r.alone)} | ${r.screen ? "yes" : ""} | ${r.clock ? "yes" : ""} | ${r.process ? "yes" : ""} | ${r.verdict} |`)];
   const flaky = rows.filter(r => r.flaky), proposed = rows.filter(r => r.verdict.startsWith("proposed")), screened = rows.filter(r => r.screen);
   const time = rs => Math.round(rs.reduce((s, r) => s + (r.seconds ?? 0), 0));
-  const share = rs => (time(rows) ? ` (${Math.round(100 * time(rs) / time(rows))}%)` : "");
+  // (each share from the summed medians as they stand, rounded only as it is shown)
+  const sum = rs => rs.reduce((s, r) => s + (r.seconds ?? 0), 0);
+  const share = rs => (sum(rows) ? ` (${Math.round(100 * sum(rs) / sum(rows))}%)` : "");
   const clocked = rows.filter(r => r.clock), spawning = rows.filter(r => r.process);
   lines.push("", `${rows.length} tests, ${time(rows)} s in all by their medians. ${screened.length} open a screen, ${time(screened)} s of it. ${clocked.length} reach a real clock, ${time(clocked)} s of it${share(clocked)}; ${spawning.length} start another process, ${time(spawning)} s of it${share(spawning)}.`);
   if (flaky.length) lines.push(`Failed for no reason, each to be mended or removed, never retried in silence: ${flaky.map(r => `\`${r.test}\` (${r.flaky})`).join(", ")}.`);

@@ -249,6 +249,13 @@ function opensScreen(ctx, from, names) {
   if (what !== undefined) add(ctx, "screen", `${from.file} -> ${what}`, what);
   for (const kind of ["clock", "process"]) for (const name of [...IMPORTS[kind], ...ctx.config[LISTS[kind]]].filter(under)) reached(ctx, kind, from.file, name);
 }
+// A module of the project's own that the config names under "clocks" or "processes" (a helper that sleeps or starts
+// a program), by its path or by the name the test imports it under.
+function configuredReach(ctx, from, names) {
+  if (!ctx.tests.has(from.file)) return;
+  const under = s => names.some(n => n === s || n.startsWith(`${s}/`) || n.startsWith(`${s}.`));
+  for (const kind of ["clock", "process"]) for (const name of ctx.config[LISTS[kind]].filter(under)) reached(ctx, kind, from.file, name);
+}
 
 // What a test reaches that costs the most time, by the names its reader knows and the config's (shape-readers.mjs,
 // REACH): each test file is one entry of each kind it reaches, "timed: <test> -> <what>" or "process: <test> ->
@@ -264,7 +271,10 @@ function reached(ctx, kind, file, name) {
 }
 function testReach(ctx, file, r) {
   if (!ctx.tests.has(file)) return;
-  const at = (run, k) => run.every((v, j) => r.toks[k + j].v === v && r.toks[k + j].t !== "str") && !(r.toks[k - 1]?.t === "punct" && r.toks[k - 1].v === ".");
+  // (a run called or read, never one after a dot, a property's key before ":" or what "=" assigns, a fake installed)
+  const is = (t, v) => t?.t === "punct" && t.v === v;
+  const at = (run, k) => run.every((v, j) => r.toks[k + j].v === v && r.toks[k + j].t !== "str") && !is(r.toks[k - 1], ".")
+    && !is(r.toks[k + run.length], ":") && !(is(r.toks[k + run.length], "=") && !is(r.toks[k + run.length + 1], "="));
   // (a test that installs a fake clock hands the time in already: its clock is none)
   if (FAKE_CLOCKS.some(name => r.toks.some(t => t.v === name && t.t !== "str"))) ctx.faked.add(file);
   for (const kind of ["clock", "process"]) {
@@ -294,6 +304,7 @@ function oneImport(ctx, from, imp) {
   const spec = alias === undefined ? imp.spec : `./${path.posix.relative(path.posix.dirname(from.file), path.posix.join(ctx.config.aliases[alias], imp.spec.slice(alias.length))) || "."}`;
   const to = resolve(from.file, spec, ctx.files, ctx.packages);
   if (!to) { outside(ctx, from, imp.spec, alias !== undefined); return; }
+  configuredReach(ctx, from, [to, imp.spec]);
   // (a package of the project's own that maps its entrances, "exports" or "imports", may load another file than this)
   if (!isRelative(spec) && ctx.packages.get(packageOf(spec))?.exports) ctx.unsure.add(from.file);
   if (to !== from.file) ctx.reach.set(from.file, (ctx.reach.get(from.file) ?? new Set()).add(to));
@@ -307,6 +318,7 @@ function foreign(ctx, from, imp, r) {
   ctx.read.imports++;
   const l = linked(from.file, imp, r, ctx.idx, ctx.files, ctx.config.platform);
   for (const to of (l.to ?? []).filter(t => t !== from.file)) {
+    configuredReach(ctx, from, [to, ...l.names ?? []]);
     ctx.reach.set(from.file, (ctx.reach.get(from.file) ?? new Set()).add(to));
     if (!imp.dynamic && !imp.types) ctx.graph.set(from.file, (ctx.graph.get(from.file) ?? new Set()).add(to));
     between(ctx, from, to);
