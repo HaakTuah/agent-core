@@ -80,6 +80,7 @@ it merges last.
 | #707 | rule builder | |
 | #701 | builder | |
 | #716 | builder | |
+| #739 | rule builder; it changes the game module (`tasks/game-design.md`) | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
