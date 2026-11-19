@@ -162,6 +162,9 @@ export function draftHoles(yaml) {
 export function unreadied(files, before) {
   const fails = [], notes = [];
   for (const { file, text } of files) {
+    // (a text past the length read cannot be read for this, and one a pull request changes is no more let through than
+    // one it adds: it fails, the base's own staying as the note repeated() gives it)
+    if (text.length > LONGEST) { if (before && before(file) !== text) fails.push(`FAIL ${file}: the file is longer than ${LONGEST} characters and changed, so this check cannot tell whether a call of one of the core's checks that is skipped on a draft has ready_for_review among its types. Mend: cut the file to under ${LONGEST} characters, the steps it repeats moved to a script or a workflow of their own`); continue; }
     const held = new Set(before ? draftHoles(before(file) ?? "") : []);
     for (const job of draftHoles(text)) {
       const old = !before || held.has(job);

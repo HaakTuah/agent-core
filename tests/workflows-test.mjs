@@ -81,6 +81,12 @@ ok(grown.fails.length === 1 && grown.notes.length === 0 && /grown\.yml:1: the fi
 // (nor does a key spelt like a reason, which a base may give twice, hold the entry of one grown too long)
 const spelt = repeated([{ file: "spelt.yml", text: `a: ${"x".repeat(LONGEST)}\n` }], () => 'on: push\n"\\0long": 1\n"\\0long": 2\n');
 ok(spelt.fails.length === 1 && spelt.notes.length === 0, "a key spelt like a reason, given twice on the base, holds no part not read of the head", spelt.fails.join("\n"));
+// (a file past the length read that a pull request changes fails, so a call left without ready_for_review is not let through
+// by its length; one unchanged on the base, and one with no base, are only noted by repeated(): #752)
+const longText = changed => `on: pull_request\n# ${"x".repeat(LONGEST)}${changed}\n`, longFiles = text => [{ file: "long.yml", text }];
+const longChanged = unreadied(longFiles(longText("a")), () => longText("b")), longSame = unreadied(longFiles(longText("a")), () => longText("a")), longAdded = unreadied(longFiles(longText("a")), () => null);
+ok(longChanged.fails.length === 1 && mended(longChanged.fails[0]) && longSame.fails.length === 0 && longAdded.fails.length === 1 && unreadied(longFiles(longText("a")), null).fails.length === 0,
+  "a file past the length read that a pull request changes or adds fails with its mend; one unchanged, or read with no base, does not", [...longChanged.fails, ...longAdded.fails].join("\n"));
 const lower = `on: push\n${Array.from({ length: 37 }, (_, i) => `k${i}: 1\n`).join("")}z: ${"[".repeat(200)}${"]".repeat(200)}\n`;
 const lowerFails = repeated([{ file: "lower.yml", text: lower }], () => null).fails;
 ok(dup(lower) === "null@39<null" && lowerFails.length === 1 && lowerFails[0].startsWith("FAIL lower.yml:39: the file nests") && mended(lowerFails[0]),
