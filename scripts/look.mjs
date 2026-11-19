@@ -54,6 +54,7 @@ import { WAITS, waitsOn } from "./pr-description.mjs";
 import { pathIn } from "./reading.mjs";
 import { ownerOf } from "./releases.mjs";
 import { HOURS, openPulls, stalled } from "./stalled.mjs";
+import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { started } from "./started.mjs";
 import { timeOf } from "./moment.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
@@ -213,14 +214,20 @@ function optionsOf(args) {
   return { dry: args.includes("--dry"), now: args.includes("--now"), toInbox: args.includes("--inbox") };
 }
 
+// The manifest, read as the steps read it (own-files.mjs): { manifest }, null in the core itself; or { refused }, the
+// line to fail with, where one is there but no file of the project's own.
+function manifestHere() {
+  const manifest = ownFiles(".").read("core-manifest.md", true);
+  if (manifest !== null || !fs.lstatSync("core-manifest.md", { throwIfNoEntry: false })) return { manifest };
+  return { refused: `FAIL: core-manifest.md is no regular file of the project's own of at most ${READ_MOST} bytes (a link that leads out of the project, a device, a folder, or a file too large), so nothing was looked at. Mend: make it the project's own manifest, a file tracked in git, as the starter kit writes it` };
+}
+
 // Where the look runs, with its options: GitHub's job or a session's run, the time, the manifest (null in the core),
 // the repository and its owner, the scripts' folder, and `say`, which prints a line and adds it to the job's summary.
-function settingOf(options) {
+function settingOf(options, manifest) {
   const job = process.env.GITHUB_ACTIONS === "true";
   const carrier = job ? "GitHub's daily job" : "a session's run";
   const at = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
-  let manifest = null;
-  try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { /* (the core itself) */ }
   const repo = job && /^[\w.-]+\/[\w.-]+$/.test(process.env.GITHUB_REPOSITORY ?? "") ? process.env.GITHUB_REPOSITORY
     : repoOf(spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout);
   const owner = ownerOf(manifest ?? "") ?? repo?.split("/")[0] ?? "";
@@ -390,7 +397,9 @@ function main(args) {
   if (!options) return 1;
   const below = spawnSync("git", ["rev-parse", "--show-prefix"], { encoding: "utf8" });
   if (below.status !== 0 || below.stdout.trim() !== "") { console.error("FAIL: run it from the root of the project's git repository"); return 1; }
-  const ctx = settingOf(options);
+  const { manifest, refused } = manifestHere();
+  if (refused) { console.error(refused); return 1; }
+  const ctx = settingOf(options, manifest);
   const { job, now, at, repo, owner, scripts, say } = ctx;
 
   // whether issues can be read and written here, as inbox.mjs asks it: no answer, nothing is done
