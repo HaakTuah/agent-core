@@ -18,6 +18,7 @@ import { scratchDir, root } from "../scripts/scratch-core.mjs";
 import { parseConfig, where, KIT } from "../scripts/shape.mjs";
 import { answered, capsOf } from "../scripts/size.mjs";
 import { STEPS, notDone } from "../scripts/steps.mjs";
+import { parserLeftOut } from "../scripts/packages.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -41,7 +42,7 @@ const BIG = 50000;
 // ---- a project holding a copy of the core's scripts, floor and starter kit, a git repository ----
 fs.mkdirSync(p);
 gitP("init", "-q", "-b", "main");
-for (const part of ["scripts", "third-party", "floor", "setup"]) fs.cpSync(path.join(root, part), path.join(p, "core", part), { recursive: true });
+for (const part of ["scripts", ".packages", "floor", "setup"]) fs.cpSync(path.join(root, part), path.join(p, "core", part), { recursive: true, filter: parserLeftOut });
 write("a.md", "a file of the project's own\n");
 gitP("add", "-A");
 

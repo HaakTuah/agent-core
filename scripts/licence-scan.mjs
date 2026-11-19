@@ -33,7 +33,7 @@
 // reach users ([] if none); "tools", the folders within them whose files do not; and "skip", the folders or files
 // left out. Node's own modules only.
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { join, posix } from "node:path";
 import { OWNER } from "./core-address.mjs";
 import { DEEPEST, leadsOut, tooDeep } from "./guards.mjs";
@@ -131,9 +131,11 @@ function executable(text, f) {
  *  project; a link that leads out of it, or nowhere, is not read and fails, since what it holds cannot be audited. */
 function trackedText(root, f, fail) {
   const at = join(root, f);
-  if (!leadsOut(root, at)) return readFileSync(at, "utf8");
-  fail(`${f} is a link that leads out of the project, so what it holds cannot be read. Mend: put the file itself there, in place of the link`);
-  return "";
+  if (leadsOut(root, at)) { fail(`${f} is a link that leads out of the project, so what it holds cannot be read. Mend: put the file itself there, in place of the link`); return ""; }
+  // (a link to a folder, a device or a pipe is never read: a folder's files are read in their own place, a device can be
+  // endless and a pipe never ends; #447)
+  if (!statSync(at, { throwIfNoEntry: false })?.isFile()) { fail(`${f} is a link to no file of bytes (a folder, a device or a pipe), so the scan reads nothing through it; a folder's files are read in their own place. Mend: put the file itself there, in place of the link, or, for a folder, take the link out of git or link each of its files`); return ""; }
+  return readFileSync(at, "utf8");
 }
 
 /** The command lines a JSON file `f` holds (licence-commands.mjs); none where it nests past the bound, which fails

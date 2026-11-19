@@ -104,6 +104,12 @@ const corr = check({ owner, have: all, issues: [fix(40, "Correction: misread\nBr
 ok(corr?.items.join() === "#41,#42", "an open correction without the pull request it names, or without its kind where it is no bug, is to mend; a note of the owner's holds them as well, and another account's issue is not asked", JSON.stringify(corr));
 const marked = check({ owner, have: all, notes: new Map([[8, [yes]], [9, [yes, { user: me, created_at: "2026-11-14T06:00:00Z", body: "The owner's own: yes." }]], [10, [yes, note("2026-11-14T06:00:00Z", "From a builder session, on #10: started.")]], [11, [yes]]]),
   issues: [8, 9, 10, 11].map(number => ({ number, user: me, labels: L("queued", "by:builder", ...(number === 9 || number === 11 ? ["stand-in-yes"] : [])), body: "x", created_at: early })) });
+ok(!check({ owner, have: all, notes: new Map([[8, [yes]]]), issues: [{ number: 8, user: me, labels: L("queued", "by:builder"), body: "x", created_at: early }], core: true }).some(f => f.what.includes("stand-in-yes")),
+  "in the core's own repository, where no verdict queues an issue, the mark is not asked");
+const named = note("2026-11-14T03:30:00Z", `${chat} The description above is updated in the same step and is the issue's current text.`);
+const dated = check({ owner, have: all, issues: [{ number: 12, user: me, labels: L("queued", "by:chat"), body: "x", created_at: early }],
+  notes: new Map([[12, [note("2026-11-14T01:00:00Z", chat), note("2026-11-14T02:00:00Z", chat), note("2026-11-14T03:00:00Z", chat), named, note("2026-11-14T04:00:00Z", chat)]]]) });
+ok(!dated.some(f => f.what.includes("current text")), "a note that says the description above is updated in the same step and is the current text dates it, so the notes before it are gathered", JSON.stringify(dated));
 ok(marked.find(f => f.what.includes("stand-in-yes"))?.items.join() === "#8 (to mark),#10 (to mark),#9 (to take off)",
   "queued on the stand-in's sure yes: marked until a note in the owner's voice follows, and the mark taken off once one does; an agent's note changes nothing",
   JSON.stringify(marked));

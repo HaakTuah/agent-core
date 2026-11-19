@@ -48,6 +48,9 @@
     "roles/shared/work-flow.md: Push after every commit": "check: scripts/work-saved.sh, in part",
     "roles/shared/work-flow.md: Updates, Dependabot and CodeQL": "describes",
     "tasks/hosts.md: One layer knows no host": "check: .github/workflows/tests.yml, in part",
+    "tasks/hosts.md: Where users get a release, a pull request merges on its own green checks": "check: .github/workflows/release.yml, in part",
+    "tasks/hosts.md: The merge line follows the host": "check: .github/workflows/tests.yml, in part",
+    "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": "check: .github/workflows/tests.yml, in part",
     "tasks/repositories.md: The manifest says where the core's copy is": ["check: scripts/core-path.mjs", "check: .github/workflows/core.yml"],
     "tasks/repositories.md: A repository may take the core through a dependency that carries it": "check: .github/workflows/core.yml, in part",
     "tasks/repositories.md: Before a split, one repository": "check: scripts/shape.mjs, in part",
@@ -106,6 +109,9 @@
     "tasks/tests.md: The tests have a time mark, which never gets worse": "check: scripts/shape.mjs",
     "tasks/tests.md: A test that fails for no reason is mended or removed, never retried in silence": "audit",
     "tasks/tests.md: A test opens a screen only where the screen is what it guards": "check: scripts/shape.mjs",
+    "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check: scripts/shape.mjs",
+    "tasks/tests.md: A test asserts no time measured on a real clock": "audit",
+    "tasks/tests.md: A tree that passed is not run again": "check: scripts/steps.mjs, in part",
     "tasks/tests.md: What a push waits on has a time mark": [
       "check: scripts/shape.mjs, in part",
       "check: scripts/look.mjs, in part"
@@ -153,7 +159,36 @@
     "roles/reviewer.md: Reads at its start": "check: scripts/reading.mjs, in part",
     "roles/reviewer.md: Hands over, gets back": "describes",
     "roles/stand-in.md: Reads at its start": "check: scripts/reading.mjs, in part",
-    "roles/stand-in.md: Hands over, gets back": "describes"
+    "roles/stand-in.md: Hands over, gets back": "describes",
+    "floor/security.md: 18. Where agents hold sign-ins": "check: .github/workflows/personal-terms.yml, in part",
+    "floor/topics/dependencies.md: An agent's own tools are code with its sign-ins": "check: scripts/agent-tools.mjs, in part",
+    "floor/topics/input.md: Every named input has hostile tests": "check: scripts/steps.mjs, in part",
+    "floor/topics/weaknesses.md: In a PR's own change": [
+      "check: scripts/security-review.mjs, in part",
+      "check: GitHub's ruleset on the default branch, in part"
+    ],
+    "roles/orchestrator.md: The scheduled look": "check: scripts/look.mjs, in part",
+    "tasks/choices.md: What reopens a choice": "check: scripts/look.mjs, in part",
+    "tasks/choices.md: its sign trips": "check: scripts/look.mjs, in part",
+    "tasks/choices.md: the pass twice a year": "check: scripts/look.mjs, in part",
+    "tasks/cleaning.md: The state of a codebase sets the dose": "check: scripts/look.mjs, in part",
+    "tasks/cleaning.md: How cleaning is done": "check: scripts/shape.mjs, in part",
+    "tasks/code-shape.md: Never worse": "check: scripts/shape.mjs, in part",
+    "tasks/code-shape.md: Each project names its systems, under the same domains": "check: scripts/shape.mjs, in part",
+    "tasks/code-shape.md: Between systems, absolute for new code": "check: scripts/shape.mjs, in part",
+    "tasks/code-shape.md: Portable by default": "check: scripts/shape.mjs, in part",
+    "tasks/code-shape.md: A function is held to three marks": "check: scripts/shape.mjs",
+    "tasks/code-shape.md: A new project starts as rules with no screen": "check: scripts/shape.mjs, in part",
+    "tasks/code-shape.md: Near-copies are reported": "check: scripts/copies.mjs, in part",
+    "tasks/reviews.md: Which": [
+      "check: scripts/security-review.mjs, in part",
+      "check: GitHub's ruleset on the default branch, in part"
+    ],
+    "tasks/reviews.md: When a PR passes": [
+      "check: scripts/security-review.mjs, in part",
+      "check: GitHub's ruleset on the default branch, in part"
+    ],
+    "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part"
   },
   "behind": {
     "AGENTS.md": [208, 209, 213],
@@ -183,7 +218,7 @@
     "AGENTS.md: The size caps keep the rules lean and decide nothing else": [179, 181, 182, 201, 234],
     "AGENTS.md: Whose words an issue holds": [211, 212],
     "floor/security.md: 11. Nothing personal, ever": [30, 43, 202, 221],
-    "floor/security.md: 12. `main` is the owners'": [113, 236],
+    "floor/security.md: 12. `main` is the owners'": [113, 236, 261],
     "floor/security.md: 13. Each project's files stay in its own repository": [4],
     "floor/security.md: 14. Nothing waits for the owner but the yeses the floor names": [76, 134, 195, 236],
     "floor/security.md: 18. Where agents hold sign-ins": [118, 119, 120, 122, 127, 149],
@@ -200,6 +235,7 @@
     "floor/topics/dependencies.md: 15. Dependencies": [76, 252],
     "floor/topics/dependencies.md: A new one is looked up in its registry": [252],
     "floor/topics/dependencies.md: A new one is taken in an order": [252],
+    "floor/topics/dependencies.md: Code of another publisher is named in a lock file": [258],
     "floor/topics/dependencies.md: 17. Dependabot's own PRs": [34],
     "floor/topics/dependencies.md: An agent's own tools are code with its sign-ins": [225],
     "floor/topics/input.md: A failure refuses": [227],
@@ -214,7 +250,7 @@
     "floor/topics/what-ships.md: A program installed on a user's machine": [227],
     "roles/builder.md: Read by task, twice": [234],
     "roles/orchestrator.md: A finished session is archived": [185],
-    "roles/orchestrator.md: A lane for every independent entry": [11],
+    "roles/orchestrator.md: A new lane only where it merges sooner": [11, 259],
     "roles/orchestrator.md: A stalled lane": [133, 200],
     "roles/orchestrator.md: Hand over at once": [10],
     "roles/orchestrator.md: It asks the owner nothing": [133, 134, 137],
@@ -269,6 +305,7 @@
     "roles/shared/work-flow.md: Lanes beside the main lane": [11],
     "roles/shared/work-flow.md: Nothing waits silently": [218],
     "roles/shared/work-flow.md: Push after every commit": [6, 15],
+    "roles/shared/work-flow.md: Ready pull requests merge in a line": [259],
     "roles/shared/work-flow.md: Review in the background": [135],
     "roles/shared/work-flow.md: Sessions": [143, 178, 187],
     "roles/shared/work-flow.md: The owner's stop switch": [201],
@@ -292,6 +329,7 @@
     "roles/shared/review-guidelines.md: A mechanical move is read by its rule and a sample": [251],
     "tasks/cleaning.md": [226],
     "tasks/cleaning.md: No process number is a builder's goal": [244],
+    "tasks/cleaning.md: The audit's reader has a fixed brief and fixed questions": [257],
     "tasks/cleaning.md: The state report leads with the outcomes": [244, 251],
     "tasks/code-shape.md": [226],
     "tasks/code-shape.md: A job a maintained package does is done by it": [255],
@@ -334,6 +372,9 @@
     "tasks/hosts.md: Each host's part": [236],
     "tasks/hosts.md: One layer knows no host": [236],
     "tasks/hosts.md: Proven host by host": [236],
+    "tasks/hosts.md: Where users get a release, a pull request merges on its own green checks": [261],
+    "tasks/hosts.md: The merge line follows the host": [259],
+    "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": [259],
     "tasks/planning.md": [243],
     "tasks/repositories.md: A repository may take the core through a dependency that carries it": [241],
     "tasks/repositories.md: A session that cannot read its floor does nothing else": [241],
@@ -373,7 +414,10 @@
     "tools/claude.md: Name models by family alone": [80, 81],
     "tools/claude.md: Pass both model and effort": [128],
     "tools/claude.md: Who to call": [70, 71, 73],
-    "tools/codex.md: On GitHub": [169]
+    "tools/codex.md: On GitHub": [169],
+    "tasks/tests.md: A test asserts no time measured on a real clock": [257],
+    "tasks/tests.md: A test reaches a real clock or another process only where it guards it": [260],
+    "tasks/tests.md: A tree that passed is not run again": [257]
   },
   "numbers": {
     "tasks/code-shape.md: A job a maintained package does is done by it": "findings; outcome: robust",
@@ -401,6 +445,15 @@
     "tasks/cleaning.md: The state report leads with the outcomes": "correction: does not work; outcome: robust",
     "floor/topics/dependencies.md: A new one is looked up in its registry": "check fires; outcome: robust; rare harm",
     "floor/topics/dependencies.md: A new one is taken in an order": "findings; outcome: robust",
-    "floor/topics/what-ships.md: A package found bad goes at once": "correction: rule missing; outcome: robust; rare harm"
+    "floor/topics/dependencies.md: Code of another publisher is named in a lock file": "correction: rule missing; outcome: robust; rare harm",
+    "floor/topics/what-ships.md: A package found bad goes at once": "correction: rule missing; outcome: robust; rare harm",
+    "tasks/tests.md: A test asserts no time measured on a real clock": "findings; outcome: robust",
+    "tasks/tests.md: A tree that passed is not run again": "check fires; outcome: fast",
+    "roles/shared/work-flow.md: Ready pull requests merge in a line": "findings; outcome: fast",
+    "roles/orchestrator.md: A new lane only where it merges sooner": "findings; outcome: fast",
+    "tasks/hosts.md: Where users get a release, a pull request merges on its own green checks": "findings; outcome: fast",
+    "tasks/hosts.md: The merge line follows the host": "findings; outcome: fast",
+    "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": "findings; outcome: fast",
+    "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check fires; outcome: fast"
   }
 }

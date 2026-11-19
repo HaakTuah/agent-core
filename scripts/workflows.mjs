@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
 import { twice } from "./yaml-keys.mjs";
+import { unreached } from "./packages.mjs";
 import { projectAt } from "./core-path.mjs";
 
 const WORD = "pull_request_target";
@@ -114,7 +115,11 @@ if (started(import.meta.url)) {
     for (const line of found.slice(0, 5)) console.log(`FAIL ${logged(file)}:${line}: ${WORD} runs a pull request with the repository's own token and secrets. Mend: take the word out, in a comment too, and trigger the workflow on pull_request, which runs one without them`);
     if (found.length > 5) console.log(`FAIL ${logged(file)}: and on ${found.length - 5} more lines. Mend: take the word out of each, as above`);
   }
-  const keys = repeated(texts, core ? () => null : base ? show : null);
+  // (where the job's install could not reach the registry, in a project's pull request, the keys given twice, which the
+  // YAML package reads, did not run, said as a warning; every failure above still fails: #654, point 4)
+  const skipped = unreached("yaml");
+  if (skipped) console.log("::warning::The check for a key given twice did not run: the package yaml could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault");
+  const keys = skipped ? { fails: [], notes: [] } : repeated(texts, core ? () => null : base ? show : null);
   for (const line of [...keys.notes, ...keys.fails]) console.log(logged(line));
   failed += keys.fails.length;
   console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} failing${keys.notes.length ? `, ${keys.notes.length} noted` : ""}${failed ? ". Mend: mend each line above as it says" : ""}`);

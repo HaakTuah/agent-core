@@ -280,20 +280,66 @@ function oneLine(ln, st, fn, cd) {
 
 // Where a module's dotted path leads among the project's files: `<path>.py` or `<path>/__init__.py`, under the
 // project's root, the importing file's folder or src/; null where none.
+const ROOTS = from => ["", `${path.posix.dirname(from)}/`.replace(/^\.\//u, ""), "src/"];
 function moduleAt(parts, from, files) {
   const p = parts.join("/");
-  for (const root of ["", `${path.posix.dirname(from)}/`.replace(/^\.\//u, ""), "src/"]) {
+  for (const root of ROOTS(from)) {
     const found = [`${root}${p}.py`, `${root}${p}/__init__.py`].find(f => files.has(f));
     if (found) return found;
   }
   return null;
 }
 
-// Of a module none of those roots holds, the one file whose path ends in it; null where none does, or more than one.
+const DEEP = new WeakMap();
+const deepest = files => {
+  if (!DEEP.has(files)) { let most = 0; for (const f of files) most = Math.max(most, f.split("/").length); DEEP.set(files, most + 1); }
+  return DEEP.get(files);
+};
+// Of a module none of those roots holds, the one file whose path ends in it; null where none does, or more than one;
+// each module's answer made once for each set of files.
+const ENDS = new WeakMap();
 function bySuffix(parts, files) {
-  const p = parts.join("/"), ends = [`${p}.py`, `${p}/__init__.py`];
-  const found = ends.flatMap(e => (byName(files).get(path.posix.basename(e) === "__init__.py" ? `${parts.at(-1)}/__init__.py` : path.posix.basename(e)) ?? []).filter(f => f === e || f.endsWith(`/${e}`)));
-  return found.length === 1 ? found[0] : null;
+  const p = parts.join("/"), key = `${parts.at(-1).length}:${p}`;
+  if (!ENDS.has(files)) ENDS.set(files, new Map());
+  const known = ENDS.get(files);
+  if (known.has(key)) return known.get(key);
+  // (a module of more parts is answered from the folders' index, a plain name being read there as it is here)
+  if (parts.length > 1 && plain(parts.at(-1))) {
+    known.set(key, one(endingIn(files, parts.slice(0, -1).join("/").split("/")), parts.at(-1)));
+    return known.get(key);
+  }
+  const ends = [`${p}.py`, `${p}/__init__.py`];
+  let count = 0, file = null;
+  for (const e of ends) {
+    let node = suffixTree(files, path.posix.basename(e) === "__init__.py" ? `${parts.at(-1)}/__init__.py` : path.posix.basename(e));
+    const segs = e.split("/");
+    for (let k = segs.length - 1; k >= 0 && node; k--) node = node.get(segs[k]);
+    if (node) { count += node.count; file = node.file; }
+  }
+  known.set(key, count === 1 ? file : null);
+  return known.get(key);
+}
+
+// The files byName holds under one name, by their path read from its end: each node the count of files under it and
+// one of them; made once for each name and set of files.
+const SUFFIXES = new WeakMap();
+function suffixTree(files, name) {
+  if (!SUFFIXES.has(files)) SUFFIXES.set(files, new Map());
+  const trees = SUFFIXES.get(files);
+  if (!trees.has(name)) {
+    const root = new Map();
+    for (const f of byName(files).get(name) ?? []) {
+      const segs = f.split("/");
+      let node = root;
+      for (let k = segs.length - 1; k >= 0; k--) {
+        if (!node.has(segs[k])) node.set(segs[k], Object.assign(new Map(), { count: 0, file: f }));
+        node = node.get(segs[k]);
+        node.count++;
+      }
+    }
+    trees.set(name, root);
+  }
+  return trees.get(name);
 }
 
 // The project's Python files by their name (a package's __init__.py by its folder's: "pkg/__init__.py"), made once
@@ -312,12 +358,67 @@ function byName(files) {
   return named;
 }
 
+// The names an import takes from a module, each read against the module's folder once the folder is found, so a name
+// costs its own length alone: { "<name>.py": file } and { "<name>/__init__.py": file } of each folder, the folders
+// also by their path read from its end, for a module found by the end of its path. A name that holds a "/", or a module
+// named __init__, is read as a whole path instead; made once for each set of files.
+const TOP = "\0";
+const MANY = Symbol("more than one");
+const FOLDERS = new WeakMap();
+function folders(files) {
+  if (FOLDERS.has(files)) return FOLDERS.get(files);
+  const held = new Map(), ends = new Map();
+  const add = (dir, name, f) => { if (!held.has(dir)) held.set(dir, new Map()); held.get(dir).set(name, f); };
+  for (const f of files) {
+    if (!f.endsWith(".py")) continue;
+    const i = f.lastIndexOf("/"), dir = i < 0 ? TOP : f.slice(0, i), name = f.slice(i + 1);
+    if (name !== "__init__.py") add(dir, name, f);
+    else if (i >= 0) { const j = dir.lastIndexOf("/"); add(j < 0 ? TOP : dir.slice(0, j), `${dir.slice(j + 1)}/__init__.py`, f); }
+  }
+  for (const [dir, names] of held) {
+    if (dir === TOP) continue;
+    const segs = dir.split("/");
+    let node = ends;
+    for (let k = segs.length - 1; k >= 0; k--) { if (!node.has(segs[k])) node.set(segs[k], new Map()); node = node.get(segs[k]); }
+    (node.here ??= []).push(names);
+  }
+  const out = { held, ends };
+  FOLDERS.set(files, out);
+  return out;
+}
+const plain = n => !n.includes("/") && n !== "__init__";
+// The files a folder holds by name: the folder named by a path that ends in "/", or by "" for the project's root.
+const heldIn = (files, at) => folders(files).held.get(at === "" ? TOP : at.slice(0, -1));
+const inFolder = (names, n) => names?.get(`${n}.py`) ?? names?.get(`${n}/__init__.py`) ?? null;
+// Every file under a folder whose path ends in the given parts, by name, each name's one file or MANY.
+function endingIn(files, parts) {
+  let node = folders(files).ends;
+  for (let k = parts.length - 1; k >= 0 && node; k--) node = node.get(parts[k]);
+  if (!node) return null;
+  if (!node.all) {
+    const all = new Map(), stack = [node];
+    while (stack.length) {
+      const at = stack.pop();
+      for (const names of at.here ?? []) for (const [n, f] of names) all.set(n, all.has(n) ? MANY : f);
+      for (const next of at.values()) stack.push(next);
+    }
+    node.all = all;
+  }
+  return node.all;
+}
+const one = (all, n) => {
+  const a = all?.get(`${n}.py`), b = all?.get(`${n}/__init__.py`);
+  return (a === undefined) === (b === undefined) || a === MANY || b === MANY ? null : (a ?? b);
+};
+
 // A relative import's files: each name that is a module of its own, else the module it names.
 function relative(from, imp, files) {
   const up = path.posix.dirname(from).split("/").filter(s => s !== ".");
   const base = [...up.slice(0, up.length - (imp.level - 1)), ...(imp.module ? imp.module.split(".") : [])].join("/");
   const at = p => [`${p}.py`, `${p}/__init__.py`].map(f => f.replace(/^\//u, "")).find(f => files.has(f)) ?? null;
-  const subs = imp.names.filter(n => n !== "*").map(n => at(`${base}/${n}`));
+  const names = heldIn(files, `${base}/`.replace(/^\//u, "")), seen = new Map();
+  const sub = n => (plain(n) ? inFolder(names, n) : at(`${base}/${n}`));
+  const subs = imp.names.filter(n => n !== "*").map(n => { if (!seen.has(n)) seen.set(n, sub(n)); return seen.get(n); });
   const own = subs.length && subs.every(Boolean) ? null : at(base);
   return [...subs.filter(Boolean), ...(own ? [own] : [])];
 }
@@ -327,9 +428,23 @@ function relative(from, imp, files) {
 // binds to a platform: such a name is never looked for among the project's files by the end of their paths.
 export function resolvePython(from, imp, files, known) {
   if (imp.level > 0) return { to: relative(from, imp, files) };
-  const parts = imp.module.split("."), subs = imp.names.filter(n => n !== "*").map(n => [...parts, n]);
-  const find = p => moduleAt(p, from, files) ?? (known(parts[0]) ? null : bySuffix(p, files));
-  const named = subs.map(find).filter(Boolean);
+  const parts = imp.module.split("."), most = deepest(files), p = parts.join("/");
+  let top;
+  const isKnown = () => (top ??= known(parts[0]));
+  const find = q => (q.length > most ? null : moduleAt(q, from, files) ?? (isKnown() ? null : bySuffix(q, files)));
+  // (a module of more parts than the deepest file's path holds is no file of the project, nor is any name under it)
+  const names = imp.names.filter(n => n !== "*"), seen = new Map();
+  let roots, all;
+  const sub = n => {
+    if (!plain(n)) return find([...parts, n]);
+    roots ??= ROOTS(from).map(root => heldIn(files, `${root}${p}/`));
+    for (const held of roots) { const f = inFolder(held, n); if (f) return f; }
+    if (isKnown()) return null;
+    all ??= endingIn(files, p.split("/"));
+    return one(all, n);
+  };
+  const subs = parts.length + 1 > most ? [] : names.map(n => { if (!seen.has(n)) seen.set(n, sub(n)); return seen.get(n); });
+  const named = subs.filter(Boolean);
   const own = named.length === subs.length && subs.length ? null : find(parts);
   const to = [...named, ...(own ? [own] : [])];
   return to.length ? { to } : { outside: imp.module, top: parts[0] };

@@ -1,6 +1,6 @@
 // A key given twice in one mapping of a YAML file, which GitHub's workflow reader refuses, running none of the file's
 // jobs (#393). The workflow check (workflows.mjs, beside this file) fails each with its line. It reads the file with the
-// YAML package the core carries (third-party/yaml, as third-party.mjs says; #528), every document of it, each mapping,
+// YAML package the core installs from its lock file (packages.mjs; #528, #654), every document of it, each mapping,
 // block or flow, and throws nothing, its errors read plainly so that a text full of them is read in linear time. A key
 // is read as YAML spells it and GitHub reads it, as text: quoted or plain, with its escapes, so "if" and if are one
 // key, and so are 1 and "1" (the failsafe schema, which reads every scalar as text). A key that is no scalar (a mapping
@@ -11,7 +11,7 @@
 // close, which is read as none of its keys and said so, an entry whose key is null, for the check to fail with its mend,
 // since GitHub refuses such a file all the same; and text that is no YAML past where the package can read it. It holds
 // one document's tokens at a time, so a text of many documents takes no more memory than reading them did.
-import { Composer, LineCounter, Parser, isScalar, visit } from "../third-party/yaml/dist/index.js";
+import { loadSync } from "./packages.mjs";
 
 export const DEEPEST = 128;
 
@@ -48,6 +48,8 @@ export function uncommented(line) {
 // YAML reads it and the line of the first, numbered from 1, in the order of the seconds in the text; and, where the
 // text could not be read to its end, { line: 1, key: null, first: null } after them.
 export function twice(text) {
+  // (the package, loaded here alone: a script that imports this file for `uncommented` needs nothing installed)
+  const { Composer, LineCounter, Parser, isScalar, visit } = loadSync("yaml");
   const found = [], lines = new LineCounter(), cut = new Set();
   const composer = new Composer({ schema: "failsafe", uniqueKeys: false });
   const read = doc => visit(doc, { Map(_, map) {
