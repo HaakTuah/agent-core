@@ -11,7 +11,7 @@
 # text of a pull request or an issue reaches a command: the scripts read them through gh's answers alone. Its last step
 # takes the personal terms out of issues and comments (core/scripts/issue-terms.mjs; #783), where the call passes the
 # secret PERSONAL_TERMS, as the starter kit's does. It may write issues, and read pull requests, checks and statuses;
-# nothing else, so a pull request's own text or a review's it counts and leaves to a session the owner works with.
+# nothing else, so a pull request's own text or a review's it counts and leaves to the owner's run of the script.
 name: look
 
 on:

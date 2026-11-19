@@ -8,7 +8,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { holds, main, MARK, places, takeOut, termsOf } from "../scripts/issue-terms.mjs";
+import { holds, main, MARK, payloadOf, places, takeOut, termsOf, texts } from "../scripts/issue-terms.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
@@ -46,23 +46,26 @@ ok(places(`${term}${term}`, terms).length === 2, "two terms side by side are eac
 
 // GitHub, made up: issues (one a closed pull request, one an open one), comments of each kind and a review
 const repo = "o/r";
-const issue = { number: 1, html_url: "https://github.com/o/r/issues/1", node_id: "I1", title: `About ${term}`, body: `See ${other}.`, state: "open" };
-const clean = { number: 2, html_url: "https://github.com/o/r/issues/2", node_id: "I2", title: "Plain", body: "Plain.", state: "open" };
-const closed = { number: 3, html_url: "https://github.com/o/r/pull/3", node_id: "P3", title: "A change", body: `Words ${term}`, state: "closed", pull_request: {} };
-const open = { number: 4, html_url: "https://github.com/o/r/pull/4", node_id: "P4", title: `Open ${term}`, body: "x", state: "open", pull_request: {} };
-const comment = { id: 11, html_url: "https://github.com/o/r/issues/1#issuecomment-11", node_id: "C11", body: `A note ${other}` };
-const inline = { id: 12, html_url: "https://github.com/o/r/pull/3#discussion_r12", node_id: "R12", body: `Here ${term}` };
-const review = { id: 13, html_url: "https://github.com/o/r/pull/3#pullrequestreview-13", node_id: "V13", body: `Review ${term}`, submitted_at: "2026-11-18T00:00:00Z" };
-const old = { id: 14, html_url: "https://github.com/o/r/pull/3#pullrequestreview-14", node_id: "V14", body: `Old ${term}`, submitted_at: "2026-01-01T00:00:00Z" };
+const issue = { author_association: "OWNER", number: 1, html_url: "https://github.com/o/r/issues/1", node_id: "I1", title: `About ${term}`, body: `See ${other}.`, state: "open" };
+const clean = { author_association: "OWNER", number: 2, html_url: "https://github.com/o/r/issues/2", node_id: "I2", title: "Plain", body: "Plain.", state: "open" };
+const closed = { author_association: "OWNER", number: 3, html_url: "https://github.com/o/r/pull/3", node_id: "P3", title: "A change", body: `Words ${term}`, state: "closed", pull_request: {} };
+const open = { author_association: "OWNER", number: 4, html_url: "https://github.com/o/r/pull/4", node_id: "P4", title: `Open ${term}`, body: "x", state: "open", pull_request: {} };
+const comment = { author_association: "OWNER", id: 11, html_url: "https://github.com/o/r/issues/1#issuecomment-11", node_id: "C11", body: `A note ${other}` };
+const inline = { author_association: "OWNER", id: 12, html_url: "https://github.com/o/r/pull/3#discussion_r12", node_id: "R12", body: `Here ${term}` };
+const review = { author_association: "OWNER", id: 13, html_url: "https://github.com/o/r/pull/3#pullrequestreview-13", node_id: "V13", body: `Review ${term}`, submitted_at: "2026-11-18T00:00:00Z" };
+const old = { author_association: "OWNER", id: 14, html_url: "https://github.com/o/r/pull/3#pullrequestreview-14", node_id: "V14", body: `Old ${term}`, submitted_at: "2026-01-01T00:00:00Z" };
 const NOW = new Date("2026-11-19T12:00:00Z");
-function github({ versions = {} } = {}) {
+// (each text as GitHub gives it when read again, by its route: as listed, unless `now` says otherwise)
+const byRoute = { "repos/o/r/issues/1": issue, "repos/o/r/issues/2": clean, "repos/o/r/issues/3": closed, "repos/o/r/issues/comments/11": comment, "repos/o/r/pulls/comments/12": inline, "repos/o/r/pulls/3/reviews/13": review };
+function github({ versions = {}, now = {}, extra = [] } = {}) {
   const asked = [];
   const gh = (...args) => {
     asked.push(args.join(" "));
+    if (args[0] in now || args[0] in byRoute) { const got = args[0] in now ? now[args[0]] : byRoute[args[0]]; if (got === null) throw new Error("gone"); return JSON.stringify(got); }
     if (args[0] === "graphql") return JSON.stringify({ data: { nodes: args.filter(a => a.startsWith("ids[]=")).map(a => a.slice(6)).map(id => ({ id, userContentEdits: { nodes: (versions[id] ?? []).map(diff => ({ diff })) } })) } });
     const route = args[0], first = /[?&]page=1$/.test(route);
     if (route.startsWith(`repos/${repo}/issues?`)) return JSON.stringify(first ? [issue, clean, closed, open] : []);
-    if (route.startsWith(`repos/${repo}/issues/comments?`)) return JSON.stringify(first ? [comment] : []);
+    if (route.startsWith(`repos/${repo}/issues/comments?`)) return JSON.stringify(first ? [comment, ...extra] : []);
     if (route.startsWith(`repos/${repo}/pulls/comments?`)) return JSON.stringify(first ? [inline] : []);
     if (route.startsWith(`repos/${repo}/pulls/3/reviews`)) return JSON.stringify(first ? [review, old] : []);
     if (/^repos\/o\/r\/pulls\/\d+\/reviews/.test(route)) return "[]";
@@ -70,8 +73,8 @@ function github({ versions = {} } = {}) {
   };
   return { gh, asked };
 }
-const run = (argv, { env = { TERMS, GITHUB_ACTIONS: "true" }, refuse = () => false, versions } = {}) => {
-  const { gh, asked } = github({ versions });
+const run = (argv, { env = { TERMS, GITHUB_ACTIONS: "true" }, refuse = () => false, versions, now, extra } = {}) => {
+  const { gh, asked } = github({ versions, now, extra });
   const edits = [], lines = [], errors = [];
   const error = console.error; console.error = m => errors.push(m);
   try {
@@ -107,11 +110,49 @@ ok(own.out.includes(`could not change: ${inline.html_url}`), "--private names a 
 ok(own.out.includes(`earlier versions hold a term: ${comment.html_url}`) && !own.out.includes(`earlier versions hold a term: ${clean.html_url}`), "--private names each text whose kept versions hold a term, and no other", own.out);
 ok(![term, other].some(t => own.out.toLowerCase().includes(t)), "--private never prints a term either");
 
+// an outsider's text: neither edited nor counted, so no comment of guesses learns the list; --private names it
+const stranger = { id: 21, html_url: "https://github.com/o/r/issues/2#issuecomment-21", node_id: "C21", body: `Guesses: ${term}, ${other}`, author_association: "NONE", user: { type: "User" } };
+const app = { id: 22, html_url: "https://github.com/o/r/issues/2#issuecomment-22", node_id: "C22", body: `Quoted ${term}`, author_association: "NONE", user: { type: "Bot" } };
+byRoute["repos/o/r/issues/comments/22"] = app;
+const guessed = run([], { extra: [stranger, app] });
+ok(!guessed.edits.some(e => e.route.endsWith("/comments/21")) && /took a term out of 6/.test(guessed.out) && /read 7 texts/.test(guessed.out), "an outsider's comment is neither edited nor counted, and an app's is", guessed.out);
+const named = run(["--private"], { env: { TERMS }, extra: [stranger] });
+ok(named.out.includes(`an outsider's text holds a term: ${stranger.html_url}`) && !named.edits.some(e => e.route.endsWith("/comments/21")), "--private names an outsider's text that holds a term, for the owner, and edits it not", named.out);
+
+// a row of GitHub's answers not of its shape is left out (floor topic 5)
+const bent = [{ ...comment, id: "11/lock" }, { ...comment, id: -1 }, { ...comment, id: 1.5 }, { ...comment, id: 31, html_url: "https://github.com/x/y/issues/1#issuecomment-31" },
+  { ...comment, id: 32, html_url: "https://github.com/o/r/issues/1 x" }, { ...comment, id: 33, node_id: "C 33" }, { ...comment, id: 34, node_id: "<b>" }, { ...comment, id: 35, body: { text: term } },
+  { ...comment, id: 36, body: `${term}${"x".repeat(1 << 20)}` }, null, "a row", { id: 37 }];
+const read = texts(repo, "2026-11-11T12:00:00Z", (...args) => { const route = args[0]; if (/[?&]page=1$/.test(route) && route.includes("issues/comments?")) return JSON.stringify(bent); if (/[?&]page=1$/.test(route) && route.includes("issues?")) return JSON.stringify([{ ...issue, number: "1/lock" }, { ...issue, number: 0 }, { ...issue, title: 7 }]); return "[]"; });
+ok(read.length === 0, "a row whose number, id, address, node id or text is not of its shape is left out, every one", JSON.stringify(read.map(r => r.route)));
+
+// a term inside the mark is never edited each day again
+const dots = termsOf("…");
+ok(payloadOf({ body: "a … b" }, dots) === null, "where a term stands inside the mark, the text is not edited");
+const looped = run([], { env: { TERMS: `${TERMS}\n…`, GITHUB_ACTIONS: "true" }, now: { "repos/o/r/issues/comments/11": { ...comment, body: `A … note ${other}` } }, extra: [] });
+ok(!looped.edits.some(e => e.route.endsWith("/comments/11")) && /may not edit/.test(looped.out), "such a text is counted, and left as it is", looped.out);
+
+// read again just before its edit: a person's edit since the first read is kept
+const since = run([], { now: { "repos/o/r/issues/comments/11": { ...comment, body: `A note, edited, ${other}` }, "repos/o/r/pulls/comments/12": { ...inline, body: "Taken out by hand" }, "repos/o/r/pulls/3/reviews/13": null } });
+ok(since.edits.find(e => e.route.endsWith("/comments/11"))?.payload.body === `A note, edited, ${MARK}`, "the edit is made from the text as it stands when read again", JSON.stringify(since.edits));
+ok(!since.edits.some(e => e.route.endsWith("/pulls/comments/12")) && !since.edits.some(e => e.route.endsWith("/reviews/13")), "a text no longer holding a term, or gone, is not edited");
+
+// the list from a file, never typed into a chat
+const file = path.join(tmp, "terms.txt");
+fs.writeFileSync(file, TERMS);
+const fromFile = run(["--private", "--terms-file", file], { env: {} });
+ok(fromFile.status === 0 && fromFile.out.includes(`changed: ${issue.html_url}`), "--terms-file reads the list from a file", fromFile.out);
+const noFile = run(["--terms-file", path.join(tmp, "none")], { env: {} });
+ok(noFile.status === 1 && mended(noFile.out) && !noFile.out.includes(tmp), "a file that cannot be read fails, says the mend, and names no path", noFile.out);
+ok(/--terms-file/.test(job.out) && /never typed into a chat/.test(job.out) && !/TERMS=/.test(job.out), "the job's mend gives the list by a file, never typed into a chat", job.out);
+
 const inJob = run(["--private"]);
+const inCi = run(["--private"], { env: { TERMS, CI: "true" } });
+ok(inCi.status === 1 && mended(inCi.out) && inCi.asked.length === 0, "--private where another runner says CI fails too, reading nothing", inCi.out);
 ok(inJob.status === 1 && mended(inJob.out) && inJob.edits.length === 0 && inJob.asked.length === 0, "--private in a job fails, reads nothing, and says the mend", inJob.out);
 const bad = run(["--days", "x"]);
 ok(bad.status === 1 && mended(bad.out), "a wrong option fails and says the mend", bad.out);
 const none = run([], { env: { GITHUB_ACTIONS: "true" } });
-ok(none.status === 0 && none.asked.length === 0 && /TERMS is not set/.test(none.out), "without TERMS it reads nothing and says so", none.out);
+ok(none.status === 0 && none.asked.length === 0 && /no terms are given here/.test(none.out), "without TERMS it reads nothing and says so", none.out);
 
 done("the check of issue and comment text for the personal terms");

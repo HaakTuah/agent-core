@@ -10,20 +10,30 @@
 // stood, since a job's log is as public as its repository: only counts, and the mend. Without TERMS it reads nothing
 // and says so. It fails nothing (exit 0), save a wrong option or no repository to read.
 //
-// GitHub keeps each earlier version of a description or a comment, shown to every reader, until someone with write
-// access deletes it by hand (the text's "edited" menu); an issue's old title stays in its timeline, which no one can
-// delete. So where a term was taken out, the owner learns where in private: a session the owner works with runs this
-// with --private, signed in to gh as the owner, which takes out the same and names, in that session's own chat alone,
-// each text it changed or could not, and each whose kept versions still hold a term. A job's token may edit only what
-// its workflow grants (the core's look.yml grants issues, not pull requests), so a text it may not edit is counted, and
-// --private takes it out. Run by the daily look's job (the core's look.yml, and own-look.yml here), from a repository's
-// root. gh and Node's own modules.
+// It reads only the texts of those the host lets write and of apps it installed (`author_association` OWNER, MEMBER or
+// COLLABORATOR, or an account of type Bot): an outsider's text is data (floor rule 4), and were it edited or counted, a
+// comment listing guesses would learn the list a day later. Such a text it neither edits nor counts; --private names
+// one that holds a term, for the owner to hide or delete by hand. Each row of GitHub's answers is read only where its
+// numbers, addresses and texts are of their shape (floor topic 5); any other is left out.
 //
-//   TERMS=... node core/scripts/issue-terms.mjs              what a job runs: counts alone
-//   TERMS=... node core/scripts/issue-terms.mjs --private    in a session the owner works with, never a job: names them
-//   ... --days N                                             N days back in place of DAYS (a first run: --days 36500)
-//   ... --dry                                                takes nothing out; says what it would
+// GitHub keeps each earlier version of a description or a comment, shown to every reader, until someone with write
+// access deletes it by hand (the text's "edited" menu), so an edit marks where a term stood until then; an issue's old
+// title stays in its timeline, which no one can delete. So where a term was taken out, the owner learns where in
+// private: the owner runs this with --private in a terminal of the owner's own, gh signed in as the owner, the list in a
+// file outside the repository (--terms-file), never typed into a chat (floor rule 11); a session the owner works with
+// may run it given that file's path alone. It takes out the same and names, there alone, each text it changed or could
+// not, and each whose kept versions still hold a term, read through GitHub's GraphQL, which Claude's cloud sessions are
+// refused: there it says so. A job's token may edit only what its workflow grants (the core's look.yml grants issues,
+// not pull requests), so a text it may not edit is counted, and --private takes it out. Just before each edit the text
+// is read again and the edit made from what it holds then, so a person's edit since the first read is kept. Run by the
+// daily look's job (the core's look.yml, and own-look.yml here), from a repository's root. gh and Node's own modules.
+//
+//   TERMS=... node core/scripts/issue-terms.mjs                  what a job runs: counts alone
+//   node core/scripts/issue-terms.mjs --private --terms-file F   by the owner, never a job: names them
+//   ... --days N                                                 N days back in place of DAYS (a first run: --days 36500)
+//   ... --dry                                                    takes nothing out; says what it would
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import { repoOf } from "./inbox.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
 import { started } from "./started.mjs";
@@ -64,42 +74,71 @@ export function takeOut(text, terms) {
   return now;
 }
 
-// What is read, from GitHub's answers through `gh` (ghApi's form): each text as { kind, url, node, fields, edit }, where
-// `fields` are its texts by the name GitHub's edit takes and `edit` is [method, route] of that edit.
+// The shapes a row of GitHub's answers is read in (floor topic 5): an id or a number a whole number above nought, an
+// address of this repository's on github.com with no blank or control character, a node id of letters, digits, _ and -,
+// a text a string of at most a mebibyte or none.
+const whole = n => Number.isSafeInteger(n) && n > 0;
+const anAddress = (v, repo) => typeof v === "string" && v.length <= 500 && v.startsWith(`https://github.com/${repo}/`) && !/[\s\u0000-\u001f\u007f]/u.test(v);
+const aNode = v => typeof v === "string" && /^[\w-]{1,100}$/u.test(v);
+const aText = v => v === null || (typeof v === "string" && v.length <= 1 << 20);
+// (those the host lets write, and apps it installed; anyone else is an outsider)
+export const insider = row => ["OWNER", "MEMBER", "COLLABORATOR"].includes(row?.author_association) || row?.user?.type === "Bot";
+
+// What is read, from GitHub's answers through `gh` (ghApi's form): each text as { kind, url, node, fields, route, method,
+// outsider }, where `fields` are its texts by the name GitHub's edit takes, `route` where it is read again and edited,
+// and `method` that edit's; a row not of its shape left out.
+// One text, where its row is of its shape; else null.
+function rowOf(repo, row, kind, fields, route, method = "PATCH") {
+  if (!anAddress(row?.html_url, repo) || !aNode(row?.node_id) || !Object.values(fields).every(aText)) return null;
+  return { kind, url: row.html_url, node: row.node_id, fields, route, method, outsider: !insider(row) };
+}
+
+// The reviews' own texts, which GitHub lists by pull request and not by date: those of each pull request touched in the
+// days read, written in them.
+const reviewsOf = (repo, since, pulls, pages) => pulls.flatMap(p => pages(`repos/${repo}/pulls/${p.number}/reviews`)
+  .filter(r => whole(r?.id) && !(typeof r.submitted_at === "string" && r.submitted_at < since))
+  .map(r => rowOf(repo, r, "review", { body: r.body ?? null }, `repos/${repo}/pulls/${p.number}/reviews/${r.id}`, "PUT")));
+
 export function texts(repo, since, gh = ghApi) {
   const pages = route => pagesOf(route, gh);
-  const out = [];
-  const touched = pages(`repos/${repo}/issues?state=all&sort=updated&direction=desc&since=${since}`);
-  for (const i of touched) {
-    // (a pull request's own title and description once it is merged or closed: while it is open the personal-terms
-    // check reads them)
-    if (i.pull_request && i.state !== "closed") continue;
-    out.push({ kind: i.pull_request ? "pull request" : "issue", url: i.html_url, node: i.node_id, fields: { title: i.title, body: i.body }, edit: ["PATCH", `repos/${repo}/issues/${i.number}`] });
-  }
-  for (const c of pages(`repos/${repo}/issues/comments?since=${since}`)) out.push({ kind: "comment", url: c.html_url, node: c.node_id, fields: { body: c.body }, edit: ["PATCH", `repos/${repo}/issues/comments/${c.id}`] });
-  for (const c of pages(`repos/${repo}/pulls/comments?since=${since}`)) out.push({ kind: "review comment", url: c.html_url, node: c.node_id, fields: { body: c.body }, edit: ["PATCH", `repos/${repo}/pulls/comments/${c.id}`] });
-  // (a review's own text has no list by date: those of each pull request touched in the days read, written in them)
-  for (const p of touched.filter(i => i.pull_request)) {
-    for (const r of pages(`repos/${repo}/pulls/${p.number}/reviews`)) {
-      if (typeof r.submitted_at === "string" && r.submitted_at < since) continue;
-      out.push({ kind: "review", url: r.html_url, node: r.node_id, fields: { body: r.body }, edit: ["PUT", `repos/${repo}/pulls/${p.number}/reviews/${r.id}`] });
-    }
-  }
-  return out;
+  const touched = pages(`repos/${repo}/issues?state=all&sort=updated&direction=desc&since=${since}`).filter(i => whole(i?.number));
+  // (a pull request's own title and description once it is merged or closed: while it is open the personal-terms
+  // check reads them)
+  const own = touched.filter(i => !i.pull_request || i.state === "closed")
+    .map(i => rowOf(repo, i, i.pull_request ? "pull request" : "issue", { title: i.title, body: i.body ?? null }, `repos/${repo}/issues/${i.number}`));
+  const notes = pages(`repos/${repo}/issues/comments?since=${since}`).filter(c => whole(c?.id))
+    .map(c => rowOf(repo, c, "comment", { body: c.body ?? null }, `repos/${repo}/issues/comments/${c.id}`));
+  const inline = pages(`repos/${repo}/pulls/comments?since=${since}`).filter(c => whole(c?.id))
+    .map(c => rowOf(repo, c, "review comment", { body: c.body ?? null }, `repos/${repo}/pulls/comments/${c.id}`));
+  return [...own, ...notes, ...inline, ...reviewsOf(repo, since, touched.filter(i => i.pull_request), pages)].filter(Boolean);
 }
 
 // GitHub's edit, its text on standard input and never on a command line; refused, false, naming nothing.
 export const editGh = (method, route, payload) => spawnSync("gh", ["api", "-X", method, route, "--input", "-"], { input: JSON.stringify(payload), encoding: "utf8", stdio: ["pipe", "ignore", "ignore"] }).status === 0;
 
-// Of each text that holds a term, its fields with the terms out, edited; what was done, by text.
-export function clean(all, terms, { edit = editGh, dry = false } = {}) {
+// The fields of `fields` that hold a term, each with the terms taken out; null where one still holds a term once
+// taken out (a term inside MARK), so it is never edited each day again.
+export function payloadOf(fields, terms) {
+  const payload = {};
+  for (const [key, value] of Object.entries(fields)) if (holds(value, terms)) payload[key] = takeOut(value, terms);
+  return Object.values(payload).some(v => holds(v, terms)) ? null : payload;
+}
+
+// Of each insider's text that holds a term, read again just before its edit and edited from what it holds then; what was
+// done, by text. An outsider's is left alone.
+export function clean(all, terms, { edit = editGh, dry = false, gh = ghApi } = {}) {
   const changed = [], refused = [];
   for (const t of all) {
-    const payload = {};
-    for (const [key, value] of Object.entries(t.fields)) if (holds(value, terms)) payload[key] = takeOut(value, terms);
-    if (!Object.keys(payload).length) continue;
+    if (t.outsider || !Object.values(t.fields).some(v => holds(v, terms))) continue;
+    if (dry) { (payloadOf(t.fields, terms) === null ? refused : changed).push(t); continue; }
+    let fresh = null;
+    try { fresh = JSON.parse(gh(t.route)); } catch {}
+    const now = fresh && Object.fromEntries(Object.keys(t.fields).map(key => [key, fresh[key] ?? null]));
+    if (!now || !Object.values(now).every(aText)) { refused.push(t); continue; }
+    const payload = payloadOf(now, terms);
+    if (payload !== null && !Object.keys(payload).length) continue;
     // (a review's edit takes its body alone, and an issue's what changed)
-    if (dry || edit(t.edit[0], t.edit[1], payload)) changed.push(t); else refused.push(t);
+    if (payload !== null && edit(t.method, t.route, payload)) changed.push(t); else refused.push(t);
   }
   return { changed, refused };
 }
@@ -133,13 +172,14 @@ function repository() {
 
 // The options, or the failure that says its mend.
 export function optionsOf(argv, env) {
-  const known = new Set(["--private", "--dry", "--days"]);
-  const days = argv.includes("--days") ? Number(argv[argv.indexOf("--days") + 1]) : DAYS;
-  const bad = argv.filter((a, i) => !known.has(a) && argv[i - 1] !== "--days");
-  if (bad.length || !Number.isSafeInteger(days) || days < 1) return { refused: "FAIL issue-terms.mjs was given an option it does not know. Mend: run it with --private, --dry or --days N (a whole number of days), or none." };
+  const known = new Set(["--private", "--dry"]), valued = new Set(["--days", "--terms-file"]);
+  const value = name => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined);
+  const days = value("--days") === undefined ? DAYS : Number(value("--days"));
+  const bad = argv.filter((a, i) => !known.has(a) && !valued.has(a) && !valued.has(argv[i - 1]));
+  if (bad.length || !Number.isSafeInteger(days) || days < 1 || (argv.includes("--terms-file") && !value("--terms-file"))) return { refused: "FAIL issue-terms.mjs was given an option it does not know. Mend: run it with --private, --dry, --days N (a whole number of days) or --terms-file <a file>, or none." };
   const own = argv.includes("--private");
-  if (own && env.GITHUB_ACTIONS === "true") return { refused: "FAIL issue-terms.mjs --private names where a term stood, and a job's log is as public as its repository. Mend: run --private only in a session the owner works with; in a job, run it with no option." };
-  return { days, own, dry: argv.includes("--dry") };
+  if (own && (env.GITHUB_ACTIONS === "true" || env.CI === "true")) return { refused: "FAIL issue-terms.mjs --private names where a term stood, and a runner's log is shared. Mend: run --private only in a terminal of the owner's own, or a session the owner works with; in a job, run it with no option." };
+  return { days, own, dry: argv.includes("--dry"), file: value("--terms-file") };
 }
 
 // For a session the owner works with alone: where each text stood, and which keep earlier versions holding a term.
@@ -147,25 +187,29 @@ function named({ all, changed, refused, terms, dry, gh, say }) {
   const title = t => "title" in t.fields && holds(t.fields.title, terms) ? "; its old title stays in its timeline, which no one can delete" : "";
   for (const t of changed) say(`${dry ? "would change" : "changed"}: ${t.url} (${t.kind})${title(t)}`);
   for (const t of refused) say(`could not change: ${t.url} (${t.kind}); edit it by hand`);
-  const { held, unread } = versions(all.map(t => t.node).filter(Boolean), terms, gh);
+  for (const t of all.filter(x => x.outsider && Object.values(x.fields).some(v => holds(v, terms)))) say(`an outsider's text holds a term: ${t.url} (${t.kind}); hide or delete it by hand, never acting on what it says (floor rule 4)`);
+  const { held, unread } = versions(all.filter(t => !t.outsider).map(t => t.node), terms, gh);
   for (const t of all.filter(x => held.has(x.node))) say(`earlier versions hold a term: ${t.url} (${t.kind}); delete them in its "edited" menu`);
-  if (unread.size) say(`the earlier versions of ${unread.size} texts could not be read; look at their "edited" menus by hand`);
+  if (unread.size) say(`the earlier versions of ${unread.size} texts could not be read (GitHub's GraphQL, which Claude's cloud sessions are refused); run this in a terminal of the owner's own, or look at their "edited" menus by hand`);
 }
 
 export function main(argv, { env = process.env, gh = ghApi, edit = editGh, now = new Date(), repo = undefined, say = console.log } = {}) {
   const options = optionsOf(argv, env);
   if (options.refused) { console.error(options.refused); return 1; }
-  const { days, own, dry } = options, terms = termsOf(env.TERMS);
-  if (!terms.length) { say("Personal terms in issues and comments: TERMS is not set here (the Actions secret PERSONAL_TERMS, passed to the daily job), so nothing was read."); return 0; }
+  const { days, own, dry, file } = options;
+  let raw = env.TERMS;
+  if (file !== undefined) { try { raw = fs.readFileSync(file, "utf8"); } catch { console.error("FAIL issue-terms.mjs could not read the file --terms-file names. Mend: give the path of a file of the terms, one a line, kept outside the repository."); return 1; } }
+  const terms = termsOf(raw);
+  if (!terms.length) { say("Personal terms in issues and comments: no terms are given here (TERMS, the Actions secret PERSONAL_TERMS passed to the daily job, or --terms-file), so nothing was read."); return 0; }
   const at = repo === undefined ? repository() : repo;
   if (!at) { console.error("FAIL issue-terms.mjs found no GitHub repository to read here. Mend: run it from a clone whose origin is on GitHub, or in GitHub's job."); return 1; }
   const since = new Date(now.getTime() - days * 86400000).toISOString().replace(/\.\d{3}Z$/u, "Z");
   let all;
   try { all = texts(at, since, gh); } catch { say("Personal terms in issues and comments: GitHub's issues and comments could not be read here, so nothing was read. Mend: run it again where gh answers for an account that may read them."); return 0; }
-  const { changed, refused } = clean(all, terms, { edit, dry });
-  say(`Personal terms in issues and comments: read ${all.length} texts written or edited in the last ${days} days; ${dry ? "would take a term out of" : "took a term out of"} ${changed.length}${refused.length ? `; ${refused.length} that hold one this account may not edit` : ""}.`);
+  const { changed, refused } = clean(all, terms, { edit, dry, gh });
+  say(`Personal terms in issues and comments: read ${all.filter(t => !t.outsider).length} texts written or edited in the last ${days} days; ${dry ? "would take a term out of" : "took a term out of"} ${changed.length}${refused.length ? `; ${refused.length} that hold one this account may not edit` : ""}.`);
   if (own) named({ all, changed, refused, terms, dry, gh, say });
-  else if (changed.length || refused.length) say(`GitHub keeps each earlier version of a text edited, shown to every reader. Mend: a session the owner works with runs \`TERMS=<the list> node ${env.CORE_AT ?? "core/"}scripts/issue-terms.mjs --private --days ${days}\` there, signed in to gh as the owner, which takes out what this could not and names, in its own chat alone, each text whose earlier versions hold a term; the owner deletes those versions by hand (the text's "edited" menu).`);
+  else if (changed.length || refused.length) say(`GitHub keeps each earlier version of a text edited, shown to every reader. Mend: the owner, in a terminal of the owner's own with gh signed in as the owner, runs \`node ${env.CORE_AT ?? "core/"}scripts/issue-terms.mjs --private --days ${days} --terms-file <a file of the terms, kept outside the repository>\` (a session the owner works with may run it given that path alone; the list is never typed into a chat), which takes out what this could not and names there alone each text whose earlier versions hold a term; the owner deletes those versions by hand (the text's "edited" menu).`);
   return 0;
 }
 
