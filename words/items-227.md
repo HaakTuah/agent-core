@@ -152,13 +152,13 @@ What these are and how they are kept: `words/README.md`.
      labelled `by:chat`, its note "What this issue asks to be built, in one place" gathering what the owner agreed
      to). Asking for an audit of the core with Kiro:
 
-     > Will agent-core work perfectly with kiro? Audit! I want to see if i can use this core in future work projects
+     > Will agent-core work perfectly with kiro? Audit! I want to see if i can use this core in [other projects]
      > also.
 
      Shown the audit:
 
-     > Our agent-core should slot in with anything, ideally. These are all areas for improvement. What about when […]
-     > runs out of claude usage, and uses antigravity instead? Everything must still work. Or if someone only uses
+     > Our agent-core should slot in with anything, ideally. These are all areas for improvement. What about when
+     > [Claude is unavailable], and uses antigravity instead? Everything must still work. Or if someone only uses
      > codex.
 
      The owner agreed to the session's six points: one door in, `AGENTS.md`, with each tool's small entry file written
@@ -191,10 +191,10 @@ What these are and how they are kept: `words/README.md`.
 
      And of how a builder is picked:
 
-     > If I have herdr, but uses gpt there for the orchestrator, then it is the foundation and the one I want to
-     > conserve the longest, so it should be another provider than the orchestrator, or? Because even though I think
-     > if you have claude, you should always save it for the most important tasks, the orchestrator is what keeps an
-     > operation going?
+     > If I have [another tool to run sessions in], but uses gpt there for the orchestrator, then it is the foundation
+     > and the one I want to conserve the longest, so it should be another provider than the orchestrator, or? Because
+     > even though I think if you have claude, you should always save it for the most important tasks, the
+     > orchestrator is what keeps an operation going?
 
      The owner agreed to the pace as the owner's (the default: no session slows or stops to save usage by its own
      choice; a pace said in person holds for now, one written in the manifest stands), to the two things saved (the

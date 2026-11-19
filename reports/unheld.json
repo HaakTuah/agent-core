@@ -153,11 +153,6 @@
       "mark": "case",
       "why": "a session misled by a comment that claims the owner's yes shows only in what it does; the case outsider could add such a comment and read that nothing of it is built"
     },
-    "roles/shared/review-guidelines.md: Every reviewer": {
-      "mark": "check",
-      "by": "#551",
-      "why": "a session's posted review is read for its score and its declared lines of blocking and other findings; what a finding says stays the reviewer's, so in part"
-    },
     "roles/shared/review-guidelines.md: A finding names its rule": {
       "mark": "move",
       "why": "no check can tell a finding that breaks a written rule from a plain bug; it binds when a finding is written: with \"A finding seen twice becomes a check\", to `tasks/reviews.md`"
@@ -284,7 +279,7 @@
     },
     "roles/shared/teams.md: An employer's rules come first": {
       "mark": "goes",
-      "why": "no project of the owner's is held by an employer; \"A project's own rules add to the core's\" covers its rule files"
+      "why": "no project of the owner's is built under an employer's rules yet; \"A project's own rules add to the core's\" covers its rule files"
     },
     "tasks/choices.md: a drop says whether it rests on a fact": {
       "mark": "case",
@@ -550,24 +545,9 @@
       "mark": "goes",
       "why": "scripts/code-review-wait.mjs and scripts/wait.mjs carry the waits; the rest is a step of the brief"
     },
-    "tasks/reviews.md: A late review is still read": {
-      "mark": "check",
-      "by": "#551",
-      "why": "a finding posted after its PR merged with no reply is read exactly from the host; the look lists it"
-    },
     "tasks/reviews.md: A reviewer, the security reviewer too, that gave the last three PRs it was asked on no review": {
       "mark": "goes",
       "why": "scripts/review-record.mjs counts answers; the rule only saves waiting"
-    },
-    "tasks/reviews.md: What a posted review declares": {
-      "mark": "check",
-      "by": "#551",
-      "why": "a comment opening \"Security review:\", \"Code review:\" or \"Design check:\" with no declared line of blocking or other findings is read exactly"
-    },
-    "tasks/reviews.md: The design check": {
-      "mark": "check",
-      "by": "#551",
-      "why": "a design-checked PR (one that changes `floor/`, `roles/`, `tasks/` or `tools/`) with no \"Design check:\" comment on its head is read exactly, in part"
     },
     "tasks/reviews.md: It goes down the lines": {
       "mark": "goes",
