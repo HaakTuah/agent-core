@@ -7,7 +7,7 @@ change): the kind `role`.
 (`roles/orchestrator.md`); a builder builds one line to its merge; the session that syncs the core moves the copy
 (`roles/shared/work-flow.md`, "Sessions"); the code reviewer and the security reviewer review a PR (`tasks/reviews.md`);
 the fallback reviewer takes a review no other gives; the design check, the stand-in and planning design judge or plan
-against the design and the owner's words; escalation takes what has beaten a builder twice.
+against the design and the owner's words.
 
 **A file for each role** (#304). By default what a role reads at its start is the floor's
 `security.md`, its own file under `roles/` (the builder's, the orchestrator's, a reviewer's, the stand-in's, the design
@@ -49,6 +49,23 @@ where that tool is not at hand, to the next it names:
 wrote it. A fresh session of the same tool serves; a different tool is a preference, the table's. It does not mean a
 second tool is needed. Reason: a reviewer that wrote the change reads its own intent instead of the diff. Held by
 nothing yet: builder and reviewer post under one login (#187).
+
+**The rules name tiers, never a model** (#467). By default a rule names the tier a job takes, with its effort:
+
+| Tier | Its jobs | Effort |
+| --- | --- | --- |
+| Strongest | the main lane, design readings and the *hard work*, the orchestrator, the fallback reviewer, the design and leanness checks, the stand-in, a choice's challenger, blind picker and judge, escalation's first step, a helper that needs design judgement | high |
+| Middle | routine lanes (polish, docs, splits, tests) and parallel helpers (`tasks/helpers.md`) | high for a builder; a helper medium, high for the hard work |
+| Light | search | low |
+| Scarce top | planning design, escalation's last step, work the owner gives it by name | high |
+
+Each tool's part maps the tiers to its models, with the day its documentation was read; where it offers several
+providers', the owner's preference decides, else the models that passed the staged cases. With no map, or a mapped
+model gone, whoever starts the session picks by the jobs, or takes the tool's automatic choice, and the PR says which
+tool, model and effort built it. It does not mean the models are equal, that one provider is preferred by rule, or that
+a session picks its own. Reason: a running session can seldom change its model, and one left to choose takes the
+strongest, which the owner's usage pays for. Held by `scripts/general.mjs` and `scripts/tools-offer.mjs`; what built
+a PR, by nothing yet.
 
 **Planning design** is asked at most once per task (its PR says when it was), with a self-contained brief, when it needs
 a new or better plan.

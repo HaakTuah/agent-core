@@ -9,7 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { asked, calledFor, copyAtBase, costMend, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, numberMend, PARTS, waitsMend, waitsOn } from "../scripts/pr-description.mjs";
+import { asked, calledFor, copyAtBase, costMend, differencesAdded, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, numberMend, PARTS, reasonsMend, waitsMend, waitsOn } from "../scripts/pr-description.mjs";
 import { lineMend } from "../scripts/reading.mjs";
 import { asking, coreAtBase, found, issuesOf, readable, textsOf, yesOf } from "../scripts/owner-yes.mjs";
 
@@ -39,6 +39,12 @@ ok(["nothing", "a review", "checks", "#241"].every(w => waitsOn(`x\n\nWaits on: 
 ok(waitsOn("x") === null && waitsOn("Waits on: soon").kind === null && waitsOn("Waits on: the owner").kind === null && waitsOn("Waits on: the owner: why").kind === null,
   "no line is none; one in no form, or the owner without a question in one sentence ending in a question mark, is no form");
 ok(waitsOn("Waits on: the owner: a?\r\nWaits on: nothing").kind === "nothing" && waitsOn("  Waits on:   a review  ").said === "a review", "the last such line counts, trimmed");
+// (#750, point 4: the check fails what is missing, never phrasing)
+ok(waitsOn("Waits on: #724, then the orchestrator's word").kind === "item" && waitsOn("Waits on: Nothing").kind === "nothing" && waitsOn("Waits on: a review by Codex").kind === "a review"
+  && waitsOn("Waits on: checks.").kind === "checks" && waitsOn("Waits on: The owner: may it go? Then #3.").kind === "the owner",
+  "a line that begins with a form, in any case, is in it whatever follows");
+ok(["nothingness", "a reviewer", "checksum", "#12a", "the owner: why", "soon, nothing"].every(w => waitsOn(`Waits on: ${w}`).kind === null),
+  "  but a word that only starts like a form, the owner with no question, or a form that does not begin the line, is in none");
 ok(costMend("x\nSession so far: 1,204 answers (opus); tokens in 3, cache written 4, cache read 5, out 6.\n") === null && costMend(`x\r\n  ${NO_COST}\r\n`) === null,
   "the cost line, or the mark that the script printed none, on a line of its own, is enough");
 ok([costMend("x"), costMend(`see ${NO_COST}`), costMend("No cost line."), costMend(null)].every(m => /Mend: run `node core\/scripts\/session-cost\.mjs`/.test(m ?? "") && m.includes(NO_COST)),
@@ -46,8 +52,9 @@ ok([costMend("x"), costMend(`see ${NO_COST}`), costMend("No cost line."), costMe
 ok(numberMend("## What holds it\n\nNone\n") === null && numberMend("x") === null
   && numberMend("## What holds it\n- \"A rule\": held by its check.\n  Number: correction: misread; outcome: asked.\n## Readings taken\nNumber: x") === null,
   "the number is asked only where \"What holds it\" stands and holds more than None, and one line in its form is enough");
-ok(numberMend("## What holds it\n- Number: check fires; outcome: robust; rare harm.") === null && numberMend("## What holds it\n- Number: check fires; outcome: robust; rare") !== null,
-  "a number may say that its rule guards against rare and severe harm, in those words");
+ok(numberMend("## What holds it\n- Number: check fires; outcome: robust; rare harm.") === null && numberMend("## What holds it\n- Number: check fires; outcome: robust; rare") === null
+  && numberMend("## What holds it\n- Number: Check fires; outcome: fast (the statuses wait less)") === null,
+  "a number may say that its rule guards against rare and severe harm, and a line that begins in the form passes whatever follows, in any case (#750, point 4)");
 ok([numberMend("## What holds it\n- \"A rule\": held by its check.\n## Readings taken\nNumber: findings; outcome: robust"), numberMend("### What holds it\n- Number: findings; outcome: cost")].every(m => /Mend: under it, .*"Number: <findings \| check fires \| correction: <kind>>; outcome: <asked/.test(m ?? ""))
   && /it reads "findings; outcome: cost"/.test(numberMend("### What holds it\n- Number: findings; outcome: cost")),
   "a rule with no number under the heading, one under another heading, or one in no form, is to mend, the mend giving the form");
@@ -83,9 +90,9 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   put("src/screens/a.js", "2\n"); put("checks/reading.json", "{}\n"); put("core-manifest.md", "# Core manifest\n\nFloor: whole. Modules: `updates.md`.\nNot taken: `game-design.md` (no game), `screens.md` (none).\n"); put("core/CLAUDE.md", "x\n"); put(".github/workflows/caf\u00e9.yml", "on: push\n");
   git("add", "-A"); git("commit", "-q", "-m", "a change that empties its own reading config");
   const called = calledFor(project);
-  ok(JSON.stringify(called.map(c => c.file)) === JSON.stringify(["core/tasks/screens.md", "core/floor/topics/workflows.md"]) && /of the kind polish/.test(called[0].why),
-    "a pull request's changed paths call for their files by the reading config and the manifest its base holds, not those it carries: a module the base's manifest leaves out is not asked, one the change itself leaves out still is; a path of the copy calls for nothing, and one outside ASCII is read as spelled", JSON.stringify(called));
-  ok(/does not list `core\/tasks\/screens\.md`/.test(lineMend("Read for it: `core/floor/topics/workflows.md`", called, "cmd")) && lineMend("Read for it: `core/floor/topics/workflows.md`, `core/tasks/screens.md`", called, "cmd") === null, "and the line is held to them");
+  ok(JSON.stringify(called.map(c => c.file)) === JSON.stringify(["core/tasks/screens.md", "core/tasks/updates.md", "core/floor/topics/workflows.md"]) && /of the kind polish/.test(called[0].why) && /core-manifest\.md/.test(called[1].why),
+    "a pull request's changed paths call for their files by the reading config and the manifest its base holds, not those it carries (a changed manifest calling for tasks/updates.md, #756): a module the base's manifest leaves out is not asked, one the change itself leaves out still is; a path of the copy calls for nothing, and one outside ASCII is read as spelled", JSON.stringify(called));
+  ok(/does not list `core\/tasks\/screens\.md`/.test(lineMend("Read for it: `core/floor/topics/workflows.md`", called, "cmd")) && lineMend("Read for it: `core/floor/topics/workflows.md`, `core/tasks/screens.md`, `core/tasks/updates.md`", called, "cmd") === null, "and the line is held to them");
   git("checkout", "-q", "--orphan", "alone"); git("commit", "-q", "-m", "no parent");
   ok(calledFor(project) === null, "with no base to read against, nothing is asked");
 }
@@ -103,11 +110,40 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   commit(null); commit(manifest("vendor/core/"));
   ok(copyAtBase(tmp) === "scripts/pr-description.mjs", "where the base holds no manifest, the core's own scripts/ are read, though the head adds one");
 }
+// the line "Reasons read:", asked of a pull request that adds a line under the manifest's "Differences" (#756)
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pr-description-reasons-"));
+  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
+  const git = (...a) => execFileSync("git", a, { cwd: tmp, env, stdio: ["ignore", "pipe", "pipe"] });
+  const manifest = (...lines) => `# Core manifest\r\n\r\n## Differences\r\n\r\n${lines.join("\r\n")}\r\n\r\n## Slots\r\n\r\n- a slot: its row\r\n`;
+  const commit = text => { if (text === null) fs.rmSync(path.join(tmp, "core-manifest.md"), { force: true }); else fs.writeFileSync(path.join(tmp, "core-manifest.md"), text); git("add", "-A"); git("commit", "-q", "--allow-empty", "-m", "x"); };
+  git("init", "-q");
+  commit(null); commit(null);
+  ok(differencesAdded(tmp).length === 0, "a head with no manifest adds no difference");
+  commit(manifest("None."));
+  ok(differencesAdded(tmp).length === 0, "a first manifest whose \"Differences\" says None adds none");
+  commit(manifest("- `core/tasks/x.md`, \"A rule\": here it is so, on the owner's word."));
+  const one = differencesAdded(tmp);
+  ok(one.length === 1 && one[0].startsWith("- `core/tasks/x.md`"), "a line added under \"Differences\" is read, lines that end both ways");
+  commit(manifest("- `core/tasks/x.md`, \"A rule\": here it is so, on the owner's word.", "- a second") .replace("## Slots\r\n\r\n- a slot: its row", "## Slots\r\n\r\n- a slot: another row"));
+  ok(differencesAdded(tmp).join() === "- a second", "only the lines the change adds are read, and none under another heading");
+  commit(manifest("- a second"));
+  ok(differencesAdded(tmp).length === 0, "a difference taken out asks nothing");
+  commit(null); commit(manifest("- a first difference"));
+  ok(differencesAdded(tmp).join() === "- a first difference", "where the base holds no manifest, each difference of the head's is added");
+  git("checkout", "-q", "--orphan", "alone"); git("commit", "-q", "-m", "no parent");
+  ok(differencesAdded(tmp) === null, "with no base to read against, nothing is asked");
+  ok(reasonsMend("No line.", []) === null && reasonsMend("No line.", null) === null, "a pull request that adds no difference is asked nothing");
+  ok(reasonsMend("x\n Reasons read: core archive 161 and #156; its reason does not hold here, since this project has no players.\n", ["- a"]) === null, "a line \"Reasons read:\" with what was read passes, whatever its words");
+  const mend = reasonsMend("x\nReasons read:\n", ["- `core/tasks/x.md`, a difference"]);
+  ok(mend !== null && mend.includes("core/tasks/x.md") && mend.includes("reasons.mjs") && mended(`FAIL ${mend}`) && reasonsMend("x", ["- a"]) !== null && !/[\r\u001b]/u.test(reasonsMend("x", ["- a\r::error::x\u001b[2J"])) && reasonsMend("x", ["- a"], "vendor/core/").includes("`node vendor/core/scripts/reasons.mjs "), "an empty line, or none, fails, naming the difference (with no control character of the project's text) and the script that prints its reasons where the copy stands, with the mend");
+}
 // run, each failure says its mend (no pull request's date given, so the line is not asked of it here)
 const run = body => spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/pr-description.mjs", import.meta.url))], { env: { ...process.env, PR_BODY: body, PR_CREATED: "" }, encoding: "utf8" });
 const none = run("The change, and nothing else.");
 ok(none.status === 1 && /has no heading "Readings taken"\. Mend: add "## Readings taken"/.test(none.stdout) && mended(none.stdout) && run(whole).status === 0, "run, a description without its headings fails, each failure saying its mend, and one with them passes");
-ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon")}`) && mended(`FAIL ${costMend("x")}`) && mended(`FAIL ${numberMend("## What holds it\n- a rule")}`), "so do the lines' own failures, as the script prints them");
+ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon")}`) && mended(`FAIL ${costMend("x")}`) && mended(`FAIL ${numberMend("## What holds it\n- a rule")}`) && mended(`FAIL ${reasonsMend("x", ["- a"])}`), "so do the lines' own failures, as the script prints them");
 // the owner's yes where the core's floor or review guidelines change (owner-yes.mjs; #549)
 {
   const said = "> Queue it from its current text; the floor's two points need my yes, and it is given.";
@@ -120,6 +156,8 @@ ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon"
   ok(asking(["core/floor/security.md", "floor/tiles.png"], "core/").length === 0 && asking(["floor/security.md"], null).length === 0,
     "in a project, a sync's copy of the floor and a folder of the project's own named floor ask nothing: only the core's own change does");
   ok(yesOf({ paths: floor, body: pr(said), texts }).note?.startsWith("the owner's yes is quoted"), "a line quoted word for word from the issue passes");
+  ok(/correct nothing in the quote: only a session the owner works with corrects[\s\S]*quote them as they stand there, and never write that record yourself/.test(yesOf({ paths: floor, body: pr("> Queue it from its curent text; the floor's two points need my yes, and it is given."), texts }).mend ?? ""),
+    "a quote that corrects or miscopies the owner's words fails, its mend saying only a session the owner works with corrects them, and that the builder quotes them as they stand and writes no record itself (#775)");
   ok(yesOf({ paths: floor, body: pr("> Queue it from its current text;   the floor's two\n> points need my yes, and it is given."), texts }).note && yesOf({ paths: floor, body: pr("> Queue it from its current text; […] and it is given."), texts }).note,
     "blanks count as one, the issue's own > marks are read through, and \"[…]\" leaves details out");
   const wrong = [yesOf({ paths: floor, body: pr("> Queue it, and my yes is given for the floor."), texts }), yesOf({ paths: floor, body: pr(said), texts: [] }), yesOf({ paths: floor, body: pr("Queue it from its current text") , texts }), yesOf({ paths: floor, body: pr(said, "Builds the floor change."), texts })];

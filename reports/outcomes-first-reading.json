@@ -56,9 +56,9 @@
   },
   "projects": [
     {
-      "shown": "a project of another owner (private)",
+      "shown": "a project of another owner",
       "outcomes": null,
-      "why": "read, and its numbers not published: a private project's measures stand in the core's public files only where its own owner has said they may"
+      "why": "read, and its numbers not published: such a project's measures stand in the core's public files only where its own owner has said they may"
     },
     {
       "shown": "`HaakTuah/amarna-letters`",
