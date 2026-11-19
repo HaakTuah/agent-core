@@ -93,6 +93,8 @@ timeline[3] = [[{ event: "ready_for_review", created_at: at(40) }]];
 const mainOnly = route => (route.includes("/pulls?") ? JSON.stringify(pulls.filter(p => p.number !== 9)) : measured(route));
 const extra = measure({ repo: "o/n", count: 2, gh: mainOnly });
 ok(extra.read === 2 && extra.minutes.join() === "30,40", "with one more read than counted, the oldest gives only the merge before the next", JSON.stringify(extra));
+const past = measure({ repo: "o/n", count: 1, gh: measured });
+ok(past.read === 1 && past.minutes.join() === "40", "a merge into another branch is passed over before the sample is cut: the merge before the oldest is one into main", JSON.stringify(past));
 timeline[3] = [filler, [{ event: "ready_for_review", created_at: at(70) }, { event: "commented", created_at: at(90) }]];
 ok(/of the last 2 merged pull requests, 4 pushes whose checks ran \(a median of 2 each\), and a median of 30\.0 min/.test(line(m)) && /not read/.test(line({ read: 0 })), "the state report's line, and with nothing read, that", line(m));
 

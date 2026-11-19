@@ -117,7 +117,9 @@ function pushesRun(repo, p, gh) {
 export function measure({ repo, count = COUNT, gh = ghApi }) {
   if (!aRepository(repo)) refuse(`${JSON.stringify(String(repo)).slice(0, 80)} names no repository`, "name it as <owner>/<name>");
   const branch = json(gh(`repos/${repo}`)).default_branch;
-  const merged = lastMerged(repo, count + 1, gh).filter(p => Number.isSafeInteger(p.number) && p.base?.ref === branch && timeOf(p.merged_at) !== null && typeof p.head?.ref === "string")
+  // (those into the default branch are kept before the sample is cut, so the merge before the oldest is one of them)
+  const into = p => Number.isSafeInteger(p.number) && p.base?.ref === branch && timeOf(p.merged_at) !== null && typeof p.head?.ref === "string";
+  const merged = lastMerged(repo, count + 1, gh, into)
     .sort((a, b) => timeOf(a.merged_at) - timeOf(b.merged_at));
   const pushes = [], minutes = [];
   merged.forEach((p, i) => {
