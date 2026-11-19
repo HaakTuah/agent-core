@@ -373,6 +373,11 @@ function computed(r, text) {
     || (tok.v === "import" && after(t, k, ".", "meta", ".", "glob")) || (tok.v === "require" && after(t, k, ".", "context"))));
 }
 
+// Whether a file's imports are as ones the readers cannot follow: a reader could not read them, its parser not installed
+// or the file past it; and in Python, read on the parser alone, those of a file the grammar could not read whole, which
+// may stand in the part it lost.
+const unfollowed = r => !r.imports || (!r.functions && r.lang === "python");
+
 function oneFile(ctx, file, r) {
   const system = systemOf(ctx.config, file), domain = system ? ctx.config.systems[system].domain ?? null : null, from = { file, system, domain };
   if (computed(r, ctx.texts[file] ?? "")) ctx.unsure.add(file);
@@ -383,10 +388,7 @@ function oneFile(ctx, file, r) {
   if (domain === "rules") ownClock(ctx, file, r);
   changeMarks(ctx, file, r.marks);
   testReach(ctx, file, r);
-  // (imports a reader could not read, its parser not installed or the file past it, are as ones it cannot follow; and in
-  // Python, read on the parser alone, so are those of a file the grammar could not read whole, which may stand in the
-  // part it lost)
-  if (!r.imports || (!r.functions && r.lang === "python")) ctx.unsure.add(file);
+  if (unfollowed(r)) ctx.unsure.add(file);
   for (const imp of r.imports ?? []) { if (r.lang === "javascript") oneImport(ctx, from, imp); else foreign(ctx, from, imp, r); }
   const names = ctx.tests.has(file) ? null : shared(file, r, ctx.idx);
   if (names) ctx.scripts.set(file, names);
