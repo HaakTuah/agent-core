@@ -4,10 +4,10 @@
 
 The rules shared by the owner's agent-built projects, written once so a change is made once and every project takes it
 alike (core archive 68). The reasoning behind each rule: `archive/instructions.md`, in the core's words; the owner's own
-words stay in this repository alone (`words/`; #252). A project of another owner takes the core the same way, its
-*owner's account* its own (read, or filled in: "Slots"), and in its copy "the owner" is its own (core archive 148),
-save in `archive/`, whose reasoning stays the core's owner's: its stand-in weighs it after its own owner's words, and
-marks an answer that rests on it alone unsure (`roles/shared/inbox.md`; core archive 166).
+words, cut to reasoning, stay in this repository alone (`words/`; #252; #778). A project of another owner takes the core
+the same way, its *owner's account* its own (read, or filled in: "Slots"), and in its copy "the owner" is its own (core
+archive 148), save in `archive/`, whose reasoning stays the core's owner's: its stand-in weighs it after its own owner's
+words, and marks an answer that rests on it alone unsure (`roles/shared/inbox.md`; core archive 166).
 
 A person who owns a project that takes the core reads `setup/owner-guide.md` first: one plain page on what it does for
 the project, the yeses it asks, the stop switch, what it costs and the settings that are theirs.
@@ -60,7 +60,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
 1. **An exact copy under `core/`** (or the folder the manifest's `Core:` line names, or carried by a library of the
    project's: point 8), pinned to one commit of this repository and never edited by hand: everything but
-   `reports/`, the dated reports of this repository's own changes, `words/`, the owner's own words behind the
+   `reports/`, the dated reports of this repository's own changes, `words/`, the record of the owner's word behind the
    archive, and `tests/`, the tests of the core's own scripts, which stay here alone (`.gitattributes`; core archive
    165; #252; #527). The packages of other publishers its scripts run are never in the copy: its
    `.packages/package-lock.json` names each, at one exact version, and `core/scripts/install.mjs` installs them from

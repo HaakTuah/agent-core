@@ -241,8 +241,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   out of the copy as it keeps `reports/`). Whoever adds an item writes its number, its date, the issue that carries
   the owner's word and one line of the reasoning, and no quotation: the words stay on the issue. Wherever the owner's
   words are recorded here (#773), they are quoted only as floor rule 4 says: the reason behind a decision, cleaned,
-  and nothing personal. Nothing changes it. It does not mean the items that stand are rewritten: they keep the words
-  they hold, in `words/`, beside their reasoning.
+  and nothing personal. Nothing changes it. It does not mean the items that stand are rewritten: they keep their
+  reasoning, and in `words/` the record of the owner's word, cut to reasoning (#778).
   Reason: a project of another owner imported the owner's dated messages with the rules, and a stand-in needs the
   reasoning, not the wording. Held, in part, by `scripts/holders.mjs`, which fails the two forms out of step
   (`scripts/archive.mjs`), and by `.github/workflows/core.yml`, which fails a copy that holds what `.gitattributes`
