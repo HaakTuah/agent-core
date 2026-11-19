@@ -68,6 +68,7 @@ ok(override("| *merge queue* | `maybe` |", "merge queue", ["on", "offered", "non
 // advice to switch the up-to-date setting off is given only where the host asks it.
 f = facts({ repo: "o/n", gh: host({ rules: strict }) });
 ok(f.users === "merges" && /its users get: each merge, as no row/.test(f.said[3]) && !/a release/.test(follows(f)), "with no row, users get each merge and the line is as before", f.said[3]);
+ok(/published on a merge alone: a pull request is brought up to date first, until its agents make its publishing wait on a green default branch/.test(follows(f)) && /row \*users get\* then says `releases`/.test(follows(f)), "and the advice says it publishes on a merge alone until its agents make it wait on a green branch (#733, point 8)", follows(f));
 const releases = "| *users get* | `releases` |\n";
 f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: strict }) });
 ok(f.users === "releases" && /merges on its own green checks/.test(follows(f)) && /to switch it off/.test(follows(f)) && /needs-owner/.test(follows(f)) && /kept by hand/.test(follows(f)), "users get a release and the host still asks an up-to-date branch: the owner is advised once, and the line kept meanwhile", follows(f));

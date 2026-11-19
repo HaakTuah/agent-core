@@ -4,8 +4,8 @@
 // repository and whether it is on, and whether the repository's runner minutes are billed, each following from who
 // holds the repository, whether it is private and its rules on the default branch; a row of the project's manifest
 // (*merge queue*, *billed minutes*) only overrides what was read, and it prints what it read. It reads too whether the
-// project's users get each merge or a release (*users get*; floor rule 12; tasks/hosts.md, "Where users get a release,
-// a pull request merges on its own green checks"; #733), which cannot be read from the host: each merge where no row
+// project's users get each merge or a release (*users get*; floor rule 12; tasks/hosts.md, "What users get is published
+// only from a green default branch"; #733), which cannot be read from the host: each merge where no row
 // says, the core's own from its AGENTS.md. With --measure it counts
 // the line's measure, which the monthly state report gives (state-report.mjs, beside this file): of the last merged
 // pull requests, the pushes whose checks ran on each, and the minutes from its turn to its merge, its turn the later of
@@ -114,9 +114,12 @@ export function follows(f) {
     if (f.upToDate === null) return `${own} Whether the host asks an up-to-date branch was not read, so the line is kept by hand meanwhile, as the core's roles/shared/work-flow.md says.`;
     return `${own} The host still asks an up-to-date branch, a setting of the default branch's rules only the owner changes: where no open issue names it, file one for the owner, labelled needs-owner, to switch it off, and nothing waits on it. Until then the line is kept${f.queue === "on" ? " by the host's merge queue" : " by hand, as the core's roles/shared/work-flow.md says"}.`;
   }
-  if (f.upToDate === false) return "No up-to-date branch is asked before a merge: the line has nothing to act on, and nothing waits.";
-  if (f.queue === "on") return "The host's merge queue keeps the line: bringing branches up to date by hand has nothing to act on.";
-  const line = "The line is kept by hand, as the core's roles/shared/work-flow.md says: only the first ready pull request is brought up to date.";
+  // (where users get each merge, its publishing waits on no green branch yet: the step of the sync notes makes it, and
+  // the row *users get* then says releases; #733, point 8)
+  const pub = "Its users get each merge, published on a merge alone: a pull request is brought up to date first, until its agents make its publishing wait on a green default branch, a step of the core's sync notes, and the manifest's row *users get* then says `releases` (floor rule 12; the core's tasks/hosts.md).";
+  if (f.upToDate === false) return `${pub} No up-to-date branch is asked before a merge: the line has nothing to act on, and nothing waits.`;
+  if (f.queue === "on") return `${pub} The host's merge queue keeps the line: bringing branches up to date by hand has nothing to act on.`;
+  const line = `${pub} The line is kept by hand, as the core's roles/shared/work-flow.md says: only the first ready pull request is brought up to date.`;
   return f.queue === "offered" ? `${line} The host offers a merge queue for this repository, a setting of the default branch's rules only the owner makes, which would keep the line: where no open issue names it, file one for the owner, labelled needs-owner, and nothing waits on it. (A queue set in the branch's classic protection is not read here; the owner's settings show it.)` : line;
 }
 

@@ -270,7 +270,23 @@ const skipsDraft = cond => {
   const inner = String(cond ?? "").trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1").replace(/'(?:[^']|'')*'/gu, "text").replace(/!?\s*\b(?:always|success|cancelled|failure)\(\)/gu, "status");
   return !/\|\||[()[\]'$]|\$\{\{|\}\}/u.test(inner) && inner.split("&&").some(part => DRAFT_PART.test(part.trim()));
 };
+// A workflow of the project's own that publishes what its users get on a push alone (floor rule 12, "What users get is
+// published only from a green default branch"; #733, points 7 and 8): one triggered by a push with a step that uses
+// GitHub's own action that publishes a site (actions/deploy-pages). A workflow that publishes otherwise (a package
+// registry, a store, a script of its own) is read by the session that syncs, since no file says it publishes.
+const PUBLISH_USES = /^actions\/deploy-pages@/u;
+const publishesOnPush = p => Object.entries(p.workflows).filter(([, { yaml }]) => onPush(yaml?.on) && Object.values(yaml.jobs ?? {})
+  .some(job => (Array.isArray(job?.steps) ? job.steps : []).some(st => typeof st?.uses === "string" && PUBLISH_USES.test(st.uses))))
+  .map(([file]) => `\`.github/workflows/${shown(file)}\``);
 function testsWhenReady(p) {
+  return [suitesWhenReady(p), publishedWhenGreen(p)].filter(Boolean).join(" ") || null;
+}
+function publishedWhenGreen(p) {
+  readable(p, text => /deploy-pages/u.test(text));
+  const on = publishesOnPush(p);
+  return on.length ? `The project publishes what its users get on a push alone (${on.join("; ")}): in one small pull request, with floor rule 3's two security reviews, make it wait on a green default branch: trigger it on \`workflow_run\` of the project's test workflow, types completed and branches its default branch, its job's \`if:\` asking \`github.event.workflow_run.conclusion == 'success'\` and the run's head repository to be this one (\`github.event.workflow_run.head_repository.full_name == github.repository\`, floor topic workflows, rule 2), and check out \`github.event.workflow_run.head_sha\`; or publish from a release cut from a green commit. Then set the manifest's row *users get* to \`releases\`, so a pull request merges on its own green checks (\`node core/scripts/merge-line.mjs --repo <owner>/<name>\` reads it). Until then a pull request is brought up to date first, as now, and nothing fails.` : null;
+}
+function suitesWhenReady(p) {
   readable(p, text => SUITE_RUN.test(text));
   const loose = Object.entries(p.workflows).filter(([, { yaml }]) => onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => {
     const types = yaml.on?.pull_request?.types, ready = Array.isArray(types) && READY_TYPES.every(t => types.includes(t));

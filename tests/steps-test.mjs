@@ -126,6 +126,16 @@ for (const step of STEPS.filter(s => s.check)) {
   ok(reads("ready_for_review", "!github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "github.event.pull_request.draft") && !reads("opened, synchronize, reopened, ready_for_review", "github.event.pull_request.draft == false") && !reads("opened, synchronize, reopened, ready_for_review", "github.actor != 'x' && !github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "always() || !github.event.pull_request.draft") && !reads("opened, synchronize, reopened, ready_for_review", "!cancelled() && !github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "!cancelled() && !(github.event.pull_request.draft || x)") && reads("opened, synchronize, reopened, ready_for_review", "always() }} && !github.event.pull_request.draft && ${{ true") && reads("opened, synchronize, reopened, ready_for_review", "github.actor != ' && !github.event.pull_request.draft && '") && !reads("opened, synchronize, reopened, ready_for_review", "github.actor != 'it''s && x' && !github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "github.event.pull_request.labels[github.actor && !github.event.pull_request.draft && 1]"),
     "a job that starts a suite reads done only with all four types and a condition of parts joined by && that skips a draft, a status function such as `!cancelled()` among them and a quoted string one word, not one that runs on drafts alone, an || that lets one through, text outside its ${{ }}, an index or a draft part inside a string");
 }
+// (and its publishing: a workflow that publishes a site on a push alone reads not done, its mend saying how it waits on a
+// green default branch; one that runs on the tests' completed run reads done; #733, points 7 and 8)
+{
+  const READY_LEAD = "19 November 2026, the project's tests at the pace of a release", file = path.join(dir, ".github/workflows/pages.yml");
+  const flow = on => `name: pages\n\non:\n${on}\n\npermissions:\n  contents: read\n\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/deploy-pages@v4\n`;
+  const said = on => { fs.writeFileSync(file, flow(on)); execFileSync("git", ["add", "-A"], { cwd: dir }); const m = notDone(dir).find(x => x.lead === READY_LEAD); fs.rmSync(file); execFileSync("git", ["add", "-A"], { cwd: dir }); return m; };
+  const onPush = said("  push:\n    branches: [main]"), onRun = said("  workflow_run:\n    workflows: [tests]\n    types: [completed]\n    branches: [main]");
+  ok(onPush && /publishes what its users get on a push alone \(`\.github\/workflows\/pages\.yml`\)/.test(onPush.mend ?? onPush.text ?? JSON.stringify(onPush)) && /workflow_run/.test(JSON.stringify(onPush)) && /users get\* to `releases`/.test(JSON.stringify(onPush)) && !onRun,
+    "a workflow that publishes a site on a push alone reads not done, its mend making it wait on the tests' completed run and the row *users get* say releases; one on that run reads done", JSON.stringify(onPush ?? onRun));
+}
 // several at once, in a project of another kind: exactly those
 const lockProject = dirs["an-npm-project"];
 const some = STEPS.filter(s => s.check).filter((_, i) => i % 2 === 0).map(s => s.lead);
