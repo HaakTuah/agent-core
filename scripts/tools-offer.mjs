@@ -81,7 +81,12 @@ export function wrong({ root = ROOT, text = fs.readFileSync(path.join(root, TABL
   if (!t) return { wrong: [`${TABLE} holds no table whose first heading is "What the core offers". Mend: put back the table of "What the core offers one tool, it offers each", a row for each thing the core offers and a column for each tool of scripts/staged-tools.json`], unread: [] };
   const out = [], unread = [], named = new Set();
   for (const name of tools.filter(n => !t.tools.some(x => x.name === n))) out.push(`${TABLE}: the tool ${name}, of scripts/staged-tools.json, has no column in the table. Mend: add its column, its part in the heading ("${name} (\`tools/<its part>.md\`)"), and fill each cell as carried, cannot or not yet`);
-  for (const x of t.tools) if (x.part) { named.add(x.part); if (fs.existsSync(path.join(root, x.part))) out.push(...ways(x.part, read(x.part))); }
+  for (const x of t.tools) if (x.part) {
+    named.add(x.part);
+    const at = path.resolve(root, x.part);
+    if (!at.startsWith(path.resolve(root) + path.sep) || !fs.existsSync(at) || !fs.statSync(at).isFile()) out.push(`${TABLE}: the column ${x.name} names its part ${x.part}, which is no file in the repository. Mend: name in the heading the tool's part as it stands under tools/`);
+    else out.push(...ways(x.part, read(x.part)));
+  }
   for (const r of t.rows) r.cells.forEach((cell, i) => {
     const where = `${TABLE}, the row "${r.what}", the column ${t.tools[i].name}`;
     for (const m of cell.matchAll(/`([^`]+)`/gu)) named.add(m[1]);

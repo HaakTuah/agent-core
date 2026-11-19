@@ -5,7 +5,8 @@ Read by a session of the tool `kiro`, and by whoever hands Kiro a task or a revi
 until Kiro has passed the staged cases.
 
 How a review is asked of Kiro by each way:
-- *Side by side:* from its command line, as below, in a fresh session that takes the review's brief.
+- *Side by side:* from its command line, as below, in a fresh session that takes the review's brief, given as
+  `"$(cat <the brief's file>)"`, never pasted between the quotes, where the shell would run what it holds.
 - *Through a plug-in:* no plug-in of Kiro's for another tool is known.
 - *On the host:* none: it has no review app there.
 

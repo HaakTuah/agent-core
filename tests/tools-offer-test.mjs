@@ -55,6 +55,8 @@ ok(WAYS.every(w => kiro.includes(w)) && withKiro(kiro).wrong.length === 0, "each
 ok(says(withKiro(kiro.replace("*Through a plug-in:*", "Through a plug-in:")), 'by the way "*Through a plug-in:*"'), "a part that leaves out a way fails, naming it and saying its mend");
 const swapped = kiro.replace("*Side by side:*", "\u0000").replace("*On the host:*", "*Side by side:*").replace("\u0000", "*On the host:*");
 ok(says(withKiro(swapped), "out of order"), "a part that names the ways out of order fails, saying its mend");
+const heading = to => text.replace("Kiro (`tools/kiro.md`)", `Kiro (\`${to}\`)`);
+ok(says(check(heading("tools")), "which is no file in the repository") && says(check(heading("../outside.md")), "which is no file in the repository"), "a heading that names a folder, or a file outside the repository, as a part fails, saying its mend");
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);
