@@ -154,14 +154,23 @@ function itemFault(adds, removes, read, owner) {
   return null;
 }
 
+// why a pull request's branches keep it from being proved: a head that is no branch of the repository's own, or a base
+// that is not the default branch, whose file the form is read from; null where neither
+function branchFault(pull) {
+  const from = pull.head?.repo?.full_name, into = pull.base?.repo?.full_name;
+  if (typeof from !== "string" || typeof into !== "string" || !same(from, into)) return "its head is no branch of the repository's own (floor rule 4)";
+  if (typeof pull.base?.ref !== "string" || pull.base.ref !== pull.base?.repo?.default_branch) return "it merges into no default branch, whose file its form is read from";
+  return null;
+}
+
 // { head, why }: head the pull request's SHA where it is queue-only, else null, and why. `progress` the progress file's
 // path, `owner` the owner's account, `read(item)` an issue as done-when.mjs's readItem gives it, `base` the progress
 // file's text on the default branch, whose form an added line must have.
 export function judge(pull, files, { progress, owner, read, base }) {
   const head = pull?.head?.sha;
   if (pull?.state !== "open" || typeof head !== "string" || !SHA.test(head)) return { head: null, why: "no open pull request with a head to prove" };
-  const from = pull.head?.repo?.full_name, into = pull.base?.repo?.full_name;
-  if (typeof from !== "string" || typeof into !== "string" || !same(from, into)) return { head: null, why: "its head is no branch of the repository's own (floor rule 4)" };
+  const stray = branchFault(pull);
+  if (stray) return { head: null, why: stray };
   const form = formOf(base);
   if (form === null) return { head: null, why: `${progress} on the default branch could not be read` };
   const list = flat(files);

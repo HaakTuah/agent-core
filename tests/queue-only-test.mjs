@@ -19,7 +19,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const HEAD = "a".repeat(40), OWNER = "The-Owner";
 const REPO = { full_name: "the-owner/project" };
-const pull = { state: "open", changed_files: 1, head: { sha: HEAD, repo: REPO }, base: { repo: { full_name: "The-Owner/project" } } };
+const pull = { state: "open", changed_files: 1, head: { sha: HEAD, repo: REPO }, base: { ref: "main", repo: { full_name: "The-Owner/project", default_branch: "main" } } };
 const BASE = "| Issue | Who | Waits on |\n| --- | --- | --- |\n| #5 | builder | |\n| #6 | rule builder; it changes `tasks/reviews.md` | #5, on hold |\n";
 const file = (patch, more = {}) => [[{ filename: "QUEUE.md", status: "modified", patch, ...more }]];
 const WORD = "**What it is**\nA design.\n\n**The owner's word**\nSaid to a chat session:\n\n> Make it so.\n";
@@ -65,6 +65,8 @@ ok(linesOf(queue).length > 0 && !off.length, "every line of the core's own QUEUE
 ok(not(of(`@@ -1 +1,2 @@\n+${row(10)}`, undefined, { ...pull, head: { ...pull.head, repo: { full_name: "outsider/project" } } }), "no branch of the repository's own")
   && not(of(`@@ -1 +1,2 @@\n+${row(10)}`, undefined, { ...pull, head: { ...pull.head, repo: null } }), "no branch of the repository's own"),
   "nor a fork's head, nor one whose repository is gone (floor rule 4)");
+ok(not(of(`@@ -1 +1,2 @@\n+${row(10)}`, undefined, { ...pull, base: { ...pull.base, ref: "release" } }), "no default branch"),
+  "nor one that merges into a branch other than the default, whose file its form is read from");
 ok(not(of(`@@ -1 +1,2 @@\n+${row(30)}`), "not opened by the owner's account") && not(of(`@@ -1 +1,2 @@\n+${row(31)}`), "not labelled queued")
   && not(of(`@@ -1 +1,2 @@\n+${row(32)}`), "labelled stand-in-yes") && not(of(`@@ -1 +1,2 @@\n+${row(33)}`), "no owner's word")
   && not(of(`@@ -1 +1,2 @@\n+${row(34)}`), "no owner's word") && not(of(`@@ -1 +1,2 @@\n+${row(35)}`), "not an open issue") && not(of(`@@ -1 +1,2 @@\n+${row(99)}`), "could not be read"),

@@ -83,8 +83,8 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      the merge once a ruleset requires it (#320).
    - **A pull request of the *progress file* alone needs no review of its own** (#750). By default every pull request
      gets its reviews. Where `scripts/queue-only.mjs`, run from the default branch on the head, proves that it
-     changes the *progress file* alone, from a branch of the repository's own, each line it adds in the form the
-     file's lines take on the default branch (a row or an item as they are, its builder one a line there names, its
+     changes the *progress file* alone, from a branch of the repository's own into the default branch, each line it
+     adds in the form the file's lines take there (a row or an item as they are, its builder one a line there names, its
      other words ones the file holds, in plain punctuation, 240 characters at most) and naming an open issue the
      *owner's account* opened, labelled `queued` and not `stand-in-yes` or `on-hold`, that carries the owner's word as
      "Whose words an issue holds" in the core's `AGENTS.md` reads it (the owner quoted under "The owner's word", or a
