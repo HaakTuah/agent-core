@@ -148,9 +148,10 @@ export const STAGES = {
   "16 November 2026, how code is put together": {
     asked: true,
     stage: dir => { for (const f of ["checks/shape.json", "checks/shape-baseline.json"]) fs.rmSync(at(dir, f), { force: true }); },
-    // (as the step words it: the config as the starter kit writes it, then its first baseline)
+    // (as the step words it: the config as the starter kit writes it, every install, then its first baseline)
     mend: dir => {
       write(dir, "checks/shape.json", read(dir, "core/setup/template/shape.json.tmpl"));
+      spawnSync(process.execPath, ["core/scripts/install.mjs", "all"], { cwd: dir, encoding: "utf8", env: process.env });
       spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--first"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });
     },
   },
@@ -338,6 +339,14 @@ export const STAGES = {
     after: dir => fs.rmSync(at(dir, ".github/workflows/scripts-staged.yml"), { force: true }),
     mend: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\n      - run: node core/scripts/steps.mjs\n")),
   },
+  "19 November 2026, the parser's packages installed where the shape check runs": {
+    // (a job of the project's own that runs the shape check after an install that names no lock but the first; the mend
+    // names every one, as the copies check's job does)
+    stage: dir => write(dir, ".github/workflows/shape-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\n      - run: node core/scripts/shape.mjs\n")),
+    after: dir => fs.rmSync(at(dir, ".github/workflows/shape-staged.yml"), { force: true }),
+    mend: dir => write(dir, ".github/workflows/shape-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs all; fi\n      - run: node core/scripts/shape.mjs\n")),
+  },
+
   "18 November 2026, the shape check reads C#'s functions on the parser": {
     asked: true,
     // (a baseline written before the check read C# on the parser: that reader's name taken out of "reads")

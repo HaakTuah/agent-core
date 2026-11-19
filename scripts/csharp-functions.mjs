@@ -24,7 +24,8 @@ import { inParser } from "./parser.mjs";
 export function csharpFunctions(src, directives = []) {
   try { return inParser(import.meta.url, "read", src, directives); } catch (e) {
     if (e?.kind === "read") return null;
-    if (e?.kind === "load") throw new Error(`The parser or C#'s grammar could not be loaded (${e.message.replace(/\. Mend: .*$/su, "")}). Mend: run node core/scripts/install.mjs (in the core, scripts/install.mjs), which installs the core's packages from its lock file, then run the check again`);
+    // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step: #719)
+    if (e?.kind === "load") throw new Error(`The parser or C#'s grammar could not be loaded: ${/ Mend: /u.test(e.message) ? e.message : `${e.message}. Mend: run node core/scripts/install.mjs parser (in the core, scripts/install.mjs parser), which installs the parser's packages from its lock file, then run the check again`}`);
     throw e;
   }
 }

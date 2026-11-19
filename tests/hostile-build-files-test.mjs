@@ -20,6 +20,7 @@ import { mended } from "../scripts/mend.mjs";
 import { lockPackages, nugetConfig, plainText } from "../scripts/nuget.mjs";
 import { lines, readable, repeated } from "../scripts/workflows.mjs";
 import { twice } from "../scripts/yaml-keys.mjs";
+import { parserLeftOut } from "../scripts/packages.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -107,7 +108,7 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   const root = path.join(fresh({ "outside.yml": "on: push\n", "in/.github/workflows/b.yml": "on: push\n" }), "in");
   // (the whole of scripts/, as a project's copy holds it, so whatever the check imports is there)
   fs.cpSync(fileURLToPath(new URL("../scripts", import.meta.url)), path.join(root, "core/scripts"), { recursive: true });
-  fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(root, "core/.packages"), { recursive: true });
+  fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(root, "core/.packages"), { recursive: true, filter: parserLeftOut });
   fs.symlinkSync(path.join(root, "../outside.yml"), path.join(root, ".github/workflows/a.yml"));
   fs.writeFileSync(path.join(root, ".github/workflows/c.yml"), Buffer.from("\ufeffon: push\n", "utf16le"));
   for (const a of [["init", "-q"], ["add", "-A"]]) spawnSync("git", a, { cwd: root });

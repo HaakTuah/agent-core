@@ -482,6 +482,13 @@ ok(String(readOrigin(hidden, "log", "-p", "--format=", "--end-of-options", `${me
 const noGit = fresh("stop"); write(noGit, "src/sum.mjs", FIX); fs.rmSync(path.join(noGit, "project", ".git"), { recursive: true });
 let noGitRead = null; try { noGitRead = touched(noGit); } catch (e) { noGitRead = e instanceof Unreadable ? "unreadable" : e; }
 ok(noGitRead === "unreadable", "a project whose .git was taken away is unreadable, never untouched", String(noGitRead));
+// (what each of the copy's installs puts in its node_modules/, the kit's and a session's start's, is no work of the
+// session's; anything beside it is: #654, #719)
+const installs = fresh("stop");
+for (const f of ["core/.packages/node_modules/x/index.js", "core/.packages/parser/node_modules/y/index.js"]) write(installs, f, "module.exports = 1;\n");
+const installsRead = touched(installs);
+write(installs, "core/.packages/parser/stray.js", "1\n");
+ok(!installsRead && touched(installs), "each install's node_modules/, the parser's too, reads as untouched, and a file beside them as work begun");
 const undone = fresh("stop"); write(undone, "src/sum.mjs", FIX); git(undone, "commit", "-q", "-am", "fix"); git(undone, "reset", "-q", "--hard", "HEAD~1");
 ok(touched(undone), "a commit undone by a reset still counts as work begun");
 if (process.platform !== "win32") {
