@@ -12,8 +12,8 @@
 # each, beside the suites, here on Linux alone; on Windows, where it set the length of every run, the release workflow
 # runs it once a day and before each release (.github/workflows/release.yml; #715), since what it guards reaches a
 # project only through a release. The staged cases' test, which writes a scratch project with the starter kit for
-# each case it reads, runs half in each of those jobs, after the upgrade test's part on Linux, and on Windows in two
-# jobs of the same name with nothing before it (#508).
+# each case it reads, runs in thirds: on Linux the first after the older release's part of the upgrade test and the
+# other two after the newer's, and on Windows in three jobs of the same name with nothing before them (#508, #715).
 # A third runs the reference parsers the hand-written readers are held to, tools that only run, the devDependencies of
 # the core's lock file, which its own jobs install and a copy does not (tests/readers-test.mjs, on Linux).
 # Each job first installs the core's own packages from its lock file in .packages/, from npm's registry, running no
