@@ -33,13 +33,14 @@ import { NOTES } from "./releases.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
+import { OWN as OWN_HOLDERS } from "./holders.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
 import { Unread, call, calls, commands, uncommented, copiesConfig, folded, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { draftHoles, reads } from "./workflows.mjs";
-import { twice } from "./yaml-keys.mjs";
+import { DEEPEST, twice } from "./yaml-keys.mjs";
 import { releaseAge, WAIT } from "./licences.mjs";
 import { codeOf, covers, pinFault, pinRead } from "./licence-scan.mjs";
 import { npmPackages, offRegistry } from "./lookup.mjs";
@@ -130,8 +131,13 @@ function keysOnce(p) {
   // (with the core's packages not installed, as after a sync made by a copy from before #654, this step cannot be read:
   // it says so, with the install, and every other step is still told)
   if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`node ${corePath(p.root) || "core/"}scripts/install.mjs\`, then \`node ${corePath(p.root) || "core/"}scripts/steps.mjs\` again.`;
-  const found = reads(p.files).flatMap(f => twice(p.read(f) ?? "").map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
-  return found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : null;
+  const read = reads(p.files).map(f => [f, twice(p.read(f) ?? "")]);
+  const found = read.flatMap(([f, keys]) => keys.filter(k => k.key !== null).map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
+  const deep = read.filter(([, keys]) => keys.some(k => k.key === null)).map(([f]) => `\`${f}\``);
+  const said = [
+    found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : "",
+    deep.length ? `In one pull request, nest the lists and mappings of these workflows or actions no deeper than a workflow needs, a few levels, since past ${DEEPEST} deep a key given twice in them cannot be read: ${deep.join("; ")}.` : ""];
+  return said.filter(Boolean).join(" ") || null;
 }
 
 // Whether what the copies and pointer checks hold against in an agent tool's files is listed (#405; AGENTS.md of the
@@ -1073,6 +1079,17 @@ export const STEPS = [
       : "Each job of the project's that calls the core's `look.yml` passes it the secret, as `core/setup/template/workflows/look.yml.tmpl` has it: under its `uses:`, `secrets:` and below it `PERSONAL_TERMS: ${{ secrets.PERSONAL_TERMS }}`.",
     partly: "whether the owner has set the secret `PERSONAL_TERMS` is the repository's setting, which no file holds" },
   { lead: "19 November 2026, the shape check reads the functions of Python on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "python-tree") },
+  { lead: "19 November 2026, a project's own rules and what holds them", cost: COST.config,
+    // (the list of what holds each of the project's own rules, holders.mjs's OWN, written and readable; what it names
+    // for each is the project's to work down, which nothing fails)
+    check: p => {
+      const text = p.read(OWN_HOLDERS);
+      const mend = `run \`node core/scripts/holders.mjs --own --write\`, which writes \`${OWN_HOLDERS}\` with each of the project's own rules named as held by "none", and commit it in a pull request of its own; where a check, test, simulation or script of the project's already fails where a rule is broken, name it there as "check: <its path>"`;
+      if (text === null) return `The project holds no list of what holds its own rules: ${mend}.`;
+      let holds;
+      try { holds = JSON.parse(text)?.holders; } catch { holds = null; }
+      return holds && typeof holds === "object" && !Array.isArray(holds) ? null : `\`${OWN_HOLDERS}\` cannot be read as JSON with an object "holders": write it so, or take it out and ${mend}.`;
+    } },
   { lead: "17 November 2026, a private project's code scanned", cost: COST.check, held: "the code scan, a step of `core.yml`'s job" },
 ];
 
