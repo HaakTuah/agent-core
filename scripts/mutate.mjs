@@ -1,6 +1,6 @@
-// The core's own mutation tool (tasks/code-shape.md, "How strong the tests are"; #253), the *mutation tool* the core's
-// AGENTS.md names, and one any project whose code is JavaScript run by Node, and whose tests are files run by
-// `node <file>`, may name too. It puts faults into the code on purpose, one at a time: an equality or comparison
+// A mutation tool the core wrote (tasks/code-shape.md, "How strong the tests are"; #253), one any project whose code
+// is JavaScript run by Node, and whose tests are files run by `node <file>`, may name as its *mutation tool*; the core
+// names Stryker, run by stryker.mjs beside this file, which takes its helpers from here (#581; retiring it: #815). It puts faults into the code on purpose, one at a time: an equality or comparison
 // turned (=== to !==, < to <=), and or or swapped, true and false swapped, a ! dropped, + and - swapped; and for each
 // it runs the tests that name the changed file, until one fails. A fault no test catches survives. It writes what it
 // found in the open form of a mutation report (the mutation-testing-elements schema, as Stryker writes it), which

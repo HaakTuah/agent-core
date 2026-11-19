@@ -84,7 +84,7 @@ const unanswered = text => /\b(?:ETIMEDOUT|ESOCKETTIMEDOUT|ECONNRESET|ECONNREFUS
 const named = [...new Set(process.argv.slice(2).flatMap(n => (n === "all" ? Object.keys(INSTALLS) : [n])))];
 const unknown = named.filter(n => !Object.hasOwn(REGISTRIES, n));
 if (unknown.length) {
-  console.error(`FAIL: install.mjs knows no install ${unknown.join(", ")}. Mend: name one of ${Object.keys(REGISTRIES).join(", ")}, all for every one, or none for the first`);
+  console.error(`FAIL: install.mjs knows no install ${unknown.join(", ")}. Mend: name one of ${Object.keys(REGISTRIES).join(", ")}, all for every one${own ? " but mutation" : ""}, or none for the first`);
   process.exit(1);
 }
 const first = Object.keys(REGISTRIES)[0]; // (npm's, where none is named)
