@@ -228,6 +228,17 @@ try {
   fs.mkdirSync(path.join(older, ".packages"), { recursive: true });
   ok(JSON.stringify(everyInstall(copy)) === '["all"]' && JSON.stringify(everyInstall(older)) === "[]", "everyInstall(), which the sync and the starter kit hand a copy's installer, names every install to a copy that holds the parser's package list, and none to an older copy's (that they call it, the mutation tool's report on their lines holds)");
   ok(every.status === 0 && /into \.packages\/node_modules\//u.test(every.stdout) && /into \.packages\/parser\/node_modules\//u.test(every.stdout) && loadParser().status === 0, "and install.mjs all installs every one, as the sync and the starter kit run it", `${every.stdout}${every.stderr}`);
+  // (a lock file that names no package starts no npm, so a job that names `all` pays nothing for an install with nothing in it)
+  const keptList = fs.readFileSync(path.join(pp, "package.json"), "utf8"), keptLock = fs.readFileSync(path.join(pp, "package-lock.json"), "utf8");
+  const emptyList = { ...JSON.parse(keptList) };
+  delete emptyList.dependencies;
+  fs.writeFileSync(path.join(pp, "package.json"), JSON.stringify(emptyList, null, 2));
+  fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: emptyList.name, lockfileVersion: 3, requires: true, packages: { "": { name: emptyList.name, license: emptyList.license } } }, null, 2));
+  fs.rmSync(path.join(pp, "node_modules"), { recursive: true, force: true });
+  const empty = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
+  fs.writeFileSync(path.join(pp, "package.json"), keptList);
+  fs.writeFileSync(path.join(pp, "package-lock.json"), keptLock);
+  ok(empty.status === 0 && /parser\/package-lock\.json names no package: nothing to install/u.test(empty.stdout) && !fs.existsSync(path.join(pp, "node_modules")), "an install whose lock file names no package starts no npm, and says so", `${empty.stdout}${empty.stderr}`);
   // (an install npm recorded for another lock file is no install of this one: the package did not run)
   const record = path.join(pk, "node_modules/.package-lock.json"), kept = fs.readFileSync(record, "utf8");
   const other = JSON.parse(kept);
