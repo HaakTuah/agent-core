@@ -662,7 +662,7 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   const unread = id => { const r = readerOf(id, found.readers); return r !== null && (!reads.has(r) || (skipped.includes(r) && groupOf(id).kind === "function")); };
   const kept = id => !current.has(id) && skipped.includes(readerOf(id, found.readers)) && ["function", "lost"].includes(groupOf(id).kind);
   const gone = id => !current.has(id) && !unread(id) && !kept(id);
-  const news = unclaimed(current, base ? heldAt(baseline.listed, gone, base) : baseline.listed, config.marks);
+  const news = unclaimed(current, base ? heldAt(baseline.listed, gone, base, config.marks) : baseline.listed, config.marks);
   const { fail, later } = fresh({ config, at, self, found, current, base, news, unread });
   const lowered = staleOf({ config, at, self, baseline, baselineText, base, gone });
   fail.push(...lowered.fail);
@@ -672,11 +672,20 @@ export function verdict({ config, at, self, found, baselineText, base }) {
 }
 
 // The entries of a baseline a new breach may claim, against the pull request's base: each but one gone now that the
-// base's code no longer held either, a mended entry an earlier pull request left listed, which covers no breach elsewhere
-// (#750, point 5). The base's code is read only where an entry is gone now.
-function heldAt(listed, gone, base) {
-  const kept = [...listed].filter(([id]) => !gone(id) || base.stood().has(id));
-  return kept.length === listed.size ? listed : new Map(kept);
+// base's code no longer held either, under its id or moved (a breach of the base's that the baseline does not list by
+// its id, of the same kind and group, within the entry's numbers, as a new breach claims one), a mended entry an
+// earlier pull request left listed, which covers no breach elsewhere (#750, point 5). The base's code is read only
+// where an entry is gone now.
+function heldAt(listed, gone, base, marks) {
+  const lost = [...listed].filter(([id]) => gone(id) && !base.stood().has(id));
+  if (!lost.length) return listed;
+  const free = new Map(lost);
+  for (const [id, n] of [...base.stood()].filter(([b]) => !listed.has(b))) {
+    const { kind, group } = groupOf(id);
+    const fit = [...free].find(([other, was]) => { const o = groupOf(other); return o.kind === kind && o.group === group && within(n, was, marks); });
+    if (fit) free.delete(fit[0]);
+  }
+  return free.size ? new Map([...listed].filter(([id]) => !free.has(id))) : listed;
 }
 
 // The entries a baseline lists that are gone or moved now (`gone`): { fail, notes }. One that only shrank passes as it

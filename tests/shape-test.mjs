@@ -265,6 +265,10 @@ v = judge({ now: cycle("src/p.js", "src/q.js"), baseline: loop, base: baseOf(loo
 ok(mended(said(v)) && /src\/p\.js/.test(said(v)), "an entry the base's code no longer held, left listed by an earlier pull request, covers no new breach of its kind", said(v));
 v = judge({ now: cycle("src/p.js", "src/q.js"), baseline: loop, base: baseOf(loop, cycle("src/x.js", "src/y.js")) });
 ok(v.fail.length === 0, "one the base held, which this change moves, still covers it", said(v));
+v = judge({ now: { "src/b.js": long("tall", 100) }, baseline: listed([f100]), base: baseOf(listed([f100]), { "src/b.js": long("tall", 100) }) });
+ok(v.fail.length === 0 && /gone or moved/.test(noted(v)), "one an earlier pull request moved, the baseline left as it was, still covers it where it stands now (Codex's finding on #751)", said(v));
+v = judge({ now: { "src/b.js": long("tall", 100), "src/c.js": long("tall", 100) }, baseline: listed([f100]), base: baseOf(listed([f100]), { "src/b.js": long("tall", 100) }) });
+ok(mended(said(v)) && /src\/c\.js#tall/.test(said(v)), "and covers that one alone: a second of its name fails", said(v));
 v = judge({ now: { "src/b.js": long("tall", 100) }, baseline: listed([f100]) });
 ok(v.fail.length === 0 && /gone or moved/.test(noted(v)) && !/functions? pass/.test(said(v)), "a listed function that moved is no new breach: its old entry is said, for --write to list where it stands", noted(v));
 ok(mended(`FAIL: ${(() => { try { judge({ now: {}, baseline: "{}" }); return ""; } catch (e) { return e.message; } })()}`), "a baseline that is none is refused, with its mend");
