@@ -87,6 +87,14 @@ const longText = changed => `on: pull_request\n# ${"x".repeat(LONGEST)}${changed
 const longChanged = unreadied(longFiles(longText("a")), () => longText("b")), longSame = unreadied(longFiles(longText("a")), () => longText("a")), longAdded = unreadied(longFiles(longText("a")), () => null);
 ok(longChanged.fails.length === 1 && mended(longChanged.fails[0]) && longSame.fails.length === 0 && longAdded.fails.length === 1 && unreadied(longFiles(longText("a")), null).fails.length === 0,
   "a file past the length read that a pull request changes or adds fails with its mend; one unchanged, or read with no base, does not", [...longChanged.fails, ...longAdded.fails].join("\n"));
+// (a base past the length read has no listed breaches: the file cut under the length, as its failure asks, holds its old ones as
+// held, never as new, and a pull request that adds one to a base that was read still fails)
+const shrunk = { dupes: "on: pull_request\nx: 1\nx: 2\njobs:\n  c:\n    uses: someone/else/.github/workflows/copies.yml@" + "a".repeat(40) + "\n", base: `on: push\nx: 1\nx: 2\n# ${"x".repeat(LONGEST)}\n` };
+const cut = repeated([{ file: "shrunk.yml", text: shrunk.dupes }], () => shrunk.base);
+ok(cut.fails.length === 0 && cut.notes.length === 1 && /as it did on the base/u.test(cut.notes[0]) && repeated([{ file: "shrunk.yml", text: shrunk.dupes }], () => "on: push\n").fails.length === 1,
+  "a file cut under the length read keeps the duplicate keys it held when it was too long as held, and one a base that was read lacked still fails", [...cut.fails, ...cut.notes].join("\n"));
+const holeOver = unreadied([{ file: "a.yml", text: call(TYPES, "copies.yml", NOT_DRAFT) }], () => shrunk.base);
+ok(holeOver.fails.length === 0 && holeOver.notes.length === 1, "a call left without ready_for_review in a file cut under the length read is held, as the base's breaches could not be listed", [...holeOver.fails, ...holeOver.notes].join("\n"));
 const lower = `on: push\n${Array.from({ length: 37 }, (_, i) => `k${i}: 1\n`).join("")}z: ${"[".repeat(200)}${"]".repeat(200)}\n`;
 const lowerFails = repeated([{ file: "lower.yml", text: lower }], () => null).fails;
 ok(dup(lower) === "null@39<null" && lowerFails.length === 1 && lowerFails[0].startsWith("FAIL lower.yml:39: the file nests") && mended(lowerFails[0]),
