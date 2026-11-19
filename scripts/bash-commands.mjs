@@ -60,10 +60,17 @@ export function read(parse, run) {
   const back = s => filled.reduceRight((acc, [k, m]) => acc.split(k).join(m), s);
   const whole = readable(parse, text, filled, until);
   if (whole === null) return null;
-  // (the time is one object every reading shares, so that one past it marks the whole step)
-  const ctx = { back, out: [], time: { until, late: false } };
+  // (the time is one object every reading shares, so that one past it, or a "!" in any, marks the whole step)
+  const ctx = { back, out: [], time: { until, late: false, negated: false } };
   commandsIn(parse, whole, 0, ctx);
-  return ctx.time.late ? null : ctx.out.sort((a, b) => a.at - b.at).map(c => c.words).filter(w => w.length);
+  if (ctx.time.late) return null;
+  const found = ctx.out.sort((a, b) => a.at - b.at).map(c => c.words).filter(w => w.length);
+  // (a "!" anywhere in the step leads each of its commands: it turns a command's status over, a pipeline's and a group's
+  // too, which the grammar binds otherwise than bash, so a reader that took a command under it for a plain run would
+  // take a check that cannot fail for one that runs; every command led so is no run, and the step is said not read.
+  // Codex's security review of 76119ae, and the fallback reviewer's checks after it)
+  if (ctx.time.negated) for (const words of found) if (words[0]?.text !== "!") words.unshift({ text: "!", dynamic: false });
+  return found;
 }
 // (what is left of the time until `until`, at least a millisecond, so that a parse past it stops at once)
 const left = until => Math.max(1, until - performance.now());
@@ -115,25 +122,22 @@ function commandsIn(parse, text, offset, ctx) {
 const AS_WRITTEN = new Set(["test_command", "declaration_command", "unset_command"]);
 function walk(node, ctx) {
   if (node.type === "comment") return;
-  // (the grammar binds a "!" before a pipeline to its first command alone, where bash turns over the whole pipeline's)
-  if (node.type === "negated_command" || (node.type === "pipeline" && node.namedChildren[0]?.type === "negated_command")) return negated(node, ctx);
+  if (node.type === "negated_command") ctx.time.negated = true;
   if (node.type === "heredoc_body") return unended(node, ctx);
   const body = node.type === "redirected_statement" ? node.childForFieldName("body") : null;
   if (body?.type === "command") return redirected(node, body, ctx);
+  if (STRUCTURE.has(node.type)) ctx.out.push({ at: ctx.offset + node.startIndex, words: [{ text: keywordOf(node), dynamic: false }] });
   if (node.type === "command") commandWords(node, ctx);
   else if (AS_WRITTEN.has(node.type)) ctx.out.push({ at: ctx.offset + node.startIndex, words: writtenWords(node, ctx.back) });
   else assignments(node, ctx);
   for (const child of node.namedChildren) walk(child, ctx);
 }
-// A command led by "!": the "!" stays its first word, as the reader before this one read it, since it turns the
-// command's status over, and a reader that takes the command for a plain run would take a check that cannot fail for
-// one that runs (Codex's security review of 76119ae). Each command it holds is led by it, a pipeline's and a group's
-// too, whose status is their last command's.
-function negated(node, ctx) {
-  const from = ctx.out.length;
-  for (const child of node.namedChildren) (child.type === "negated_command" ? child.namedChildren : [child]).forEach(c => walk(c, ctx));
-  for (const c of ctx.out.slice(from)) if (c.words[0]?.text !== "!") c.words.unshift({ text: "!", dynamic: false });
-}
+// A function, a loop, an if, a case or a { } group is a command of its keyword alone, before the commands it holds, as
+// the reader before this one read its keywords: a command inside one may run once, many times or never (a function
+// only defined, a loop over nothing), so a reader that asks whether a step is one command run once is told it is not
+// (Codex's review of d32e5f0).
+const STRUCTURE = new Set(["function_definition", "for_statement", "c_style_for_statement", "while_statement", "if_statement", "case_statement", "compound_statement"]);
+const keywordOf = node => (node.type === "function_definition" ? "function" : node.type === "compound_statement" ? "{" : node.children[0]?.text ?? node.type);
 // A here-document with no line that ends it: its lines read as commands, each alone, so that one inside another's is
 // read once, never again with each that holds it.
 function unended(node, ctx) {

@@ -879,13 +879,20 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
   ok(JSON.stringify(shown('echo "$(node a.mjs)" `node b.mjs`')) === JSON.stringify(['echo $(node a.mjs)* `node b.mjs`*', "node a.mjs", "node b.mjs"]),
     "a command inside $( ) or ` ` is a command of its own, its output a word filled when it runs");
   // (Codex's security review of 76119ae: "!" turns a command's status over, so a check run under it cannot fail)
-  ok(JSON.stringify(shown("! node core/scripts/lookup.mjs c.json\nif ! node a.mjs; then x; fi")) === JSON.stringify(["! node core/scripts/lookup.mjs c.json", "! node a.mjs", "x"])
+  ok(JSON.stringify(shown("! node core/scripts/lookup.mjs c.json\nif ! node a.mjs; then x; fi")) === JSON.stringify(["! node core/scripts/lookup.mjs c.json", "! if", "! node a.mjs", "! x"])
     && notRead("copies", { "a.yml": stepped("! node core/scripts/copies.mjs config/c.json") }),
-    "a command led by \"!\" keeps it as its first word, and a check's run under it is not read as its run");
+    "a \"!\" in a step leads each of its commands, and a check's run under it is not read as its run");
+// (Codex's review of d32e5f0: a command inside a function, a loop, an if, a case or a { } group may run once, many
+// times or never, so its keyword is a command of its own, and the step is never one command run once)
+ok(["check() { node core/scripts/lookup.mjs c.json; }", "for f in; do node core/scripts/lookup.mjs c.json; done", "case x in y) node core/scripts/lookup.mjs c.json;; esac",
+  "while false; do node core/scripts/lookup.mjs c.json; done", "{ node core/scripts/lookup.mjs c.json; }"].every(run => { const c = shown(run); return c.length > 1 && c.includes("node core/scripts/lookup.mjs c.json"); })
+  && JSON.stringify(shown("until x; do y; done")) === JSON.stringify(["until", "x", "y"]),
+  "a command inside a function, a loop, a case or a group is read with its keyword as a command before it, so no such step reads as one command run once");
 // (the fallback reviewer's check of d32e5f0: a folder changed behind "!" is changed, and a pipeline under it is led by
 // it in each of its commands)
-ok(["! cd app; node core/scripts/copies.mjs config/c.json", "! pushd app\nnode core/scripts/copies.mjs config/c.json", "! echo x | node core/scripts/copies.mjs config/c.json"]
-  .every(run => notRead("copies", { "a.yml": stepped(run) })), "a folder changed behind \"!\" leaves the run after it not read, and so does a check's run in a pipeline under \"!\"");
+ok(["! cd app; node core/scripts/copies.mjs config/c.json", "! pushd app\nnode core/scripts/copies.mjs config/c.json", "! echo x | node core/scripts/copies.mjs config/c.json",
+  "! { echo x; } | node core/scripts/copies.mjs config/c.json", "true\n! false\nnode core/scripts/copies.mjs config/c.json"]
+  .every(run => notRead("copies", { "a.yml": stepped(run) })), "a folder changed behind \"!\" leaves the run after it not read, and so does a check's run in a step that holds \"!\" anywhere, a pipeline's or a group's under it among them");
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);
