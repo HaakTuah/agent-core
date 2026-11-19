@@ -882,7 +882,7 @@ const aFile = at => {
 // baseline, so that from the sync that brings the check nothing gets worse and nothing that stood before fails.
 function unwritten(self, base) {
   const config = parseConfig(fs.readFileSync(TEMPLATE, "utf8"), "the starter kit's config");
-  const yet = `the project has not written its config of the shape check yet (${KIT}; core/setup/sync-notes.md, "how code is put together")`;
+  const yet = `the project has not written its config of the shape check yet (${KIT}; core/setup/sync-notes/, "how code is put together")`;
   if (!base) { console.log(`ok   ${yet}, and there is no base to compare with: nothing was held`); return 0; }
   const now = standing(config), found = survey(now.texts, config, now.tests);
   const current = new Map([...found.entries].map(([id, e]) => [id, e.n]));

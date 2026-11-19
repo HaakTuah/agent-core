@@ -19,6 +19,6 @@ Newest last, each on one line in a file of its own, named to stand after the ent
 step in `scripts/steps/` under the same name, so that two pull requests that add an entry never edit the same lines
 (#750, point 1); `node core/scripts/sync-notes.mjs` reads the notes whole.
 
-- A copy of the core older than 19 November 2026 syncs with a script that reads what a sync asks from this file alone, where no entry stands now: the session that syncs such a copy reads each entry of `core/setup/sync-notes/` dated on or after the day of the project's last sync as one the sync printed, and does what the project lacks of it in a pull request of its own, as `core/scripts/steps.mjs` reports and beyond.
+- A sync that brings `core/setup/sync-notes/` to a copy that did not hold it ran the copy's older script, which reads what a sync asks from this file alone, where no entry stands now: the session that syncs reads each entry of that folder dated on or after the day of the project's last sync as one the sync printed, and does what the project lacks of it in a pull request of its own, as `core/scripts/steps.mjs` reports and beyond.
 
 Its entries stand in `setup/sync-notes/`, a file each, read in the order of their names.

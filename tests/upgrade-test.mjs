@@ -45,7 +45,7 @@ import { scratchEnv } from "../scripts/scratch-core.mjs";
 import { where } from "../scripts/shape.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { STEPS, callers, leads, notDone, project as read, report } from "../scripts/steps.mjs";
-import { notesAt } from "../scripts/sync-notes.mjs";
+import { FOLDER, NOTICE, notesAt } from "../scripts/sync-notes.mjs";
 import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
 
 const STEP_LEADS = STEPS.map(s => s.lead);
@@ -288,8 +288,12 @@ function upgrade(p, from, ownChanges, expect) {
 
   // the sync, as the project's own copy of the release's sync.mjs makes it
   git(p.dir, "checkout", "-q", "-B", "sync", main0);
+  const hadFolder = fs.existsSync(path.join(p.dir, "core", FOLDER));
   const s = node(p.dir, "core/scripts/sync.mjs");
   ok(s.status === 0 && s.out.includes(carrying), `${p.name}: its own sync script takes the release that carries the change, ${carrying}`, s.out);
+  // (a copy that held no folder of the notes reads its asks from their file alone: across the move it prints the notice,
+  // which sends the session to the folder; #750, point 1)
+  ok(hadFolder || s.out.includes(NOTICE), `${p.name}: its own sync script, which reads the notes' file alone, prints the notice that sends the session to the notes' folder`, s.out);
   git(p.dir, "add", "-A");
   git(p.dir, "commit", "-q", "-m", `Sync the core to ${carrying}`);
   git(p.dir, "push", "-q", "origin", "sync");

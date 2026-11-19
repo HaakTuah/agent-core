@@ -4,16 +4,17 @@
 // scripts/steps/ (steps.mjs, beside this file). A copy from before the folder holds its entries in the file itself,
 // and is read the same way, so that the notes of any two commits compare. Reads only; Node's own modules.
 //
-//   node core/scripts/sync-notes.mjs     the notes whole, as one text, each entry in its place
+//   node core/scripts/sync-notes.mjs     the notes whole, as one text, each entry in its place, from the copy it stands in
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { started } from "./started.mjs";
 
 export const NOTES = "setup/sync-notes.md", FOLDER = "setup/sync-notes";
 export const POINTER = "Its entries stand in `setup/sync-notes/`, a file each, read in the order of their names.";
 // How the notes' one line that is no entry opens: the notice that a sync from a copy older than the folder prints, its
 // reader taking what a diff of the file alone adds, which sends the session that syncs to the folder.
-export const NOTICE = "- A copy of the core older than 19 November 2026 syncs with a script that reads what a sync asks from this file alone";
+export const NOTICE = "- A sync that brings `core/setup/sync-notes/` to a copy that did not hold it ran the copy's older script";
 
 // The notes whole, from `read(file)` (its text, null where it is not there) and `list(folder)` (the names of the files
 // in it): the file's text, the line naming the folder replaced by the folder's entries; null where the file is not.
@@ -38,4 +39,5 @@ export const notesAt = (rev, run) => notesFrom(
 // The entries of notes read whole: each line that opens an item of the list.
 export const entries = text => String(text ?? "").split("\n").map(l => l.replace(/\r$/u, "")).filter(l => l.startsWith("- "));
 
-if (started(import.meta.url)) process.stdout.write(notes() ?? "");
+// (run, it reads the core or the copy it stands in, from wherever it is run: a project runs it as core/scripts/...)
+if (started(import.meta.url)) process.stdout.write(notes(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")) ?? "");

@@ -42,6 +42,8 @@ const notOne = noteFiles.filter(f => !/^- \*\*[^\n]+\n$/u.test(fs.readFileSync(p
 ok(!notOne.length, `each file of ${FOLDER}/ holds one entry, on one line`, notOne.join(", "));
 const own = fs.readFileSync(path.join(root, NOTES), "utf8");
 ok(!leads(own).length && entries(own).length === 1 && entries(own)[0].startsWith(NOTICE) && entries(own)[0].includes("`core/setup/sync-notes/`") && own.split("\n").filter(l => l === POINTER).length === 1, `${NOTES} holds no entry of its own, only the notice to a sync from an older copy, and names the folder once: a new entry is a file of ${FOLDER}/, named to stand after the one before it`, entries(own).join("\n"));
+const printed = execFileSync(process.execPath, [path.join(root, "scripts", "sync-notes.mjs")], { cwd: tmp, encoding: "utf8" });
+ok(printed === notesWhole(root), "node core/scripts/sync-notes.mjs, run from another folder (a project's root), prints the notes of the copy it stands in", printed.slice(0, 300));
 const ways = STEPS.filter(s => [s.check, s.held, s.unread].filter(Boolean).length !== 1 || !Object.values(COST).includes(s.cost));
 ok(!ways.length, "each step is told done one way (a check, a check of the project's that holds it, or why none reads it) and says what it costs", ways.map(s => s.lead).join("\n"));
 const unstaged = STEPS.filter(s => s.check && !STAGES[s.lead]).map(s => s.lead);

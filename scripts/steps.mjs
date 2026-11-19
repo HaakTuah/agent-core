@@ -19,7 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { differencesOf } from "./manifest-reads.mjs";
-import { NOTES } from "./sync-notes.mjs";
+import { FOLDER as NOTES_FOLDER, NOTES } from "./sync-notes.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./workflow-run.mjs";
@@ -67,7 +67,7 @@ export function notDone(root, steps = STEPS) {
   for (const step of steps) {
     if (!step.check || declared(p, step)) continue;
     let mend;
-    try { mend = step.check(p); } catch (e) { mend = `Its check could not read the project (${plain(e.message, root)}): read the entry in \`core/${NOTES}\` against it.`; }
+    try { mend = step.check(p); } catch (e) { mend = `Its check could not read the project (${plain(e.message, root)}): read its entry in \`core/${NOTES_FOLDER}/\` against it.`; }
     if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend });
   }
   out.unread = p.unread;
