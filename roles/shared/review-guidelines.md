@@ -41,8 +41,8 @@ project's own guidelines, its `SECURITY.md` and the floor. Changes only on the o
   and a fresh session's word there that it found no other way (`tasks/code-shape.md`, "Never worse");
 - a test weakened, skipped or deleted beyond what the task forces, or one the PR does not name under "Readings taken"
   with a reason that holds (`tasks/code-shape.md`, #253);
-- against the pillars of `roles/shared/how-to-work.md`, a fact, rule or piece of logic written a second time instead of
-  pointed to;
+- against "One fact, one place" in `roles/shared/how-to-work.md`, a fact, rule or piece of logic written a second time
+  instead of pointed to;
 - a new job a maintained package does written by hand, a reader of a format someone else defines above all, with no
   line naming its exception or, past about 50 lines, `Looked for:` (`tasks/code-shape.md`, #486).
 

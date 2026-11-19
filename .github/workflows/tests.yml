@@ -1,11 +1,12 @@
 # The core's scripts' own tests, and its own licence audit and copies check, on Linux and on Windows, where a project
 # built there runs the scripts and both hooks (in Git Bash, as Claude Code does). When each runs (#733): on a pull
 # request once it is marked ready and on each push after, never on a draft, on Linux alone, the suites its change can
-# reach; on each push to main, on Linux, main tested at its newest commit, a run giving way to the next merge's; once an
-# hour, on Windows, at main's newest commit where its full run has not already passed there, with the tests that reach
-# the network on both, which no pull request's run or push's carries (tasks/tests.md, "A test that reaches the network
-# runs once per batch"; #733, point 9); and in full on both, on a start by hand. A release waits on the tests' full
-# runs on its commit, hourly or by hand: none unfinished, the newest passed (.github/workflows/release.yml,
+# reach; on each push to main, on Linux, main tested at its newest commit, a run that has started finishing and only a
+# waiting one giving way to the next merge's (#810); once an hour, on Windows, at main's newest commit where its full
+# run has not already passed there, with the tests that reach the network on both, which no pull request's run or push's
+# carries (tasks/tests.md, "A test that reaches the network runs once per batch"; #733, point 9); and in full on both,
+# on a start by hand. A release waits on the tests' full runs on its commit, hourly or by hand: none unfinished, the
+# newest passed (.github/workflows/release.yml,
 # scripts/release.mjs). Every suite runs though another failed, so one run shows them all. This repository only; no project calls it. Reads only, with no secret; nothing is installed but the
 # core's own packages, below. The suites run on the core's one exact Node, the pin
 # (.node-version), and on the least long-term Node its scripts promise to run on (.node-least, which scripts/node.sh
@@ -25,7 +26,8 @@
 # among them (#719), from npm's registry, running no install script (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
 # tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
 # Once, on Linux, the core's own lock files are held as a project's are: each package it brings looked up in npm's
-# registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures).
+# registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures); the
+# mutation tool's in tests/mutation/ in the job that installs it, the step after its install.
 # Each job of the suites, three on Linux and eight on Windows on each Node, the network's on both, and the upgrade
 # test, are measured against a time mark (the "suites" of .github/shape.json, by scripts/shape.mjs), which a job past
 # it says as a warning and never fails on (tasks/tests.md, "A time mark measures and never fails"; #733, point 5).
@@ -38,9 +40,10 @@
 # that passed is not run again"; #457); the upgrade test and the staged cases, which read the release tags and the day,
 # never in the tree, run on every push; and the checks of the core itself, each a step of its own after the suites, run
 # every time.
-# After them, on Linux, in the job of the suites projects and sync on the pin, the core's own mutation tool puts faults
-# into the lines a pull request changes and runs the tests that name each file against them (scripts/strength.mjs with scripts/mutate.mjs; tasks/code-shape.md, "How
-# strong the tests are"), in working copies of its own, with no secret.
+# After them, on Linux, in the job of the suites projects and sync on the pin, the core's mutation tool, Stryker, installed
+# there from its own lock file in tests/mutation/, puts faults into the lines a pull request changes and runs the tests
+# that name each file against them (scripts/strength.mjs with scripts/stryker.mjs; tasks/code-shape.md, "How strong the
+# tests are"), in a working copy of its own, with no secret.
 name: tests
 
 on:
@@ -56,12 +59,13 @@ permissions:
   contents: read
 
 # (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is, #388; a run on
-# main after a merge gives way to the next merge's, main being tested at its newest commit only, #733, point 4; the
-# hourly runs are one group that waits rather than cancels, so a long one finishes and the next, on the same commit,
-# skips itself where it passed; a start by hand is a group of its own and never cancelled)
+# main after a merge that has started finishes, and of the merges' runs waiting behind it only the newest is kept, so one
+# run covers every merge that landed meanwhile, #733, point 4, as #810 changed it; the hourly runs are one group that
+# waits rather than cancels, so a long one finishes and the next, on the same commit, skips itself where it passed; a
+# start by hand is a group of its own and never cancelled)
 concurrency:
   group: tests-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.event_name == 'push' || github.event_name == 'schedule') && format('{0}-main', github.event_name) || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # (the hourly run tests main's newest commit on Windows only where main moved: it skips only where no other full run
@@ -94,8 +98,9 @@ jobs:
           if [ "$done" = success ]; then echo "run=false" >> "$GITHUB_OUTPUT"; else echo "run=true" >> "$GITHUB_OUTPUT"; fi
 
   # (the suites are split in parts that run side by side, each under a time mark of its own: the core's checks from
-  # plain git on whole scratch projects, with the hostile tests of the core's inputs (projects); the sync and its proof
-  # (sync); the starter kit (kit); the steps' test (steps); the check of the core's copy (core.yml) on scratch projects (core), on
+  # plain git on whole scratch projects, and what they leave out for the copy, with the hostile tests of the core's
+  # inputs (projects); the sync and its proof (sync); the starter kit (kit); the steps' test (steps); the check of the
+  # core's copy (core.yml) on scratch projects (core), on
   # Windows in two halves of its test, the faults it names and where the copy stands (faults, places); the
   # personal-terms check's own job (terms); the licence, NuGet and lookup (and its lookup again) checks, with the hostile
   # tests of build files and packages (licences); the agent-tools check (tools), on Windows alone, since its cases
@@ -249,6 +254,9 @@ jobs:
       - name: The core's own mutation tool
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/mutate-test.mjs ')) }}
         run: node tests/mutate-test.mjs
+      - name: Stryker's run as a mutation tool, without Stryker itself
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/stryker-test.mjs ')) }}
+        run: node tests/stryker-test.mjs
       - name: The stand-in's record
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/stand-in-record-test.mjs ')) }}
         run: node tests/stand-in-record-test.mjs
@@ -358,6 +366,9 @@ jobs:
       - name: The core's checks from plain git (check.mjs), on scratch projects
         if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/check-test.mjs ')) }}
         run: node tests/check-test.mjs
+      - name: What a project's checks leave out for the core's copy, held to README.md's list
+        if: ${{ !cancelled() && contains(matrix.parts, 'projects') && (env.RUN == 'all' || contains(env.RUN, ' tests/copy-left-out-test.mjs ')) }}
+        run: node tests/copy-left-out-test.mjs
       - name: The sync, and the proof that a sync is pure, against every way a sync branch can carry more
         if: ${{ !cancelled() && contains(matrix.parts, 'sync') && (env.RUN == 'all' || contains(env.RUN, ' tests/pure-sync-test.mjs ')) }}
         run: node tests/pure-sync-test.mjs
@@ -454,6 +465,9 @@ jobs:
       - name: What the core's own workflows and scripts use, each to its list
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
         run: node scripts/licences.mjs .github/licences.json
+      - name: Every package of the core's own lock files at one exact version, from npm's registry (floor rule 7)
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
+        run: node scripts/exact-versions.mjs .github/licences.json
       - name: Each package new to the core's own lock file looked up in its registry (floor rule 15; once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }}
         env:
@@ -490,7 +504,20 @@ jobs:
         run: node scripts/shape.mjs .github/shape.json --suite "$SUITE" --since "$SUITES_START"
       # (after the time mark, which it is no part of: the faults put into the lines a pull request changes, with the
       # base fetched above; the tool stops at its budget and says what it left unrun. In the shortest job, projects and
-      # sync, since in rest and steps it made that job the longest on a large change; #715)
+      # sync, since in rest and steps it made that job the longest on a large change; #715. Stryker,
+      # the core's mutation tool, is installed first from its own lock file at the versions it pins, with no package's
+      # install scripts (floor rules 7 and 15), and its run tested with it)
+      - name: Stryker, from its lock file, with no install scripts (once, on Linux)
+        id: mutation
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
+        run: node scripts/install.mjs mutation # (its lock file, package list and .npmrc refused before npm runs where they could reach past npm's registry, as each install's are)
+      - name: Stryker's packages, the registry's signature on each (once, on Linux)
+        if: ${{ !cancelled() && steps.mutation.outcome == 'success' && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
+        working-directory: tests/mutation
+        run: npm audit signatures --prefix=. # (only where the install passed, as the core's other installs' are checked, floor rule 7)
+      - name: Stryker's run as a mutation tool, with Stryker itself (once, on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' && (env.RUN == 'all' || contains(env.RUN, ' tests/stryker-test.mjs ')) }}
+        run: node tests/stryker-test.mjs --tool tests/mutation
       - name: How strong the tests are, on the lines the pull request changes (once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
         env:
@@ -555,10 +582,12 @@ jobs:
   # cancelled, which no failing test is, so the gate says which it was. On a draft it runs and fails, since a check the
   # ruleset requires passes where its job is skipped, and a draft's head is tested only once it is marked ready; on an
   # hourly run where main did not move it is skipped, which only ever follows a full run that passed, so a release reads
-  # it as that pass)
+  # it as that pass. Where a run of main, the hour or a hand is cancelled whole, it stands aside, so the commit reads
+  # cancelled and never failed, #810; a pull request's always runs, since a skipped one would pass a run cancelled by
+  # hand or by merge-line.mjs --cancel)
   tests:
     needs: [moved, suites, upgrade]
-    if: ${{ always() && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}
+    if: ${{ (github.event_name == 'pull_request' && always() || !cancelled()) && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

@@ -69,6 +69,7 @@ import { started } from "./started.mjs";
 import { timeOf } from "./moment.mjs";
 import { due as capPassed } from "./size.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
+import { line as blindLine, reader as blindSample, shareNow, TITLE as BLIND } from "./blind-sample.mjs";
 import { before as monthBefore, copies, monthOf, pushWait, readCounts, shape, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
 import { notDone, report as stepsReport } from "./steps.mjs";
 
@@ -93,10 +94,11 @@ export const LATE_DAYS = 7, LATE_PULLS = 30, LATE_PAGES = 50;
 // issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs) and a cap passed (size.mjs), in
 // the core alone; the pass over
 // the choices that are hard to undo and a sign of theirs that has tripped (choices.mjs); and the cleaning and the audit
-// the dose makes due (dose.mjs). One that says `owner`, true or false, has its issue's state label kept to it:
+// the dose makes due (dose.mjs); and the blind sample (blind-sample.mjs), whose draw is laid out on the first run of
+// each month. One that says `owner`, true or false, has its issue's state label kept to it:
 // needs-owner where true, else queued; one that gives `requeue`, the key of a line of its lists, has it put back to
 // queued where an update brings a key the issue did not hold (`updating`).
-export const DUE = [stagedCases, capPassed, choicesDue, signs, cleaningDue, auditIsDue];
+export const DUE = [stagedCases, capPassed, choicesDue, signs, cleaningDue, auditIsDue, blindSample];
 export const OWNERS = "needs-owner";
 export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner, ...(typeof d.requeue === "function" ? { requeue: d.requeue } : {}) }));
 const labelsFor = owner => (owner ? [OWNERS, ...LABELS.slice(1)] : LABELS);
@@ -277,8 +279,10 @@ function idleFinding(repo, add) {
   }
 }
 
-// The conclusions of a check run that count as failed on the default branch. A cancelled run is left out: there a newer
-// merge's run takes its place (tasks/tests.md, "The default branch is tested at its newest commit").
+// The conclusions of a check run that count as failed on the default branch. A cancelled run is left out: a newer merge
+// cancels there only a run still waiting, which ran nothing (tasks/tests.md, "The default branch is tested at its newest
+// commit"), and a job that ran out of its time fails the core's gate, which is counted; one cancelled by hand is not
+// counted yet (#817).
 export const FAILED = ["failure", "timed_out", "startup_failure", "action_required"];
 
 // The red issue's body, from the latest check runs of the default branch's newest commit (GitHub's "latest" filter, so
@@ -373,7 +377,7 @@ function findingsOf({ repo, manifest, owner, at }, reach, last) {
 const reopenedSince = (repo, i) => { try { return pagesOf(`repos/${repo}/issues/${i.number}/events`).filter(e => e.event === "reopened").map(e => e.created_at).sort().at(-1) ?? i.created_at; } catch { return i.created_at; } };
 
 // The state report, once a month: its title, its file in the inbox, and `monthly`, its body where it is due, else null.
-function monthlyOf({ repo, manifest, at, scripts }, reach, kept, stepsLeft) {
+function monthlyOf({ repo, owner, manifest, at, scripts }, reach, kept, stepsLeft) {
   const month = monthOf(at), reportTitle = `${REPORT}, ${month}`;
   let monthly = null;
   // (in the inbox, a month's report is written once: while no commit has held its file)
@@ -384,7 +388,7 @@ function monthlyOf({ repo, manifest, at, scripts }, reach, kept, stepsLeft) {
     const overdue = [...kept.entries()].filter(([t, i]) => i.state === "open" && t !== RECORD && !t.startsWith(`${REPORT}, `) && hoursBetween(i.created_at, at) > 7 * 24)
       .map(([t, i]) => ({ number: i.number, title: t, since: reopenedSince(repo, i) })).filter(o => hoursBetween(o.since, at) > 7 * 24);
     const counts = manifest === null ? null : readCounts({ repo, manifest, month, steps: stepsLeft }), last = previous?.body ?? null;
-    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: last, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), outcomes: outcomesReport({ repo, month: monthBefore(month), manifest, previous: last }), scripts });
+    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: last, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), outcomes: outcomesReport({ repo, month: monthBefore(month), manifest, previous: last, blind: blindLine(shareNow(repo, kept.get(BLIND), owner)) }), scripts });
   }
   return { reportTitle, reportFile, monthly };
 }

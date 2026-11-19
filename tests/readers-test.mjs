@@ -53,12 +53,12 @@ const ok = (cond, what, detail = "") => { if (cond) passed++; else failed++; con
   const words = (e) => e.match(/\(|\)|[^ ()]+/gu) ?? [];
   // The expression as SPDX's parser is asked it: its brackets and operators as the reader sees them, each word the
   // reader allows kept, and each other word, which the reader refuses whatever it is, made one SPDX knows and no list
-  // here allows; a side with an exception, which each reader refuses whatever its words, made a known licence with a
-  // known exception (SPDX's grammar puts a LicenseRef before WITH too, which this parser does not read)
+  // here allows; a side with an exception made a known licence with a known exception, save a LicenseRef the reader
+  // keeps, which SPDX's grammar and this parser (from 5.0.0) read before WITH too
   const asked = (e, kept) => {
     const w = words(e);
     return w.map((x, i) => (["(", ")", "AND", "OR", "WITH"].includes(x) ? x
-      : w[i + 1] === "WITH" ? "MIT" : w[i - 1] === "WITH" ? (/^[A-Za-z0-9][A-Za-z0-9.-]*$/u.test(x) ? "Classpath-exception-2.0" : x)
+      : w[i + 1] === "WITH" ? (/^LicenseRef-/u.test(x) && kept(x) ? x : "MIT") : w[i - 1] === "WITH" ? (/^[A-Za-z0-9][A-Za-z0-9.-]*$/u.test(x) ? "Classpath-exception-2.0" : x)
       : kept(x) ? x : "AGPL-3.0-only")).join(" ");
   };
   // what each reader refuses that SPDX's parser reads, as each says: AND and OR mixed without brackets (licenceOk), an
