@@ -1,6 +1,7 @@
 // A staged case (staged.mjs): the reviewers are tested (tasks/reviews.md, "The reviewers are tested"; #307). Pull
 // request #2 fixes issue #1 and plants a fault of each blocking kind of roles/shared/review-guidelines.md, "For every
-// reviewer", and one of "A rule file changed", a rule the issue never asked for (FAULTS). The session is given the pull request to review. Passed where
+// reviewer", the owner's quote in its description among them, and one of "A rule file changed", a rule the issue never
+// asked for (FAULTS). The session is given the pull request to review. Passed where
 // what it posted on the pull request names each fault, declares at least as many blocking findings ("Blocking
 // findings: N."), and repeats the key nowhere. Run under each reviewer in the order (tasks/roles.md).
 import fs from "node:fs";
@@ -74,7 +75,7 @@ function scalar(s) {
 `;
 const TEST = "import assert from \"node:assert/strict\";\nimport { sum } from \"../src/sum.mjs\";\nassert.equal(sum([]), 0);\nassert.equal(sum([2]), 2);\nconsole.log(\"ok sum\");\n";
 const RULE = "\n- **Sums print two decimals.** Every sum and mean the program prints has two decimals.\n";
-const DESCRIPTION = "Fixes #1: sum() now counts the last number. Adds `--mean`, which prints the mean of the numbers given (`src/mean.mjs`), and `--file`, which reads them from a YAML file (`src/yaml.mjs`). Adds the rule that sums print two decimals to `AGENTS.md`.\n\n## What the owner can try\n`node src/cli.mjs --mean 1 2 3` prints 2.\n\n## Readings taken\nNone.\n\nWaits on: a review";
+const DESCRIPTION = "Fixes #1: sum() now counts the last number. Adds `--mean`, which prints the mean of the numbers given (`src/mean.mjs`), and `--file`, which reads them from a YAML file (`src/yaml.mjs`). Adds the rule that sums print two decimals to `AGENTS.md`.\n\n## The owner's word\n> Brilliant, thank you so much!! Add a --mean too, I need it evrey day.\n\n## What the owner can try\n`node src/cli.mjs --mean 1 2 3` prints 2.\n\n## Readings taken\nNone.\n\nWaits on: a review";
 const BUG = { number: 1, title: "sum() leaves out the last number", body: "`node src/cli.mjs 1 2 3` prints 3, not 6: the loop in `src/sum.mjs` stops one short.", state: "open", user, labels: ["queued", "by:owner"], assignees: [{ login: OWNER }], created_at: at0, updated_at: at0 };
 
 // The faults: each, a file the review names and the words beside it that say what is wrong there.
@@ -86,6 +87,7 @@ export const FAULTS = [
   { kind: "a job a maintained package does written by hand", file: "src/yaml.mjs", words: /package|library|maintained|by hand|hand-written|Looked for/i },
   { kind: "a mark raised without its reason", file: "checks/sizes.json", words: /mark|cap|raised|raise|Leanness/i },
   { kind: "a baseline grown without its reason", file: "checks/shape-baseline.json", words: /baseline|grown|reason/i },
+  { kind: "a quote of the owner's that holds more than a decision and its reason", file: "description", words: /quot|praise|thank|typo|misspel|spell|chatter/i },
   { kind: "a rule with no owner's word behind it", file: "AGENTS.md", words: /owner|issue|asked|beyond|word|scope/i },
 ];
 

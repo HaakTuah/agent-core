@@ -98,20 +98,20 @@ makes a process measure its goal (`tasks/cleaning.md`).
 
 ## Worked examples
 
-For each kind of blocking point above, one that blocks, then one that does not (#307):
-- departure: a PR described as fixing a sum also drops negative numbers; not: a local variable renamed.
+Each kind of blocking point above, one that blocks, then one that does not (#307):
+- departure: a PR said to fix a sum also drops negative numbers; not: a local variable renamed.
 - broken rule: a live key in a test's fixture; not: a fake key built from pieces as the test runs.
-- mark: a cap raised with no "Leanness check:"; not: one raised beside the fresh session's answer.
-- baseline: an entry under "grown" whose reason is "it reads YAML"; not: one whose reason is that the fault changes
-  nothing the program does, a fresh session's word beside it.
-- test: an assertion taken out and named nowhere; not: one taken out and named on `Tests changed:`, the case moved.
-- second copy: a new loop that sums where `sum()` stands; not: two tests that each set up the same three numbers.
-- package: a YAML reader written by hand with no `Looked for:`; not: ten lines that split a format the project defines.
-- text users read: a button that says "Click here to proceed"; not: one that says "Save".
-- trim: one that cuts a rule's reason since the archive holds it; not: one that cuts what floor rule 4 says alike.
-- brief: one that gives its reader a title it does not hold, or counts its own goal; not: one that names its role.
-- screen: a screen changed with no critique; not: one with no pictures where no browser ran, the PR saying so and the
-  tool's issue filed.
+- quote: the owner's praise kept beside a decision, or a typo left; not: the reason alone, or a floor yes as recorded.
+- mark: a cap raised with no "Leanness check:"; not: one beside a fresh session's answer.
+- baseline: an entry under "grown" with the reason "it reads YAML"; not: one whose fault changes nothing the program
+  does, a fresh session's word beside it.
+- test: an assertion taken out, named nowhere; not: one named on `Tests changed:`, the case moved.
+- second copy: a new loop summing where `sum()` stands; not: two tests that set up the same three numbers.
+- package: a YAML reader by hand with no `Looked for:`; not: ten lines splitting a format the project defines.
+- text users read: a button reading "Click here to proceed"; not: "Save".
+- trim: one cutting a rule's reason since the archive holds it; not: one cutting what floor rule 4 says alike.
+- brief: one giving its reader a title it does not hold, or counting its own goal; not: one naming its role.
+- screen: one changed with no critique; not: one with no pictures where no browser ran, so said, the tool's issue filed.
 - rule file: a rule its issue never asked for; not: one narrower, with why. A core rule with no reason; not: one whose
   reason could be shorter. One no agent can carry out; not: one an agent does. A fact read from nowhere; not: one
   whose reader is named.

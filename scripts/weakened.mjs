@@ -1,7 +1,7 @@
 // The tests a pull request edits (tasks/code-shape.md, "A test taken out or weakened is said"; #307): in each test file
 // it changes, each line that asserts (ASSERT) that it takes out or changes, and each line that skips a case or runs
-// one alone (SKIP) that it adds, read from git as the merge commit against its first parent, the base, each file on
-// its own and as text, whatever its attributes say. A test file is one the *shape check*'s config names under "tests",
+// one alone (SKIP) that it adds, read from git against the pull request's base (a merge commit's first parent, or
+// where the checkout is a branch head, where it left the base branch), each file on its own and as text, whatever its attributes say. A test file is one the *shape check*'s config names under "tests",
 // the manifest and the config read as the base holds them, so that a pull request does not set either for itself. It
 // lists each such line for the reviewer, who rules on each. Where a file is left with fewer lines that assert than it
 // had, or gains a skip, the pull request has made it weaker than it stood, and the description check
@@ -10,7 +10,10 @@
 // and a line that only looks like one is listed too: the reviewer rules on it. An assertion spread over several lines
 // is read by the line that holds its call alone. Git and Node's own modules.
 //
-//   node core/scripts/weakened.mjs        in a checkout of a pull request's merge commit: each line, by its file
+//   node core/scripts/weakened.mjs                 each line, by its file: in a checkout of a pull request's merge
+//                                                  commit, against its base; on a branch head, against origin/main
+//   node core/scripts/weakened.mjs --base <ref>    on a branch head, against where it left <ref>: one that merged
+//                                                  its base in, or whose base is not origin/main, names it
 import { spawnSync } from "node:child_process";
 import { parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
@@ -71,24 +74,36 @@ export function changedMend(body, found, list = "node core/scripts/weakened.mjs"
   return `the description does not name, on its line "${LINE}", each test file this pull request deletes, leaves with fewer lines that assert, or skips a case in: ${unnamed.map(f => `\`${plain(f.file)}\` (${[f.deleted && "deleted", f.asserts.length && `${f.asserts.length} assertion line${f.asserts.length === 1 ? "" : "s"} taken out or changed`, f.skips.length && `${f.skips.length} skip${f.skips.length === 1 ? "" : "s"} added`].filter(Boolean).join(", ")})`).join(", ")}. Mend: add the line "${LINE}" naming each file in backticks with why (the case proved nothing, the assertion was made stricter, the case moved), so that the reviewer rules on each; ${list} lists the lines`;
 }
 
-// What the pull request in the checkout at `dir` does to its tests, as weakened() gives it; null where it cannot be
-// read (no base, no config at the base).
-export function testsChanged(dir = ".") {
-  const git = (...args) => { const r = spawnSync("git", args, { cwd: dir, encoding: "utf8", maxBuffer: 1 << 28 }); return r.status === 0 ? r.stdout : null; };
-  const manifest = git("show", "HEAD^1:core-manifest.md") ?? git("show", "HEAD^1:AGENTS.md");
+const gitIn = dir => (...args) => { const r = spawnSync("git", args, { cwd: dir, encoding: "utf8", maxBuffer: 1 << 28 }); return r.status === 0 ? r.stdout : null; };
+
+// The commit the checkout at `dir` is read against: where `ref` is given, where HEAD left it; otherwise a merge
+// commit's first parent, which is the base in a checkout of a pull request's merge, or, where HEAD is no merge, where
+// it left origin/main, since a branch head's parent is only its last commit. Null where none can be read.
+export function baseOf(dir = ".", ref = null) {
+  const git = gitIn(dir);
+  if (!ref && git("rev-parse", "-q", "--verify", "HEAD^2^{commit}") !== null) return git("rev-parse", "HEAD^1")?.trim() || null;
+  return git("merge-base", "HEAD", ref ?? "origin/main")?.trim() || null;
+}
+
+// What the pull request in the checkout at `dir` does to its tests against the commit `base`, as weakened() gives it;
+// null where it cannot be read (no base, no config at the base, or one that names no tests).
+export function testsChanged(dir = ".", base = "HEAD^1") {
+  if (!base) return null;
+  const git = gitIn(dir);
+  const manifest = git("show", `${base}:core-manifest.md`) ?? git("show", `${base}:AGENTS.md`);
   if (manifest === null) return null;
-  const at = where(manifest), text = git("show", `HEAD^1:${at}`);
+  const at = where(manifest), text = git("show", `${base}:${at}`);
   if (text === null) return null;
   let tests;
   try { tests = parseConfig(text, at).tests ?? []; } catch { return null; }
-  if (!tests.length) return [];
+  if (!tests.length) return null;
   // (each file by its name, read whole from git's list and given back as a literal path, so that no name git would
   // quote, and no attribute a pull request sets, keeps a line from its own file)
-  const names = git("diff", "--name-only", "-z", "--no-renames", "HEAD^1", "HEAD", "--", ...tests);
+  const names = git("diff", "--name-only", "-z", "--no-renames", base, "HEAD", "--", ...tests);
   if (names === null) return null;
   const found = [];
   for (const file of names.split("\0").filter(Boolean)) {
-    const diff = git("diff", "-U0", "--text", "--no-renames", "--no-ext-diff", "--no-textconv", "--no-color", "HEAD^1", "HEAD", "--", `:(literal)${file}`);
+    const diff = git("diff", "-U0", "--text", "--no-renames", "--no-ext-diff", "--no-textconv", "--no-color", base, "HEAD", "--", `:(literal)${file}`);
     if (diff === null) return null;
     found.push(...weakened(diff).map(f => ({ ...f, file })));
   }
@@ -96,8 +111,10 @@ export function testsChanged(dir = ".") {
 }
 
 if (started(import.meta.url)) {
-  const found = testsChanged(".");
-  if (found === null) console.log("Not read: the change could not be read against its base, or the base holds no shape check config naming the tests.");
+  const at = process.argv.indexOf("--base"), ref = at >= 0 ? process.argv[at + 1] : null;
+  if (at >= 0 && (!ref || ref.startsWith("-"))) { console.log("Usage: node core/scripts/weakened.mjs [--base <ref>]"); process.exit(2); }
+  const base = baseOf(".", ref), found = testsChanged(".", base);
+  if (found === null) console.log(`Not read: ${base ? "the base holds no shape check config naming the tests, or the change could not be read against it" : `no base could be read${ref ? ` from ${plain(ref)}` : ": name it with --base <ref>"}`}.`);
   else if (!found.length) console.log("No test file of this pull request's has an assertion taken out or changed, or a case skipped.");
   else for (const f of found) {
     console.log(`${plain(f.file)}${f.weaker ? " (weaker than it stood: the description names it on its line \"" + LINE + "\")" : ""}:`);

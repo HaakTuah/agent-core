@@ -272,7 +272,7 @@ if (started(import.meta.url)) {
     else console.log(`ok   the cost line or its mark is not asked here: ${why}`);
     if (created >= CHANGED_SINCE && then?.includes("export const CHANGED_SINCE")) {
       const found = testsChanged(process.cwd());
-      if (found === null) console.log("ok   the tests this pull request edits are not asked here: the change, or the shape check's config at its base, could not be read");
+      if (found === null) console.log("ok   the tests this pull request edits are not asked here: the change, or the shape check's config at its base, could not be read, or that config names no tests");
       else {
         // (each file whose assertions are only changed is listed for the reviewer, and asks nothing: one made stricter is no worse)
         for (const f of found.filter(f => !f.weaker)) console.log(`ok   for the reviewer: ${plain(f.file)} has ${f.asserts.length} line${f.asserts.length === 1 ? "" : "s"} that assert changed, none fewer`);
