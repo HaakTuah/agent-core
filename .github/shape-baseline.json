@@ -15,9 +15,6 @@
     "clocks",
     "processes"
   ],
-  "grown": {
-    "process: tests/shape-readers-test.mjs -> node:child_process": "The test that a script run with node --input-type=module -e reads C# on the parser must start that process: the flag, which a worker thread is not to inherit, exists only on a process's own command line (#529, #605)."
-  },
   "listed": {
     "function: scripts/licence-commands.mjs#atCommand": {
       "lines": 43,
@@ -128,7 +125,6 @@
     "process: tests/security-review-test.mjs -> node:child_process": true,
     "process: tests/select-test.mjs -> node:child_process": true,
     "process: tests/session-cost-test.mjs -> node:child_process": true,
-    "process: tests/shape-readers-test.mjs -> node:child_process": true,
     "process: tests/shape-test.mjs -> node:child_process": true,
     "process: tests/size-test.mjs -> node:child_process": true,
     "process: tests/staged-test.mjs -> node:child_process": true,

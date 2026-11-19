@@ -5,7 +5,7 @@
 // (.github/workflows/tests.yml).
 //
 //   node tests/shape-readers-test.mjs
-import { spawnSync } from "node:child_process";
+import { Worker } from "node:worker_threads";
 import { csTokens, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "../scripts/shape-csharp.mjs";
 import { STDLIB, logicalLines, pythonPackages, readPython, resolvePython } from "../scripts/shape-python.mjs";
 import { ParserFailed, inParser } from "../scripts/parser.mjs";
@@ -458,12 +458,19 @@ readCsharp(`class A { int x = extension ${"+ a ".repeat(40000)}; }`);
 readCsharp(`class A { void M() { var f = (() => { })${" + a".repeat(40000)}; } }`);
 ok(deepIfs?.depth === 20000 && deepIfs.branches === 20000 && Date.now() - walked < 5000, `C#: code nested twenty thousand deep, headers that never end and the left ends of long chains are read on the parser in time linear in their length (${Date.now() - walked} ms)`, JSON.stringify(deepIfs));
 
-// (a script started with node --input-type=module -e reads C# on the parser all the same: its thread is not handed that
-// flag, which Node refuses for a module file, where the thread would die at once and every file wait out the parser's wait)
+// (code run with --input-type=module, as a script started with node -e and that flag is, reads C# on the parser all the
+// same: the parser's thread is not handed that flag, which Node refuses for a module file, where the thread would die
+// at once and every file wait out the parser's wait. A thread of this process's own, given the flag, is such code, so no
+// other process is started for it)
 {
   const at = new URL("../scripts/shape-csharp.mjs", import.meta.url).href;
-  const r = spawnSync(process.execPath, ["--input-type=module", "-e", `const { readCsharp } = await import(${JSON.stringify(at)}); console.log(JSON.stringify(readCsharp("class A { void M() { } }\\n").functions));`], { encoding: "utf8", timeout: 60000 });
-  ok(r.status === 0 && /"name":"M"/u.test(r.stdout), "a script run with --input-type reads C#'s functions on the parser at once", `${r.status} ${r.stdout}${r.stderr}`);
+  const code = `const { parentPort } = await import("node:worker_threads"); const { readCsharp } = await import(${JSON.stringify(at)}); parentPort.postMessage({ argv: process.execArgv, functions: readCsharp("class A { void M() { } }\\n").functions });`;
+  const got = await new Promise(resolve => {
+    const w = new Worker(code, { eval: true, execArgv: ["--input-type=module"] });
+    w.once("message", m => { resolve(m); w.terminate(); });
+    w.once("error", e => resolve({ error: String(e?.message ?? e) }));
+  });
+  ok(got.argv?.includes("--input-type=module") && got.functions?.[0]?.name === "M", "code run with --input-type reads C#'s functions on the parser at once", JSON.stringify(got));
 }
 
 console.log(`${count - failed} of ${count} passed`);
