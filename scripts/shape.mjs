@@ -262,24 +262,31 @@ function configuredReach(ctx, from, names) {
 // <what>", its first name in order; found by the readers "clocks" and "processes".
 const KINDS = { clock: "timed", process: "process" }, LISTS = { clock: "clocks", process: "processes" };
 // (what installs a fake clock: Jest's, Vitest's and Sinon's timers, .NET's FakeTimeProvider, freezegun's freeze_time)
-const FAKE_CLOCKS = ["useFakeTimers", "FakeTimeProvider", "freeze_time"];
+const FAKE_CLOCKS = ["useFakeTimers", "FakeTimeProvider", "freeze_time"], REAL_AGAIN = ["useRealTimers"];
 const IMPORTS = Object.fromEntries(Object.keys(KINDS).map(kind => [kind, [...new Set(Object.values(REACH).flatMap(l => l[kind].imports))]]));
 function reached(ctx, kind, file, name) {
   const of = ctx.reached.get(file) ?? { clock: new Set(), process: new Set() };
   ctx.reached.set(file, of);
   of[kind].add(name);
 }
+const isPunct = (t, v) => t?.t === "punct" && t.v === v;
+// Whether a run of tokens is called or read at k: never one after a dot, a property's key before ":" or what "=" assigns.
+function runAt(toks, run, k) {
+  if (!run.every((v, j) => toks[k + j].v === v && toks[k + j].t !== "str") || isPunct(toks[k - 1], ".")) return false;
+  const next = toks[k + run.length];
+  return !isPunct(next, ":") && !(isPunct(next, "=") && !isPunct(toks[k + run.length + 1], "="));
+}
+// Whether a test installs a fake clock, by a call, and never goes back to the real one: it hands the time in already.
+function fakesClock(toks) {
+  const called = name => toks.some((t, k) => t.v === name && t.t !== "str" && isPunct(toks[k + 1], "("));
+  return FAKE_CLOCKS.some(called) && !REAL_AGAIN.some(called);
+}
 function testReach(ctx, file, r) {
   if (!ctx.tests.has(file)) return;
-  // (a run called or read, never one after a dot, a property's key before ":" or what "=" assigns, a fake installed)
-  const is = (t, v) => t?.t === "punct" && t.v === v;
-  const at = (run, k) => run.every((v, j) => r.toks[k + j].v === v && r.toks[k + j].t !== "str") && !is(r.toks[k - 1], ".")
-    && !is(r.toks[k + run.length], ":") && !(is(r.toks[k + run.length], "=") && !is(r.toks[k + run.length + 1], "="));
-  // (a test that installs a fake clock hands the time in already: its clock is none)
-  if (FAKE_CLOCKS.some(name => r.toks.some(t => t.v === name && t.t !== "str"))) ctx.faked.add(file);
+  if (fakesClock(r.toks)) ctx.faked.add(file);
   for (const kind of ["clock", "process"]) {
     const own = REACH[r.lang]?.[kind]?.runs ?? [], named = reachRuns(ctx.config[LISTS[kind]]);
-    for (const { run, what } of [...own, ...named]) for (let k = 0; k + run.length <= r.toks.length; k++) if (at(run, k)) { reached(ctx, kind, file, what); break; }
+    for (const { run, what } of [...own, ...named]) for (let k = 0; k + run.length <= r.toks.length; k++) if (runAt(r.toks, run, k)) { reached(ctx, kind, file, what); break; }
   }
 }
 function reachEntries(ctx) {

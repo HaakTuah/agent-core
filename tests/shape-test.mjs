@@ -153,10 +153,11 @@ const faked = survey({
   "src/f.test.js": "vi.useFakeTimers();\nsetTimeout(() => {}, 5);\nimport { spawnSync } from 'node:child_process';\n",
   "tests/test_sleep.py": "from time import sleep\n\ndef test_a():\n    sleep(1)\n",
   "src/g.test.js": "const options = { setTimeout: false };\nDate.now = () => 42;\n",
+  "src/i.test.js": "const useFakeTimers = 1;\nsetTimeout(() => {}, 5);\n", "src/j.test.js": "vi.useFakeTimers();\nvi.useRealTimers();\nconst t = Date.now();\n",
   "src/helpers/run.js": "export const run = () => 1;\n", "src/h.test.js": "import { run } from './helpers/run.js';\nrun();\n",
-}, reachCfg, new Set(["src/f.test.js", "tests/test_sleep.py", "src/g.test.js", "src/h.test.js"]));
-ok(same(ids(faked).filter(id => /^(timed|process): /.test(id)), ["process: src/f.test.js -> node:child_process", "process: src/h.test.js -> src/helpers/run.js", "timed: tests/test_sleep.py -> time"]),
-  "a test that installs a fake clock reaches no real one, nor does one that names a clock as a property's key or assigns to it; a module of the clock imported by name counts (Python's from time import sleep), and so does a module of the project's own that the config names", ids(faked));
+}, reachCfg, new Set(["src/f.test.js", "tests/test_sleep.py", "src/g.test.js", "src/h.test.js", "src/i.test.js", "src/j.test.js"]));
+ok(same(ids(faked).filter(id => /^(timed|process): /.test(id)), ["process: src/f.test.js -> node:child_process", "process: src/h.test.js -> src/helpers/run.js", "timed: src/i.test.js -> setTimeout", "timed: src/j.test.js -> Date.now", "timed: tests/test_sleep.py -> time"]),
+  "a test that installs a fake clock, by a call, and never goes back to the real timers reaches no real one, nor does one that names a clock as a property's key or assigns to it; a module of the clock imported by name counts (Python's from time import sleep), and so does a module of the project's own that the config names", ids(faked));
 ok(unclaimed(new Map([["timed: src/a.test.js -> Date.now", true]]), new Map([["timed: src/a.test.js -> setTimeout", true]])).length === 0
   && unclaimed(new Map([["process: src/a.test.js -> runTool", true]]), new Map([["process: src/a.test.js -> node:child_process", true]])).length === 0
   && unclaimed(new Map([["timed: src/b.test.js -> setTimeout", true]]), new Map([["timed: src/a.test.js -> setTimeout", true]])).length === 1,
