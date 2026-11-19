@@ -249,21 +249,44 @@ function leafBefore(root) {
 // What a # on a line of its own may lie inside and be no directive: a string's text, a character, or a comment.
 const TEXTS = new Set(["string_literal", "verbatim_string_literal", "raw_string_literal", "interpolated_string_expression", "character_literal", "comment"]);
 // The lines (from 0) of the preprocessor: those whose first sign, after white space alone, is a # that lies in no
-// string or comment of the tree read as it stands.
+// string or comment of the tree read as it stands. The strings and comments are found in one walk, and each # is looked
+// up among them, so the work grows with the file, never with its lines times its depth.
 function preprocessor(src, root) {
-  const found = new Set();
+  const found = new Set(), texts = textSpans(root);
   let line = 0;
   for (let at = 0; at <= src.length; line++) {
     const end = src.indexOf("\n", at), stop = end < 0 ? src.length : end;
     let k = at;
     while (k < stop && (src[k] === " " || src[k] === "\t" || src[k] === "\r" || src[k] === "\f" || src[k] === "\v" || src[k] === "\uFEFF")) k++;
-    if (src[k] === "#" && !inText(root.descendantForIndex(k))) found.add(line);
+    if (src[k] === "#" && !within(texts, k)) found.add(line);
     if (end < 0) break;
     at = end + 1;
   }
   return found;
 }
-const inText = node => { for (let at = node; at; at = at.parent) if (TEXTS.has(at.type)) return true; return false; };
+// The outermost strings and comments of the tree, by where each starts and ends, in order: none holds another. The
+// walk goes by the tree's cursor, which makes no node of each it passes.
+function textSpans(root) {
+  const spans = [], c = root.walk();
+  try {
+    for (;;) {
+      if (TEXTS.has(c.nodeType)) spans.push([c.startIndex, c.endIndex]);
+      else if (c.gotoFirstChild()) continue;
+      while (!c.gotoNextSibling()) if (!c.gotoParent()) return spans;
+    }
+  } finally { c.delete(); }
+}
+// Whether `at` lies inside one of `spans`, found by halving.
+function within(spans, at) {
+  let lo = 0, hi = spans.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1, [start, end] = spans[mid];
+    if (at < start) hi = mid - 1;
+    else if (at >= end) lo = mid + 1;
+    else return true;
+  }
+  return false;
+}
 
 // ---- what a file declares and takes ----
 

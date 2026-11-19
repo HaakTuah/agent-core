@@ -549,6 +549,10 @@ readCsharp(`class A {${"x; extension(".repeat(5000)}}`);
 readCsharp(`class A { int x = extension ${"+ a ".repeat(40000)}; }`);
 readCsharp(`class A { void M() { var f = (() => { })${" + a".repeat(40000)}; } }`);
 ok(deepIfs?.depth === 20000 && deepIfs.branches === 20000 && Date.now() - walked < 5000, `C#: code nested twenty thousand deep, headers that never end and the left ends of long chains are read on the parser in time linear in their length (${Date.now() - walked} ms)`, JSON.stringify(deepIfs));
+// (the security review's case: many lines of the preprocessor deep in nested namespaces, under 2 MB, read in time, each
+// # looked up among the file's strings and comments rather than by walking up from it)
+const ppStarted = Date.now(), deepDirectives = readCsharp(`${"namespace A{".repeat(2000)}\n${"#region x\n".repeat(100000)}${"}".repeat(2000)}\n`);
+ok(deepDirectives.functions !== null && Date.now() - ppStarted < 5000, `C#: 100,000 lines of the preprocessor two thousand namespaces deep are read in time (${Date.now() - ppStarted} ms)`);
 
 // (code run with --input-type=module, as a script started with node -e and that flag is, reads C# on the parser all the
 // same: the parser's thread is not handed that flag, which Node refuses for a module file, where the thread would die
