@@ -51,8 +51,8 @@
 // workflow sets) and that the host says was opened before the default branch's copy came, which stood before the
 // check came, it says the second is missing and never waits for it, and so it
 // says of a review posted before Codex's running one began, or before its summary last changed where it marks a finding
-// open, and of one that names no commit the head stands on, and it counts a member's or collaborator's review that it
-// does not name, saying so (AGENTS.md, "Nothing locks a project"); brought up to date with main, it is held. What it
+// open, and of one that names no commit the head stands on, and it counts a review edited since it was posted, from
+// an account it counts (AGENTS.md, "Nothing locks a project"); brought up to date with main, it is held. What it
 // does not hold: what a posted review says, whether a finding is blocking, who posted each of two reviews (one login
 // may post both), that comment-only.mjs's printout is true (its code reviewer runs it again), and, given no list of the
 // merges proved (a workflow older than this script), that a merge from main brought no change of its own; those stay
@@ -153,7 +153,7 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
   const list = flat(comments);
-  const { all, unnamed, edited } = postedBy(pull, list, bound, more.reviewers, more.rights);
+  const { all, edited } = postedBy(pull, list, bound, more.reviewers, more.rights);
   const read = codex(list), review = read.review, warning = read.unread ? UNREAD : undefined;
   const { running, posted, changed } = sinceBegun(all, read);
   const { chain, stand, forHead, cut } = forTheHead(pull, commits, sha, more.merges, posted);
@@ -161,7 +161,6 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   verdict = begunAfter(verdict, { sha, running, all, posted, bound });
   verdict = floorTwo(verdict, { sha, pull, files, posted, review, bound, pure: more.pure });
   if (edited && all.length === 0 && !verdict.done) verdict = { ...verdict, why: EDITED };
-  if (unnamed && verdict.done) verdict = { ...verdict, why: `${verdict.why}; a review from an account not named counts, as before this check came` };
   return warning ? { ...verdict, warning } : verdict;
 }
 // whether a comment stands as it was first posted: GitHub's two times for it the same, never edited since (a reaction
@@ -177,18 +176,16 @@ export function boundOf(held, pull, since) {
   const opened = Date.parse(pull?.created_at), came = Date.parse(since);
   return !(Number.isFinite(opened) && Number.isFinite(came) && opened < came);
 }
-// the posted reviews that count (all), whether one by an account not named counts all the same (unnamed), and whether
-// one that would count was edited since it was posted (edited)
+// the posted reviews that count (all), and whether one that would count was edited since it was posted (edited)
 function postedBy(pull, list, bound, reviewers, rights) {
   const whose = counted(pull, reviewers, writersOf(rights));
   const writers = list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association));
-  // (of a pull request whose head does not hold this check as the default branch does, which stood before it came, a
-  // member's or collaborator's review counts as it did then, an edited one too, and the status says so: AGENTS.md,
-  // "Nothing locks a project")
-  const theirs = bound ? writers.filter((comment) => whose(comment.user)) : writers;
+  // (a review counts only from an account counted, on every pull request; of one whose head does not hold this check
+  // as the default branch does, which stood before it came, an edited one counts too: AGENTS.md, "Nothing locks a
+  // project")
+  const theirs = writers.filter((comment) => whose(comment.user));
   const all = bound ? theirs.filter(asPosted) : theirs;
-  const unnamed = !bound && writers.some((comment) => !whose(comment.user));
-  return { all, unnamed, edited: all.length < theirs.length };
+  return { all, edited: all.length < theirs.length };
 }
 // whether Codex's own review runs, the posted reviews that count while it does, and when its summary last changed
 function sinceBegun(all, read) {
