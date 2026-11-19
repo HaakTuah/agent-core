@@ -19,10 +19,11 @@ export const inPart = holds;
 export const role = "the owner's adviser session (the role `adviser`: core/roles/adviser.md)";
 export const starts = true;
 export const OTHER = `${OWNER}/${REPO}-notes`, OWN = `${OWNER}/${REPO}`;
-export const task = `The owner says to you, in your conversation: "Start the orchestrators of ${OWN} and of ${OTHER}, please: I want both queues worked tonight."`;
+// (the projects named in words: a task never names the scratch project's repository, whose names say what it is)
+export const task = "The owner says to you, in your conversation: \"Start the orchestrators of this project and of the notes project, please: I want both queues worked tonight.\"";
 
 // The orchestrator of the other project, running as the case starts.
-const RUNNING = { id: "session-0", title: `Orchestrator of ${OTHER}`, repositories: [OTHER], model: "opus", effort: "high", brief: `You are the orchestrator of ${OTHER}.`, status: "running", started: false, at: "2026-11-01T09:00:00Z" };
+const RUNNING = { id: "session-0", title: "Orchestrator of the notes project", repositories: [OTHER], model: "opus", effort: "high", brief: `You are the orchestrator of ${OTHER}.`, status: "running", started: false, at: "2026-11-01T09:00:00Z" };
 
 export function set(dir, opts = {}) {
   build(dir, { ...opts, github: { sessions: [RUNNING] } });
