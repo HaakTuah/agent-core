@@ -28,8 +28,9 @@ sessions.
   itself. A task one failed at twice (its closed PRs and the *progress file* say) goes to the next, from `main`.
 - It does not mean the order holds back a line the owner gave a tool by name, nor that a project's own pace is passed
   over ("The pace is the owner's", below).
-- Reason: the orchestrator is what keeps the work going, so its provider is saved the longest, and the strongest model
-  is kept for the work that takes judgement.
+- Reason: the orchestrator keeps the work going, and builders that empty its provider stop it too, with nothing to
+  restart what stalled, so that provider is saved the longest; the strongest model is kept for the work that takes
+  judgement (a rule, the design check, a security review, escalation), on whichever provider.
 - Held by nothing yet: a builder's tool and the usage left are no mark a check reads.
 
 - **It builds nothing itself:** every lane goes to a builder session of its own, with its own brief
@@ -44,19 +45,19 @@ sessions.
     builders in one message;
   - each step `core/scripts/steps.mjs` reports not done, and each difference `core/scripts/fresh.mjs` lists, gets a
     lane, one only the owner can do labelled `needs-owner`;
-  - sync the core in a routine lane, as "Sessions" in `roles/shared/work-flow.md` says;
+  - sync the core in a routine lane;
   - run the scheduled look, which does nothing more where it ran less than 20 hours before;
   - turn back on any scheduled workflow GitHub switched off for want of activity (`gh workflow enable`);
   - act on what is new in the *progress file*, planned as `tasks/planning.md` says;
   - once an open idea has waited a week with no verdict of the stand-in's, call the stand-in.
 - **The scheduled look:** once a day, `core/scripts/look.mjs` keeps one issue, labelled `queued`
-  and `by:look`, for each thing that has stopped or is due: the PRs that stand idle (a draft with green checks first),
-  the steps of a release not done, the labels and openers to mend, a run of its own missed, the cleaning and each
-  audit the codebase's state makes due (`tasks/cleaning.md`), the pass over the choices that are hard to undo and a
-  sign of theirs written in a measure that holds (`tasks/choices.md`), and in the core alone the staged cases due
-  (`core/scripts/staged.mjs`); once a month, the state report (`core/scripts/state-report.mjs`). Its carriers: the
-  project's daily job (`look.yml`, as the starter kit writes it) and the orchestrator's wake; where issues cannot be
-  reached, its files go to the inbox (`--inbox`).
+  and `by:look`, for each thing that has stopped or is due: idle PRs (a draft with green checks first), late review
+  findings, a release's steps not done, a check failed on the default branch, the labels and openers to mend, a run of
+  its own missed, the cleaning and each audit the codebase's state makes due (`tasks/cleaning.md`), the pass over the
+  choices that are hard to undo and a sign of theirs written in a measure that holds (`tasks/choices.md`), and in the
+  core alone the staged cases due (`core/scripts/staged.mjs`); once a month, the state report
+  (`core/scripts/state-report.mjs`). Its carriers: the project's daily job (`look.yml`, as the starter kit writes it)
+  and the orchestrator's wake; where issues cannot be reached, its files go to the inbox (`--inbox`).
   - Each issue is a task an orchestrator gives a lane like any other, the report too, so starting an orchestrator is all
     an owner does: only an issue that GitHub's job or the owner's account opened, labelled `by:look`, under a title of
     the look's own; the lane's work is what the look's scripts find again on `main` (`look.mjs --dry`, and the script
@@ -91,10 +92,6 @@ sessions.
   own choice. Where the owner sets a pace, the orchestrator follows it: said to it in person, for now; written under
   "Pace" in the project's manifest, until changed there: how many lanes run at once, which model takes which kind of
   line, how much of a usage window is left free for the owner's own use.
-  - The orchestrator's provider keeps the work going: where builders on it empty
-    its allowance, the orchestrator stops too and nothing restarts what stalled, so builders are picked as
-    "The builders", above, says. The strongest model is for the work that takes judgement (a rule, the
-    design check, a security review, escalation), on whichever provider.
   - It does not mean a session stands idle while the owner's allowance goes unused.
   - Reason: no session decides by itself to stand idle, and the pace of the owner's usage is the owner's to set.
   - Held by nothing yet: the usage left is no mark a check reads.

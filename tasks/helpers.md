@@ -23,7 +23,7 @@ template of the starter kit for the sessions that read it.
 - By default it stands alone and says four things: the role, by what it does ("you built none of this; find what is
   wrong with it"); the task, with the files it may change; what done looks like, which is what it returns, in what form,
   and where it stops; and the reason.
-- Where the task is the owner's word, that goes word for word (floor rule 4), the four things around it.
+- Where the task is the owner's word, that goes word for word, the four things around it.
 - It gives no title ("an expert"), no stakes that are not real, and no number of the state report as a target
   (`tasks/cleaning.md`, "No process number is a builder's goal").
 - It does not mean a brief repeats what its reader reads anyway (`AGENTS.md` and what that names), nor that a template

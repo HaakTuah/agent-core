@@ -22,6 +22,7 @@
     "suites-licences": { "win32": 450 },
     "suites-rest": { "win32": 480 },
     "suites-tools": { "win32": 450 },
+    "suites-network": { "linux": 240, "win32": 600 },
     "upgrade": { "linux": 240, "win32": 700 },
     "staged": { "linux": 240, "win32": 900 }
   }

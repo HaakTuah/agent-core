@@ -1,8 +1,8 @@
-# The reasons behind the core: items 265 onward
+# The reasons behind the core: issue #467
 
 The index, and how an item is written: `archive/instructions.md`.
 
-265. **16 November 2026**, #467. What the core offers one agent tool it offers each tool on its list, as far as that
+#467. **16 November 2026**, #467. What the core offers one agent tool it offers each tool on its list, as far as that
      tool allows, its own documentation saying where it cannot; one table, a row for each thing offered and a column for
      each tool, each cell carried, cannot or not yet, filled by whoever changes something for one tool; and the rules
      name a tier by the job, never a model, each tool's part mapping the tiers to its models: the owner set the standard

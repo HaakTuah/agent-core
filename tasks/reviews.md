@@ -11,8 +11,28 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
 - The *design-checked PRs* also get the design check, and a PR its users will see the stand-in's notes.
 - A PR that changes a screen also gets the critique (`tasks/screens.md`, point 18).
 
-1. **Ask** the code reviewer (`tasks/roles.md`) as its part (`tools/codex.md`, `tools/copilot.md`) or the project
-   says.
+1. **Ask by the first way there is** (#397). By default the session whose PR it is asks its code reviewer
+   (`tasks/roles.md`), and its security reviewer where one is asked, through the first of these that its project has,
+   as a builder is reached (`roles/orchestrator.md`, "The builders"): the tool that runs the agents side by side, a
+   plug-in in the session's own tool, a way the project names, and the host's app last, each as the reviewer's part
+   says under that way (`tasks/tools.md`, "Each tool's part"). Which ways the project has is read, never asked: from
+   the tools the session can call (a plug-in's agent, a tool that runs the agents side by side), the reviews and checks
+   of the host's apps on recent PRs, and the manifest's "Tools" table for the project's own; where none can be read,
+   the host's app. Nothing changes it. A review that starts by itself is still waited for and read (floor rule 8): the
+   order decides how a session asks, and replaces no review. It does not mean a second review
+   of the same kind by another way. Reason: on 15 November the merge line lost about 20 minutes at each conflict, the
+   sessions asking the host's app and waiting while a faster way stood open (#395). Held, in part, by
+   `core/scripts/tools-offer.mjs`, which fails a tool's part with a way left out or the ways out of order; that the
+   first was taken, by nothing.
+   - **A review's stance follows the kind of change** (#397). By default the code review's brief is regular, a review
+     against the guidelines; where the PR does the *hard work*, its brief says adversarial
+     (`roles/shared/review-guidelines.md`, "Its stance is its brief's"). Only where the code reviewer takes a brief: a
+     tool that runs the agents side by side, a plug-in, or the fallback reviewer; where the only one takes none, as a
+     host's app asked by a bare comment, the hard work gets the regular review and nothing is added. It does not mean a
+     second review is asked to get the stance, nor that another provider's reviewer is swapped for the fallback reviewer
+     to get it. Reason: no review was asked to try to break a change, though the hard work is where that pays. Held by
+     nothing yet: `core/scripts/review-record.mjs` counts the posted code reviews by the stance each declares, so the
+     next pruning sees whether the adversarial find more, and fails nothing.
 2. **No sign in about 5 minutes, no finished review in about 20, or an answer that is not a review:** the next reviewer,
    last the fallback reviewer, takes the PR at once.
    - **A review already running is waited for,** never merged past: the `code-review` status holds a
@@ -64,9 +84,10 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      blocks or what a builder mends (point 5; #315), that they stand in for the findings written out, that Codex's own
      reviews, read by their badges, are asked anything, nor that a comment covering two kinds is read as both. Reason:
      run on 10 to 15 November 2026, the count of what the reviews find read 4 of 24 posted security reviews, their
-     wording varying, and the findings that do not block are to be counted before #315 is decided. Held by no check
-     yet: `core/scripts/review-record.mjs` counts a review without its line as "not read", never as none, so the share
-     not read shows where the form is not kept, and no check fails a pull request for it.
+     wording varying, and the findings that do not block are to be counted before #315 is decided. Held by the
+     `code-review` status, which waits while the newest posted review of a kind declares no line
+     (`core/scripts/review-marks.mjs`; #551); `core/scripts/review-record.mjs` counts one without its line as "not
+     read".
 4. **The design check:** once before the merge, a fresh reviewer judges the work against the design alone, and its
    "Readings taken" as the stand-in would.
    - **It goes down the lines** (#305). By default, where the pull request's entry has "Done when"
@@ -89,8 +110,8 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    - After three rounds, what is still open goes to escalation (`tasks/roles.md`); a PR it cannot settle stays
      unmerged.
 7. **The fallback reviewer's brief,** written as `tasks/helpers.md` says, hands it the diff, the task's text, the
-   *review reference*, the review guidelines (the core's and the project's) and the project's `SECURITY.md` and threat
-   model with the floor, and nothing else.
+   *review reference*, the review guidelines (the core's and the project's), the project's `SECURITY.md` and threat
+   model with the floor, and its stance (point 1), and nothing else.
 8. **A finding seen twice becomes a check** (#254). By default a kind of finding stays a point a
    review holds a change to, and needs nothing more. Once the findings of a second pull request name the same rule
    that stands (the core's, or the project's own in its `AGENTS.md` or `SECURITY.md`), which

@@ -76,7 +76,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that closes its issue.
 - **Queued means wanted: nothing queued waits for a second word.** Where the floor asks the owner's
   yes in a PR (floor rule 3: a change to the floor or the review guidelines), the yes the owner gave when its issue was
-  queued is that yes: the builder relays it into the PR word for word as it was recorded (floor rule 4), and it covers
+  queued is that yes: the builder relays it into the PR word for word as it was recorded (floor rule 3), and it covers
   the change as the issue describes it. A PR that goes beyond its issue is not covered by it, and the design check
   says so.
 - **The file holds no note.** Where a module asks for one in the *progress file* (a lane that waits), it goes in the
@@ -89,8 +89,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   where it quotes the owner's words, and equally where it sets out a design and says the owner agreed to it, since a
   bare yes is never quoted (#252). Such a record sets the design out in full, as what binds, and says plainly that the
   owner agreed to it, as the notes on #244 and #252 do; it covers what it sets out and nothing beyond, and a view of
-  the session's own, marked as not a decision, binds nothing. The builder relays the record word for word (floor rule
-  4), and the review reads the change against the design it sets out. A label or opening on another account's text
+  the session's own, marked as not a decision, binds nothing. The builder relays the record word for word, and the
+  review reads the change against the design it sets out. A label or opening on another account's text
   makes it no more than data. What any other session adds to an issue is that session's word.
 - **Who builds a line, the line says.** A bug, a test and a check for a rule that already stands go to any builder
   session. A new or changed rule goes to the design session or to a builder at the strongest tier (`tasks/roles.md`), as its
@@ -236,17 +236,17 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   file changed"), and the standing word by the staged case `order-for-now`.
 - **The archive keeps the reasoning; the owner's words stay here** (#252). By default each item of the core's archive
   stands in the core's own words (`archive/instructions/`: its date and source, what was asked, what was decided and
-  what it stands behind), and that is what a project's copy carries and "core archive N" leads to; the owner's words
-  of the items written before 16 November 2026 stay in this repository alone (`words/`, which `.gitattributes` keeps
-  out of the copy as it keeps `reports/`). Whoever adds an item writes its number, its date, the issue that carries
-  the owner's word and one line of the reasoning, and no quotation: the words stay on the issue. Wherever the owner's
-  words are recorded here, a bare yes is never quoted (the record says the owner agreed, and to what), words that
-  carry a decision or a reason stay quoted, and words addressed to a session are left out. Nothing changes it. It does
-  not mean the items that stand are rewritten: they keep the words they hold, in `words/`, beside their reasoning.
-  Reason: a project of another owner imported the owner's dated messages with the rules, and a stand-in needs the
-  reasoning, not the wording. Held, in part, by `scripts/holders.mjs`, which fails the two forms out of step
-  (`scripts/archive.mjs`), and by `.github/workflows/core.yml`, which fails a copy that holds what `.gitattributes`
-  keeps here; what is quoted, by no check, since none can tell a bare yes from a decision.
+  what it stands behind), and that is what a project's copy carries and "core archive N" leads to; the record of the
+  owner's word behind the items written before 16 November 2026 stays in this repository alone (`words/`, which
+  `.gitattributes` keeps out of the copy as it keeps `reports/`). Whoever adds an item writes its key ("A new archive
+  item is named by its issue"), its date and one line of the reasoning, and no quotation: the words stay on the issue.
+  Wherever the owner's words are recorded here (#773), they are quoted only as floor rule 4 says: the reason behind a
+  decision, cleaned, and nothing personal. Nothing changes it. It does not mean the items that stand are rewritten: they
+  keep their reasoning, and in `words/` the record of the owner's word, cut to reasoning (#778). Reason: a project of
+  another owner imported the owner's dated messages with the rules, and a stand-in needs the reasoning, not the wording.
+  Held, in part, by `scripts/holders.mjs`, which fails the two forms out of step (`scripts/archive.mjs`), and by
+  `.github/workflows/core.yml`, which fails a copy that holds what `.gitattributes` keeps here; what is quoted, by what
+  holds floor rule 4's "The owner's word".
 - **The archive is pointed to from the list,** not from the rule (#252). By default a rule file here (this file, the
   floor's, the roles' and the modules') holds no "core archive N": `scripts/holders.json` names under "behind" the
   items behind each rule, and a session that needs a rule's reason looks them up there. Whoever writes or changes a
@@ -255,6 +255,27 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   asked anything. Reason: about 60 such pointers stood in what every session reads at its start, and a builder on an
   ordinary task never opens the archive. Held by `scripts/holders.mjs`, which fails a pointer in a rule file and an item the list names
   that is not in the archive.
+- **A new archive item is named by its issue** (#744). By default an item added to the archive is keyed by the issue
+  that carries the owner's word and, where it records one point of several, by that point, as `#733.1`, and stands in
+  a file of its own named by its key (`archive/instructions/issue-733.1.md`; #750, point 1); `scripts/holders.json`
+  names it so under "behind", and a pointer to it gives that key where one to an older item gives its number. Items 1
+  to 262 keep their numbers, so every "core archive N" that stands still leads where it did. Nothing changes it. It does not mean an item moves or
+  is rewritten. Reason: on 19 November 2026 two pull requests merged in parallel took the same next number, and a
+  running count cannot be claimed without coordinating, where an issue's number is already unique and already named in
+  the item. Held by `scripts/holders.mjs` with `scripts/archive.mjs`, which fail a key used twice, a key that names no
+  issue (an item numbered past 262 among them), an item outside its own file, one of items 1 to 262 taken out, and a
+  key under "behind" that is not in the archive.
+- **An item that changes an earlier one names it, and the earlier one is marked** (#756). By default an item of the
+  archive stands as written. Where a new item changes what an earlier one decided (corrects, narrows, widens, replaces
+  or overturns it), whoever writes the new one gives it a line "Changes: N." naming each such item by its key, and
+  gives each item it names one line "Changed by: M.", the keys joined by ", " where there are more; `scripts/reasons.mjs`
+  prints that line under the item, and the later items after it. Nothing changes it. It does not mean the earlier item
+  is rewritten: its text stays as it stands, the one line added; nor that an item that only cites an earlier one, or
+  leaves it as it was, names it. Reason: some items said in passing that they replaced an earlier one while nothing
+  linked the earlier one forward, so a session reading it could rely on a reason that no longer stood. Held by the
+  marks' check in `scripts/archive.mjs`, run by `scripts/holders.mjs`: a "Changes:" whose item is not marked back, a
+  "Changed by:" with no "Changes:" to match, a key in either that is no item, and a mark out of its form each fail;
+  that a new item that changes one says so, by none yet.
 - **Every rule says what holds it.** By default a rule of the floor or the modules is held by
   a check that fails where it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no
   check can read its breach exactly, by a staged case, the holder of last resort, or by the scheduled audit; and where
@@ -351,14 +372,14 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that takes the core on trust sets nothing, so a rule that waits for a setting gives it its worst case. Held by
   `scripts/manifest-reads.mjs --core`, which fails a slot with no mark, a `read:` whose reader is not there and any
   other with no default; by each reader's own test; and by the review guidelines ("A rule file changed").
-- **Rules are written for any project.** The projects that take the core differ in what they build
-  (a game, a program people rely on at work), where they are built (the cloud, the owner's own computer), who can read
-  them (anyone, the owner alone) and how they release (every merge, a tagged build). A rule reads true in each, what
-  differs is a slot, and what holds for one kind alone goes in a module of its own. `scripts/general.mjs` fails a word
-  in the floor or the modules that fits only some (`scripts/general.json`); a word a project finds untrue for it joins
-  that list in the PR that rewords it. The owner is never "he" or "his" in new text: the same check reads each line a
-  PR adds under `archive/` and `reports/` for a gendered pronoun, a line quoted with `>` (the owner's own words, as
-  `words/` keeps them) and a record moved word for word aside, while the older records stay as they were.
+- **Rules are written for any project.** The projects that take the core differ in what they build (a game, a program
+  people rely on at work), where they are built (the cloud, the owner's own computer), who can read them (anyone, the
+  owner alone) and how they release (every merge, a tagged build). A rule reads true in each, what differs is a slot,
+  and what holds for one kind alone goes in a module of its own. `scripts/general.mjs` fails a word in the floor or the
+  modules that fits only some (`scripts/general.json`); a word a project finds untrue for it joins that list in the PR
+  that rewords it. The owner is never "he" or "his" in new text: the same check reads each line a PR adds under
+  `archive/` and `reports/` for a gendered pronoun, a line quoted with `>` (the owner's own words) and a record moved
+  word for word aside, while the older records stay as they were.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
   `tests/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its
