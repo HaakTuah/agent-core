@@ -4,7 +4,8 @@
 // project, a number out of range, and nothing at all; each fails with its mend or reads the input as not there, and
 // reads and writes nothing outside the project. The readers: copies.mjs and reading-size.mjs, run from a scratch
 // project's copy of the core; shape.mjs's parseConfig and where; size.mjs's capsOf, answered and --raise;
-// manifest-reads.mjs's notes; licences.mjs's loadConfig; steps.mjs's notDone with the step for rule 5's inputs. Test
+// manifest-reads.mjs's notes; licences.mjs's loadConfig; steps.mjs's notDone with the step for rule 5's inputs; and
+// sync.mjs and look.mjs, run from the copy, on a manifest that is a link out of the project. Test
 // data is made up. Run by the core's tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
 //
 //   node tests/hostile-configs-test.mjs
@@ -89,6 +90,23 @@ for (const f of ["../outside/x", "/etc/passwd", "C:\\x", "<script>x</script>"]) 
   ok(fails(r) && r.out.includes("is no tracked file"), `reading-size.mjs: refuses with its mend a file read named ${f}, never counting it`);
 }
 ok(fails(sizes(marks({ past: { "../outside/x": 1 } }))), "reading-size.mjs: refuses with its mend a file past the split mark named outside the project");
+// (a tracked file that is a link to a pipe, which never ends, or a folder, is refused before it is read: #446. A pipe,
+// not a device: where a fault the mutation tool puts in lets it be read, the read waits until the tool stops it, where
+// an endless device would fill the machine's memory)
+const pipe = at => process.platform !== "win32" && spawnSync("mkfifo", [at]).status === 0;
+if (pipe(path.join(outside, "pipe"))) {
+  fs.symlinkSync(path.join(outside, "pipe"), path.join(p, "zero.md"));
+  fs.symlinkSync(path.join(outside, "x"), path.join(p, "out.md"));
+  fs.mkdirSync(path.join(p, "folder.md"));
+  fs.writeFileSync(path.join(p, "folder.md/x"), "x\n");
+  gitP("add", "zero.md", "out.md", "folder.md/x");
+  for (const f of ["zero.md", "out.md", "folder.md"]) {
+    r = sizes(marks({ read: { "a.md": 20000, [f]: 5 } }));
+    ok(fails(r) && (f === "folder.md" ? r.out.includes("is no tracked file") || r.out.includes("is no regular file") : r.out.includes("is no regular file")) && r.ms < 5000, `reading-size.mjs: refuses with its mend a file read that is ${{ "zero.md": "a link to a pipe", "out.md": "a link to a file outside the project" }[f] ?? "a folder"}, never reading it, in ${r.ms} ms`);
+  }
+  gitP("rm", "-q", "--cached", "zero.md", "out.md", "folder.md/x");
+  fs.rmSync(path.join(p, "zero.md")); fs.rmSync(path.join(p, "out.md")); fs.rmSync(path.join(p, "folder.md"), { recursive: true });
+} else console.log("skip reading-size.mjs: a file read that is a link to a pipe: no pipe can be made here (Windows)");
 r = sizes(marks({ read: Object.fromEntries(Array.from({ length: BIG }, (_, i) => [`f${i}.md`, 5])) }));
 ok(fails(r) && r.ms < 5000, `reading-size.mjs: refuses with its mend ${BIG} files read that are not there, in ${r.ms} ms`);
 
@@ -143,6 +161,24 @@ ok(read("Modules: <img src=x onerror=alert(1)>.\n").some(l => l.includes("cannot
 [said, ms] = timed(() => read(`Modules: ${Array.from({ length: BIG }, (_, i) => `\`m${i}.md\``).join(", ")}.\n${"*x ".repeat(1 << 20)}`));
 ok(said.length === BIG + 1 && ms < 5000, `manifest-reads.mjs: notes reads a manifest of ${BIG} names and 3 MB in ${ms} ms, each name no module`);
 // (a number has no place in the manifest's lines this reader reads: no case of one out of range applies)
+
+// ---- sync.mjs and look.mjs: core-manifest.md, read as the steps read it (own-files.mjs; #446) ----
+// (a manifest that is a link out of the project, to a file or a device, is no file of the project's own: each refuses
+// it before it fetches, asks or writes anything; a link cannot be made on Windows)
+if (process.platform !== "win32") {
+  const away = path.join(outside, "manifest.md"), was = "Core: the-core at 0000000000000000000000000000000000000000, copied whole under `core/`.\n";
+  fs.writeFileSync(away, was);
+  for (const [what, to] of [["a file outside the project", away], ...(fs.existsSync(path.join(outside, "pipe")) ? [["a pipe, which never ends", path.join(outside, "pipe")]] : [])]) {
+    fs.symlinkSync(to, path.join(p, "core-manifest.md"));
+    const synced = run("sync.mjs"), looked = run("look.mjs");
+    ok(synced.status === 1 && synced.out.includes("a regular file of the project's own") && !raw(synced.out) && synced.ms < 5000, `sync.mjs: a manifest that is a link to ${what} is refused before anything is fetched`);
+    ok(fails(looked) && looked.out.includes("no regular file of the project's own") && looked.ms < 5000, `look.mjs: a manifest that is a link to ${what} is refused with its mend, nothing looked at`);
+    fs.rmSync(path.join(p, "core-manifest.md"));
+  }
+  ok(fs.readFileSync(away, "utf8") === was, "sync.mjs: the manifest outside, which a link named, is left as it was");
+  fs.rmSync(away);
+  fs.rmSync(path.join(outside, "pipe"), { force: true });
+} else console.log("skip sync.mjs and look.mjs: a manifest that is a link out: Windows makes no link here");
 
 // ---- licences.mjs: loadConfig, checks/licences.json ----
 const lic = c => { write("checks/licences.json", typeof c === "string" ? c : JSON.stringify(c)); return thrown(() => loadConfig(path.join(p, "checks/licences.json"))); };
