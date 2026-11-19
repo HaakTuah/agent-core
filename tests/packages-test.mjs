@@ -287,11 +287,11 @@ try {
     fs.mkdirSync(path.join(py, "tests"), { recursive: true });
     fs.cpSync(copy, path.join(py, "core"), { recursive: true });
     fs.writeFileSync(path.join(py, "shape.json"), JSON.stringify({ baseline: "shape-baseline.json", code: [".", ":!core/"], tests: ["tests/"], systems: {} }));
-    fs.writeFileSync(path.join(py, "a.py"), "from b import x\n");
+    fs.writeFileSync(path.join(py, "a.py"), "# Changed: x\nfrom b import x\n");
     fs.writeFileSync(path.join(py, "b.py"), "import a\nx = 1\n");
     fs.writeFileSync(path.join(py, "c.py"), "y = 2\n");
     fs.writeFileSync(path.join(py, "tests/test_c.py"), "import c\n");
-    fs.writeFileSync(path.join(py, "shape-baseline.json"), JSON.stringify({ reads: ["javascript", "jsx", "javascript-tree", "csharp", "csharp-tree", "python", "python-tree", "scripts", "screens", "clocks", "processes"], listed: { "cycle: a.py -> b.py": true, "cycle: b.py -> a.py": true } }));
+    fs.writeFileSync(path.join(py, "shape-baseline.json"), JSON.stringify({ reads: ["javascript", "jsx", "javascript-tree", "csharp", "csharp-tree", "python", "python-tree", "scripts", "screens", "clocks", "processes", "changes"], listed: { "cycle: a.py -> b.py": true, "cycle: b.py -> a.py": true, "change: a.py: a change's heading": { count: 1 } } }));
     const git = (...a) => execFileSync("git", a, { cwd: py, encoding: "utf8" });
     git("init", "-q");
     git("add", "-A");
@@ -299,13 +299,13 @@ try {
     const unreachedEnv = { ...env, SHAPE_BASE: "", CORE_PACKAGES_UNREACHED: "1" };
     const shape = () => spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json"], { cwd: py, encoding: "utf8", timeout: 120000, env: unreachedEnv });
     const skipped = shape(), skippedOut = `${skipped.stdout}${skipped.stderr}`;
-    ok(skipped.status === 0 && /^::warning::The shape check did not read Python, by the parser \(the reader python-tree\): the core's packages could not be installed, .*the 2 entries its baseline lists there \(functions, files the grammar cannot read, and all of a file of Python\) are kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut),
-      "where the registry did not answer, the check reads nothing of Python, says so as a warning naming the reader, and keeps its baseline's cycle", skippedOut);
-    fs.writeFileSync(path.join(py, "d.py"), "import e\n");
+    ok(skipped.status === 0 && /^::warning::The shape check did not read Python, by the parser \(the reader python-tree\): the core's packages could not be installed, .*the 3 entries its baseline lists there \(functions, files the grammar cannot read, and all of a file of Python\) are kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut),
+      "where the registry did not answer, the check reads nothing of Python, says so as a warning naming the reader, and keeps its baseline's cycle and its comment that marks a change", skippedOut);
+    fs.writeFileSync(path.join(py, "d.py"), "# Changed: y\nimport e\n");
     fs.writeFileSync(path.join(py, "e.py"), "import d\n");
     git("add", "-A");
     const cycle = shape(), cycleOut = `${cycle.stdout}${cycle.stderr}`;
-    ok(cycle.status === 0 && !/FAIL/u.test(cycleOut), "and a cycle of Python's imports, which only the parser reads, is reported, never failed", cycleOut);
+    ok(cycle.status === 0 && !/FAIL/u.test(cycleOut), "and a cycle of Python's imports and a comment that marks a change, which only the parser reads, are reported, never failed", cycleOut);
     fs.writeFileSync(path.join(py, "c.py"), "y = 3\n");
     git("add", "-A");
     git("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "change");

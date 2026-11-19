@@ -34,11 +34,12 @@ import { COMMENT_READ } from "./code-shape.mjs";
 import { LARGEST, walkFunctions } from "./tree-walk.mjs";
 
 /** The file `src` read: { functions: [{ name, line, lines, depth, branches }] in the order their bodies open, null where
- *  they cannot be told; imports: [{ level, module, names, line, dynamic, types }]; toks: [{ t, v, line }] }; null where
- *  the parser could not read it within its time or it is past LARGEST. Read in the parser's thread (read, below). */
+ *  they cannot be told; imports: [{ level, module, names, line, dynamic, types }]; toks: [{ t, v, line }]; comments:
+ *  [{ line, text }] }; null where the parser could not read it within its time or it is past LARGEST. Read in the
+ *  parser's thread (read, below). */
 export function pythonTree(src) {
   if (src.length > LARGEST) return null;
-  try { return inParser(import.meta.url, "read", src); } catch (e) {
+  try { const r = inParser(import.meta.url, "read", src); return r && { ...r, toks: unpacked(r.toks) }; } catch (e) {
     if (e?.kind === "read") return null;
     // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step: #719)
     const mended = / Mend: /u.test(e?.message ?? "");
@@ -57,8 +58,8 @@ export function read(parse, src) {
   if (!tree) return null;
   try {
     const root = tree.rootNode, whole = !root.hasError || signsInFormats(root);
-    const comments = [], toks = tokensOf(root, comments);
-    return { functions: whole ? walkFunctions(root, { functionBody, nameOf, branches, isControl, rowsOf }) : null, imports: importsOf(root), toks, comments };
+    const comments = [], toks = packed(tokensOf(root, comments));
+    return { functions: whole ? walkFunctions(root, { functionBody, nameOf, branches, isControl, rowsOf, outside: node => HOLDS.has(node.type) }) : null, imports: importsOf(root), toks, comments };
   } finally { tree.delete(); }
 }
 
@@ -109,11 +110,15 @@ const broken = node => node.isError || node.isMissing || node.hasError;
 // What the file imports, in the order it stands: each import statement the grammar read whole, with whether a def holds
 // it (dynamic) and whether the block of `if TYPE_CHECKING:` does (types). The walk keeps a stack of its own, as the
 // functions' does, so that no nesting runs out of the call stack.
+// (only what can hold a statement is walked into: an expression holds none, and a file of one long expression is
+// read in the time its statements take)
+const HOLDS = new Set(["module", "block", "ERROR", "if_statement", "elif_clause", "else_clause", "for_statement", "while_statement", "try_statement", "except_clause", "except_group_clause", "finally_clause", "with_statement", "match_statement", "case_clause", "function_definition", "class_definition", "decorated_definition"]);
 function importsOf(root) {
   const found = [], stack = [{ node: root, dynamic: false, types: false }];
   while (stack.length) {
     const { node, dynamic, types } = stack.pop();
     if (IMPORTS.has(node.type)) { if (!broken(node)) found.push(...statementImports(node).map(i => ({ ...i, dynamic, types }))); continue; }
+    if (!HOLDS.has(node.type)) continue;
     const inDef = dynamic || node.type === "function_definition";
     const checking = node.type === "if_statement" && isTypeChecking(node.childForFieldName("condition"));
     const consequence = checking ? node.childForFieldName("consequence")?.id : null;
@@ -143,6 +148,11 @@ function statementImports(node) {
 
 // ---- tokens ----
 
+// (the tokens sent from the parser's thread as three lists, which cost far less to copy than an object for each)
+const packed = toks => ({ t: toks.map(x => x.t[0]).join(""), v: toks.map(x => x.v), line: Int32Array.from(toks, x => x.line) });
+const KINDS = { i: "id", n: "num", s: "str", p: "punct" };
+const unpacked = ({ t, v, line }) => v.map((value, k) => ({ t: KINDS[t[k]], v: value, line: line[k] }));
+
 // The file's tokens, in the order they stand. A string is one token, and an f-string's code in its { } follows it; the
 // leaves of the tree are the rest, a comment none of them: each comment goes to `comments` instead, its text after the
 // #, as much of it as a change's mark is read in (shape.mjs, "changes").
@@ -150,8 +160,25 @@ const WORDLIKE = /^[A-Za-z_\u0080-\uffff][\w\u0080-\uffff]*$/u;
 const NUMBERS = new Set(["integer", "float"]);
 // (what an f-string's { } holds that is no code: its braces, its conversion (!r) and its format after a :)
 const NOT_CODE = new Set(["{", "}", "type_conversion", "format_specifier"]);
+// The walk goes by the tree's cursor, which makes no node of each leaf it passes, and takes each string's nodes apart.
 function tokensOf(root, comments) {
-  const toks = [], stack = [root];
+  const toks = [], c = root.walk();
+  try {
+    for (;;) {
+      const type = c.nodeType;
+      if (type === "string") nodeTokens(c.currentNode, toks, comments);
+      else if (type === "comment") comments.push({ line: c.startPosition.row + 1, text: c.nodeText.slice(1, 1 + COMMENT_READ) });
+      else if (type !== "line_continuation") {
+        if (c.gotoFirstChild()) continue;
+        leaf(toks, type, c.nodeText, c.startPosition.row + 1);
+      }
+      while (!c.gotoNextSibling()) if (!c.gotoParent()) return toks;
+    }
+  } finally { c.delete(); }
+}
+// The tokens of a string and of the code in its { }, as tokensOf gives them.
+function nodeTokens(start, toks, comments) {
+  const stack = [start];
   while (stack.length) {
     const node = stack.pop(), line = node.startPosition.row + 1;
     if (node.type === "comment") { comments.push({ line, text: node.text.slice(1, 1 + COMMENT_READ) }); continue; }
@@ -162,11 +189,10 @@ function tokensOf(root, comments) {
       for (let k = holes.length - 1; k >= 0; k--) for (const c of codeOf(holes[k]).reverse()) stack.push(c);
       continue;
     }
-    if (node.childCount === 0) { leaf(toks, node, line); continue; }
+    if (node.childCount === 0) { leaf(toks, node.type, node.text, line); continue; }
     const children = node.children;
     for (let k = children.length - 1; k >= 0; k--) stack.push(children[k]);
   }
-  return toks;
 }
 // The code of an f-string's { }: its children but its braces, conversion and format; in one the grammar misread, a
 // format's fill of = taken for := (signsInFormats, above), the leaves before that :, as the format starts there.
@@ -182,9 +208,9 @@ function codeOf(hole) {
   return leaves;
 }
 // (a leaf of two words, as "not in" may be, gives two; a token the grammar took as missing holds no text, and gives none)
-function leaf(toks, node, line) {
-  if (NUMBERS.has(node.type)) { toks.push({ t: "num", v: node.text, line }); return; }
-  for (const v of node.text.split(/\s+/u).filter(Boolean)) {
+function leaf(toks, type, text, line) {
+  if (NUMBERS.has(type)) { toks.push({ t: "num", v: text, line }); return; }
+  for (const v of text.split(/\s+/u).filter(Boolean)) {
     if (WORDLIKE.test(v)) toks.push({ t: "id", v, line });
     else if (v === ":=") toks.push({ t: "punct", v, line });
     else for (const c of v) toks.push({ t: "punct", v: c, line });

@@ -10,12 +10,13 @@ export const LARGEST = 2_000_000;
 /** The functions under `root`, in the order their bodies open, as a baseline numbers functions of one name. `parts`
  *  are the reader's: `functionBody(node)`, the body of a node that is a function, else null; `nameOf(node, parent)`;
  *  `branches(node)`, the branch points a node adds; `isControl(node, parent)`, whether it opens a control block; and,
- *  where a function's lines are not its body's, `rowsOf(node, body)`, its first and last rows (from 0).
+ *  where a function's lines are not its body's, `rowsOf(node, body)`, its first and last rows (from 0); and, where only
+ *  some nodes can hold a function, `outside(node)`, whether one outside every function can.
  *  The walk keeps a stack of its own so that no nesting runs out of the call stack: each item a node, its parent, the
  *  function it counts toward (null outside any) and the level of control blocks it stands at. (The parent is carried,
  *  not asked of the node: the parser finds it from the file's root, at a cost that grows with how deep it lies.) */
 const bodyRows = (node, body) => [body.startPosition.row, body.endPosition.row];
-export function walkFunctions(root, { functionBody, nameOf, branches, isControl, rowsOf = bodyRows }) {
+export function walkFunctions(root, { functionBody, nameOf, branches, isControl, rowsOf = bodyRows, outside = null }) {
   const found = [], stack = [{ node: root, parent: null, fn: null, level: 0 }];
   while (stack.length) {
     const { node, parent, fn, level } = stack.pop();
@@ -30,6 +31,8 @@ export function walkFunctions(root, { functionBody, nameOf, branches, isControl,
       push(stack, body, node, own, 0);
       continue;
     }
+    // (outside every function, a node no function can lie under, where the reader names them, is passed over whole)
+    if (!fn && outside && !outside(node)) continue;
     if (fn) fn.branches += branches(node);
     const inner = isControl(node, parent) ? level + 1 : level;
     if (fn && inner > level) fn.depth = Math.max(fn.depth, inner);
