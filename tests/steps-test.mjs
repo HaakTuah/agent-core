@@ -178,10 +178,8 @@ ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.y
 const shapeBaseline = path.join(lockProject, "checks/shape-baseline.json"), shapeAsKit = fs.readFileSync(shapeBaseline, "utf8");
 fs.writeFileSync(shapeBaseline, "{\n  \"listed\": {}\n}\n");
 let shapeMissed = notDone(lockProject);
-ok(shapeMissed.length === 2 && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, Python, scripts that share one global space, the tests that open a screen, a window or a device:/.test(shapeMissed[0].mend)
-  && shapeMissed[1].lead === "19 November 2026, the tests that reach a real clock or start another process" && /written before the check read the tests that reach a real clock, the tests that start another process:/.test(shapeMissed[1].mend)
-  && shapeMissed.every(s => /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(s.mend)),
-  "a shape baseline that names no reader is reported, by each step for the readers its entry brought, its mend to write it with every reader", report(shapeMissed));
+ok(shapeMissed.length === 1 && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, Python, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process:/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
+  "a shape baseline that names no reader is reported, its mend to write it with every reader", report(shapeMissed));
 execFileSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: lockProject, env: { ...process.env, SHAPE_BASE: "" } });
 shapeMissed = notDone(lockProject);
 ok(!shapeMissed.length && JSON.parse(fs.readFileSync(shapeBaseline, "utf8")).reads.length === Object.keys(READERS).length, "and the mend as written makes it done", report(shapeMissed));

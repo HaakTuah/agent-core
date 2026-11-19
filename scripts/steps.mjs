@@ -284,26 +284,21 @@ function passedRuns(p) {
   return missing.length ? `The selection runs on a push with nothing to say whether the merged tree passed already (${missing.join("; ")}): give its step \`--passed <the check that gates the tests>\` on a push's first run alone (the job's own check, such as \`tests\`, as a ruleset requires it; in bash, \`\${SELECT_PASSED:+--passed "$SELECT_PASSED"}\` with \`SELECT_PASSED\` set so on a push and empty otherwise), \`GH_TOKEN: \${{ github.token }}\` on that step on a push alone, and \`checks: read\` beside \`contents: read\` in the job's permissions; and have every step that reads \`RUN\` run nothing where it says \`none\` (\`if [ \"$RUN\" = all ]; then <the whole suite>; elif [ \"$RUN\" != none ]; then <the runner> $RUN; fi\`, or an \`if:\` whose parts joined by \`&&\` hold \`RUN\` in one part alone, nothing but \`env.RUN == 'all'\` and \`contains(env.RUN, ' <file> ')\` joined by \`||\`), since a runner given no file runs every test, and one given \`none\` fails; then a push that merges a pull request's head whose tree it holds, whose run selected the whole suite and passed that check, runs no test again. Leave it off any job, or entry of a job's matrix, that a pull request does not run, whose suite ran nowhere else, and any whose tests read what no tree holds (a release's tag, the day). Nothing fails meanwhile: the whole suite runs on a push as before.` : null;
 }
 
-// The readers a later entry brings, its own step's (#457); the rest the 16 November entry's.
-export const LATER_READERS = ["clocks", "processes"];
 // Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
 // its config, where the manifest names it or the starter kit writes it, read as the check reads it, and the baseline
-// that config names, which names the step's readers ("reads"; shape-readers.mjs), so that it lists what each finds.
-// Null where all of it stands; else the mend.
-function shapeWritten(p, readers = Object.keys(READERS).filter(r => !LATER_READERS.includes(r))) {
+// that config names, which names every reader of the check's ("reads"; shape-readers.mjs), so that it lists what each
+// finds. Null where all of it stands; else the mend.
+function shapeWritten(p) {
   const at = shapeAt(p.manifest), text = p.read(at);
   const first = `write its first baseline with \`node core/scripts/shape.mjs ${at} --first\`, commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
-  // (a later entry's step reads its own readers alone, once the config and its baseline stand: the 16 November entry's
-  // step says how they come to stand)
-  const later = readers.every(r => LATER_READERS.includes(r));
-  if (text === null) return later ? null : `Write \`${at}\` as the starter kit does (\`core/setup/template/shape.json.tmpl\`), with the project's own code under "code" and its test files under "tests", as git pathspecs; then ${first}. Until then the shape check holds the project to the starter kit's config, with each pull request's base as its baseline.`;
+  if (text === null) return `Write \`${at}\` as the starter kit does (\`core/setup/template/shape.json.tmpl\`), with the project's own code under "code" and its test files under "tests", as git pathspecs; then ${first}. Until then the shape check holds the project to the starter kit's config, with each pull request's base as its baseline.`;
   let config;
-  try { config = parseConfig(text, at); } catch (e) { return later ? null : `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.`; }
+  try { config = parseConfig(text, at); } catch (e) { return `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.`; }
   const baseline = p.read(config.baseline);
-  if (baseline === null) return later ? null : `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.`;
+  if (baseline === null) return `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.`;
   let reads = [];
   try { reads = parseBaseline(baseline, config.baseline, "").reads; } catch { /* (read as naming no reader: its mend writes it again) */ }
-  const missing = readers.filter(r => !reads.includes(r)).map(r => READERS[r]);
+  const missing = Object.keys(READERS).filter(r => !reads.includes(r)).map(r => READERS[r]);
   return missing.length ? `The shape check's baseline \`${config.baseline}\` was written before the check read ${missing.join(", ")}: run \`node core/scripts/shape.mjs ${at} --write\`, which lists what stands there and names every reader, and commit the baseline in a pull request of its own. Until then what the pull request's base held there is reported, never failed.` : null;
 }
 
@@ -950,7 +945,6 @@ export const STEPS = [
   { lead: "18 November 2026, another publisher's code named in a lock file", cost: COST.line, unread: "how a project loads another publisher's code (a content network's script, a file copied in) is no file's to say exactly: the session that syncs reads the project's pages and folders for it" },
   { lead: "18 November 2026, a tree that passed is not run again", cost: COST.workflow, check: passedRuns,
     partly: "which check gates a project's tests is the project's own, as its ruleset names it, and which entries of a job's matrix a pull request leaves out is a reading of its expressions" },
-  { lead: "19 November 2026, the tests that reach a real clock or start another process", cost: COST.config, check: p => shapeWritten(p, LATER_READERS) },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

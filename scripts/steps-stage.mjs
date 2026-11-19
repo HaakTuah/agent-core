@@ -153,15 +153,6 @@ export const STAGES = {
       spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--first"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });
     },
   },
-  "19 November 2026, the tests that reach a real clock or start another process": {
-    asked: true,
-    // (the baseline as a release before the two readers wrote it; the mend, as the step words it, writes it again)
-    stage: dir => {
-      const baseline = JSON.parse(read(dir, "checks/shape-baseline.json"));
-      write(dir, "checks/shape-baseline.json", `${JSON.stringify({ ...baseline, reads: (baseline.reads ?? []).filter(r => r !== "clocks" && r !== "processes") }, null, 2)}\n`);
-    },
-    mend: dir => { spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } }); },
-  },
   "16 November 2026, how strong the tests are": {
     asked: true,
     stage: dir => write(dir, "core-manifest.md", read(dir, "core-manifest.md").split(/\r?\n/).filter(l => !l.includes("*mutation tool*")).join("\n")),
