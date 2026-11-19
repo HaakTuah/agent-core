@@ -508,6 +508,21 @@ function namesTests(p, item) {
   return [...(/hostile\s+tests\b([\s\S]*)/i.exec(item)?.[1] ?? "").matchAll(/`([^`]+)`/g)].some(m => there(m[1]));
 }
 const CASES = "too long, the wrong type, markup, a file path, a number out of range, nothing at all";
+// An item's limits, the words after "limits:" up to its hostile tests or its end, what is in backticks taken out first
+// (a "limits:" there is none); null where it states none: no number and no "none".
+function limitsOf(item) {
+  const said = /\blimits:([\s\S]*?)(?=hostile\s+tests\b|$)/i.exec(item.replace(/`[^`]*`/g, ""))?.[1] ?? "";
+  return /\d|\bnone\b/i.test(said) ? said : null;
+}
+// Whether an item says its input carries a version, in its own words outside its limits and anything in backticks (a
+// path such as `scripts/exact-versions.mjs` says nothing of the input).
+// An item that says its input carries none ("carries no version", "without a version number") says nothing of one
+// either; one that names its version otherwise ("refused without a version", "no version newer") still does.
+const versioned = item => /\bversions?\b/i.test(item.replace(/`[^`]*`/g, "").replace(/\blimits:[\s\S]*?(?=hostile\s+tests\b|$)/i, "")
+  .replace(/\b(?:(?:carries|carry|has|have|holds?)\s+no\s+versions?(?:\s+numbers?)?|without\s+an?\s+version\s+numbers?)\b/gi, ""));
+// (an item's words as a mend shows them: no control character, which would reach the sync's log as it stands, and no
+// character that reorders or hides text, which would make the mend read otherwise than it is)
+const short = l => { const t = l.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, "?"); return t.length > 80 ? `${t.slice(0, 77)}...` : t; };
 // The step for the inputs rule 5 names: "None", or the starter kit's "FILL IN", reads done only while it lists no input;
 // once one is listed, each is read, and an item whose tests are still "FILL IN" names none.
 function hostileTests(p) {
@@ -516,8 +531,16 @@ function hostileTests(p) {
   const items = listItems(block), said = block.join("\n");
   if (!items.length && (/FILL IN/.test(said) || /^None\b/i.test(said.trim()))) return null;
   if (!items.length) return `In \`SECURITY.md\`, rule 5, list each input anyone but the user at hand can shape as an item of its own (a line that opens \`- \`), saying what checks it and then, after the words "hostile tests:", naming in backticks the file or folder that holds them (${CASES}), or write "None" where the project takes none.`;
-  const bare = items.filter(l => !namesTests(p, l)).map(l => l.split("\n")[0].trim().slice(2).trim());
-  return bare.length ? `In \`SECURITY.md\`, rule 5, each input names, after the words "hostile tests:", in backticks, a file or folder of the project that holds them (${CASES}): write those tests where they are missing, and name them so. Naming none that is there: ${bare.map(l => l.length > 80 ? `${l.slice(0, 77)}...` : l).join("; ")}.` : null;
+  const first = l => short(l.split("\n")[0].trim().slice(2).trim());
+  const bare = items.filter(l => !namesTests(p, l)).map(first);
+  const unlimited = items.filter(l => !limitsOf(l)).map(first);
+  const unversioned = items.filter(l => limitsOf(l) && versioned(l) && !/\bversions?\W{0,3}v?\d/i.test(limitsOf(l))).map(first);
+  const wrong = [
+    bare.length && `each input names, after the words "hostile tests:", in backticks, a file or folder of the project that holds them (${CASES}): write those tests where they are missing, and name them so. Naming none that is there: ${bare.join("; ")}.`,
+    unlimited.length && `each input names, after the words "limits:", its limit in size, in count and in time, each as a number where it applies, as its reader holds it (or "limits: none", with why, where its shape has none), and its "too long" test uses that number. Naming none: ${unlimited.join("; ")}.`,
+    unversioned.length && `an input that carries a version number names, among its limits, the newest version its reader knows ("version 3"), its reader refuses a newer one with nothing of it used, in words the user can act on, and its hostile tests try one; where the input carries none, its item says nothing of a version. Naming none: ${unversioned.join("; ")}.`,
+  ].filter(Boolean);
+  return wrong.length ? `In \`SECURITY.md\`, rule 5, ${wrong.join(" And ")}` : null;
 }
 
 // The core's files that moved to folders that say who reads them or when (#304, point 8), old path to new, as the
@@ -949,7 +972,7 @@ export const STEPS = [
   { lead: "16 November 2026, how code is put together", cost: COST.config, check: shapeWritten,
     partly: "which folders hold the project's code, which files are its tests and what its systems are is a reading of the project, which its audit's first question answers" },
   { lead: "16 November 2026, hostile tests for every named input", cost: COST.read, check: hostileTests,
-    partly: "whether every input is listed, and whether its tests try each case, is a reading of the project, held by the security review" },
+    partly: "whether every input is listed, whether its limits are those its reader holds, whether it carries a version number its item does not speak of, and whether its tests try each case, is a reading of the project, held by the security review" },
   { lead: "16 November 2026, secret scanning with push protection", cost: COST.read, unread: "whether secret scanning and its push protection are on is GitHub's setting, not a file's: `gh api repos/<owner>/<repo>` answers it under `security_and_analysis`, and the entry says how a session switches them on or names them to the owner" },
   { lead: "16 November 2026, the NuGet check where it can matter", cost: COST.workflow, check: nugetPathsHold,
     partly: "whether the repository is private is GitHub's setting, not a file's; the starter kit now runs a private project's NuGet check as a step of `core.yml`'s one job (17 November 2026), so `core/scripts/fresh.mjs` lists that call, not these `paths:`" },

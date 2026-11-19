@@ -28,6 +28,8 @@
       "check: scripts/versions.mjs, in part"
     ],
     "floor/topics/licences.md: 10. Licences: free to use, kept that way": "check: scripts/licences.mjs, in part",
+    "floor/topics/input.md: 5. Untrusted input is checked before it is used": "check: scripts/steps.mjs, in part",
+    "floor/topics/input.md: A reader refuses a version it does not know": "check: scripts/steps.mjs, in part",
     "floor/topics/dependencies.md: 15. Dependencies": [
       "check: scripts/licences.mjs, in part",
       "check: scripts/agent-tools.mjs, in part"
@@ -269,8 +271,10 @@
     "floor/topics/dependencies.md: 17. Dependabot's own PRs": [34],
     "floor/topics/dependencies.md: An agent's own tools are code with its sign-ins": [225],
     "floor/topics/input.md: A failure refuses": [227],
+    "floor/topics/input.md: 5. Untrusted input is checked before it is used": ["#456"],
     "floor/topics/input.md: Every named input has hostile tests": [227],
-    "floor/topics/licences.md: 10. Licences: free to use, kept that way": [41, 198, 201],
+    "floor/topics/input.md: A reader refuses a version it does not know": ["#456"],
+    "floor/topics/licences.md: 10. Licences: free to use, kept that way": [41, 198, 201, "#456"],
     "floor/topics/weaknesses.md": [164],
     "floor/topics/weaknesses.md: 9. Security alerts and reported weaknesses": [35],
     "floor/topics/weaknesses.md: In a PR's own change": [130],
@@ -483,6 +487,8 @@
     "tasks/tests.md: A test that guards only what a release brings runs where the release is made": ["#715.2"]
   },
   "numbers": {
+    "floor/topics/input.md: 5. Untrusted input is checked before it is used": "findings; outcome: robust",
+    "floor/topics/input.md: A reader refuses a version it does not know": "findings; outcome: robust",
     "AGENTS.md: A bug fix and a rework of tests are built on Sonnet": "findings; outcome: robust",
     "floor/security.md: The owner's word": "findings; outcome: readable; rare harm",
     "tasks/tools.md: What the core offers one tool, it offers each": "check fires; outcome: usable",
