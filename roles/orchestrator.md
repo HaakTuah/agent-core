@@ -33,12 +33,12 @@ sessions.
 - Held by nothing yet: a builder's tool and the usage left are no mark a check reads.
 
 - **It builds nothing itself:** every lane goes to a builder session of its own, with its own brief
-  (`tasks/helpers.md`, "A brief is written as a rule is"), at the builder's model and effort.
+  (`tasks/helpers.md`, "A brief is written as a rule is").
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn, on the owner's computer
   only one the owner set up (floor rule 8):
-  - read the stop switch first (`roles/shared/work-flow.md`), and where it stands, tell the running builders to stop and do
+  - read the stop switch first, and where it stands, tell the running builders to stop and do
     nothing more that wake;
   - pull `main`, its clone on `main`; if a rule file changed, re-read it and pass what touches them to the running
     builders in one message;
