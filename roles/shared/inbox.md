@@ -2,7 +2,7 @@
 
 Read at the start of every task.
 
-- **Nothing goes to the owner to be answered** but the yeses floor rule 14 names.
+- **Nothing goes to the owner to be answered** but floor rule 14's yeses and the blind sample.
   - Where the best reading is not plain from the *settling references* and the owner's past words, the stand-in gives
     it, and any departing from an owner's answer.
   - "Readings taken" lists the unsure first, and a departure with that answer's date, named when the owner is told of
