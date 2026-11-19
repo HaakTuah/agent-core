@@ -44,7 +44,7 @@
       "why": "Split by the reader each case tests in #852."
     },
     "tests/hostile-pr-changes-test.mjs": {
-      "mark": 34591,
+      "mark": 44725,
       "why": "Split by the reader each case tests in #852."
     },
     "tests/init-test.mjs": {
