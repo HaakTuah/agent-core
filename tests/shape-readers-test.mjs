@@ -125,6 +125,13 @@ ok(lead("main.py", { level: 0, module: "json" }) === '{"outside":"json","top":"j
   "Python: the standard library is never taken for a file of the project's that ends in its name, and a name two files end in leads nowhere the reader can tell");
 const many = new Set(Array.from({ length: 200000 }, (_, i) => `f${i}.py`));
 ok(JSON.stringify(resolvePython("main.py", { level: 0, module: "os", names: [] }, many, std)) === '{"outside":"os","top":"os"}', "Python: an import is led in a project of any number of files");
+const long = "m".repeat(100000), names = Array(100000).fill("b");
+const wide = new Set(["x.py", "deep/pkg/b.py", ...Array.from({ length: 20000 }, (_, i) => `d${i}/b.py`)]);
+ok(JSON.stringify(resolvePython("a.py", { level: 0, module: long, names }, wide, std)) === JSON.stringify({ outside: long, top: long })
+  && same(resolvePython("a.py", { level: 1, module: long, names }, wide, std).to, [])
+  && JSON.stringify(resolvePython("a.py", { level: 0, module: "z", names: names.slice(0, 20000) }, wide, std)) === '{"outside":"z","top":"z"}'
+  && JSON.stringify(resolvePython("a.py", { level: 0, module: "pkg", names: ["b", "c"] }, wide, std)) === '{"to":["deep/pkg/b.py"]}',
+  "Python: an import of a long name, of many names or of a name many files share is led, and a module found by the end of its path still is");
 const pyPackages = pythonPackages({
   "pyproject.toml": "[project]\nname = \"game\"\ndependencies = [\n  \"requests[socks]>=2\",\n  \"PyYAML\",  # a comment\n]\n[project.optional-dependencies]\ntest = [\"pytest\"]\n[tool.poetry.dependencies]\npython = \"^3.11\"\nflask = \"*\"\n[tool.poetry.group.dev.dependencies]\nblack = \"*\"\n",
   "requirements-dev.txt": "ruff==1\n-r requirements.txt\n", "requirements.txt": "numpy # x\n-e .\nscikit_learn>=1\n",
