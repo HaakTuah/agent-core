@@ -25,9 +25,8 @@ What these are and how they are kept: `words/README.md`.
 46. **2 November 2026** (Amarna Letters, item 173; for both games), on PRs merged without his yes for `.github/`: "You
     do it." To Dependabot's pinned version updates of actions already used needing no yes, the owner agreed, always.
 
-47. **2 November 2026** (Amarna Letters, item 175; for both games): "I see that Claude Codex and Codex has spent roughly
-    the same usage today, both a little over 30%. [...] So only reviewing at […] takes about as much as all we have done
-    with Claude and Claude Code today." To one security review a PR and no Codex review for docs-only PRs, the owner
+47. **2 November 2026** (Amarna Letters, item 175; for both games): "[…] [...] So only reviewing at […] takes about as much as all we have done
+    with Claude and Claude Code […]." To one security review a PR and no Codex review for docs-only PRs, the owner
     agreed to both.
 
 48. **2 November 2026** (Amarna Letters, item 177; for both games): "does it always make sense with a security review?"
@@ -44,7 +43,7 @@ What these are and how they are kept: `words/README.md`.
     here." To pointing its threat model at the repository's own file, the owner agreed.
 
 52. **3 November 2026** (Amarna Letters, item 193; for both games): "Nope, we don't run anything locally with a poller.
-    Security risk for my system." Then: "Remove it, you coded it and gave it to me. But I refused it on the grounds
+    Security risk for […]." Then: "Remove it, you coded it and gave it to me. But I refused it on the grounds
     stated, so it was never in use. So we can remove all references to it."
 
 53. **3 November 2026** (Amarna Letters, item 196), to a reading that is a matter of taste going to him as a question
@@ -99,8 +98,7 @@ What these are and how they are kept: `words/README.md`.
     latest version as a rule, I think, unless there is a good reason not to: breaks something, worse performance, change
     in license, etc. Your take?" Then the owner agreed.
 
-66. **5 November 2026** (Amarna Letters, item 221; for both games): "I notice that fable drains usage much much faster
-    than opus." To moving the design check to Opus at high effort, the owner agreed, with a correction: "Though the
+66. **5 November 2026** (Amarna Letters, item 221; for both games): "I notice that […]." To moving the design check to Opus at high effort, the owner agreed, with a correction: "Though the
     problem is it can't be on high, it inherits."
 
 67. **5 November 2026** (Amarna Letters, item 222; for both games), to the rule-file audit also cutting and simplifying,
@@ -136,7 +134,7 @@ What these are and how they are kept: `words/README.md`.
     off as described. Get my meaning?"
 
 72. **6 November 2026** (Amarna Letters, item 229; for both games), on a canary in which Codex missed two planted
-    faults: "(…) don't stop using Codex. We don't have endless with usage for Claude, and it is better than the
+    faults: "(…) don't stop using Codex. […] it is better than the
     alternative still. But I agree with the rule addition and new test."
 
 73. **9 November 2026** (Amarna Letters, item 238; Barkstreet Snakes, 9 November 2026), to routine lanes built by
@@ -146,9 +144,8 @@ What these are and how they are kept: `words/README.md`.
 
 74. **9 November 2026** (Amarna Letters, item 239; Barkstreet Snakes, 9 November 2026), to later review rounds seeing
     only the change, a weekly workshop check, his words quoted only in the archive, and trimming what every session
-    reads, the owner agreed to all of them, and added: "Though, remember, we still pay for Codex usage. It is a
-    different quota. My goal is still to maximize it, and Claude is the more important link, but that doesn't mean waste
-    there dont matter."
+    reads, the owner agreed to all of them, and added, as a reason: waste matters on
+    every tool, however much more one of them carries.
 
 75. **9 November 2026** (Amarna Letters, item 240; Barkstreet Snakes, 9 November 2026), on this repository: "We must do
     that. though, I want to experiment with dynamic governance maybe on 1 project like I said, so that project might not
@@ -161,11 +158,9 @@ What these are and how they are kept: `words/README.md`.
     safety rules only one game had join the floor; where the games differ in substance, each keeps its own; the floor in
     two files, the rules any task can break read at every start and the rest before a task touches them), to setting
     Dependabot here to the workflow's actions, and to a last code review before the merge; the owner added: "Only thing
-    i want to add is that only Claude has to stop around 90%, its the only license I use for other tasks. So codex or
-    whatveer else I add will only be for project work. Ideally they time so that 90% is never spent up before 100% of
-    them are spent, but that depends on them being in an environment where they can track it, like local on my pc, or
-    server, even better on Herdr where I believe they can track and initiate one another directly. So calibrate for
-    that. Right now every cloud session wastes time establishing that they can track their usage, and wastes tokens
+    i want to add is that only Claude has to stop around 90%, […]. […] Ideally they time so that 90% is never spent up
+    before 100% of them are spent, but that depends on them being in an environment where they can track it, […]. So
+    calibrate for that. Right now every cloud session wastes time establishing that they can track their usage, and wastes tokens
     posting about it every PR, possibly more. Sounds good to you?"
 
 77. **9 November 2026** (Amarna Letters, item 243; Barkstreet Snakes, 9 November 2026), asked for his yes on this

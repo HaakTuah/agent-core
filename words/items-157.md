@@ -2,21 +2,19 @@
 
 What these are and how they are kept: `words/README.md`.
 
-157. **12 November 2026** (the core, in the design chat), of the project of another owner, a product that is sold:
-     told that a product for sale needs its seller's name somewhere, that the floor let no name into a repository
-     but the GitHub account in its address, so that the build would have to take the name from outside, and that he
-     could instead allow a company's name there:
+157. **12 November 2026** (the core, in the design chat), of a project of another owner:
+     told that a product needs a name somewhere, that the floor let no name into a repository
+     but the GitHub account in its address, so that the build would have to take the name from outside, and that a
+     company's name could instead be allowed there:
 
-     > He has a company name, yes.
+     The owner's reason: a company's name, naming no person, may stand where a project's name is needed.
 
      Behind the second exception of floor rule 11: the company name a project is sold under, naming no person.
 
-158. **12 November 2026** (the core, in the design chat), of the same project, whose owner had a third provider's
-     tool on his computer, one its terms keep out of Claude Code:
+158. **12 November 2026** (the core, in the design chat), on development with another provider's tool, one its terms
+     keep out of Claude Code:
 
-     > […] has also installed antigravity on his computer. Since the terms forbids integrating it into claude code,
-     > he might rely on it as a fallback for further development when he is out of usage for claude code. Is
-     > agent-core right now permissive for development with other tools? It must not inhibt development with another
+     > […] Is agent-core right now permissive for development with other tools? It must not inhibt development with another
      > tool/provider. But we still want it to work the same as now. Thoughts?
 
      Behind the end of "Another provider builds" (`modules/roles.md`) and the two lines of
@@ -33,7 +31,7 @@ What these are and how they are kept: `words/README.md`.
 
      Advised against a workflow that opens the pull request (it would get no checks without a stored token, and
      would be the first workflow able to write code), and for one that only keeps an issue open while the core is
-     ahead; and that sessions of another owner's private project report through that project's own inbox, since the
+     ahead; and that sessions of a project of another owner report through that project's own inbox, since the
      core's repository is public. His answer, agreeing to the second:
 
      > And on 1, I will never get most of those reports, if that is how you envision it. I see no
@@ -72,12 +70,12 @@ What these are and how they are kept: `words/README.md`.
      the core" in `README.md`, and the step of `core.yml` that fails a difference from the floor or the review
      guidelines.
 
-162. **12 November 2026** (the core, in the design chat), of the project of item 154, whose Codex usage before it took
-     the core had been almost wholly sessions Claude started; told that the core gave another provider's builder
-     first what a check proves right without judgement, and left the rest with Claude's:
+162. **12 November 2026** (the core, in the design chat), of how fully another provider's builder is used; told that
+     the core gave another provider's builder first what a check proves right without judgement, and left the rest
+     with Claude's:
 
-     > I noticed […] setups used only codex subsessions for 94% of codex's usage, prior to incorporating agent-core.
-     > Will his setup now utilize it more fully? I suspect subsessions only were reviews? Your take?
+     The owner's reason: the other provider's sessions had been used for little beyond reviews, and the owner asked
+     whether the rule would use them more fully.
 
      > It was supposed to save on Claude usage by pushing all work suited to any other provider first…
 
@@ -85,14 +83,13 @@ What these are and how they are kept: `words/README.md`.
      its review can judge, where the owner set it up for the project) and the end of "Work continuously, other
      providers first" in `modules/claude.md`.
 
-163. **12 November 2026** (the core, in the design chat), of "Another provider builds first" (item 162) and of the
-     project of item 154, whose owner pastes no further word of this chat into his sessions:
+163. **12 November 2026** (the core, in the design chat), of "Another provider builds first" (item 162):
 
      > Important that this is only if Claude is the orchestrator, doesn't prohibit other kinds of work
 
      > Check thoroughly for other contradictions and for cohesion across the board!
 
-     > […] won't reprompt, so I hope this all gets fixed with new imports of core.
+     The owner's reason: the fix had to reach projects with the next sync of the core, not by a further prompt.
 
      Behind "Where Claude's sessions hand out work, another provider builds first" in `modules/roles.md` and the
      orchestrator's own line of it in `modules/orchestrating.md`; `setup/sync-notes.md`, what a sync asks of a project
@@ -105,7 +102,7 @@ What these are and how they are kept: `words/README.md`.
      read as every protected file; "costs money", which could read as every push to a private repository), the cap
      raised by 1 KB for the dozen fixes that waited for room, the orchestrator's next session kept at the merge, and
      three questions left from earlier in the day: whether each pull request should say what its session cost,
-     whether agents may file private weakness reports themselves, and whether "He has a company name, yes" (item 157)
+     whether agents may file private weakness reports themselves, and whether his word of item 157
      had been his yes to the company's name in floor rule 11. The owner agreed to everything, with an instruction:
 
      > then breakdown everything you did
@@ -121,7 +118,7 @@ What these are and how they are kept: `words/README.md`.
      nothing, and the hooks run the copy that was reviewed; instead a slimmer copy that leaves the dated reports in the
      core alone, syncs made once for several changes, a trimming pass over the modules since the cap was full, and the
      day's small leftovers (a clause in floor rule 14 for rule 3's case of a project with no trusted builder, "where one
-     answers", a pointer check on the core's own files); NuGet in the licence check and the queued checks left until a
+     answers", a pointer check on the core's own files); another installer in the licence check and the queued checks left until a
      project's real use reports back. The owner agreed to all of it, with a condition: "if you so advice".
 
      Behind `/reports export-ignore` in `.gitattributes` with `core.yml` and `scripts/pure-sync.mjs` comparing a copy
@@ -184,11 +181,11 @@ What these are and how they are kept: `words/README.md`.
 169. **12 November 2026** (the core, in the design chat), told that the core said who builds first but left each
      project to write down how a Claude session hands a task to another provider, and that neither game did:
 
-     > Hand off is only possible via a tool like herdr, or a plug-in in claude code. We have already tested trying to
+     > Hand off is only possible via […], or a plug-in in claude code. We have already tested trying to
      > do it via github, there it can initiate, but codex in legacy cloud can't push, so no use. So only review and
      > security review is avaliable via github. Seems to me a more generalized rule to just handoff what you can, is
      > the best way? Shouldn't that produce what we do now, when we only have github? And then use plug-in if it is
-     > there? But prefer herdr even more if you set it up with it? What is your take? This is the kind of
+     > there? But prefer […] even more if you set it up with it? What is your take? This is the kind of
      > stuff agent-core should solve for […], since he isn't familiar with the options. Are there more holes like
      > this, that leaves things open for him, without good cause?
 
@@ -213,7 +210,7 @@ What these are and how they are kept: `words/README.md`.
 
      Told that Copilot reviewed ahead of Claude's reviewer only where a project named it, and built only under the tool
      that runs the agents side by side; offered it second in the default order of reviewers, and its agent on GitHub as
-     a third way to build, after Codex's plug-in, with what that costs (its plan's requests), that GitHub marks the call
+     a third way to build, after Codex's plug-in, with what that costs, that GitHub marks the call
      a preview and that it was not yet run; and asked again whether the cap may go to 46 KB. The owner agreed to all of
      it, with a condition:
 
@@ -226,8 +223,8 @@ What these are and how they are kept: `words/README.md`.
      project that has Copilot's agent names it as its own way meanwhile. The cap of item 164 goes from 45 to 46 KB on
      that yes.
 
-170. **12 November 2026** (the core, in the design chat), told that the stand-in had given its verdict on nine of one
-     project's fifteen open ideas and that the six newest had none, since its sweep took only the ideas that had waited
+170. **12 November 2026** (the core, in the design chat), told that the stand-in had given its verdict on some of one
+     project's open ideas and that the newest had none, since its sweep took only the ideas that had waited
      a week:
 
      > That's a glip, should take all when it first runs, no?
@@ -256,7 +253,7 @@ What these are and how they are kept: `words/README.md`.
      standing; and behind the cap of item 164 at 47 KB.
 
 172. **12 November 2026** (the core, in the design chat), an hour after item 170, whose words were read as the weekly
-     sweep alone; told that six ideas in one project and three in the core still had no verdict, since the sweep starts
+     sweep alone; told that ideas in one project and in the core still had no verdict, since the sweep starts
      only once an idea has waited a week and the stand-in, called for a question, judged only the ideas on that
      question's topic:
 
@@ -291,7 +288,7 @@ What these are and how they are kept: `words/README.md`.
      with none:
 
      > I suggest the agent-core projects only states the ideal narrower use, for when you yourself control through
-     > plug-in or herdr, or something of the like, but maybe still wait for it if it triggers anyhow, like it will for
+     > plug-in or […], or something of the like, but maybe still wait for it if it triggers anyhow, like it will for
      > github triggers?
 
      On widening Codex's automatic security review to every pull request so that Dependabot's were covered:
@@ -312,7 +309,7 @@ What these are and how they are kept: `words/README.md`.
 
      > On 3, maybe we ought not to? Having it defined as preferred
      > reviewer before claude code, if avaliable, I think suffices, or what is your take on this? And you can
-     > merge it all now, so [...] gets these updates when he pulls tomorrow, unless there is good reason not to.
+     > merge it all now, so [...] gets these updates when he pulls, unless there is good reason not to.
 
      Behind floor rule 8's "A PR that touches one merges only after its security review has run (Dependabot's own: rule
      17)", point 3 of `modules/reviews.md` (a security review the session calls, once on the finished work and aimed;
@@ -322,7 +319,7 @@ What these are and how they are kept: `words/README.md`.
 175. **13 November 2026** (the core, in the design chat), on who reviews first, told that a third tool reviewed only
      where a project named it:
 
-     > And if we have antigravity or something else in herdr, then it is also preferred? The aim is to make the rules
+     > And if we have antigravity or something else in […], then it is also preferred? The aim is to make the rules
      > general where practical, so any setup will work without specification, and we want to save on claude usage as a
      > general rule.
 
@@ -525,7 +522,7 @@ What these are and how they are kept: `words/README.md`.
 187. **13 November 2026** (the core, in the design chat), on the rule that a finished session is archived:
 
      > […] What i would however add is that they should also clean up, no? In the cloud, I don't think it matters. The
-     > container is finished when the session is. But locally/server, they have a tendency to leave work trees behind,
+     > container is finished when the session is. But […], they have a tendency to leave work trees behind,
      > scratches, branches, etc, etc. Shouldn't everything important for future work be pushed, and everything not, be
      > cleaned up? When you archive a sessions seems like a good time to do it? Your take?
 
@@ -549,14 +546,14 @@ What these are and how they are kept: `words/README.md`.
      Told: the test already rules that trim out, but "a second statement" did not say what makes two statements the
      same; offered that a second statement counts only if it covers every case the removed words do, with the same
      force, and that whoever proposes a trim names the other statement and what it covers; and that the nineteen trims
-     merged that night had been gone over again, scope against scope, and held; the owner agreed.
+     merged that day had been gone over again, scope against scope, and held; the owner agreed.
 
      Behind "one that covers every case the removed words do, with the same force" in `modules/review-guidelines.md`.
 
 189. **13 November 2026** (the core, in the design chat):
 
      > Just one last thing! I see the owner is referred to as "him", "he" and "his" everywhere. That makes the repos
-     > less general purpose. The last thing I'll note tonight, that would benefit from being changed to something that
+     > less general purpose. The last thing I'll note, that would benefit from being changed to something that
      > could work for any owner.
 
      > And one more question: how does my game repos know that the archive is my decisions, while […] repo will know
@@ -587,7 +584,7 @@ What these are and how they are kept: `words/README.md`.
 
 191. **13 November 2026** (the core, in the design chat):
 
-     > Should we do a full audit again while I sleep?
+     > Should we do a full audit again […]?
 
      Told: yes, by a fresh reader of the whole core as it then stood, with the imports replayed and every suite run;
      plain faults mended at once, each reviewed, and whatever would change what a rule asks listed for the owner; the
@@ -615,12 +612,12 @@ What these are and how they are kept: `words/README.md`.
      Told: in that file the name is a banned word, which keeps it out of the rules; that the account stands in about ten
      places outside the archive, each an address or the one anchor of whose word counts, which is stated on purpose and
      never inferred; that GitHub needs it written out in a workflow's call to another repository and in an issue
-     template's assignee; and that the scripts could share one place for it, a change for the daytime. The owner agreed
+     template's assignee; and that the scripts could share one place for it, a change for later. The owner agreed
      fully, and added:
 
      > It must be one place at least, so it only needs changing once, if there is no better way to
      > attach it to the account name so it changes dynamically? Want all we have
-     > agreed on finished tonight. […]
+     > agreed on finished. […]
 
      Behind `scripts/core-address.mjs`, which every script that names the core reads; the one `CORE` of
      `.github/workflows/core.yml`, which may not read it from the copy it checks; the words check banning the
@@ -649,5 +646,5 @@ What these are and how they are kept: `words/README.md`.
      minutes and skipping the review that starts by itself costs more. The owner agreed to all that was advised.
 
      Behind the opening of `floor/topics.md`, and "A security review that starts by itself is still waited for" in
-     `modules/reviews.md`. The owner with two accounts was filed as an idea.
+     `modules/reviews.md`. One more case was filed as an idea.
 

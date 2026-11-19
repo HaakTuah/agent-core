@@ -28,20 +28,19 @@ What these are and how they are kept: `words/README.md`.
      games now followed the releases, and that one step was left to the owner, cutting the first release, since the
      session could push no tag:
 
-     > I need you to do everything, I won't be tagging commits. Also, couldn't you try it on windows with a .net
-     > project? Is there anything else we should do? Are all rules grounded now, or is there anything more we can do?
+     > I need you to do everything, I won't be tagging commits. Also, couldn't you try it on […]? Is there anything else we should do? Are all rules grounded now, or is there anything more we can do?
      > […]
 
      Behind "The owner tags nothing by hand" in `AGENTS.md` and the workflow that cuts a release
-     (`.github/workflows/release.yml`); and behind the starter kit's trial on Windows with a .NET project and the
+     (`.github/workflows/release.yml`); and behind the starter kit's trial on another platform and kind of project and the
      further checks for rules only discipline held, each in a PR of its own.
 
 197. **13 November 2026** (the core, the same chat as item 195). Told that the session's own limits had refused it the
      start of the release workflow, as they had the push of a tag, so that the first release waited for the owner;
-     that GitHub writes the name on the owner's profile into every merge it makes, which only an empty name on the
-     profile ends; that the starter kit now set up Dependabot for a .NET project's packages while the core still had
+     that GitHub writes the name on an account's profile into every merge it makes, which only an empty name on the
+     profile ends; that the starter kit now set up Dependabot for another installer's packages while the core still had
      no licence check for them, the owner having said the same day that a project should prove one first (core issue
-     143); and that floor rule 10's list for what ships left out licences a .NET project meets, Microsoft's public
+     143); and that floor rule 10's list for what ships left out licences such packages meet, Microsoft's public
      licence, PostgreSQL's, Boost's and Unicode's among them, which could be added, while the licences that carry
      conditions someone should read (LGPL, MPL, Microsoft's own terms, a paid component) stayed with the owner's yes
      each time:
@@ -49,11 +48,11 @@ What these are and how they are kept: `words/README.md`.
      > Is there good reason we shouldn't do this in agent-core?
 
      Told there was none that held: the check could be proven on real packages on GitHub's own machines, and "a
-     project first" would spend another owner's usage on shared tooling.
+     project first" would make one project carry the cost of shared tooling.
 
      The owner agreed to add all of them (the licences).
 
-     > What steps do I need to do, I don't find them on agent-core github? My name will remain on my profile.
+     > What steps do I need to do, I don't find them on agent-core github? […]
 
      Behind the six licences added to floor rule 10's list; the NuGet check built in the core, not in a project
      first; floor rule 11's exception for the name and address GitHub writes into a merge; and "the owner, or a
@@ -99,7 +98,7 @@ What these are and how they are kept: `words/README.md`.
      alarm of unpushed commits, the owner had said that Sonnet, at high, had "stopped fully up at least twice for the
      couple of days we have given it this position". Then:
 
-     > Agreed! But would a script spam whenever I run out of usage, or tell my orchestrators to stop up to save usage?
+     > Agreed! But would a script spam […], or tell my orchestrators to stop up to save usage?
      > What should our recommendation be? Opus on high? Or should we keep sonnet on high/extra, with the script to keep
      > it in line?
 
@@ -125,9 +124,8 @@ What these are and how they are kept: `words/README.md`.
      On section 2, that the personal-terms check reads every commit, the owner asking whether a private repository pays
      for it:
 
-     > Agreed, if the test is quick. Don't want to add too much overhead. […] private repo, so […] spends action points
-     > on such checks, no? If so, make it an opt-in, so […] doesn't go broke over it, when [the] repo is private
-     > anyways.
+     The owner's reason: the check must add little overhead, and must use no billed minutes where a repository is
+     private.
 
      Answered that the scan adds seconds inside the job that already runs and no billed minute, so it is on for every
      project; and on failing where the secret `PERSONAL_TERMS` is missing:
@@ -138,10 +136,10 @@ What these are and how they are kept: `words/README.md`.
      copy compared by git's object ids; tests for the sync scripts; the workflows' shell in tested scripts),
      the owner agreed to each.
 
-     On sections 8, 9, 10, 11 and 12 (the core's own repository; reading and size; .NET; games served by GitHub Pages;
+     On sections 8, 9, 10, 11 and 12 (the core's own repository; reading and size; another stack; games served by GitHub Pages;
      extra checks and a stop switch), the owner agreed to all in 'agent-core itself', to all in 'Reading and size', to
-     all in '.NET and […] project' with a condition, "but 'Branch protection and secret scanning for […] private repo' I
-     don't want this to stun lock […] work if this isn't set-up on […] end", to 'Games', and to all in 'Extra'.
+     all in the section on another stack with a condition, that branch protection and secret scanning must not lock a
+     project's work where they are not set up, to 'Games', and to all in 'Extra'.
 
      And, handing it over, on the two the brief had only explained (the security-review check warning where it cannot
      read Codex's summary; a project that follows the releases taking a commit that is no release only through a
@@ -170,7 +168,7 @@ What these are and how they are kept: `words/README.md`.
      public"). Asked how the check should treat a listed name that a machine's git writes into each commit, the owner
      first asked:
 
-     > But my account has my name, will this block me too now?
+     > But my account has […], will this block me too now?
 
      Told that the agents commit as Claude or under the login, and that GitHub's own merges are excepted, but that an
      edit or a suggestion committed on github.com carries the profile's name and is not, and that this would be
@@ -182,14 +180,14 @@ What these are and how they are kept: `words/README.md`.
      left out by its date; `AGENTS.md`'s "Nothing locks another owner's project", its one exception that mend; a sync
      note, and `README.md`, "Setting up (the owner's part)", on git's own name on each machine; in
      `.github/workflows/core.yml`, the reports left out by the pin's tree's own entry; in `scripts/upgrade-test.mjs`, a
-     start from each of the last two releases, its private project's commits made under a listed name and its sync
+     start from each of the last two releases, its projects' commits made under a listed name and its sync
      mended so; and in item 201, that description taken out, the one change to a dated record here, on the owner's
      word.
 
 203. **14 November 2026** (the core, the same chat as item 202). While the fixes of item 202 were under way, the owner
      asked:
 
-     > Why do we need secondary security reviews? Are we trying to waste usage?
+     > Why do we need secondary security reviews? […]
 
      Told that floor rule 3 asks a second security review of every change to what runs by itself or with credentials,
      that those reviews had caught real faults in the fixes, and that one cheaper option was to keep two only for
@@ -208,14 +206,12 @@ What these are and how they are kept: `words/README.md`.
      it runs neither by itself nor with credentials; `modules/reviews.md`, point 3, the "Security review:" comment
      giving what it printed and that word, which the code reviewer checks.
 
-204. **14 November 2026** (the core, in the design chat). Told, of a new game being designed that is only ever added
+204. **14 November 2026** (the core, in the design chat). Told, of a planned project that is only ever added
      to, that it could be played from its first stage on, unlike Amarna, which was built toward its finished form:
 
-     > Yes, unlike amarna, this is a game that you only add to. Amarna still doesn't feel like a game. Something I
+     > Yes, unlike amarna, this is […] that you only add to. Amarna still doesn't feel like a game. Something I
      > should get better at. Mvps and stages that feel playable. With amarna, I am trying to get to the end station,
-     > and that was a mistake. But I still want to see it through. This game is inherently limited by scope at the
-     > core, but can have lots of fun additions around. And is maybe the easiest game to actually get someone else to
-     > play with me and the models.
+     > and that was a mistake. But I still want to see it through. […]
 
      Asked whether the core should say that each stage of a build ends in a game someone can play from start to finish
      and enjoy, a feature that makes sense only once later ones exist waiting for them:
@@ -247,7 +243,7 @@ What these are and how they are kept: `words/README.md`.
      merged a pull request past a code review it had asked for that was still running:
 
      > Ideally it would block merging before reviews are finished. But then you would have to make sure it doesn't
-     > Bottleneck if a reviewer goes wrong or runs out of usage.
+     > Bottleneck if a reviewer goes wrong or […].
 
      Told that the security review already had such a check, `security-review`, advisory for its first week and with
      the fallback reviewer taking over a review not begun in about 5 minutes or finished in about 30, and that a code

@@ -2,11 +2,11 @@
 
 What these are and how they are kept: `words/README.md`.
 
-82. **11 October 2026** (Barkstreet Snakes, 11 October 2026, 21:21), on the computer players he wanted:
+82. **11 October 2026** (Barkstreet Snakes, 11 October 2026), on the computer players he wanted:
 
     > I want 3 enemy AI's in the game. They shouldn't have super human reaction speed, but they should be very clever.
 
-83. **14 October 2026** (Barkstreet Snakes, 14 October 2026, 00:50), on making them better:
+83. **14 October 2026** (Barkstreet Snakes, 14 October 2026), on making them better:
 
     > If we can upgrade the AI, through making it do better future step planning, not by increasing reaction time, or
     > making them all samey in strategy, nor decreasing performance below good gameplay levels, then I think we should
@@ -17,7 +17,7 @@ What these are and how they are kept: `words/README.md`.
 
     > Add that!
 
-85. **27 October 2026** (Barkstreet Snakes, 27 October 2026, 09:35 UTC), asked whether that game should also test
+85. **27 October 2026** (Barkstreet Snakes, 27 October 2026), asked whether that game should also test
     each new feature by playing computer players that use it against ones that ignore it, as Amarna Letters does:
 
     > If your opinion is that we should, then go ahead!
@@ -34,12 +34,12 @@ What these are and how they are kept: `words/README.md`.
     > You figure all this out. You know me by now. But models must be able to alter clauses also. Remember, everyone
     > plays the same game!
 
-88. **29 October 2026** (Barkstreet Snakes, 29 October 2026, 12:21 UTC), on the new moves:
+88. **29 October 2026** (Barkstreet Snakes, 29 October 2026), on the new moves:
 
     > And very important that the commin ai is updated to understand all these rule changes to maximize they use of
     > all the playrules!!!
 
-89. **31 October 2026** (Barkstreet Snakes, 31 October 2026, 19:13 to 19:15 UTC), on a use-against-ignore test of two
+89. **31 October 2026** (Barkstreet Snakes, 31 October 2026), on a use-against-ignore test of two
     new moves coming out even:
 
     > And I cannot believe that super flash and super jump isn't useful, then it must be the AI not properly being
@@ -65,7 +65,7 @@ What these are and how they are kept: `words/README.md`.
     questions (#14: one shared rule for "conditional goods" and "don't prohibit, give it its real cost"; #16: may an
     orchestrator run on his own computer), the owner agreed, and added:
 
-    > And a orchestrator may run on my computer, even though I prefer cloud and server. As for the 2 rules, they are not
+    > And a orchestrator may run on my computer, […]. As for the 2 rules, they are not
     > fully the same. One is about free game design, as in, don't disallow an action juat because it seems not sensible,
     > like marching through the mountains in the winter, because then you are inhibiting player agency, rather you
     > should reflect in game mechanics why this was a rarely done move. And then, you open up for that rare exception
@@ -76,7 +76,7 @@ What these are and how they are kept: `words/README.md`.
 
     > - Dont prohibit an action, reflect its real cost
 
-93. **31 October 2026** (Barkstreet Snakes, 31 October 2026, 20:04 UTC), of the design session's line "Sowell would
+93. **31 October 2026** (Barkstreet Snakes, 31 October 2026), of the design session's line "Sowell would
     approve: no solutions, only trade-offs.":
 
     > Maybe it include that one, so the builder understands xD
@@ -92,7 +92,7 @@ What these are and how they are kept: `words/README.md`.
     exception for sessions he starts there:
 
     > But nothing does start without me? Why do we have rules for scheduled or service calls, when this is project
-    > specs? They won't see that? Is this just jumbo you have decided to add without running it by me? Remember about
+    > specs? They won't see that? […] Remember about
     > keeping things lean and mean? No useless fat!
 
     Told that the ban rests on his words of 3 November (core archive 52), that agents have tools that can set up
@@ -157,7 +157,7 @@ What these are and how they are kept: `words/README.md`.
 105. **10 November 2026** (the core), asked whether four more principles of his games hold for every game he makes:
      Amarna Letters' "Different data, same rules" (its design pillars, decided 19 October 2026), "The order of
      resolution never decides" (decided 28 October 2026) and "Code decides facts; language models phrase them" (design
-     pillar 6), and Barkstreet Snakes' "Everything new belongs", from his words of 13 October 2026, 23:11 UTC:
+     pillar 6), and Barkstreet Snakes' "Everything new belongs", from his words of 13 October 2026:
 
      > Very important everything feels balanced, cohesive, purposeful and like it belongs!
 
@@ -165,7 +165,7 @@ What these are and how they are kept: `words/README.md`.
 
      > Do we run a new session on this?
 
-106. **13 October 2026** (Barkstreet Snakes, 13 October 2026, 23:11), in the message that core archive 105 quotes for
+106. **13 October 2026** (Barkstreet Snakes, 13 October 2026), in the message that core archive 105 quotes for
      "Everything new belongs":
 
      > Very important that all the new stuff works across online play!
@@ -181,7 +181,7 @@ What these are and how they are kept: `words/README.md`.
      > - **Difficulty curve.** Speed should increase gently, never feeling unfair. Tune it by playing; don't just pick
      >   numbers.
 
-109. **30 October 2026** (Amarna Letters, item 70; Barkstreet Snakes, 30 October 2026, 07:15 to 07:16 UTC), on new
+109. **30 October 2026** (Amarna Letters, item 70; Barkstreet Snakes, 30 October 2026), on new
      versions, for both games:
 
      > No, i havent. I just figured it should've updated itself, and not have to ask me.
@@ -195,7 +195,7 @@ What these are and how they are kept: `words/README.md`.
 
      > (…) There must be levers for him to pull, or it is just rng.
 
-111. **31 October 2026** (Barkstreet Snakes, 31 October 2026, 19:55 to 20:02 UTC), on the woodpecker's endgame:
+111. **31 October 2026** (Barkstreet Snakes, 31 October 2026), on the woodpecker's endgame:
 
      > (…) and i also think when there is just a little bit of space, it should slow down again, so it isn't and rng
      > competition where it is who's island it pecks at next that decides it, capiche? Whats your take?
@@ -249,32 +249,30 @@ What these are and how they are kept: `words/README.md`.
      and a version that changes play waits until the game in play ends or the game is next opened) and "Yes to #41?"
      (two workflow comments), the owner agreed to both.
 
-118. **10 November 2026** (the core). Told that Codex's cloud tasks cannot push, that a machine of his own could run
-     Claude Code and Codex side by side, what the rules would need for it, and that the tool he named for it is under a
-     copyleft licence:
+118. **10 November 2026** (the core). Told that Codex's cloud tasks cannot push, that the rules would need changes
+     for running Claude Code and Codex side by side, and that a tool for it is under a copyleft licence:
 
      > Yes, we must fully accommodate this in the rules. It is the end-goal. Also:
 
      > "Its licence is AGPL. That's a copyleft licence: anyone who distributes the software, or offers it to others as
-     > a service over a network, must share their source. Using it as your own tool on your own server should be fine,
+     > a service over a network, must share their source. Using it as your own tool […] should be fine,
      > since it never goes into the games' code. But your rule says every package must allow free use without
      > restrictions, so it's your call whether a tool counts or only what ships in the games."
 
      > It only matters if it matters, otherwise, it doesn't matter. And you know which. Now, carry out my will!
 
-119. **10 November 2026** (the core), on the first draft of those rules, which named the machine's tool and its setup:
+119. **10 November 2026** (the core), on the first draft of those rules:
 
      > Does it help to let the models know where they run, and is it wise to show it off in a public repo? Answer, don't
      > act before you have told me.
 
      To the design session's answer (a short, general floor rule; the machine telling its own agents where they run, in
-     a file of its own outside every repository; his setup checklist kept out of the repository), the owner agreed.
+     a file of its own outside every repository), the owner agreed.
 
-120. **10 November 2026** (the core), on the setup checklist and the agents' instructions, sent to him privately and
-     kept out of the repository:
+120. **10 November 2026** (the core), on a set-up guide and the agents' instructions for it:
 
      > Ehh. WIll disappear. Is it important? Is it sensitive? Should it just be in the repo and only read by agents on
-     > set-up of server?
+     > set-up of […]?
 
      To the design session's answer (nothing in it is secret, every defence in it holds when known, and it is the one
      place that says how; a guide in the core that only the setup reads, and floor rule 18 keeping out of repositories
@@ -292,19 +290,12 @@ What these are and how they are kept: `words/README.md`.
 
      > Renamed the repo to [agent-core](https://github.com/HaakTuah/agent-core).
 
-122. **10 November 2026** (the core), on Codex building. Told that Codex's cloud tasks cannot push, that a capped OpenAI
-     API key in a cloud environment would let Claude call Codex there, and that it is no less safe than the same key
-     on a machine of his:
+122. **10 November 2026** (the core), on Codex building. Told that Codex's cloud tasks cannot push, that a capped API key in a
+     cloud environment would let Claude call Codex there, and that a sign-in is kept where no agent that reads
+     outsiders' text can read it, and that a cloud session's machine is reclaimed too often to keep a sign-in it was
+     given, the owner agreed that nothing changes for now.
 
-     > But how is it any safer then to have it run locally on my computer or server like this?
-
-     > I don't pay API prices, that's pissing money out the window. I want to use my subsidized subscription.
-
-     Told that his ChatGPT login opens his account, so it is kept where no agent that reads outsiders' text can read
-     it, and that a cloud session's machine is reclaimed too often to keep a login it was given:
-
-     > So nothing needs changing then for now? Codex stays the reviewer, just until I either do the server setup or
-     > decide for a good local setup? Anything we must update? check.
+     The owner's reason: Codex stays the reviewer until a safe way to run it as a builder is set up.
 
 123. **10 November 2026** (the core), on the stand-in's sources:
 

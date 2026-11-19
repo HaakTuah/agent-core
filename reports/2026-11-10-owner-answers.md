@@ -2,7 +2,7 @@
 
 His words: core archive 91 (and 92, 93, his earlier words behind the two new design principles).
 
-- **An orchestrator may run on his own computer** (#16), though he prefers the cloud or a server. Floor rule 8 still
+- **An orchestrator may run on his own computer** (#16). Floor rule 8 still
   lets nothing on his machine run or start an agent by itself (no poller, hook or schedule); the one exception is an
   orchestrator session he starts there himself, which keeps every floor rule, works in a folder of its own, away from
   his other files, and holds no key beyond its own sign-in. The design session added the folder and key limits, as the
