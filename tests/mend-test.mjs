@@ -47,6 +47,7 @@ const CHECKS = {
   "scripts/security-review.mjs": "tests/security-review-test.mjs",
   "scripts/code-review-wait.mjs": "tests/code-review-wait-test.mjs",
   "scripts/size.mjs": "tests/size-test.mjs",
+  "scripts/queue.mjs": "tests/queue-test.mjs",
   "scripts/general.mjs": "tests/general-test.mjs",
   "scripts/own-modules.mjs": "tests/own-modules-test.mjs",
   "scripts/manifest-reads.mjs": "tests/manifest-reads-test.mjs",

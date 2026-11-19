@@ -72,8 +72,11 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   joins only where that PR relays the owner's yes to its issue, as the chat session records it ("Whose words an issue
   holds"): that PR is the gate, so no verdict of the stand-in's queues one here, a difference from `roles/shared/inbox.md`.
   A test, a check for a rule that already stands, a task the scheduled look opens (#248) and a small finding of an
-  audit (#259) join without the owner's word. A bug waits for no line, as that module says. A line leaves in the PR
-  that closes its issue.
+  audit (#259) join without the owner's word. A bug waits for no line, as that module says. A line does not leave in
+  the PR that closes its issue: the readers of the file skip the line of a closed issue, and the next PR that changes
+  the file takes such lines out together (`node scripts/queue.mjs --clear`; #750, point 1), as that module says, since
+  PRs merging side by side collided on it. Held here by `own-description.yml`, which fails a ready PR that changes the
+  file and leaves one.
 - **Queued means wanted: nothing queued waits for a second word.** Where the floor asks the owner's
   yes in a PR (floor rule 3: a change to the floor or the review guidelines), the yes the owner gave when its issue was
   queued is that yes: the builder relays it into the PR word for word as it was recorded (floor rule 3), and it covers
