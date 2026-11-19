@@ -1,7 +1,6 @@
 # The orchestrator
 
-Read at its start by the role `orchestrator`: the session started on the owner's word to hand out lines and start
-builder sessions.
+Read at its start by the role `orchestrator`: a session started on the owner's word.
 
 **Reads at its start:** `tasks/roles.md`, `tasks/helpers.md`, `roles/shared/inbox.md`, `roles/shared/how-to-work.md`,
 `roles/shared/work-flow.md`.
@@ -22,7 +21,7 @@ messages the adviser only for a yes of the owner's (floor rule 14), its mileston
 report privately (floor rule 9), one not urgent sent to wait for a turn's end. Reason: each message wakes the adviser
 for a turn and fills its context. Held by nothing yet.
 
-**The builders**: the orchestrator picks a builder for a line in this order:
+**The builders**: it picks a builder for a line in this order:
 1. by what the line needs: the *hard work* to the tool the project prefers for it (by default Claude), routine work to
    the cheapest tool that can do it;
 2. not the orchestrator's provider, while another has allowance left;
