@@ -10,6 +10,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
 | #810 | rule builder; it changes `tests.yml` and `tasks/tests.md` | |
+| #812 | builder; on Sonnet (#767); `tests.yml` timing | #715 |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
 | #704 | builder; `tests.yml` | #715 |
 | #770 | builder; `tests.yml` | #704 |
@@ -74,6 +75,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #701 | builder | |
 | #716 | builder | |
 | #739 | rule builder; it changes the game module (`tasks/game-design.md`) | |
+| #786 | rule builder; it changes the floor (the threat model) | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
@@ -84,7 +86,8 @@ They read and change no rule.
 | --- | --- | --- |
 | #550 | builder; a case a PR | |
 | #765 | builder | |
-| #552 | builder | #793 |
+| #809 | builder | |
+| #552 | builder | |
 | #553 | builder | #552 |
 | #554 | builder | #553 |
 | #555 | builder | #534's tools, and #554 |
