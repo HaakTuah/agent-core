@@ -169,6 +169,8 @@ ok([...[0, 1, 2].map(i => `"tasks/x.md: Its own item", item ${i} `), "core archi
   ok(holders(dir, []).wrong.length === 4, "and they fail the check once each", holders(dir, []).wrong.join("\n"));
   const twin = holders(project({}, { "tasks/z.md": "# Z\n\nRead when needed.\n\n**A rule.** a.\n\n**A rule!** b.\n" }), []).wrong;
   ok(twin.some(w => /would be the entry of "tasks\/z\.md: A rule" and "tasks\/z\.md: A rule!"\. Mend: reword the lead/.test(w)), "two rules whose entries would share a file fail, saying the mend", twin.join("\n"));
+  const twinOwn = holders(project({}, { "AGENTS.md": "# A core\n\n**An own rule.** a.\n\n**An own rule!** b.\n" }), []).wrong;
+  ok(twinOwn.some(w => /would be the entry of "AGENTS\.md: An own rule" and "AGENTS\.md: An own rule!"\. Mend: /.test(w)), "and so do two rules of the core's own AGENTS.md", twinOwn.join("\n"));
   const all = rules(root, { agents: true }), seen = new Map();
   for (const r of all) seen.set(entryFile(r.key), [...(seen.get(entryFile(r.key)) ?? []), r.key]);
   ok([...seen.values()].every(k => k.length === 1), "no two rules of the core share the file name their entry would stand in", [...seen.values()].filter(k => k.length > 1).join("\n"));
