@@ -17,6 +17,8 @@
 //                            opens with "Other findings: M." or "No other finding." ("No finding." too), with or
 //                            without ** round it; a comment without the line, or whose lines disagree, is not read for
 //                            it, and is never counted as none. A "Security review: none needed" is a note, not a review.
+//                            A posted code review is counted again by its stance, from a line "Stance: adversarial." or
+//                            "Stance: regular." (stanceOf, below; #397), and one with neither in neither row.
 // A review that was not read is said so ("not read"); it is never added as a zero. It also lists the pull requests whose
 // second security review blocked where Codex's own found no blocking point, and counts the bugs that reached `main`
 // all the same: a bug counts against a pull request only where the owner's account filed it, and a line "Brought in by:
@@ -46,6 +48,7 @@ const BADGE = /!\[(P[0-3]) Badge\]/u;
 
 export const REVIEWS = [
   ["codexCode", "Codex's code review"], ["postedCode", "Code review posted (the next reviewer's or the fallback's)"],
+  ["postedAdversarial", "of those, its stance adversarial"], ["postedRegular", "of those, its stance regular"],
   ["codexSecurity", "Codex's security review"], ["postedSecurity", "Security review posted (the second)"],
   ["postedDesign", "Design check posted"],
 ];
@@ -84,6 +87,14 @@ function declared(body, count, none) {
 export const blockingOf = body => declared(body, /^Blocking findings: (\d{1,6})\.(?:\s|$)/u, /^(?:No blocking findings?|No findings?|Nothing blocks|Blocking: none)\.(?:\s|$)/iu);
 export const otherOf = body => declared(body, /^Other findings: (\d{1,6})\.(?:\s|$)/u, /^(?:No other findings?|No findings?)\.(?:\s|$)/iu);
 
+// The stance a posted code review declares on a line of its own (tasks/reviews.md, "A review's stance follows the kind
+// of change"; #397): "adversarial", "regular", or null where no line says one or two lines disagree.
+export function stanceOf(body) {
+  const said = new Set();
+  for (const raw of lines(seen(body))) { const m = /^Stance: (adversarial|regular)\.(?:\s|$)/iu.exec(raw.replaceAll("**", "").trim()); if (m) said.add(m[1].toLowerCase()); }
+  return said.size === 1 ? [...said][0] : null;
+}
+
 // One inline comment as a find of Codex's: { review: "code" | "security", badge, blocking }, or null where it is not
 // one of Codex's, replies to another comment, or has no priority badge.
 export function codexFind(comment) {
@@ -93,7 +104,7 @@ export function codexFind(comment) {
   return { review: FINDING.test(comment.body) ? "security" : "code", badge, blocking: badge === "P0" || badge === "P1" };
 }
 
-// What the five reviews did on one pull request, from its comments (issue comments and inline ones, as GitHub's API
+// What the five reviews, and the posted code review by stance, did on one pull request, from its comments (issue comments and inline ones, as GitHub's API
 // gives them): each of REVIEWS' keys gives { got, blocked: null | "yes" | "no" | "unread", points, other, otherUnread },
 // otherUnread true where a posted review that ran declares no count of its other points (Codex's are read by badge).
 export function perPull(issueComments, inline, owner) {
@@ -108,13 +119,13 @@ export function perPull(issueComments, inline, owner) {
     const unread = state.unread === true || said?.has_any_findings === true && mine.length === 0;
     return { got, blocked: !got ? null : points ? "yes" : unread ? "unread" : "no", points, other: mine.length - points, otherUnread: false };
   };
-  const posted = kind => {
-    const mine = issueComments.filter(c => String(c.user?.login ?? "").toLowerCase() === owner.toLowerCase() && postedKind(c.body) === kind);
+  const posted = (kind, stance) => {
+    const mine = issueComments.filter(c => String(c.user?.login ?? "").toLowerCase() === owner.toLowerCase() && postedKind(c.body) === kind && (!stance || stanceOf(c.body) === stance));
     const reads = mine.map(c => blockingOf(c.body)), others = mine.map(c => otherOf(c.body));
     return { got: mine.length > 0, blocked: !mine.length ? null : reads.some(n => n > 0) ? "yes" : reads.every(n => n === 0) ? "no" : "unread",
       points: reads.reduce((s, n) => s + (n ?? 0), 0), other: others.reduce((s, n) => s + (n ?? 0), 0), otherUnread: others.some(n => n === null) };
   };
-  return { codexCode: codex("code"), postedCode: posted("code"), codexSecurity: codex("security"), postedSecurity: posted("security"), postedDesign: posted("design") };
+  return { codexCode: codex("code"), postedCode: posted("code"), postedAdversarial: posted("code", "adversarial"), postedRegular: posted("code", "regular"), codexSecurity: codex("security"), postedSecurity: posted("security"), postedDesign: posted("design") };
 }
 
 // What a pull request's reviews were asked or posted on, for its rounds (review-rounds.mjs): { sha, at, blocking }, sha
