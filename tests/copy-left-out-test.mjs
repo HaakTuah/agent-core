@@ -73,6 +73,8 @@ const NOT_CHECKS = {
   "nuget-look.sh": "the NuGet check's first look, a part of the row nuget.mjs, which leaves the copy out as that row does",
   "nuget-fetch.mjs": "the NuGet check's fetch, a part of the row nuget.mjs, from the lock files that row reads",
   "clean-merges.mjs": "it reads the pull request's merge commits, never a file of the tree",
+  "queue-only.yml": "it runs queue-only.mjs, which fails no pull request: one it does not prove is reviewed as any other",
+  "queue-only.mjs": "it reads the pull request's patch, its issues and the default branch's progress file, never the copy, and fails no pull request: one it does not prove is reviewed as any other",
   "core-moved.mjs": "it runs on the daily schedule (look.yml) and fails no pull request",
   "look.mjs": "it runs on the daily schedule (look.yml) and fails no pull request",
   "issue-terms.mjs": "it runs on the daily schedule (look.yml), reads issues and comments, never a file of the tree, and fails no pull request",
