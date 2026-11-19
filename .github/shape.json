@@ -13,6 +13,7 @@
   "suites": {
     "suites-kit-core-licences": { "linux": 240 },
     "suites": { "linux": 240 },
+    "suites-rest-steps": { "linux": 240 },
     "suites-projects": { "win32": 600 },
     "suites-sync": { "win32": 300 },
     "suites-kit": { "win32": 600 },
@@ -20,6 +21,7 @@
     "suites-core-places": { "win32": 450 },
     "suites-licences": { "win32": 450 },
     "suites-rest": { "win32": 480 },
+    "suites-tools": { "win32": 450 },
     "upgrade": { "linux": 240, "win32": 700 },
     "staged": { "linux": 240, "win32": 900 }
   }

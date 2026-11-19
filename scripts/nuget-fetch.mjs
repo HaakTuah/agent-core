@@ -26,7 +26,7 @@ import { join, posix } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { baseOf, configAt, loadConfig, textAt } from "./licences.mjs";
-import { NOT_A_FILE, REGISTRY, heldBefore, lockPackages, nugetConfig, readProject, sourcesOf, twoHashes, unmarked } from "./nuget.mjs";
+import { NOT_A_FILE, NOT_A_FILE_IS, REGISTRY, heldBefore, lockPackages, nugetConfig, readProject, sourcesOf, twoHashes, unmarked } from "./nuget.mjs";
 import { started } from "./started.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
 
@@ -235,7 +235,7 @@ function reader(root, failures) {
   return (f) => {
     if (!texts.has(f)) {
       const bytes = readProject(root, f);
-      if (bytes === NOT_A_FILE) failures.push(`${f} is no file of bytes (a link to a device, a folder or a pipe), and this check reads none. Mend: make it a file`);
+      if (bytes === NOT_A_FILE) failures.push(`${f} is ${NOT_A_FILE_IS}, and this check reads none. Mend: make it a file of the project's own`);
       texts.set(f, bytes === NOT_A_FILE ? null : bytes?.toString("utf8") ?? "");
     }
     return texts.get(f);

@@ -10,18 +10,18 @@ it merges last.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue | |
-| #529, step 4 | builder | #528 |
-| #530, step 5 | builder; licence readers after #585 and #586 | #529 |
+| #715 | rule builder; `tests.yml` steps one by one, 2 security reviews | |
+| #733 | rule builder; it changes the floor (rule 12), with the owner's yes on the issue; two security reviews | |
+| #530, step 5 | builder; licence readers | |
 | #593, points 1 to 3 | rule builder | |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | |
-| #593, points 8 and 9 | rule builder | #577 and #476 |
+| #593, points 8 and 9 | rule builder | #577 |
 | #625 | builder | #624 |
 | #626 | builder | #624 |
 | #627 | builder | #624 |
 | #628 | builder | #577 |
 | #629 | builder | #624 and #577 |
-| #593, points 6, 10 and 11 | rule builder | #593's points 1 to 3 |
+| #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #579 | builder | |
 | #580 | builder | |
 | #581 | rule builder; it changes `AGENTS.md`'s *mutation tool* | |
@@ -31,9 +31,6 @@ it merges last.
 | #589 | builder | |
 | #590 | builder | #580 |
 | #591 | builder | #589 |
-| #585 | builder | |
-| #586 | builder | |
-| #546 | rule builder; two security reviews | |
 | #587 | rule builder; it may change the floor's topics and what every role reads at its start | #530 |
 | #306 | rule builder | |
 | #307 | rule builder | |
@@ -44,7 +41,7 @@ it merges last.
 | #325 | rule builder | |
 | #314 | rule builder | |
 | #456 | rule builder; it changes the floor (rules 5 and 10) | |
-| #457 | rule builder; point 1's reading of tests for a clock or process waits on #529 | |
+| #457 | rule builder | |
 | #458 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose rule list it reads |
@@ -55,17 +52,15 @@ it merges last.
 | #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged; the file stays whole where #469's measure finds no kind of task reads less | #469 |
 | #471 | rule builder; it changes what the orchestrator reads at its start | |
 | #355 | builder | #530: the readers left go on the parser #529 brings |
-| #391 | builder; it overlaps #355 | #530, as #355 |
 | #542 | rule builder; it changes what the orchestrator reads at its start | #457 |
 | #337 | builder | |
-| #426 | builder; a .NET reader it files waits on #529 | |
+| #426 | builder | |
 | #404 | builder | |
-| #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467 and #407 |
+| #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467 |
 | #492 | rule builder; it changes floor rule 4, with the owner's yes on the issue, who may start the orchestrator, and what every role reads at its start | #397 and #467 |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 1 | rule builder | |
 | #486, point 5 | builder | the types record reopening |
-| #460, point 1 | builder | |
 | #460, point 2 (the author's address) | builder | |
 | #460, point 3 (a copy in a test) | builder | |
 | #460, point 4 (names in descriptions) | builder | |
@@ -75,9 +70,15 @@ it merges last.
 | #502, case 2 | rule builder; it changes what every role reads at its start | |
 | #593, points 4 and 12 | rule builder; it changes what a builder reads at its start | |
 | #594 | rule builder; it changes the README | |
-| #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
+| #650 | rule builder | |
+| #661 | builder | |
+| #662 | rule builder | |
+| #679 to #682 | rule builder; one PR each | #467 |
+| #707 | rule builder | |
+| #701 | builder | |
+| #716 | builder | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
@@ -86,8 +87,7 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #548 | builder | |
-| #549 | builder; a workflow, two security reviews | #548 |
+| #549 | builder; a workflow, two security reviews | |
 | #550 | builder; a case a PR | |
 | #551 | builder | #549 |
 | #552 | builder | #551 |
