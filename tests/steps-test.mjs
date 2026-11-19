@@ -69,7 +69,12 @@ ok(printed === notesWhole(root), "node core/scripts/sync-notes.mjs, run from ano
 const ways = STEPS.filter(s => [s.check, s.held, s.unread].filter(Boolean).length !== 1 || !Object.values(COST).includes(s.cost));
 ok(!ways.length, "each step is told done one way (a check, a check of the project's that holds it, or why none reads it) and says what it costs", ways.map(s => s.lead).join("\n"));
 const unstaged = STEPS.filter(s => s.check && !STAGES[s.lead]).map(s => s.lead);
-ok(!unstaged.length && Object.keys(STAGES).every(l => STEPS.some(s => s.lead === l && s.check)), "each step with a check has a stage and a mend in steps-stage.mjs, so the tests can take it out and put it back", unstaged.join("\n"));
+ok(!unstaged.length, "each step with a check has a stage and a mend, in a file of scripts/stages/ of its step's name, so the tests can take it out and put it back", unstaged.join("\n"));
+// (a stage whose file has no step of the same name that holds a check is read by nothing)
+const stageFiles = fs.readdirSync(path.join(root, "scripts", "stages")).sort();
+const withCheck = stepFiles.filter(f => f.endsWith(".mjs")).sort().filter((f, i) => STEPS[i].check);
+const stray = stageFiles.filter(f => !f.endsWith(".mjs") || !withCheck.includes(f));
+ok(!stray.length && stageFiles.length === Object.keys(STAGES).length, "each file of scripts/stages/ is the stage of the step of the same name in scripts/steps/, a step with a check", stray.join(", "));
 
 // ---- a project the starter kit writes: every step done, no difference from a fresh start ----
 function kit(name, o, { held = true } = {}) {
@@ -229,7 +234,7 @@ const lockProject = dirs["an-npm-project"];
 const some = STEPS.filter(s => s.check).filter((_, i) => i % 2 === 0).map(s => s.lead);
 for (const lead of some) STAGES[lead].stage(lockProject);
 ok(JSON.stringify(notDone(lockProject).map(m => m.lead)) === JSON.stringify(some), "several taken out at once are reported, exactly those", report(notDone(lockProject)));
-// (in the order steps-stage.mjs lists them, the one whose mend lists what the others write last)
+// (in the order steps-stage.mjs loads them: the steps', and `last` where a stage's mend reads what the others' mends write)
 for (const lead of Object.keys(STAGES).filter(l => some.includes(l))) STAGES[lead].mend(lockProject);
 ok(!notDone(lockProject).length, "and their mends make every one done");
 for (const lead of some) STAGES[lead].after?.(lockProject);
