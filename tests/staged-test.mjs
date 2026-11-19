@@ -146,8 +146,12 @@ describe("The owner decided, as “skip them WITHOUT a word, no warning: the lis
 ok(relayed().pass, "relay: the quote read with curly quotes, spacing and case set aside", said.why);
 describe("The owner wants arguments that are no number skipped silently, since pasted lists have a header row.");
 ok(relayed().pass, "relay: the decision and its reason in the session's own words pass (#773)", said.why);
+describe("Pasted lists begin with column labels, and warnings for those labels would obscure the sum, so the owner wants them skipped.");
+ok(relayed().pass, "relay: the reason in other words, with no word of the quote's, passes", said.why);
 describe("The owner wants arguments that are no number skipped silently.");
 ok(/gives the owner's reason/.test(relayed().why), "relay: the decision without its reason fails, saying so", said.why);
+describe("Fixed the sum and updated the file header.");
+ok(/gives the owner's reason/.test(relayed().why), "relay: a mention of a file's header is no reason, and fails", said.why);
 describe("> Skip them without a word, no warning: the lists people paste hold a header row, and a warnign on the header would bury the sum.");
 ok(/"warnign" left misspelled/.test(relayed().why) && !/bare yes/.test(said.why), "relay: the owner's words quoted uncorrected fail, saying so", said.why);
 describe("> Yes. Skip them without a word, no warning: the lists people paste hold a header row, and a warning on the header would bury the sum.");
