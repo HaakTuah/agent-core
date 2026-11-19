@@ -468,11 +468,11 @@ if (process.platform !== "win32") { // (a link is made without a privilege only 
 r = run(["checks/shape.json", "--suite", "quick", "--", process.execPath, "-e", "console.log('ran')"]);
 ok(r.status === 0 && /ran/.test(r.out) && /the suite quick took \d+ s, within its mark of 30/.test(r.out), "a suite within its mark passes, its own output shown", r.out);
 r = run(["checks/shape.json", "--suite", "slow", "--", process.execPath, "-e", "0"]);
-ok(r.status === 1 && mended(r.out) && /past its mark of 0\.001/.test(r.out), "a suite past its mark, on this platform, fails with its mend", r.out);
+ok(r.status === 0 && /^::warning::the suite slow took \d+ s, past its mark of 0\.001, which fails nothing\. Mend: /m.test(r.out) && !/FAIL/.test(r.out), "a suite past its mark, on this platform, is said as a warning with its mend and fails nothing (#733, point 5)", r.out);
 r = run(["checks/shape.json", "--suite", "quick", "--", process.execPath, "-e", "process.exit(7)"]);
 ok(r.status === 7 && !/FAIL/.test(r.out), "a suite that fails keeps its own status, and the check adds nothing", r.out);
 r = run(["checks/shape.json", "--suite", "quick", "--since", String(Math.floor(Date.now() / 1000) - 100)]);
-ok(r.status === 1 && mended(r.out) && /took 10\d s/.test(r.out), "a time taken since a start the workflow gave is held to the mark too", r.out);
+ok(r.status === 0 && /^::warning::the suite quick took 10\d s, past its mark/m.test(r.out), "a time taken since a start the workflow gave is measured against the mark too", r.out);
 ok([["--suite", "unnamed", "--", "x"], ["--suite", "quick"], ["--suite", "quick", "--since", "soon"], ["--suite", "quick", "--", "no-such-command-here"]].every(a => { const x = run(["checks/shape.json", ...a]); return x.status === 1 && mended(x.out); }),
   "a suite with no mark, no command, no start or a command that cannot be started is refused, with its mend");
 

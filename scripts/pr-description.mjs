@@ -33,7 +33,9 @@
 // be told from one forgotten ("An exemption leaves a mark" in roles/shared/work-flow.md; #302). And where the part
 // "What holds it" is asked and holds more than "None", of a pull request opened since the copy on its base held
 // NUMBER_SINCE, a line under it that names a rule's number in its form ("Number: findings; outcome: robust";
-// outcomes.mjs's NUMBER; #303).
+// outcomes.mjs's NUMBER; #303). And, since YES_SINCE, the owner's yes where the core's floor or review guidelines change
+// (owner-yes.mjs, beside this file; #549). A line asked for passes where it begins in its form, whatever
+// follows it (#750, point 4).
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
 //
@@ -43,13 +45,18 @@ import { spawnSync } from "node:child_process";
 import { doneMends, ownerAt, queueAt, readItem, takesIt } from "./done-when.mjs";
 import { isPart, milestoneMends } from "./milestones.mjs";
 import { NUMBER } from "./outcomes.mjs";
+import { asking, coreAtBase, issuesOf, textsOf, yesOf } from "./owner-yes.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, pathIn, taken, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
 
 // The line a description ends with, saying what the pull request waits on: nothing (its builder goes on), a review, its
-// checks, another item ("#241"), or the owner, with the question in one sentence after a colon.
+// checks, another item ("#241"), or the owner, with the question in one sentence after a colon. A line that begins with
+// a form, in any case, is in it, whatever follows ("#724, then the orchestrator's word"): the check fails what is
+// missing, never phrasing (#750, point 4).
 export const WAITS = "Waits on:";
-const FORMS = [["nothing", /^nothing$/], ["a review", /^a review$/], ["checks", /^checks$/], ["item", /^#[1-9]\d{0,8}$/], ["the owner", /^the owner: \S.*\?$/]];
+const FORMS = [["nothing", /^nothing(?![\w-])/iu], ["a review", /^a review(?![\w-])/iu], ["checks", /^checks(?![\w-])/iu], ["item", /^#[1-9]\d{0,8}(?![\w-])/u], ["the owner", /^the owner: \S[^?]*\?/iu]];
+// a rule's number in its form at the start of a line, whatever follows it, in any case (#750, point 4)
+const NUMBER_FIRST = new RegExp(NUMBER.source.replace(/\$$/u, "(?![\\w-])"), "iu");
 export const WAITS_SINCE = "2026-11-16T00:00:00Z";
 // The day from which the line "Read for it:" is asked, of a pull request opened since the copy on its base held this.
 export const READS_SINCE = "2026-11-16T00:00:00Z";
@@ -63,6 +70,9 @@ export const NO_COST = "No cost line: the script printed none.";
 // rule says what holds it"; #303), as the lines above are.
 export const NUMBER_SINCE = "2026-11-17T00:00:00Z";
 export const HOLDS = "What holds it";
+// The day from which the owner's yes is asked of a pull request that changes the floor or the review guidelines
+// (owner-yes.mjs, beside this file; #549), as the lines above are.
+export const YES_SINCE = "2026-11-18T00:00:00Z";
 
 // The mend where the part HOLDS holds more than "None" and no line "Number: <the count>; outcome: <the outcome>" in
 // NUMBER's form; null where it does, or where the part is not there (missing() names that).
@@ -74,7 +84,7 @@ export function numberMend(body) {
   const part = lines.slice(at + 1, end < 0 ? undefined : end).map(l => l.trim()).filter(Boolean);
   if (part.every(l => /^None\b/u.test(l))) return null;
   const named = part.map(l => /(?:^|[\s*-])Number: (.*[^.\s])[.\s]*$/u.exec(l)?.[1]).filter(Boolean);
-  if (named.some(n => NUMBER.test(n))) return null;
+  if (named.some(n => NUMBER_FIRST.test(n))) return null;
   return `the part "${HOLDS}" names no rule's number${named.length ? ` in its form (it reads "${named[0]}")` : ""}. Mend: under it, for each rule this pull request adds or widens, add a line "Number: <findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for, with "; rare harm" at its end where the rule guards against rare and severe harm, as scripts/holders.json keeps it under "numbers"; or write "None" alone under the heading where it adds no rule`;
 }
 
@@ -212,6 +222,17 @@ if (started(import.meta.url)) {
     // (asked only where the part is, which is where the rules change)
     if (parts.includes(HOLDS) && created >= NUMBER_SINCE && then?.includes("export const NUMBER_SINCE")) { const mend = numberMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log(`ok   the part "${HOLDS}" names a rule's number, or "None"`); }
     else if (parts.includes(HOLDS)) console.log(`ok   the number under "${HOLDS}" is not asked here: ${why}`);
+    if (created >= YES_SINCE && then?.includes("export const YES_SINCE")) {
+      const diff = spawnSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
+      // (where the core lies is read from the base's manifest, never the head's, which the pull request could bring)
+      const at = coreAtBase(process.cwd()), paths = diff.status === 0 && at !== null ? asking(diff.stdout.split("\0").filter(Boolean), at) : null;
+      if (paths === null) console.log("ok   the owner's yes is not asked here: the change could not be read against its base");
+      else {
+        const issues = issuesOf(process.env.PR_BODY), got = paths.length && issues.length ? textsOf(repo, issues) : { texts: [], read: true };
+        const yes = yesOf({ paths, body: process.env.PR_BODY, ...got });
+        if (yes.mend) mends.push(yes.mend); else console.log(`ok   ${yes.note}`);
+      }
+    } else console.log(`ok   the owner's yes is not asked here: ${why}`);
   }
   for (const mend of mends) console.log(`FAIL ${mend}`);
   process.exit(absent.length || mends.length ? 1 : 0);

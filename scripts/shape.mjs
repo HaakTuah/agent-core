@@ -57,10 +57,10 @@
 //                                                     "grown" gives a reason for, what a reader the baseline did
 //                                                     not name finds, and, with SHAPE_BASE set, what that branch
 //                                                     held already, where the config reads more
-//   node core/scripts/shape.mjs <config> --suite <name> -- <command>...   run a suite (with no shell) and hold its
-//                                                     time to its mark
-//   node core/scripts/shape.mjs <config> --suite <name> --since <seconds>  hold the time since a start the workflow
-//                                                     took (date +%s) to the suite's mark
+//   node core/scripts/shape.mjs <config> --suite <name> -- <command>...   run a suite (with no shell) and measure its
+//                                                     time against its mark, a warning past it, never a failure
+//   node core/scripts/shape.mjs <config> --suite <name> --since <seconds>  measure the time since a start the
+//                                                     workflow took (date +%s) against the suite's mark
 // Run from the project's root, by the copies workflow (.github/workflows/copies.yml) on every pull request; in the
 // core by its size workflow. Reads only, but for the baseline it writes when told; git and Node's own modules.
 import { execFileSync, spawnSync } from "node:child_process";
@@ -676,7 +676,8 @@ function unlisted({ config, at, self, reads, later, reread }) {
 
 // ---- the commands ----
 
-// A suite held to its time mark: the command after --, run and timed, or the time since a start the workflow took.
+// A suite measured against its time mark: the command after --, run and timed, or the time since a start the workflow
+// took.
 function timed(name, rest, usage) {
   if (rest[0] === "--since" && /^\d+$/u.test(rest[1] ?? "") && rest.length === 2) return { took: Date.now() / 1000 - Number(rest[1]), status: 0 };
   if (rest[0] !== "--" || rest.length < 2) refuse("--suite takes a name, then -- and the suite's command, or --since and the second its run started at", usage);
@@ -692,9 +693,10 @@ function suite(config, at, self, [name, ...rest]) {
   const limit = isObject(mark) ? mark[process.platform] : mark;
   const { took, status } = timed(name, rest, `run node ${self} ${at} --suite ${name} -- <command>`);
   if (status !== 0) return status; // (the suite's own failure, which says its own mend)
+  // (a time mark measures and never fails, tasks/tests.md; #733, point 5: past it, a warning, which the run shows)
   if (limit !== undefined && took > limit) {
-    console.error(`FAIL: the suite ${name} took ${Math.round(took)} s, past its mark of ${limit}. Mend: make it faster (set up only what each test needs, run only what the change can reach), or split it so that each part runs alone under a mark of its own; only where it cannot be, raise its mark in ${at} with the reason under "grown" in ${config.baseline} and in the pull request`);
-    return 1;
+    console.log(`::warning::the suite ${name} took ${Math.round(took)} s, past its mark of ${limit}, which fails nothing. Mend: add it to the open task on the tests' time, or file one where none is open: make it faster (set up only what each test needs, run only what the change can reach), or split it so that each part runs alone under a mark of its own; only where it cannot be, raise its mark in ${at} with the reason under "grown" in ${config.baseline} and in the pull request`);
+    return 0;
   }
   console.log(`ok   the suite ${name} took ${Math.round(took)} s${limit === undefined ? `; ${at} gives it no mark on ${process.platform}` : `, within its mark of ${limit}`}`);
   return 0;

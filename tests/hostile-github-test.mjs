@@ -3,7 +3,8 @@
 // releases.mjs's hostAccount, and an account's rights to a repository, security-review.mjs's writersOf). Each reader is tried, as its shape
 // allows, with too long, the wrong type, markup, a file path, a number or date out of range and nothing at all, and
 // takes nothing of it as a pass or a value: core-moved.mjs (with a stand-in git and gh), releases.mjs and release.mjs
-// (in a scratch repository), wait.mjs, stalled.mjs, core-cost.mjs, clean-merges.mjs and look.mjs's checksOf.
+// (in a scratch repository), wait.mjs, stalled.mjs, core-cost.mjs, clean-merges.mjs, look.mjs's checksOf and
+// tools-offer.mjs's openFrom (an issue's state).
 // workflow-run.mjs reads no answer of GitHub's (its contexts are the caller's). Test data is made up. Run by the core's
 // tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
 //
@@ -17,12 +18,14 @@ import { CORE } from "../scripts/core-address.mjs";
 import { TITLE, openIssue } from "../scripts/core-moved.mjs";
 import { RELEASE, elsewhere, fetchCore, hostAccount, ownerOf, releasesIn } from "../scripts/releases.mjs";
 import { OWN, held } from "../scripts/release.mjs";
+import { read as runnersRead } from "../scripts/runners.mjs";
 import { line, measure, median, waited } from "../scripts/wait.mjs";
 import { openPulls, print, stalled } from "../scripts/stalled.mjs";
 import { priced, reading, readings, sessionOf } from "../scripts/core-cost.mjs";
 import { isGits, proved } from "../scripts/clean-merges.mjs";
 import { checksOf } from "../scripts/look.mjs";
 import { writersOf } from "../scripts/security-review.mjs";
+import { openFrom } from "../scripts/tools-offer.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0;
@@ -168,6 +171,17 @@ if (process.platform !== "win32") {
   ok(r.status === 0 && /^gh issue create /m.test(r.calls) && !/issue (?:edit|close)/.test(r.calls) && !["etc/passwd", "<script>"].some(w => r.calls.includes(w)), "hostile issue lines name no issue to edit or close, and nothing of them is used: a new one opens");
 }
 
+// ---- runners.mjs: whether the repository is private, as the host answers (#733) ----
+{
+  const none = fs.mkdtempSync(path.join(scratch, "runners-"));
+  for (const [answer, what] of [[JSON.stringify({ private: "yes" }), "a text"], [JSON.stringify({ private: { a: 1 } }), "an object"], ["not json", "no JSON"], ["null", "null"], ["", "nothing"], [JSON.stringify([{ private: false }]), "a list"]]) {
+    const r = runnersRead({ repo: "o/n", dir: none, gh: () => answer });
+    ok(r.billed && /was not read, so taken as billed/.test(r.said[1]), `runners.mjs: a repository whose privacy the host gives as ${what} is not read, taken as billed, and said so`);
+  }
+  const r = runnersRead({ repo: "o/n", dir: none, gh: () => { throw new Error("HTTP 403"); } });
+  ok(r.billed && r.where === "local", "runners.mjs: a host that refuses is taken as billed, nothing thrown");
+}
+
 // ---- nothing at all ----
 for (const v of [undefined, null, "", [], {}]) {
   const what = JSON.stringify(v) ?? "undefined";
@@ -203,5 +217,10 @@ for (const answer of [undefined, null, "", 7, "write", [], {}, { permission: "wr
   ok(writersOf([answer]).size === 0 && writersOf([[answer]]).size === 0, `rights answered as ${JSON.stringify(answer) ?? "undefined"} make no one an owner`);
 }
 for (const v of [undefined, null, "", 7, {}, "[]"]) ok(writersOf(v).size === 0, `a list of rights of ${JSON.stringify(v) ?? "undefined"} makes no one an owner`);
+
+// ---- tools-offer.mjs: an issue's state ----
+ok(openFrom("open\n") === true && openFrom("closed\n") === false, "tools-offer: an issue's state reads open or closed");
+ok([undefined, null, "", "OPEN", "opened", "open; closed", 42, ["open"], { state: "open" }, `open${" ".repeat(40)}x`, "x".repeat(5000)].every(a => openFrom(a) === null),
+  "tools-offer: nothing, the wrong type, another word and a long answer read as not answered, never as open or closed");
 
 process.exit(failed ? 1 : 0);
