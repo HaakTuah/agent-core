@@ -6,10 +6,9 @@
 // `maintain` or `admin`, of an account whose type is User: tasks/github-calls.md). A quoted line passes where it is found so: whitespace counts as one blank, the issue's own
 // ">" marks are read through, and "[…]" (floor rule 11's details left out) splits a line into pieces each found in
 // one text. It never guesses: it reads text and the host's answer on each account's right. What it does not read:
-// whether the quote covers the change (the design check's). A quote is relayed as the issue's current text records
-// it (roles/shared/inbox.md, "One current text"): where the owner's words are cleaned (floor rule 4), the record holds
-// them cleaned and the pull request quotes that record word for word, so nothing here reads a spelling as near enough
-// (#775). A text that was edited counts only where every account the
+// whether the quote covers the change (the design check's). A quote is relayed word for word from the issue: where the
+// owner's words are corrected, a session the owner works with corrects them in its record there, never the pull
+// request's builder, so nothing here reads a spelling as near enough (#775). A text that was edited counts only where every account the
 // host names among its editors has the higher right too, since one who may only write can edit another's text.
 // It reads only the core's own repository: in a project the floor and the core's review guidelines stand in the
 // copy, which a sync alone changes (floor rule 8), so a sync is never asked. gh, git and Node's own modules.
@@ -120,7 +119,7 @@ export function found(line, texts) {
 export function yesOf({ paths, body, texts, read = true }) {
   if (!paths.length) return { note: "the owner's yes is not asked here: the change touches neither the floor nor the review guidelines" };
   const lines = quoted(body), issues = issuesOf(body), named = `${paths.slice(0, 3).join(", ")}${paths.length > 3 ? ", …" : ""}`;
-  const how = `quote under a heading "## ${WORD}", in lines that open with ">", the owner's words word for word from the issue's text (its description or a comment) written by an account the host gives maintain or admin, whole words in their order, one piece of ${WORDS} or more, details floor rule 11 keeps out written "[…]"; take them from the issue's current text, the record of the owner's word (roles/shared/inbox.md, "One current text"), and correct nothing in the quote: a correction of the owner's words is made in that record, never here`;
+  const how = `quote under a heading "## ${WORD}", in lines that open with ">", the owner's words word for word from the issue's text (its description or a comment) written by an account the host gives maintain or admin, whole words in their order, one piece of ${WORDS} or more, details floor rule 11 keeps out written "[…]"; correct nothing in the quote: only a session the owner works with corrects the owner's words, in its record on the issue (AGENTS.md, "Whose words an issue holds"), so where the issue holds them uncorrected, quote them as they stand there, and never write that record yourself`;
   if (!issues.length) return { mend: `this pull request changes ${named}, which asks the owner's yes (floor rule 3), and names no issue. Mend: name the issue that holds the owner's yes ("Fixes #n" or "Part of #n"), and ${how}` };
   if (!lines.length) return { mend: `this pull request changes ${named}, which asks the owner's yes (floor rule 3), and quotes nothing under "${WORD}". Mend: ${how}; where the issue holds no yes for this change, file one asking the owner and leave this pull request unmerged meanwhile` };
   if (lines.some(l => found(l, texts))) return { note: `the owner's yes is quoted, found word for word on ${issues.map(n => `#${n}`).join(", ")}` };

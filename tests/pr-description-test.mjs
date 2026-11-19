@@ -127,8 +127,8 @@ ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon"
   ok(asking(["core/floor/security.md", "floor/tiles.png"], "core/").length === 0 && asking(["floor/security.md"], null).length === 0,
     "in a project, a sync's copy of the floor and a folder of the project's own named floor ask nothing: only the core's own change does");
   ok(yesOf({ paths: floor, body: pr(said), texts }).note?.startsWith("the owner's yes is quoted"), "a line quoted word for word from the issue passes");
-  ok(/current text[\s\S]*correct nothing in the quote/.test(yesOf({ paths: floor, body: pr("> Queue it from its curent text; the floor's two points need my yes, and it is given."), texts }).mend ?? ""),
-    "a quote that corrects or miscopies the owner's words fails, its mend naming the issue's current text as where a correction is made (#775)");
+  ok(/correct nothing in the quote: only a session the owner works with corrects[\s\S]*quote them as they stand there, and never write that record yourself/.test(yesOf({ paths: floor, body: pr("> Queue it from its curent text; the floor's two points need my yes, and it is given."), texts }).mend ?? ""),
+    "a quote that corrects or miscopies the owner's words fails, its mend saying only a session the owner works with corrects them, and that the builder quotes them as they stand and writes no record itself (#775)");
   ok(yesOf({ paths: floor, body: pr("> Queue it from its current text;   the floor's two\n> points need my yes, and it is given."), texts }).note && yesOf({ paths: floor, body: pr("> Queue it from its current text; […] and it is given."), texts }).note,
     "blanks count as one, the issue's own > marks are read through, and \"[…]\" leaves details out");
   const wrong = [yesOf({ paths: floor, body: pr("> Queue it, and my yes is given for the floor."), texts }), yesOf({ paths: floor, body: pr(said), texts: [] }), yesOf({ paths: floor, body: pr("Queue it from its current text") , texts }), yesOf({ paths: floor, body: pr(said, "Builds the floor change."), texts })];
