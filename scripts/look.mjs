@@ -265,12 +265,26 @@ function reachOf(repo) {
   return got && typeof got === "object" && got.permissions ? asked(repo, got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
 }
 
+// The titles of the open notices that count, of `opened` ({ title, login }, as the search gives them): those the
+// owner's account opened, and in a team those of another owner, an account the host lets write (roles/shared/teams.md),
+// its right read through `right(login)` as the security-review check reads one (writersOf), at most NOTICE_LOGINS
+// accounts; a right not read counts as none, so the look errs toward reporting, never toward silence.
+export const NOTICE_LOGINS = 5;
+export function noticesOf(opened, owner, right) {
+  const mine = String(owner).toLowerCase(), rights = [];
+  const logins = [...new Set(opened.map(i => String(i?.login ?? "").toLowerCase()).filter(l => l && l !== mine && /^[a-z0-9-]{1,39}$/u.test(l)))];
+  for (const login of logins.slice(0, NOTICE_LOGINS)) { try { rights.push(right(login)); } catch { /* counted as none */ } }
+  const writers = writersOf(rights);
+  return opened.filter(i => { const l = String(i?.login ?? "").toLowerCase(); return l === mine || writers.has(l); }).map(i => String(i.title));
+}
+
 // The work standing still (stalled.mjs's standingStill; #471), through `add`. Read cheapest first, each costlier
 // reading only once the one before leaves the question open: the open pull requests' pushes, the default branch's
 // newest commit (a merge is work going on), the progress file the manifest's slot names (the core's QUEUE.md here),
 // placed and read as queue.mjs's own reader takes it, a plain Markdown file inside the project, no larger than it reads
 // (SECURITY.md, rule 5), then the open issues titled as the orchestrator's notice that `owner`'s account opened (anyone
-// may open an issue in a public repository, and only the orchestrator's, posting as the owner, says why work waits),
+// may open an issue in a public repository, and only an owner's, as the orchestrator posts, says why work waits:
+// noticesOf),
 // and last which issues are open. `gh` as ghApi gives it; `read` the text of the file placed.
 export function stillFinding({ repo, manifest, owner, pulls, now = Date.now(), gh = ghApi, read = f => (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : "") }, add) {
   try {
@@ -281,8 +295,9 @@ export function stillFinding({ repo, manifest, owner, pulls, now = Date.now(), g
     if (wrong) return add(TITLES.still, null, `the progress file was not read: ${wrong.replace(/^FAIL: /u, "")}`);
     const queue = read(file);
     if (!queue.trim()) return add(TITLES.still, null);
-    const asOwner = JSON.parse(gh(`search/issues?q=${encodeURIComponent(`repo:${repo} is:issue is:open in:title "${NOTICE}"`)}`, "--jq", "[.items[] | {title, login: .user.login}]"));
-    const notices = asOwner.filter(i => String(i?.login ?? "").toLowerCase() === String(owner).toLowerCase()).map(i => String(i.title));
+    const opened = JSON.parse(gh(`search/issues?q=${encodeURIComponent(`repo:${repo} is:issue is:open in:title "${NOTICE}"`)}`, "--jq", "[.items[] | {title, login: .user.login}]"));
+    const notices = noticesOf(opened, owner, login => JSON.parse(gh(`repos/${repo}/collaborators/${login}/permission`)));
+    if (notices.some(t => t.startsWith(NOTICE))) return add(TITLES.still, null);
     const free = standingStill({ queue, closed: statesOf(repo, route => gh(route)), pulls, notices, now, latest });
     add(TITLES.still, free ? `The *progress file* (\`${file}\`) holds a line a session could take (${free.map(n => `#${n}`).join(", ")}, the first that waits on nothing open), no pull request of this repository's own was pushed in the last day, nothing reached the default branch in it, and no issue titled "${NOTICE}" from the owner's account is open. Where builders are held back for usage, the orchestrator opens that issue, saying what is left, when the window opens again, which lines wait and the words that change it (\`roles/orchestrator.md\`, "Never held back in silence"); otherwise start a builder on that line. Close this issue once work goes on.` : null);
   } catch {

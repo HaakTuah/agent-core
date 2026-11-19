@@ -3,7 +3,7 @@
 // report's parts. Node's own modules only; the calls to gh and git are the program's own and are not made here.
 //
 //   node tests/look-test.mjs
-import { BOT, checksOf, stillFinding, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, staleFinding, lateFinding, LATE_PAGES, LATE_PULLS, text, TITLES, updating, FAILED, redBody } from "../scripts/look.mjs";
+import { BOT, checksOf, noticesOf, stillFinding, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, staleFinding, lateFinding, LATE_PAGES, LATE_PULLS, text, TITLES, updating, FAILED, redBody } from "../scripts/look.mjs";
 import { parse, signKey, tripped, trippedBody } from "../scripts/choices.mjs";
 import { before, body, copies, countsFrom, reportOf, share, SHARES, shownAs } from "../scripts/state-report.mjs";
 import fs from "node:fs";
@@ -252,6 +252,12 @@ ok(stale(0, "Packages the project holds that have gone stale\n\n- a\n").what ===
     const r = still({ manifest: `| *progress file* | \`${at}\` |\n` });
     ok(r.what === null && /^the progress file was not read: .*Mend:/.test(r.unread ?? "") && !r.calls.some(c => c.startsWith("search/")), `a progress file the manifest places outside what queue.mjs reads is not read, and says so: ${at}`, JSON.stringify(r));
   }
+  const right = (login, role = "write", type = "User") => ({ role_name: role, permission: role === "admin" ? "admin" : "write", user: { login, type, permissions: { push: true } } });
+  const team = still({ notices: [{ title: "Builders held back for usage", login: "co-owner" }], gh: (route, ...rest) => (/collaborators\/co-owner\/permission$/.test(route) ? JSON.stringify(right("co-owner")) : route.startsWith("search/") ? JSON.stringify([{ title: "Builders held back for usage", login: "co-owner" }]) : route.startsWith("repos/o/r/commits") ? `${day}\n` : (() => { throw new Error(route); })()) });
+  ok(team.what === null && team.unread === null, "in a team, another owner's notice, an account the host lets write, says why too", JSON.stringify(team));
+  const asked = [];
+  const counted = noticesOf([{ title: "A", login: "Owner" }, { title: "B", login: "reader" }, { title: "C", login: "bot-app" }, { title: "D", login: "gone" }, { title: "E", login: "../x" }, ...["a1", "a2", "a3", "a4", "a5", "a6"].map(l => ({ title: l, login: l }))], "owner", login => { asked.push(login); if (login === "gone") throw new Error("HTTP 404"); return login === "reader" ? right(login, "read") : login === "bot-app" ? right(login, "write", "Bot") : right(login); });
+  ok(JSON.stringify(counted) === JSON.stringify(["A", "a1", "a2"]) && asked.length === 5 && !asked.includes("../x"), "a notice counts from the owner's account or one that may write, read strictly: a reader, an app, a right not read and a login of no form count for nothing, and at most five rights are read", JSON.stringify({ counted, asked }));
   ok(still({ queue: "" }).what === null, "no progress file, or an empty one: no line to take, nothing reported");
   const blind = still({ gh: () => { throw new Error("HTTP 403"); } });
   ok(blind.what === null && /could not be read/.test(blind.unread ?? ""), "a call that fails leaves the issue as it stands, saying what could not be read", JSON.stringify(blind));
