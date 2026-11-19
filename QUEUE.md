@@ -11,12 +11,13 @@ it merges last.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one, 2 security reviews | |
-| #733 | rule builder; it changes the floor (rule 12), with the owner's yes on the issue; two security reviews | |
+| #733 | rule builder; it changes the floor (rule 12); two security reviews | |
 | #744 | rule builder; it changes the archive's key and its check | |
-| #750 | rule builder; it changes floor rule 8 (point 2), with the owner's yes on the issue; two security reviews | |
+| #750 | rule builder; it changes floor rule 8 (point 2); two security reviews | |
+| #756 | rule builder | |
 | #530, step 5 | builder; licence readers | |
 | #593, points 1 to 3 | rule builder | |
-| #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | |
+| #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md` | |
 | #593, points 8 and 9 | rule builder | #577 |
 | #625 | builder | #624 |
 | #626 | builder | #624 |
@@ -59,7 +60,7 @@ it merges last.
 | #426 | builder | |
 | #404 | builder | |
 | #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467 |
-| #492 | rule builder; it changes floor rule 4, with the owner's yes on the issue, who may start the orchestrator, and what every role reads at its start | #397 and #467 |
+| #492 | rule builder; it changes floor rule 4, who may start the orchestrator, and what every role reads at its start | #397 and #467 |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 1 | rule builder | |
 | #486, point 5 | builder | the types record reopening |
