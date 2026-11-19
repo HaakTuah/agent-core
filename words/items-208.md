@@ -2,18 +2,18 @@
 
 What these are and how they are kept: `words/README.md`.
 
-208. **14 November 2026** (the core; the first three quotes in a chat with a session the owner had asked to look through
-     the core, not the design session, as that session quoted them on issue #237; the last two to the design session, in
-     the message that asked for the queue to be built). Told that work in the core costs every project a sync and a
-     reading, that five releases had been cut in two days, and that the core's open issues had no order, the owner
-     decided that everything the session found be addressed and asked whether a queue should hold it all. The owner
-     agreed to a short file that holds the order alone, worked by an orchestrator while it holds items, with nothing
-     released until it is empty, and decided that there is no pause on new rules, a pause being the owner adding
+208. **14 November 2026** (the core; the first three answers in a chat with a session the owner had asked to look
+     through the core, not the design session, as that session quoted them on issue #237; the last two to the design
+     session, in the message that asked for the queue to be built). Told that work in the core costs every project a
+     sync and a reading, that five releases had been cut in two days, and that the core's open issues had no order, the
+     owner decided that everything the session found be addressed and asked whether a queue should hold it all. The
+     owner agreed to a short file that holds the order alone, worked by an orchestrator while it holds items, with
+     nothing released until it is empty, and decided that there is no pause on new rules, a pause being the owner adding
      nothing. To the design session, the owner said that the decisions quoted in the open issues labelled `queued` and
      `by:chat` are the owner's word, and that an orchestrator on Opus at high would work the whole file, rule changes
      included, so the rules were to let it, any rule of the floor against that named plainly.
 
-209. **14 November 2026** (the core, the same chat as the first quotes of item 208, as that session quoted it on issue
+209. **14 November 2026** (the core, the same chat as the first answers of item 208, as that session quoted it on issue
      #255). A builder session had stopped at a draft pull request with every check green, since this repository read no
      rule for any step after the draft. Having said that everything established must hold in the core also, the owner
      proposed a rule that the core abide by its own rules to the full extent, the audits and refactoring it sets for
@@ -24,7 +24,7 @@ What these are and how they are kept: `words/README.md`.
      would cut none, the owner decided that the release workflow is started when the queue holds no line a session can
      take and every check on main is green; read narrowly, as the word for the one release after `release-5`.
 
-211. **14 November 2026** (the core; the first three quotes in a chat with a session the owner works with, not the
+211. **14 November 2026** (the core; the first three answers in a chat with a session the owner works with, not the
      design session, as that session quoted them on issue #260; the last to the orchestrator, in the message that
      started it). Told that three pull requests would stand open for a yes the owner had given by queueing their issues,
      that every release after the first would wait for the owner's word again, and that what the owner said through a
@@ -97,7 +97,7 @@ What these are and how they are kept: `words/README.md`.
      that every session posts under the owner's login, so that GitHub's filter by author tells nothing, the owner
      decided that posts be labelled clearly enough to tell apart and filter each sender and topic, so that the owner
      sees when an instruction is taken in or answered, and that the owner's games follow the same flow. The owner agreed
-     to one state label and one sender label on each issue, fixed headings in an item of the owner's voice and one
+     to one state label on each open issue and one sender label, fixed headings in an item of the owner's voice and one
      opening line on every agent's comment; and, so that it shows where a question, idea or bug report came from, to a
      sender label for what a review finds, a line saying where an agent found each issue it files, and an opening line
      naming the task. Shown that queued issues had grown many notes, some overturning others, the owner agreed that an

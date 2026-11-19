@@ -63,7 +63,7 @@ What these are and how they are kept: `words/README.md`.
 241. **15 November 2026** (every project in more than one repository, and a library shared by several projects; in a
      chat with a session the owner works with, not the design session, as that session recorded it on issue #285,
      labelled `by:chat`, saying the owner agreed to it). Of a part a project may one day split off, and of taking the
-     core into both repositories, which the owner saw as needless duplication that would cause drift in versions. The
+     core into both repositories, which the owner saw as needless duplication that would cause drift in versions, the
      owner agreed to keeping the part in the project's repository to begin with, strictly under the new rules so that it
      is easy to sort out, and to the session's six points, the manifest saying where the core's copy is; gave the yes
      for the change to the floor; and told the orchestrator that the owner's yes is given for every queued change, the

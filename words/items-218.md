@@ -49,8 +49,8 @@ What these are and how they are kept: `words/README.md`.
      kind of file, in the core and in a project of another owner alike, and agreed to the three guards on it. Of the
      work's name, the owner would have liked one after Hammurabi, so the work is also named Hammurabi's Agentic Code,
      and nothing is renamed. To the orchestrator, the owner gave the yes for every queued change as its issue describes
-     it, to be quoted in those pull requests, and said that #257, grown to change floor rule 11 and the personal-terms
-     check, is a rule builder's line.
+     it, to be quoted in those pull requests; and, as the session's own note, #257, grown to change floor rule 11 and
+     the personal-terms check, is a rule builder's line.
 
 222. **15 November 2026** (the core; in chats with a session the owner had asked to look through the core, not the
      design session, as that session recorded them on issue #256, labelled `by:chat`, its note "What this issue asks to
