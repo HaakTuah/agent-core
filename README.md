@@ -177,7 +177,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      and `reading-size.mjs`, the pointer check and the reading-size check,
      the second with marks of its own (the *size marks*), whose total counts the project's own files alone (the core's
      copy is held to the core's own cap), and `workflows.mjs`, which needs no config and fails a workflow that names
-     `pull_request_target` (floor rule 2) or gives a key twice in one mapping, which GitHub refuses.
+     `pull_request_target` (floor rule 2), gives a key twice in one mapping, which GitHub refuses, or calls one of the
+     core's checks that a draft skips while its trigger leaves out `ready_for_review`.
    - **The shape check,** in the same job: `shape.mjs`, with a config of the project's own (the *shape check*: its
      systems, its marks and its suites' time marks) and a baseline of what stood before it, which only shrinks
      (`tasks/code-shape.md`, which says too how the check holds a project before its config is written). From its
@@ -325,12 +326,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      by its whole SHA (`tasks/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
      nor a sync's shape) has had none on its head, or on a commit only such updates from `main` follow; while the newest
      "Security review:", "Code review:" or "Design check:" posted from 18 November lacks its lines "Blocking findings:"
-     and "Other findings:" (`tasks/reviews.md`, point 3); and, in the core's own repository, while a pull request opened
-     from that day that changes `floor/`, `roles/`, `tasks/` or `tools/` has no "Design check:" naming its head, or a
-     commit only such updates follow (point 4); it advises as the first does. It runs a short job at each push and each
-     "Code review:" or "Design check:" comment, a dozen or so a pull request, which a private repository pays for:
-     there the job is skipped, and so not billed, unless the project turns it on (the input `private`) or has turned
-     advisory off, since a ruleset may then wait for it.
+     and "Other findings:", or, posted from 20 November, its line "Score:" (`tasks/reviews.md`, point 3); and, in the
+     core's own repository, while a pull request opened from that day that changes `floor/`, `roles/`, `tasks/` or
+     `tools/` has no "Design check:" naming its head, or a commit only such updates follow (point 4); it advises as the
+     first does. It runs a short job at each push and each "Code review:" or "Design check:" comment, a dozen or so a
+     pull request, which a private repository pays for: there the job is skipped, and so not billed, unless the project
+     turns it on (the input `private`) or has turned advisory off, since a ruleset may then wait for it.
    - **A private repository** has GitHub's dependency review and CodeQL only with its paid code security, so without
      it it calls neither `licences.yml` nor `codeql.yml`: a workflow of its own runs `core/scripts/licences.mjs` for
      what no package list holds, `core/scripts/exact-versions.mjs` and `core/scripts/lookup.mjs` for its lockfiles and

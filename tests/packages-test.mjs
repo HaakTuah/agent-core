@@ -187,7 +187,7 @@ try {
   fs.writeFileSync(path.join(pp, "package.json"), JSON.stringify(parserList, null, 2));
   fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license, dependencies: parserList.dependencies }, "node_modules/is-number": staged } }, null, 2));
   // (each script that loads a package, by the call that loads it; a script that loads one and has no case here fails)
-  const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")`, "workflow-run.mjs": `parseYaml("a: 1\\n")`, "markdown.mjs": "markdownReader()", "runners.mjs": `workflowsIn(".github/workflows")`, "toml.mjs": `parseToml("a = 1\\n")`, "schemas.mjs": `shapeFaults("copies", {})` };
+  const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")`, "workflow-run.mjs": `parseYaml("a: 1\\n")`, "markdown.mjs": "markdownReader()", "runners.mjs": `workflowsIn(".github/workflows")`, "toml.mjs": `parseToml("a = 1\\n")`, "schemas.mjs": `shapeFaults("copies", {})`, "workflows.mjs": `draftHoles("on: pull_request\\njobs: {}\\n")` };
   // (a reader whose caller goes on without the package, saying so as a warning: it answers null, and loads nothing)
   const ANSWERS_NULL = new Set(["schemas.mjs"]);
   // (parseYaml throws where the package is not installed, and each of its callers says so as a failure or an unread file:

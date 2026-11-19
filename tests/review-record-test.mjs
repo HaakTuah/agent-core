@@ -8,7 +8,7 @@
 //   node tests/review-record-test.mjs
 import { fileURLToPath } from "node:url";
 import { FIVE as trialFive, blockingOf as trialBlocking, builderOf, changedOf, effortOf, findingsOf, groupOf, kindOf, print as trialPrint, verdict } from "../scripts/builder-trial.mjs";
-import { blockingOf, broughtBy, bugs, codexFind, foundTwice, otherOf, perPull, postedKind, print, ruleOf, rulesIn, rulesNamed, secondFound, stanceOf, standing, tally } from "../scripts/review-record.mjs";
+import { blockingOf, broughtBy, bugs, codexFind, foundTwice, otherOf, perPull, postedKind, print, ruleOf, rulesIn, rulesNamed, scoreOf, secondFound, stanceOf, standing, tally } from "../scripts/review-record.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -51,6 +51,10 @@ ok(otherOf("Security review: x\nBlocking findings: 1.\nOther findings: 3.") === 
   && otherOf("Design check: x\nNo finding.") === 0 && otherOf("Security review: x\nNo blocking finding.") === null && otherOf("Security review: x\nOther findings: 1.\nNo other finding.") === null
   && otherOf("Security review: x\nTwo nits, fixed.") === null && otherOf(null) === null,
   "the other points read from their own line, \"No finding.\" as none of either; a review without the line, or whose lines disagree, is not read for them");
+ok(scoreOf("Code review: x\nScore: 8 of 10.") === 8 && scoreOf("Code review: x\n**Score: 10 of 10.**") === 10 && scoreOf("Design check: x\nScore: 1 of 10.\n") === 1
+  && [0, 11, "8.5", "08"].every(n => scoreOf(`Code review: x\nScore: ${n} of 10.`) === null) && scoreOf("Code review: x\nScore: 8 of 10.\nScore: 9 of 10.") === null
+  && scoreOf("Code review: x\n<!-- Score: 8 of 10. -->") === null && scoreOf("Code review: x\nScore: 8/10") === null && scoreOf(null) === null,
+  "the score is read from its own line, a whole number from 1 to 10; one out of range, in another form, hidden, or two that disagree, is not read");
 
 // Codex's finds
 ok(same(codexFind(inline(CODEX, badge("P1"))), { review: "code", badge: "P1", blocking: true }) && codexFind(inline(CODEX, badge("P2"))).blocking === false
