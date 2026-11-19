@@ -45,10 +45,10 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    - **What a posted review stands for** (#99): by default the commit it names, and the head only
      where nothing but merges from `main` follow that commit, each the merge git makes of its parents with no conflict,
      as `scripts/clean-merges.mjs` proves (#323, #750), and the builder asks Codex, or any reviewer, again only for new
-     content; after any other commit, a merge with a conflict among them however it is settled, since its settling is a
-     choice no review saw (an order of lines can change what they do), where no review of the head has
-     run, the fallback reviewer checks it and posts one naming the head, or the session posts the note that none is
-     needed, naming the head. It counts from the repository's owner (the *owner's account*, where that owns it), from
+     content. A merge with a conflict is new content however it is settled, since its settling is a choice no review
+     saw (an order of lines can change what they do). After any other commit, where no review of the head has run,
+     the fallback reviewer checks it and posts one naming the head, or the session posts the note that none is needed,
+     naming the head. It counts from the repository's owner (the *owner's account*, where that owns it), from
      a person's account the host lets write, each owner of a team's project (`roles/shared/teams.md`), whose rights
      the check reads from the host each run (#412), and from another account only where the project names it to the
      check (its input `reviewers`). A pure sync needs none: the check proves it with `pure-sync.mjs` and waits only for
@@ -59,7 +59,8 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      one commit stood for later commits no one checked, and any collaborator's comment passed a pull request; and a
      fresh review was asked of every head, about 150 of Codex's on 39 pull requests, 113 finding nothing (#750). Held by
      the `security-review` status, which waits where it is broken, in the core, and holds the merge once a ruleset
-     requires it (#320).
+     requires it (#320), through `scripts/clean-merges.mjs` and its test, by which the `code-review` status carries a
+     code review over the same way.
    - **What a posted review declares** (#299): by default a review posted in a comment that opens
      "Security review:", "Code review:" or "Design check:" covers one kind of review, and declares what it found on two
      lines of their own: "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other
