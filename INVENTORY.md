@@ -60,7 +60,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   anchors), remark-validate-links, markdown-link-check and linkinator, each kept for Markdown's own links and dropped,
   on fact, for the rest: none reads a backticked path, a quoted section, a bold lead or "point 6". *Bugs:* 0. **Try** a
   link checker, run offline, for the form `[text](path)` and a project's own documents (with #486's group 5); **keep**
-  the core's own forms: nothing fits, they are the core's.
+  the core's own forms: nothing fits, they are the core's. Its reading of Markdown runs on the package marked (#530,
+  item 7).
 - `scripts/reading-size.mjs`: fails a file every session reads that passes its mark. *Runs:* any session and the
   runners. *Else:* size-limit and bundlesize, dropped on fact: they weigh a built bundle, not a file read whole.
   *Bugs:* 2. **Keep:** nothing fits; what a session reads is the core's own list.
@@ -238,7 +239,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   for the selection, Jest's related tests, Vitest's changed mode and Nx's affected, dropped on fact: each needs its
   framework and reads JavaScript alone, where `select.mjs` reads C# and Python too. *Bugs:* 17 naming `tests.yml`, 2
   `select.mjs`. **Keep** the selection: nothing fits. The upgrade test's runner of workflows
-  (`scripts/workflow-run.mjs`) stays as #486 says: `act`, dropped on fact, needs a container a session cannot start.
+  (`scripts/workflow-run.mjs`) stays as #486 says: `act`, dropped on fact, needs a container a session cannot start;
+  its YAML is read by the YAML package (#530).
 - `scripts/mutate.mjs`, `scripts/strength.mjs`: the mutation tool puts faults into the lines a change touches, one at a
   time, and writes the open mutation report, which the strength check reads to say how strong the tests are. *Runs:* any
   session and the runners. *Else:* StrykerJS (Apache-2.0, 176 packages) and Stryker.NET, kept, tried above; mutmut and
@@ -315,9 +317,9 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   #519 weighed the template; `git archive`, which the sync already uses. *Bugs:* 2, 8 and 4. **Keep:** nothing fits;
   what a release asks is the core's.
 - `scripts/install.mjs`, `scripts/packages.mjs`: install the packages of other publishers the scripts run from the
-  core's lock file in `.packages/` into `.packages/node_modules/`, and load each from there alone, a missing one saying
-  its mend (#654); and, named, the code scan's engine from `.packages/requirements.txt` into `.packages/pypi/` with
-  pip (#546). *Runs:* any session, at its start and at each sync, and on the host's runners before each check.
+  core's lock file in `.packages/` into `.packages/node_modules/`, and the parser's from `.packages/parser/` only where
+  a job names it (#719), and load each from its own install alone, a missing one saying its mend (#654); and, named, the code scan's engine from `.packages/requirements.txt` into
+  `.packages/pypi/` with pip (#546). *Runs:* any session, at its start and at each sync, and on the host's runners before each check.
   *Else:* npm's own `npm ci` and pip's `install --require-hashes`, which do the installs, kept; a folder of carried packages (#528), dropped on the owner's
   decision of 18 November 2026. *Bugs:* none. **Keep:** the install is npm's; the scripts run it once more after a
   failed fetch and say the mend.

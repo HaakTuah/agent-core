@@ -55,21 +55,6 @@
       "depth": 2,
       "branches": 27
     },
-    "function: scripts/workflow-run.mjs#block": {
-      "lines": 20,
-      "depth": 2,
-      "branches": 16
-    },
-    "function: scripts/workflow-run.mjs#parseYaml": {
-      "lines": 66,
-      "depth": 0,
-      "branches": 2
-    },
-    "function: scripts/workflow-run.mjs#scalar": {
-      "lines": 15,
-      "depth": 1,
-      "branches": 19
-    },
     "process: tests/agent-tools-test.mjs -> node:child_process": true,
     "process: tests/check-test.mjs -> node:child_process": true,
     "process: tests/checks-test.mjs -> node:child_process": true,

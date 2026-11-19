@@ -25,7 +25,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { NOTES, RELEASE, asksBetween, fetchCore, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
+import { NOTES, OWN, RELEASE, asksBetween, fetchCore, held, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
 import { atRelease } from "./staged.mjs";
 import { started } from "./started.mjs";
 import { STEPS } from "./steps.mjs";
@@ -58,25 +58,8 @@ export const costed = entry => {
 // sync script knows no release and, run with no SHA, takes the core's newest main, so it syncs once with this SHA.
 export const older = (name, sha) => `A project whose copy is older than release-1 syncs to ${name} once with its full SHA, \`node core/scripts/sync.mjs ${sha}\`: its own sync script, run with none, takes the core's main (setup/sync-notes.md, at its top).`;
 
-// This repository's own release workflow: its runs on a commit are no check of that commit.
-export const OWN = ".github/workflows/release.yml";
-
-// Why a release may not stand on a commit yet, each reason a line, from GitHub's list of the workflow runs that the
-// push of that commit to main started (repos/<core>/actions/runs?head_sha=<sha>&branch=main&event=push); none where
-// it may. It may where every such run has finished and passed, and at least one did more than skip: a run still going,
-// one that failed or was cancelled, a list read only in part, and a commit no check has run on yet each hold it, so a
-// release never stands on a commit whose checks the core's own main has not passed. Nothing is guessed: a list in any
-// other form holds it too.
-export function held(list, own = OWN) {
-  const runs = list?.workflow_runs;
-  if (!Array.isArray(runs) || !Number.isSafeInteger(list.total_count)) return ["the list of the checks on it could not be read"];
-  if (list.total_count !== runs.length) return [`${list.total_count} runs stand on it and ${runs.length} were read`];
-  const checks = runs.filter(r => r?.path !== own);
-  const passed = r => r?.status === "completed" && ["success", "skipped", "neutral"].includes(r.conclusion);
-  const reasons = checks.filter(r => !passed(r)).map(r => `${r?.name ?? "a check"}: ${r?.status === "completed" ? r.conclusion : r?.status ?? "unreadable"}`);
-  if (!reasons.length && !checks.some(r => r.conclusion === "success")) reasons.push("no check has passed on it yet");
-  return reasons;
-}
+// (held and OWN stand in releases.mjs, beside this file, which the syncs read too: #733)
+export { OWN, held };
 
 // Whether this file lies in the core's own repository: its scripts/ at the root of a repository that is no project's
 // copy, even a copy kept as a repository of its own (a clone or a submodule under a project's core/, with the

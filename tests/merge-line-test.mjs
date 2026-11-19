@@ -1,7 +1,8 @@
 // Tests the merge line's reader (scripts/merge-line.mjs; #702) through a stand-in for gh: the three facts read from
 // the host for each kind of repository (a person's public one, an organisation's public one, an organisation's private
 // one on each plan, one whose queue is on, one that asks no up-to-date branch, one whose rules cannot be read), a row
-// of the manifest overriding a reading, the one line of advice where a queue is offered and off; the measure, each
+// of the manifest overriding a reading, the one line of advice where a queue is offered and off, and where users get a
+// release and the host still asks an up-to-date branch (#733); the measure, each
 // pull request's turn the later of the merge before it and its last marking ready, and the pushes whose checks ran
 // counted once each; the cancelling, which cancels nothing while the front's run is not queued and never a run of the
 // front's, the next's or the default branch's; and a run told no repository refused with its mend (mend.mjs). Run by
@@ -11,7 +12,10 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { cancel, facts, follows, line, main, measure, override } from "../scripts/merge-line.mjs";
+import { cancel, coreOwn, facts, follows, line, main, measure, override } from "../scripts/merge-line.mjs";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -20,7 +24,11 @@ const sha = letter => letter.repeat(40);
 
 // A host: the repository's row, its rules on the default branch (null: refused), its classic protection ("404", a
 // row, or null: refused), and an organisation's plan (null: refused).
-const host = ({ owner = "User", priv = false, rules = [], classic = "404", plan = "free" }) => route => {
+// `newest`: the runs the push of the default branch's newest commit started, as the host lists them (undefined: not
+// answered).
+const host = ({ owner = "User", priv = false, rules = [], classic = "404", plan = "free", newest = undefined }) => route => {
+  if (route === "repos/o/n/commits/main" && newest !== undefined) return JSON.stringify({ sha: "c".repeat(40) });
+  if (route.startsWith("repos/o/n/actions/runs?head_sha=") && newest !== undefined) return JSON.stringify(newest);
   if (route === "repos/o/n") return JSON.stringify({ default_branch: "main", private: priv, owner: { type: owner, login: "o" } });
   if (route.startsWith("repos/o/n/rules/branches/")) { if (rules === null) throw new Error("HTTP 403"); return JSON.stringify(rules); }
   if (route.includes("/protection/")) { if (classic === "404") throw new Error("gh: Branch not protected (HTTP 404)"); if (classic === "404-other") throw new Error("gh: Not Found (HTTP 404)"); if (classic === null) throw new Error("HTTP 403"); return JSON.stringify(classic); }
@@ -55,6 +63,39 @@ const manifest = "| *merge queue* | `on` |\n| *billed minutes* | `yes` |\n";
 f = facts({ repo: "o/n", manifest, gh: host({ rules: strict }) });
 ok(f.queue === "on" && f.billed === true && /manifest's row \*merge queue\* says \(read: none\)/.test(f.said[1]) && /\*billed minutes\* says \(read: no,/.test(f.said[2]), "a row of the manifest overrides a reading, and what was read is still printed", f.said.join(" | "));
 ok(override("| *merge queue* | `maybe` |", "merge queue", ["on", "offered", "none"]) === undefined, "a row with no value the slot takes overrides nothing");
+
+// Where users get a release (floor rule 12; #733): no row says each merge; a row *users get* says a release, and the
+// advice to switch the up-to-date setting off is given only where the host asks it.
+f = facts({ repo: "o/n", gh: host({ rules: strict }) });
+ok(f.users === "merges" && /its users get: each merge, as no row/.test(f.said[3]) && !/a release/.test(follows(f)), "with no row, users get each merge and the line is as before", f.said[3]);
+const releases = "| *users get* | `releases` |\n";
+f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: strict }) });
+ok(f.users === "releases" && /merges on its own green checks/.test(follows(f)) && /to switch it off/.test(follows(f)) && /needs-owner/.test(follows(f)) && /kept by hand/.test(follows(f)), "users get a release and the host still asks an up-to-date branch: the owner is advised once, and the line kept meanwhile", follows(f));
+f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: [] }) });
+ok(/merges on its own green checks/.test(follows(f)) && /nothing to act on/.test(follows(f)) && !/needs-owner/.test(follows(f)), "users get a release and no up-to-date branch is asked: no advice, no line", follows(f));
+f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: null, classic: null }) });
+ok(/was not read, so the line is kept/.test(follows(f)) && !/needs-owner/.test(follows(f)), "users get a release, and the host's rules cannot be read: the line is kept, no advice", follows(f));
+ok(facts({ repo: "o/n", manifest: "| *users get* | `sometimes` |\n", gh: host({ rules: strict }) }).users === "merges", "a row *users get* with no value it takes is read as each merge");
+// The default branch's newest commit, read where users get a release: a failed check stops every merge but the fix.
+const runsOf = (...rs) => ({ total_count: rs.length, workflow_runs: rs.map(([conclusion, status = "completed"]) => ({ name: "tests", path: ".github/workflows/tests.yml", status, conclusion })) });
+f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: [], newest: runsOf(["success"]) }) });
+ok(f.newest.state === "passed" && /cccccc.: its checks all passed/.test(f.said.at(-1)) && !/auto-merge off/.test(follows(f)), "the newest commit passed: merging goes on", f.said.at(-1));
+f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: [], newest: runsOf(["success"], [null, "in_progress"]) }) });
+ok(f.newest.state === "running" && /still running/.test(f.said.at(-1)) && !/auto-merge off/.test(follows(f)), "its checks still running: merging goes on", f.said.at(-1));
+f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: [], newest: runsOf(["success"], ["failure"]) }) });
+ok(f.newest.state === "failed" && /a check failed \(tests: failure\)/.test(f.said.at(-1)) && /no pull request but its fix merges/.test(follows(f)) && /auto-merge off on every other open pull request/.test(follows(f)), "a failed check: no pull request but its fix merges, auto-merge turned off on the others", follows(f));
+f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: [], newest: "not json" }) });
+ok(f.newest.state === null && /read them before a merge/.test(follows(f)), "checks that cannot be read are said so, and read before a merge", follows(f));
+ok(facts({ repo: "o/n", gh: host({ rules: [], newest: runsOf(["failure"]) }) }).newest === null, "where users get each merge, the newest commit is not read here");
+// The core's own row, read from its AGENTS.md where no manifest stands.
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "merge-line-core-"));
+fs.mkdirSync(path.join(root, "scripts"));
+fs.writeFileSync(path.join(root, "scripts", "merge-line.mjs"), "");
+fs.writeFileSync(path.join(root, "AGENTS.md"), "the *users get*:\n`releases`, its users taking the core from a release;\n");
+ok(override(coreOwn(root), "users get", ["merges", "releases"]) === "releases", "the core reads its own *users get* from its AGENTS.md, across a line's end");
+fs.writeFileSync(path.join(root, "AGENTS.md"), "no such slot\n");
+ok(coreOwn(root) === null && coreOwn(path.join(root, "none")) === null, "and nothing where it names none, or outside the core");
+fs.rmSync(root, { recursive: true, force: true });
 
 // The measure: three merged pull requests, oldest first #1, #2, #3 (and #9 into another branch, left out); #2 was
 // marked ready after #1 merged, so its turn is its marking ready, as is #3's, marked ready after #2 merged.

@@ -125,6 +125,25 @@ ok(lead("main.py", { level: 0, module: "lib.util" }) === '{"to":["src/lib/util.p
   && lead("pkg/a/m.py", { level: 0, module: "pkg.a", names: ["x"] }) === '{"to":["pkg/a/x.py"]}', "Python: an absolute import leads to the project's own module under its root, src/ or the file's own folder");
 ok(lead("main.py", { level: 0, module: "json" }) === '{"outside":"json","top":"json"}' && lead("main.py", { level: 0, module: "dup" }) === '{"outside":"dup","top":"dup"}' && lead("main.py", { level: 0, module: "numpy.linalg" }) === '{"outside":"numpy.linalg","top":"numpy"}',
   "Python: the standard library is never taken for a file of the project's that ends in its name, and a name two files end in leads nowhere the reader can tell");
+const many = new Set(Array.from({ length: 200000 }, (_, i) => `f${i}.py`));
+ok(JSON.stringify(resolvePython("main.py", { level: 0, module: "os", names: [] }, many, std)) === '{"outside":"os","top":"os"}', "Python: an import is led in a project of any number of files");
+const long = "m".repeat(100000), names = Array(100000).fill("b");
+const wide = new Set(["x.py", "deep/pkg/b.py", ...Array.from({ length: 20000 }, (_, i) => `d${i}/b.py`)]);
+ok(JSON.stringify(resolvePython("a.py", { level: 0, module: long, names }, wide, std)) === JSON.stringify({ outside: long, top: long })
+  && same(resolvePython("a.py", { level: 1, module: long, names }, wide, std).to, [])
+  && JSON.stringify(resolvePython("a.py", { level: 0, module: "z", names: names.slice(0, 20000) }, wide, std)) === '{"outside":"z","top":"z"}'
+  && JSON.stringify(resolvePython("a.py", { level: 0, module: "pkg", names: ["b", "c"] }, wide, std)) === '{"to":["deep/pkg/b.py"]}',
+  "Python: an import of a long name, of many names or of a name many files share is led, and a module found by the end of its path still is");
+ok(Array.from({ length: 20000 }, () => resolvePython("a.py", { level: 0, module: "b", names: [] }, wide, std)).every(r => r.outside === "b")
+  && Array.from({ length: 20000 }, (_, i) => resolvePython("a.py", { level: 0, module: `a${i}.b`, names: [] }, wide, std)).every((r, i) => r.outside === `a${i}.b`)
+  && same(resolvePython("a.py", { level: 0, module: "d7.b", names: [] }, wide, std).to, ["d7/b.py"]),
+  "Python: a module many files end in, imported again and again, or under many names, is led each time");
+const inits = new Set(Array.from({ length: 20000 }, (_, i) => `d${i}/__init__/__init__.py`));
+const longTop = "t".repeat(100000), distinct = Array.from({ length: 100000 }, (_, i) => `b${i}`);
+ok(Array.from({ length: 20000 }, (_, i) => resolvePython("a.py", { level: 0, module: `a${i}.__init__`, names: [] }, inits, std)).every((r, i) => r.outside === `a${i}.__init__`)
+  && same(resolvePython("a.py", { level: 0, module: "d7.__init__", names: [] }, inits, std).to, ["d7/__init__/__init__.py"])
+  && resolvePython("a.py", { level: 0, module: longTop, names: distinct }, wide, std).outside === longTop,
+  "Python: modules of any last part many files end in, and many names from a module of a long name, are led");
 const pyPackages = pythonPackages({
   "pyproject.toml": "[project]\nname = \"game\"\ndependencies = [\n  \"requests[socks]>=2\",\n  \"PyYAML\",  # a comment\n]\n[project.optional-dependencies]\ntest = [\"pytest\"]\n[tool.poetry.dependencies]\npython = \"^3.11\"\nflask = \"*\"\n[tool.poetry.group.dev.dependencies]\nblack = \"*\"\n",
   "requirements-dev.txt": "ruff==1\n-r requirements.txt\n", "requirements.txt": "numpy # x\n-e .\nscikit_learn>=1\n",
@@ -433,6 +452,13 @@ ok(failedAs === "read" && same(shown(readCsharp("class A { void M() { if (a) { }
 // A type named extension: its constructor `extension() { }` is read as a constructor, never as an extension block's
 // header (Codex's finding on #605).
 ok(same(shown(readCsharp("class extension\n{\n    extension() { int x = 0; }\n}\nstatic class P\n{\n    extension(char c) { public int Y() { return 1; } }\n}\n").functions), ["extension:3:1:0:0", "Y:7:1:0:0"]), "C#: a type named extension keeps its constructor, and an extension block beside it is still read as one", shown(readCsharp("class extension\n{\n    extension() { int x = 0; }\n}\n").functions));
+// Types named extension inside one another, beside one another and many in a file: each one's constructor is read as
+// one, and an extension block between them as a block, its member read.
+const kin = "class extension\n{\n    class extension\n    {\n        extension(int x) { }\n    }\n    extension(int y) { }\n}\nstatic class P\n{\n    extension(char c) { public int Y() { return 1; } }\n}\nclass extension\n{\n    extension() { }\n}\n";
+const manyKin = readCsharp(`${"class extension { extension(int x) { } }\n".repeat(2000)}static class P { extension(char c) { public int Y() { return 1; } } }\n`).functions;
+ok(same(shown(readCsharp(kin).functions).map(f => f.split(":").slice(0, 2).join(":")), ["extension:5", "extension:7", "Y:11", "extension:15"])
+  && manyKin.length === 2001 && manyKin.at(-1).name === "Y" && manyKin.slice(0, -1).every(f => f.name === "extension"),
+  "C#: types named extension, nested, side by side or many, each keep their constructor, and a block between them is read as one", shown(readCsharp(kin).functions));
 // Both sides of an #if read as code, as the lexer read them: an if on each side, one block after.
 const sides = "class S\n{\n    void M()\n    {\n#if WINDOWS\n        if (a)\n#else\n        if (b)\n#endif\n        {\n            Go();\n        }\n    }\n}\n";
 ok(same(shown(readCsharp(sides).functions), ["M:4:10:1:2"]), "C#: both sides of an #if are read as code, the block after them the second if's", shown(readCsharp(sides).functions));

@@ -68,7 +68,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    that no workspace pattern of the project's own package list takes the copy's package list in): the sync runs it after
    it writes the copy, a session's start runs npm's own install where what is installed is not what the lock file names
    and the copy's npm files are `main`'s own (the work-saved hook), and each of the core's workflows a project calls
-   runs it before its checks; a check that finds a package missing says it did not run, with that command (#654). Its
+   runs it before its checks; a check that finds a package missing says it did not run, with that command (#654). The
+   parser's packages, whose grammars carry far more than a reader runs, have a lock file of their own in
+   `.packages/parser/`, installed only where a job names it (`install.mjs parser`, or `all`, as the sync runs it and
+   the copies check's job, which runs the shape check; #719): a session's start installs the first alone, and a check
+   that needs the parser says so, with its mend; in a project's own job that installs the first alone, the shape check
+   reads no function of C# and says so as a warning, failing nothing by that. Its
    devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
    copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
@@ -91,7 +96,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    have passed (`AGENTS.md`, "A release is cut on the owner's word"; `scripts/release.mjs`). A project whose *owner's
    account* is not the account the core is under follows the releases, unless its manifest's *follows* row says `main`;
    the projects of the core's own owner follow `main`, unless theirs says `releases` (`scripts/releases.mjs`). Following
-   the releases, the sync script takes the newest release past the project's pin and nothing in between, and wherever
+   `main`, the sync script and the core-moved check take its newest commit whose checks all passed, never one ahead of
+   them, since a pull request merges here without being brought up to date (floor rule 12; `greenMain` in
+   `scripts/releases.mjs`; #733). Following the releases, the sync script takes the newest release past the project's pin and nothing in between, and wherever
    this README or a script says the core has moved, it has moved only when such a release is cut and asks a sync of the
    project (below); a full SHA still takes any commit of `main`, but such a sync is no pure sync there: it is reviewed
    like any PR (core archive 201). Why: a pure sync brings scripts, hooks and workflows that no review in the project
@@ -415,6 +422,7 @@ for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit
 | *other builders' checks* | what a session of another tool than Claude Code runs before it finishes (`tools/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync | choice: left out, the project's own tests |
 | *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so (`tasks/roles.md`, "Tools are preferences") | read: from the last merged pull requests, as `tasks/roles.md` says ("Tools are preferences") (`scripts/tools-read.mjs`) |
 | *pace* | the manifest's lines under "Pace", each a pace the owner sets, of the kinds `roles/orchestrator.md`, "The pace is the owner's", names | choice: left out, no pace but the default |
+| *users get* | `merges` or `releases`, in backticks: whether the project's users get each merge to its default branch (a site deployed on each push) or a release cut from it (floor rule 12; `tasks/hosts.md`) | cannot be read: a deploy on each push and a release workflow each say it only in part; left out, `merges`, under which a pull request is brought up to date first |
 | *merge queue* | `on`, `offered` or `none`, in backticks: whether the host offers the repository a merge queue and whether it is on (`tasks/hosts.md`, "The merge line follows the host") | read: from who holds the repository, whether it is private and its rules on the default branch (`scripts/merge-line.mjs`) |
 | *billed minutes* | `yes` or `no`, in backticks: whether the host bills the repository's runner minutes (`tasks/hosts.md`, "The merge line follows the host") | read: whether the repository is private (`scripts/merge-line.mjs`) |
 | *other builders*, *code reviewers*, *security reviewer* | rows of the *tools* table, "Builder", "Code reviewer" and "Security reviewer"; one still standing among the slots is read as that row | read: as the *tools* (`scripts/tools-read.mjs`) |
@@ -470,9 +478,10 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   the commit it was cut on (core archive 195).
 - This repository's own `main`: a ruleset as each project's has, deletions restricted, force pushes blocked, a pull
   request required, and the checks `tests`, `size`, `own-description` and the Personal terms workflow's `check`
-  required, branches up to date (core archive 201).
+  required, branches up to date (core archive 201) until the owner switches that off, as floor rule 12 lets where users
+  get a release (#733).
 - Each project's ruleset on its default branch: deletions restricted, force pushes blocked; a pull request required, no
-  approvals (a team's project may ask some: `roles/shared/teams.md`); status checks required (the project's CI and `core / core`), branches up to date; where the repository has
+  approvals (a team's project may ask some: `roles/shared/teams.md`); status checks required (the project's CI and `core / core`), branches up to date where every merge goes live (floor rule 12); where the repository has
   them, code scanning results required from CodeQL, blocking on security alerts High or higher and alerts Errors, code
   quality results required at Errors, and Copilot's review requested automatically, advisory (core archive 130).
 - Each repository's Actions settings (Settings, Actions, General): "Require actions to be pinned to a full-length commit
@@ -571,9 +580,10 @@ repository, the floor, the modules, the scripts and workflows, the starter kit a
 `words/` and `reports/`: the owner's decisions, own words and records, all rights reserved. Both files travel in each
 project's copy under `core/`, and they license the core alone: a project keeps the terms its own owner gives its own work, and nothing here
 adds or changes them (floor rule 10). Nor do they cover the packages of other publishers the scripts run, each under its
-own licence: none is carried, each an entry of `.packages/package-lock.json`, installed from npm's registry into
-`.packages/node_modules/`, which git does not track (`scripts/install.mjs`; #654), and held to floor rule 10's list by
-the core's own licence check, which reads that lock file. Nothing of the core ships, so no project's audit or notices
+own licence: none is carried, each an entry of `.packages/package-lock.json` or the parser's
+`.packages/parser/package-lock.json`, installed from npm's registry into the `node_modules/` beside it, which git does
+not track (`scripts/install.mjs`; #654, #719), and held to floor rule 10's list by the core's own licence check, which
+reads both lock files. Nothing of the core ships, so no project's audit or notices
 file asks for it.
 `NOTICE` names the work, with its other name, which renames nothing, and as the holder the account in the core's
 address, until the core's owner types another name there by hand (floor rule 11).

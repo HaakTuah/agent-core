@@ -288,7 +288,7 @@ function passedRuns(p) {
 // or { mend } where the config or the baseline is not there or cannot be read.
 function shapeHeld(p) {
   const at = shapeAt(p.manifest), text = p.read(at);
-  const first = `write its first baseline with \`node core/scripts/shape.mjs ${at} --first\`, commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
+  const first = `write its first baseline with \`node core/scripts/install.mjs all\` and then \`node core/scripts/shape.mjs ${at} --first\` (the parser's packages, which C#'s reader needs, are installed only where named: #719), commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
   if (text === null) return { none: true, mend: `Write \`${at}\` as the starter kit does (\`core/setup/template/shape.json.tmpl\`), with the project's own code under "code" and its test files under "tests", as git pathspecs; then ${first}. Until then the shape check holds the project to the starter kit's config, with each pull request's base as its baseline.` };
   let config;
   try { config = parseConfig(text, at); } catch (e) { return { mend: `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.` }; }
@@ -358,20 +358,38 @@ function suitesOnPins(p) {
 // workflows installs by itself, and holds no step to read. The install counts only as a step that runs it, node and the
 // copy's install.mjs as a command's first words (after a shell's then, else or do), with no `if:` or
 // continue-on-error of its own; a command that only names the path, as echo does, installs nothing.
-function installsFirst(p) {
+// (the reading both install steps share: the copy's scripts and install; whether a step runs a file, a command as
+// check-configs.mjs reads it, its words; and whether it installs, naming one of `named` where it is given)
+function installReading(p) {
   const copy = corePath(p.root) || "core/", script = `${copy}scripts/`, install = `${copy}scripts/install.mjs`;
   const bare = t => t.replace(/^\.\//u, "");
-  // (a command, as check-configs.mjs reads it: its words; one runs a script of the copy where a word is one's path)
   const runs = (st, file) => st.cmds.some(c => c.some(w => file(bare(w.text))));
-  const installs = st => st.unconditioned && st.cmds.some(c => {
+  const installs = (st, named) => st.unconditioned && st.cmds.some(c => {
     const w = c.map(x => x.text); while (["then", "else", "do"].includes(w[0])) w.shift();
-    return /(?:^|[\\/])node(?:\.exe)?$/u.test(w[0] ?? "") && bare(w[1] ?? "") === install;
+    return /(?:^|[\\/])node(?:\.exe)?$/u.test(w[0] ?? "") && bare(w[1] ?? "") === install && (!named || w.slice(2).some(a => named.includes(a)));
   });
+  return { script, install, bare, runs, installs };
+}
+function installsFirst(p) {
+  const { script, install, runs, installs } = installReading(p);
   const wrong = Object.entries(p.workflows).filter(([, w]) => jobsOf(w).some(job => {
     const at = job.steps.findIndex(st => runs(st, t => t.startsWith(script) && t.endsWith(".mjs") && t !== install));
-    return at >= 0 && !job.steps.slice(0, at).some(installs);
+    return at >= 0 && !job.steps.slice(0, at).some(st => installs(st));
   })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
   return wrong.length ? `In one small pull request, add a step \`node ${install}\` before the first step that runs a .mjs script under \`${script}\` in each such job of ${wrong.join(", ")}: the core's scripts load the packages it installs from its lock file, and without them a check says it did not run.` : null;
+}
+
+// Where a job of the project's own workflows runs the shape check (its script, or the copies check's steps through
+// checks.mjs) before the parser's packages are installed from their own lock file (#719): each such workflow, with the
+// mend; null where each names that install first. Read as installsFirst reads an install, and naming `parser` or `all`.
+function parserFirst(p) {
+  const { script, install, bare, installs } = installReading(p);
+  const shapes = st => st.cmds.some(c => { const w = c.map(x => bare(x.text)); return w.includes(`${script}shape.mjs`) || (w.includes(`${script}checks.mjs`) && w.includes("copies")); });
+  const wrong = Object.entries(p.workflows).filter(([, w]) => jobsOf(w).some(job => {
+    const at = job.steps.findIndex(shapes);
+    return at >= 0 && !job.steps.slice(0, at).some(st => installs(st, ["parser", "all"]));
+  })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
+  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check install the parser's too, \`node ${install} all\`, before the shape check runs: it reads C# on the parser, whose packages stand in a lock file of their own, and without them, after an install of the core's first lock alone, the check reads no function of C#, saying so as a warning, and with no install of the core's at all it fails, saying so.` : null;
 }
 
 // Where the project's call to the NuGet check starts only on the paths it names, each build file a build reads by
@@ -976,6 +994,8 @@ export const STEPS = [
   { lead: "18 November 2026, a tree that passed is not run again", cost: COST.workflow, check: passedRuns,
     partly: "which check gates a project's tests is the project's own, as its ruleset names it, and which entries of a job's matrix a pull request leaves out is a reading of its expressions" },
   { lead: "18 November 2026, the shape check reads C#'s functions on the parser", cost: COST.config, check: shapeReadsParsed },
+  { lead: "19 November 2026, the parser's packages installed where the shape check runs", cost: COST.workflow, check: parserFirst,
+    partly: "that a job reaching the shape check through the project's own npm or shell script installs the parser's first is read by the review" },
   { lead: "17 November 2026, a private project's code scanned", cost: COST.check, held: "the code scan, a step of `core.yml`'s job" },
 ];
 

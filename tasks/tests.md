@@ -97,7 +97,8 @@ reads is the *shape check*'s config.
   the check that gates the tests (`core/scripts/select.mjs`), which finds the merged head's tree, its whole selection
   and that check's pass, as GitHub Actions posted it, and then says `none`, which the job's runner honours, or otherwise
   runs the whole suite; that the head held the default
-  branch rests on floor rule 12, which merges a pull request brought up to date. A test that reads what no tree holds
+  branch is read from the tree, never assumed, since floor rule 12 lets a pull request merge without being brought up
+  to date where users get a release. A test that reads what no tree holds
   (a release's tag, the day) stays out of the skip. The trigger is a push that merges a pull request with a merge commit. It does not
   mean a run is skipped where the pull request ran a selection only, where it was merged by a squash or a rebase, on a
   re-run, on a schedule or before a release, nor that a job a pull request does not run is skipped. Reason: in #426's
