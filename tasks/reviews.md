@@ -15,11 +15,11 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    (`tasks/roles.md`), and its security reviewer where one is asked, through the first of these that its project has,
    as a builder is reached (`roles/orchestrator.md`, "The builders"): the tool that runs the agents side by side, a
    plug-in in the session's own tool, a way the project names, and the host's app last, each as the reviewer's part
-   says under that way (`tasks/tools.md`, "Each tool's part"). Which ways the project has is read, never asked: from the
-   tools the session can call (a plug-in's agent, a tool that runs the agents side by side), the apps the host shows on
-   the repository, and the manifest's "Tools" table for the project's own; where none can be read, the host's app.
-   Nothing changes it. A review that starts by itself is still waited for and read (floor rule 8): the order decides
-   how a session asks, and replaces no review. It does not mean a second review
+   says under that way (`tasks/tools.md`, "Each tool's part"). Which ways the project has is read, never asked: from
+   the tools the session can call (a plug-in's agent, a tool that runs the agents side by side), the reviews and checks
+   of the host's apps on recent PRs, and the manifest's "Tools" table for the project's own; where none can be read,
+   the host's app. Nothing changes it. A review that starts by itself is still waited for and read (floor rule 8): the
+   order decides how a session asks, and replaces no review. It does not mean a second review
    of the same kind by another way. Reason: on 15 November the merge line lost about 20 minutes at each conflict, the
    sessions asking the host's app and waiting while a faster way stood open (#395). Held, in part, by
    `core/scripts/tools-offer.mjs`, which fails a tool's part with a way left out or the ways out of order; that the
