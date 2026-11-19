@@ -1,5 +1,5 @@
 // Tests rules.mjs (what counts as a rule, and its text), holders.mjs (what holds each, the archive's items behind each,
-// and what it fails) and archive.mjs (the archive's two forms in step), on
+// and what it fails; and, with --own, a project's own rules, which fail nothing: #662) and archive.mjs (the archive's two forms in step), on
 // rule files and holders written in a scratch folder, and on the core's own. Its tests workflow runs it on every pull
 // request here, after the core's install: the file's form is read by ajv (schemas.mjs), and the script as a check is run
 // once on a copy with no packages.
@@ -11,7 +11,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { inStep as inStepAt, itemsIn, KEY, LAST_NUMBERED } from "../scripts/archive.mjs";
-import { counts, heldThere, holders, ownRules, report } from "../scripts/holders.mjs";
+import { OWN, counts, holders, ownHolders, ownReport, report } from "../scripts/holders.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { fingerprint, rules, rulesOf } from "../scripts/rules.mjs";
 import { shapeFaults } from "../scripts/schemas.mjs";
@@ -168,51 +169,76 @@ ok(own.status === 0 && !own.stderr, "the core's own holders.json names only rule
 const failing = project({ "tasks/x.md: Gone": "audit" });
 fs.mkdirSync(path.join(failing, "scripts", "staged"));
 fs.mkdirSync(path.join(failing, "scripts", "schemas"));
-for (const f of ["archive.mjs", "core-address.mjs", "core-path.mjs", "holders.mjs", "packages.mjs", "rules.mjs", "schemas.mjs", "schemas/holders.json", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
+for (const f of ["archive.mjs", "core-address.mjs", "core-path.mjs", "guards.mjs", "holders.mjs", "packages.mjs", "rule-files.mjs", "rules.mjs", "schemas.mjs", "schemas/holders.json", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
 fs.writeFileSync(path.join(failing, "scripts", "staged.mjs"), "export const CASES = [];\n");
 fs.writeFileSync(path.join(failing, "scripts", "outcomes.mjs"), "export const NUMBER = /^$/u;\n");
 const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.mjs")], { encoding: "utf8" });
 ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`) && /^::warning::The form of scripts\/holders\.json was not checked: the package ajv is not installed\. Mend: run node scripts\/install\.mjs/mu.test(run.stdout),
   "where holders.json is wrong the check fails, each failure saying its mend; on a copy with no packages its form goes unchecked, said as a warning with its mend, and the rest is read as ever", `${run.stdout}${run.stderr}`);
 
-// a project's own rules (#459, point 1; #484, points 9 and 10): each by its list's holder and what it is about; those
-// the list leaves out, entries that are wrong, and rules about a kind or every project, which go to the core as ideas
-const ownFiles = { "AGENTS.md": "# P\n\n- **Saves are atomic.** By default x.\n- **Players see their own hand.** By default y.\n- **Models answer in time.** By default z.\n- **Untold.** By default w.\n", "core/tasks/x.md": "- **Not ours.** x\n", "tests/save.test.js": "" };
-const list = JSON.stringify({ rules: {
-  "AGENTS.md: Saves are atomic": { held: "test: tests/save.test.js", about: "this project" },
-  "AGENTS.md: Players see their own hand": { held: "review", about: "its kind: a card game" },
-  "AGENTS.md: Models answer in time": { held: "check: scripts/missing.mjs", about: "every project" },
-  "AGENTS.md: Gone": { held: "review", about: "this project" } } });
-const o = ownRules(["AGENTS.md", "core/tasks/x.md"], f => ownFiles[f] ?? null, list);
-ok(o.counts.all === 4 && o.counts.test === 1 && o.counts.review === 1 && o.counts.check === 0 && o.none.join() === "AGENTS.md: Untold"
-  && o.toCore.length === 2 && o.toCore[0].includes("its kind: a card game") && o.wrong.some(w => /missing\.mjs, which is not there/.test(w)) && o.wrong.some(w => /"AGENTS\.md: Gone" names no rule/.test(w)) && o.wrong.every(w => /Mend:/.test(w)),
-  "a project's own rules are listed by what holds them and what they are about: the copy of the core aside, one the list leaves out, a check not there said and counted as holding nothing, a rule gone said, a rule of a kind or every project marked for the core", JSON.stringify(o));
-const unlisted = ownRules(["AGENTS.md"], f => ownFiles[f] ?? null, null), unread = ownRules(["AGENTS.md"], f => ownFiles[f] ?? null, "{");
-ok(unlisted.none.length === 4 && unlisted.wrong.length === 0 && unread.wrong.some(w => /cannot be read as JSON/.test(w)), "with no list every rule is said as not listed, and a list that cannot be read is said, nothing failing");
-// a holder "in part" is read, its path checked, and counted apart; a rule file with no rule the check reads is named
-const parted = ownRules(["AGENTS.md", "CLAUDE.md"], f => ({ ...ownFiles, "CLAUDE.md": "@AGENTS.md\n" })[f] ?? null, JSON.stringify({ rules: {
-  "AGENTS.md: Saves are atomic": { held: "test: tests/save.test.js, in part", about: "this project" },
-  "AGENTS.md: Untold": { held: "check: scripts/gone.mjs, in part", about: "this project" } } }));
-ok(parted.counts.part === 1 && parted.counts.test === 0 && parted.wrong.some(w => /gone\.mjs, which is not there/.test(w)) && !parted.wrong.some(w => /in no form/.test(w)) && parted.bare.join() === "CLAUDE.md",
-  "a holder written \"in part\" is read and counted apart, one not there said; a rule file that holds no rule the check reads is named", JSON.stringify(parted));
-// (read as a project's own are read: inside the project, a file; a device or a path that leads out is not there, and
-// read nothing, so that no list makes the look hang)
-const { isHere, readHere } = await import("../scripts/rule-files.mjs");
-const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "own-rules-")), here = process.cwd();
-fs.writeFileSync(path.join(outsideDir, "AGENTS.md"), ownFiles["AGENTS.md"]);
-fs.mkdirSync(path.join(outsideDir, "tests"));
-process.chdir(outsideDir);
-const devices = ownRules(["AGENTS.md"], readHere, JSON.stringify({ rules: { "AGENTS.md: Saves are atomic": { held: "check: /dev/zero", about: "this project" }, "AGENTS.md: Untold": { held: "test: ../outside.js", about: "this project" }, "AGENTS.md: Models answer in time": { held: "test: tests", about: "this project" } } }), "core/", isHere);
-process.chdir(here);
-ok(devices.wrong.filter(w => /which is not there/.test(w)).length === 2 && devices.counts.test === 1, "a holder that is a device or leads out of the project is read as not there, read from its stat alone; a folder inside it is there", devices.wrong.join("\n"));
-const inCore = spawnSync(process.execPath, [path.join(root, "scripts", "holders.mjs"), "--project"], { cwd: root, encoding: "utf8" });
-ok(inCore.status === 1 && mended(inCore.stdout) && /holders\.mjs --list/.test(inCore.stdout), "in the core's own repository --project fails, saying to list the core's rules with --list", inCore.stdout + inCore.stderr);
-const allHeld = heldThere(root, []), less = heldThere(root, ["core/scripts/shape.mjs"]);
-ok(allHeld.all > 0 && allHeld.held > 0 && less.held < allHeld.held, "of the core's rules, one held only by a check that read nothing is not held there", JSON.stringify({ allHeld, less }));
-// a module the manifest leaves out is not counted; the floor, never left out, is (#459, point 3)
-const game = rules(root).filter(r => r.file === "tasks/game-design.md").length, floor = rules(root).filter(r => r.file.startsWith("floor/")).length;
-const noGame = heldThere(root, [], new Set(["game-design.md"])), noFloor = heldThere(root, [], new Set(["security.md"]));
-ok(game > 0 && noGame.all === allHeld.all - game && floor > 0 && noFloor.all === allHeld.all, "of the core's rules, those of a module the manifest leaves out are not counted, and the floor's always are", JSON.stringify({ game, noGame, noFloor }));
+// ---- a project's own rules (#662) ----
+// (a scratch project: its AGENTS.md with one rule held and one not, the file it pulls in, its SECURITY.md with the rule
+// file it adds, and a copy of the core whose rules are none of its own)
+const proj = fs.mkdtempSync(path.join(tmp, "own-"));
+const put = (f, t) => { fs.mkdirSync(path.dirname(path.join(proj, f)), { recursive: true }); fs.writeFileSync(path.join(proj, f), t); };
+put("AGENTS.md", "# A game\n\n@core/floor/security.md\n@docs/play.md\n\n- **Each computer player keeps its style.** A test plays each.\n- **Name things plainly.** Words.\n");
+put("docs/play.md", "# Play\n\n- **A turn ends on a move.** Rules of play.\n");
+put("SECURITY.md", "# Security\n\n3. **The protected files,** besides:\n   - **the rule files:** `docs/design.md`;\n");
+put("docs/design.md", "# Design\n\n**Saves are small.** Read on need.\n");
+put("core/floor/security.md", "# The floor\n\n**1. Nothing secret.** The core's.\n");
+put("tests/style.test.js", "");
+// (a tool's own file of the project's, and a copy of the core where its manifest places it, under shared/core/)
+const copied = fs.mkdtempSync(path.join(tmp, "own-"));
+const put2 = (f, t) => { fs.mkdirSync(path.dirname(path.join(copied, f)), { recursive: true }); fs.writeFileSync(path.join(copied, f), t); };
+put2("AGENTS.md", "# A tool\n\n@shared/core/floor/security.md\n\n- **Keep it short.** Words.\n");
+put2("SECURITY.md", "# Security\n");
+put2("core-manifest.md", "Core: " + CORE + " at " + "a".repeat(40) + ", copied whole under shared/core/ (never edited here).\n");
+put2("shared/core/floor/security.md", "# The floor\n\n**1. Nothing secret.** The core's.\n");
+put2("GEMINI.md", "# Gemini\n\n- **Ask before a big change.** Words.\n");
+spawnSync("git", ["init", "-q"], { cwd: copied });
+spawnSync("git", ["add", "-A"], { cwd: copied });
+const tooled = ownHolders(copied).rules.map(r => r.key);
+ok(tooled.includes("GEMINI.md: Ask before a big change") && tooled.includes("AGENTS.md: Keep it short") && !tooled.some(k => k.startsWith("shared/core/")),
+  "a tool's own file of the project's is read for its rules, and the core's copy is left out where the manifest places it", tooled.join("; "));
+const ownCli = (...a) => spawnSync(process.execPath, [path.join(root, "scripts", "holders.mjs"), "--own", ...a], { cwd: proj, encoding: "utf8" });
+const unlisted = ownHolders(proj);
+ok(JSON.stringify(unlisted.rules.map(r => r.key).sort()) === JSON.stringify(["AGENTS.md: Each computer player keeps its style", "AGENTS.md: Name things plainly", "SECURITY.md: The protected files", "SECURITY.md: the rule files", "docs/design.md: Saves are small", "docs/play.md: A turn ends on a move"]) && !unlisted.list
+  && unlisted.start.has("docs/play.md: A turn ends on a move") && !unlisted.start.has("docs/design.md: Saves are small"),
+  "a project's own rules are those of its rule files, what its AGENTS.md pulls in and what its SECURITY.md adds, none of the core's copy; those pulled in are read at the start", unlisted.rules.map(r => r.key).join("; "));
+let r2 = ownCli("--write");
+const written = JSON.parse(fs.readFileSync(path.join(proj, OWN), "utf8")).holders;
+ok(r2.status === 0 && Object.keys(written).length === 6 && Object.values(written).every(v => v === "none") && /6 have no holder/.test(r2.stdout),
+  "--write writes the first list, each rule named as held by none, and fails nothing", `${r2.stdout}${r2.stderr}`);
+fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { ...written, "AGENTS.md: Each computer player keeps its style": "check: tests/style.test.js", "docs/design.md: Saves are small": "check: tests/saves.test.js", "AGENTS.md: Gone": "audit", "docs/play.md: A turn ends on a move": "check: the code review" } }));
+const held = ownHolders(proj), lines = ownReport(proj);
+ok(counts(held).check === 1 && counts(held).none.length === 5 && held.wrong.length === 3 && held.wrong.some(w => w.includes("a review, which holds no rule")) && held.wrong.every(w => /Mend: /.test(w)),
+  "the list names one rule's check, which is there; one that is not there, a review named as a check, and a rule that is gone, are wrong, each with its mend", held.wrong.join("\n"));
+const listed = lines.find(l => l.startsWith("- No holder")) ?? "";
+ok(/^- Of 6 rules of the project's own .*: 1 held whole by a check, .* 5 have no holder/.test(lines[0]) && listed.indexOf("docs/play.md: A turn ends on a move") < listed.indexOf("docs/design.md: Saves are small") && !listed.includes("Each computer player") && lines.filter(l => /Mend: /.test(l)).length === 3,
+  "the report's lines: the counts, the rules with no holder, those read at a session's start first, and each wrong line of the list", lines.join("\n"));
+// (holders that are no text, or empty, as no schema reads a project's list: named wrong once for their key, and the
+// report still made)
+fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { ...written, "AGENTS.md: Name things plainly": [3, "", { by: "x" }], "docs/design.md: Saves are small": null } }));
+const untyped = ownHolders(proj);
+ok(untyped.wrong.length === 2 && untyped.wrong.every(w => w.includes("no text or an empty one") && /Mend: /.test(w)) && ownReport(proj)[0].startsWith("- Of 6 rules"),
+  "a holder in the project's list that is no text, or an empty one, is named wrong once for its key, saying the mend, and the report is still made", untyped.wrong.join("\n"));
+// (a key and a value of the list, and a rule's lead, holding a line break, a workflow command and a mention: each goes
+// into the report on one line, in a code span)
+fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { "x\n::error::key @ghost": "audit", "AGENTS.md: Name things plainly": "weird\n::warning::v" } }));
+put("docs/play.md", "# Play\n\n- **A turn ends on a move.** Rules of play.\n- **Ask `@octocat` first.** Words.\n");
+const hostile = ownReport(proj);
+ok(hostile.every(l => !l.includes("\n")) && !hostile.some(l => /(?:^|[^`'])@(?:ghost|octocat)/u.test(l.replace(/`[^`]*`/gu, ""))) && hostile.some(l => l.includes("`x?::error::key @ghost`")),
+  "text from the project's files goes into the report on one line, in code spans, so no workflow command or mention acts (floor rule 5)", hostile.join("\n"));
+fs.writeFileSync(path.join(proj, OWN), '{"holders": @ghost }');
+const unreadable = ownReport(proj).join("\n");
+ok(/cannot be read \(`[^`]*@ghost[^`]*`\)/u.test(unreadable) && !/@ghost/u.test(unreadable.replace(/`[^`]*`/gu, "")), "a list that cannot be read is named with JSON's own words in a code span, so no mention in it acts", unreadable);
+put("docs/play.md", "# Play\n\n- **A turn ends on a move.** Rules of play.\n");
+fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { ...written, "AGENTS.md: Each computer player keeps its style": "check: tests/style.test.js", "docs/design.md: Saves are small": "check: tests/saves.test.js", "AGENTS.md: Gone": "audit", "docs/play.md: A turn ends on a move": "check: the code review" } }));
+r2 = ownCli();
+ok(r2.status === 0 && /No holder/.test(r2.stdout), "--own fails nothing, a wrong list included", `${r2.stdout}${r2.stderr}`);
+r2 = ownCli("--write");
+const kept = JSON.parse(fs.readFileSync(path.join(proj, OWN), "utf8")).holders;
+ok(r2.status === 0 && kept["AGENTS.md: Each computer player keeps its style"] === "check: tests/style.test.js" && kept["AGENTS.md: Name things plainly"] === "none", "--write again keeps what the list names", JSON.stringify(kept));
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);

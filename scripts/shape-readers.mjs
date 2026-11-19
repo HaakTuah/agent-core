@@ -69,11 +69,7 @@ export const CHANGE_MARKS = {
 // What a baseline that names no reader was written with: the check as #246 built it.
 export const FIRST_READS = ["javascript"];
 
-// The reader of each file of code, by its extension; a file of none is no code the readers follow.
-const LANGUAGE = new Map([...CODE.map(e => [e, "javascript"]), [".cs", "csharp"], [".py", "python"]]);
-export const isCode = file => LANGUAGE.has(path.posix.extname(file));
-// The languages they read, by name (read-nothing.mjs says them).
-export const LANGUAGES = [...new Set(LANGUAGE.values())].map(r => READERS[r]);
+export const isCode = file => [...CODE, ".cs", ".py"].includes(path.posix.extname(file));
 const PACKAGE_FILE = /(^|\/)(package\.json|pyproject\.toml|[^/]*requirements[^/]*\.txt|[^/]+\.csproj)$/u;
 export const isPackageFile = file => PACKAGE_FILE.test(file);
 // (the same, as git pathspecs)

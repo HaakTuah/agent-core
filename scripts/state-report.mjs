@@ -1,7 +1,7 @@
 // The state report (roles/orchestrator.md, "The scheduled look"; core archive 218): once a month the scheduled look
 // (look.mjs, beside this file) opens it, in the core and in every project that takes it. It reports and asks nothing
 // (floor rule 14): led by the five outcomes and what the work cost (outcomes.mjs, beside this file; #302), each measure that keeps a baseline against the last report, in the core the rules of the floor and
-// the modules by what holds them, those with none listed (holders.mjs, beside this file), whether the rules' pruning is
+// the modules by what holds them, and in a project its own rules (#662), those with none listed (holders.mjs, beside this file), whether the rules' pruning is
 // due (pruning.mjs, beside this file; #303), which rules each role cited in
 // the month before (cited.mjs, beside this file), what the look keeps open past a week, and the step that files a check
 // for each rule the reviews found twice and the step that adds the rounds of review the pull requests took (#477), both
@@ -22,19 +22,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { HEADING as CITED, citedFrom, mergedIn } from "./cited.mjs";
 import { CORE } from "./core-address.mjs";
-import { copyOf } from "./core-path.mjs";
 import { classify } from "./core-cost.mjs";
 import { HEADING as OUTCOMES, outcomesFrom } from "./outcomes.mjs";
 import { pinOf } from "./core-moved.mjs";
-import { leftOut } from "./reading.mjs";
 import { reading, rulesOf } from "./dose.mjs";
 import { baselineOf } from "./strength.mjs";
 import { ghApi, pagesOf } from "./labels.mjs";
-import { OWN, heldThere, ownRules, report as holdersReport, shareLine } from "./holders.mjs";
-import { readNothing } from "./read-nothing.mjs";
+import { report as holdersReport } from "./holders.mjs";
 import { said as pruningSaid } from "./pruning.mjs";
-import { isHere, readHere, ruleFiles } from "./rule-files.mjs";
-import { ROOT, rules } from "./rules.mjs";
+import { ruleFiles } from "./rule-files.mjs";
+import { rules } from "./rules.mjs";
 import { started } from "./started.mjs";
 import { billedLine, line as waitLine, measure as measureWait, selfHosted } from "./wait.mjs";
 
@@ -108,9 +105,9 @@ const pct = (a, b) => (b ? `${Math.round((100 * a) / b)}%` : "none merged");
 const heldNow = () => { try { return holdersReport(); } catch { return null; } };
 
 // The report's text. `core`: whether this is the core's own repository; `previous`: the last report's text, or null;
-// `overdue`: [{ number, title, since }]; `counts` (a project): { pin, behind, steps, merged, held } as readCounts gives them;
-// `holders` (the core): the lines holders.mjs gives, the rules of the floor and the modules by what holds them, read
-// here where left out, and null where they could not be read; `cited`: the lines cited.mjs gives for the month before,
+// `overdue`: [{ number, title, since }]; `counts` (a project): { pin, behind, steps, merged } as readCounts gives them;
+// `holders`: the lines holders.mjs gives, in the core the rules of the floor and the modules by what holds them, read
+// here where left out, and in a project its own rules (--own; #662), and null where they could not be read; `cited`: the lines cited.mjs gives for the month before,
 // null where they were not counted; `outcomes`: the lines outcomes-read.mjs gives for the month before, which the report
 // leads with (#302), null where they were not read; `pruning` (the core): the lines pruning.mjs gives for `month`.
 export function body({ core, month, measures, shape: shaped = null, wait = null, previous, overdue, counts = null, holders = core ? heldNow() : null, cited = null, outcomes = null, pruning = core ? pruningSaid({ month }) : null, scripts }) {
@@ -125,7 +122,7 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
     "",
     "**The rules, by what holds them**",
     ...(holders ?? [core ? "- Not read: `scripts/holders.mjs` could not read them, so the report leaves them out rather than guess."
-      : "- The core's rules, in the core's own report; how many of this project's own, and of the core's it takes, a check holds, under the counts below."]),
+      : `- Not read: \`${scripts}/holders.mjs --own\` could not read this project's own rules, so the report leaves them out rather than guess.`]),
     ...(pruning ? ["", "**The pruning of the rules**", ...pruning] : []),
     "",
     `**${CITED}**`,
@@ -146,8 +143,7 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
     `- copy: ${counts.pin ?? "not read"}${counts.behind === null ? "" : `, ${counts.behind} commits behind the core's main`}.`,
     `- steps not done: ${counts.steps ?? "not read"}.`,
     counts.merged ? `- merged in ${before(month)}: ${counts.merged.all}, the core's share ${pct(counts.merged.sync + counts.merged.upkeep, counts.merged.all)} (sync ${counts.merged.sync}, upkeep ${counts.merged.upkeep}, update ${counts.merged.update}, own ${counts.merged.own}).`
-      : `- merged in ${before(month)}: not read (the token here may not read pull requests).`,
-    counts.held ? shareLine(counts.held.own, counts.held.there) : "- rules held by a check: not read.");
+      : `- merged in ${before(month)}: not read (the token here may not read pull requests).`);
   return lines.join("\n");
 }
 
@@ -164,18 +160,7 @@ export function readCounts({ repo, manifest, month, steps, gh = ghApi }) {
     for (const p of pulls) p.files = pagesOf(`repos/${repo}/pulls/${p.number}/files`, gh).map(f => f.filename);
     merged = share(pulls, ruleFiles(undefined, undefined, { tools: true }));
   } catch { /* (not read) */ }
-  return { pin, behind, steps, merged, held: heldHere(manifest) };
-}
-
-// Of a project's rules, those a check holds (#459, point 3): its own, by its list (holders.mjs, --project), and the
-// core's it takes (the modules its manifest leaves out aside), none whose every check read nothing here
-// (read-nothing.mjs); null where they cannot be read.
-function heldHere(manifest) {
-  try {
-    const read = readHere; // (inside the project, a file: rule-files.mjs)
-    const nothing = readNothing(process.cwd(), manifest ?? "", read).map(n => n.check);
-    return { own: ownRules(ruleFiles(), read, read(OWN), copyOf(), isHere), there: heldThere(ROOT, nothing, leftOut(manifest)) };
-  } catch { return null; }
+  return { pin, behind, steps, merged };
 }
 
 // What a push waits on and the minutes GitHub bills a pull request (wait.mjs), from a state report's measures, above its
@@ -197,22 +182,16 @@ function waitsFrom(text) {
 // through the core's own rule names alone, `known`), and, of a public project (`open`), its outcomes (outcomes.mjs's
 // outcomesFrom, which lets through its own measures' names and words alone); null where none is in its form. The commit its copy holds is kept
 // only where `named` (the owner's public project).
-// (each count's whole-line form, and what is written anew from it; `named`, whether the copy's commit is kept)
-const COUNT_FORMS = [
-  [/^- copy: ([0-9a-f]{40}|not read)(?:, (\d{1,9}) commits behind the core's main)?\.$/, (m, named) => `copy${named && m[1] !== "not read" ? ` ${m[1]}` : ""}${m[2] ? ` ${m[2]} commits behind the core's main` : m[1] === "not read" ? " not read" : ""}`],
-  [/^- steps not done: (\d{1,6}|not read)\.$/, m => `steps not done: ${m[1]}`],
-  [/^- merged in (\d{4}-\d\d): (\d{1,6}), the core's share (\d{1,3}%|none merged) \(sync (\d{1,6}), upkeep (\d{1,6}), update (\d{1,6}), own (\d{1,6})\)\.$/,
-    m => `merged in ${m[1]}: ${m[2]}, the core's share ${m[3]} (sync ${m[4]}, upkeep ${m[5]}, update ${m[6]}, own ${m[7]})`],
-  [/^- merged in (\d{4}-\d\d): not read /, m => `merged in ${m[1]}: not read`],
-  [/^- rules held by a check: the project's own (\d{1,6}) of (\d{1,6}), the core's (\d{1,6}) of (\d{1,6})\.$/, m => `rules held by a check: its own ${m[1]} of ${m[2]}, the core's ${m[3]} of ${m[4]}`],
-  [/^- rules held by a check: not read\.$/, () => "rules held by a check: not read"],
-];
 export function countsFrom(text, named, known = new Set(rules().map(r => r.key)), open = named) {
   const part = String(text ?? "").split(`**${COUNTS}**`)[1] ?? "";
   const out = [];
   for (const line of part.split(/\r?\n/)) {
-    const said = COUNT_FORMS.map(([form, write]) => { const m = form.exec(line); return m && write(m, named); }).find(Boolean);
-    if (said) out.push(said);
+    let m;
+    if ((m = /^- copy: ([0-9a-f]{40}|not read)(?:, (\d{1,9}) commits behind the core's main)?\.$/.exec(line))) out.push(`copy${named && m[1] !== "not read" ? ` ${m[1]}` : ""}${m[2] ? ` ${m[2]} commits behind the core's main` : m[1] === "not read" ? " not read" : ""}`);
+    else if ((m = /^- steps not done: (\d{1,6}|not read)\.$/.exec(line))) out.push(`steps not done: ${m[1]}`);
+    else if ((m = /^- merged in (\d{4}-\d\d): (\d{1,6}), the core's share (\d{1,3}%|none merged) \(sync (\d{1,6}), upkeep (\d{1,6}), update (\d{1,6}), own (\d{1,6})\)\.$/.exec(line)))
+      out.push(`merged in ${m[1]}: ${m[2]}, the core's share ${m[3]} (sync ${m[4]}, upkeep ${m[5]}, update ${m[6]}, own ${m[7]})`);
+    else if ((m = /^- merged in (\d{4}-\d\d): not read /.exec(line))) out.push(`merged in ${m[1]}: not read`);
   }
   out.push(...waitsFrom(text));
   const cited = citedFrom(text, known);

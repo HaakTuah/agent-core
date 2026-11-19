@@ -8,6 +8,10 @@ player can choose to use.
   - Nothing in the logic of the *computer players*, nor in *what they are shown*, says whether another player is a
     person; they judge every player by behaviour alone, so the game tests everyone alike.
   - The game makes no tells that give a person away, such as computer players that answer at once.
+  - The one condition that changes it (#484): a game may make knowing who is a person a setting, where knowing is part
+    of what the game is for and its *game page* says so; whatever is measured (the simulations, the standing measures,
+    an experiment) runs with the setting off. It does not mean a tell stays in where the setting is off. Reason: a
+    party game with model players may be played for knowing, and a rule that forbids it would stop that game.
 - **The computer players never cheat.** They hold nothing a player in their place could not
   see or know: no sight through what hides the game from a player, no knowledge it was not given.
 - **What must be remembered is decided once for each game.** By default the *game page* says, once
@@ -69,6 +73,15 @@ player can choose to use.
   instead): the rules are measured through their play, and weak play hides what is wrong with a rule.
   - Stronger never means samey: where there are several, each keeps its own style, checked before and after a change to
     their play.
+- **A game whose rules are given is built as given** (#484). By default, where a game is a traditional one, or its
+  rules come from a rule set the owner hands in, those rules as written down are its spec, and the points on design
+  of this module ("Don't prohibit", "No solutions", "Reality first", "Effects from causes", "Levers, not luck" and "Using a
+  feature must pay") bind only what the project adds or may choose: options, table sizes, variants, and how the
+  *computer players* play. Where the measures show a given rule never pays, or that chance alone decides it, the
+  builder who finds it reports it to the owner on the *game page*, and no session changes the rule. It does not mean
+  the measures are not taken. Reason: a traditional card game forbids a play outright, and a builder holding it to
+  these points would either stop or break them without saying so. Held by no check: whether a rule is given is read
+  from the game page by the design check.
 - **Don't prohibit; give it its real cost,** so the player keeps its agency. An action a player
   could realistically take is never forbidden because it seems unwise; the game's own rules make it as costly, risky and
   rare as it really was, so the rare exception stays possible, as Hannibal crossed the Alps.
@@ -114,23 +127,6 @@ player can choose to use.
   hold a player (daily rewards, streaks, timers that punish leaving), or a model's verdict on whether it is fun, which
   stays the owner's own play. Reason: a feature that serves none of the aims the owner set is still built, and the owner
   finds it only in play. The design check reads it; no check holds it yet.
-- **A game takes each kind that is true of it** (#484). By default a game is sorted by what it is made of, never by a
-  genre, and takes every kind that is true of it: a game the project designs, an emergent simulation, a traditional
-  game, a game with model players, a game played in real time, a game played online, a show for a room; one game takes
-  several. The trigger is a game's first stage, or a change that makes another kind true of it: its builder writes
-  each kind that is true of it on the *game page*, which holds them, since nothing reads a game's kinds yet (#484,
-  points 6 and 11). It does not mean a list of genres, nor that a kind binds before it is true of the game. Reason: a
-  game that is two kinds at once was held to the rules of one. The design check reads the page; no check holds it yet.
-- **A rule of a game's kind moves to the core once a second game needs it** (#484). By default a rule a game writes for
-  itself stays in the game, and whether it is about this game, its kind or every game is asked by the audit
-  (`tasks/cleaning.md`, "A project's own rules name what holds them"), which files one about a kind to the core as an
-  idea. The one condition that changes it: a second game needs the same rule, one that stands or one the owner has
-  planned. The trigger is that idea's line joining the core's queue: its builder writes the rule for the kind, never for
-  the game it came from, and the session that syncs it into a game takes out that game's own copy, pointing to the
-  core's ("One fact, one place"). It does not mean a game's rule is taken from it before the owner's word, nor that a
-  kind with one game gets a part in the core. Reason: two games each held rules true of their kind (on what a request to
-  a model may imply, on how fast a computer player may react), and a new game of that kind would have to find them
-  again. Held by the audit, through the project's list; the copies check, once a rule stands in both places.
 - **Every stage is a game.** A game built in stages ends each stage in one someone can play from
   start to finish and enjoy; a feature that makes sense only once later ones exist waits for them.
 - **The first stage is the loop alone.** By default a game built in stages has as its first stage
@@ -156,6 +152,13 @@ player can choose to use.
     within its own seat.
   - A model is called only where its judgement can change what happens; the obvious, the routine and the mechanical are
     the code's.
+  - **Play that is measured and play that entertains are told apart** (#484). By default the computer players play as
+    strongly as they can ("Strong computer players") and a model is called as the point above says. The one condition
+    that changes it: a game may have a mode whose *game page* says its purpose is the show, in which who decides a move
+    may follow what makes the show, a model seat taking a move a script would find plain among them; nothing is
+    measured in that mode. It does not mean a script that errs on purpose, nor a seat kept from what a player in its
+    place would see: a model's mistakes are its own. Reason: in a party game a model's mistake at a high point is the
+    show. Held by no check: whether a mode is for the show is the game page's to say.
 - **In a game played online, everything new works online,** the same on every screen, with the
   protocol's version raised when its messages change, which an older client refuses as floor topic 5 says ("A reader
   refuses a version it does not know").
@@ -181,6 +184,11 @@ player can choose to use.
   the game shows a person, as plainly and in the same order, so that every player reads the game on equal terms. The
   general forms (at a glance, nothing by colour alone, reduced motion keeping whatever informs, one name for each
   thing) are `tasks/screens.md`'s points 9, 12 and 13: a game with a screen takes both modules.
+- **A game's own scene is no desktop program's window** (#484). By default `tasks/screens.md`, point 15 (the
+  platform's own controls, windows that resize, right-click menus) binds a game on a desktop as it binds any program.
+  The one condition that changes it: in a game, it binds the game's menus and settings and not its playing scene. It
+  does not mean the menus and settings are spared it. Reason: a playing scene read from across a room has no window to
+  resize, and a builder holding it to point 15 would add one. Held by the critique and the pictures of point 15.
 - **How a game answers a player.** In a game played through a screen, each point below binds as
   `tasks/screens.md`'s points do ("Whom it binds, and when"), and each check it names is one of that module's, the
   project's own and off until its *screen checks* name it ("What holds it" there). It does not mean that a game with no
