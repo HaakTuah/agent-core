@@ -81,7 +81,7 @@ const NOT_CHECKS = {
   "scripts/pure-sync.mjs": "run by security-review.yml as a proof alone: where it fails, the sync is not proved pure and the status says its own mend",
   "scripts/clean-merges.mjs": "run by security-review.yml as a proof alone: a merge it does not prove stops a review of an earlier commit, and the status says its own mend",
   ".github/workflows/preview.yml": "publishes a preview of a pull request's site",
-  ".github/workflows/release.yml": "cuts a release, started by hand on main",
+  ".github/workflows/release.yml": "cuts a release, started by hand on main, and runs the upgrade test on Windows on main once a day: no pull request runs it",
 };
 
 const workflows = [

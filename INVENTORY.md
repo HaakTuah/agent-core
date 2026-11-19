@@ -88,7 +88,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   ESLint's `complexity` and `max-lines-per-function`, dropped on fact: JavaScript alone; dependency-cruiser (MIT, 18
   packages) and madge, for cycles and boundaries, dropped on fact: JavaScript and TypeScript alone, where the check
   reads C# and Python too. *Bugs:* 3. **Keep:** fitting costs more than keeping, each tool knowing one language or
-  fixing its definitions; its readers go to the parser, as #486's group 3 and #519's path say.
+  fixing its definitions; its readers go to the parser, as #486's group 3 and #519's path say, C#'s functions the
+  first (`scripts/csharp-functions.mjs`, #529).
 - `scripts/choices.mjs`: fails a choice record a pull request adds without its lines, says when the pass is due, and
   reads each sign written in a measure. *Runs:* any session and the runners. *Else:* none found; the decision records'
   tools (adr-tools, log4brains) write records and check no form. *Bugs:* 1. **Keep:** nothing fits; the form is the
@@ -264,7 +265,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   17 November names no age a release must reach, which the script asks. *Bugs:* 1. **Keep:** fitting and keeping
   Renovate costs more than the script.
 - `scripts/release.mjs`, `.github/workflows/release.yml`: cuts `release-N` on `main`'s newest commit once every check
-  passed. *Runs:* the runners, started by hand. *Else:* release-please, semantic-release and changesets, dropped on
+  passed and its own run of the upgrade test on Windows, which it also runs once a day, cutting nothing. *Runs:* the
+  runners, started by hand, and daily. *Else:* release-please, semantic-release and changesets, dropped on
   fact: they write versions and notes from commit messages, which the core does not ask. *Bugs:* 0. **Keep:** small and
   stable.
 - `.github/workflows/delete-merged-branches.yml`: deletes the branches whose every commit is in `main`. *Runs:* the

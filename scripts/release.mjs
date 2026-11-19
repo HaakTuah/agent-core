@@ -6,8 +6,9 @@
 // what it would ask of a project (the sync notes it carries, each with roughly what it costs a project where it is not
 // done yet: steps.mjs, beside this file) and how a copy older than release-1 would take it, and cuts nothing; with
 // --cut it says the same, and how such a copy takes it once it is cut. The owner tags nothing by hand: the release
-// workflow (.github/workflows/release.yml) runs the cut, started by a session on the owner's word, and hands it the
-// commit it was started on and GitHub's list of the checks that ran there; the cut is refused where main has moved on
+// workflow (.github/workflows/release.yml) runs the cut, started by a session on the owner's word, once its own jobs of
+// the upgrade test on Windows have passed on that commit (#715), and hands it the commit it was started on and GitHub's
+// list of the checks that ran there; the cut is refused where main has moved on
 // from that commit, or where a check on it has not passed; and, once the staged cases hold a release (staged.mjs,
 // beside this file), where one failed in its last run as that commit's record holds it. Git and Node's own modules
 // only.
