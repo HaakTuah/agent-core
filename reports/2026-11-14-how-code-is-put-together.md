@@ -8,7 +8,7 @@ measured from a read-only clone, and for each practice a proposal for #246. The 
 
 What the audit asked for, in the owner's words on the issue:
 
-> But i want good codebases, or else I'll grow tired of developing these 2 games. […] Should we have size checks, or
+> But i want good codebases. […] Should we have size checks, or
 > more sophisticated checks? I think this requires a full audit. What does our rules and enforcement leave out of best
 > practices?
 
