@@ -14,11 +14,12 @@ import { HOST_OWN } from "../scripts/check.mjs";
 import { onPath } from "../scripts/workflow-run.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { npmOnce, root, scratch, scratchEnv, tally } from "../scripts/scratch-core.mjs";
+import { root, scratch, scratchEnv, tally } from "../scripts/scratch-core.mjs";
+import { npmOnce } from "../scripts/npm-once.mjs";
 
 const { ok, done } = tally();
 const { tmp, git, core, project } = scratch("check-test-");
-// (the core's packages installed by the real npm once, and linked into each job's clone after: scratch-core.mjs, npmOnce)
+// (the core's packages installed by the real npm once, and linked into each job's clone after: npm-once.mjs)
 const env = npmOnce(scratchEnv(core, tmp), tmp);
 const check = (dir, ...args) => { const r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), ...args], { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 const commit = (dir, what) => { git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", what); };
