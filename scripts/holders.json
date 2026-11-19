@@ -504,6 +504,7 @@
     "tasks/hosts.md: The merge line follows the host": "findings; outcome: fast",
     "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": "findings; outcome: fast",
     "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check fires; outcome: fast",
-    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": "check fires; outcome: fast"
+    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": "check fires; outcome: fast",
+    "tasks/reviews.md: What a posted review declares": "check fires; outcome: readable"
   }
 }
