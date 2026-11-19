@@ -444,9 +444,10 @@ jobs:
 
   # (on Linux the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the older
   # of the two releases with the copy older than the first, and the newer release; on Windows it runs in the release
-  # workflow alone, daily and before each release, and these two jobs run the staged cases' test alone (#715). Its
-  # first half runs in the older's job and its second in the newer's, each half under the suite's own mark, since whole
-  # it took up to 1009 s of its 900 on Windows and up to 264 s of its 240 on Linux; #304, #508, #515)
+  # workflow alone, daily and before each release, and three jobs there run the staged cases' test alone (#715). It
+  # runs in thirds, each under the suite's own mark: on Windows a job each, since in halves the longer took 805 s of
+  # its 900 and set the pull request's time; on Linux its first in the older's job and the other two in the newer's,
+  # since whole it took up to 264 s of its 240 there; #304, #508, #515, #715)
   upgrade:
     name: ${{ matrix.os == 'windows-latest' && 'staged' || 'upgrade' }} (${{ matrix.os }}, ${{ matrix.part }})
     strategy:
@@ -457,6 +458,7 @@ jobs:
           - { os: ubuntu-latest, part: newer }
           - { os: windows-latest, part: older }
           - { os: windows-latest, part: newer }
+          - { os: windows-latest, part: third }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     defaults:
@@ -481,11 +483,12 @@ jobs:
         env:
           PART: ${{ matrix.part }}
         run: node scripts/shape.mjs .github/shape.json --suite upgrade -- node tests/upgrade-test.mjs --part "$PART"
-      # (here, not in the suites: a scratch project each, which on Windows would run the suites past their time)
+      # (here, not in the suites: a scratch project each, which on Windows would run the suites past their time; a third
+      # each, a job of its own on Windows, the second and third after the newer release's upgrade test on Linux; #715)
       - name: The staged cases, each read as set, kept and broken; what is due, and when they hold a release
         if: ${{ !cancelled() && (env.RUN == 'all' || contains(env.RUN, ' tests/staged-test.mjs ')) }}
         env:
-          STAGED: ${{ matrix.part == 'older' && 'first' || matrix.part == 'newer' && 'second' || 'all' }}
+          STAGED: ${{ matrix.part == 'older' && 'first' || matrix.part == 'third' && 'third' || matrix.part == 'newer' && runner.os == 'Linux' && 'second,third' || matrix.part == 'newer' && 'second' || 'all' }}
         run: node scripts/shape.mjs .github/shape.json --suite staged -- node tests/staged-test.mjs --part "$STAGED"
 
   # (the one check the ruleset asks for by name: it passes only where the suites, the staged cases on both and the
