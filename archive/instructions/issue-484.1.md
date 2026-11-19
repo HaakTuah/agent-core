@@ -12,3 +12,4 @@ The index, and how an item is written: `archive/instructions.md`.
        know who is a person", "A game whose rules are given is built as given", "Play that is measured and play that
        entertains are told apart" and "Code decides facts; models phrase them" in `tasks/game-design.md`, and points 10
        and 15 of `tasks/screens.md`.
+       Changes: 112, 114.

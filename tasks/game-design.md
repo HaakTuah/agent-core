@@ -75,7 +75,7 @@ player can choose to use.
     their play.
 - **A game whose rules are given is built as given** (#484). By default, where a game is a traditional one, or its
   rules come from a rule set the owner hands in, those rules as written down are its spec, and the points on design
-  below ("Don't prohibit", "No solutions", "Reality first", "Effects from causes", "Levers, not luck" and "Using a
+  of this module ("Don't prohibit", "No solutions", "Reality first", "Effects from causes", "Levers, not luck" and "Using a
   feature must pay") bind only what the project adds or may choose: options, table sizes, variants, and how the
   *computer players* play. Where the measures show a given rule never pays, or that chance alone decides it, the
   builder who finds it reports it to the owner on the *game page*, and no session changes the rule. It does not mean
@@ -184,6 +184,11 @@ player can choose to use.
   the game shows a person, as plainly and in the same order, so that every player reads the game on equal terms. The
   general forms (at a glance, nothing by colour alone, reduced motion keeping whatever informs, one name for each
   thing) are `tasks/screens.md`'s points 9, 12 and 13: a game with a screen takes both modules.
+- **A game's own scene is no desktop program's window** (#484). By default `tasks/screens.md`, point 15 (the
+  platform's own controls, windows that resize, right-click menus) binds a game on a desktop as it binds any program.
+  The one condition that changes it: in a game, it binds the game's menus and settings and not its playing scene. It
+  does not mean the menus and settings are spared it. Reason: a playing scene read from across a room has no window to
+  resize, and a builder holding it to point 15 would add one. Held by the critique and the pictures of point 15.
 - **How a game answers a player.** In a game played through a screen, each point below binds as
   `tasks/screens.md`'s points do ("Whom it binds, and when"), and each check it names is one of that module's, the
   project's own and off until its *screen checks* name it ("What holds it" there). It does not mean that a game with no

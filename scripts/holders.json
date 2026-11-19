@@ -397,7 +397,7 @@
     "tasks/game-design.md: Code decides facts; models phrase them": [105, 112, "#484.1"],
     "tasks/game-design.md: A game whose rules are given is built as given": ["#484.1"],
     "tasks/game-design.md: Play that is measured and play that entertains are told apart": ["#484.1"],
-    "tasks/screens.md: On a desktop": ["#484.1"],
+    "tasks/game-design.md: A game's own scene is no desktop program's window": ["#484.1"],
     "tasks/screens.md: Each size it is used at": ["#484.1"],
     "tasks/game-design.md: Different data, same rules": [105],
     "tasks/game-design.md: Don't prohibit; give it its real cost": [91, 92],
@@ -495,6 +495,8 @@
     "tasks/tests.md: A test that guards only what a release brings runs where the release is made": ["#715.2"]
   },
   "numbers": {
+    "tasks/game-design.md: A game's own scene is no desktop program's window": "correction: misread; outcome: asked",
+    "tasks/screens.md: Each size it is used at": "correction: misread; outcome: asked",
     "tasks/game-design.md: A game whose rules are given is built as given": "correction: misread; outcome: asked",
     "tasks/game-design.md: Play that is measured and play that entertains are told apart": "correction: misread; outcome: asked",
     "roles/shared/inbox.md: Nothing goes to the owner to be answered": "correction: misread; outcome: asked",
