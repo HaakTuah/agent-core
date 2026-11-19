@@ -5,7 +5,8 @@
 // copy, on what GitHub's own API gives of the pull request and its comments. It waits only while the summary Codex's
 // own app keeps on the pull request says its code review is running on the pull request's head commit. The wait ends
 // when Codex's code review finishes, or when a comment that opens "Code review:", as first posted and never edited
-// since, from the repository's owner, a member or a collaborator names that commit by its whole SHA, all forty
+// since, from an account the security-review status counts (the repository's owner, an account the project names, or
+// a person the host's rights let write, REVIEWERS and RIGHTS) names that commit by its whole SHA, all forty
 // characters, since a commit can be made to share a short one's first characters: how the next reviewer, or the
 // fallback reviewer, posts the review it took over.
 // Given the pull request's commits and files, it also waits while a pull request that needs a code review
@@ -25,13 +26,16 @@
 // neither list, it waits only for a review running, as it did before it read them. A list GitHub cut short (3000
 // files, 250 commits) is read as needing a review and as proving no update from main. A pull request that leaves this
 // script alone and whose head does not hold it as the default branch does (BOUND=false, which the workflow sets), and
-// that the host says was opened before the default branch's copy came (SINCE; boundOf in security-review.mjs), stood
+// that the host says was opened before the script first came to the default branch (SINCE; boundOf in security-review.mjs), stood
 // before the check came:
 // its missing review is said in the status, never waited for (AGENTS.md, "Nothing locks a project"); brought up to
 // date with main, it is held. A summary whose state cannot be read counts as no review of Codex's, with a warning. It
 // does not hold what a review says, that docs another provider built got their code review, nor, given no list of the
 // merges proved (a workflow older than this script), that a merge from `main` brought no change of its own: those stay
-// with the builder and the reviews. It prints, as JSON, the commit to
+// with the builder and the reviews. Once a review has run, it waits too on the marks reviews leave (review-marks.mjs,
+// beside this file; #551): the newest posted review of each kind declaring its lines and its score (#710), and, in the core's own
+// repository, a design-checked pull request's design check of its head; a review counts for these only as the
+// security-review status counts one (REVIEWERS, RIGHTS). It prints, as JSON, the commit to
 // mark and the status to give it, named "code-review", or {} for a pull request that is closed or a draft. While
 // "advisory" (the workflow's input, on unless turned off) the status is always a pass that says what the check would
 // have done, as the security-review status's.
@@ -39,13 +43,16 @@
 // Usage:  node scripts/code-review-wait.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its commits, the same> <its files, the same> [<the merges clean-merges.mjs proved>]]
 //         ADVISORY=false for a status that waits; BOUND=false and SINCE for a pull request from before the check; RUN_URL for
-//         the link the status carries; QUEUE for the head the caller's queue-only.mjs proved.
+//         the link the status carries; REVIEWERS, the accounts the project names, and RIGHTS, the host's rights of
+//         those who posted a review (a JSON list), as security-review.mjs reads them; QUEUE for the head the
+//         caller's queue-only.mjs proved.
 import { existsSync, readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
 import { copyOf } from "./core-path.mjs";
-import { ruleFiles } from "./rule-files.mjs";
+import { formOf, marksWait } from "./review-marks.mjs";
+import { RULES, ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
-import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, form, pinsAlone, queueOnly, standsFrom, status, unproved, whole } from "./security-review.mjs";
+import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, counted, pinsAlone, queueOnly, reviewersOf, standsFrom, status, unproved, whole, writersOf } from "./security-review.mjs";
 
 export const CONTEXT = "code-review";
 const SHA = /^[0-9a-f]{40}$/u;
@@ -54,23 +61,38 @@ const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry
 
 // { sha, done, why, warning? }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name);
 // merges: the SHAs of the merges clean-merges.mjs proved the ones git makes, where it ran (#323)
-export function judge(pull, comments, commits, files, rules = [], bound = true, merges = undefined, copy = null, queue = false) {
+export function judge(pull, comments, commits, files, rules = [], bound = true, merges = undefined, copy = null, more = {}) {
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
   const read = codexState(flat(comments));
-  const verdict = judgeWith(sha, flat(comments), read.state?.code_review, pull, commits, files, rules, bound, merges, copy, queue);
+  const verdict = withMarks(judgeWith(sha, flat(comments), read.state?.code_review, pull, commits, files, rules, bound, merges, copy, more), pull, flat(comments), commits, files, bound, merges, more);
   // (a summary whose state cannot be read is no review of Codex's, running or done: the check warns, and goes on)
   return read.unread ? { ...verdict, warning: UNREAD } : verdict;
 }
+// the marks reviews leave (review-marks.mjs; #551), once the review has run: a posted review's lines and score, and, in the
+// core, a design-checked pull request's design check of the head; a review counts for them only as security-review.mjs
+// counts one (more: the accounts the project names, and the host's rights read for those who posted one), never by
+// GitHub's association alone, since in an organisation a member who may only read has it too
+function withMarks(verdict, pull, list, commits, files, bound, merges, more) {
+  if (!verdict.done) return verdict;
+  const chain = commits === undefined ? undefined : new Set(standsFrom(pull, flat(commits), verdict.sha, merges));
+  const core = String(pull.base?.repo?.full_name).toLowerCase() === CORE.toLowerCase();
+  const whose = counted(pull, more?.reviewers, writersOf(more?.rights));
+  const why = marksWait({ pull, comments: list, files: files === undefined ? undefined : flat(files), chain, whose, core });
+  if (why === null) return verdict;
+  return bound ? { sha: verdict.sha, done: false, why } : { sha: verdict.sha, done: true, why: `before this check came, so not waited for: ${why}` };
+}
 // the whole SHAs a posted code review names, never a prefix: an old review naming the first characters of another
-// commit must not stand for this one; and only as it was first posted, where the pull request is held (bound)
-function postedShas(list, bound) {
-  return new Set(list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && (!bound || asPosted(comment)))
+// commit must not stand for this one; only from an account security-review.mjs counts (more: the accounts the
+// project names, and the host's rights read); and, where the pull request is held (bound), only as it was first posted
+function postedShas(list, pull, bound, more) {
+  const whose = counted(pull, more?.reviewers, writersOf(more?.rights));
+  return new Set(list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && whose(comment.user) && (!bound || asPosted(comment)))
     .flatMap((comment) => (comment.body.match(/(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/giu) ?? []).map((found) => found.toLowerCase())));
 }
-function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges, copy, queue) {
+function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges, copy, more) {
   const short = sha.slice(0, 7);
-  const posted = postedShas(list, bound);
+  const posted = postedShas(list, pull, bound, more);
   const running = review !== null && typeof review === "object" && review.commit_sha === sha && RUNNING.includes(review.status);
   if (running) {
     if (posted.has(sha)) return { sha, done: true, why: `a code review of ${short} is posted, so Codex's running one is not waited for` };
@@ -78,7 +100,7 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
   }
   if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules, copy))) return { sha, done: true, why: "no code review is running" };
   // (one its caller proved queue-only, its files as queueOnly reads them, needs none: floor rule 8, #750)
-  if (queue === true && queueOnly(pull, files)) return { sha, done: true, why: "queue-only, as queue-only.mjs proves: no code review needed" };
+  if (more?.queue === true && queueOnly(pull, files)) return { sha, done: true, why: "queue-only, as queue-only.mjs proves: no code review needed" };
   return reviewRan(sha, posted, review, pull, commits, bound, merges);
 }
 // whether a code review has run on the head, or on a commit only updates from main follow: posted, or Codex's completed
@@ -90,8 +112,8 @@ function reviewRan(sha, posted, review, pull, commits, bound, merges) {
   // (where a merge from main that git would not make stops it, the status names that merge: #323)
   const cut = unproved(pull, flat(commits), sha, merges);
   const why = cut !== undefined && [...standsFrom(pull, flat(commits), sha)].some((at) => seen.has(at))
-    ? `merge ${cut.slice(0, 7)} unproved. Mend: another reviews, posts ${form("Code")}`
-    : `no code review yet. Mend: ask one, or another reviews, posts ${form("Code")}`;
+    ? `merge ${cut.slice(0, 7)} unproved. Mend: another posts ${formOf("Code review")}`
+    : `no code review. Mend: a fresh reviewer posts ${formOf("Code review")}`;
   // a pull request whose head does not hold this check as the default branch does stood before it came: reported only
   return bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
 }
@@ -99,7 +121,6 @@ function reviewRan(sha, posted, review, pull, commits, bound, merges) {
 // whether a pull request needs a code review: not where it holds docs alone, or has a sync's shape (the manifest's pin
 // moved alone among them)
 const MANIFEST = /^(Core: \S+ at )[0-9a-f]{40}(, copied whole under \S+\/.*)$/u; // (at the path the manifest names: core-path.mjs)
-const RULES = /(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|GEMINI|REVIEW)(?:\.[\w-]+)?\.md$|threat-model|^core-manifest\.md$|^core\/|(?:^|\/)\.(?:github|claude|agents?)\//iu;
 // A rule file: by the pattern, by the project's own list, or a file of the core's copy where the default branch's
 // manifest names it (`copy`, given apart from the list, which names files alone).
 const isRule = (name, rules, copy) => RULES.test(name) || rules.includes(name) || (copy !== null && name.startsWith(copy));
@@ -138,7 +159,8 @@ if (started(import.meta.url)) {
   // (and the core's copy, at the path the default branch's manifest names, checked out here: core-path.mjs)
   const copy = existsSync("core-manifest.md") ? copyOf(".") : null;
   const pull = read(pullFile);
-  const verdict = judge(pull, read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, boundOf(process.env.BOUND, pull, process.env.SINCE), mergesFile ? read(mergesFile) : undefined, copy,
-    typeof pull?.head?.sha === "string" && /^[0-9a-f]{40}$/u.test(pull.head.sha) && process.env.QUEUE === pull.head.sha);
+  const more = { reviewers: reviewersOf(process.env.REVIEWERS), rights: process.env.RIGHTS ? read(process.env.RIGHTS) : undefined,
+    queue: typeof pull?.head?.sha === "string" && /^[0-9a-f]{40}$/u.test(pull.head.sha) && process.env.QUEUE === pull.head.sha };
+  const verdict = judge(pull, read(commentsFile), commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, rules, boundOf(process.env.BOUND, pull, process.env.SINCE), mergesFile ? read(mergesFile) : undefined, copy, more);
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL, CONTEXT), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }

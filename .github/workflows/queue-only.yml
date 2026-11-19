@@ -54,7 +54,9 @@ jobs:
       && (startsWith(github.event.comment.body, 'Security review:')
       || startsWith(github.event.comment.body, '**Security review:')
       || (!inputs.advisory && (startsWith(github.event.comment.body, 'Code review:')
-      || startsWith(github.event.comment.body, '**Code review:')))))))) }}
+      || startsWith(github.event.comment.body, '**Code review:')
+      || startsWith(github.event.comment.body, 'Design check:')
+      || startsWith(github.event.comment.body, '**Design check:')))))))) }}
     # (one at a time for a pull request, in the order they came, as the security-review job its answer feeds)
     concurrency:
       group: queue-only-${{ github.event.issue.number || github.event.pull_request.number }}

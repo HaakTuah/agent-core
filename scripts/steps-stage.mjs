@@ -296,11 +296,14 @@ export const STAGES = {
   },
   "17 November 2026, the checks as one job": {
     // (the call to core.yml folds the description check and leaves the copies checks out, their own call taken out too;
-    // the mend, as the step words it, passes core.yml their config and marks)
+    // the mend, as the step words it, passes core.yml their config and marks. Its trigger starts it once a pull request
+    // is ready, as the starter kit's does, so the description check it folds, which skips a draft, breaks no other step;
+    // where a draft skip was staged already, that step is broken as it stood)
     stage: dir => {
       const call = read(dir, ".github/workflows/core.yml").replace(/^ {6}(copies|sizes|description): .*\r?\n/gm, "");
       write(dir, ".github/workflows/core.yml", /^ {4}with:/m.test(call) ? call.replace(/^( {4}with:\r?\n)/m, "$1      description: true\n")
         : call.replace(/^( {4}uses: \S+\/\.github\/workflows\/core\.yml@\S+.*\r?\n)/m, "$1    with:\n      description: true\n"));
+      if (!/ready_for_review|github\.event\.pull_request\.draft/.test(read(dir, ".github/workflows/core.yml"))) STAGES["16 November 2026, checks once a pull request is ready"].mend(dir);
       for (const f of ["copies.yml", "pr-description.yml"]) fs.rmSync(at(dir, `.github/workflows/${f}`), { force: true });
     },
     mend: dir => write(dir, ".github/workflows/core.yml", read(dir, ".github/workflows/core.yml").replace(/^( {4}with:\r?\n)/m, "$1      copies: checks/copies.json\n      sizes: checks/sizes.json\n")),
@@ -350,6 +353,16 @@ export const STAGES = {
     mend: dir => write(dir, ".github/workflows/suites-ready.yml", READY.replace("TYPES", "\n    types: [opened, synchronize, reopened, ready_for_review]").replace("IF", "    if: ${{ !github.event.pull_request.draft }}\n")),
   },
 
+  "19 November 2026, issue and comment text read for the personal terms": {
+    asked: true,
+    // (the daily job's call as the starter kit wrote it before: no secret passed; where the project has no daily job
+    // of the kit's, as one of a release before it came, that call written)
+    stage: dir => write(dir, ".github/workflows/look.yml", fs.existsSync(at(dir, ".github/workflows/look.yml"))
+      ? read(dir, ".github/workflows/look.yml").replace(/\n {4}secrets:\n {6}PERSONAL_TERMS: .*\n/u, "\n")
+      : `name: look\n\non:\n  schedule:\n    - cron: '41 5 * * *'\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\njobs:\n  look:\n    permissions:\n      contents: read\n      issues: write\n      pull-requests: read\n      checks: read\n      statuses: read\n    uses: ${CORE}/.github/workflows/look.yml@${PIN}\n`),
+    mend: dir => write(dir, ".github/workflows/look.yml", read(dir, ".github/workflows/look.yml").replace(/^( {4}uses: .*\/\.github\/workflows\/look\.yml@.*\n)(?! {4}secrets:)/mu, "$1    secrets:\n      PERSONAL_TERMS: ${{ secrets.PERSONAL_TERMS }}\n")),
+  },
+
   "19 November 2026, the parser's packages installed where the shape check runs": {
     // (a job of the project's own that runs the shape check after an install that names no lock but the first; the mend
     // names every one, as the copies check's job does)
@@ -396,6 +409,16 @@ export const STAGES = {
       write(dir, "checks/shape-baseline.json", `${JSON.stringify({ ...baseline, reads: (baseline.reads ?? []).filter(r => r !== "csharp-tree") }, null, 2)}\n`);
     },
     // (as the step words it: the baseline written again)
+    mend: dir => spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } }),
+  },
+
+  "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser": {
+    asked: true,
+    // (a baseline written before the check read JavaScript's functions on the parser, as that of C#'s above)
+    stage: dir => {
+      const baseline = fs.existsSync(at(dir, "checks/shape-baseline.json")) ? JSON.parse(read(dir, "checks/shape-baseline.json")) : { reads: Object.keys(READERS), listed: {} };
+      write(dir, "checks/shape-baseline.json", `${JSON.stringify({ ...baseline, reads: (baseline.reads ?? []).filter(r => r !== "javascript-tree") }, null, 2)}\n`);
+    },
     mend: dir => spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } }),
   },
 };

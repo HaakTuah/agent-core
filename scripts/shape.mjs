@@ -71,6 +71,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE, append, cycles, lyingUnder, nameTree, resolve } from "./code-shape.mjs";
 import { inProject, logged } from "./guards.mjs";
+import { installed, unreached } from "./packages.mjs";
+import { shapeFaults } from "./schemas.mjs";
 import { FIRST_READS, PACKAGE_FILES, REACH, READERS, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 
@@ -82,11 +84,9 @@ export const MARKS = { lines: 60, depth: 4, branches: 15 };
 export const DOMAINS = ["rules", "saved-data", "computer-players", "display", "input", "network", "storage", "platform", "packages", "tools", "tests"];
 // What the rules never use: nothing outward.
 export const OUTWARD = ["display", "input", "network", "storage", "platform"];
-const KEYS = ["baseline", "code", "tests", "systems", "aliases", "platform", "marks", "suites", "screens", "clocks", "processes", "select", "wait", "long"];
 const SELECT_KEYS = ["proof", "whole", "none"];
 // The seconds from which a measurement runs as a job outside the session, where the config gives none (#321).
 export const LONG = 3600;
-const SYSTEM_KEYS = ["paths", "uses", "entrance", "domain", "wraps"];
 const BUILTIN = new Set(builtinModules.flatMap(m => [m, `node:${m}`]));
 
 class Refused extends Error {}
@@ -94,51 +94,35 @@ const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
 const isObject = v => !!v && typeof v === "object" && !Array.isArray(v);
 const strings = v => Array.isArray(v) && v.every(s => typeof s === "string" && s.length > 0);
 const optional = (v, test) => v === undefined || test(v);
-const isName = v => typeof v === "string" && /^[a-z][a-z0-9-]*$/u.test(v);
 const plainPath = s => typeof s === "string" && /^[\w@.-][\w@. -]*(\/[\w@.-][\w@. -]*)*\/?$/u.test(s) && !s.split("/").includes("..");
-const wholeNumbers = o => Object.values(o).every(n => Number.isInteger(n) && n > 0);
-const aSecond = n => Number.isFinite(n) && n > 0;
-const seconds = v => aSecond(v) || (isObject(v) && Object.keys(v).length > 0 && Object.values(v).every(aSecond));
 const KIT_FORM = "write it as the starter kit does (core/setup/template/shape.json.tmpl): a JSON object with \"baseline\", the baseline's path, and \"code\", git pathspecs of the code to read";
 
 // ---- the config ----
 
-function readLists(c, at) {
-  const unknown = Object.keys(c).filter(k => !KEYS.includes(k));
-  if (unknown.length) refuse(`${at} holds keys the check does not know: ${unknown.join(", ")}`, `take them out; it reads ${KEYS.map(k => `"${k}"`).join(", ")} alone`);
+// The config's shape, held by its schema (scripts/schemas/shape.json, schemas.mjs; #530): a key the check does not know,
+// or one of the wrong shape, would read less without a word, so it is refused, its first fault said with its mend.
+// Where the core's packages are not installed, as in a project's job of tests that selects with the config and installs
+// none, the shape is not checked, and what the check reads is taken where it stands in its form (formed, below); the
+// shape check itself says so as a warning (main). What the schema cannot say stays here: a path outside the project.
+function readShape(c, at) {
+  const faults = shapeFaults("shape", c, "core/", at);
+  if (faults?.length) throw new Refused(faults[0]);
+  if (faults === null && !(typeof c.baseline === "string" && strings(c.code) && c.code.length)) refuse(`${at} names no "baseline" and "code" the check can read`, KIT_FORM);
   if (!plainPath(c.baseline) || c.baseline.endsWith("/")) refuse(`${at} names no "baseline" that is a plain path inside the project`, "name the baseline's path in \"baseline\", as the starter kit writes it (checks/shape-baseline.json)");
-  for (const k of ["code", "tests"]) if (!optional(c[k], strings)) refuse(`"${k}" in ${at} is not a list of words`, "list git pathspecs there (\":!\" leaves a path out)");
-  if (!optional(c.platform, strings)) refuse(`"platform" in ${at} is not a list of words`, "list there each package or module of Node's that binds code to one platform, by the name it is imported under");
-  if (!optional(c.screens, strings)) refuse(`"screens" in ${at} is not a list of words`, "list there each package or module a test imports that opens a screen, a window or a device, by the name it is imported under");
-  for (const [k, what] of [["clocks", "reaches a real clock (sleeps, waits on a timer or reads the time)"], ["processes", "starts another process"]]) {
-    if (!optional(c[k], strings)) refuse(`"${k}" in ${at} is not a list of words`, `list there each name a test calls or imports that ${what}, beside those the check knows for each language: a call by its dotted name (Clock.Wait), a module by the name it is imported under`);
-  }
-  if (!optional(c.select, v => isObject(v) && Object.keys(v).every(k => SELECT_KEYS.includes(k)) && Object.values(v).every(strings))) refuse(`"select" in ${at} is not in the form the check reads`, `give it ${SELECT_KEYS.map(k => `"${k}"`).join(", ")} alone, each a list of git pathspecs`);
-  for (const k of ["wait", "long"]) if (!optional(c[k], aSecond)) refuse(`"${k}" in ${at} is not a number of seconds`, `give it a number of seconds above 0, or take it out`);
-  if (!c.code?.length) refuse(`${at} names no "code" to read`, "list the code's folders in \"code\", as git pathspecs (\":!\" leaves a path out)");
+  const aliases = formed(c.aliases, isObject, {});
+  if (!Object.values(aliases).every(plainPath)) refuse(`"aliases" in ${at} is not in the form the check reads`, "give each prefix an import may start with (\"@/\") the path inside the project it stands for (\"src/\")");
 }
-
-function readMarks(c, at) {
-  const given = c.marks ?? {}, marks = { ...MARKS, ...(isObject(given) ? given : {}) };
-  if (!isObject(given) || Object.keys(marks).length !== 3 || !wholeNumbers(marks))
-    refuse(`"marks" in ${at} is not in the form the check reads`, `give "lines", "depth" and "branches" a whole number each, or leave one out for the core's own (${JSON.stringify(MARKS)})`);
-  const aliases = c.aliases ?? {}, suites = c.suites ?? {};
-  if (!isObject(aliases) || !Object.entries(aliases).every(([k, v]) => k.length > 0 && plainPath(v))) refuse(`"aliases" in ${at} is not in the form the check reads`, "give each prefix an import may start with (\"@/\") the path inside the project it stands for (\"src/\")");
-  if (!isObject(suites) || !Object.values(suites).every(seconds)) refuse(`"suites" in ${at} is not in the form the check reads`, "give each suite's name its time mark in seconds: a number, or one for each of Node's names for a platform ({ \"linux\": 60, \"win32\": 240 })");
-  return { marks, aliases, suites };
-}
+// (a key as given where it holds its form, else its default: what a config unchecked can hold)
+const formed = (v, test, fallback) => (v !== undefined && test(v) ? v : fallback);
+const aSecond = n => Number.isFinite(n) && n > 0;
 
 function readSystem(name, s, systems, at) {
   const here = `the system "${name}" in ${at}`;
-  if (!isName(name)) refuse(`${here} has a name the check does not read`, "name it in small letters, digits and hyphens, a letter first");
-  if (!isObject(s) || Object.keys(s).some(k => !SYSTEM_KEYS.includes(k))) refuse(`${here} holds keys the check does not know`, `give it ${SYSTEM_KEYS.map(k => `"${k}"`).join(", ")} alone`);
-  if (!Array.isArray(s.paths) || !s.paths.length || !s.paths.every(plainPath)) refuse(`${here} names no "paths" inside the project`, "list its folders (each ending in /) or files there");
-  if (!optional(s.uses, strings)) refuse(`"uses" of ${here} is not a list of names`, "list there the systems it may import from");
-  if (!optional(s.wraps, strings)) refuse(`"wraps" of ${here} is not a list of names`, "list there the packages it alone imports");
+  if (!isObject(s) || !Array.isArray(s.paths) || !s.paths.length || !s.paths.every(plainPath)) refuse(`${here} names no "paths" inside the project`, "list its folders (each ending in /) or files there");
+  for (const k of ["uses", "wraps"]) s[k] = formed(s[k], strings, undefined);
   const other = (s.uses ?? []).find(u => !(u in systems) || u === name);
   if (other !== undefined) refuse(`${here} uses "${other}", which is no other system of the config`, "name a system the config holds, or take it out");
-  if (!optional(s.entrance, e => plainPath(e) && s.paths.some(p => e.startsWith(p)))) refuse(`${here} names an "entrance" outside its own paths`, "name the one file of the system that the others import from");
-  if (!optional(s.domain, isName)) refuse(`the "domain" of ${here} is not a name`, `name one of ${DOMAINS.join(", ")}, or the project's own in the same form`);
+  if (s.entrance !== undefined && !(plainPath(s.entrance) && s.paths.some(p => s.entrance.startsWith(p)))) refuse(`${here} names an "entrance" outside its own paths`, "name the one file of the system that the others import from");
 }
 
 // What holds between the systems: the rules use nothing outward, a package is wrapped once, and no circle is declared.
@@ -157,17 +141,26 @@ function readTogether(systems, at) {
   return wrapped;
 }
 
+// Where ajv is not installed the config's shape went unchecked, as readShape says: said as a warning, and the check
+// goes on (the core's AGENTS.md, "Nothing locks a project").
+function unchecked() {
+  if (installed("ajv")) return;
+  console.log(unreached("ajv") ? "::warning::The config's shape was not checked: the package ajv could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault"
+    : `::warning::The config's shape was not checked: the package ajv is not installed beside the core's copy. Mend: in a pull request of its own, add the step node ${path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)))} to this job before the step that runs this check`);
+}
+
 // The config as the check reads it, every key filled; it throws a Refused, with its mend, for one it cannot hold to.
 export function parseConfig(text, at = KIT) {
   let c;
   try { c = JSON.parse(text); } catch { refuse(`${at} could not be read as JSON`, KIT_FORM); }
   if (!isObject(c)) refuse(`${at} is not a JSON object`, KIT_FORM);
-  readLists(c, at);
-  const systems = c.systems ?? {};
-  if (!isObject(systems)) refuse(`"systems" in ${at} is not an object`, "give each system's name its \"paths\", and what else it declares: \"uses\", \"entrance\", \"domain\", \"wraps\"");
+  readShape(c, at);
+  const systems = formed(c.systems, isObject, {});
   for (const [name, s] of Object.entries(systems)) readSystem(name, s, systems, at);
-  const select = Object.fromEntries(SELECT_KEYS.map(k => [k, c.select?.[k] ?? []]));
-  return { baseline: c.baseline, code: c.code, tests: c.tests ?? [], systems, platform: c.platform ?? [], screens: c.screens ?? [], clocks: c.clocks ?? [], processes: c.processes ?? [], select, wait: c.wait, long: c.long ?? LONG, ...readMarks(c, at), wrapped: readTogether(systems, at) };
+  const list = k => formed(c[k], strings, []), select = Object.fromEntries(SELECT_KEYS.map(k => [k, formed(c.select?.[k], strings, [])]));
+  const marks = { ...MARKS, ...Object.fromEntries(Object.entries(formed(c.marks, isObject, {})).filter(([k, n]) => Object.hasOwn(MARKS, k) && Number.isInteger(n) && n > 0)) };
+  const suites = Object.fromEntries(Object.entries(formed(c.suites, isObject, {})).filter(([, v]) => aSecond(v) || (isObject(v) && Object.keys(v).length > 0 && Object.values(v).every(aSecond))));
+  return { baseline: c.baseline, code: c.code, tests: list("tests"), systems, platform: list("platform"), screens: list("screens"), clocks: list("clocks"), processes: list("processes"), select, wait: formed(c.wait, aSecond, undefined), long: formed(c.long, aSecond, LONG), marks, aliases: formed(c.aliases, isObject, {}), suites, wrapped: readTogether(systems, at) };
 }
 
 // ---- what stands ----
@@ -551,8 +544,8 @@ const SAID = {
   cycle: n => [`${plural(n, "import lies", "imports lie")} on a cycle between files that did not stand before`, "turn one import of the cycle round: move what both files need into a file that imports neither, or pass it in"],
   platform: n => [`${plural(n, "import binds", "imports bind")} code to one platform outside the system declared for that`, "move the code that needs it into the system of the domain \"platform\", and have the rest call what that system offers, so that the rest builds and tests wherever the project's checks run"],
   package: n => [`${plural(n, "import takes", "imports take")} a package the project ships with outside the one system that wraps it`, "import it in one system alone, named under that system's \"wraps\" in the config, and have the others use what that system offers"],
-  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (an element of JSX that never closes, a type's parameter in .tsx it takes for one, as in <T>(x: T) => T, code nested more than 200 levels deep, or C# the grammar the core installs cannot read whole, or in two minutes), so ${n === 1 ? "its" : "their"} functions are not held`,
-    "write it so that the reader can follow it: close each element, give a type's parameter in .tsx a comma or a bound (<T,>, <T extends U>), or nest less deep; where it is C# that builds, newer than the grammar reads, list the entry under \"grown\" with that reason, by its id, and tell the core which construct it is, never the project's code (the core's README.md, \"Reporting to the core\"); the check's failure on the file then names what it holds"],
+  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (JavaScript, TypeScript or C# the grammar the core installs cannot read whole, or within its time, a file of them past 2 MB, or C# or Python nested more than 200 levels deep), so ${n === 1 ? "its" : "their"} functions are not held`,
+    "write it so that the reader can follow it: close each element of JSX, write a } or > in JSX's text as {'}'} or {'>'}, and nest less deep; where a script wrote it as data past 2 MB, leave it out of the config's \"code\" (\"!\" before its pathspec); where it is code that builds, newer than the grammar reads, list the entry under \"grown\" with that reason, by its id, and tell the core which construct it is, never the project's code (the core's README.md, \"Reporting to the core\"); the check's failure on the file then names what it holds"],
   global: n => [`${plural(n, "name joins", "names join")} the global space that scripts with no import or export share: a second name of one file there, or a name another such file declares too`,
     "make the file a module that imports what it uses and exports what it offers; where the page cannot load it so, put what it adds under the one name the file declares there already (an object of its functions), and give a name that two files declare one home"],
   screen: n => [`${plural(n, "test imports", "tests import")} what opens a screen, a window or a device, where no test of ${n === 1 ? "its" : "their"} file did before`,
@@ -804,12 +797,13 @@ function main(argv) {
   const base = baseOf(), at = configAt(named, self, base);
   if (at === null) return unwritten(self, base);
   const config = parseConfig(fs.readFileSync(at, "utf8"), at);
+  unchecked();
   if (rest[0] === "--suite") return suite(config, at, self, rest.slice(1));
   const command = { "--first": first, "--write": write }[rest[0] ?? ""];
   if (rest.length > 1 || (rest.length && !command)) refuse(`the check does not know ${rest.join(" ")}`, `run node ${self} [<config>] [--first | --write], or --suite <name> with -- <command> or --since <seconds>`);
   const now = standing(config), found = survey(now.texts, config, now.tests);
   // (a baseline is written only where every reader of a file the project holds could run: one that has no file to read
-  // is no reason to refuse, so a project with no C# writes its own with the parser's packages not installed)
+  // is no reason to refuse, so a project of Python alone writes its own with the parser's packages not installed)
   const skipped = unreachedReaders().filter(r => [...found.readers.values()].includes(r));
   if (command && skipped.length) refuse(`the core's packages are not installed, so ${skipped.map(r => READERS[r]).join(", ")} cannot be read and a baseline written now would leave out what stands there`, `run node ${path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)))}${unnamedReaders().length ? " all" : ""} until it installs them, then run this again`);
   if (!command) return check(config, at, self, found, base, named);
