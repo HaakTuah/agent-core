@@ -23,12 +23,14 @@ import { fileURLToPath } from "node:url";
 import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tools.mjs";
 import { parse as parseChoices, where as choicesAt } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
-import { THIRD_PARTY, corePath } from "./core-path.mjs";
-import { modulesOf } from "./manifest-reads.mjs";
+import { corePath } from "./core-path.mjs";
+import { installed } from "./packages.mjs";
+import { differencesOf, modulesOf } from "./manifest-reads.mjs";
 import { progressOf } from "./done-when.mjs";
 import { leadsOut } from "./guards.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
 import { NOTES } from "./releases.mjs";
+import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { ruleFiles } from "./rule-files.mjs";
@@ -36,7 +38,7 @@ import { started } from "./started.mjs";
 import { toolOf } from "./strength.mjs";
 import { Unread, call, calls, commands, uncommented, copiesConfig, folded, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
-import { reads } from "./workflows.mjs";
+import { draftHoles, reads } from "./workflows.mjs";
 import { twice } from "./yaml-keys.mjs";
 import { releaseAge, WAIT } from "./licences.mjs";
 import { codeOf, covers, pinFault, pinRead } from "./licence-scan.mjs";
@@ -52,6 +54,7 @@ export const COST = {
   read: "a read of the project's own rules or settings against the entry, and a small pull request where one differs",
   config: "a check's config and its first baseline: one small pull request of a builder's; what the baseline lists is a debt worked down by tasks, at the dose the codebase's state sets",
   owner: "the owner's yes, asked once; nothing of a session's beyond the ask",
+  clean: "one cleanup lane of a builder's, once, its size set by how much of its owner's words the project holds: a pull request for its files, and its issues and comments edited on the host",
   record: "a choice record argued in full: a session's long list and trial, three fresh sessions (the blind picker, the challenger, the judge), one pull request and one issue",
 };
 
@@ -61,36 +64,9 @@ export const leads = text => [...String(text).matchAll(/^- \*\*([^*]+?)\.\*\*/gm
 // The project at `root`, as the checks read it: its files as git lists them (committed or not, ignored ones left out),
 // a file's text (null where it is not there), its manifest's slots and differences, and its workflows' YAML.
 export function project(root) {
-  const listed = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 })
-    .split("\0").filter(f => f && fs.existsSync(path.join(root, f)));
-  // (what is read is a regular file of the project's own, at most READ_MOST bytes, by a path that, every link on it
-  // followed, ends inside the project (#362, #423): a path or link that leads out, a device, a pipe or a folder reads as
-  // missing, and a file past the size as missing too, named in `unread`, so that no file the project holds stops the
-  // report; a link to a file of its own reads as that file, as the project's tools read it, and only to one git lists
-  // as the project's: never git's own folder nor a file it ignores, a person's or a machine's own)
-  const home = fs.realpathSync(root), unread = [], known = new Set(listed);
-  const within = to => { const rel = path.relative(home, to); return !!rel && rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel); };
-  const file = f => { // the regular file of the project's own a path leads to, as { real, size }, or null
-    const to = path.resolve(home, f);
-    if (!within(to)) return null;
-    try {
-      const real = fs.realpathSync(to), stat = fs.statSync(real);
-      return within(real) && known.has(path.relative(home, real).split(path.sep).join("/")) && stat.isFile() ? { real, size: stat.size } : null;
-    } catch { return null; }
-  };
-  const read = f => {
-    const at = file(f);
-    if (!at) return null;
-    if (at.size > READ_MOST) { if (!unread.includes(f)) unread.push(f); return null; }
-    try { return fs.readFileSync(at.real, "utf8").replace(/\r\n/g, "\n"); } catch { return null; }
-  };
-  // (whether another script may be given the path to read as this reader would: nothing there, or what it reads)
-  const safe = f => {
-    try { if (!fs.lstatSync(path.resolve(home, f), { throwIfNoEntry: false })) return true; } catch { return false; }
-    return (file(f)?.size ?? Infinity) <= READ_MOST;
-  };
+  const { listed, read, safe, unread } = ownFiles(root);
   const manifest = read("core-manifest.md") ?? "";
-  const differences = (/^## Differences\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(manifest)?.[1] ?? "").split("\n").filter(l => l.trim());
+  const differences = differencesOf(manifest);
   const workflows = Object.fromEntries(listed.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(f)).map(f => {
     let yaml = null;
     try { yaml = parseYaml(read(f)); } catch { /* (a workflow this reader cannot read: a check that needs it says so) */ }
@@ -98,8 +74,6 @@ export function project(root) {
   }));
   return { root, files: listed, read, safe, unread, manifest, differences, workflows };
 }
-// The most a file the steps read may hold: past any rule file, config, workflow, audit or baseline a project writes.
-export const READ_MOST = 64 << 20;
 
 // Where the project's run of each check finds its config, and its calls to the core's workflows: check-configs.mjs,
 // beside this file, whose `Unread` a step throws where it cannot read what it needs.
@@ -153,6 +127,9 @@ function strengthNamed(p) {
 // them (workflows.mjs and yaml-keys.mjs, beside this file), which GitHub refuses, running none of the file's jobs: the
 // old ones, which the check notes and passes, listed here at every sync until they are gone (#393). Null where none is.
 function keysOnce(p) {
+  // (with the core's packages not installed, as after a sync made by a copy from before #654, this step cannot be read:
+  // it says so, with the install, and every other step is still told)
+  if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`node ${corePath(p.root) || "core/"}scripts/install.mjs\`, then \`node ${corePath(p.root) || "core/"}scripts/steps.mjs\` again.`;
   const found = reads(p.files).flatMap(f => twice(p.read(f) ?? "").map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
   return found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : null;
 }
@@ -227,22 +204,176 @@ function selectionRuns(p) {
   return selects ? null : "No workflow on pull requests runs the selection of the tests a change can reach: in the job that runs the project's tests, add a step before them `node core/scripts/select.mjs --env RUN`, with `SELECT_BASE` set to the pull request's base (`origin/<its base branch>`, fetched first, or `HEAD^1` with `fetch-depth: 2`), and have the job run only the test files `RUN` names, each between spaces, or its whole suite where it says `all` (`if [ \"$RUN\" = all ]; then <the whole suite>; else <the runner> $RUN; fi`); name the project's proof, never selected out, under \"select\" and \"proof\" in the shape check's config. Where the record's numbers (`node core/scripts/test-record.mjs`) show the suite needed whole, name every test under \"select\" and \"whole\" instead, citing them in that pull request.";
 }
 
-// Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
-// its config, where the manifest names it or the starter kit writes it, read as the check reads it, and the baseline
-// that config names, which names every reader of the check's ("reads"; shape-readers.mjs), so that it lists what each
-// finds. Null where all of it stands; else the mend.
-function shapeWritten(p) {
+// Whether each job that runs the selection on a push, in a workflow a pull request runs too, gives it --passed, the name
+// of the check that gates the tests (core/tasks/tests.md, "A tree that passed is not run again"); null where it does,
+// or where no such job selects (the step of the tests a change can reach asks that first); else the mend.
+// (the step that selects gives --passed; and every step that reads RUN after it runs nothing on "none", so that no
+// runner is handed that word or an empty list, which it would read as every test. Only shapes that can be read to be
+// false on "none" count, any other is reported: an `if:` whose parts joined by && at its top hold RUN in one part
+// alone, that part nothing but `env.RUN == 'all'` and `contains(env.RUN, ' <file> ')` joined by ||, each false for
+// "none"; or a run that is the line the mend gives, `if [ "$RUN" = all ]; then …; elif [ "$RUN" != none ]; then … $RUN; fi`)
+const passes = job => (job?.steps ?? []).some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run) && /(?<![\w-])--passed(?![\w-])/u.test(step.run));
+const RUN_IN_RUN = /\$\{?RUN\}?(?![\w])/u, RUN_IN_IF = /\benv\.RUN\b/u;
+const SAFE_TERM = /^(env\.RUN\s*==\s*'all'|contains\(\s*env\.RUN\s*,\s*' [^' ]+ '\s*\))$/u;
+const RUN_LINE = /^if \[ "\$RUN" = all \]; then [^;\n]+; elif \[ "\$RUN" != none \]; then [^;\n]+ \$RUN; fi$/u;
+// (an expression split at its top level by `op`, its parentheses kept whole; null where they do not pair)
+function topLevel(text, op) {
+  const parts = [];
+  let depth = 0, from = 0, quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === "'") quoted = !quoted;
+    else if (!quoted && c === "(") depth++;
+    else if (!quoted && c === ")" && --depth < 0) return null;
+    else if (!quoted && depth === 0 && text.startsWith(op, i)) { parts.push(text.slice(from, i).trim()); from = i + op.length; i += op.length - 1; }
+  }
+  return depth === 0 && !quoted ? [...parts, text.slice(from).trim()] : null;
+}
+const unwrapped = t => { let x = t.trim(); while (x.startsWith("(") && x.endsWith(")") && topLevel(x.slice(1, -1), "&&")) x = x.slice(1, -1).trim(); return x; };
+function ifKeepsNone(expression) {
+  const body = expression.trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1");
+  const ands = topLevel(unwrapped(body), "&&");
+  const reading = ands?.filter(part => RUN_IN_IF.test(part)) ?? [];
+  if (reading.length !== 1) return false;
+  const ors = topLevel(unwrapped(reading[0]), "||");
+  return !!ors && ors.every(term => SAFE_TERM.test(unwrapped(term)));
+}
+const keepsNone = step => {
+  if (typeof step?.if === "string" && RUN_IN_IF.test(step.if)) return ifKeepsNone(step.if);
+  return typeof step?.run !== "string" || !RUN_IN_RUN.test(step.run) || RUN_LINE.test(step.run.trim());
+};
+const honoursNone = job => {
+  const after = (job?.steps ?? []).filter(step => !(typeof step?.run === "string" && SELECT_RUN.test(step.run)));
+  const reads = after.filter(step => (typeof step?.if === "string" && RUN_IN_IF.test(step.if)) || (typeof step?.run === "string" && RUN_IN_RUN.test(step.run)));
+  return reads.length > 0 && reads.every(keepsNone);
+};
+const onPush = on => (typeof on === "string" ? on === "push" : Array.isArray(on) ? on.includes("push") : !!on && "push" in on);
+function passedRuns(p) {
+  readable(p, text => text.includes("select.mjs"));
+  // (only a workflow a pull request runs too: a job that runs on a push alone ran nowhere else, and is never skipped)
+  const missing = Object.entries(p.workflows).filter(([, { yaml }]) => onPush(yaml?.on) && onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => Object.entries(yaml.jobs ?? {})
+    .filter(([, job]) => (job?.steps ?? []).some(step => typeof step?.run === "string" && SELECT_RUN.test(step.run)) && !(passes(job) && honoursNone(job)))
+    .map(([name]) => `\`.github/workflows/${file}\`, its job \`${name}\``));
+  return missing.length ? `The selection runs on a push with nothing to say whether the merged tree passed already (${missing.join("; ")}): give its step \`--passed <the check that gates the tests>\` on a push's first run alone (the job's own check, such as \`tests\`, as a ruleset requires it; in bash, \`\${SELECT_PASSED:+--passed "$SELECT_PASSED"}\` with \`SELECT_PASSED\` set so on a push and empty otherwise), \`GH_TOKEN: \${{ github.token }}\` on that step on a push alone, and \`checks: read\` beside \`contents: read\` in the job's permissions; and have every step that reads \`RUN\` run nothing where it says \`none\` (\`if [ \"$RUN\" = all ]; then <the whole suite>; elif [ \"$RUN\" != none ]; then <the runner> $RUN; fi\`, or an \`if:\` whose parts joined by \`&&\` hold \`RUN\` in one part alone, nothing but \`env.RUN == 'all'\` and \`contains(env.RUN, ' <file> ')\` joined by \`||\`), since a runner given no file runs every test, and one given \`none\` fails; then a push that merges a pull request's head whose tree it holds, whose run selected the whole suite and passed that check, runs no test again. Leave it off any job, or entry of a job's matrix, that a pull request does not run, whose suite ran nowhere else, and any whose tests read what no tree holds (a release's tag, the day). Nothing fails meanwhile: the whole suite runs on a push as before.` : null;
+}
+
+// Each job of the project's own that starts a suite through the shape check on a pull request, as every suite is
+// started, starts once the pull request is marked ready and skips a draft (tasks/tests.md, "No test run on a draft";
+// #733, point 7): its trigger's types hold opened, synchronize, reopened and ready_for_review, and its job's `if:` skips
+// a draft: a condition of parts joined by && alone, one of them `!github.event.pull_request.draft` or
+// `github.event.pull_request.draft == false`, the others any, a status function such as `!cancelled()` among them,
+// its quoted strings read as one word each; any other shape (an ||, a negation of more, an index, text outside its
+// `${{ }}`, which GitHub reads as a string and so as true) is read as not done.
+const SUITE_RUN = /shape\.mjs\b[^\n]*--suite\b/u;
+const READY_TYPES = ["opened", "synchronize", "reopened", "ready_for_review"];
+const DRAFT_PART = /^(?:!\s*github\.event\.pull_request\.draft|github\.event\.pull_request\.draft\s*==\s*false)$/u;
+const skipsDraft = cond => {
+  const inner = String(cond ?? "").trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1").replace(/'(?:[^']|'')*'/gu, "text").replace(/!?\s*\b(?:always|success|cancelled|failure)\(\)/gu, "status");
+  return !/\|\||[()[\]'$]|\$\{\{|\}\}/u.test(inner) && inner.split("&&").some(part => DRAFT_PART.test(part.trim()));
+};
+// A workflow of the project's own that publishes what its users get otherwise than from a green default branch (floor
+// rule 12, "What users get is published only from a green default branch"; #733, points 7 and 8): one with a step that
+// uses GitHub's own action that publishes a site (actions/deploy-pages), read exactly. It waits on a green branch where
+// each of its triggers is a person's dispatch, a release, a push of tags alone, or `workflow_run` of completed runs on
+// one named branch, each of its jobs asking by an `if:` of parts joined by && alone that the run's conclusion be success
+// and its head repository this one (floor topic workflows, rule 2), read as skipsDraft reads a condition, or, with no
+// `if:` of its own, needing a job that asks it, so that no job runs a fork's code. A workflow that publishes otherwise (a package registry, a store, a script of its own)
+// is read by the session that syncs, since no file says it publishes.
+const PUBLISH_USES = /^actions\/deploy-pages@/u;
+const RUN_PARTS = [/^github\.event\.workflow_run\.conclusion\s*==\s*'success'$/u, /^(?:github\.event\.workflow_run\.head_repository\.full_name\s*==\s*github\.repository|github\.repository\s*==\s*github\.event\.workflow_run\.head_repository\.full_name)$/u];
+const greenOnly = cond => {
+  const inner = String(cond ?? "").trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1").replace(/'(?:[^']|'')*'/gu, q => (q === "'success'" ? "'success'" : "text"));
+  if (/\|\||[()[\]$]|\$\{\{|\}\}/u.test(inner)) return false;
+  const parts = inner.split("&&").map(x => x.trim());
+  return RUN_PARTS.every(re => parts.some(x => re.test(x)));
+};
+const triggers = on => (typeof on === "string" ? { [on]: null } : Array.isArray(on) ? Object.fromEntries(on.map(t => [t, null])) : on && typeof on === "object" ? on : {});
+const tagsAlone = push => !!push && typeof push === "object" && Array.isArray(push.tags) && push.tags.length > 0 && !("branches" in push) && !("branches-ignore" in push);
+const oneBranch = run => !!run && typeof run === "object" && Array.isArray(run.branches) && run.branches.length === 1 && typeof run.branches[0] === "string" && !/[*?[\]!+]/u.test(run.branches[0]) && Array.isArray(run.types) && run.types.length === 1 && run.types[0] === "completed";
+const needsOf = (jobs, name, seen = new Set()) => {
+  if (seen.has(name)) return seen;
+  seen.add(name);
+  const n = jobs[name]?.needs;
+  for (const d of typeof n === "string" ? [n] : Array.isArray(n) ? n : []) needsOf(jobs, d, seen);
+  return seen;
+};
+const publishesUngated = p => Object.entries(p.workflows).filter(([, { yaml }]) => {
+  const jobs = yaml?.jobs && typeof yaml.jobs === "object" ? yaml.jobs : {};
+  const publishing = Object.keys(jobs).filter(name => (Array.isArray(jobs[name]?.steps) ? jobs[name].steps : []).some(st => typeof st?.uses === "string" && PUBLISH_USES.test(st.uses)));
+  if (!publishing.length) return false;
+  const on = triggers(yaml?.on);
+  return Object.entries(on).some(([t, v]) => {
+    if (t === "workflow_dispatch" || t === "release") return false;
+    if (t === "push") return !tagsAlone(v);
+    if (t === "workflow_run") return !oneBranch(v) || !Object.keys(jobs).every(name => greenOnly(jobs[name]?.if) || (!("if" in (jobs[name] ?? {})) && [...needsOf(jobs, name)].some(j => greenOnly(jobs[j]?.if))));
+    return true;
+  });
+}).map(([file]) => `\`.github/workflows/${shown(file)}\``);
+function testsWhenReady(p) {
+  return [suitesWhenReady(p), publishedWhenGreen(p)].filter(Boolean).join(" ") || null;
+}
+function publishedWhenGreen(p) {
+  readable(p, text => /deploy-pages/u.test(text));
+  const on = publishesUngated(p);
+  return on.length ? `The project publishes what its users get otherwise than from a green default branch (${on.join("; ")}): in one small pull request, with floor rule 3's two security reviews, make it wait on one: trigger it on \`workflow_run\` of the one workflow that holds every check run on the default branch (where they stand in several, gather them in one that calls the rest by \`workflow_call\`), types [completed] and branches [its default branch], each of its jobs, or a first job every other \`needs\`, asking \`if: \${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository }}\` (floor topic workflows, rule 2), and check out \`github.event.workflow_run.head_sha\`; or publish from a release cut from a green commit (a push of tags alone, or the event release); a person's dispatch may stay, started only on a green commit. Then set the manifest's row *users get* to \`releases\`, so a pull request merges on its own green checks (\`node core/scripts/merge-line.mjs --repo <owner>/<name>\` reads it). Until then a pull request is brought up to date first, as now, and nothing fails.` : null;
+}
+function suitesWhenReady(p) {
+  readable(p, text => SUITE_RUN.test(text));
+  const loose = Object.entries(p.workflows).filter(([, { yaml }]) => onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => {
+    const types = yaml.on?.pull_request?.types, ready = Array.isArray(types) && READY_TYPES.every(t => types.includes(t));
+    return Object.entries(yaml.jobs ?? {})
+      .filter(([, job]) => (Array.isArray(job?.steps) ? job.steps : []).some(st => typeof st?.run === "string" && SUITE_RUN.test(st.run)) && !(ready && skipsDraft(job?.if)))
+      .map(([name]) => `\`.github/workflows/${shown(file)}\`, its job \`${shown(name)}\``);
+  });
+  return loose.length ? `In one small pull request, with floor rule 3's two security reviews, bring the project's own test workflow to \`core/tasks/tests.md\` as its kind reads it (${loose.join("; ")}): give its \`pull_request\` trigger the types opened, synchronize, reopened and ready_for_review, and have each job that starts a suite skip a draft (\`if: \${{ !github.event.pull_request.draft }}\`, or that beside other parts joined by && alone), the check the ruleset requires failing on a draft rather than skipped, since a required check whose job is skipped passes (the core's own \`tests.yml\` shows it); then run the platform suites on the schedule \`node core/scripts/runners.mjs --repo <owner>/<name>\` prints from where the tests run, who pays and what users get (where every merge goes live, on each pull request, as now; where users get a release, at the default branch's newest commit), and give the runs on the default branch one concurrency group that cancels the run in progress. Where \`node core/scripts/merge-line.mjs --repo <owner>/<name>\` says the project's users get a release and the host still asks an up-to-date branch, file the issue it names for the owner, labelled needs-owner; nothing waits on it.` : null;
+}
+
+// The shape check's config and baseline as a project holds them: { at, config, reads } (the readers its baseline names),
+// or { mend } where the config or the baseline is not there or cannot be read.
+function shapeHeld(p) {
   const at = shapeAt(p.manifest), text = p.read(at);
-  const first = `write its first baseline with \`node core/scripts/shape.mjs ${at} --first\`, commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
-  if (text === null) return `Write \`${at}\` as the starter kit does (\`core/setup/template/shape.json.tmpl\`), with the project's own code under "code" and its test files under "tests", as git pathspecs; then ${first}. Until then the shape check holds the project to the starter kit's config, with each pull request's base as its baseline.`;
+  const first = `write its first baseline with \`node core/scripts/install.mjs all\` and then \`node core/scripts/shape.mjs ${at} --first\` (the parser's packages, which the readers of JavaScript, TypeScript, C# and Python need, are installed only where named: #719), commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
+  if (text === null) return { none: true, mend: `Write \`${at}\` as the starter kit does (\`core/setup/template/shape.json.tmpl\`), with the project's own code under "code" and its test files under "tests", as git pathspecs; then ${first}. Until then the shape check holds the project to the starter kit's config, with each pull request's base as its baseline.` };
   let config;
-  try { config = parseConfig(text, at); } catch (e) { return `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.`; }
+  try { config = parseConfig(text, at); } catch (e) { return { mend: `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.` }; }
   const baseline = p.read(config.baseline);
-  if (baseline === null) return `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.`;
+  if (baseline === null) return { mend: `The shape check's config stands at \`${at}\` and its baseline does not: ${first}.` };
   let reads = [];
   try { reads = parseBaseline(baseline, config.baseline, "").reads; } catch { /* (read as naming no reader: its mend writes it again) */ }
-  const missing = Object.keys(READERS).filter(r => !reads.includes(r)).map(r => READERS[r]);
-  return missing.length ? `The shape check's baseline \`${config.baseline}\` was written before the check read ${missing.join(", ")}: run \`node core/scripts/shape.mjs ${at} --write\`, which lists what stands there and names every reader, and commit the baseline in a pull request of its own. Until then what the pull request's base held there is reported, never failed.` : null;
+  return { at, config, reads };
+}
+
+// The readers a later entry of the sync notes asks a baseline to name, each by its own step (shapeReadsParsed).
+const LATER_READERS = ["csharp-tree", "javascript-tree", "python-tree"];
+
+// Whether a baseline names `readers`, else the mend that writes it again.
+const readersNamed = (held, readers) => {
+  const missing = readers.filter(r => !held.reads.includes(r)).map(r => READERS[r]);
+  return missing.length ? `The shape check's baseline \`${held.config.baseline}\` was written before the check read ${missing.join(", ")}: run \`node core/scripts/shape.mjs ${held.at} --write\`, which lists what stands there and names every reader, and commit the baseline in a pull request of its own. Until then what the pull request's base held there is reported, never failed.` : null;
+};
+
+// Whether the shape check's own list is written (AGENTS.md, "Nothing locks a project": no old breach goes unlisted):
+// its config, where the manifest names it or the starter kit writes it, read as the check reads it, and the baseline
+// that config names, which names every reader of the check's but those a later entry asks for ("reads";
+// shape-readers.mjs), so that it lists what each finds. Null where all of it stands; else the mend.
+function shapeWritten(p) {
+  const held = shapeHeld(p);
+  return held.mend ?? readersNamed(held, Object.keys(READERS).filter(r => !LATER_READERS.includes(r)));
+}
+
+// Whether the shape check's baseline names `reader`, one of its readers on the parser, so that it lists what that reader
+// finds: the baseline its config names, or, where the project has no config yet, the one the starter kit's names, which
+// the check holds it to. Null where it does, and where there is no such baseline or the config cannot be read, which
+// the step of 16 November reports: the first baseline it asks for names every reader.
+function shapeReadsParsed(p, reader) {
+  const held = shapeHeld(p);
+  if (!held.mend) return readersNamed(held, [reader]);
+  if (!held.none) return null;
+  const config = JSON.parse(fs.readFileSync(path.join(HERE, "setup/template/shape.json.tmpl"), "utf8")), baseline = p.read(config.baseline);
+  if (baseline === null) return null;
+  let reads = [];
+  try { reads = parseBaseline(baseline, config.baseline, "").reads; } catch { /* (read as naming no reader) */ }
+  return readersNamed({ at: shapeAt(p.manifest), config, reads }, [reader]);
 }
 
 // The files that hold only calls to the core's workflows, each job of each a call: a sync moves their pins, which
@@ -266,18 +397,43 @@ function suitesOnPins(p) {
   return started.length ? `A sync that only moves the pin of a call to the core's workflows starts no suite of the project's own: each workflow named lists in its \`paths-ignore\`, beside \`core/**\` and \`core-manifest.md\`, each file that holds only such calls by its exact path, or, where it filters with \`paths\`, takes each out with \`!<its path>\` after its patterns (\`core.yml\` checks those pins on every pull request). Started by such a file alone: ${started.join("; ")}.` : null;
 }
 
-// Where a workflow of the project's filters its pull requests by their paths and runs on a change to a script of the
-// copy, each file of the packages the copy carries for them (its own files, as the project holds them), a change to it
-// let through alike; null where each workflow does.
-function scriptsWithPackages(p) {
-  const copy = corePath(p.root) || "core/", scripts = p.files.filter(f => f.startsWith(`${copy}scripts/`)), packages = p.files.filter(f => f.startsWith(`${copy}${THIRD_PARTY}`));
-  readable(p, text => /paths(-ignore)?\s*:/.test(text));
-  const wrong = Object.entries(p.workflows).filter(([, w]) => {
-    const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];
-    const through = f => (Array.isArray(only) ? pathsLetThrough(only, [f]) : Array.isArray(ignore) ? !pathsLetThrough(ignore, [f]) : true);
-    return scripts.some(through) && packages.some(f => !through(f));
-  }).map(([f]) => `\`.github/workflows/${shown(f)}\``);
-  return wrong.length ? `In one small pull request, let a change under \`${copy}${THIRD_PARTY}\` through wherever a change to a script under \`${copy}scripts/\` is, in the \`paths:\` (add \`'${copy}${THIRD_PARTY}**'\`) or \`paths-ignore:\` of ${wrong.join(", ")}: those scripts run the packages the copy carries in that folder.` : null;
+// Where a job of the project's own workflows runs a script of the copy before the core's packages are installed from its
+// lock file (#654): each such workflow, with the mend; null where each installs first. A call to the core's own
+// workflows installs by itself, and holds no step to read. The install counts only as a step that runs it, node and the
+// copy's install.mjs as a command's first words (after a shell's then, else or do), with no `if:` or
+// continue-on-error of its own; a command that only names the path, as echo does, installs nothing.
+// (the reading both install steps share: the copy's scripts and install; whether a step runs a file, a command as
+// check-configs.mjs reads it, its words; and whether it installs, naming one of `named` where it is given)
+function installReading(p) {
+  const copy = corePath(p.root) || "core/", script = `${copy}scripts/`, install = `${copy}scripts/install.mjs`;
+  const bare = t => t.replace(/^\.\//u, "");
+  const runs = (st, file) => st.cmds.some(c => c.some(w => file(bare(w.text))));
+  const installs = (st, named) => st.unconditioned && st.cmds.some(c => {
+    const w = c.map(x => x.text); while (["then", "else", "do"].includes(w[0])) w.shift();
+    return /(?:^|[\\/])node(?:\.exe)?$/u.test(w[0] ?? "") && bare(w[1] ?? "") === install && (!named || w.slice(2).some(a => named.includes(a)));
+  });
+  return { script, install, bare, runs, installs };
+}
+function installsFirst(p) {
+  const { script, install, runs, installs } = installReading(p);
+  const wrong = Object.entries(p.workflows).filter(([, w]) => jobsOf(w).some(job => {
+    const at = job.steps.findIndex(st => runs(st, t => t.startsWith(script) && t.endsWith(".mjs") && t !== install));
+    return at >= 0 && !job.steps.slice(0, at).some(st => installs(st));
+  })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
+  return wrong.length ? `In one small pull request, add a step \`node ${install}\` before the first step that runs a .mjs script under \`${script}\` in each such job of ${wrong.join(", ")}: the core's scripts load the packages it installs from its lock file, and without them a check says it did not run.` : null;
+}
+
+// Where a job of the project's own workflows runs the shape check (its script, or the copies check's steps through
+// checks.mjs) before the parser's packages are installed from their own lock file (#719): each such workflow, with the
+// mend; null where each names that install first. Read as installsFirst reads an install, and naming `parser` or `all`.
+function parserFirst(p) {
+  const { script, install, bare, installs } = installReading(p);
+  const shapes = st => st.cmds.some(c => { const w = c.map(x => bare(x.text)); return w.includes(`${script}shape.mjs`) || (w.includes(`${script}checks.mjs`) && w.includes("copies")); });
+  const wrong = Object.entries(p.workflows).filter(([, w]) => jobsOf(w).some(job => {
+    const at = job.steps.findIndex(shapes);
+    return at >= 0 && !job.steps.slice(0, at).some(st => installs(st, ["parser", "all"]));
+  })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
+  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check install the parser's too, \`node ${install} all\`, before the shape check runs: it reads the functions of JavaScript, TypeScript, C# and Python on the parser, whose packages stand in a lock file of their own, and without them, after an install of the core's first lock alone, the check reads none of them, saying so as a warning, and with no install of the core's at all it fails, saying so.` : null;
 }
 
 // Where the project's call to the NuGet check starts only on the paths it names, each build file a build reads by
@@ -297,19 +453,13 @@ function nugetPathsHold(p) {
   return wrong.length ? `The \`paths:\` of a call to the NuGet check let through a change to every file a build of the project's reads, or the check starts on none of its changes: add each, by its exact path, to ${wrong.map(([f, missed]) => `\`.github/workflows/${f}\`: ${missed.map(asPattern).join(", ")}`).join("; ")} (a name shown with "?" holds a control character or a backtick: rename it).` : null;
 }
 
-// A call to one of the core's pull-request checks whose job is skipped on a draft runs on a pull request once it is
-// ready only where its trigger starts it when one is marked ready (#375): without that, the check a draft skipped never
-// runs on that head, and a ruleset counts the skip as passed. Each workflow where a call does so is named.
+// A call to one of the core's pull-request checks whose job is skipped on a draft, or which skips a draft by itself (the
+// description check's), runs on a pull request once it is ready only where its trigger starts it when one is marked
+// ready (#375, #502): without that, the check a draft skipped never runs on that head, and a ruleset counts the skip as
+// passed. Each workflow where a call does so is named, as the workflow check reads it (workflows.mjs, draftHoles).
 function readyOnlyHolds(p) {
-  const checks = /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget)\.yml@/i;
-  readable(p, text => checks.test(text));
-  // (the types a workflow's pull_request trigger lists, GitHub's own where it lists none or names the event alone, as
-  // `on: pull_request` or `on: [push, pull_request]`; null where it has no such trigger)
-  const types = on => typeof on === "string" || Array.isArray(on) ? ([].concat(on).includes("pull_request") ? [] : null)
-    : on && typeof on === "object" && "pull_request" in on ? [].concat(on.pull_request?.types ?? []).map(String) : null;
-  const wrong = Object.entries(p.workflows).filter(([, w]) => types(w.yaml?.on) !== null && !types(w.yaml.on).includes("ready_for_review")
-    && Object.values(w.yaml.jobs ?? {}).some(job => typeof job?.uses === "string" && job.uses.toLowerCase().startsWith(`${CORE}/`.toLowerCase()) && checks.test(job.uses)
-      && /\bpull_request\.draft\b/.test(String(job.if ?? ""))));
+  readable(p, text => /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget|pr-description)\.yml@/i.test(text));
+  const wrong = Object.entries(p.workflows).filter(([, w]) => w.yaml && draftHoles(w.yaml).length);
   return wrong.length ? `A call to the core's checks whose job is skipped on a draft never runs once the pull request is marked ready, since its trigger leaves that out: add \`ready_for_review\` to the \`types:\` under \`pull_request:\` (where it lists none, \`types: [opened, reopened, synchronize, ready_for_review]\`) in ${wrong.map(([f]) => `\`.github/workflows/${shown(f)}\``).join(", ")}.` : null;
 }
 
@@ -531,6 +681,8 @@ const plainAction = (st, job, w) => Object.keys(st.env).length === 0 && visible(
 // Whether a job runs in a container of its own, or beside service containers, which may mount its folder: it runs as
 // they are given, their env and options too, so nothing counts there.
 const boxedJob = job => job?.container !== undefined || job?.services !== undefined;
+// Whether a step runs whenever its job reaches it: no `if:` and no continue-on-error of its own.
+const unconditioned = st => st?.if === undefined && !st?.["continue-on-error"];
 // A step of a job as the step reads it: its commands, whether its one lookup counts, its action and its env.
 function stepOf(st, job, w, started) {
   const cmds = typeof st?.run === "string" ? commands(st.run) : [];
@@ -540,7 +692,7 @@ function stepOf(st, job, w, started) {
   const counts = started && cmds.length === 1 && alone && stops && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"];
   const env = st?.env && typeof st.env === "object" ? st.env : {};
   const boxed = boxedJob(job);
-  return { cmds, counts, hidden: boxed || hides(st, env, job, w), plain: !boxed && typeof st?.uses === "string" && plainAction({ ...st, env }, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
+  return { cmds, counts, unconditioned: unconditioned(st), hidden: boxed || hides(st, env, job, w), plain: !boxed && typeof st?.uses === "string" && plainAction({ ...st, env }, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
 }
 
 // Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads
@@ -579,13 +731,14 @@ const lookupOf = (st, flag, copy, at, job) => {
   return !name || st.env[name[1] ?? name[2]] === at.step.env[name[1] ?? name[2]];
 };
 // Where a lookup stands, as the step's mend says it (beforeLookup).
-const FIRST = copy => `with nothing before it in its job but the checkout, \`setup-\` actions and the core's lookup, exact-versions, licence and agent-tools scripts, each run as \`node ${copy}scripts/<name>.mjs\` from the project's root under bash (named, or on GitHub's own Linux or macOS runner) in a job with no container or services, with no env but a variable its config is named by, each setup action given only its version, its cache, if named, turned off (\`package-manager-cache: false\`, or in \`setup-dotnet\` \`cache: false\`), so that nothing of the pull request's (\`npm\`, \`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`) has run before it`;
+const FIRST = copy => `with nothing before it in its job but the checkout, \`setup-\` actions and the core's lookup, exact-versions, licence, agent-tools and install scripts, each run as \`node ${copy}scripts/<name>.mjs\` from the project's root under bash (named, or on GitHub's own Linux or macOS runner) in a job with no container or services, with no env but a variable its config is named by, each setup action given only its version, its cache, if named, turned off (\`package-manager-cache: false\`, or in \`setup-dotnet\` \`cache: false\`), so that nothing of the pull request's (\`npm\`, \`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`) has run before it`;
 // Whether a step may stand before a lookup: checkout or a setup action, or a run, by the runner's own `node`, from the
 // project's root, of one of the core's scripts that only read (BEFORE_LOOKUP), named by the copy's own path, with nothing
 // hidden (hides). Anything else (dotnet under any spelling, npm, a build script, make, a local action, a script of the
 // core's that restores or runs the project's tests) may run the pull request's own files, which could change what the
 // lookup reads or the lookup itself: an allow-list, not a search for a build.
-const BEFORE_LOOKUP = ["lookup.mjs", "exact-versions.mjs", "licences.mjs", "agent-tools.mjs"];
+// (and the install of the core's own packages from its lock file, which runs none of their code: #654)
+const BEFORE_LOOKUP = ["lookup.mjs", "exact-versions.mjs", "licences.mjs", "agent-tools.mjs", "install.mjs"];
 const beforeLookup = (st, copy) => (st.uses ? st.plain && /^actions\/(?:checkout|setup-[\w-]+)@/u.test(st.uses)
   : !st.hidden && (st.dir === undefined || st.dir === ".") && st.cmds.length > 0 && st.cmds.every(c => c.length > 1
     && /^node(?:\.exe)?$/iu.test(c[0].text) && BEFORE_LOOKUP.some(n => c[1].text === `${copy}scripts/${n}` || c[1].text === `./${copy}scripts/${n}`)));
@@ -675,7 +828,7 @@ export const STEPS = [
     // (the core's licences.yml runs exact-versions.mjs itself; a project that runs the licence script from a workflow of
     // its own runs it beside it)
     check: p => {
-      if (!p.files.some(f => /(^|\/)package-lock\.json$/.test(f) && !f.startsWith(corePath(p.root) || "core/") && !f.split("/").includes("node_modules"))) return null;
+      if (!p.files.some(f => /(^|\/)(?:package-lock|npm-shrinkwrap)\.json$/.test(f) && !f.startsWith(corePath(p.root) || "core/") && !f.split("/").includes("node_modules"))) return null;
       if (calls(p, "licences.yml").length) return null;
       const own = runFiles(p, "licences.mjs");
       return own.length && !own.some(f => runFiles(p, "exact-versions.mjs").includes(f))
@@ -785,8 +938,11 @@ export const STEPS = [
       const file = licenceConfig(p);
       let config = null;
       try { config = JSON.parse(p.read(file) ?? "null"); } catch { /* (read as no list, below) */ }
+      // (with the core's packages not installed, a Codex config cannot be read: the step says so, with the install, and
+      // every other step is still told, as of a key given twice)
+      if (p.read(".codex/config.toml") !== null && !installed("smol-toml")) return `The core's packages are not installed, so \`.codex/config.toml\` could not be read for the tools it configures: run \`node ${corePath(p.root) || "core/"}scripts/install.mjs\`, then \`node ${corePath(p.root) || "core/"}scripts/steps.mjs\` again.`;
       const head = readProject(p.root), list = listed(config, file) ?? { keys: new Set(), problems: [] };
-      const wrong = [...head.problems, ...head.links.map(at => `\`${at}\` is a link that leads out of the checkout: replace it with what it points to`), ...(({ problems, pins, sources }) => [...problems, ...[...pins, ...sources].map(([, problem]) => problem)])(toolsCheck(head, list, kitHooks(), file))];
+      const wrong = [...head.problems, ...(({ problems, pins, sources }) => [...problems, ...[...pins, ...sources].map(([, problem]) => problem)])(toolsCheck(head, list, kitHooks(), file))];
       if (own.length && !beside) wrong.push(`the workflow that runs the licence check, ${own.join(", ")}, runs \`node core/scripts/agent-tools.mjs ${file}\` beside it, as the core's \`licences.yml\` does`);
       return wrong.length ? `List under "agentTools" in \`${file}\` every plug-in, tool server, skill and hook the project configures for its agents beyond the starter kit's hooks, each as { "kind", "name", "publisher", "version" }, a plug-in or tool server at one exact version, the one its configuration pins where it can pin one, or take out what nobody meant to configure; and see that its check runs: ${wrong.join("; ")}` : null;
     } },
@@ -873,8 +1029,26 @@ export const STEPS = [
     } },
   { lead: "17 November 2026, packages from the registry, the week's wait and pinned downloads", cost: COST.check, check: packagesHeld },
   { lead: "17 November 2026, held packages looked up again", cost: COST.read, unread: "whether a package has gone stale is its registry's answer on the day, and GitHub's, not a file's: the session that syncs runs `node core/scripts/held.mjs` once and puts what it prints in the sync pull request's description, each package gone stale a task; the scheduled look runs it again each month" },
-  { lead: "17 November 2026, the packages the copy carries", cost: COST.workflow, check: scriptsWithPackages,
-    partly: "which suites read the core's scripts is the project's own logic, read by the review" },
+  { lead: "18 November 2026, the core's packages installed from its lock file", cost: COST.workflow, check: installsFirst,
+    partly: "that a job reaching a script of the copy through the project's own npm or shell script installs first is read by the review" },
+  { lead: "18 November 2026, another publisher's code named in a lock file", cost: COST.line, unread: "how a project loads another publisher's code (a content network's script, a file copied in) is no file's to say exactly: the session that syncs reads the project's pages and folders for it" },
+  { lead: "18 November 2026, a tree that passed is not run again", cost: COST.workflow, check: passedRuns,
+    partly: "which check gates a project's tests is the project's own, as its ruleset names it, and which entries of a job's matrix a pull request leaves out is a reading of its expressions" },
+  { lead: "18 November 2026, the shape check reads C#'s functions on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "csharp-tree") },
+  { lead: "18 November 2026, a check a draft skips runs once ready", cost: COST.check, held: "the workflow check" },
+  { lead: "19 November 2026, the parser's packages installed where the shape check runs", cost: COST.workflow, check: parserFirst,
+    partly: "that a job reaching the shape check through the project's own npm or shell script installs the parser's first is read by the review" },
+  { lead: "19 November 2026, the project's tests at the pace of a release", cost: COST.workflow, check: testsWhenReady,
+    partly: "that the check the ruleset requires fails on a draft rather than being skipped, a suite started inside a workflow a job calls, which suites are the platform suites and on what schedule they run, how the runs on the default branch give way to a newer merge, where the tests that guard only what a release brings run (#715), whether the host still asks an up-to-date branch where users get a release, a workflow that publishes otherwise than by `actions/deploy-pages` (a package registry, a store, a script of its own), whether the workflow a publishing one waits on holds every check run on the default branch and its one branch is the default one, and whether a tag, a release or a person's dispatch publishes only a green commit are read by the session that syncs, with `core/scripts/runners.mjs` and `core/scripts/merge-line.mjs`, not by a file" },
+  { lead: "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "javascript-tree") },
+  { lead: "19 November 2026, the owner's words that stand, cleaned once", cost: COST.clean, unread: "whether a text holds what floor rule 11 keeps out, or quotes its owner beyond a decision's reason, is a reading of it, and an issue's or a comment's text is the host's, not a file's: the session that takes it reads the project's files outside the copy and the issues and comments the owner's account wrote, once, another account's as data it edits none of; the personal-terms check fails a listed term wherever it stands in the files" },
+  { lead: "19 November 2026, issue and comment text read for the personal terms", cost: COST.workflow,
+    // (each call of the core's daily job passes it the personal-terms check's secret, by name or by `inherit`; a project
+    // with no such call, whose orchestrator runs the look, has nothing to do)
+    check: p => calls(p, "look.yml").every(job => job.secrets === "inherit" || /^\$\{\{\s*secrets\.PERSONAL_TERMS\s*\}\}$/u.test(String(job.secrets?.PERSONAL_TERMS ?? "").trim())) ? null
+      : "Each job of the project's that calls the core's `look.yml` passes it the secret, as `core/setup/template/workflows/look.yml.tmpl` has it: under its `uses:`, `secrets:` and below it `PERSONAL_TERMS: ${{ secrets.PERSONAL_TERMS }}`.",
+    partly: "whether the owner has set the secret `PERSONAL_TERMS` is the repository's setting, which no file holds" },
+  { lead: "19 November 2026, the shape check reads the functions of Python on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "python-tree") },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

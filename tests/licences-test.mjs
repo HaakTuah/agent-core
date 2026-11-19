@@ -1,18 +1,41 @@
 // Checks the licence check's lists and readers (scripts/licences.mjs), alone, on invented names: how a licence
-// expression is read, which list allows what, a package known by its registry address, npm's settings. The check on a
-// whole project, and its scan, are checked by licence-scan-test.mjs. Run by the core's tests workflow
+// expression is read, which list allows what, a package known by its registry address, npm's settings; and, of the
+// core's own files, that its audit's entry for Node names the version the core pins (#592). The check on a whole
+// project, and its scan, are checked by licence-scan-test.mjs. Run by the core's tests workflow
 // (.github/workflows/tests.yml).
 //
 //   node tests/licences-test.mjs
 import { readable } from "../scripts/licence-yes.mjs";
 import { actionLists, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 let failed = 0;
 const ok = (cond, what, more = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) { failed++; if (more) console.log(more); } };
+
+// the pin, .node-version, is one fact that the audit's entry for Node and node.sh's sums each name: the scan reads the
+// download as pinned by the entry's version, so an entry left behind when the pin moves would pass unseen (#592)
+{
+  const core = f => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
+  const pin = core(".node-version").trim();
+  const entry = JSON.parse(core(".github/licences-audit.json")).entries.filter(e => e.name === "Node.js");
+  // (node.sh's case on "$want-$(uname -m)" read strictly, line by line: the pin's x86_64 arm, its aarch64 arm, each
+  // with one sum, then the closing *) alone, so that no glob, alternative, extra arm or form the test does not know,
+  // above the pin's lines or among them, passes)
+  const block = /^case "\$want-\$\(uname -m\)" in\n([\s\S]*?)\nesac$/mu.exec(core("scripts/node.sh").replace(/\r\n/gu, "\n"))?.[1];
+  const v = pin.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const shapes = [new RegExp(`^  ${v}-x86_64\\) arch=x64 sum=[0-9a-f]{64} ;;$`, "u"), new RegExp(`^  ${v}-aarch64\\) arch=arm64 sum=[0-9a-f]{64} ;;$`, "u"), /^  \*\) (?:[^;]|;(?!;))*;;$/u];
+  const lines = block === undefined ? [] : block.split("\n");
+  const odd = block === undefined ? ['no line `case "$want-$(uname -m)" in` closed by `esac`'] : [
+    ...lines.flatMap((line, i) => (shapes[i]?.test(line) ? [] : [`line ${i + 1} of the case, ${JSON.stringify(line)}`])),
+    ...shapes.slice(lines.length).map((_, i) => `no line ${lines.length + i + 1}`)];
+  const want = ["x86_64", "aarch64"].map(arch => `${pin}-${arch}`);
+  ok(entry.length === 1 && entry[0].version === pin && odd.length === 0,
+    `the audit's entry for Node, and node.sh's sums, one for each architecture, name the pin in .node-version, ${pin}`,
+    `the entry names ${entry.map(e => e.version).join(", ") || "nothing"}; in scripts/node.sh, ${odd.join("; ") || "the case is as wanted"}; where the case wants exactly three lines: \`  ${want[0]}) arch=x64 sum=<its sha256> ;;\`, \`  ${want[1]}) arch=arm64 sum=<its sha256> ;;\` and \`  *) <one command line, no ;;> ;;\`. Mend: set "version" of the entry "Node.js" in .github/licences-audit.json to the version .node-version names, and give node.sh's case on "$want-$(uname -m)" that version's two sums, one for x86_64 and one for aarch64, in those three lines and no other, in the pull request that moves the pin (tasks/updates.md, "Node")`);
+}
 
 const lists = policy({ data: ["mossgrip-data"], fonts: ["mossgrip-face"] });
 const code = lists.allowedFor("mossgrip-lib"), data = lists.allowedFor("mossgrip-data"), font = lists.allowedFor("mossgrip-face");
@@ -28,7 +51,12 @@ ok(all(["GPL-3.0-only", "LGPL-2.1-or-later", "MPL-2.0", "EUPL-1.2", "OSL-3.0", "
   && all(["GPL-3.0-only", "LGPL-2.1-or-later", "MPL-2.0", "EUPL-1.2", "OSL-3.0", "CECILL-2.1", "MS-RL"], code, false), "tools may use every licence the Open Source Initiative approves, what ships none of its copyleft ones");
 ok(all(["BUSL-1.1", "SSPL-1.0", "Elastic-2.0", "CC-BY-NC-4.0", "CC-BY-ND-4.0", undefined], tool, false), "nor any terms floor rule 10 never allows");
 ok(registryName("https://registry.npmjs.org/mossgrip-data/-/mossgrip-data-1.0.0.tgz") === "mossgrip-data" && registryName("https://registry.npmjs.org/@moss/grip/-/grip-1.0.0.tgz") === "@moss/grip"
-  && [undefined, "file:vendor/mossgrip-data.tgz", "vendor/mossgrip-data", "git+https://mossgrip.example/data.git", "https://mossgrip.example/mossgrip-data/-/mossgrip-data-1.0.0.tgz"].every((r) => registryName(r) === undefined),
+  && [undefined, "file:vendor/mossgrip-data.tgz", "vendor/mossgrip-data", "git+https://mossgrip.example/data.git", "https://mossgrip.example/mossgrip-data/-/mossgrip-data-1.0.0.tgz",
+    "https://registry.npmjs.org/@moss\\../z\\..\\grip/-/z\\..\\grip-1.0.0.tgz", "https://registry.npmjs.org/@moss/../-/grip-1.0.0.tgz", "https://registry.npmjs.org/%2e%2e/-/grip-1.0.0.tgz"].every((r) => registryName(r) === undefined)
+  && registryName("https://registry.npmjs.org/JSONStream/-/JSONStream-1.3.5.tgz") === "JSONStream" && registryName("https://registry.npmjs.org/-moss/-/-moss-1.0.0.tgz") === "-moss"
+  && registryName("https://registry.npmjs.org/@-moss/grip/-/grip-1.0.0.tgz") === "@-moss/grip" && ["https://registry.npmjs.org/.moss/-/.moss-1.0.0.tgz", "https://registry.npmjs.org/.moss/-/moss-1.0.0.tgz", "https://registry.npmjs.org/_moss/-/moss-1.0.0.tgz",
+    "https://registry.npmjs.org/@_moss/grip/-/grip-1.0.0.tgz", "https://registry.npmjs.org/@.moss/grip/-/grip-1.0.0.tgz", "https://registry.npmjs.org/moss/-/_moss-1.0.0.tgz"].every((r) => registryName(r) === undefined)
+  && registryName("https://registry.npmjs.org/-/-/--0.0.1.tgz") === "-" && registryVersion("https://registry.npmjs.org/-/-/--0.0.1.tgz") === "0.0.1",
   "names a package by its registry address, never by a name the lockfile could be given");
 ok(registryVersion("https://registry.npmjs.org/mossgrip-data/-/mossgrip-data-1.0.0.tgz") === "1.0.0" && registryVersion("https://registry.npmjs.org/@moss/grip/-/grip-2.0.0-beta.1.tgz") === "2.0.0-beta.1"
   && registryVersion("https://registry.npmjs.org/mossgrip-data/-/lichen-1.0.0.tgz") === undefined && registryVersion("file:vendor/mossgrip-data-1.0.0.tgz") === undefined && registryVersion(undefined) === undefined,
@@ -50,6 +78,12 @@ ok(JSON.stringify(registryOverrides(npmrc.join("\n"))) === JSON.stringify(npmrc)
   && JSON.stringify(registryOverrides("ignore-scripts=false\nIGNORE-SCRIPTS=true\nignore-scripts=\n")) === JSON.stringify(["ignore-scripts=false", "IGNORE-SCRIPTS=true", "ignore-scripts="]),
   "refuses every npm setting but a few harmless ones, however its key is spelt");
 ok(scriptsOff("# no install scripts\nignore-scripts=true\n") && !scriptsOff("ignore-scripts=false\n"), "knows when install scripts are off");
+// (an .npmrc is read line by line as npm reads it, a lone carriage return ending a line too)
+ok(!scriptsOff("ignore-scripts=\rtrue\n") && releaseAge("min-release-age=\r7\n") === null && JSON.stringify(registryOverrides("fund=\rregistry=x\n")) === JSON.stringify(["registry=x"])
+  && releaseAge("ignore-scripts=true\r\nmin-release-age=7\r\n") === 7 && scriptsOff("\uFEFFignore-scripts=true\n")
+  && !scriptsOff("ignore-scripts=true\u2028\n") && releaseAge("min-release-age=7\u2029\n") === null && registryOverrides("ignore-scripts=true\u2028\n").length === 1
+  && registryOverrides("fund=false\u00a0\nmin-release-age=7\u3000\n").length === 0 && scriptsOff("ignore-scripts=true\u00a0\n"),
+  "reads an .npmrc's lines as npm does, at each carriage return too");
 
 // a licence the floor moved off the list for what ships (MS-PL, 13 November 2026): held at the base, reported and passing;
 // added or updated, failing, that pull request alone
