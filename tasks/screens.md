@@ -67,9 +67,11 @@ Each point gives its reason; what holds it is named there, from "What holds it" 
    Held by the rendered check; colour alone by the critique ("Is anything lost in grey?").
 10. **Each size it is used at,** the smallest first: the builder builds a screen at each of the *screen sizes*, and
     nothing runs off the screen at those sizes or at any width between them. It does not mean "mobile first" as a stance
-    for every product: the main size is the direction's, and a product made for a large screen keeps it. Reason: text
-    that runs off at a phone's width is the commonest mistake a builder could see for itself. Held by the rendered
-    check's sweep of widths.
+    for every product: the main size is the direction's, and a product made for a large screen keeps it. A screen read
+    from across a room is one of the *screen sizes*, its distance named in the *direction* and its text sized for that
+    distance, a first guess tuned on a real screen of that kind (#484). Reason: text that runs off at a phone's width is
+    the commonest mistake a builder could see for itself, and text sized for a hand's reach is unread across a room.
+    Held by the rendered check's sweep of widths.
 11. **Familiar first.** A control works as its users know it from the platform and from other products. A departure is
     a choice, recorded with its reason (`tasks/choices.md`). It does not mean nothing new: a departure with its reason
     stands. Reason: users bring habits, and a control that breaks one is read as broken. Held by the critique ("Does
