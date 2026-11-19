@@ -12,18 +12,23 @@
 // account the security-review check counts (security-review.mjs's counted: the repository's owner, or a person whose
 // rights the host gives as letting them write, read by the size workflow for those who posted one), and one that raises
 // it by more than one step. It holds that the comment is there, not what it says, when it was written or that a fresh session
-// wrote it: whether the session found too little room stays with the reviews, as does any change to this check itself,
-// which a pull request runs in its own version, and the first cap of a role that had none. Run from this repository's
-// root by the size workflow (.github/workflows/size.yml); Node's own modules only.
+// wrote it: whether the session found too little room stays with the reviews, as does any change to this check itself
+// and the first cap of a role that had none. The size workflow (.github/workflows/size.yml) runs the raise twice: the
+// default branch's version, from the base's own copy before any of the pull request's code runs, reads the head's file
+// as text alone, so that no change to this file decides its own raise; and the pull request's version, as itself, which
+// holds that the caps its text sets are those it runs with. Node's own modules only.
 //
 //   node scripts/size.mjs                                  what each role reads at its start, against its cap, and
 //                                                          the queue against its own mark
-//   node scripts/size.mjs --raise <base> <comments> [<rights>]
+//   node scripts/size.mjs --raise <base> <comments> [<rights> [<head>]]
 //                                                          a raise has its leanness check: <base>, this file as the
 //                                                          pull request's base holds it; <comments>, the pull
 //                                                          request's comments as GitHub's API gives them; <rights>,
 //                                                          the host's answers on the rights of those who posted one;
-//                                                          OWNER, the repository's owner's login
+//                                                          <head>, this file as the pull request would merge it, read
+//                                                          as text, its caps those the text sets (left out, this
+//                                                          file itself, its caps those it runs with); OWNER, the
+//                                                          repository's owner's login
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { sizeOf } from "./file-size.mjs";
@@ -127,15 +132,17 @@ export function raised(base, head, comments, running = capsOf(head), whose = () 
   return null;
 }
 
-function raise(baseFile, commentsFile, rightsFile) {
-  let base = null, comments = null, rights = [];
+function raise(baseFile, commentsFile, rightsFile, headFile) {
+  let base = null, comments = null, rights = [], head = null;
   try { base = fs.readFileSync(baseFile, "utf8"); comments = JSON.parse(fs.readFileSync(commentsFile, "utf8")); } catch { /* (said below) */ }
   // (rights that cannot be read let no one write: the owner's answer still counts)
   try { if (rightsFile) rights = JSON.parse(fs.readFileSync(rightsFile, "utf8")); } catch { rights = []; }
-  if (comments === null) { console.error("FAIL: the base's size.mjs or the pull request's comments could not be read. Mend: name both, readable: node scripts/size.mjs --raise <base> <comments, as JSON>"); return 1; }
-  const wrong = raised(base, fs.readFileSync(fileURLToPath(import.meta.url), "utf8"), comments, CAPS, whoseOf(process.env.OWNER, rights));
+  try { head = fs.readFileSync(headFile ?? fileURLToPath(import.meta.url), "utf8"); } catch { /* (said below) */ }
+  if (comments === null || head === null) { console.error("FAIL: the base's size.mjs, the pull request's comments or the head's size.mjs could not be read. Mend: name them, readable: node scripts/size.mjs --raise <base> <comments, as JSON> [<rights> [<head>]]"); return 1; }
+  const running = headFile === undefined ? CAPS : capsOf(head);
+  const wrong = raised(base, head, comments, running, whoseOf(process.env.OWNER, rights));
   if (wrong) { console.error(`FAIL: ${wrong}`); return 1; }
-  const from = capsOf(base), up = Object.keys(CAPS).filter(r => from[r] !== undefined && from[r] < CAPS[r]);
+  const from = capsOf(base), up = Object.keys(running).filter(r => from[r] !== undefined && from[r] < running[r]);
   console.log(up.length ? `ok   the cap of ${up.join(", ")} rises one step, and the pull request holds a leanness check's answer` : "ok   no role's cap is raised");
   return 0;
 }
@@ -153,8 +160,8 @@ function over(role, roles) {
     + "has read all the rules for room and found too little, its answer posted in a comment that opens \"Leanness check:\".";
 }
 
-function main([flag, baseFile, commentsFile, rightsFile]) {
-  if (flag === "--raise") return raise(baseFile, commentsFile, rightsFile);
+function main([flag, baseFile, commentsFile, rightsFile, headFile]) {
+  if (flag === "--raise") return raise(baseFile, commentsFile, rightsFile, headFile);
   const roles = rolesAt();
   if (!roles.length || !fs.existsSync(QUEUE.file)) { console.error(`FAIL: what each role reads at its start cannot be counted: ${roles.length ? QUEUE.file : "roles/"} is not here. Mend: run it from the core's root, where roles/ and ${QUEUE.file} stand, or put back what was moved or taken out`); return 1; }
   const wrong = [...new Set([...roles, ...Object.keys(CAPS)])].map(role => over(role, roles)).filter(Boolean);

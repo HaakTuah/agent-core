@@ -108,10 +108,31 @@ ok(/gives the role reviewer a cap, and roles\/ holds no file for it\. Mend:/.tes
 fs.writeFileSync(copy, own.replace(/^  builder: (\d+) \* 1024,$/m, (line, n) => `  builder: ${Number(n) + 8}*1024,`).replace(/^export const CAPS = \{$/m, m => `/*\n${caps(kb)}*/\n${m}`));
 const hidden = at2("--raise", same, one);
 ok(hidden.status === 1 && hidden.out.includes("does not set the caps the script runs with") && mended(hidden.out) && !hidden.out.includes("ok "), "run as itself, a script whose real caps hide behind a look-alike block fails the raise check, answer or no answer", hidden.out);
+// (given the head's file, it reads the head as text alone, its caps those the text sets: what the head's own script
+// would say of the raise or of an answer has no say)
+const raising = own.replace(/^  builder: (\d+) \* 1024,$/m, (line, n) => `  builder: ${Number(n) + 1} * 1024,`), rewritten = put("rewritten.mjs", raising.replace(/^export function answered\(comments, whose = \(\) => false\) \{$/m, m => `${m}\n  return true;`));
+const judged = run("--raise", same, none, put("rights.json", "[]"), rewritten);
+ok(raising !== own && fs.readFileSync(rewritten, "utf8").includes("return true;") && judged.status === 1 && /the role builder rises.*Leanness check:/.test(judged.out) && mended(judged.out)
+  && run("--raise", same, one, put("rights.json", "[]"), rewritten).status === 0 && run("--raise", same, none, put("rights.json", "[]"), put("same-head.mjs", own)).out.includes("no role's cap is raised"),
+  "given the head's file, the raise is judged as this script reads the head's text: one without its answer fails whatever the head's own script holds, and passes with it", judged.out);
+ok(run("--raise", same, none, put("rights.json", "[]"), path.join(tmp, "missing.mjs")).status === 1 && mended(run("--raise", same, none, put("rights.json", "[]"), path.join(tmp, "missing.mjs")).out)
+  && /not the one block the check reads/.test(run("--raise", same, one, put("rights.json", "[]"), put("nocaps.mjs", "const x = 1;\n")).out),
+  "  and a head it cannot read, or whose caps cannot be read, fails, saying the mend");
 const elsewhere = spawnSync(process.execPath, [file], { cwd: os.tmpdir(), encoding: "utf8" });
 ok(elsewhere.status === 1 && /cannot be counted: roles\/ is not here/.test(elsewhere.stderr) && mended(elsewhere.stderr), "where the core is not there (run from another folder), it fails and says so", elsewhere.stdout + elsewhere.stderr);
 ok(run("--raise").status === 1 && run("--raise", same).status === 1 && run("--raise", same, path.join(tmp, "missing.json")).status === 1 && run("--raise", same, put("bad.json", "{")).status === 1 && run("--raise", path.join(tmp, "missing.mjs"), one).status === 1,
   "without its two files, or with one it cannot read, it fails");
+
+// size.yml: the step that holds a token comes before every step that runs the repository's own code, and so does the
+// raise as the base's own script judges it, given the head's file
+{
+  const steps = parseYaml(fs.readFileSync(path.join(root, ".github/workflows/size.yml"), "utf8")).jobs.size.steps;
+  const tokened = steps.map((s, i) => [s, i]).filter(([s]) => Object.values(s.env ?? {}).some(v => /github\.token|secrets\./u.test(String(v)))).map(([, i]) => i);
+  const ownCode = steps.map((s, i) => [s, i]).filter(([s]) => /(^|[\s"'])(\.\/)?scripts\//mu.test(s.run ?? "")).map(([, i]) => i);
+  const judge = steps.findIndex(s => /^node "\$RUNNER_TEMP\/raise\/base\/scripts\/size\.mjs" --raise .* "\$RUNNER_TEMP\/raise\/head\.mjs"$/u.test((s.run ?? "").trim()));
+  ok(tokened.length === 1 && ownCode.length >= 3 && judge >= 0 && [...tokened, judge].every(i => ownCode.every(j => i < j)),
+    "size.yml: the step that holds the token, and the raise as the base's own script judges it, come before every step that runs the pull request's own code", JSON.stringify({ tokened, ownCode, judge }));
+}
 
 // size.yml's step that reads the rights of those who answered, run as it stands, against a stand-in for GitHub's API:
 // a writer's right is read, and counts; a reader's is read, and does not; one the host does not answer, nor the
@@ -138,6 +159,8 @@ ok(run("--raise").status === 1 && run("--raise", same).status === 1 && run("--ra
   ok(r.status === 0 && rights.length === 2 && whose({ login: "writer", type: "User" }) && !whose({ login: "reader", type: "User" }) && !whose({ login: "silent", type: "User" }) && whose({ login: "SomeOne", type: "User" })
     && r.stdout.includes("The host's rights of silent could not be read") && !/outsider|bad;name|someone\b/iu.test(r.stdout),
     "size.yml reads the rights of those who answered: a writer's counts, a reader's and one not answered do not, and the owner, an outsider and a login of any other form are not asked for", r.stdout + r.stderr);
+  ok(fs.readFileSync(path.join(runner, "raise", "head.mjs"), "utf8") === own && fs.readFileSync(path.join(runner, "raise", "base", "scripts", "size.mjs"), "utf8") === own,
+    "  and puts by the head's script as text and the base's own scripts, for the base's to judge the raise");
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the cap's check`);
