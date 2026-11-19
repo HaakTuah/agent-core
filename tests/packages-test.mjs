@@ -272,9 +272,34 @@ try {
   const notNamed = loadParser();
   ok(!fs.existsSync(path.join(pp, "node_modules")) && notNamed.status === 1 && /did not run: the package is-number is not installed in \S*parser\S*node_modules as \.packages\/parser\/package-lock\.json names it\. Mend: run node \S*install\.mjs parser,/u.test(notNamed.stderr) && mended(notNamed.stderr),
     "the parser's install is not installed where no job names it, and what loads one of its packages says it did not run, naming the install", `${notNamed.stdout}${notNamed.stderr}`);
+  // (a project's own job that installs the core's first install alone, written before the parser's came, has the reader
+  // that needs it told so as a warning, never failed; not in the core, which holds its tests: #719)
+  const askUnnamed = () => spawnSync(process.execPath, ["--input-type=module", "-e", `const p = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(p.unreached("is-number"), p.unnamed("is-number"), p.unreached("yaml"));`], { cwd: project, encoding: "utf8", env });
+  const asked = askUnnamed();
+  fs.mkdirSync(path.join(copy, "tests"));
+  const askedInCore = askUnnamed();
+  fs.rmSync(path.join(copy, "tests"), { recursive: true });
+  ok(asked.stdout.trim() === "true true false" && askedInCore.stdout.trim() === "false false false",
+    "in a copy whose job installed the first install alone, a package of the parser's reads as unreached, so its reader warns and fails nothing; in the core, never", `${asked.stdout}${asked.stderr}${askedInCore.stdout}${askedInCore.stderr}`);
+  {
+    // (the shape check in such a job, its copy's parser list naming the parser's own packages, as the core's does: it
+    // reads no function of C#, and its warning names the install step's mend, not a run again)
+    const cs = path.join(tmp, "cs-unnamed");
+    fs.mkdirSync(cs);
+    fs.cpSync(copy, path.join(cs, "core"), { recursive: true });
+    fs.copyFileSync(path.join(root, ".packages/parser/package.json"), path.join(cs, "core/.packages/parser/package.json"));
+    fs.writeFileSync(path.join(cs, "shape.json"), JSON.stringify({ baseline: "shape-baseline.json", code: [".", ":!core/"], tests: [], systems: {} }));
+    fs.writeFileSync(path.join(cs, "Program.cs"), "class A { void M(bool x) { if (x) { } } }\n");
+    fs.writeFileSync(path.join(cs, "shape-baseline.json"), JSON.stringify({ reads: ["javascript", "jsx", "csharp", "csharp-tree", "python", "scripts", "screens"], listed: { "function: Program.cs#A.M": { lines: 99 } } }));
+    execFileSync("git", ["init", "-q"], { cwd: cs });
+    execFileSync("git", ["add", "-A"], { cwd: cs });
+    const r = spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json"], { cwd: cs, encoding: "utf8", timeout: 120000, env: { ...env, SHAPE_BASE: "" } }), out = `${r.stdout}${r.stderr}`;
+    ok(r.status === 0 && /^::warning::The shape check did not read C#, its functions by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone, .*Mend: make this job's install step node core\/scripts\/install\.mjs all/mu.test(out),
+      "and the shape check there reads no function of C#, failing nothing, and its warning says to name every install in the job's install step", out);
+  }
   const parser = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
   const named = loadParser();
-  ok(parser.status === 0 && /into \.packages\/parser\/node_modules\//u.test(parser.stdout) && !/into \.packages\/node_modules\//u.test(parser.stdout) && named.status === 0 && named.stdout.trim() === "true",
+  ok(parser.status === 0 && /into \.packages\/parser\/node_modules\//u.test(parser.stdout) && !/into \.packages\/node_modules\//u.test(parser.stdout) && named.status === 0 && named.stdout.trim() === "true" && askUnnamed().stdout.trim() === "false false false",
     "install.mjs parser installs the parser's alone, and its package then loads from there", `${parser.stdout}${parser.stderr}${named.stdout}${named.stderr}`);
   fs.rmSync(path.join(pp, "node_modules"), { recursive: true, force: true });
   const every = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "all"], { cwd: project, encoding: "utf8", timeout: 300000, env });

@@ -72,7 +72,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    parser's packages, whose grammars carry far more than a reader runs, have a lock file of their own in
    `.packages/parser/`, installed only where a job names it (`install.mjs parser`, or `all`, as the sync runs it and
    the copies check's job, which runs the shape check; #719): a session's start installs the first alone, and a check
-   that needs the parser says so, with its mend. Its
+   that needs the parser says so, with its mend; in a project's own job that installs the first alone, the shape check
+   reads no function of C# and says so as a warning, failing nothing by that. Its
    devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
    copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is

@@ -13,14 +13,16 @@
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import { MessageChannel, Worker, receiveMessageOnPort } from "node:worker_threads";
-import { installedFile, unreached } from "./packages.mjs";
+import { installedFile, unnamed, unreached } from "./packages.mjs";
 
 // Each language read, by the name a reader asks for, and its grammar's package and file.
 const GRAMMARS = { csharp: ["tree-sitter-c-sharp", "tree-sitter-c_sharp.wasm"] };
 // Whether the parser or the grammar of `language` could not be installed, the registry not answering, in a project's
-// pull request (install.mjs): its reader then reads no file of it, and the check that runs it says so as a warning,
-// failing nothing by that alone (#654, point 4).
+// pull request (install.mjs), or was never installed, a project's own job naming only the core's first install
+// (unnamedFor; #719): its reader then reads no file of it, and the check that runs it says so as a warning, failing
+// nothing by that alone (#654, point 4).
 export const unreachedFor = language => ["web-tree-sitter", GRAMMARS[language][0]].some(unreached);
+export const unnamedFor = language => ["web-tree-sitter", GRAMMARS[language][0]].some(unnamed);
 const bytes = (name, rel) => fs.readFileSync(installedFile(name, rel));
 // (how long a call waits on the worker: a file the parser takes longer on is one its reader cannot follow)
 const WAIT = 120000;

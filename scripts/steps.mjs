@@ -389,7 +389,7 @@ function parserFirst(p) {
     const at = job.steps.findIndex(shapes);
     return at >= 0 && !job.steps.slice(0, at).some(st => installs(st, ["parser", "all"]));
   })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
-  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check install the parser's too, \`node ${install} all\`, before the shape check runs: it reads C# on the parser, whose packages stand in a lock file of their own, and without them the check says it did not run.` : null;
+  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check install the parser's too, \`node ${install} all\`, before the shape check runs: it reads C# on the parser, whose packages stand in a lock file of their own, and without them the check reads no function of C#, saying so as a warning.` : null;
 }
 
 // Where the project's call to the NuGet check starts only on the paths it names, each build file a build reads by

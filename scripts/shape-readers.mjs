@@ -11,7 +11,7 @@
 import path from "node:path";
 import { CODE, functions, globals, imports, isModule, isP, jsxIn, tokens } from "./code-shape.mjs";
 import { OWN as CS_OWN, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "./shape-csharp.mjs";
-import { unreachedFor } from "./parser.mjs";
+import { unnamedFor, unreachedFor } from "./parser.mjs";
 import { OWN as PY_OWN, STDLIB, normal, pythonPackages, readPython, resolvePython } from "./shape-python.mjs";
 
 // Each reader by its name, with what it reads, as a note says it.
@@ -29,9 +29,11 @@ export const READERS = {
   processes: "the tests that start another process",
 };
 // The readers that read on the parser and could not run, its packages not installed for the registry not answering in
-// a project's pull request (parser.mjs, unreachedFor): the check reads their finds as a reader's the baseline does not
-// name, reported and never failed, and says so (#654, point 4).
+// a project's pull request, or for a project's own job naming the core's first install alone (parser.mjs, unreachedFor,
+// unnamedFor): the check reads their finds as a reader's the baseline does not name, reported and never failed, and
+// says so (#654, point 4; #719).
 export const unreachedReaders = () => (unreachedFor("csharp") ? ["csharp-tree"] : []);
+export const unnamedReaders = () => (unnamedFor("csharp") ? ["csharp-tree"] : []);
 // What a baseline that names no reader was written with: the check as #246 built it.
 export const FIRST_READS = ["javascript"];
 

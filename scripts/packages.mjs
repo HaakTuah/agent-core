@@ -188,10 +188,19 @@ function entryFaults(k, e, specs) {
 }
 
 // Whether the package could not be installed because the registry did not answer, in a project's pull request
-// (install.mjs): a script that reads it checks this first and says that part did not run, as a warning, keeping every
-// failure it found without the package (#654, point 4).
+// (install.mjs), or unnamed(): a script that reads it checks this first and says that part did not run, as a warning,
+// keeping every failure it found without the package (#654, point 4).
 export function unreached(name) {
-  return process.env.CORE_PACKAGES_UNREACHED === "1" && !installed(name);
+  return !installed(name) && (process.env.CORE_PACKAGES_UNREACHED === "1" || unnamed(name));
+}
+// Whether, in a copy, the job installed the core's first install but never the one whose list names the package (npm's
+// record of it absent): a job of the project's own written before that install came, which no change of the pull
+// request's made so, said as a warning with the mend, never failed (#719; "Nothing locks a project"). In the core, which
+// holds its tests, every job names what it runs, and a package not there fails.
+const own = fs.existsSync(path.join(root, "tests"));
+export function unnamed(name) {
+  const install = installOf(name);
+  return !own && install !== null && install !== FIRST && !installed(name) && matches(FIRST) && recordOf(install).had === null;
 }
 
 // The failure where no package list of the core's names the package: no install puts it there, so the mend is the core's

@@ -71,7 +71,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE, cycles, resolve } from "./code-shape.mjs";
 import { inProject, logged } from "./guards.mjs";
-import { FIRST_READS, PACKAGE_FILES, REACH, READERS, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unreachedReaders } from "./shape-readers.mjs";
+import { FIRST_READS, PACKAGE_FILES, REACH, READERS, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 
 export const KIT = "checks/shape.json";
@@ -782,7 +782,12 @@ function check(config, at, self, found, base, named) {
     base: base && { name: base.name, ...baseFiles(base, named), standing: () => standingAt(base.name, config) } });
   for (const note of v.notes) console.log(`note ${logged(note)}`);
   const skipped = unreachedReaders().filter(r => [...found.readers.values()].includes(r));
-  if (skipped.length) console.log(`::warning::The shape check did not read ${skipped.map(r => `${READERS[r]} (the reader ${r})`).join(", ")}: the core's packages could not be installed, the registry not answering, so what it would find there on the parser is reported, never failed${v.kept ? `, and the ${plural(v.kept, "entry", "entries")} its baseline lists there (functions, and files the grammar cannot read) ${v.kept === 1 ? "is" : "are"} kept as listed, never failed as gone` : ""}; what it reads without the parser is held as ever. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`);
+  // (a job of the project's own that names the core's first install alone, written before the parser's came, is told to
+  // name every one; one whose install could not reach the registry, to run again: #719)
+  const unnamed = skipped.length && unnamedReaders().length, install = path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)));
+  const why = unnamed ? "the parser's packages are not installed, this job's install step naming the core's first install alone" : "the core's packages could not be installed, the registry not answering";
+  const mend = unnamed ? `make this job's install step node ${install} all, which installs the parser's packages too` : "run this job again before the pull request merges; if it fails again, file it as a fault";
+  if (skipped.length) console.log(`::warning::The shape check did not read ${skipped.map(r => `${READERS[r]} (the reader ${r})`).join(", ")}: ${why}, so what it would find there on the parser is reported, never failed${v.kept ? `, and the ${plural(v.kept, "entry", "entries")} its baseline lists there (functions, and files the grammar cannot read) ${v.kept === 1 ? "is" : "are"} kept as listed, never failed as gone` : ""}; what it reads without the parser is held as ever. Mend: ${mend}`);
   if (!base) console.log("note no base to compare with (set SHAPE_BASE to the branch the work started from), so the baseline was not checked for what joined it, and what the config newly reads is not told from what is new");
   for (const line of v.fail.flat()) console.error(logged(line));
   if (v.fail.length) return 1;
