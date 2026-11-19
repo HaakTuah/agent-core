@@ -300,8 +300,8 @@ ok(is(pure([summary(running)]), false, "no security review") && is(pure([summary
 ok(is(pure([summary(done)], syncs), true, `has run (on ${SEEN.slice(0, 7)}`) && is(judge(pull, [], [], [], undefined, true, { pure: false }), false, "no security review"), "one that has run, on any commit of the sync, is done with; not proved pure, it is any pull request");
 
 // A pull request its caller proved queue-only (#750): queue-only.mjs, which the caller runs, proves it, and the check
-// honours the proof only where GitHub's whole list of its files is one Markdown file that runs nothing (the fallback
-// review of 64361aa, 6).
+// honours the proof only where GitHub's whole list of its files is one Markdown file that runs nothing, since a proof
+// handed by a caller changed in the pull request itself must wave through nothing more.
 const lineOf = file("QUEUE.md", "@@ -1 +1 @@\n-| #1 | builder | |\n+| #2 | builder | |");
 const queued = (comments, files, p = counted(pull, files), proved = true) => judge(p, comments, [], [], [files], true, { queue: proved });
 ok(is(queued([], [lineOf]), true, "queue-only, as queue-only.mjs proves") && is(queued([], [lineOf], undefined, false), false, "no security review"),

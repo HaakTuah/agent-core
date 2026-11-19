@@ -21,9 +21,9 @@ permissions:
   pull-requests: read
   statuses: write
 
-# (no group for the whole run: every comment's run would join it before any job's condition is read, and GitHub
-# cancels a waiting run once a newer one queues, so anyone's comment could lose a run that records a review; each
-# run's proof feeds only its own review job, which honours it only where it names the head that job reads itself)
+# (the run as a whole joins no group, since every comment's run would join it before any job's condition is read, and
+# GitHub cancels a waiting run once a newer one queues, so anyone's comment could lose a run that records a review;
+# each run's proof feeds only its own review job, which honours it only where it names the head that job reads itself)
 jobs:
   queue:
     permissions:

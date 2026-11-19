@@ -187,8 +187,8 @@ ok(unreadable.done === false && unreadable.warning === UNREAD && had([garbled, s
 ok(is(had([summary(running)]), false, "still running") && is(had([summary(running), said(`Code review: of ${HEAD}`)]), true, "is posted"), "a running review is still waited for, and ended by one posted of the head");
 
 // A pull request its caller proved queue-only (#750): in the core, where every pull request needs its code review, it
-// needs none where GitHub's whole list of its files is one Markdown file that runs nothing (the fallback review of
-// 64361aa, 6).
+// needs none where GitHub's whole list of its files is one Markdown file that runs nothing, since a proof handed by a
+// caller changed in the pull request itself must wave through nothing more.
 const lineOf = { filename: "QUEUE.md", status: "modified", patch: "@@ -1 +1 @@\n-| #1 | builder | |\n+| #2 | builder | |" };
 const queued = (comments, files, p = inCore, proved = true) => judge({ commits: line.length, changed_files: files.length, ...p }, comments, line, [files], [], true, undefined, null, { queue: proved });
 ok(is(queued([], [lineOf]), true, "queue-only, as queue-only.mjs proves") && is(queued([], [lineOf], inCore, false), false, "no code review"),

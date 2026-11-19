@@ -147,9 +147,9 @@ try {
 // ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
 // Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and
 // the pull request, cancelled once a newer run starts for it; a run on main, a schedule or a start by hand is a group of
-// its own (its run id), and never cancelled. Left out, each for its reason: the security-review check and the queue-only
-// proof that feeds it, whose runs go one
-// at a time in order so the last has read the newest comments, the release, the preview's queue and the deletion of
+// its own (its run id), and never cancelled. Left out, each for its reason: the security-review check, whose runs go
+// one at a time in order so the last has read the newest comments, and the queue-only proof that feeds it, which keeps
+// no group, so that no comment's run cancels one waiting to record a review (read below), the release, the preview's queue and the deletion of
 // merged branches, which no pull request starts and which never cancel, the scheduled ones, and the core's tests, read
 // below for their own groups (#733).
 const KEY = "${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}";
@@ -202,7 +202,7 @@ const callOf = (name) => ownCall.filter((job) => job.uses === `./.github/workflo
 ok(ownCall.length === 2 && ["security-review.yml", "queue-only.yml"].every((name) => callOf(name).length === 1 && callOf(name)[0].with?.root === ".") && callOf("security-review.yml")[0].with?.advisory === false,
   "and calls the core's workflow, and the queue-only proof before it, with its scripts at the root and advisory turned off");
 // (no group holds a whole run of the check, nor its proof: GitHub cancels a waiting run or job once a newer one of its
-// group queues, so any comment's run would lose the one that records a review; the fallback review of 64361aa)
+// group queues, so any comment's run would lose the one that records a review)
 const queueProof = parseYaml(fs.readFileSync(path.join(wfDir, "queue-only.yml"), "utf8"));
 ok(ownReview.concurrency === undefined && kitReview.concurrency === undefined && Object.values(queueProof.jobs).every((job) => job.concurrency === undefined),
   "and neither caller holds its whole run in a group, nor the proof its job, so no comment's run cancels one waiting to record a review");
