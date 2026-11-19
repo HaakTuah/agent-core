@@ -1,8 +1,8 @@
 # The six lines go again
 
 `reports/2026-11-11-silent-cuts-restored.md` put back six lines the cut-down of 10 November had removed without naming
-them. The owner, the same day: "Do we actually need any of this stuff. I think the cutter were spot on on msot of
-these, except about removing the use other providers first. Your take?"
+them. The owner, the same day, asked whether any of them is needed, and judged: "I think the cutter was spot on about
+most of these, except about removing the use of other providers first."
 
 Judged by what they say rather than by whether the cut-down listed them, none is needed, and they go again:
 

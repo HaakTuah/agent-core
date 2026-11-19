@@ -1,10 +1,8 @@
 # What the core's workflows cost a private repository for one pull request (15 November 2026)
 
-The owner asked, on 15 November 2026, through the orchestrator:
-
-> 4. Count what the core's own workflows cost a private repository for one pull request: the jobs each push starts,
-> times the pushes a pull request gets under "push after every commit". Say whether they can run as one job, and only
-> once a pull request is ready, and file what you find.
+The owner asked, on 15 November 2026, through the orchestrator, for a count of what the core's own workflows cost a
+private repository for one pull request: the jobs each push starts, times the pushes a pull request gets under "push
+after every commit"; whether they can run as one job, and only once a pull request is ready; and what is found filed.
 
 Counted from the starter kit on `main` at 2501701 (`scripts/init.mjs`, `setup/template/workflows/`) and the core's
 reusable workflows they call. GitHub's free plan gives a private repository 2,000 minutes a month, and bills each job
