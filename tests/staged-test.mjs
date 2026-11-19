@@ -984,7 +984,8 @@ ok(brief(caseOf("finish"), labelled) === [`You are a builder session of a projec
 // ---- the adviser's third case (#492): the project's orchestrator started, and no second where one runs ----
 const OWN = `${OWNER}/${REPO}`, NOTES = `${OWNER}/${REPO}-notes`;
 const STARTED = `You are the orchestrator of ${OWN} (the role \`orchestrator\`): read core/roles/orchestrator.md at your start, then work its queue. The owner's word that started you: "I want both queues worked tonight."`;
-const session = (dir, args, input = "") => spawnSync(path.join(dir, "bin", "session"), args, { env, encoding: "utf8", input });
+// (through Node, as gh above: Windows runs no script by its first line)
+const session = (dir, args, input = "") => spawnSync(process.execPath, [path.join(dir, "bin", "session"), ...args], { env, encoding: "utf8", input });
 const start = (dir, { repos = [OWN], model = "opus", effort = "high", text = STARTED } = {}) =>
   session(dir, ["start", ...repos.flatMap(r => ["--repo", r]), "--model", model, "--effort", effort, "--title", "Orchestrator", "--brief-file", "-"], text);
 check("adviser-starts", fresh("adviser-starts"), d => start(d), d => start(d, { repos: [NOTES] }), /in .*-notes, whose orchestrator runs.*no orchestrator of/);
