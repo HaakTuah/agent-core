@@ -48,6 +48,7 @@ The index, and how an item is written: `archive/instructions.md`.
      no "and similar" and no pattern. Behind: the core's own files named in "A release that brings nothing a project
      takes asks no sync of it" in `README.md`, "How a project takes the core", point 1, and `OWN_FILES` in
      `scripts/releases.mjs`.
+     Changes: 224.
 
 246. **14 to 16 November 2026**, #252. A project's copy carries each item's reasoning and not the owner's words, a bare
      yes is never quoted, an order for now is no rule, and rule text points to no item: a stand-in needs the reasoning,
