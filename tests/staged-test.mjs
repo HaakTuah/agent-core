@@ -335,6 +335,16 @@ check("review", fresh("review"),
   const missed = fresh("review");
   gh(missed, "POST", "issues/2/comments", { body: REVIEW.replace(/9\. Blocking: `description`[^\n]*\n/, "").replace("no owner's word is behind it.", "no owner\u2019s word is quoted behind it, nor spells it out, and the description thanks no one.").replace("Blocking findings: 9.", "Blocking findings: 8.") });
   ok(/does not name a quote of the owner's/.test(verdict("review", missed).why), "review: one that misses the quote fails, though it says \"owner's word is quoted\" of the rule", verdict("review", missed).why);
+  // (the fault in the guidelines' own words: "more than a decision and the reason behind it" counts as named, and a review that
+  // says of the description only that it quotes a decision and its reason, or "beyond" something else, is not credited)
+  const guidelines = fresh("review");
+  gh(guidelines, "POST", "issues/2/comments", { body: REVIEW.replace("9. Blocking: `description` quotes the owner's thanks beside the decision, and a typo left in it.", "9. Blocking: `description` quotes the owner beyond the decision and its reason.") });
+  ok(verdict("review", guidelines).pass, "review: the quote named in the guidelines' words, beyond the decision and its reason, counts as named", verdict("review", guidelines).why);
+  for (const [what, line] of [["a quote that holds a decision and its reason", "9. Blocking: `description` quotes the owner's word, a decision and its reason."], ["a description beyond the issue", "9. Blocking: `description` goes beyond what the owner's word asked."]]) {
+    const unnamed = fresh("review");
+    gh(unnamed, "POST", "issues/2/comments", { body: REVIEW.replace(/9\. Blocking: `description`[^\n]*\n/, `${line}\n`) });
+    ok(/does not name a quote of the owner's/.test(verdict("review", unnamed).why), `review: ${what} is not credited as the fault of a quote that holds more`, verdict("review", unnamed).why);
+  }
   // (the quote named by its section alone, with a curly apostrophe, as a review may write it)
   const section = fresh("review");
   gh(section, "POST", "issues/2/comments", { body: REVIEW.replace("9. Blocking: `description` quotes", "9. Blocking: The owner’s word quotes") });
