@@ -609,8 +609,10 @@ ok(["cat <<'EOF' | bash\nnode core/scripts/copies.mjs config/custom.json\nEOF", 
   "bash <<<'node core/scripts/copies.mjs config/custom.json'", "pwsh -c node core/scripts/copies.mjs config/custom.json", "powershell -NoProfile -Command node ./core/scripts/copies.mjs config/custom.json",
   "pwsh -c 'Push-Location app; node ../core/scripts/copies.mjs ../config/custom.json'"].every(run => notRead("copies", { "a.yml": stepped(run) })),
   "a naming of the script the reader does not account for leaves the run not read, in whatever form of the shell's");
-ok(notRead("copies", { "a.yml": stepped('echo "$(node core/scripts/copies.mjs config/custom.json)"') }) && notRead("copies", { "a.yml": stepped("echo `node core/scripts/copies.mjs config/custom.json`") }),
-  "a command's output in a line that runs no script itself runs the script all the same");
+// (on the parser, #530: a command in $( ) or ` ` is a command, as the reader's definition parts commands at ( and ), and
+// its run is read as any other)
+ok(copiesOf({ "a.yml": stepped('echo "$(node core/scripts/copies.mjs config/custom.json)"') }) === "config/custom.json" && copiesOf({ "a.yml": stepped("echo `node core/scripts/copies.mjs config/custom.json`") }) === "config/custom.json",
+  "a command whose output a line takes runs the script all the same, and is read as its run");
 // (the review of 6757c34: commands that can run another are no text; every naming of scripts/<name> is counted, as
 // a run's is matched; quotes read in one pass)
 ok(["awk 'BEGIN{system(\"node core/scripts/copies.mjs bad.json\")}'", "git -c alias.r='!node core/scripts/copies.mjs bad.json' r", "sed -n '1e node core/scripts/copies.mjs bad.json' x",
@@ -855,6 +857,25 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
   const left = of(wf("core.yml", "core.yml", "    with:\n      description: true\n")), twice = of(wf("core.yml", "core.yml", all), wf("s.yml", "signatures.yml")), bare = of(wf("core.yml", "core.yml", "    with:\n      copies: c.json\n      description: true\n"));
   ok(/pass it `copies: checks\/copies\.json`/.test(left ?? "") && /`signatures\.yml`, which its `signatures:` runs too/.test(twice ?? "") && /`sizes: checks\/sizes\.json` beside its `copies:`/.test(bare ?? ""),
     "one that leaves the copies checks out, runs the signature check twice, or passes copies without its marks is reported, each with its mend", [left, twice, bare].join("\n"));
+}
+
+// ---- a step's commands on the parser's bash grammar (bash-commands.mjs; #530, item 3): where the grammar the core
+// installs reads otherwise than bash, the reader mends it from the tree ----
+{
+  const { bashCommands } = await import("../scripts/bash-commands.mjs");
+  const shown = run => bashCommands(run).map(c => c.map(w => `${w.text}${w.dynamic ? "*" : ""}`).join(" "));
+  ok(JSON.stringify(shown("a=1 b=2\nnode core/scripts/copies.mjs c.json")) === JSON.stringify(["a=1 b=2", "node core/scripts/copies.mjs c.json"]),
+    "assignments on a line of their own are a command apart from the next line's, where the grammar joins them");
+  ok(JSON.stringify(shown("node core/scripts/copies.mjs > log c.json 2>&1 d.json")) === JSON.stringify(["node core/scripts/copies.mjs c.json d.json"]),
+    "the words after a redirection's file are the command's arguments, as bash gives them, where the grammar gives them to the redirection");
+  ok(JSON.stringify(shown("node core/scripts/c?(x)opies.mjs c.json")) === JSON.stringify(["node core/scripts/c?(x)opies.mjs* c.json"]) && JSON.stringify(shown('echo "a?(b)"')) === JSON.stringify(["echo a?(b)"]),
+    "an extended glob is part of its word, filled when it runs, where the grammar reads a subshell; in quotes it is text");
+  ok(JSON.stringify(shown("echo ${{ inputs.a }}x 'y${{ b }}'\ncat <<EOF\nnode no\nEOF\nnode yes")) === JSON.stringify(["echo ${{ inputs.a }}x* y${{ b }}*", "cat", "node yes"]),
+    "an expression of GitHub's is filled when it runs, quoted or not, and a here-document's lines are no commands");
+  ok(JSON.stringify(shown("cat <<OPEN\nnode core/scripts/copies.mjs c.json")) === JSON.stringify(["cat", "node core/scripts/copies.mjs c.json"]),
+    "a here-document with no line that ends it leaves its lines read as commands, so that no run is missed");
+  ok(JSON.stringify(shown('echo "$(node a.mjs)" `node b.mjs`')) === JSON.stringify(['echo $(node a.mjs)* `node b.mjs`*', "node a.mjs", "node b.mjs"]),
+    "a command inside $( ) or ` ` is a command of its own, its output a word filled when it runs");
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);

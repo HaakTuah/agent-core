@@ -5,8 +5,10 @@
 // the starter kit's path. Every source is read, never only the first: where two give different files, or one names its
 // file only when the workflow runs, or a script is run from a file the reader does not run (a shell script, a Makefile,
 // a package's scripts), the config is not read (Unread), said with why, and compared nowhere, never read as a path no
-// check is given. One check's config not read leaves every other's read. Node's own modules only.
+// check is given. One check's config not read leaves every other's read. Node's own modules, and the parser the core
+// installs, with bash's grammar, for a step's commands (bash-commands.mjs).
 import path from "node:path";
+import { bashCommands } from "./bash-commands.mjs";
 import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
 import { installed } from "./packages.mjs";
@@ -87,107 +89,11 @@ export function uncommented(line) {
   return line;
 }
 
-// The commands of a step's `run:`, each a list of its words as { text, dynamic }, quotes taken off, as a shell reads
-// them: a line continued by "\" joined to the next, a comment left out, commands parted by a line's end, ; & | ( or ).
-// A word is dynamic where a variable, a command's output or an expression of GitHub's in it is filled only when the
-// workflow runs. A "\" between two letters of a path is read as "/", a folder's parting on Windows. A here-document's
-// lines are data the command reads, never commands.
+// The commands of a step's `run:`, each a list of its words as { text, dynamic }, as bash reads them, on the parser
+// the core installs (bash-commands.mjs, beside this file, says what a command and a word are). Where the parser cannot
+// be loaded, the step that asks is reported as not read, saying so with the install's mend.
 export function commands(run) {
-  const text = withoutHereDocuments(run.split(/\r?\n/u).map(uncommented)).join("\n").replace(/\\\n/gu, " ");
-  const out = [];
-  let words = [], word = null, operand = false; // (operand: the next word is a redirection's file, no argument)
-  const add = (s, dynamic = false) => { word ??= { text: "", dynamic: false }; word.text += s; word.dynamic ||= dynamic; };
-  const close = () => { if (word && !operand) words.push(word); if (word) operand = false; word = null; };
-  const end = () => { close(); operand = false; if (words.length) out.push(words); words = []; };
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === "(" && word && "?*+@!".includes(text[i - 1])) i = extglob(text, i, add); // (?(…), @(…): a glob of bash's)
-    else if (text.startsWith("&>", i) || "<>".includes(text[i])) i = redirection(text, i, () => { if (!/^(?:\d+|\{\w+\})$/u.test(word?.text ?? "")) close(); word = null; operand = true; });
-    else if ("\n;&|()".includes(text[i])) end();
-    else if (" \t".includes(text[i])) close();
-    else i = part(text, i, add);
-  }
-  end();
-  for (const ws of out) for (const w of ws) w.dynamic ||= /%\w+%/u.test(w.text);
-  return out;
-}
-// A redirection at `i` (>, >>, >|, <, 2>, &>, >&2, <<EOF …): `opens` is told, so the word it is written against, a file
-// descriptor's number or name ({fd}), is no argument and the word after it is its file; it returns where its operator ends.
-function redirection(text, i, opens) {
-  opens();
-  let j = i + (text[i] === "&" ? 1 : 0);
-  while ("<>".includes(text[j + 1] ?? "x")) j++;
-  return "&|".includes(text[j + 1] ?? "x") ? j + 1 : j; // (>&2, and >| that writes over a file)
-}
-// The lines of a step with each here-document's lines left out (`<<EOF` up to the line that holds "EOF" alone); where
-// no such line follows, none is left out.
-function withoutHereDocuments(lines) {
-  const skipped = new Set(hereDocuments(lines).flatMap(({ opens, body }) => body.map((_, k) => opens + 1 + k)));
-  return lines.filter((_, k) => !skipped.has(k));
-}
-// Each here-document of a step's lines, as { opens, body }: the line that opens it and the lines it holds.
-function hereDocuments(lines) {
-  const found = [], at = new Map(); // (each line's text, trimmed, with the lines it stands on, in order: read once)
-  lines.forEach((l, k) => { const t = l.trim(); if (!at.has(t)) at.set(t, []); at.get(t).push(k); });
-  for (let n = 0; n < lines.length; n++) {
-    const end = hereDocument(lines[n]), last = end ? next(at.get(end) ?? [], n) : -1;
-    if (last > n) { found.push({ opens: n, body: lines.slice(n + 1, last) }); n = last - 1; }
-  }
-  return found;
-}
-// The first of the sorted line numbers `list` past `n`, or -1.
-function next(list, n) {
-  let low = 0, high = list.length;
-  while (low < high) { const mid = (low + high) >> 1; if (list[mid] <= n) low = mid + 1; else high = mid; }
-  return low < list.length ? list[low] : -1;
-}
-// The word that ends a here-document a line opens: a `<<` outside quotes and arithmetic, never `<<<`, then the word,
-// quoted, after a "\\" or bare, starting with a letter or "_"; null where it opens none.
-function hereDocument(line) {
-  const closes = line.lastIndexOf("))"); // (so that a "((" with none after it is passed in one step)
-  for (let i = 0, quote = ""; i < line.length; i++) {
-    const c = line[i];
-    if (quote) { if (c === "\\" && quote === '"') i++; else if (c === quote) quote = ""; }
-    else if (line.startsWith("((", i)) { if (closes > i) i = line.indexOf("))", i + 2) + 1; } // (with no "))" after it, two subshells)
-    else if (c === "'" || c === '"') quote = c;
-    else if (c === "\\") i++;
-    else if (line.startsWith("<<<", i)) i += 2;
-    else if (line.startsWith("<<", i)) {
-      const at = /^<<-?[ \t]*(?:\\|(['"]))?([A-Za-z_][\w.-]*)\1/u.exec(line.slice(i));
-      if (at) return at[2];
-      i++;
-    }
-  }
-  return null;
-}
-// An extended glob's (…), at `i`, to its closing ")" on that line: added to the word, filled when it runs (a glob that
-// may match); it returns where it ends.
-function extglob(text, i, add) {
-  let depth = 0, j = i;
-  for (; j < text.length && text[j] !== "\n"; j++) { if (text[j] === "(") depth++; else if (text[j] === ")" && --depth === 0) break; }
-  add(text.slice(i, Math.min(j + 1, text.length)), true);
-  return Math.min(j, text.length - 1);
-}
-// One part of a word, at `i`: given to `add` as what it spells, and whether it is filled only when the workflow runs;
-// it returns where the part ends.
-const expressionEnd = (text, i) => { const e = text.indexOf("}}", i); return e < 0 ? text.length : e + 2; };
-function part(text, i, add) {
-  const c = text[i];
-  if (text.startsWith("${{", i)) { const j = expressionEnd(text, i); add(text.slice(i, j), true); return j - 1; }
-  // (GitHub fills its expressions before the shell runs, single quotes or not)
-  if (c === "'") { const e = text.indexOf("'", i + 1), j = e < 0 ? text.length : e; add(text.slice(i + 1, j), text.slice(i + 1, j).includes("${{")); return j; }
-  if (c === '"') return doubleQuoted(text, i, add);
-  if (c === "\\") { const next = text[i + 1] ?? ""; add(/[\w.-]/u.test(next) && /[\w.-]/u.test(text[i - 1] ?? "") ? `\\${next}` : next); return i + 1; }
-  add(c, "$`{*?[".includes(c)); // (an unquoted "{", "*", "?" or "[" may be expanded, {a,b} or a glob, when it runs)
-  return i;
-}
-function doubleQuoted(text, i, add) {
-  let j = i + 1;
-  for (; j < text.length && text[j] !== '"'; j++) {
-    if (text.startsWith("${{", j)) { const k = expressionEnd(text, j); add(text.slice(j, k), true); j = k - 1; }
-    else if (text[j] === "\\" && /["\\$`]/u.test(text[j + 1] ?? "")) add(text[++j]);
-    else add(text[j], text[j] === "$" || text[j] === "`");
-  }
-  return j;
+  try { return bashCommands(run); } catch (e) { throw new Unread(e.message); }
 }
 
 // The root of the checkout as a workflow names it, at a path's start, read as the project's root: GitHub's expression
