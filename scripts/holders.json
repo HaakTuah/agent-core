@@ -216,6 +216,7 @@
     "AGENTS.md": [208, 209, 213],
     "AGENTS.md: A check that fails says the mend": [219],
     "AGENTS.md: A pull request says what it asks of a project": [215],
+    "AGENTS.md: A bug fix and a rework of tests are built on Sonnet": ["#767"],
     "AGENTS.md: A release is cut on the owner's word": [195, 196, 197],
     "AGENTS.md: A release says what it asks, step by step": [215],
     "AGENTS.md: A rule is written to one pattern": [214],
@@ -459,6 +460,7 @@
     "tasks/tests.md: A test that reaches the network runs once per batch": ["#733.9"]
   },
   "numbers": {
+    "AGENTS.md: A bug fix and a rework of tests are built on Sonnet": "findings; outcome: robust",
     "floor/security.md: The owner's word": "findings; outcome: readable; rare harm",
     "tasks/tools.md: What the core offers one tool, it offers each": "check fires; outcome: usable",
     "tasks/reviews.md: Ask by the first way there is": "check fires; outcome: fast",
