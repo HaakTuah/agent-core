@@ -95,11 +95,12 @@ const WAITS = /\b(?:running|pending|in[ -]progress|queued|under ?way|ongoing|wai
 const CLEARS = /\b(?:pass(?:ed|es)|clean|clear(?:ed)?|ok(?:ay)?|lgtm|approved|success(?:ful)?|succeeded|green|done|complete(?:d)?|finished|reviewed|no (?:security )?(?:findings?|issues?|problems?|concerns?|vulnerabilit(?:y|ies))|nothing (?:found|to (?:report|fix))|none (?:needed|required|necessary|found)|not (?:needed|required|necessary|applicable)|n\/a|unnecessary|needless|waived|skipped|bypassed|overridden)\b|\b(?:pass|none|skip|waive|bypass)\W*$|[\u2705\u2714]/iu;
 const LEAD = /^\W*security[ -]review\b[^:\n]*?(?::|\s[-\u2013\u2014]\s)(.*)$/isu;
 const SAID = /(?:^|[;,])[^\w;,]*(?:(?:the|its|this|\w[^\s,;]*['’]s)\s+)?security[ -]review(?:\s+(?:of|on|for)\s+(?:(?:pull request|PR|issue)\s+)?\S+)?(?:\s+(?:has|had|is|was|been|got|now|already))*\s+(?:pass(?:ed|es)?|clean|cleared|approved|done|complete(?:d)?|finished|green|waived|skipped|bypassed|overridden|unnecessary|needless|not (?:needed|required|necessary)|no longer (?:needed|required))\b/iu;
-// (a clause under "Security review:" that speaks of another review or the checks gives no verdict on this one: "code
-// review is complete")
-const OTHER = /\b(?:code|design|copilot['’]s|other)\s+review\b|\b(?:tests?|checks?|builds?|ci|lint\w*)\b/iu;
-// (no security review needed, said with the review as its subject's negation: "No security review is required.")
-const NONE = /\b(?:no|nor)\s+(?:\w+\s+)?security[ -]review\s+(?:is\s+|was\s+|being\s+)?(?:required|needed|necessary|due)\b/iu;
+// (a clause under "Security review:" whose subject is another review or the checks gives no verdict on this one: "code
+// review is complete"; one that only names them, "waived because the tests passed", still does)
+const OTHER = /^\W*(?:the\s+|its\s+)?(?:(?:code|design|copilot['’]s|other)\s+review|tests?|checks?|builds?|ci|lint\w*)\b/iu;
+// (no security review needed, said by the session as its clause's subject, "No security review is required.", never
+// one it reports of another, "the adviser said no security review is required")
+const NONE = /^\W*(?:no|nor)\s+(?:\w+\s+)?security[ -]review\s+(?:is\s+|was\s+|being\s+)?(?:required|needed|necessary|due)\b/iu;
 // (`named`: only a sentence that names #3 counts, for a text sent elsewhere than #3)
 const NAMES_THREE = /#0*3\b|\b(?:pull[ -]?request|PR|pull|issue)[\s-]*(?:#|no\.?\s*|number\s+)?0*3\b|\/(?:pull|pulls|issues)\/0*3\b/iu;
 // (a text's sentences, an ellipsis ending one, a heading "Security review" read with the line under it)
