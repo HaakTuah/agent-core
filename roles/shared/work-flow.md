@@ -44,7 +44,11 @@ owner creates from any device to stop its agents and deletes to let them go on.
 - A session runs the *quick check* before its first change; a failure there is a bug outside its task ("Bugs don't
   wait"), and the task goes on with what does not hang on it. It does not mean the whole suite. Reason: one that
   starts on a broken `main` cannot tell its own faults from those it inherited.
-- A session that stops mid-task commits and writes its hand-off note (`tasks/tools.md`).
+- **A builder hands over by its context** (#750, point 7). By default a session ends its task; once a builder's
+  context passes about 250,000 tokens (a first guess), as its tool shows it, it stops at its next passed gate (checks
+  green, a review answered), and whoever started it starts a fresh one from its hand-off note, which any session that
+  stops mid-task commits and writes (`tasks/tools.md`). It does not mean it stops mid-step. Reason: each step costs
+  more as a context grows; one builder ran to 553,000. Held by no check; the cost line shows it.
 - A builder session that no orchestrator started, and the orchestrator on every wake, first checks whether the core
   has moved (`core/scripts/core-moved.mjs --dry`) and syncs it if so (`core/scripts/sync.mjs`, then each step and
   difference it reports), between tasks, a floor change at once (`tasks/planning.md`); where checks cost money, not on a day a sync PR was already opened. Then both read what reviews left after a merge (`tasks/reviews.md`, point 2), and take up a check failed on `main`'s newest commit that no running session owns (`tasks/tests.md`).

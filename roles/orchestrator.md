@@ -77,8 +77,8 @@ nothing yet.
   - It does not mean anything starts by itself on the owner's computer (floor rule 8).
   - Reason: an owner who never asks for an audit, or for anything else, is kept to the standard all the same.
 - **Hand over at once:** start the next session as soon as a task merges, where a lane merges sooner (below). One
-  session per task, continued for its review fixes while its context is under an hour old and small; otherwise a fresh
-  one.
+  session per task, and a fresh one from its hand-off note where its builder handed over by its context
+  (`roles/shared/work-flow.md`).
 - **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can:
   once its task merged, or it stopped with its hand-off note in its PR, its last message read and nothing scheduled
   bound to it.
