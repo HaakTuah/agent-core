@@ -15,6 +15,7 @@ it merges last.
 | #744 | rule builder; it changes the archive's key and its check | |
 | #750 | rule builder; it changes floor rule 8 (point 2); two security reviews | |
 | #756 | rule builder | |
+| #704 | builder; `tests.yml`, 2 security reviews | #715, on the same file |
 | #530, step 5 | builder; licence readers | |
 | #593, points 1 to 3 | rule builder | |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md` | |
@@ -82,6 +83,7 @@ it merges last.
 | #707 | rule builder | |
 | #701 | builder | |
 | #716 | builder | |
+| #551 | builder; #710 adds a line to `tasks/reviews.md` | #642 |
 | #739 | rule builder; it changes the game module (`tasks/game-design.md`) | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
@@ -92,7 +94,7 @@ They read and change no rule.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #550 | builder; a case a PR | |
-| #551 | builder | #549 |
+| #765 | builder | #756, whose #763 brings the rule |
 | #552 | builder | #551 |
 | #553 | builder | #552 |
 | #554 | builder | #553 |
