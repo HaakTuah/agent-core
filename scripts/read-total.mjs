@@ -45,11 +45,11 @@ const safe = s => String(s).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu
 // its text is not read), this many bytes of all the files' text together, this many rule files and kinds of task, this
 // many names they give (a role's start line, a module's kinds, paths and tools), and this many of the reading script's
 // steps for all its readers' tries of their paths on the path patterns (reading.mjs, STEPS, #673);
-// past the last five it fails, saying so. The steps, not the names, bound the path patterns: on the last 30 merged pull
-// requests' paths (about 1,350), some 240 patterns run a tree past them though within the names, and the failure's
-// mend says so. The core's rule files are 44, about 330 KB in all, giving 92 names of which 32 kinds, among them 16 path
-// patterns, and their tries take about 6% of the steps on today's merged pull requests, a share that moves with them;
-// at these limits the worst case reads in about 2 s, within the 5 s SECURITY.md allows.
+// past the last five it fails, saying so. The steps, not the names, bound the path patterns: on about 1,350 paths, some
+// 240 patterns run a tree past them though within the names, and the failure's mend says so. The core's rule files are
+// 44, about 330 KB in all, giving 92 names of which 32 kinds, among them 16 path patterns, and their tries take a few
+// percent of the steps (about 2.5% on the 426 paths of main's last 30 merged pull requests, on 19 November 2026, a share
+// that moves with them); at these limits the worst case reads in about 2 s, within the 5 s SECURITY.md allows.
 export const LIMITS = { bytes: 1 << 20, all: 8 << 20, files: 200, kinds: 100, names: 300, steps: STEPS };
 const TOO_MUCH = `the rule files' text is past the ${LIMITS.all / (1 << 20)} MB the total read reads. Mend: keep the rule files to what the core holds, a module for each subject`;
 // A name the tree is asked for is a path inside it: relative, with no empty, "." or ".." segment, so that no name a rule
