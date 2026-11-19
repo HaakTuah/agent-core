@@ -137,7 +137,8 @@ code is held to: `tasks/code-shape.md`.
   before its file is next changed. Reason: a mark on size is a weak sign that a file holds two things, and files were
   cut where nothing was gained. Held by the reading-size check (`core/scripts/reading-size.mjs`), which fails a file
   past its mark that a pull request changes with no line in `"past"`, one whose new line names neither a split's issue
-  nor why it stays whole, and one grown a quarter past its line's mark, or past a mark alone that stood.
+  nor why it stays whole, and one grown a quarter past its line's mark, or past a mark alone that stood; a mark a pull
+  request raises on a line that stood it notes, for the reviews to read that its why still holds.
 - **A cut or a join lowers the total read** (#469). By default what a change to how the core's rule files are cut
   brings down is the sum of what the core's tasks read, each file opened counted as a cost of its own, never one file's
   size: `core/scripts/read-total.mjs` works it out from what the reading script gives each role and kind of task and

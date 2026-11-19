@@ -87,15 +87,41 @@ export function readsOf(text, lead) {
 }
 
 // Whether a changed path matches a pattern of a module's line.
-// (each pattern compiled once: a module's paths are tried against every changed path of every task the total read
-// counts; the cache is let go past a few thousand, which no module set holds)
-const compiled = new Map();
+// A pattern as its parts: each character a literal, `*` any run of characters but "/", `**` (with a "/" after it, which
+// it takes) any run at all. Matched by walking the path once for each part, never by a regular expression, whose
+// backtracking takes time that grows exponentially with the stars a pattern a branch writes holds side by side.
+const partsOf = p => { const out = []; for (let i = 0; i < p.length; i++) { if (p[i] !== "*") out.push(p[i]); else if (p[i + 1] === "*") { out.push(ANY); i += p[i + 2] === "/" ? 2 : 1; } else out.push(STAR); } return out; };
+const STAR = Symbol("*"), ANY = Symbol("**");
+// (a pattern's parts once, and its literal runs, which must stand in the path in their order: a check in one pass that
+// turns away nearly every path before the walk)
+const known = new Map();
+const prepared = p => {
+  if (!known.has(p)) {
+    if (known.size > 4096) known.clear();
+    const parts = partsOf(p), runs = [""];
+    for (const part of parts) if (typeof part === "string") runs[runs.length - 1] += part; else runs.push("");
+    known.set(p, { parts, runs: runs.filter(Boolean), first: runs.length > 1 ? runs[0] : "", last: runs.length > 1 ? runs[runs.length - 1] : "" });
+  }
+  return known.get(p);
+};
+function inOrder(runs, s) { let from = 0; for (const r of runs) { const at = s.indexOf(r, from); if (at < 0) return false; from = at + r.length; } return true; }
+function globbed(parts, s) {
+  let at = new Uint8Array(s.length + 1);
+  at[0] = 1;
+  for (const part of parts) {
+    const next = new Uint8Array(s.length + 1);
+    if (typeof part === "string") { for (let j = 0; j < s.length; j++) if (at[j] && s[j] === part) next[j + 1] = 1; }
+    else for (let j = 0; j <= s.length; j++) next[j] = at[j] || (j > 0 && next[j - 1] && (part === ANY || s[j - 1] !== "/")) ? 1 : 0;
+    at = next;
+  }
+  return at[s.length] === 1;
+}
 export function matches(pattern, file) {
   const p = String(pattern).replace(/^\.\//u, ""), f = String(file).replace(/\\/gu, "/").replace(/^\.\//u, "");
   if (p.endsWith("/")) return f.startsWith(p);
-  const glob = s => s.replace(/[.+^${}()|[\]\\?]/gu, "\\$&").replace(/\*\*\/?/gu, "\u0000").replace(/\*/gu, "[^/]*").replace(/\u0000/gu, ".*");
-  if (!compiled.has(p)) { if (compiled.size > 4096) compiled.clear(); compiled.set(p, new RegExp(`^${glob(p)}$`, "u")); }
-  return compiled.get(p).test(p.includes("/") ? f : f.split("/").pop());
+  const s = p.includes("/") ? f : f.split("/").pop(), g = prepared(p);
+  if (!s.startsWith(g.first) || !s.endsWith(g.last) || !inOrder(g.runs, s)) return false;
+  return globbed(g.parts, s);
 }
 
 // The core's roles and modules as they say when they are read: `read(file)` gives a file's text or null, `list(folder)`

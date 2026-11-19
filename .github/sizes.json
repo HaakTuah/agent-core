@@ -32,7 +32,7 @@
       "why": "Whoever changes how the total is counted reads its tree reader, its readers, its cut and its conditions together, each calling the others; split, that session opens more files and reads no less, and no other task reads it."
     },
     "scripts/reading.mjs": {
-      "mark": 30594,
+      "mark": 32082,
       "why": "The start hook runs it from git with no file beside it, so it stands alone (its opening says so): no part can be moved to a file of its own."
     },
     "scripts/state-report.mjs": {
@@ -44,7 +44,7 @@
       "why": "Split by the reader each case tests in #852."
     },
     "tests/hostile-pr-changes-test.mjs": {
-      "mark": 33922,
+      "mark": 34591,
       "why": "Split by the reader each case tests in #852."
     },
     "tests/init-test.mjs": {
@@ -54,6 +54,10 @@
     "tests/look-test.mjs": {
       "mark": 37770,
       "why": "Split into the look's tests and the state report's in #852."
+    },
+    "tests/reading-test.mjs": {
+      "mark": 31106,
+      "why": "Split by the part of reading.mjs each case tests in #852."
     }
   }
 }

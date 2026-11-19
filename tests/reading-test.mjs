@@ -37,6 +37,11 @@ ok(matches("CLAUDE.md", "CLAUDE.md") && matches("CLAUDE.md", "tools/CLAUDE.md") 
 ok(["Cargo.lock", "svc/yarn.lock", "bun.lockb", "packages.lock.json", "app/package-lock.json", "pnpm-lock.yaml", "npm-shrinkwrap.json", "svc/go.sum"].every(f => KINDS_BY_PATH.some(r => r.kind === "update" && matches(r.path, f))) && ["clock.json", "block.js", "padlock.md", "go.sum.txt", "package.json"].every(f => !KINDS_BY_PATH.some(r => r.kind === "update" && matches(r.path, f))),
   "a lock file of any kind is an update, and a file whose name only ends like one is not");
 ok(matches(".github/dependabot.yml", ".github/dependabot.yml") && !matches(".github/dependabot.yml", "x/.github/dependabot.yml") && matches("src/**/*.css", "src/a/b/c.css") && matches("src/*.css", "src/a.css") && !matches("src/*.css", "src/a/b.css") && !matches("a.b", "aXb") && matches("./a/", "a/b"), "a path with a folder is from the root, * within a folder and ** across them, and a dot is a dot");
+// (the matcher walks the path, never backtracking: "**/" may match nothing, the parts that stand between stars are
+// literal, and a pattern of many stars side by side that matches nothing answers at once; #673)
+const slowAt = Date.now();
+ok(matches("**/x", "x") && matches("**/x", "a/b/x") && matches("a*a", "aa") && !matches("a*a", "a") && matches("*b*", "abc") && !matches("x*", "abc") && matches("a?b", "a?b") && !matches("a?b", "axb") && matches("src/a.(x)", "src/a.(x)") && !matches(`${"*a".repeat(40)}b`, "a".repeat(200)) && !matches(`${"**/".repeat(40)}*z*z*z*q`, "a/".repeat(100)) && Date.now() - slowAt < 1000,
+  "a pattern's stars, ** across folders and literal parts match as before, and one of many stars side by side that matches nothing answers at once");
 
 // a small core
 const texts = {

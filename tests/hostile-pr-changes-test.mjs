@@ -343,6 +343,11 @@ ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "co
     const a = total(mem(texts), given), c = conditions(a, total(mem(texts), given, a), "");
     ok(Date.now() - slow < 5000 && !c.cut, `read-total: ${n} names of one rule file (${what}), read by 60 readers of merged pull requests, take ${Date.now() - slow} ms, within 5 s`);
   }
+  // (a path pattern of many stars side by side that matches no path, which a backtracking matcher takes minutes over)
+  const stars = { ...plain, "tasks/s.md": `# S\n\nRead when: the paths ${["*a".repeat(30) + "b", "**/".repeat(30) + "*z*z*z*z*z*z*q", `src/${"*".repeat(200)}x`].map(x => `\`${x}\``).join(", ")}.\n` };
+  slow = Date.now();
+  const sa = total(mem(stars), given.map(t => ({ ...t, paths: t.paths.map(p => `${p.replace(/\.js$/u, "")}${"a".repeat(150)}.js`) })));
+  ok(Date.now() - slow < 5000 && sa.readers.size > 0, `read-total: path patterns of many stars side by side, matching no path, are read by 60 readers in ${Date.now() - slow} ms, within 5 s`);
   for (const [what, texts] of Object.entries(giving(40000))) {
     slow = Date.now();
     thrown = null;
