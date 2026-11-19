@@ -13,9 +13,9 @@ Read before a task touches what anyone but the user at hand can shape, and by a 
   uses that number.
   - The limits are declared, since no script reads a reader's limit from its code exactly; the security review reads
     them against the reader's code. They are written, and reported where missing, as the input's hostile tests are
-    (below), and no more waits on them. It does not mean a limit made up where a shape has none: "limits: none", with
-    why, is an answer, nor a limit for every field. Reason: "too long" means nothing until an input says how long is
-    allowed.
+    (below), and wait for nothing those tests do not. It does not mean a limit made up where a shape has none: "limits:
+    none", with why, is an answer, nor a limit for every field. Reason: "too long" means nothing until an input says how
+    long is allowed.
 - **Every named input has hostile tests:** too long, the wrong type, markup, a file path, a number
   out of range, and nothing at all, each refused with nothing of it used. Whoever adds an input, or changes the code
   that reads one, writes its tests in that pull request; an input named without them is a task of its own, which the
