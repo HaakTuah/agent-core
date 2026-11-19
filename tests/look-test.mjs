@@ -170,15 +170,23 @@ ok(stale(0, "Packages the project holds that have gone stale\n\n- a\n").what ===
     codex(5, 9, "2026-11-18T10:00:00Z", `${badge("P1")} On an open pull request`), { ...codex(6, 7, "2026-11-18T10:00:00Z", `${badge("P1")} Not Codex's`), user: { login: "someone", type: "User" } },
     codex(7, 7, "2026-11-18T10:00:00Z", `<!-- codex-security-review-finding:v1 -->\n${badge("P0")} A late security finding`),
     codex(8, 7, "2026-11-18T10:00:00Z", `${badge("P1")} Replied to by another account alone`), { id: 9, in_reply_to_id: 8, pull_request_url: "https://api.github.com/repos/o/r/pulls/7", created_at: "2026-11-18T11:00:00Z", user: { login: "someone", type: "User" }, author_association: "NONE", body: "Done." },
-    codex(10, 11, "2026-11-01T10:00:00Z", `${badge("P1")} Made before the week, edited since`)];
+    codex(10, 11, "2026-11-01T10:00:00Z", `${badge("P1")} Made before the week, edited since`),
+    codex(12, 7, "2026-11-18T10:00:00Z", `${badge("P1")} Replied to by a member who may only read`), { id: 13, in_reply_to_id: 12, pull_request_url: "https://api.github.com/repos/o/r/pulls/7", created_at: "2026-11-18T11:00:00Z", user: { login: "reader", type: "User" }, author_association: "MEMBER", body: "Done." }];
   const merged = { 7: "2026-11-18T09:00:00Z", 8: "2026-11-18T09:00:00Z", 9: null, 11: "2026-10-30T09:00:00Z" };
-  const gh = route => { if (route.startsWith("repos/o/r/pulls/comments")) return JSON.stringify(route.includes("page=1") ? inline : []); const n = /pulls\/(\d+)$/.exec(route)?.[1]; return JSON.stringify({ merged_at: merged[n] ?? null }); };
+  // the host's rights, as GitHub's collaborators/<login>/permission gives them: the owner's admin, a member's read
+  const right = (login, role_name, permission, push) => ({ role_name, permission, user: { login, type: "User", permissions: { push } } });
+  const rights = { owner: right("owner", "admin", "admin", true), reader: right("reader", "read", "read", false) };
+  const gh = route => { if (route.startsWith("repos/o/r/pulls/comments")) return JSON.stringify(route.includes("page=1") ? inline : []); const who = /collaborators\/([^/]+)\/permission$/.exec(route)?.[1]; if (who) { if (!rights[who]) throw new Error("HTTP 404"); return JSON.stringify(rights[who]); } const n = /pulls\/(\d+)$/.exec(route)?.[1]; return JSON.stringify({ merged_at: merged[n] ?? null }); };
   const found = [];
   lateFinding("o/r", (title, what, unread = null) => found.push({ title, what, unread }), "2026-11-18T12:00:00Z", gh);
   const what = found[0]?.what ?? "";
   ok(found.length === 1 && found[0].title === TITLES.late && what.includes("discussion_r1") && !/discussion_r([23456]|10)\b/.test(what) && !what.includes("Not read"),
     "when a finding stands unanswered on a merged pull request, the look lists it; one made before the merge, one answered, one on an open pull request, one made before the week and another account's are not", what);
   ok(what.includes("discussion_r8"), "a reply from an account the host does not let write answers no finding (floor rule 4)", what);
+  ok(what.includes("discussion_r12"), "a reply from a member whose right, as the host gives it, is to read alone answers no finding", what);
+  const blind = [];
+  lateFinding("o/r", (title, w, unread = null) => blind.push({ what: w, unread }), "2026-11-18T12:00:00Z", route => (/collaborators\/owner\/permission$/.test(route) ? (() => { throw new Error("HTTP 403"); })() : gh(route)));
+  ok(blind[0].what?.includes("discussion_r3") && /Not read this run: the rights of 1 account that replied, whose replies are counted as none/.test(blind[0].what), "where the right of an account that replied cannot be read, its reply answers nothing, and the issue says so", blind[0].what);
   ok(/#7, a finding of Codex's security review/.test(what) && !what.includes("discussion_r7") && !what.includes("A late security finding"), "a security finding is listed by its pull request alone, nothing of it written (floor rule 9)", what);
   const none = [];
   lateFinding("o/r", (title, what2, unread = null) => none.push({ what: what2, unread }), "2026-11-18T12:00:00Z", route => JSON.stringify(route.startsWith("repos/o/r/pulls/comments") ? [] : {}));

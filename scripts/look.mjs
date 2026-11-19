@@ -55,9 +55,10 @@ import { asked, FOLDER, repoOf } from "./inbox.mjs";
 import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
 import { WAITS, waitsOn } from "./pr-description.mjs";
 import { pathIn } from "./reading.mjs";
-import { lateBody, lateOf, pullOf } from "./review-marks.mjs";
+import { lateBody, lateOf, pullOf, repliersOf } from "./review-marks.mjs";
 import { codexFind } from "./review-record.mjs";
 import { ownerOf } from "./releases.mjs";
+import { writersOf } from "./security-review.mjs";
 import { HOURS, openPulls, stalled } from "./stalled.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { started } from "./started.mjs";
@@ -289,7 +290,12 @@ export function lateFinding(repo, add, at, gh = ghApi) {
     const all = [...new Set(inline.filter(c => codexFind(c)).map(pullOf).filter(Number.isInteger))].sort((a, b) => b - a);
     const merged = new Map(all.slice(0, LATE_PULLS).map(n => [n, JSON.parse(gh(`repos/${repo}/pulls/${n}`)).merged_at ?? null]).filter(([, m]) => typeof m === "string"));
     const left = [pages > LATE_PAGES && `the review comments past the first ${LATE_PAGES * 100} of the week`, all.length > LATE_PULLS && `Codex's findings on ${all.length - LATE_PULLS} older pull requests`].filter(Boolean);
-    const body = lateBody(lateOf(inline, merged, since));
+    // a reply answers a finding only where the host says its author may write: a right not read counts as none, so its
+    // finding stays listed, and is said
+    const repliers = repliersOf(inline, LATE_PULLS), rights = [], unknown = [];
+    for (const login of repliers) { try { rights.push(JSON.parse(gh(`repos/${repo}/collaborators/${login}/permission`))); } catch { unknown.push(login); } }
+    if (unknown.length) left.push(`the rights of ${unknown.length} account${unknown.length === 1 ? "" : "s"} that replied, whose replies are counted as none`);
+    const body = lateBody(lateOf(inline, merged, since, writersOf(rights)));
     if (left.length === 0) return add(TITLES.late, body);
     if (body === null) return add(TITLES.late, null, `${left.join(" and ")} could not be read this run`);
     add(TITLES.late, `${body}\n\nNot read this run: ${left.join("; ")}.`);

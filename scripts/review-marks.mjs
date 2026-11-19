@@ -63,15 +63,23 @@ export const pullOf = c => Number(/\/pulls\/(\d+)$/u.exec(String(c?.pull_request
 // The late findings (tasks/reviews.md, "A late review is still read"): of `inline` (review comments, any pull
 // request's, as GitHub's API gives them), Codex's findings made on or after `since` and after their pull request merged
 // (`merged`, a Map of the pull request's number to when it merged), with no reply from an account the host lets write
-// (GitHub's author_association, as WRITERS: another account's reply is data, floor rule 4): [{ pull, url, review, at }].
-// (A finding Codex posts as an issue comment is not read: an issue comment has no reply GitHub ties to it, so whether
-// it was answered could only be guessed.)
-export function lateOf(inline, merged, since = "") {
-  const answered = new Set(inline.filter(c => WRITERS.includes(c?.author_association)).map(c => c?.in_reply_to_id).filter(id => id !== undefined && id !== null));
+// (`writers`, the logins in lower case that security-review.mjs's writersOf reads from the host's rights: another
+// account's reply is data, floor rule 4, and in an organisation a member or collaborator may only read):
+// [{ pull, url, review, at }]. (A finding Codex posts as an issue comment is not read: an issue comment has no reply
+// GitHub ties to it, so whether it was answered could only be guessed.)
+export function lateOf(inline, merged, since = "", writers = new Set()) {
+  const answered = new Set(inline.filter(c => c?.user?.type === "User" && typeof c.user.login === "string" && writers.has(c.user.login.toLowerCase())).map(c => c?.in_reply_to_id).filter(id => id !== undefined && id !== null));
   return inline.flatMap(c => {
     const find = codexFind(c), pull = pullOf(c), at = merged.get(pull), made = String(c?.created_at ?? "");
     return find && at && made >= since && made > at && !answered.has(c.id) ? [{ pull, url: String(c.html_url ?? ""), review: find.review, at: made }] : [];
   });
+}
+
+// The logins whose rights lateOf needs: of `inline`, the people (accounts of type User) whose association GitHub gives
+// as one that may write (WRITERS) and who replied to a finding of Codex's, in lower case, the first `cap` of them.
+export function repliersOf(inline, cap) {
+  const finds = new Set(inline.filter(c => codexFind(c)).map(c => c.id));
+  return [...new Set(inline.filter(c => finds.has(c?.in_reply_to_id) && c?.user?.type === "User" && typeof c.user.login === "string" && /^[a-z\d](?:[a-z\d-]{0,38})$/iu.test(c.user.login) && WRITERS.includes(c.author_association)).map(c => c.user.login.toLowerCase()))].slice(0, cap);
 }
 
 // The body of the look's issue for them, or null where none stands.
