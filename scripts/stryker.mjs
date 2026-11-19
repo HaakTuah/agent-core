@@ -142,7 +142,7 @@ function askedOf(argv) {
   const out = value("--report"), tool = value("--tool"), budget = Number(value("--budget") ?? (process.env.MUTATE_BUDGET || Infinity));
   if (!out || !tool || !(budget > 0)) refuse("Stryker's run was not told where Stryker is installed, where to write its report, or its budget in seconds", "run node scripts/stryker.mjs --tool <the folder Stryker is installed in> --report <file> [--budget <seconds>] [<file>[:<first>-<last>],...]");
   const bin = path.resolve(tool, "node_modules", "@stryker-mutator", "core", "bin", "stryker.js");
-  if (!fs.existsSync(bin)) refuse(`Stryker is not installed in ${tool}`, `install it there from its lock file, with no install scripts: npm ci --ignore-scripts --prefix ${tool}`);
+  if (!fs.existsSync(bin)) refuse(`Stryker is not installed in ${tool}`, `install it there from its lock file, with no install scripts: npm ci --ignore-scripts --allow-git=none --allow-remote=none --allow-file=none --allow-directory=none --workspaces=false --prefix ${tool} (in the core: node scripts/install.mjs mutation)`);
   const flags = new Set(["--report", "--tool", "--budget"]);
   return { out: path.resolve(out), bin, budget, named: argv.filter((a, i) => !flags.has(a) && !flags.has(argv[i - 1])) };
 }

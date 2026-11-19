@@ -25,7 +25,9 @@
 # among them (#719), from npm's registry, running no install script (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
 # tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
 # Once, on Linux, the core's own lock files are held as a project's are: each package it brings looked up in npm's
-# registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures).
+# registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures), but for
+# the mutation tool's in tests/mutation/, installed in another job, whose signatures the versions update checks
+# (.github/versions.json).
 # Each job of the suites, three on Linux and eight on Windows on each Node, the network's on both, and the upgrade
 # test, are measured against a time mark (the "suites" of .github/shape.json, by scripts/shape.mjs), which a job past
 # it says as a warning and never fails on (tasks/tests.md, "A time mark measures and never fails"; #733, point 5).
@@ -499,8 +501,7 @@ jobs:
       # install scripts (floor rules 7 and 15), and its run tested with it)
       - name: Stryker, from its lock file, with no install scripts (once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
-        working-directory: tests/mutation
-        run: npm ci --ignore-scripts --no-audit --no-fund --allow-git=none --allow-remote=none --allow-file=none --allow-directory=none --workspaces=false # (as scripts/install.mjs runs it: from npm's registry alone)
+        run: node scripts/install.mjs mutation # (its lock file, package list and .npmrc refused before npm runs where they could reach past npm's registry, as each install's are)
       - name: Stryker's run as a mutation tool, with Stryker itself (once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' && (env.RUN == 'all' || contains(env.RUN, ' tests/stryker-test.mjs ')) }}
         run: node tests/stryker-test.mjs --tool tests/mutation

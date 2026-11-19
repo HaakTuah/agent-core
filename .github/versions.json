@@ -15,7 +15,7 @@
       "pattern": "\"@stryker-mutator/core\": \"(\\d+\\.\\d+\\.\\d+)\"",
       "days": 7,
       "sameMajor": false,
-      "how": "Put the version in `tests/mutation/package.json`, then write its lock file afresh in that folder with `npm install --ignore-scripts --before <the time a week ago>`, so that no package it brings is under a week old (floor rule 7), and run `node tests/stryker-test.mjs --tool tests/mutation`; the licence check and the lookup read what it brings. Its `overrides` holds `mutation-testing-report-schema` at 3.9.0, where the packages that need it pin 3.8.4, whose lock entry a check of this repository's fails: take the override out once they pin 3.9.0 or later."
+      "how": "Put the version in `tests/mutation/package.json`, then write its lock file afresh in that folder with `npm install --ignore-scripts --before <the time a week ago>`, so that no package it brings is under a week old (floor rule 7), check the registry's signatures there (`npm audit signatures`, once installed by `node scripts/install.mjs mutation`), and run `node tests/stryker-test.mjs --tool tests/mutation`; the licence check and the lookup read what it brings. Its `overrides` holds `mutation-testing-report-schema` at 3.9.0, where the packages that need it pin 3.8.4, whose lock entry a check of this repository's fails: take the override out once they pin 3.9.0 or later."
     }
   ]
 }

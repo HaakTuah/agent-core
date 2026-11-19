@@ -285,10 +285,13 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   `session-cost.mjs`, 39 (9) in 5 s against 221 (63) in 28 s; `dose.mjs`, 72 (13) in 24 s against 428 (98) in 126 s;
   `mend.mjs`, 4 (0) in 1 s against 32 (2) in 513 s, 48 tests naming it. Each line where a fault of the core's survived
   holds a surviving one of Stryker's. *Replayed:* none (no bug was filed against `mutate.mjs`; #636 has no merged fix).
-  Replaced in #651: Stryker, installed from `tests/mutation/`'s lock file (its package list, lock file, `.npmrc` and
-  `.gitignore`, in `tests/`, which no copy carries), is run by `stryker.mjs` with the core's glue (the tests that name
-  each file, a working copy, the budget, a report written as the run goes); `mutate.mjs` stays for a project that names
-  it, and for `--every`, which names each test that caught a fault.  ## Jobs on a schedule or by hand
+  Replaced in #651: Stryker, installed from `tests/mutation/`'s lock file (its package list, lock file, `.npmrc`, in
+  `tests/`, which no copy carries, installed by `install.mjs mutation`), is run by `stryker.mjs` with the core's glue
+  (the tests that name each file, a working copy, the budget, a report written as the run goes); `mutate.mjs` stays for
+  a project that names it, and for `--every`, which names each test that caught a fault.
+
+## Jobs on a schedule or by hand
+
 - `scripts/look.mjs`, `.github/workflows/look.yml`, `.github/workflows/own-look.yml`, `scripts/moment.mjs`,
   `scripts/stalled.mjs`: the scheduled look, once a day, keeps in issues what has stopped, what is due and what is
   overdue, and the monthly state report. *Runs:* the runners on a schedule; an orchestrator's wake. *Else:* the host's
