@@ -1,5 +1,5 @@
 - `scripts/shape.mjs`, `scripts/code-shape.mjs`, `scripts/shape-readers.mjs`, `scripts/shape-csharp.mjs`,
-  `scripts/shape-python.mjs`, `scripts/csharp-functions.mjs`, `scripts/javascript-functions.mjs`,
+  `scripts/shape-python.mjs`, `scripts/csharp-tree.mjs`, `scripts/javascript-functions.mjs`,
   `scripts/python-tree.mjs`, `scripts/tree-walk.mjs`, `scripts/dose.mjs`, `scripts/wait.mjs`, `.github/shape.json`,
   `.github/shape-baseline.json`, `tests/readers-test.mjs`: fails what is new in how the code is put together: a function past its marks for lines,
   depth and branching, an import on a cycle, a file in no system. *Runs:* any session and the runners. *Else:* Lizard
@@ -8,7 +8,7 @@
   packages) and madge, for cycles and boundaries, dropped on fact: JavaScript and TypeScript alone, where the check
   reads C# and Python too. *Bugs:* 3. **Keep:** fitting costs more than keeping, each tool knowing one language or
   fixing its definitions; its readers go to the parser, as #486's group 3 and #519's path say, C#'s functions the first
-  (`scripts/csharp-functions.mjs`, #529), then JavaScript's and TypeScript's (`scripts/javascript-functions.mjs`), then
+  (#529), then JavaScript's and TypeScript's (`scripts/javascript-functions.mjs`), then
   Python's, then all of Python, its imports and tokens too (`scripts/python-tree.mjs`), then all of C#, its using
   directives, namespaces and types too (`scripts/csharp-tree.mjs`). *Tried:* 19 November 2026 (#723), tree-sitter's JavaScript grammar 0.25.0
   and TypeScript's 0.23.2, on the core's 204 files of JavaScript and every case of the lexer's tests: the same where the
