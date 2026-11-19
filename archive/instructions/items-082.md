@@ -89,12 +89,15 @@ The index, and how an item is written: `archive/instructions.md`.
     model, with "and effort" cut; the roles file names the orchestrator as the session that starts builder sessions).
     Decided: The owner agreed, with a correction: effort can be set for agents, the owner is pretty sure, so that should
     remain.
+    Changed by: 99.
 
 99. **10 November 2026** (the core). Asked: the design session reading item 98 as keeping "and effort" for the sessions
     an orchestrator starts. Decided: The owner corrected it. An orchestrator cannot set a different effort than its own
     for any sub-session or builder session, as the owner had said before; it can set whatever model it wants, but not
     effort. A builder session that starts sub-agents can set both model and effort as it wants, to the best of the
     owner's knowledge.
+    Changes: 98.
+    Changed by: 128.
 
 100. **10 November 2026** (the core). Asked: whether the orchestrator's effort in the model table should go from medium
      to high, since the builder sessions it starts run at its effort (item 99). Decided: The owner agreed.

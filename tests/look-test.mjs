@@ -3,7 +3,7 @@
 // report's parts. Node's own modules only; the calls to gh and git are the program's own and are not made here.
 //
 //   node tests/look-test.mjs
-import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, staleFinding, lateFinding, LATE_PAGES, LATE_PULLS, text, TITLES, updating } from "../scripts/look.mjs";
+import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, staleFinding, lateFinding, LATE_PAGES, LATE_PULLS, text, TITLES, updating, FAILED, redBody } from "../scripts/look.mjs";
 import { parse, signKey, tripped, trippedBody } from "../scripts/choices.mjs";
 import { before, body, copies, countsFrom, reportOf, share, SHARES, shownAs } from "../scripts/state-report.mjs";
 import fs from "node:fs";
@@ -24,8 +24,8 @@ ok(plan(null, open, true) === "nothing" && plan("b", open, true) === "nothing", 
 const readers = [() => null, () => ({ title: "One", body: "a" }), () => ({ title: "Two", body: null, unread: "its file is no file" }), () => ({ title: "Three", body: "c", owner: true })];
 ok(JSON.stringify(dueNow({}, readers)) === JSON.stringify([{ title: "One", what: "a", unread: null }, { title: "Two", what: null, unread: "its file is no file" }, { title: "Three", what: "c", unread: null, owner: true }]),
   "each reader of what is due gives its issue, one that has nothing to say gives none, and one says whether it is the owner's to see");
-ok(DUE.length === 5 && dueNow({ manifest: "# Core manifest\n", at: "2026-11-16T05:00:00Z", root: os.tmpdir() }).map(d => d.title).join("; ") === "Choices to read again; A choice's measured sign to act on; Cleaning due: how the code is put together; An audit of how the code is put together is due",
-  "the look keeps an issue for the pass over the choices, for a sign of theirs that has tripped, for cleaning and for the audit by a reader (and, in the core alone, the staged cases)");
+ok(DUE.length === 6 && dueNow({ manifest: "# Core manifest\n", at: "2026-11-16T05:00:00Z", root: os.tmpdir() }).map(d => d.title).join("; ") === "Choices to read again; A choice's measured sign to act on; Cleaning due: how the code is put together; An audit of how the code is put together is due",
+  "the look keeps an issue for the pass over the choices, for a sign of theirs that has tripped, for cleaning and for the audit by a reader (and, in the core alone, the staged cases and a cap passed)");
 ok(relabelled(["queued", "by:look"], false) === null && relabelled(["needs-owner", "by:look"], true) === null && relabelled(["queued", "by:look", "cleaning"], true).join() === "by:look,cleaning,needs-owner"
   && relabelled(["needs-owner", "by:look"], false).join() === `by:look,${LABELS[0]}` && relabelled(["queued", "needs-owner"], true).join() === OWNERS && relabelled([], false).join() === "queued" && relabelled(["later", "by:look"], true) === null && relabelled(["on-hold"], false) === null,
   "an issue that is the owner's to see carries needs-owner in place of queued, and queued again once it is not; its other labels stay");
@@ -78,6 +78,16 @@ ok(checksOf([run("completed", "success")], { state: "pending", total_count: 2 })
   "the commit's statuses count beside its check runs: a review's status still pending is waiting, one failed is red; none set changes nothing");
 ok(checksOf([run("completed", "success"), run("in_progress", null)]) === "waiting" && checksOf([run("in_progress", null), run("completed", "failure")]) === "red" && checksOf([run("completed", "timed_out")]) === "red",
   "one still running is waiting; one that failed or timed out is red, whatever else runs");
+
+// ---- checks failed on the default branch (#542) ----
+const SHA = "a".repeat(40), job = (name, conclusion, extra = {}) => ({ name, status: "completed", conclusion, head_sha: SHA, html_url: "https://github.com/o/r/actions/runs/1/job/2", ...extra });
+const red = redBody([job("suites (ubuntu-latest, rest)", "success"), job("suites (windows-latest, core)", "failure"), job("upgrade", "timed_out", { html_url: "https://example.invalid/x" }), job("moved", "cancelled"), { name: "running", status: "in_progress", conclusion: null }], "main");
+ok(red.includes("`suites (windows-latest, core)`: failure (https://github.com/o/r/actions/runs/1/job/2).") && red.includes("`upgrade`: timed_out.") && !red.includes("example.invalid") && !/rest\)|moved|running/.test(red) && red.includes("`aaaaaaa`") && red.includes("A check that fails on the default branch has an owner"),
+  "a check failed on the default branch's newest commit is listed, its address only where it is GitHub's own; one passed, cancelled or still running is not");
+ok(redBody([job("a", "success"), job("b", "skipped"), job("c", "cancelled")], "main") === null && redBody([], "main") === null && plan(null, { state: "open" }) === "close" && FAILED.includes("startup_failure"),
+  "where none failed there is nothing, and the issue the look keeps closes");
+ok(!redBody([job("x`\n@team", "failure")], "ma`in").includes("\n@team") && redBody([job("x`y", "failure")], "main").includes("`x'y`"),
+  "a check's name and the branch are written as data: no line break or backtick of theirs reaches the issue");
 
 // ---- the idle list ----
 const lane = (number, draft, checks, waited, bodyText, labels = []) => ({ number, draft, checks, waited, body: bodyText, labels });

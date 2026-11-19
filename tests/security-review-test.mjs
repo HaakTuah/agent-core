@@ -224,9 +224,12 @@ ok(is(byRights([as("SomeOne", "OWNER")], []), true, "is posted") && is(byRights(
 const opened = { ...pull, created_at: "2026-11-12T10:00:00Z" };
 ok(boundOf("false", opened, "2026-11-12T11:00:00Z") === false && boundOf("false", opened, "2026-11-12T09:00:00Z") === true && boundOf("false", opened, "2026-11-12T10:00:00Z") === true
   && ["", undefined, "soon"].every((since) => boundOf("false", opened, since) === true) && boundOf("false", { ...pull, created_at: "soon" }, "2026-11-12T11:00:00Z") === true && [undefined, "true", ""].every((held) => boundOf(held, opened, "2026-11-12T11:00:00Z") === true),
-  "a pull request is taken as from before the check only where the host says it was opened before the default branch's copy came; one opened since, or with either time unread, is held, whatever its head holds");
-const unnamedOld = judge(pull, [as("helper")], [], undefined, undefined, false);
-ok(unnamedOld.done === true && unnamedOld.why.endsWith("a review from an account not named counts, as before this check came") && is(judge(pull, [as("helper", "NONE")], [], undefined, undefined, false), false, "no security review") && is(judge(pull, [as("SomeOne", "OWNER")], [], undefined, undefined, false), true, "is posted on the pull request"), "a pull request from before the check: a member's or collaborator's review counts as it did then, said in the status, and no one else's");
+  "a pull request is taken as from before the check only where the host says it was opened before the script first came to the default branch; one opened since, or with either time unread, is held, whatever its head holds");
+const helperOld = (rights) => judge(pull, [as("helper")], [], undefined, undefined, false, { rights });
+ok(is(helperOld(undefined), false, "no security review") && is(helperOld([right("helper", "read")]), false, "no security review") && is(helperOld([right("helper")]), true, "is posted on the pull request")
+  && is(judge(pull, [as("helper", "NONE")], [], undefined, undefined, false), false, "no security review") && is(judge(pull, [as("SomeOne", "OWNER")], [], undefined, undefined, false), true, "is posted on the pull request")
+  && is(judge(pull, [{ ...as("helper"), updated_at: "2026-11-14T12:30:00Z" }], [], undefined, undefined, false, { rights: [right("helper")] }), true, "is posted on the pull request"),
+  "a pull request from before the check counts a review only from an account it counts, as any other does: a member whose right was not read, or who may only read, counts not; a writer, the owner, and an edited review of theirs do");
 
 // What a review must have seen (#99): a review of an earlier commit stands only where nothing but updates from main
 // follow it; otherwise a posted review names the head, or such a commit, by its whole SHA.
@@ -304,7 +307,7 @@ try {
   ok(asked.status.state === "pending" && asked.status.description.startsWith("Waiting: floor rule 3 asks two") && run(counted(pull, [pinMove]), [[summary(onHead)]], { ADVISORY: "false" }, [], [], [[pinMove]]).status.state === "success"
     && run({ ...counted(pull, [stepChange]), created_at: "2026-11-12T09:00:00Z" }, [[summary(onHead)]], { ADVISORY: "false", BOUND: "false", SINCE: "2026-11-12T10:00:00Z" }, [], [], [[stepChange]]).status.state === "success"
     && ["2026-11-12T08:00:00Z", ""].every((since) => run({ ...counted(pull, [stepChange]), created_at: "2026-11-12T09:00:00Z" }, [[summary(onHead)]], { ADVISORY: "false", BOUND: "false", SINCE: since }, [], [], [[stepChange]]).status.state === "pending"),
-  "given the files too, it asks two where what runs by itself changed, and says how to mend it; told the pull request is from before the check and opened before the default branch's copy came, it waits not; opened since, or with no time for that, it waits");
+  "given the files too, it asks two where what runs by itself changed, and says how to mend it; told the pull request is from before the check and opened before the script first came to the default branch, it waits not; opened since, or with no time for that, it waits");
   ok(run(pull, [], { ADVISORY: "false", PURE: HEAD }).status.description === "a pure sync, as pure-sync.mjs proves: no review needed, none begun by itself yet (floor rule 8)" && run(pull, [], { ADVISORY: "false", PURE: SEEN }).status.state === "pending" && run({ ...pull, head: { sha: "main" } }, [], { PURE: "main" }).sha === undefined, "told the workflow's proof holds for the head, a sync needs no review; for another commit it does");
   ok(run(pull, [[as("helper")]], { ADVISORY: "false", REVIEWERS: "x helper" }).status.state === "success" && run(pull, [[as("helper")]], { ADVISORY: "false" }).status.state === "pending", "the accounts the workflow names count, and no others");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");

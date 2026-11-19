@@ -512,6 +512,16 @@ counter and its commands are in the pull request that adds this record (#487).
   `.packages/parser/node_modules/`, only where a job names it, with no script run, the runtime's CommonJS build and WebAssembly (378 KB) and the grammar's WebAssembly (5.4 MB) read from there;
   the grammar's package brings two more, `node-addon-api` and `node-gyp-build` (MIT), which only its native build,
   never run, uses. Nothing of them is in the repository's history.
+- **JavaScript's and TypeScript's grammars arrived** on 19 November 2026 (#530's item 6, #723), with the port of the
+  shape check's functions of JavaScript and TypeScript, JSX among them, onto them (`scripts/javascript-functions.mjs`),
+  its definition kept: `tree-sitter-javascript` 0.25.0 and `tree-sitter-typescript` 0.23.2 (TypeScript's grammar and
+  TSX's), the tree-sitter organisation's, MIT, in the parser's lock. On the core's 204 files, 200 read the same and the
+  4 others are the lexer's misreads mended (a regular expression in a template literal that lost 17 functions after it;
+  a choice's `:` taken for a key's or a return type's, 3); every case of the lexer's tests reads as written, but JSX
+  whose text holds a bare `}`, which JSX refuses. The imports, a script's names and the mutation tool stay on the lexer,
+  since they run where the parser is not installed. Neither grammar has had a release in the last year (JavaScript's
+  last on 1 September 2025, TypeScript's on 11 November 2024), and TypeScript's predates `export type *` and a type's
+  parameter marked `in` or `out`: an error of the grammar that is words alone leaves the functions around it told.
 - Reopens it: the counts of a reader built this way differ from a count by hand on code it was not written against,
   or from real code of a project's, beyond a mend of its definition; a grammar a project of the owner's needs is
   missing, or fails to parse more than 1 file in 100 of that project's code; a runtime update leaves a grammar the
