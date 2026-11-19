@@ -56,25 +56,40 @@ export function runnersRow(manifest) {
   return m && WHERE.includes(m[1]) ? m[1] : undefined;
 }
 
-// Where the tests run, who pays and how often the slow suites run: { where, billed, cadence, said, advice }.
-export function read({ repo, dir = ".github/workflows", manifest = null, gh = ghApi, parse }) {
-  const w = workflowsIn(dir, parse);
-  let priv = null;
-  try { priv = JSON.parse(gh(`repos/${repo}`) || "null")?.private ?? null; } catch { /* (not read) */ }
+// Whether the repository is private, as the host says: true, false, or null where it did not answer.
+function privateOf(repo, gh) {
+  try { return JSON.parse(gh(`repos/${repo}`) || "null")?.private ?? null; } catch { return null; }
+}
+
+// Where the tests run and who pays, read and overridden: { where, whereRead, whereRow, billed, billedRow }.
+function settled(w, priv, manifest) {
   const whereRead = w.selfHosted ? "self-hosted" : w.onHost ? "hosted" : "local";
   const whereRow = runnersRow(manifest), billedRow = override(manifest, "billed minutes", ["yes", "no"]);
-  const where = whereRow ?? whereRead;
-  const billed = billedRow ? billedRow === "yes" : priv !== false; // (not read: taken as billed, the cheaper way)
-  const cadence = where === "local" ? "release" : where === "self-hosted" || billed ? "nightly" : "hourly";
-  const said = [
-    `where the tests run: ${{ hosted: "the host's runners", "self-hosted": "a runner of the owner's own", local: "a session's or the owner's computer alone, no workflow running on a pull request or a push" }[where]}${whereRow ? `, as the manifest's row *test runners* says (read: ${whereRead})` : ""}`,
-    `who pays: ${billed ? "minutes billed" : "the host's free minutes"}${billedRow ? ", as the manifest's row *billed minutes* says" : priv === null ? " (whether the repository is private was not read, so taken as billed)" : `, the repository being ${priv ? "private" : "public"}`}`,
-    ...w.unread.length ? [`workflows not read: ${w.unread.map(f => oneLine(f).slice(0, 60)).join(", ")}`] : []];
-  const when = { hourly: "once an hour, where it moved", nightly: "once a night, where it moved", release: "before each release, on that computer" }[cadence];
+  // (where whether it is private was not read: taken as billed, the cheaper way)
+  const billed = billedRow ? billedRow === "yes" : priv !== false;
+  return { where: whereRow ?? whereRead, whereRead, whereRow, billed, billedRow };
+}
+
+const PLACES = { hosted: "the host's runners", "self-hosted": "a runner of the owner's own", local: "a session's or the owner's computer alone, no workflow running on a pull request or a push" };
+const WHEN = { hourly: "once an hour, where it moved", nightly: "once a night, where it moved", release: "before each release, on that computer" };
+
+// The lines that say what was read, and from where.
+function saidOf(s, priv, unread) {
+  const whereBy = s.whereRow ? `, as the manifest's row *test runners* says (read: ${s.whereRead})` : "";
+  const paidBy = s.billedRow ? ", as the manifest's row *billed minutes* says"
+    : priv === null ? " (whether the repository is private was not read, so taken as billed)" : `, the repository being ${priv ? "private" : "public"}`;
+  return [`where the tests run: ${PLACES[s.where]}${whereBy}`, `who pays: ${s.billed ? "minutes billed" : "the host's free minutes"}${paidBy}`,
+    ...unread.length ? [`workflows not read: ${unread.map(f => oneLine(f).slice(0, 60)).join(", ")}`] : []];
+}
+
+// Where the tests run, who pays and how often the slow suites run: { where, billed, cadence, said, when, advice }.
+export function read({ repo, dir = ".github/workflows", manifest = null, gh = ghApi, parse }) {
+  const w = workflowsIn(dir, parse), priv = privateOf(repo, gh), s = settled(w, priv, manifest);
+  const cadence = s.where === "local" ? "release" : s.where === "self-hosted" || s.billed ? "nightly" : "hourly";
   const advice = w.selfHosted && priv === false
     ? "A public repository runs a job on a runner of the owner's own, where a stranger's pull request would run its code: where no open issue names it, file one for the owner, labelled needs-owner, to move that job to the host's runners; nothing waits on it."
     : null;
-  return { where, billed, cadence, said, when, advice };
+  return { where: s.where, billed: s.billed, cadence, said: saidOf(s, priv, w.unread), when: WHEN[cadence], advice };
 }
 
 export function main(argv, { gh = ghApi, say = console.log } = {}) {
