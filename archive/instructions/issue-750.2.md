@@ -8,5 +8,5 @@ The index, and how an item is written: `archive/instructions.md`.
      closed one: it merges on its checks, as a pure sync does. Of 39 merges, 4 only added queue lines, each through
      Codex's two reviews, a fallback's review and the full tests, where what a review would read is what a script can
      read. The owner agreed to the point as set out on the issue, which is the yes floor rule 3 asks for this change to
-     floor rule 8, and asked that it be a priority. It stands behind floor rule 8 and "A pull request of queue lines
-     alone needs no review of its own" in `tasks/reviews.md`.
+     floor rule 8, and asked that it be a priority. It stands behind floor rule 8 and "A pull request of the *progress
+     file* alone needs no review of its own" in `tasks/reviews.md`.

@@ -68,11 +68,11 @@ saved data; a weakened check).
 - One that changes a protected file also gets a code review.
 - A security review that starts by itself when a PR opens or is marked ready is waited for and read on every PR
   (how long: `tasks/reviews.md`, point 3).
-- A PR a script of the core's, run from its `main`, proves one of these needs no review of its own, nor rule 3's two:
+- A PR a script of the core's, run from its `main`, proves one of these needs no review of its own, nor rule 3's two
+  (`tasks/reviews.md`, point 3):
   - a pure sync, its code passed both in the core's PR: its diff only the core's copy, its pin and the pins of
-    calls to the core's workflows, moved forward to one commit of the core's `main` (`pure-sync.mjs`), merged only at
-    the head checked;
-  - queue lines alone (`queue-only.mjs`; `tasks/reviews.md`).
+    calls to the core's workflows, moved forward to one commit of the core's `main`, merged only at the head checked;
+  - the *progress file* alone.
 - **Nothing is reviewed twice:** a later commit is reviewed only for what it changes.
 - **Nothing runs on the owner's computer unless the owner starts it:** no poller, scheduled task or service of an
   agent's making.
