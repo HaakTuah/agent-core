@@ -194,7 +194,7 @@ try {
   ok(none.status.state === "pending" && none.status.description.startsWith("Waiting: no code review yet") && mended(none.status.description) && run(counts, [[summary(done)]], { ADVISORY: "false" }, [line], [code]).status.state === "success"
     && run({ ...counts, created_at: "2026-11-14T09:00:00Z" }, [], { ADVISORY: "false", BOUND: "false", SINCE: "2026-11-14T10:00:00Z" }, [line], [code]).status.state === "success"
     && run({ ...counts, created_at: "2026-11-14T11:00:00Z" }, [], { ADVISORY: "false", BOUND: "false", SINCE: "2026-11-14T10:00:00Z" }, [line], [code]).status.state === "pending",
-  "given the commits and files too, it waits for a code review that has not run, and says how to mend it; told the pull request is from before the check and opened before the default branch's copy came, it waits not; opened since, it waits");
+  "given the commits and files too, it waits for a code review that has not run, and says how to mend it; told the pull request is from before the check and opened before the script first came to the default branch, it waits not; opened since, it waits");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   let usage = 0;
   try { execFileSync(process.execPath, [script], { stdio: "ignore" }); } catch (e) { usage = e.status; }
