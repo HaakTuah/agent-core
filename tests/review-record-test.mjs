@@ -7,7 +7,7 @@
 //
 //   node tests/review-record-test.mjs
 import { fileURLToPath } from "node:url";
-import { blockingOf as trialBlocking, builderOf, changedOf, effortOf, findingsOf, groupOf, kindOf, print as trialPrint, verdict } from "../scripts/builder-trial.mjs";
+import { FIVE as trialFive, blockingOf as trialBlocking, builderOf, changedOf, effortOf, findingsOf, groupOf, kindOf, print as trialPrint, verdict } from "../scripts/builder-trial.mjs";
 import { blockingOf, broughtBy, bugs, codexFind, foundTwice, otherOf, perPull, postedKind, print, ruleOf, rulesIn, rulesNamed, secondFound, stanceOf, standing, tally } from "../scripts/review-record.mjs";
 
 let failed = 0, count = 0;
@@ -201,7 +201,8 @@ ok(trialBlocking(five(ran("yes", 2, 3), ran("no", 0, 1))) === 2 && findingsOf(fi
   && trialBlocking(five(ran("no", 0, 1, true), idle)) === 0 && findingsOf(five(ran("no", 0, 1, true), idle)) === null && findingsOf(five(idle, idle)) === 0,
   "the trial's findings are each review's, blocking and other, and unknown where a count of a review that ran was not read, never none");
 const staged = { ...five(ran("yes", 1, 1), idle), postedCode: ran("yes", 2, 1), postedAdversarial: ran("yes", 2, 1), postedRegular: idle };
-ok(trialBlocking(staged) === 3 && findingsOf(staged) === 5, "a posted code review counted again by its stance is counted once in the trial");
+ok(trialBlocking(staged) === 3 && findingsOf(staged) === 5 && same(trialFive, ["codexCode", "postedCode", "codexSecurity", "postedSecurity", "postedDesign"]),
+  "a posted code review counted again by its stance is counted once in the trial, and every other review is counted");
 ok(effortOf("Fixes #3 (a builder on Sonnet at medium).") === "medium" && effortOf("Fixes #3, on Sonnet at High.") === "high" && effortOf("Fixes #3, a high-risk fix.") === null
   && effortOf("at medium, then at high") === null && effortOf("x\non Sonnet at medium") === null,
   "the effort is the one the first line names, \"at medium\" or \"at high\"; anything else is not read");

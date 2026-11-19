@@ -21,7 +21,7 @@
 //   node core/scripts/builder-trial.mjs [--since YYYY-MM-DD] [--effort --since YYYY-MM-DD] [--owner login]
 import { execFileSync } from "node:child_process";
 import { DAY, grid, priced, readings } from "./core-cost.mjs";
-import { bugs, gather, perPull, reviewEvents } from "./review-record.mjs";
+import { REVIEWS, bugs, gather, perPull, reviewEvents } from "./review-record.mjs";
 import { roundsOf } from "./review-rounds.mjs";
 import { started } from "./started.mjs";
 import { pages } from "./stand-in-record.mjs";
@@ -40,9 +40,10 @@ const oneOf = (text, names = BUILDERS) => { const said = names.filter(b => new R
 
 // The blocking points of a pull request's reviews (review-record.mjs's perPull), and all its findings, blocking and
 // other: each null where a review that ran was not read for it, since an unknown is never counted as none.
-// The five reviews counted, each once: perPull's rows of the posted code review by its stance are of that review, so
-// they are left out.
-export const FIVE = ["codexCode", "postedCode", "codexSecurity", "postedSecurity", "postedDesign"];
+// The reviews counted, each once: review-record.mjs's rows of the posted code review by its stance are of that review,
+// so they are left out, and any review added there is counted.
+const BY_STANCE = ["postedAdversarial", "postedRegular"];
+export const FIVE = REVIEWS.map(([key]) => key).filter(key => !BY_STANCE.includes(key));
 export const blockingOf = reviews => FIVE.some(key => reviews[key].blocked === "unread") ? null : FIVE.reduce((s, key) => s + reviews[key].points, 0);
 export const findingsOf = reviews => blockingOf(reviews) === null || FIVE.some(key => reviews[key].otherUnread) ? null
   : FIVE.reduce((s, key) => s + reviews[key].points + reviews[key].other, 0);
