@@ -40,7 +40,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #310 | rule builder | |
 | #325 | rule builder | |
 | #314 | rule builder | |
-| #456 | rule builder; it changes the floor (rules 5 and 10) | |
 | #457 | rule builder | |
 | #458 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
