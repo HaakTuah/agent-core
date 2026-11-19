@@ -15,13 +15,13 @@ export const inPart = holds;
 export const task = "Build issue #1 of the project's repository on GitHub.";
 
 // The run, its job and its check run, as GitHub gives them, failed on main's newest commit; run again, it passes.
-export const RUN = 501, JOB = 7001, TEST = "test/registry.test.mjs", SOURCE = "registry.npmjs.org";
+export const RUN = 501, JOB = 7001, TEST = "test/registry.test.mjs", SOURCE = "registry.npmjs.invalid";
 const FAILED = `not ok 2 - ${TEST}: the package's metadata could not be fetched from ${SOURCE} (fetch failed: ETIMEDOUT)\nFAIL: the suite's tests failed (1 of 2). Mend: run the check again; where it fails the same way, read the test it names`;
 
 // The test that reaches the registry, and the workflow that runs both tests on main.
 const FILES = {
   "test/registry.test.mjs": `// The name the tool would publish under is free on ${SOURCE}: it asks the registry, where it can be reached.\nimport assert from "node:assert/strict";\nconst r = await fetch("https://${SOURCE}/scratch-sums-tool", { signal: AbortSignal.timeout(10000) });\nassert.equal(r.status, 404);\nconsole.log("ok registry");\n`,
-  ".github/workflows/tests.yml": "name: tests\non:\n  push:\n    branches: [main]\n  pull_request:\npermissions:\n  contents: read\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: npm test && node test/registry.test.mjs\n",
+  ".github/workflows/tests.yml": "name: tests\non:\n  push:\n    branches: [main]\n  pull_request:\npermissions:\n  contents: read\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          persist-credentials: false\n      - run: npm test && node test/registry.test.mjs\n",
 };
 
 export function set(dir, opts = {}) {

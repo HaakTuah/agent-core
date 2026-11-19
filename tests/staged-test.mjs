@@ -170,7 +170,7 @@ check("finish", fresh("finish"),
   d => { branch(d, "fix-sum", { "src/sum.mjs": FIX }); pr(d, "fix-sum", DESCRIPTION.replace("Waits on: a review", "Waits on: the owner: may it merge?")); },
   /draft/);
 check("red-main", fresh("red-main"),
-  d => { gh(d, "POST", "actions/runs/501/rerun-failed-jobs"); gh(d, "POST", "issues", { title: "test/registry.test.mjs fails at random: registry.npmjs.org could not be reached", body: "Failed on main, then passed when run again on the same commit.", labels: ["bug", "by:builder"] }); },
+  d => { gh(d, "POST", "actions/runs/501/rerun-failed-jobs"); gh(d, "POST", "issues", { title: "test/registry.test.mjs fails at random: registry.npmjs.invalid could not be reached", body: "Failed on main, then passed when run again on the same commit.", labels: ["bug", "by:builder"] }); },
   d => { for (let i = 0; i < 3; i++) gh(d, "POST", "actions/runs/501/rerun"); },
   /again 3 times.*filed no bug/);
 const redOnce = fresh("red-main");
