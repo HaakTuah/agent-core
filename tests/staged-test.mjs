@@ -104,6 +104,8 @@ const takeSteps = (d, leave = null) => {
   };
   for (const [name, files] of Object.entries(work)) if (name !== leave) branch(d, `step-${name}`, files);
   if (leave !== "words" && leave !== "issue") gh(d, "PATCH", "issues/2", { body: "## The owner's word\n\nTotals are whole numbers, since no one who reads them wants the cents.\n" });
+  if (leave !== "words" && leave !== "comment") gh(d, "PATCH", "issues/comments/2001", { body: "Totals are whole numbers." });
+  if (leave === "public") gh(d, "POST", "issues/1/comments", { body: "The owner's words cleaned: #2 and its comment edited." });
   if (leave !== "labels") for (const l of LABELS) gh(d, "POST", "labels", l);
   if (leave !== "scanning") gh(d, "POST", "issues", { title: "Switch on secret scanning with push protection", body: "Settings, Advanced Security: secret scanning and its push protection. The repository is private, so it is the owner's (floor rule 14).", labels: ["needs-owner", "by:builder"] });
 };
@@ -195,6 +197,10 @@ const noLabels = fresh("steps"); takeSteps(noLabels, "labels");
 ok(/labels and openers/.test(verdict("steps", noLabels).why), "steps: labels left unmade are read from GitHub's answer", verdict("steps", noLabels).why);
 const wordsLeft = fresh("steps"); takeSteps(wordsLeft, "issue");
 ok(/not done: 19 November 2026, the owner's words that stand, cleaned once/.test(verdict("steps", wordsLeft).why), "steps: the owner's quote cleaned in the files but left in its issue is read from GitHub's answer", verdict("steps", wordsLeft).why);
+for (const [leave, what] of [["comment", "cleaned in its issue but left in the owner's comment on it"], ["public", "cleaned, but the issues edited named in a public comment"]]) {
+  const d = fresh("steps"); takeSteps(d, leave);
+  ok(/not done: 19 November 2026, the owner's words that stand, cleaned once/.test(verdict("steps", d).why), `steps: the owner's quote ${what} is read from GitHub's answer`, verdict("steps", d).why);
+}
 const noScanning = fresh("steps"); takeSteps(noScanning, "scanning");
 ok(/not done: 16 November 2026, secret scanning with push protection/.test(verdict("steps", noScanning).why), "steps: secret scanning left off, and not named to the owner, is read from GitHub's answer", verdict("steps", noScanning).why);
 const fields = ["-F", "security_and_analysis[secret_scanning][status]=enabled", "-F", "security_and_analysis[secret_scanning_push_protection][status]=enabled"];
