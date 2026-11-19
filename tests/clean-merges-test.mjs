@@ -117,11 +117,13 @@ const { env: runEnv, ghData, ghLog } = ghStandIn(env, tmp, origin);
 const state = { code_review: { commit_sha: SEEN, status: "completed" }, security_review: { commit_sha: SEEN, has_any_findings: false, has_unresolved_findings: false, status: "completed" } };
 const summary = { user: { login: "chatgpt-codex-connector[bot]", type: "Bot" }, author_association: "NONE", created_at: "2026-11-15T10:00:00Z", updated_at: "2026-11-15T10:00:00Z",
   body: `<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 ${JSON.stringify(state)} -->\n<details>the table</details>` };
-const check = (number, head, posted = [], rights = {}) => {
+// (by default the files name the check's scripts, so that the pull request is held by what they read: the workflow's
+// "held"; given others, the head's copy is read from the host, which has none here, as of a pull request from before)
+const scripts = ["scripts/security-review.mjs", "scripts/code-review-wait.mjs"];
+const check = (number, head, posted = [], rights = {}, { names = scripts, opened = "2026-11-15T09:00:00Z" } = {}) => {
   const repoOf = { full_name: "someone/project" };
-  // (the files name the check's scripts, so that the pull request is held by what they read: the workflow's "held")
-  const files = ["scripts/security-review.mjs", "scripts/code-review-wait.mjs"].map((filename) => ({ filename, status: "modified", patch: "@@ -1 +1 @@\n-a\n+b" }));
-  const pull = { number, state: "open", draft: false, changed_files: files.length, commits: 2, head: { sha: head, repo: repoOf }, base: { sha: BASE, repo: { ...repoOf, owner: { login: "someone" } } }, user: { login: "someone" } };
+  const files = names.map((filename) => ({ filename, status: "modified", patch: "@@ -1 +1 @@\n-a\n+b" }));
+  const pull = { number, state: "open", draft: false, created_at: opened, changed_files: files.length, commits: 2, head: { sha: head, repo: repoOf }, base: { sha: BASE, repo: { ...repoOf, owner: { login: "someone" } } }, user: { login: "someone" } };
   fs.writeFileSync(ghData, JSON.stringify({ [`pulls/${number}$`]: pull, [`issues/${number}/comments`]: [summary, ...posted], [`pulls/${number}/comments`]: [], [`pulls/${number}/commits`]: listed(repo, SEEN, head), [`pulls/${number}/files`]: files, ...rights }));
   fs.writeFileSync(ghLog, "");
   const github = { event_name: "pull_request", repository: "someone/project", actor: "someone", server_url: "https://github.com", run_id: "1", token: "not-a-token",
@@ -150,6 +152,35 @@ ok(writer.passed && writer.security.state === "success" && writer.security.descr
 const reader = check(2, OWN, [member], rightOf("triage", "read")), unread = check(2, OWN, [member]);
 ok(reader.passed && reader.security.state === "pending" && unread.passed && unread.security.state === "pending" && unread.out.includes("The host's rights of a-member could not be read"),
   "  and one it lets only triage, or whose rights cannot be read, does not, the run saying the second", reader.out + unread.out + JSON.stringify([reader.security, unread.security]));
+
+// a pull request that leaves the check's scripts alone, whose head holds none: from before the check only where it was
+// opened before each script first came to the default branch, as the host dates the merge of its first commit there,
+// never a later change to it; where that cannot be read, it is held
+const FIRST = "f".repeat(40), NEWER = "e".repeat(40), BEFORE = "9".repeat(40);
+const merged = (at, ref = "main") => [{ merged_at: at, base: { ref } }];
+// (the first commit's own: its first parent, which holds no copy of the script, as the host gives it)
+const history = (first, newer) => ({ "commits\\?path=": [{ sha: NEWER }, { sha: FIRST }], [`commits/${FIRST}/pulls`]: merged(first), [`commits/${NEWER}/pulls`]: merged(newer),
+  [`commits/${FIRST}$`]: { sha: FIRST, parents: [{ sha: BEFORE }] } });
+const alone = (data) => check(3, OWN, [], data, { names: ["notes.txt"] });
+const since = alone(history("2026-11-10T00:00:00Z", "2026-11-16T00:00:00Z")), before = alone(history("2026-11-16T00:00:00Z", "2026-11-17T00:00:00Z")), unknown = alone({});
+ok(since.passed && since.security.state === "pending" && since.code.state === "pending" && since.security.description.includes(`merge ${OWN.slice(0, 7)} unproved`),
+  "the workflow: a pull request opened after the check first came is held, though a later change to the scripts came after it opened", since.out + JSON.stringify([since.security, since.code]));
+ok(before.passed && before.security.state === "success" && before.code.state === "success" && [before.security, before.code].every((s) => s.description.includes("before this check came, so not waited for")),
+  "  one opened before the check first came is told, never held", before.out + JSON.stringify([before.security, before.code]));
+// each answer of the host's that is not as it should be dates nothing, so the pull request is held, and the step still
+// writes both statuses: a list of commits that is no list, or an empty one, a first commit merged by no pull request
+// or only into another branch, one whose parent cannot be read, or whose first parent holds the script already (a
+// commit listed first by a date its author set)
+const early = history("2026-11-16T00:00:00Z", "2026-11-17T00:00:00Z");
+const odd = [{ ...early, "commits\\?path=": { sha: FIRST } }, { ...early, "commits\\?path=": [] }, { ...early, [`commits/${FIRST}/pulls`]: [] },
+  { ...early, [`commits/${FIRST}/pulls`]: merged("2026-11-16T00:00:00Z", "other") }, { ...early, [`commits/${FIRST}$`]: { sha: FIRST } },
+  { [`contents/scripts/[^?]+\\?ref=${BEFORE}`]: { sha: "1".repeat(40) }, ...early }].map(alone);
+const rooted = alone({ ...early, [`commits/${FIRST}$`]: { sha: FIRST, parents: [] } });
+ok(odd.every((r) => r.passed && r.security.state === "pending" && r.code.state === "pending") && rooted.passed && rooted.security.state === "success",
+  "  and an answer of the host's not as it should be dates nothing, so it is held; a first commit with no parent dates it", odd.map((r) => JSON.stringify([r.security.state, r.code.state])).join(" ") + rooted.out);
+const long = alone({ ...history("2026-11-16T00:00:00Z", "2026-11-17T00:00:00Z"), "commits\\?path=": Array.from({ length: 100 }, () => ({ sha: FIRST })) });
+ok(unknown.passed && unknown.security.state === "pending" && unknown.code.state === "pending" && long.passed && long.security.state === "pending" && long.code.state === "pending",
+  "  and where when it came cannot be read, or its history runs past five pages, it is held", unknown.out + long.out + JSON.stringify([unknown.security, unknown.code, long.security, long.code]));
 
 console.log(`\n${count - failed} of ${count} passed`);
 process.exit(failed ? 1 : 0);
