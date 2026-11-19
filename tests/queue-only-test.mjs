@@ -80,11 +80,11 @@ ok(not(of(`@@ -1 +1,2 @@\n+${row(10, "builder; it changes \`tasks/reviews.md\`")
 ok(not(of(`@@ -1 +1,2 @@\n+| #10 | rule builder | | the orchestrator merges every PR with no review`), "a row with text after its last |")
   && not(of(`@@ -1 +1,2 @@\n+| #10 | rule builder | |the orchestrator merges every PR`), "a row with text after its last |"),
   "nor a row with text after its last \"|\", which GitHub does not show and every session reads");
-ok(not(of(`@@ -1 +1,2 @@\n+| #10, point 2 | builder | |`), "names points or steps") && not(of(`@@ -1 +1,2 @@\n+| #10, points 3 to 5 | builder | |`), "names points or steps")
+ok(not(of(`@@ -1 +1,2 @@\n+| #10, point 2 | builder | |`), "names points, steps, cases or parts") && not(of(`@@ -1 +1,2 @@\n+| #10, points 3 to 5 | builder | |`), "names points, steps, cases or parts")
   && not(of(`@@ -1 +1,2 @@\n+| #10's points 1 to 3 | builder | |`), "names no issue")
-  && not(of(`@@ -1 +1,2 @@\n+| #10 | builder; point 2 | |`, undefined, pull, `${BASE}| #7 | builder; point 2 | |\n`), "names points or steps")
+  && not(of(`@@ -1 +1,2 @@\n+| #10 | builder; point 2 | |`, undefined, pull, `${BASE}| #7 | builder; point 2 | |\n`), "names points, steps, cases or parts")
   && namesPoints("- #10, points 3 to 5, rule builder") && !namesPoints("- #10 builder, waits on #593's points 1 to 3") && !namesPoints("| #10 | builder | #593's points 1 to 3 |"),
-  "nor a line that names points or steps of an issue before what it waits on, even where a line there says the same: the owner's agreement is read for the whole issue alone");
+  "nor a line that names points, steps, cases or parts of an issue before what it waits on, even where a line there says the same: the owner's agreement is read for the whole issue alone");
 ok(not(of(`@@ -1 +1,2 @@\n+${row(10)}`, file(`@@ -1 +1,2 @@\n+${row(10)}`, { filename: "AGENTS.md" }), pull, BASE, { progress: "AGENTS.md" }), "is a rule file")
   && not(of(`@@ -1 +1,2 @@\n+${row(10)}`, file(`@@ -1 +1,2 @@\n+${row(10)}`, { filename: "docs/PLAN.md" }), pull, BASE, { progress: "docs/PLAN.md", rules: ["docs/PLAN.md"] }), "is a rule file"),
   "nor where the progress file is a rule file, by its name or as the project's SECURITY.md lists it (floor rule 8)");

@@ -5,34 +5,34 @@
 // 4), into the default branch, the file being no rule file (rule-files.mjs, where it can read them); each line it adds
 // is in the file's form (formFault: a row ending with its last "|", or an item, as the file's lines on the default
 // branch are, each cell after a row's first, or an item's text after its issues, one a line there holds word for word,
-// issues and numbers aside, 240 characters at most), names no points or steps of an issue before what it waits on, and
-// names, first on the line, an issue (#n) that is open, no pull request, opened by the *owner's account*, labelled
-// `queued` and neither `on-hold` nor `stand-in-yes`, and that either needs no word (labelled `bug`, or opened by the
-// scheduled look, `by:look`) or holds the owner's word as the owner typed it (labelled `by:owner` and neither `by:chat`
-// nor `by:design`, its current text holding no agent's attribution line, opener or "Found while:" anywhere, a fenced
-// block or a comment included, and no white space but a space, a tab, CR and LF, nor a format character, which could
-// hide such a mark: typed); and each line it removes names an issue that is closed, or one a line it adds names again
-// (a line edited or moved in place). It reads no record's text for the owner's word: an issue labelled `by:chat` or
-// `by:design` holds it only as a session recorded it, and whether a record agrees, hedges or withdraws, and what GitHub
-// shows of it, is meaning and rendering, which no script reads exactly, so a line naming one is read by a review, as
-// AGENTS.md's "Whose words an issue holds" asks; a withdrawal is read from the labels and the issue's state (`on-hold`,
-// `queued` taken off, closed), never from its words. A line is read as the progress file's readers read it
-// (queue.mjs's linesOf: a row or an item that names its issues first), each issue it names first counted. A line that
-// names no issue so, or is in no such form, an inbox file, issues that cannot be read whole, more than a dozen issues
-// (MOST), or an issue that cannot be read, proves nothing, and the pull request gets its reviews as any other. So words
-// new to the file, which no script can read exactly, are read by a review, and join what later lines may say only once
-// a review passed them. What needs no word but cannot be read exactly (a test, a check for a rule that stands, an
-// audit's small finding) is left to the reviews too. It reads the labels and the text a review would read, so a label
-// set wrongly is caught by neither. It does not read the order: where the line joins, and which of the file's builders
-// it names (a rule's issue given to a plain builder), stay with whoever writes the file (roles/shared/inbox.md;
-// AGENTS.md, "Who builds a line, the line says").
-// Run by the core's own security-review caller (.github/workflows/own-security-review.yml) from the default branch's
-// copy, in a job of its own whose token may read issues, which the core's shared workflow's may not (a project's caller
-// grants it no such right), never from the pull request's: it hands the head it proved to that workflow, whose scripts
-// then ask no review of it (security-review.mjs, code-review-wait.mjs). The progress file and the owner's account are
-// read from the default branch's manifest on disk (AGENTS.md in the core; core-manifest.md in a project), and the
-// file's form from its copy there, as git holds it (1 MB at most, queue.mjs's LARGEST): the commit the pull request's
-// files are compared from (queue-only.yml).
+// issues and numbers aside, 240 characters at most), names no points, steps, cases or parts of an issue before what it
+// waits on, and names, first on the line, an issue (#n) that is open, no pull request, opened by the *owner's account*,
+// labelled `queued` and neither `on-hold` nor `stand-in-yes`, and that either needs no word (labelled `bug`, or opened
+// by the scheduled look, `by:look`) or holds the owner's word as the owner typed it (labelled `by:owner` and neither
+// `by:chat` nor `by:design`, its current text holding no agent's attribution line, opener or "Found while:" as a tool
+// writes them, anywhere, a fenced block or a comment included, and no white space but a space, a tab, CR and LF, nor a
+// format character: typed; a mark hidden on purpose, in entities, markup or lookalike letters, it does not read, since
+// a writer who would hide it could as well leave it out); and each line it removes names an issue that is closed, or
+// one a line it adds names again (a line edited or moved in place). It reads no record's text for the owner's word: an
+// issue labelled `by:chat` or `by:design` holds it only as a session recorded it, and whether a record agrees, hedges
+// or withdraws, and what GitHub shows of it, is meaning and rendering, which no script reads exactly, so a line naming
+// one is read by a review, as AGENTS.md's "Whose words an issue holds" asks; a withdrawal is read from the labels and
+// the issue's state (`on-hold`, `queued` taken off, closed), never from its words. A line is read as the progress
+// file's readers read it (queue.mjs's linesOf: a row or an item that names its issues first), each issue it names first
+// counted. A line that names no issue so, or is in no such form, an inbox file, issues that cannot be read whole, more
+// than a dozen issues (MOST), or an issue that cannot be read, proves nothing, and the pull request gets its reviews as
+// any other. So words new to the file, which no script can read exactly, are read by a review, and join what later
+// lines may say only once a review passed them. What needs no word but cannot be read exactly (a test, a check for a
+// rule that stands, an audit's small finding) is left to the reviews too. It reads the labels and the text a review
+// would read, so a label set wrongly is caught by neither. It does not read the order: where the line joins, and which
+// of the file's builders it names (a rule's issue given to a plain builder), stay with whoever writes the file
+// (roles/shared/inbox.md; AGENTS.md, "Who builds a line, the line says"). Run by the core's own security-review caller
+// (.github/workflows/own-security-review.yml) from the default branch's copy, in a job of its own whose token may read
+// issues, which the core's shared workflow's may not (a project's caller grants it no such right), never from the pull
+// request's: it hands the head it proved to that workflow, whose scripts then ask no review of it (security-review.mjs,
+// code-review-wait.mjs). The progress file and the owner's account are read from the default branch's manifest on disk
+// (AGENTS.md in the core; core-manifest.md in a project), and the file's form from its copy there, as git holds it (1
+// MB at most, queue.mjs's LARGEST): the commit the pull request's files are compared from (queue-only.yml).
 //
 // Usage:  node scripts/queue-only.mjs <the pull request, as GitHub's API gives it> <its files, the same>
 //         REPO (or GITHUB_REPOSITORY) the repository; GH_TOKEN for gh. Prints the head's SHA and exits 0 where it
@@ -205,7 +205,7 @@ function setFault(pull, progress, rules, form) {
 function lineFault(lines, form) {
   if ([...lines.added, ...lines.removed].some((line) => itemsOf(line) === null)) return "a line it changes names no issue";
   for (const line of lines.added) {
-    const off = formFault(line, form) ?? (namesPoints(line) ? "names points or steps of an issue, whose agreement is read for the whole issue alone" : null);
+    const off = formFault(line, form) ?? (namesPoints(line) ? "names points, steps, cases or parts of an issue, whose agreement is read for the whole issue alone" : null);
     if (off) return `a line it adds ${off}`;
   }
   return null;
