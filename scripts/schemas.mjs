@@ -8,7 +8,7 @@
 // the schema's root, where the mend is looked up; one that held a "$ref" would be compiled apart, its path starting
 // again at the definition, and its mend missed. A failure is said of the file by its schema's "title", else "the config".
 //
-//   import { keysOf, shapeFaults } from "./schemas.mjs";   shapeFaults("copies", config, "core/") -> ["the config's ...",
+//   import { keysOf, shapeFaults } from "./schemas.mjs";   shapeFaults("copies", config, "core/"[, its path]) -> ["the config's ...",
 //                                                  ...], [] where it holds; null where ajv is not installed, which the
 //                                                  caller says; keysOf("copies") -> the keys its schema gives
 import fs from "node:fs";
@@ -18,7 +18,8 @@ const schemaOf = name => JSON.parse(fs.readFileSync(new URL(`./schemas/${name}.j
 const checkers = new Map();
 function checker(name) {
   if (!checkers.has(name)) {
-    const Ajv = loadSync("ajv"), ajv = new Ajv({ allErrors: true, strict: true });
+    // (a union of types, such as a key that is a number or a string, gives one failure where "anyOf" gives one a branch)
+    const Ajv = loadSync("ajv"), ajv = new Ajv({ allErrors: true, strict: true, allowUnionTypes: true });
     ajv.addKeyword({ keyword: "mend", schemaType: "string" });
     ajv.addKeyword({ keyword: "mendFor", schemaType: "object" });
     const schema = schemaOf(name);
@@ -46,13 +47,14 @@ function mendOf(schema, schemaPath, keyword) {
 // the key or item the path names.
 const where = (path, file) => (path ? `${file}'s ${path.split("/").slice(1).map(k => (/^\d+$/u.test(k) ? `item ${k}` : JSON.stringify(k.replace(/~1/gu, "/").replace(/~0/gu, "~")))).join(", ")}` : file);
 
-/** The failures of `value` against the schema `name`, each with its mend, {core} read as `core`; [] where it holds;
+/** The failures of `value` against the schema `name`, each with its mend, {core} read as `core`, said of `file` (its path)
+ *  where given, else of the schema's title; [] where it holds;
  *  null where ajv is not installed beside the core's copy, which the caller says as a warning. */
-export function shapeFaults(name, value, core = "") {
+export function shapeFaults(name, value, core = "", file = null) {
   if (!installed("ajv")) return null;
   const { validate, schema } = checker(name);
   if (validate(value)) return [];
-  const file = schema.title ?? "the config";
+  file ??= schema.title ?? "the config";
   // (a name's failure is said once, by the rule it breaks, naming the name: ajv adds a line of its own for the
   // "propertyNames" around it, which says no more)
   const errors = validate.errors.filter(e => e.keyword !== "propertyNames");

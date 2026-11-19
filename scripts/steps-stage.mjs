@@ -51,7 +51,7 @@ export const STAGES = {
   "16 November 2026, hostile tests for every named input": {
     // (rule 5 of SECURITY.md lists an input whose hostile tests are nowhere; the mend writes them where it names them)
     stage: dir => write(dir, "SECURITY.md", read(dir, "SECURITY.md").replace(/^(5\. .*\r?\n)(?:(?!\d+\. |#).*\r?\n)*/m,
-      "$1   - a peer's message: its type and size checked on arrival; its hostile tests: `tests/hostile/peer-message.test.mjs`.\n")),
+      "$1   - a peer's message: its type and size checked on arrival; limits: 64 KB, one message, 5 s; its hostile tests: `tests/hostile/peer-message.test.mjs`.\n")),
     mend: dir => write(dir, "tests/hostile/peer-message.test.mjs", "// too long, the wrong type, markup, a file path, a number out of range, nothing at all\n"),
   },
   "16 November 2026, an agent's own tools listed": {
@@ -390,6 +390,16 @@ export const STAGES = {
     stage: dir => {
       const baseline = fs.existsSync(at(dir, "checks/shape-baseline.json")) ? JSON.parse(read(dir, "checks/shape-baseline.json")) : { reads: Object.keys(READERS), listed: {} };
       write(dir, "checks/shape-baseline.json", `${JSON.stringify({ ...baseline, reads: (baseline.reads ?? []).filter(r => r !== "javascript-tree") }, null, 2)}\n`);
+    },
+    mend: dir => spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } }),
+  },
+
+  "19 November 2026, the shape check reads the functions of Python on the parser": {
+    asked: true,
+    // (a baseline written before the check read Python's functions on the parser, as that of JavaScript's above)
+    stage: dir => {
+      const baseline = fs.existsSync(at(dir, "checks/shape-baseline.json")) ? JSON.parse(read(dir, "checks/shape-baseline.json")) : { reads: Object.keys(READERS), listed: {} };
+      write(dir, "checks/shape-baseline.json", `${JSON.stringify({ ...baseline, reads: (baseline.reads ?? []).filter(r => r !== "python-tree") }, null, 2)}\n`);
     },
     mend: dir => spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } }),
   },

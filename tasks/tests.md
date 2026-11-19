@@ -64,16 +64,20 @@ reads is the *shape check*'s config.
   (`roles/shared/work-flow.md`). Reason: in the core 43% of the job-minutes of 24 hours went to runs that a newer push
   replaced before they finished. Held by `tests/workflows-test.mjs`, for the core's own workflow; in a project, by
   nothing yet: which of its workflows runs its tests cannot be read without guessing.
-- **The default branch is tested at its newest commit** (#733). By default a run of the tests on the default branch gives
-  way to the run of a newer merge, so that when merges come fast one run covers several: whoever writes the workflow
-  puts its runs there in one concurrency group that cancels the run in progress. Nothing changes it. The trigger is a
-  red run on the default branch: the session that reads it (`core/scripts/merge-line.mjs` says it, where users get a
-  release) narrows it, first by the history of the files its failing test names since the last green run, then by
-  halving the merges since that run, running the failing suite alone at each half's commit in its own working copy, and
-  fixes it before any other merge (floor rule 12; `tasks/hosts.md`). It does not mean a pull request's run, a start by
-  hand or the run before a release is cancelled, nor that a red run is merged past. Reason: a batch tested once costs
-  less than each merge tested alone, and a break between merges is rare and quickly found. Held, in the core, by the
-  concurrency its `tests.yml` gives the runs on main, which the workflows test reads; the narrowing, by nothing yet.
+- **The default branch is tested at its newest commit** (#733; #810). By default a run of the tests on the default
+  branch that has started runs to its end, and a newer merge's run waits behind it; of the runs waiting only the newest
+  is kept, so that when merges come fast one run covers every merge that landed while the one before it ran: whoever
+  writes the workflow puts its runs there in one concurrency group that does not cancel the run in progress, as the
+  host's groups replace a waiting run by a newer one. Nothing changes it. The trigger is a red run on the default
+  branch: the session that reads it (`core/scripts/merge-line.mjs` says it, where users get a release) narrows it, first
+  by the history of the files its failing test names since the last green run, then by halving the merges since that
+  run, running the failing suite alone at each half's commit in its own working copy, and fixes it before any other
+  merge (floor rule 12; `tasks/hosts.md`). It does not mean that every merge is tested alone, that a pull request's run
+  waits (a newer push still cancels it), that a start by hand or the run before a release is cancelled, nor that a red
+  run is merged past. Reason: a batch tested once costs less than each merge tested alone, and a break between merges is
+  rare and quickly found; a run that gave way to every newer merge's never finished while merges landed faster than a
+  run took, and on 19 November 2026 nine merges in a row were never tested whole. Held, in the core, by the concurrency
+  its `tests.yml` gives the runs on main, which the workflows test reads; the narrowing, by nothing yet.
 
 - **The slow suites run once per batch, wherever they run** (#733). By default a pull request's run holds the suites its
   change reaches on one platform, and the platform suites (those on any other platform) and the suites its builders move
@@ -115,6 +119,27 @@ reads is the *shape check*'s config.
   push's, save the mutation run on a pull request, which still runs those its change names (#772); which tests reach the
   network, by nothing yet, since the shape check's counts read what a test imports and calls, and these reach it through
   the programs they start (#770 would cut the network off for a pull request's run).
+
+- **A test that guards only what a release brings runs where the release is made** (#715). By default a test runs
+  where its suite does. The one condition that changes it: a test whose breach reaches users only through a release
+  (what a save, a setting or a project written by the last release does in this one; what a published package or
+  installer holds) and that is slow, the pull request's run ending sooner without it or, where minutes are billed, it
+  taking more of the run's job-minutes than any other test, runs instead at the default branch's newest commit once a
+  day and before each release where releases are cut apart from merging and minutes are free; before each release
+  only where minutes are billed, a daily run there the owner's choice, since it costs; and where every merge goes live,
+  on each pull request, since a merge there is the release. Who pays and whether every merge goes live are read, never
+  asked, as "The slow suites run once per batch, wherever they run" says. The trigger is a pull request's run whose job
+  times, with the test record's (`core/scripts/test-record.mjs`), show such a test slow: the session that reads them,
+  its builder or the orchestrator, moves the test to that run (in the core, the release workflow's daily run,
+  `.github/workflows/release.yml`), and a failure there is owned as "A check that fails on the default branch has an
+  owner" says, the release waiting for it to pass. It does not mean that the test is dropped, that a release is cut
+  without its pass on the release's commit, that a test that guards what a pull request brings leaves that run, nor
+  that one that is not slow moves. Reason: in the core the upgrade test on Windows set every pull request's run at 13
+  to 22 minutes, while what it guards reaches a project only through a release. Held, in the core, by
+  `tests/workflows-test.mjs`, which reads that the release workflow, which no pull request starts, runs the upgrade
+  test on Windows daily where the repository is public and before each release, and that `tests.yml` runs it on Linux
+  alone; in a project, by nothing yet, since which tests guard only what a release brings cannot be read without
+  guessing.
 
 - **A test that fails for no reason is mended or removed, never retried in silence.** By default a test passes or
   fails the same way each time it runs on the same commit. The trigger is a test that failed and then passed on the
@@ -204,8 +229,8 @@ reads is the *shape check*'s config.
 - **A long measurement runs outside the session.** By default a measurement that may run for "long" seconds or more
   (the config's, an hour where it gives none: a first guess) runs neither in a suite nor in the checks of a pull
   request, nor while a session waits on it. The trigger is such a run: its session starts it as a job of the
-  project's own, which posts its result on the pull request, then ends at a passed gate with its note
-  (`roles/shared/work-flow.md`), and the session that picks the work up reads the result there. It does not mean that the
+  project's own, which posts its result on the pull request, then ends at a passed gate with its hand-off note
+  (`tasks/tools.md`), and the session that picks the work up reads the result there. It does not mean that the
   core adds a billed job to a project: the job is the project's own to turn on, and with none the measurement runs on
   a machine its owner starts (floor rule 18). Reason: one entry of a project held 130 minutes of measuring inside one
   session. Held by nothing yet: no check can tell how long a run would have taken, so it is listed.

@@ -6,7 +6,7 @@
 // A grammar comes only with the reader that needs it: C#'s, for the functions the shape check's reader of C# finds
 // (csharp-functions.mjs); bash's, for the commands of a workflow's step, which the steps read (bash-commands.mjs);
 // JavaScript's, TypeScript's and TSX's, for the functions of JavaScript and TypeScript the shape check and the measures
-// find (javascript-functions.mjs).
+// find (javascript-functions.mjs); Python's, for the functions of Python the shape check finds (python-functions.mjs).
 //
 // The parser starts only where a file is read with it, so that a script that reads none, as most that load the shape
 // check's readers, pays nothing for it: in a worker thread of its own (parser-worker.mjs), which the reader's call
@@ -22,6 +22,7 @@ const GRAMMARS = {
   csharp: ["tree-sitter-c-sharp", "tree-sitter-c_sharp.wasm"], bash: ["tree-sitter-bash", "tree-sitter-bash.wasm"],
   javascript: ["tree-sitter-javascript", "tree-sitter-javascript.wasm"],
   typescript: ["tree-sitter-typescript", "tree-sitter-typescript.wasm"], tsx: ["tree-sitter-typescript", "tree-sitter-tsx.wasm"],
+  python: ["tree-sitter-python", "tree-sitter-python.wasm"],
 };
 // Whether the parser or the grammar of `language` could not be installed, the registry not answering, in a project's
 // pull request (install.mjs), or was never installed, a project's own job naming only the core's first install

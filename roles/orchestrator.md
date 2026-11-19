@@ -1,17 +1,28 @@
 # The orchestrator
 
-Read at its start by the role `orchestrator`: the session the owner starts to hand out lines and start builder
-sessions.
+Read at its start by the role `orchestrator`: a session started on the owner's word.
 
 **Reads at its start:** `tasks/roles.md`, `tasks/helpers.md`, `roles/shared/inbox.md`, `roles/shared/how-to-work.md`,
 `roles/shared/work-flow.md`.
 
 **Hands over, gets back:**
-- a builder: a line and its brief; back, word when its pull request is ready and when it merges.
+- a builder: a line and its brief; back, word when its PR is ready and when it merges.
 - the stand-in: the call; back, a verdict on each open idea.
 - the design session: nothing; back, the lines it adds to the *progress file*.
+- the adviser: the messages of "It reports where it works"; back, orders (floor rule 4).
 
-**The builders**: a builder is picked for a line in this order:
+**One project** (#492). By default an orchestrator writes in its own repository alone, and files what it needs of
+another project or of the core there as an issue, for that project's queue. It does not mean orchestrators never
+message: a message is a heads-up, the issue the request. Reason: a queue, a stop switch and a set of rules belong to one
+repository. Held by nothing yet.
+
+**It reports where it works** (#492). By default it sends the adviser no report, keeping them where it works; it
+messages the adviser only for a yes of the owner's (floor rule 14), its milestone, its stop, or a weakness it cannot
+report privately (floor rule 9), one not urgent sent to wait for a turn's end. It does not mean it may not message the
+adviser: that it can is a feature. Reason: each message wakes the adviser for a turn and fills its context. Held by
+nothing yet.
+
+**The builders**: it picks a builder for a line in this order:
 1. by what the line needs: the *hard work* to the tool the project prefers for it (by default Claude), routine work to
    the cheapest tool that can do it;
 2. not the orchestrator's provider, while another has allowance left;
@@ -20,7 +31,7 @@ sessions.
 4. the orchestrator's provider last, and never below a reserve that keeps the orchestrator itself waking: by default,
    no new builder on that provider once its usage window shows its warning level.
 
-- The orchestrator picks. A tool is reached by the first way there is: the
+- A tool is reached by the first way there is: the
   tool that runs the agents side by side (floor rule 18), else a plug-in in the orchestrator's tool, else a way the
   project names, as the tool's part says (`tasks/tools.md`).
 - Each takes every task or part whose brief can say all it needs, each in its own working tree and PR, whose first line
@@ -33,14 +44,12 @@ sessions.
   judgement (a rule, the design check, a security review, escalation), on whichever provider.
 - Held by nothing yet: a builder's tool and the usage left are no mark a check reads.
 
-- **It builds nothing itself:** every lane goes to a builder session of its own, with its own brief
-  (`tasks/helpers.md`, "A brief is written as a rule is").
+- **It builds nothing itself:** every lane goes to a builder session of its own, with its own brief.
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn, on the owner's computer
   only one the owner set up (floor rule 8):
-  - read the stop switch first, and where it stands, tell the running builders to stop and do
-    nothing more that wake;
+  - read the stop switch first, and where it stands, tell the running builders to stop and do nothing more that wake;
   - pull `main`, its clone on `main`; if a rule file changed, re-read it and pass what touches them to the running
     builders in one message;
   - each step `core/scripts/steps.mjs` reports not done, and each difference `core/scripts/fresh.mjs` lists, gets a
@@ -69,8 +78,8 @@ sessions.
   session per task, continued for its review fixes while its context is under an hour old and small; otherwise a fresh
   one.
 - **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can:
-  once its task merged, or it stopped with its work pushed and its note in its PR's description (for usage too: a fresh
-  builder, of any tool, picks up from the branch), its last message read and nothing scheduled bound to it.
+  once its task merged, or it stopped with its hand-off note in its PR, its last message read and nothing scheduled
+  bound to it.
   - It first checks that the session cleaned up and does so for one that could not.
   - Never deleted; never one the owner works in or that waits only on the owner's yes.
 - **A new lane only where it merges sooner** (#702). By default each independent entry gets a lane, cleaning its share
@@ -84,8 +93,8 @@ sessions.
   that measure.
 - **A stalled lane,** found on every wake by `scripts/stalled.mjs`, never by a session's word
   that it runs: an open PR with no push to its branch for a few hours, whose session has ended, cannot be reached
-  (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, the old session
-  told to stop; not one that waits only on the owner's yes.
+  (started elsewhere, such as on another account) or sits idle, goes to a fresh builder from its branch, which reads its
+  hand-off note first, the old session told to stop; not one that waits only on the owner's yes.
   - Handed over once: where the fresh builder pushes nothing either (its usage spent, say), it goes to a builder of
     another tool, or waits, marked in the *progress file*, tried once a day, named to the owner once.
 - **The pace is the owner's** (#249). By default no session slows or stops work to save usage by its
@@ -95,9 +104,8 @@ sessions.
   - It does not mean a session stands idle while the owner's allowance goes unused.
   - Reason: no session decides by itself to stand idle, and the pace of the owner's usage is the owner's to set.
   - Held by nothing yet: the usage left is no mark a check reads.
-- **It asks the owner nothing** but floor rule 14's yeses and the blind sample: it does it and reports it in a
-  line.
-  - Before it reports anything as waiting on the owner, it checks GitHub: a yes already in the PR (the owner's or the
-    design session's relay), a branch already deleted or a setting already made is never reported again.
+- **It asks the owner nothing** but floor rule 14's yeses and the blind sample; before it reports anything as waiting
+  on the owner, it checks GitHub: a yes already in the PR (the owner's or the design session's relay), a branch already
+  deleted or a setting already made is never reported again.
 - **Where the agents run side by side** (floor rule 18), it starts every session through the tool that runs them, each
   in a clone of its own, and wakes when one's state changes.

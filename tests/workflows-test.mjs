@@ -9,7 +9,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { parseYaml } from "../scripts/workflow-run.mjs";
+import { TEMPLATES } from "../scripts/init.mjs";
+import { holds, parseYaml } from "../scripts/workflow-run.mjs";
 import { draftHoles, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { twice, uncommented } from "../scripts/yaml-keys.mjs";
@@ -154,9 +155,33 @@ ok(Object.values(groups["codeql.yml"].jobs)[0].concurrency.group.includes("${{ m
   "and jobs of one run that differ (a matrix, a call for each lock folder or config) are groups of their own, so none cancels another");
 ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] === false, "while the security-review check's runs go one at a time, never cancelled");
 
+// ---- the security-review job's condition, for each kind of event it is started by (#593, point 8) ----
+const REPO = "someone/project";
+const runs = ({ event = "pull_request", pr = {}, comment = {}, issue = {}, actor = "someone", priv = false, inputs = {} } = {}) => holds(groups["security-review.yml"].jobs.report.if, {
+  github: { event_name: event, repository: REPO, actor, event: { repository: { private: priv },
+    ...(event === "pull_request" ? { pull_request: { draft: false, head: { repo: { full_name: REPO } }, ...pr } }
+      : { issue: { pull_request: { url: "x" }, state: "open", ...issue }, comment: { user: { login: "someone" }, author_association: "OWNER", body: "Security review: none", ...comment } }) } },
+  inputs: { advisory: true, private: false, reviewers: "", root: "core", ...inputs } }, { failed: false });
+ok(runs() && !runs({ pr: { draft: true } }) && !runs({ pr: { head: { repo: { full_name: "outsider/project" } } } }) && !runs({ actor: "dependabot[bot]" }), "on a pull request it runs for one of the repository's own branches that is no draft, and not for a draft, a fork's or Dependabot's (E2, E3, E4)");
+const SUMMARY = "<!-- codex-pull-request-review-summary -->\nCodex's summary";
+ok(runs({ event: "issue_comment", comment: { user: { login: "chatgpt-codex-connector[bot]" }, author_association: "NONE", body: SUMMARY } }) && !runs({ event: "issue_comment", comment: { user: { login: "someone-else[bot]" }, author_association: "NONE", body: SUMMARY } }), "it runs for Codex's summary, and not for a look-alike from another login (E5)");
+const as = (body, author_association, inputs) => runs({ event: "issue_comment", comment: { body, author_association }, inputs });
+ok(["Security review: none needed", "**Security review:** none needed"].every(b => ["OWNER", "MEMBER", "COLLABORATOR"].every(a => as(b, a)) && ["CONTRIBUTOR", "NONE"].every(a => !as(b, a))), "it runs for \"Security review:\" and \"**Security review:\" from an owner, a member or a collaborator, and not from a contributor or anyone else (E6)");
+ok(!as("Code review: done", "OWNER") && as("Code review: done", "OWNER", { advisory: false }), "it runs for \"Code review:\" only where the check is not advisory (E7)");
+ok(!runs({ event: "issue_comment", issue: { pull_request: null } }) && !runs({ event: "issue_comment", issue: { state: "closed" } }), "it runs for no comment on an issue, nor on a closed pull request (E8)");
+ok(!runs({ priv: true }) && runs({ priv: true, inputs: { private: true } }) && runs({ priv: true, inputs: { advisory: false } }) && !runs({ event: "issue_comment", priv: true }) && runs({ event: "issue_comment", priv: true, inputs: { advisory: false } }), "in a private repository it runs only where the caller passes private or turns advisory off (E11, R3)");
+
+// ---- the core's own caller: the template's triggers, its scripts at the root, not advisory (E9, E12, R4) ----
+const ownReview = parseYaml(fs.readFileSync(path.join(wfDir, "own-security-review.yml"), "utf8"));
+// (the template's own {{core}} and {{pin}} filled in, which init.mjs writes when it makes the project)
+const kitReview = parseYaml(fs.readFileSync(path.join(core, TEMPLATES, "workflows/security-review.yml.tmpl"), "utf8").replace(/\{\{\w+\}\}/g, "x"));
+ok(JSON.stringify(ownReview.on) === JSON.stringify(kitReview.on), `the core's own security-review check is started by what the template's is, and nothing more${JSON.stringify(ownReview.on) === JSON.stringify(kitReview.on) ? "" : `: ${JSON.stringify(ownReview.on)}`}`);
+const ownCall = Object.values(ownReview.jobs ?? {});
+ok(ownCall.length === 1 && ownCall[0].uses === "./.github/workflows/security-review.yml" && ownCall[0].with?.root === "." && ownCall[0].with?.advisory === false, "and calls the core's workflow with its scripts at the root and advisory turned off");
+
 // ---- when the core's tests run (#733, points 2 to 4 and 6) ----
 // A pull request's run starts once it is ready, never on a draft, on Linux alone; main is tested on Linux at its newest
-// commit, each run giving way to the next merge's; Windows once an hour at main's newest commit where it moved, with the
+// commit, a run that has started finishing and only a waiting one giving way to the next merge's (#810); Windows once an hour at main's newest commit where it moved, with the
 // tests that reach the network on both; both in full on a start by hand, which a release waits on.
 {
   const tests = parseYaml(fs.readFileSync(path.join(wfDir, "tests.yml"), "utf8"));
@@ -166,8 +191,8 @@ ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] =
   const gate = tests.jobs.tests, gateStep = gate.steps.at(-1);
   ok(tests.on.pull_request.types.includes("ready_for_review") && !tests.on.pull_request.types.includes("edited") && ["suites", "upgrade"].every(j => String(tests.jobs[j].if).includes(DRAFT) && String(tests.jobs[j].if).includes(MOVED)),
     "no run on a draft: a pull request's run starts when it is marked ready, and each job of tests skips a draft and an hourly run where main did not move (point 2)");
-  ok(!String(gate.if).includes("draft") && String(gate.if).startsWith("${{ always()") && String(gate.if).includes(MOVED) && /github\.event\.pull_request\.draft/.test(gateStep.env.DRAFT) && /if \[ -n "\$DRAFT" \]; then[\s\S]*Mend:[\s\S]*exit 1/.test(gateStep.run),
-    "but the gate the ruleset requires runs on a draft and fails there, saying its mend, since a required check whose job is skipped passes");
+  ok(!String(gate.if).includes("draft") && String(gate.if) === `\${{ (github.event_name == 'pull_request' && always() || !cancelled()) && ${MOVED} }}` && /github\.event\.pull_request\.draft/.test(gateStep.env.DRAFT) && /if \[ -n "\$DRAFT" \]; then[\s\S]*Mend:[\s\S]*exit 1/.test(gateStep.run),
+    "but the gate the ruleset requires runs on a draft and fails there, saying its mend, since a required check whose job is skipped passes; a pull request's runs even where its run is cancelled, so a cancelled head never passes, and a run of main, the hour or a hand cancelled whole leaves it aside, never reading failed (#810)", String(gate.if));
   // (the gate's step run in a shell, as the runner runs it: each of its failures says its mend, its pass none)
   if (process.platform !== "win32") {
     const gateRun = env => spawnSync("bash", ["-e", "-c", gateStep.run], { encoding: "utf8", env: { PATH: process.env.PATH, ...env } });
@@ -198,13 +223,29 @@ ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] =
     && steps.join() === ["node tests/init-dotnet-test.mjs", "node tests/nuget-fetch-test.mjs"].join(),
     "the tests that reach the network run in no pull request's run nor a push's, and once an hour and by hand in a job of their own on each system and Node (point 9)", steps.join(", "));
   ok(tests.concurrency.group.includes("format('pr-{0}', github.event.pull_request.number)") && tests.concurrency.group.includes("(github.event_name == 'push' || github.event_name == 'schedule') && format('{0}-main', github.event_name) || github.run_id")
-    && tests.concurrency["cancel-in-progress"] === "${{ github.event_name == 'pull_request' || github.event_name == 'push' }}",
-    "a run on main after a merge gives way to the next merge's, main tested at its newest commit; the hourly runs wait their turn; a start by hand or a call is never cancelled (point 4)");
+    && tests.concurrency["cancel-in-progress"] === "${{ github.event_name == 'pull_request' }}",
+    "a pull request's run gives way to its newer push's; a run on main after a merge, the hourly runs, a start by hand and a call wait their turn and are never cancelled (point 4, as #810 changed it)");
+  // (the events whose run cancels the one in progress, read from the expression as written, which must be such terms
+  // joined by ||: a run on main that has started finishes, and only a waiting one gives way to a newer merge's; #810)
+  const cancelOn = c => /^\$\{\{ github\.event_name == '\w+'(?: \|\| github\.event_name == '\w+')* \}\}$/u.test(String(c)) ? [...String(c).matchAll(/'(\w+)'/gu)].map(m => m[1]) : null;
+  ok(cancelOn(tests.concurrency["cancel-in-progress"])?.join() === "pull_request",
+    "a push's run on main never cancels the run in progress, nor does any event but a pull request's (#810)", String(tests.concurrency["cancel-in-progress"]));
   ok(tests.on.schedule?.length === 1 && /^\d{1,2} \* \* \* \*$/.test(tests.on.schedule[0].cron) && tests.jobs.moved.if === "${{ github.event_name == 'schedule' }}" && /event == "schedule" or \.event == "workflow_dispatch"/.test(tests.jobs.moved.steps.at(-1).run) && /\(\.id \| tostring\) != env\.GITHUB_RUN_ID/.test(tests.jobs.moved.steps.at(-1).run) && /if any\(\.\[\]; \.status != "completed"\) then "running"/.test(tests.jobs.moved.steps.at(-1).run) && /if gh api --paginate /.test(tests.jobs.moved.steps.at(-1).run) && /jq -rs /.test(tests.jobs.moved.steps.at(-1).run) && /-f branch=main/.test(tests.jobs.moved.steps.at(-1).run) && /sort_by\(\[\.run_started_at \/\/ "", \.id\]\) \| last \| \.conclusion/.test(tests.jobs.moved.steps.at(-1).run) && /if \[ "\$done" = success \]; then echo "run=false"/.test(tests.jobs.moved.steps.at(-1).run),
     "Windows once an hour, at main's newest commit, skipped only where no other full run there, every page of them read, is still going and the newest, by when it last started, passed, so no skipped run hides a failure from the release (point 6)");
   const cut = release.jobs.release.steps.at(-1).run;
   ok("workflow_dispatch" in tests.on && !("workflow_call" in tests.on) && /actions\/runs" -f head_sha="\$GITHUB_SHA" -f branch=main -f event=push /.test(cut) && /gh api --paginate -X GET "repos\/\$GITHUB_REPOSITORY\/actions\/workflows\/tests\.yml\/runs" -f head_sha="\$GITHUB_SHA"/.test(cut) && /jq -s '\{ workflow_runs: \. \}' "\$full\.pages" > "\$full"/.test(cut) && /--runs "\$runs" --full "\$full"/.test(cut),
     "and both in full by hand, which the release waits on: it reads the push's runs and, apart, the tests' runs on its commit, every page, none unfinished and the newest passed, and the tests stay a workflow no project calls (point 6; release.mjs, fullRun)", cut);
+  // (#715, point 2: the upgrade test guards only what a release brings, so on Windows, where its job set every pull
+  // request's run, it runs in the release workflow alone: daily where the repository is public, before each release)
+  const upgradeStep = release.jobs.upgrade?.steps?.find(s => /tests\/upgrade-test\.mjs/.test(s.run ?? ""));
+  const testsUpgrade = tests.jobs.upgrade.steps.find(s => /tests\/upgrade-test\.mjs/.test(s.run ?? ""));
+  ok(release.on.schedule?.length === 1 && /^\d{1,2} \d{1,2} \* \* \*$/.test(release.on.schedule[0].cron) && "workflow_dispatch" in release.on
+    && release.jobs.upgrade["runs-on"] === "windows-latest" && upgradeStep
+    && release.jobs.upgrade.if === "${{ github.event_name != 'schedule' || needs.main.outputs.public == 'true' }}"
+    && [release.jobs.release.needs].flat().includes("upgrade") && !Object.keys(release.on).some(e => e.startsWith("pull_request"))
+    && /^\$\{\{ runner\.os == 'Linux' && (matrix\.part != '[\w ]+' && )?\(env\.RUN == 'all' \|\| contains\(env\.RUN, ' tests\/upgrade-test\.mjs '\)\) \}\}$/.test(String(testsUpgrade?.if)),
+    "the upgrade test runs on Windows in the release workflow alone, once a day where minutes are free and before each release, never in a pull request's run (tasks/tests.md, \"A test that guards only what a release brings runs where the release is made\")",
+    JSON.stringify({ schedule: release.on.schedule, if: release.jobs.upgrade?.if, tests: testsUpgrade?.if }));
 }
 
 // (#802: the copy's check removes the folders it fetched into, so no fetch there may leave git's own upkeep running

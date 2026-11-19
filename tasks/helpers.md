@@ -13,7 +13,7 @@ A helper pays only for work of one of these shapes:
 
 How:
 - Not for one-pass work, steps that depend on each other, or waiting on a run.
-- At most five at a time, each on the cheapest model that does its part well: its tier and effort, `tasks/roles.md`,
+- At most five at a time, each at its tier and effort: `tasks/roles.md`,
   "The rules name tiers, never a model".
 - Check every result before using it.
 
@@ -31,4 +31,4 @@ template of the starter kit for the sessions that read it.
 - Reason: a session's whole view of its task comes from its brief; in tests a title or a stake changed no score, and
   a stake that is not real is untrue.
 - Held by the core's phrase list, which reads its starter kit's templates too, and the review guidelines' point on a
-  brief a pull request writes; a brief written in the moment, by discipline alone.
+  brief a PR writes; a brief written in the moment, by discipline alone.
