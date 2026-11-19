@@ -185,6 +185,34 @@ try {
   // (a script that imports one of them for what needs no package runs with nothing installed: the copies check)
   const plain = call("yaml-keys.mjs", `uncommented("a: 1 # b")`);
   ok(plain.status === 0 && plain.stdout.trim() === JSON.stringify("a: 1"), "what needs no package runs with nothing installed, so a project's own workflow that runs the copies check is not stopped", `${plain.stdout}${plain.stderr}`);
+  // (the shape check's reader of C#, which reads on the parser's files (installedFile), with nothing installed: it did
+  // not run, saying the mend; where the job's install could not reach the registry, it reads no function of C#, says so
+  // as a warning and fails nothing by that alone, and writes no baseline then (#654, point 4))
+  {
+    const cs = path.join(tmp, "cs");
+    fs.mkdirSync(cs);
+    fs.cpSync(copy, path.join(cs, "core"), { recursive: true });
+    fs.writeFileSync(path.join(cs, "shape.json"), JSON.stringify({ baseline: "shape-baseline.json", code: [".", ":!core/"], tests: [], systems: {} }));
+    fs.writeFileSync(path.join(cs, "Program.cs"), "class A { void M(bool x) { if (x) { } } }\n");
+    // (a file the grammar cannot read whole, which its baseline lists as lost: only the parser tells it so)
+    fs.writeFileSync(path.join(cs, "Bad.cs"), "class B { void M() { int x = ; } }\n");
+    execFileSync("git", ["init", "-q"], { cwd: cs });
+    execFileSync("git", ["add", "-A"], { cwd: cs });
+    const shape = (args, extra = {}) => spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json", ...args], { cwd: cs, encoding: "utf8", timeout: 120000, env: { ...env, SHAPE_BASE: "", ...extra } });
+    const none = shape(["--first"]), noneOut = `${none.stdout}${none.stderr}`;
+    ok(none.status === 1 && /did not run: the package \S+ is not installed/u.test(noneOut) && /install\.mjs/u.test(noneOut) && mended(noneOut), "the shape check, reading C# with nothing installed beside the copy, says it did not run and how to install", noneOut);
+    const refusedWrite = shape(["--first"], { CORE_PACKAGES_UNREACHED: "1" }), refusedOut = `${refusedWrite.stdout}${refusedWrite.stderr}`;
+    ok(refusedWrite.status === 1 && /cannot be read and a baseline written now would leave out/u.test(refusedOut) && !fs.existsSync(path.join(cs, "shape-baseline.json")) && mended(refusedOut), "where the registry did not answer, it writes no baseline, saying the mend", refusedOut);
+    fs.writeFileSync(path.join(cs, "shape-baseline.json"), JSON.stringify({ reads: ["javascript", "jsx", "csharp", "csharp-tree", "python", "scripts", "screens"], listed: { "function: Program.cs#A.M": { lines: 99 }, "lost: Bad.cs": true } }));
+    const skipped = shape([], { CORE_PACKAGES_UNREACHED: "1" }), skippedOut = `${skipped.stdout}${skipped.stderr}`;
+    ok(skipped.status === 0 && /^::warning::The shape check did not read C#, its functions by the parser \(the reader csharp-tree\): the core's packages could not be installed, the registry not answering, .*the 2 entries its baseline lists there \(functions, and files the grammar cannot read\) are kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut), "and where it did not answer, the check reads no function of C#, says which reader it skipped and why as a warning, and fails nothing by that alone, its baseline's function and its file the grammar cannot read kept as listed", skippedOut);
+    // (what the reader of C# finds without the parser, here a cycle of using directives, still fails under the flag)
+    fs.writeFileSync(path.join(cs, "X.cs"), "using B;\nnamespace A { class X { } }\n");
+    fs.writeFileSync(path.join(cs, "Y.cs"), "using A;\nnamespace B { class Y { } }\n");
+    execFileSync("git", ["add", "-A"], { cwd: cs });
+    const cycle = shape([], { CORE_PACKAGES_UNREACHED: "1" }), cycleOut = `${cycle.stdout}${cycle.stderr}`;
+    ok(cycle.status === 1 && /FAIL: 2 imports lie on a cycle/u.test(cycleOut) && mended(cycleOut), "and what the reader of C# finds without the parser, a cycle of its using directives, fails all the same", cycleOut);
+  }
   // (and the install puts each package where the scripts load it from, untracked)
   // (a project whose own .gitignore leaves out an .npmrc, a lock file and every dot folder still tracks the copy's)
   fs.writeFileSync(path.join(project, ".gitignore"), ".*\n!.gitignore\n.npmrc\npackage-lock.json\npackage.json\n");

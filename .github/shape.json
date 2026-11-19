@@ -13,6 +13,7 @@
   "suites": {
     "suites-kit-core-licences": { "linux": 240 },
     "suites": { "linux": 240 },
+    "suites-rest-steps": { "linux": 240 },
     "suites-projects": { "win32": 600 },
     "suites-sync": { "win32": 300 },
     "suites-kit": { "win32": 600 },
