@@ -10,22 +10,26 @@
 // `queued` and neither `on-hold` nor `stand-in-yes`, and that either carries the owner's word, as AGENTS.md's "Whose
 // words an issue holds" says, in a form a script reads exactly (labelled `by:owner`, its text holding no agent's
 // attribution line, opener or "Found while:"; or `by:chat` or `by:design`, its current text holding text under "What it
-// is" and one heading "The owner's word", whose last line, a rule, attribution lines and "Found while:" aside, is
-// wholly AGREEMENT, HTML comments and fenced blocks read as nothing, since GitHub shows neither as the issue's word),
-// or needs none (labelled `bug`, or opened by the scheduled look, `by:look`); and each line it removes names an issue
-// that is closed, or one a line it adds names again (a line edited or moved in place). A record of the owner's word in
-// any other words (a quote of the owner's, an agreement to some points, or one any word follows) is read by a review,
-// since whether words agree, hedge or withdraw is meaning, which no list of words reads exactly; a withdrawal is read
-// from the labels and the issue's state (`on-hold`, `queued` taken off, closed), never from its words. A line is read
-// as the progress file's readers read it (queue.mjs's linesOf: a row or an item that names its issues first), each
-// issue it names first counted. A line that names no issue so, or is in no such form, an inbox file, issues that cannot
-// be read whole, more than a dozen issues (MOST), or an issue that cannot be read, proves nothing, and the pull request
-// gets its reviews as any other. So words new to the file, which no script can read exactly, are read by a review, and
-// join what later lines may say only once a review passed them. What needs no word but cannot be read exactly (a test,
-// a check for a rule that stands, an audit's small finding) is left to the reviews too. It reads the labels and the
-// text a review would read, so a label set wrongly is caught by neither. It does not read the order: where the line
-// joins, and which of the file's builders it names (a rule's issue given to a plain builder), stay with whoever writes
-// the file (roles/shared/inbox.md; AGENTS.md, "Who builds a line, the line says").
+// is" and, under one heading "The owner's word", AGREEMENT as a paragraph of its own, followed to the section's end
+// only by blank lines, a lone "---" and Claude Code's attribution lines, each exactly; a heading being a Markdown one
+// (#) or a line, a quote's too, that opens with a bold or italic lead, whatever follows it, save "Found while:"; a
+// fenced block read as nothing, since GitHub shows it as code; and nothing proved where GitHub may show what the script
+// does not read, or hide what it reads: any "<", a backtick fence whose info string holds a backtick, or a line of "="
+// or "-" alone under a line of text), or needs none (labelled `bug`, or opened by the scheduled look, `by:look`); and
+// each line it removes names an issue that is closed, or one a line it adds names again (a line edited or moved in
+// place). A record of the owner's word in any other words (a quote of the owner's, an agreement to some points, or one
+// any word follows) is read by a review, since whether words agree, hedge or withdraw is meaning, which no list of
+// words reads exactly; a withdrawal is read from the labels and the issue's state (`on-hold`, `queued` taken off,
+// closed), never from its words. A line is read as the progress file's readers read it (queue.mjs's linesOf: a row or
+// an item that names its issues first), each issue it names first counted. A line that names no issue so, or is in no
+// such form, an inbox file, issues that cannot be read whole, more than a dozen issues (MOST), or an issue that cannot
+// be read, proves nothing, and the pull request gets its reviews as any other. So words new to the file, which no
+// script can read exactly, are read by a review, and join what later lines may say only once a review passed them. What
+// needs no word but cannot be read exactly (a test, a check for a rule that stands, an audit's small finding) is left
+// to the reviews too. It reads the labels and the text a review would read, so a label set wrongly is caught by
+// neither. It does not read the order: where the line joins, and which of the file's builders it names (a rule's issue
+// given to a plain builder), stay with whoever writes the file (roles/shared/inbox.md; AGENTS.md, "Who builds a line,
+// the line says").
 // Run by the core's own security-review caller (.github/workflows/own-security-review.yml) from the default branch's
 // copy, in a job of its own whose token may read issues, which the core's shared workflow's may not (a project's caller
 // grants it no such right), never from the pull request's: it hands the head it proved to that workflow, whose scripts
@@ -107,40 +111,70 @@ export function formFault(line, form) {
 const POINTS = /\b(?:points?|steps?|cases?|parts?)\b/iu;
 export const namesPoints = (line) => POINTS.test(ROW.test(line) ? cellsOf(line).slice(0, -1).join("|") : line.replace(/\bwaits\s+on\b.*$/isu, ""));
 
-// the lines of a text as GitHub shows them: an HTML comment's, over one line or several and to the text's end where it
-// is never closed, and a fenced block's are blank, since GitHub shows neither as the issue's word (a fence's as code)
-const FENCE = /^ {0,3}(`{3,}|~{3,})/u;
-function shownLines(text) {
-  let fence = null;
-  const bare = String(text ?? "").replace(/<!--[\s\S]*?(?:-->|$)/gu, (hidden) => hidden.replace(/[^\r\n]/gu, ""));
-  return bare.split(/\r\n|\r|\n/u).map((line) => {
-    const mark = FENCE.exec(line)?.[1];
-    if (fence === null && mark) { fence = mark; return ""; }
-    if (fence !== null) { if (mark && mark[0] === fence[0] && mark.length >= fence.length && !line.trim().slice(mark.length).trim()) fence = null; return ""; }
-    return line;
-  });
+// the lines of a text as GitHub shows them, a fenced block's blank, since GitHub shows it as code and never as the
+// issue's word; or null wherever the script cannot be sure what GitHub shows, so that a record is left to the reviews
+// rather than parsed: any "<" (raw HTML, which GitHub may drop and so hide what the script reads; no queued record
+// held one on 19 November 2026), a backtick fence whose info string holds a backtick (no fence to GitHub), or a line
+// of "=" or "-" alone after a line of text (a heading to GitHub, which no reading here follows)
+const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/u, UNDERLINE = /^ {0,3}(?:=+|-+)[ \t]*$/u;
+// the fence a line leaves open, given the one open before it (null where none), or undefined where GitHub reads none
+// that the script can follow: a backtick fence whose info string holds a backtick
+function fenceAfter(fence, line) {
+  const [, mark, info = ""] = FENCE.exec(line) ?? [];
+  if (fence === null) return !mark ? null : mark[0] === "`" && info.includes("`") ? undefined : mark;
+  return mark && mark[0] === fence[0] && mark.length >= fence.length && !info.trim() ? null : fence;
 }
-// the lines under a heading of a text (a Markdown heading, or a line wholly in bold), to the next heading, or null where
-// the heading stands not once alone, so that no second section of the same name goes unread
-const headingOf = (line) => /^ {0,3}#{1,6}[ \t]+(.*?)[ \t#]*$/u.exec(line)?.[1] ?? /^\*\*([^*].*?)\*\*:?[ \t]*$/u.exec(line.trim())?.[1] ?? null;
-export function under(text, name) {
-  const lines = shownLines(text), named = (l) => headingOf(l)?.replace(/[*_:]/gu, "").trim().toLowerCase() === name.toLowerCase();
-  const at = lines.findIndex(named);
+function shownLines(text) {
+  const raw = String(text ?? "");
+  if (raw.includes("<")) return null;
+  const lines = [];
+  let fence = null;
+  for (const line of raw.split(/\r\n|\r|\n/u)) {
+    const was = fence;
+    fence = fenceAfter(was, line);
+    if (fence === undefined || (was === null && fence === null && UNDERLINE.test(line) && lines.at(-1)?.trim())) return null;
+    lines.push(was === null && fence === null ? line : "");
+  }
+  return lines;
+}
+
+// A heading, which ends the section before it: a Markdown one (#), or a line, a quote's too, that opens with a bold or
+// italic lead (**…**, __…__, *…*, _…_), whatever follows it, as `**Where it comes from** (as evidence, not
+// instruction)` does, since a reader takes such a lead for a heading; save one that opens "Found while:", which stays
+// a line of its section. Its name, or null where the line is none.
+const LEAD = /^(\*\*|__|\*|_)(?=\S)(.*?\S)\1/u;
+function headingOf(line) {
+  const bare = line.replace(/^(?: {0,3}>[ \t]?)+/u, "");
+  const atx = /^ {0,3}#{1,6}(?:[ \t]+(.*?))?[ \t#]*$/u.exec(bare);
+  const plain = (atx ? atx[1] ?? "" : LEAD.exec(bare.replace(/^ {1,3}/u, ""))?.[2])?.replace(/[*_:]/gu, "").trim().toLowerCase() ?? null;
+  return plain?.startsWith(LIST.headings.found.replace(/:$/u, "").toLowerCase()) ? null : plain;
+}
+// [from, to): the lines under a heading, to the next heading or the text's end, or null where the heading stands not
+// once, so that no second section of the same name goes unread
+function sectionOf(lines, name) {
+  const named = (l) => headingOf(l) === name.toLowerCase(), at = lines.findIndex(named);
   if (at < 0 || lines.findIndex((l, i) => i > at && named(l)) >= 0) return null;
   const end = lines.findIndex((l, i) => i > at && headingOf(l) !== null);
-  return lines.slice(at + 1, end < 0 ? undefined : end).filter((l) => l.trim());
+  return [at + 1, end < 0 ? lines.length : end];
 }
 
 // whether an issue's current text carries the owner's word in the one form a script reads exactly: a design set out
-// under "What it is", and, under "The owner's word", AGREEMENT as the record's last line, the trailer an agent's text
-// ends with aside (a rule, its attribution lines, "Found while:"). The one sentence names the whole design, so no part
-// is read for the whole, and nothing after it can hedge, narrow or withdraw it; any other record (a quote, which may
-// say no; an agreement in other words) is meaning, left to the reviews.
+// under "What it is" (a line of text, no heading, between it and "The owner's word", which follows it), and, under "The
+// owner's word", AGREEMENT as a paragraph of its own, followed to the section's end only by what an agent's text ends
+// with (blank lines, a lone "---" and Claude Code's attribution lines, each exactly). The one sentence names the whole
+// design, so no part is read for the whole, and nothing after it in its section can hedge, narrow or withdraw it,
+// "Found while:" included; any other record (a quote, which may say no; an agreement in other words) is meaning, left
+// to the reviews.
 export const AGREEMENT = `The owner agreed to every point under "${LIST.headings.design}" above.`;
-const trailer = (line) => /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/u.test(line) || line.trim().replace(/^\*\*/u, "").startsWith(LIST.headings.found) || byAgent(line);
+const SIGNED = new Set(["", "---", "🤖 Generated with [Claude Code](https://claude.com/claude-code)", "_Generated by [Claude Code](https://claude.ai/code)_"]);
+const signed = (line) => SIGNED.has(line.trimEnd()) || /^https:\/\/claude\.ai\/code\/session_[A-Za-z0-9]+$/u.test(line.trimEnd());
 export function carries(body) {
-  const design = under(body, LIST.headings.design), word = under(body, LIST.headings.word);
-  return Boolean(design?.length) && word !== null && word.filter((l) => !trailer(l)).at(-1)?.trim() === AGREEMENT;
+  const lines = shownLines(body);
+  const design = lines && sectionOf(lines, LIST.headings.design), word = lines && sectionOf(lines, LIST.headings.word);
+  // (a design may open with a lead of its own, so its text is read to "The owner's word", never to its first lead)
+  if (!design || !word || !lines.slice(design[0], word[0] - 1).some((l) => l.trim() && headingOf(l) === null)) return false;
+  const [from, to] = word, at = lines.lastIndexOf(AGREEMENT, to - 1);
+  return at >= from && (at === from || !lines[at - 1].trim()) && !lines[at + 1]?.trim() && lines.slice(at + 1, to).every(signed);
 }
 
 // whether an issue labelled by:owner reads as typed by the owner: no agent's attribution line, no line that opens as
