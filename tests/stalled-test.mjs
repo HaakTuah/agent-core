@@ -3,7 +3,7 @@
 // here.
 //
 //   node tests/stalled-test.mjs
-import { handedOff, print, stalled } from "../scripts/stalled.mjs";
+import { goesOn, handedOff, NOTICE, print, stalled, standingStill } from "../scripts/stalled.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -30,6 +30,17 @@ const noted = body => print(stalled([{ ...p(7, "lane/noted", "2026-11-13T10:19:0
 for (const body of ["Hand-off: done a; next b", "x\n**Hand-off:** done a", "## Hand-off: done", "- Hand-off: done"]) ok(!noted(body).includes("no hand-off note"), `a lane with a hand-off note is not marked: ${JSON.stringify(body)}`, noted(body));
 for (const body of ["It has no Hand-off: here", "", undefined, 42]) ok(noted(body).endsWith("(t7); no hand-off note"), `a lane with none is marked: ${JSON.stringify(body)}`, noted(body));
 ok(handedOff("a\nHand-off: b") && !handedOff("hand-off: b"), "the note's line is \"Hand-off:\", as written");
+
+// ---- the work standing still (#471): the progress file's next line, no push of the repository's own for a day, no notice ----
+const queue = "| Issue | Who | Waits on |\n| --- | --- | --- |\n| #11 | builder | |\n| #14 | the owner | |\n| #13 | rule builder | #12 |\n| #15 | builder | on hold |\n| #12 | builder | |\n| #16 | rule builder; it changes the floor | |\n";
+const closed = n => n === 11, old = { own: true, at: "2026-11-12T08:00:00Z" }, fresh = { own: true, at: "2026-11-13T15:00:00Z" }, fork = { own: false, at: "2026-11-13T18:00:00Z" };
+ok(JSON.stringify(standingStill({ queue, closed, pulls: [old, fork], notices: [], now })) === "[12]", "the first line a session could take is reported, where no pull request of the repository's own was pushed in a day (a fork's push counts for nothing): a closed issue's line, one held for the owner, one waiting on an open issue and one on hold are passed over", JSON.stringify(standingStill({ queue, closed, pulls: [old, fork], notices: [], now })));
+ok(standingStill({ queue, closed, pulls: [old, fresh], notices: [], now }) === null, "a push of the repository's own in the last day: the work goes on, nothing is reported");
+ok(standingStill({ queue, closed, pulls: [], notices: [`${NOTICE} until the window opens on Friday`], now }) === null, "an open notice of the orchestrator's says why: nothing is reported");
+ok(standingStill({ queue: "| #13 | builder | #12 |\n| #14 | the owner | |\n| #11 | builder | |\n", closed, pulls: [], notices: [], now }) === null, "no line a session could take, a closed issue's among them: nothing is reported");
+ok(JSON.stringify(standingStill({ queue: "| #13 | builder | #11 |\n", closed, pulls: [], notices: [], now })) === "[13]", "a line whose wait has closed can be taken");
+
+ok(standingStill({ queue, closed, pulls: [old], notices: [], now, latest: "2026-11-13T12:00:00Z" }) === null && goesOn({ pulls: [], latest: "2026-11-13T12:00:00Z", now }) && !goesOn({ pulls: [fork], latest: "2026-11-12T08:00:00Z", now }) && !goesOn({ pulls: [{ own: true, at: "not a time" }], now }), "a commit on the default branch in the last day is work going on; a fork's push, an older commit and a time that is no time are not");
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);
