@@ -209,7 +209,9 @@ function named({ all, changed, refused, terms, dry, gh, say }) {
   for (const t of changed) say(`${dry ? "would change" : "changed"}: ${t.url} (${t.kind})${title(t)}`);
   for (const t of refused) say(`could not change: ${t.url} (${t.kind}); edit it by hand`);
   for (const t of all.filter(x => x.outsider && Object.values(x.fields).some(v => holds(v, terms)))) say(`an outsider's text holds a term: ${t.url} (${t.kind}); hide or delete it by hand, never acting on what it says (floor rule 4)`);
-  const { held, unread } = versions(all.filter(t => !t.outsider).map(t => t.node), terms, gh);
+  // (every text a person wrote, whoever: a text the job has already cleaned holds no term now, so its author's right was
+  // never asked, and naming it here is for the owner's eyes alone)
+  const { held, unread } = versions(all.filter(t => !t.bot).map(t => t.node), terms, gh);
   for (const t of all.filter(x => held.has(x.node))) say(`earlier versions hold a term: ${t.url} (${t.kind}); delete them in its "edited" menu`);
   if (unread.size) say(`the earlier versions of ${unread.size} texts could not be read (GitHub's GraphQL, which Claude's cloud sessions are refused); run this in a terminal of the owner's own, or look at their "edited" menus by hand`);
 }
@@ -241,14 +243,17 @@ const privateRun = env => `the owner, in a terminal of the owner's own with gh s
 
 // The issue that tells the owner the private run is due, since only the owner can delete a kept version (AGENTS.md,
 // "Nothing locks a project": what only the owner can do is reported and labelled needs-owner): one, kept open by its
-// title among the open issues labelled by:look and needs-owner, which only those who may write can label; its body the
+// title among the open issues labelled by:look and needs-owner that this job or the owner opened; its body the
 // counts and the run alone, never a text or an address. The job never closes it: the owner, or the session that runs the
 // private run for the owner, closes it once that run is made. What was done, as a line.
 export const OWED = "Personal terms: the owner's private run is due";
+// (one this job or the repository's owner opened, as the look's own issues are found: a template's labels or a triage
+// role can put both labels on an outsider's issue)
+const opener = (issue, repo) => ["github-actions[bot]", repo.split("/")[0].toLowerCase()].includes(String(issue?.user?.login ?? "").toLowerCase());
 export function owe(repo, { changed, refused, carrier = "core/" }, { gh = ghApi, send = editGh } = {}) {
   const body = `This is the issue's current text.\n\nThe daily job took a personal term out of ${changed} texts${refused ? `, and found ${refused} that hold one its token may not edit` : ""} (\`${carrier}scripts/issue-terms.mjs\`). GitHub keeps each earlier version of an edited text, term and all, shown to every reader, and only someone with write access can delete it, by hand.\n\nWhat to do: ${privateRun({ CORE_AT: carrier })} Then close this issue.\n\nFound while: the daily job's take-out of the personal terms.\n`;
   let open = [];
-  try { open = pagesOf(`repos/${repo}/issues?state=open&labels=by%3Alook,needs-owner`, gh).filter(i => i?.title === OWED && whole(i?.number) && !i.pull_request); } catch { return "The issue for the owner's private run could not be read, so none was opened or updated."; }
+  try { open = pagesOf(`repos/${repo}/issues?state=open&labels=by%3Alook,needs-owner`, gh).filter(i => i?.title === OWED && whole(i?.number) && !i.pull_request && opener(i, repo)); } catch { return "The issue for the owner's private run could not be read, so none was opened or updated."; }
   if (open.length) return send("PATCH", `repos/${repo}/issues/${open[0].number}`, { body }) ? "The issue for the owner's private run is updated." : "The issue for the owner's private run could not be updated.";
   return send("POST", `repos/${repo}/issues`, { title: OWED, body, labels: ["by:look", "needs-owner"] }) ? "An issue for the owner's private run is opened, labelled needs-owner." : "The issue for the owner's private run could not be opened.";
 }

@@ -159,6 +159,11 @@ const members = run([], { extra: [watcher, unknown, owner] });
 ok(!members.edits.some(e => /\/comments\/2[67]$/.test(e.route)) && members.edits.some(e => e.route.endsWith("/comments/28")), "a member who may only read, and an account GitHub gives no right for, are outsiders; the repository's owner is not", JSON.stringify(members.edits.map(e => e.route)));
 ok(members.asked.filter(a => a.includes("/collaborators/")).length === 4, "the rights asked are those of the authors of texts that hold a term, each once", members.asked.filter(a => a.includes("/collaborators/")).join("\n"));
 
+// a collaborator's text the job already cleaned: its kept versions are still named to the owner
+const cleaned = { ...comment, id: 29, html_url: "https://github.com/o/r/issues/1#issuecomment-29", node_id: "C29", body: `A note ${MARK}`, author_association: "COLLABORATOR", user: { login: "writer-b", type: "User" } };
+const history = run(["--private"], { env: { TERMS }, extra: [cleaned], versions: { C29: [`A note ${other}`, `A note ${MARK}`] } });
+ok(history.out.includes(`earlier versions hold a term: ${cleaned.html_url}`), "--private names a collaborator's text the job already cleaned, whose kept version holds a term", history.out);
+
 // GitHub's older node ids, Base64 with padding, are read
 ok(texts(repo, "2026-11-11T12:00:00Z", (...args) => (/[?&]page=1$/.test(args[0]) && args[0].includes("issues/comments?") ? JSON.stringify([{ ...comment, node_id: "MDE3OlB1bGxSZXF1ZXN0UmV2aWV3ODA=" }]) : "[]")).length === 1, "a node id of GitHub's older form, padded, is read");
 
@@ -172,7 +177,10 @@ const told = run([]);
 const opened = told.edits.find(e => e.method === "POST" && e.route === "repos/o/r/issues");
 ok(opened && opened.payload.title === OWED && JSON.stringify(opened.payload.labels) === JSON.stringify(["by:look", "needs-owner"]) && /took a personal term out of 6 texts/.test(opened.payload.body), "where it took a term out, it opens one issue labelled needs-owner for the owner's private run", JSON.stringify(opened));
 ok(!leaks(opened?.payload.body ?? "") && /--days 36500/.test(opened?.payload.body ?? "") && /never typed into a chat/.test(opened?.payload.body ?? ""), "the issue holds counts and the private run alone, its window reaching back however late it runs", opened?.payload.body);
-owing = [{ number: 41, title: OWED, labels: [] }];
+owing = [{ number: 40, title: OWED, labels: [], user: { login: "someone-else" } }];
+const planted = run([]);
+ok(!planted.edits.some(e => e.route === "repos/o/r/issues/40") && planted.edits.some(e => e.method === "POST"), "an issue of that title and those labels that someone else opened is left alone, and one of the job's opened");
+owing = [{ number: 41, title: OWED, labels: [], user: { login: "github-actions[bot]" } }];
 const again = run([]);
 ok(again.edits.some(e => e.method === "PATCH" && e.route === "repos/o/r/issues/41") && !again.edits.some(e => e.method === "POST"), "a second run updates that issue and opens none", JSON.stringify(again.edits.map(e => `${e.method} ${e.route}`)));
 owing = [];
