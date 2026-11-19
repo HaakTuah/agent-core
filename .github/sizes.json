@@ -47,6 +47,10 @@
       "mark": 32082,
       "why": "The start hook runs it from git with no file beside it, so it stands alone (its opening says so): no part can be moved to a file of its own."
     },
+    "scripts/size.mjs": {
+      "mark": 26021,
+      "why": "#892: the record of its caps' raises apart from the caps and the measure."
+    },
     "scripts/shape.mjs": {
       "mark": 84826,
       "why": "#884: along its sections, the survey apart from the baseline and the verdict."
