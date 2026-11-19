@@ -52,6 +52,7 @@ The index, and how an item is written: `archive/instructions.md`.
      provider first. Behind: "Another provider builds first" in `modules/roles.md` (every task or part a brief can carry
      and a check or its review can judge, where the owner set it up for the project) and the end of "Work continuously,
      other providers first" in `modules/claude.md`.
+     Changed by: 163.
 
 163. **12 November 2026** (the core, in the design chat). Raised, of "Another provider builds first" (item 162) and of
      the project of item 154. Decided: the rule holds only where Claude is the orchestrator and does not prohibit other
@@ -60,6 +61,7 @@ The index, and how an item is written: `archive/instructions.md`.
      Claude's sessions hand out work, another provider builds first" in `modules/roles.md` and the orchestrator's own
      line of it in `modules/orchestrating.md`; `setup/sync-notes.md`, what a sync asks of a project beyond the copy,
      which the sync script prints and an orchestrator gives a lane; and the audit's fixes of the same pull request.
+     Changes: 162.
 
 164. **12 November 2026** (the core, in the design chat). Asked: what the day's audit left for the owner. Put to the
      owner: four wordings of the floor (the owner's word passed on word for word against nothing personal in any brief;
@@ -73,6 +75,7 @@ The index, and how an item is written: `archive/instructions.md`.
      "Reporting a weakness" in `floor/topics.md`), the cap of 45 KB (`scripts/size.mjs`), the fixes of the same pull
      request, the last line of "Work from main" in `modules/git.md` with `scripts/session-cost.mjs`, and the owner's
      yes, now said, to floor rule 11's second exception.
+     Changed by: 169, 171.
 
 165. **12 November 2026** (the core, in the design chat). Asked: whether the core should be a package a project
      installs, and whether anything more would make it better. Advised: no package, since every reader of the rules
@@ -121,6 +124,7 @@ The index, and how an item is written: `archive/instructions.md`.
      in `modules/orchestrating.md`, "On every wake", and "A verdict the stand-in is sure of decides one" in
      `modules/inbox.md`, which replaces item 142's hold. What the stand-in is never sure of stays as it was: a call of
      taste, and an answer resting only on the core's archive in a project of another owner.
+     Changes: 142.
 
 169. **12 November 2026** (the core, in the design chat). Asked, on being told that the core said who builds first but
      left each project to write down how a Claude session hands a task to another provider, and that neither game did.
@@ -152,12 +156,14 @@ The index, and how an item is written: `archive/instructions.md`.
      workflows wait for, which asks a permission the sessions' sign-ins are set up without), so it is filed as an idea
      (issue 124) with what a run must show, and a project that has Copilot's agent names it as its own way meanwhile.
      The cap of item 164 goes from 45 to 46 KB on that agreement.
+     Changes: 164.
 
 170. **12 November 2026** (the core, in the design chat). Asked, on being told that the stand-in had given its verdict
      on nine of one project's fifteen open ideas and that the six newest had none, since its sweep took only the ideas
      that had waited a week. Decided: that was a glitch, and the sweep should take all ideas when it first runs. Behind:
      "every idea that lacks one" in `modules/orchestrating.md`: a week's wait still starts the sweep, and once it runs
      it takes every open idea without a verdict, so none is left for a call of its own.
+     Changed by: 172.
 
 171. **12 November 2026** (the core, in the design chat). Asked, after the change of item 169 was merged with the ways
      of handing work over in order but nothing on which provider builds where more than one can, whether all other
@@ -170,6 +176,7 @@ The index, and how an item is written: `archive/instructions.md`.
      accepted the layout as offered and agreed to everything, now and before. Behind: "Where more than one can build" in
      `modules/roles.md`, "The builders", and the *other builders* slot; the *security reviewer* slot's default, Codex of
      what its own provider built too, floor rule 3's two reviews standing; and the cap of item 164 at 47 KB.
+     Changes: 164.
 
 172. **12 November 2026** (the core, in the design chat). Asked, an hour after item 170, whose words were read as the
      weekly sweep alone, whether the stand-in is now told to do all when it steps forward; told that six ideas in one
@@ -184,6 +191,7 @@ The index, and how an item is written: `archive/instructions.md`.
      these points. Behind: "whenever it is called, its verdict on every open idea that lacks one" in `modules/inbox.md`:
      item 170's intent that the stand-in take all when it first runs meant any run of the stand-in, not the sweep's
      alone. The sweep of `modules/orchestrating.md` stays for a project where a week passes without a call.
+     Changes: 170.
 
 173. **12 November 2026** (the core, in the design chat). Asked, by the owner's agreement in item 172 to the advice on
      the three ideas the stand-in had given a sure yes; the first, filed when one game listed it as a difference from

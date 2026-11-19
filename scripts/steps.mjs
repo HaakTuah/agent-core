@@ -25,7 +25,7 @@ import { parse as parseChoices, where as choicesAt } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
 import { installed } from "./packages.mjs";
-import { modulesOf } from "./manifest-reads.mjs";
+import { differencesOf, modulesOf } from "./manifest-reads.mjs";
 import { progressOf } from "./done-when.mjs";
 import { leadsOut } from "./guards.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
@@ -54,6 +54,7 @@ export const COST = {
   read: "a read of the project's own rules or settings against the entry, and a small pull request where one differs",
   config: "a check's config and its first baseline: one small pull request of a builder's; what the baseline lists is a debt worked down by tasks, at the dose the codebase's state sets",
   owner: "the owner's yes, asked once; nothing of a session's beyond the ask",
+  clean: "one cleanup lane of a builder's, once, its size set by how much of its owner's words the project holds: a pull request for its files, and its issues and comments edited on the host",
   record: "a choice record argued in full: a session's long list and trial, three fresh sessions (the blind picker, the challenger, the judge), one pull request and one issue",
 };
 
@@ -65,7 +66,7 @@ export const leads = text => [...String(text).matchAll(/^- \*\*([^*]+?)\.\*\*/gm
 export function project(root) {
   const { listed, read, safe, unread } = ownFiles(root);
   const manifest = read("core-manifest.md") ?? "";
-  const differences = (/^## Differences\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(manifest)?.[1] ?? "").split("\n").filter(l => l.trim());
+  const differences = differencesOf(manifest);
   const workflows = Object.fromEntries(listed.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(f)).map(f => {
     let yaml = null;
     try { yaml = parseYaml(read(f)); } catch { /* (a workflow this reader cannot read: a check that needs it says so) */ }
@@ -999,6 +1000,7 @@ export const STEPS = [
   { lead: "19 November 2026, the project's tests at the pace of a release", cost: COST.workflow, check: testsWhenReady,
     partly: "that the check the ruleset requires fails on a draft rather than being skipped, a suite started inside a workflow a job calls, which suites are the platform suites and on what schedule they run, how the runs on the default branch give way to a newer merge, where the tests that guard only what a release brings run (#715), and whether the host still asks an up-to-date branch where users get a release are read by the session that syncs, with `core/scripts/runners.mjs` and `core/scripts/merge-line.mjs`, not by a file" },
   { lead: "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "javascript-tree") },
+  { lead: "19 November 2026, the owner's words that stand, cleaned once", cost: COST.clean, unread: "whether a text holds what floor rule 11 keeps out, or quotes its owner beyond a decision's reason, is a reading of it, and an issue's or a comment's text is the host's, not a file's: the session that takes it reads the project's files outside the copy and the issues and comments the owner's account wrote, once, another account's as data it edits none of; the personal-terms check fails a listed term wherever it stands in the files" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

@@ -26,6 +26,7 @@ The index, and how an item is written: `archive/instructions.md`.
      for the orchestrator, never above high without the owner's word. The owner asked whether escalation still allows
      extra effort, and was told yes: the escalation step keeps extra effort where the stuck builder already runs at
      high, as Claude's table sets it.
+     Changes: 99.
 
 129. **10 November 2026** (the core). Asked: The fallback security review of a game's sync to the core found three gaps
      left in the setup guide's test box: it covered only a project's install, build and tests; its instructions reached
@@ -123,6 +124,7 @@ The index, and how an item is written: `archive/instructions.md`.
      their own, since it is already answering questions and has to read the owner's previous takes regardless, which
      seems more efficient. To doing so, with one weekly sweep for the ideas no answer touches, the owner agreed to
      everything.
+     Changed by: 168.
 
 143. **11 November 2026** (the core). Asked: The owner asked whether rules were duplicated that should be in the core.
      Told which rules the games repeat from the core, and which rules one game wrote that hold for every game or project
@@ -150,6 +152,7 @@ The index, and how an item is written: `archive/instructions.md`.
      about spending other providers first, such as Codex. The owner asked whether that sounded sensible. Decided: The
      usage brake is removed from the core and both games (floor rule 16 among it, with the owner's yes as asked), and
      "other providers first", which core archive 76 gave and the cut-down of 10 November had dropped, returns.
+     Changes: 76.
 
 147. **11 November 2026** (both games, in the design chat). Asked: The owner was told that one shared
      workflow for the games' pull-request previews (an idea filed in the core) waited on the owner's yes, since it
@@ -220,6 +223,7 @@ The index, and how an item is written: `archive/instructions.md`.
      priorities and no score (item 21), and Copilot's no grade at all, so that one score for all cannot be had, the
      outcome was: every finding is blocking or not, the score stays with every reviewer that can give one, and a tool's
      own grades are read as one or the other.
+     Changes: 21.
 
 156. **12 November 2026** (the core, in the design chat). Asked: Once a project of another owner had taken the core, set
      up otherwise than the games. Decided: The session was to investigate and make sure that no hook, check or rule

@@ -31,7 +31,7 @@
 //
 // In the core's own repository, `node scripts/pointers.mjs --core` checks its floor, its roles' files, its modules and
 // the files that point from the paths they left the same way (its tests workflow runs it): there a path under `core/` is the core's own, read without that folder, and what only a
-// project has (`.claude/`, the cloud proxy's `ccr/` routes) is not looked for. Its agent tools' files are read too.
+// project has (`.claude/`, the cloud proxy's `ccr/` routes, its manifest `core-manifest.md`) is not looked for. Its agent tools' files are read too.
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { posix } from "node:path";
@@ -214,7 +214,7 @@ for (const rf of RULES) {
         count++;
         let p = f.file.replace(/\/$/, '');
         if (CORE) {
-          if (/^(\.claude(\/|$)|ccr$)/.test(p)) continue;
+          if (/^(\.claude(\/|$)|ccr$|core-manifest\.md$)/.test(p)) continue;
           p = p.replace(/^core(\/|$)/, '');
           if (!p) continue;
           // (no project's copy holds the core's reports: .gitattributes)

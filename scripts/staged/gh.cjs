@@ -183,6 +183,24 @@ if ((m = /^pulls\/(\d+)(?:\/(.+))?$/.exec(rest))) {
 // a weakness reported by GitHub's private reporting, which only the owner sees (core/floor/topics/weaknesses.md)
 if (rest === "security-advisories/reports" && method === "POST") { const r = { ghsa_id: `GHSA-${next()}`, summary: String(body.summary ?? ""), description: String(body.description ?? ""), state: "triage", created_at: now() }; (state.reports ??= []).push(r); out(r); }
 if ((m = /^commits\/([^/]+)\/check-runs$/.exec(rest))) out({ total_count: (state.checks ?? []).length, check_runs: state.checks ?? [] });
+// the workflow runs a case sets (red-main.mjs): listed, read with their jobs and logs, and run again, a run again taking
+// the conclusion the case gave it (`again`, else success) for the run and each of its jobs and check runs
+const runById = n => (state.runs ?? []).find(r => r.id === n) ?? fail(404, "Not Found");
+const jobById = n => (state.runs ?? []).flatMap(r => r.jobs ?? []).find(j => j.id === n) ?? fail(404, "Not Found");
+const runAgain = r => {
+  r.run_attempt = (r.run_attempt ?? 1) + 1; r.conclusion = r.again ?? "success"; r.status = "completed";
+  for (const j of r.jobs ?? []) { j.conclusion = r.conclusion; j.run_attempt = r.run_attempt; }
+  for (const c of state.checks ?? []) if (c.run_id === r.id) { c.conclusion = r.conclusion; c.output = { title: r.conclusion, summary: r.againSays ?? "" }; }
+  out({});
+};
+const asRun = r => { const { jobs, again, againSays, ...rest } = r; return rest; };
+if (rest === "actions/runs" && method === "GET") { const runs = (state.runs ?? []).filter(r => (!params.branch || r.head_branch === params.branch) && (!params.head_sha || r.head_sha === params.head_sha) && (!params.status || r.status === params.status || r.conclusion === params.status)); out({ total_count: runs.length, workflow_runs: page(runs.map(asRun)) }); }
+if ((m = /^actions\/runs\/(\d+)$/.exec(rest)) && method === "GET") out(asRun(runById(Number(m[1]))));
+if ((m = /^actions\/runs\/(\d+)\/(?:attempts\/\d+\/)?jobs$/.exec(rest))) { const jobs = runById(Number(m[1])).jobs ?? []; out({ total_count: jobs.length, jobs: page(jobs.map(({ log, ...j }) => j)) }); }
+if ((m = /^actions\/jobs\/(\d+)$/.exec(rest)) && method === "GET") { const { log, ...j } = jobById(Number(m[1])); out(j); }
+if ((m = /^actions\/jobs\/(\d+)\/logs$/.exec(rest))) { process.stdout.write(`${jobById(Number(m[1])).log ?? ""}\n`); save(); process.exit(0); }
+if ((m = /^actions\/runs\/(\d+)\/(?:rerun|rerun-failed-jobs)$/.exec(rest)) && method === "POST") runAgain(runById(Number(m[1])));
+if ((m = /^actions\/jobs\/(\d+)\/rerun$/.exec(rest)) && method === "POST") { const j = jobById(Number(m[1])); runAgain((state.runs ?? []).find(r => (r.jobs ?? []).includes(j))); }
 if ((m = /^commits\/([^/]+)\/status$/.exec(rest))) out({ state: "pending", total_count: 0, statuses: [] });
 if ((m = /^compare\/(.+)\.\.\.(.+)$/.exec(rest))) {
   const [from, to] = [commitOf(decodeURIComponent(m[1])), commitOf(decodeURIComponent(m[2]))];

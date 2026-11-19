@@ -225,8 +225,11 @@ const opened = { ...pull, created_at: "2026-11-12T10:00:00Z" };
 ok(boundOf("false", opened, "2026-11-12T11:00:00Z") === false && boundOf("false", opened, "2026-11-12T09:00:00Z") === true && boundOf("false", opened, "2026-11-12T10:00:00Z") === true
   && ["", undefined, "soon"].every((since) => boundOf("false", opened, since) === true) && boundOf("false", { ...pull, created_at: "soon" }, "2026-11-12T11:00:00Z") === true && [undefined, "true", ""].every((held) => boundOf(held, opened, "2026-11-12T11:00:00Z") === true),
   "a pull request is taken as from before the check only where the host says it was opened before the default branch's copy came; one opened since, or with either time unread, is held, whatever its head holds");
-const unnamedOld = judge(pull, [as("helper")], [], undefined, undefined, false);
-ok(unnamedOld.done === true && unnamedOld.why.endsWith("a review from an account not named counts, as before this check came") && is(judge(pull, [as("helper", "NONE")], [], undefined, undefined, false), false, "no security review") && is(judge(pull, [as("SomeOne", "OWNER")], [], undefined, undefined, false), true, "is posted on the pull request"), "a pull request from before the check: a member's or collaborator's review counts as it did then, said in the status, and no one else's");
+const helperOld = (rights) => judge(pull, [as("helper")], [], undefined, undefined, false, { rights });
+ok(is(helperOld(undefined), false, "no security review") && is(helperOld([right("helper", "read")]), false, "no security review") && is(helperOld([right("helper")]), true, "is posted on the pull request")
+  && is(judge(pull, [as("helper", "NONE")], [], undefined, undefined, false), false, "no security review") && is(judge(pull, [as("SomeOne", "OWNER")], [], undefined, undefined, false), true, "is posted on the pull request")
+  && is(judge(pull, [{ ...as("helper"), updated_at: "2026-11-14T12:30:00Z" }], [], undefined, undefined, false, { rights: [right("helper")] }), true, "is posted on the pull request"),
+  "a pull request from before the check counts a review only from an account it counts, as any other does: a member whose right was not read, or who may only read, counts not; a writer, the owner, and an edited review of theirs do");
 
 // What a review must have seen (#99): a review of an earlier commit stands only where nothing but updates from main
 // follow it; otherwise a posted review names the head, or such a commit, by its whole SHA.
