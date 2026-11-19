@@ -5,7 +5,8 @@
 # (AGENTS.md, "Every rule says what holds it"), and one that changes the floor, a module, a script (the checks), the
 # setup (the starter kit and the sync notes) or a workflow, "What it asks of a project" (AGENTS.md, "Nothing locks a
 # project"): whether it does is read from git alone, the merge commit against its first parent, the base, and nothing
-# of the pull request's own text reaches that step's script. This repository only;
+# of the pull request's own text reaches that step's script. On a draft it reports what it would fail and passes, so
+# a draft's builder sees it early and is stopped by nothing (#750, point 4). This repository only;
 # no project calls it. Reads only, with no secret: the description reaches the script through env and is never
 # written into a run line (floor rule 2).
 name: own-description
@@ -23,7 +24,7 @@ concurrency:
 
 jobs:
   own-description:
-    if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.login != 'dependabot[bot]' }}
+    if: ${{ github.event.pull_request.user.login != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -42,6 +43,7 @@ jobs:
           PR_CREATED: ${{ github.event.pull_request.created_at }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           GH_TOKEN: ${{ github.token }} # (read only: the base's commits and copy, for the day it gained a line, and the issues a pull request queues or closes)
+          DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           # (a diff that cannot be read counts as a change: each heading is asked for, never waived)
           parts=""
@@ -49,4 +51,7 @@ jobs:
           if ! git diff --quiet HEAD^1 HEAD -- floor modules roles tasks tools scripts setup .github/workflows; then
             parts="${parts:+$parts|}What it asks of a project"
           fi
-          node scripts/pr-description.mjs "+$parts"
+          if [ "$DRAFT" != true ]; then node scripts/pr-description.mjs "+$parts"
+          elif ! node scripts/pr-description.mjs "+$parts"; then
+            echo "::notice::A draft: each FAIL above is reported, not failed; it fails once the pull request is marked ready unless mended."
+          fi
