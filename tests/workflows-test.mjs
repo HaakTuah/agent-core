@@ -58,12 +58,15 @@ ok(["? ", "[", "{", "- ", "? - "].every(form => dup(`${form.repeat(12500)}\n`) =
   `a list or mapping nested past 128 deep, a document counted as one, is read as an empty value, the rest of the text read still and the cut said so, and twelve thousand marks of any nesting, read twice, stop nothing (#610; ${Date.now() - deep} ms)`);
 // (block nesting some thousands deep, closed by a line at a lower indent, which the package's parser cannot close: the
 // text is said to be read only in part, whether the parser gives out first, naming line 1, or the depth mark cuts it,
-// naming the cut's line, so the case holds wherever a Node's stack ends; and the check fails it with its mend, never
+// naming the cut's line (cutAt), so the case holds wherever a Node's stack ends; and the check fails it with its mend, never
 // passing it as holding no key)
 let indented = "x:\n"; for (let i = 1; i < 2500; i++) indented += `${" ".repeat(i)}k:\n`;
 const past = [`on: push\non: pull_request\nx:\n  ${"? ".repeat(2500)}a\nz: 1\n`, `on: push\non: pull_request\nx:\n  ${"- ".repeat(5000)}a\nz: 1\n`, `on: a\non: b\n${indented}z: 1\n`];
-const unreadDeep = repeated(past.map((text, i) => ({ file: `deep${i}.yml`, text })), () => null);
-ok(past.every(t => /(?:^|,)null@\d+<null$/u.test(dup(t))) && unreadDeep.fails.length === 3 && unreadDeep.fails.every(l => /^FAIL deep\d\.yml:\d+: the file nests its lists or mappings more than 128 deep, past what this check reads/.test(l)) && mended(unreadDeep.fails.join("\n")),
+// (where a Node's stack lets the parser read as far as the mark, the doubled "on" is found too: only the lines on depth
+// are counted)
+const cutAt = [4, 4, 130], unreadDeep = repeated(past.map((text, i) => ({ file: `deep${i}.yml`, text })), () => null);
+const nested = unreadDeep.fails.filter(l => l.includes(": the file nests "));
+ok(past.every((t, i) => [1, cutAt[i]].some(n => dup(t).endsWith(`null@${n}<null`))) && nested.length === 3 && nested.every((l, i) => [1, cutAt[i]].some(n => l.startsWith(`FAIL deep${i}.yml:${n}: `))) && nested.every(l => /^FAIL deep\d\.yml:\d+: the file nests its lists or mappings more than 128 deep, past what this check reads/.test(l)) && mended(unreadDeep.fails.join("\n")),
   "a text nested some thousands deep in block form, past what the parser can close, is read as unread, and the check fails it with its mend (#610)", unreadDeep.fails.join("\n"));
 const lower = `on: push\n${Array.from({ length: 37 }, (_, i) => `k${i}: 1\n`).join("")}z: ${"[".repeat(200)}${"]".repeat(200)}\n`;
 const lowerFails = repeated([{ file: "lower.yml", text: lower }], () => null).fails;
