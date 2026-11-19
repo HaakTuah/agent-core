@@ -15,7 +15,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #772 | builder; `tests.yml` | #770 |
 | #530, step 5 | builder; licence readers | |
 | #534, point 12 | rule builder; it changes `tasks/cleaning.md` | |
-| #593, points 8 and 9 | rule builder | |
 | #625 | builder | #624 |
 | #626 | builder | #624 |
 | #627 | builder | #624 |
@@ -62,7 +61,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #460, point 3 (a copy in a test) | builder | |
 | #460, point 4 (names in descriptions) | builder | |
 | #460, point 5 (a report's size) | builder | |
-| #460, point 6 (billed minutes) | builder | |
 | #502, case 2 | rule builder; it changes what every role reads at its start | |
 | #593, points 4 and 12 | rule builder; it changes what a builder reads at its start | |
 | #594 | rule builder; it changes the README | |
