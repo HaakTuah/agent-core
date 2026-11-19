@@ -109,6 +109,23 @@ const undone = [
 ];
 ok(undone.every((at) => proved(pullOf(at, [at]), listed(r, at), r).length === 0),
   "  nor one whose conflict a union settles where a side changed or deleted a line: modify against delete either way, the same line changed on both sides in either order, a delete beside an add");
+// two conflicts a few lines apart, or apart only by lines with no letter or digit, which merge-file's --union joins
+// into one: both kept in place, each conflict's own, is proved; the union that moves a side's line past the line both
+// share is not (the fallback reviewer's second finding on #753)
+const near = (name, between) => {
+  const at = (text) => text.replace("%", between);
+  const base = branch(`${name}-base`, B0, at("start\n%\nend\n"));
+  const ours = branch(`${name}-pr`, base, at("start\nA pr-line\n%\nB pr-line\nend\n"));
+  const theirs = branch(`${name}-main`, base, at("start\nverify || exit 1\n%\nD main-line\nend\n"));
+  return { ours, theirs };
+};
+for (const [name, between] of [["exit", "exit 0"], ["braces", "}\n\n}"]]) {
+  const { ours, theirs } = near(name, between);
+  const inPlace = kept(`${name}-in-place`, ours, theirs, `start\nA pr-line\nverify || exit 1\n${between}\nB pr-line\nD main-line\nend\n`);
+  const moved = kept(`${name}-moved`, ours, theirs, `start\nA pr-line\n${between}\nB pr-line\nverify || exit 1\n${between}\nD main-line\nend\n`);
+  ok(proved(pullOf(inPlace, [inPlace]), listed(r, inPlace), r).join() === inPlace && proved(pullOf(moved, [moved]), listed(r, moved), r).length === 0,
+    `  two conflicts apart by ${name === "exit" ? "a line both share" : "lines with no letter or digit"}: kept in place, proved; the union that moves main's line past it, not`);
+}
 git(r, "checkout", "-q", "-B", "mode", ADDS);
 const MODE = merge(r, MAIN_ADDS, () => { write(r, "a.txt", "one\ntwo\nthree\nmain's line\nthe pull request's line\n"); fs.chmodSync(path.join(r, "a.txt"), 0o755); git(r, "update-index", "--add", "--chmod=+x", "a.txt"); });
 git(r, "checkout", "-q", "-B", "gone", B0);
