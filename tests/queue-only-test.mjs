@@ -176,6 +176,9 @@ const record = (word, evidence = "") => ["This is the issue's current text.", ""
 ok(carries(record(`\n${AGREEMENT}\n`)) && !carries(record("", `\n${AGREEMENT}\n`)) && !carries(record("")) && !carries(record("", `${AGREEMENT}\n`))
   && !carries(record(`\n${AGREEMENT}\n**But** the owner later withdrew it.\n`)) && !carries(`**What it is**\n**A lead alone.**\n\n**The owner's word**\n${AGREEMENT}`),
   "  a line that opens with a bold or italic lead ends the section, as a record's \"Where it comes from\" does: the sentence last under \"The owner's word\" proves, and after the evidence it does not");
+ok(!carries(record(`\n${AGREEMENT}\n\n**But** the owner later withdrew it.\n`)) && !carries(record(`\n${AGREEMENT}\n`, "\n## Later\nIt was withdrawn.\n"))
+  && carries(record(`\n${AGREEMENT}\n`, "\n**The session's view (not a decision)**\nA view.\n")),
+  "  nor where a heading the record's template does not name, its evidence and the session's view, stands after \"The owner's word\", since such a line could withdraw the yes");
 ok(typed("Typed by the owner.") && !typed(issues["#36"].body) && !typed(issues["#37"].body) && !typed("A note.\n\n**Found while:** a builder's task.")
   && of(`@@ -1 +1,2 @@\n+${row(13)}`).head === HEAD && not(of(`@@ -1 +1,2 @@\n+${row(36)}`), "its text is an agent's") && not(of(`@@ -1 +1,2 @@\n+${row(37)}`), "its text is an agent's"),
   "an issue labelled by:owner carries the owner's word only where no agent's attribution line, opener or \"Found while:\" stands in it (floor rule 4)");
