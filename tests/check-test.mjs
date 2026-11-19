@@ -41,13 +41,16 @@ const npmEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => /^
 fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd(), files, npmEnv }) + "\\n");
 if (process.argv[2] === "ci") fs.mkdirSync("node_modules", { recursive: true });
 `);
-  if (process.platform === "win32") fs.writeFileSync(path.join(fake, "npm.cmd"), `@"${process.execPath}" "${logger}" %*\r\n`);
-  else fs.writeFileSync(path.join(fake, "npm"), `#!/bin/sh\nexec '${process.execPath}' '${logger}' "$@"\n`, { mode: 0o755 });
+  // (the fake is handed to npmOnce as the real one, so it needs no name of npm's, and this file stays one the licence
+  // scan reads)
+  const realFake = path.join(fake, process.platform === "win32" ? "logger.cmd" : "logger");
+  if (process.platform === "win32") fs.writeFileSync(realFake, `@"${process.execPath}" "${logger}" %*\r\n`);
+  else fs.writeFileSync(realFake, `#!/bin/sh\nexec '${process.execPath}' '${logger}' "$@"\n`, { mode: 0o755 });
   // (from the scratch environment, which leaves the runner's npm settings and credentials out, so a failure prints none)
-  const base = scratchEnv(core, tmp), PATHKEY = Object.keys(base).find(k => k.toUpperCase() === "PATH") ?? "PATH";
-  const probed = npmOnce({ ...base, [PATHKEY]: `${fake}${path.delimiter}${base[PATHKEY]}`, npm_config_probe: "as-set" }, probe);
+  const base = scratchEnv(core, tmp);
+  const probed = npmOnce({ ...base, npm_config_probe: "as-set" }, probe, { real: realFake });
   const ownNpmEnv = JSON.stringify(Object.fromEntries(Object.entries(probed).filter(([k]) => /^npm_config_|^NODE_OPTIONS$/iu.test(k)).sort()));
-  const shim = path.join(probe, "npm-once", process.platform === "win32" ? "npm.cmd" : "npm");
+  const shimDir = path.join(probe, "npm-once"), shim = path.join(shimDir, fs.readdirSync(shimDir).find(f => !f.endsWith(".cjs")));
   const files = { "package.json": '{"name":"p"}\n', "package-lock.json": '{"lockfileVersion":3}\n', ".npmrc": "ignore-scripts=true\n" };
   for (const [f, body] of Object.entries(files)) for (const d of [work, again, other]) fs.writeFileSync(path.join(d, f), f === "package-lock.json" && d === other ? body.replace("3", "4") : body);
   const asked = [["view", "left-pad", "version"], ["ci", "--ignore-scripts", "--no-audit"]];
