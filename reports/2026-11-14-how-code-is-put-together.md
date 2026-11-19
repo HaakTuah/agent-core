@@ -7,7 +7,7 @@ the core's: the core's rules and checks against the practices, the core's own co
 measured from a read-only clone, and for each practice a proposal for #246. The audit writes no rule.
 
 What the audit asked for: the owner asked on the issue for a full audit of what the rules and their enforcement leave
-out of best practices, size checks or more searching ones, for the reason in the owner's words:
+out of best practices, size checks or more sophisticated ones, for the reason in the owner's words:
 
 > I want good codebases.
 

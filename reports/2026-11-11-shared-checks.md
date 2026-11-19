@@ -1,8 +1,8 @@
 # The pointer and reading-size checks, shared
 
 The audit of both games against the core (the owner asked whether any other overlap, discrepancy or excess between
-the two games should be cut or shared, and whether the core is taken in full in both, then for everything found to be
-fixed) found that only Snakes had a
+the two games should be cut or shared, and whether the core is implemented in full in both, then for everything found
+to be fixed) found that only Snakes had a
 pointer check and a reading-size check, while Amarna's lane was building its own (Amarna #721). Both checks serve the
 core's pillars, so they move here, once, for every project.
 
