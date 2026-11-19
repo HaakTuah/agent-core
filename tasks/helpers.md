@@ -13,7 +13,8 @@ A helper pays only for work of one of these shapes:
 
 How:
 - Not for one-pass work, steps that depend on each other, or waiting on a run.
-- At most five at a time, each on the cheapest model that does its part well.
+- At most five at a time, each on the cheapest model that does its part well: its tier and effort, `tasks/roles.md`,
+  "The rules name tiers, never a model".
 - Check every result before using it.
 
 **A brief is written as a rule is** (#282). Whoever hands a session or helper its work writes its

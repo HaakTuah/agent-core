@@ -240,14 +240,13 @@ export function joinedIn(r, root = ROOT) {
   } catch { return null; }
 }
 
-// The workflows' named steps at `root`: { path: [{ name, run }] }, read by the core's own reader of YAML, each mapping
-// written on one line as a list's item (a matrix's, which holds no step) set aside first, since it reads none; a
-// workflow it cannot read has none.
+// The workflows' named steps at `root`: { path: [{ name, run }] }, read by the core's reader of YAML (workflow-run.mjs);
+// a workflow it cannot read has none.
 export async function stepsAt(root = ROOT) {
   const { parseYaml } = await import("./workflow-run.mjs"), dir = path.join(root, ".github", "workflows"), out = {};
   for (const f of fs.readdirSync(dir).filter(x => /\.ya?ml$/u.test(x))) {
     let yaml = {};
-    try { yaml = parseYaml(fs.readFileSync(path.join(dir, f), "utf8").replace(/^(\s*-[ \t]+)\{[^\n]*\}[ \t]*$/gmu, "$1(set aside)")); } catch { /* (none read) */ }
+    try { yaml = parseYaml(fs.readFileSync(path.join(dir, f), "utf8")); } catch { /* (none read) */ }
     out[`.github/workflows/${f}`] = Object.values(yaml.jobs ?? {}).flatMap(j => (Array.isArray(j?.steps) ? j.steps : [])).filter(st => typeof st?.name === "string").map(st => ({ name: st.name, run: st.run ?? "" }));
   }
   return out;

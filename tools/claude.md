@@ -2,25 +2,19 @@
 
 Read by the tool `claude` at the start of every task.
 
-| Who | Model | Effort |
-| --- | --- | --- |
-| Builder | Opus for the main lane, design readings and the *hard work*; Sonnet for routine lanes (polish, docs, splits, tests) | high |
-| Search helper | Haiku | low |
-| Parallel helper (`tasks/helpers.md`) | Sonnet; Opus where it needs design judgement | medium; high for the hard work |
-| Orchestrator (the owner starts it), fallback reviewer, design check, leanness check, stand-in, a choice's challenger, blind picker and judge | Opus | high |
-| Planning design | Fable | high |
-| Escalation (`tasks/roles.md`) | Opus, then Fable | high, or xhigh if you run at high |
+Its map (`tasks/roles.md`, "The rules name tiers, never a model"; Anthropic's models, read on 18 November 2026):
+strongest, Opus; middle, Sonnet; light, Haiku; scarce top, Fable, at xhigh for escalation's last step
+if you run at high.
 
 - **Pass both model and effort** whenever you start a session or helper, save a helper whose
   definition gives them: one of a type the project defines, or a plug-in's own (`codex:codex-rescue`). Never above high,
   but for escalation; never max.
 - **Name models by family alone.**
-- **Fable's usage runs out first:** it gets only planning design, the last escalation step and work the owner gives it
-  by name, and only what needs judgement.
-  - If it is unavailable, its call goes to Opus at high.
+- **Fable's usage runs out first:** it takes only what needs judgement; where it is unavailable, its call goes to Opus
+  at high.
 - **Who to call:**
-  - a helper for judgement only when it ranks above you (models: Haiku, Sonnet, Opus, Fable; then effort; yours: your
-    system prompt and `$CLAUDE_EFFORT`, unset meaning medium), else do it yourself;
+  - a helper for judgement only when it ranks above you (by tier, then effort; yours: your system prompt and
+    `$CLAUDE_EFFORT`, unset meaning medium), else do it yourself;
   - a fresh eye (reviewer, design check, stand-in) and a helper for cost (search, routine parts) whatever your level;
   - a Sonnet builder hands what needs judgement to Opus at high, and its PR's first line says Sonnet built it.
 - **Who builds** is picked as `roles/orchestrator.md`, "The builders", says: Claude's usage is also the owner's own, and is

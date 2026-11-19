@@ -16,7 +16,8 @@ import { NOTES } from "../scripts/releases.mjs";
 import { READERS } from "../scripts/shape-readers.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { parseYaml, pathsLetThrough } from "../scripts/workflow-run.mjs";
-import { COST, MOVED_GLOB, NEW_GLOBS, READ_MOST, STEPS, Unread, configs, leads, moved, notDone, plain, project, report, runsOwn } from "../scripts/steps.mjs";
+import { COST, MOVED_GLOB, NEW_GLOBS, STEPS, Unread, configs, leads, moved, notDone, plain, project, report, runsOwn } from "../scripts/steps.mjs";
+import { READ_MOST } from "../scripts/own-files.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -48,7 +49,7 @@ function kit(name, o) {
   fs.mkdirSync(path.join(dir, "checks"), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify(licences(o, () => false), null, 2)}\n`);
   // (the copy of the core the project holds, as far as its checks read it, and the size marks the kit writes for it)
-  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", "third-party", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
+  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", ".packages", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, f)).size]))), null, 2)}\n`);
   execFileSync("git", ["add", "-A"], { cwd: dir });
   // (the copies check's first baseline as the starter kit writes it, its two entry files' shared sentence listed)
@@ -84,15 +85,6 @@ for (const [name, dir] of Object.entries(dirs)) {
   ok(comment !== null && bare !== null && runs === null, "a named mutation tool reads done only where a workflow on pull requests runs the strength check with its base, never where one only mentions it", `${comment}\n${bare}\n${runs}`);
   fs.writeFileSync(manifest, was); fs.rmSync(flow);
 }
-// (a suite filtered to one script of the copy's, by its exact path, reads it too: every file the copy holds is read)
-{
-  const dir = dirs["an-npm-project"], flow = path.join(dir, ".github/workflows/one-script.yml");
-  const step = STEPS.find(s => s.lead === "17 November 2026, the packages the copy carries");
-  const said = paths => { fs.writeFileSync(flow, `name: one\non:\n  pull_request:\n    paths:\n${paths.map(x => `      - '${x}'\n`).join("")}jobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`); return step.check(project(dir)); };
-  const one = said(["src/**", "core/scripts/yaml-keys.mjs"]), both = said(["src/**", "core/scripts/yaml-keys.mjs", "core/third-party/**"]), own = said(["src/**"]);
-  ok(one?.includes("one-script.yml") && both === null && own === null, "a suite that runs on one script of the copy, named by its path, is reported until it runs on the packages too; one that runs on none of the copy is not", `${one}\n${both}\n${own}`);
-  fs.rmSync(flow);
-}
 // (the starter kit's `none`: no tests yet stands until the project's own code holds a test)
 {
   const dir = dirs["an-npm-project"], test = path.join(dir, "src", "first.test.js");
@@ -125,6 +117,15 @@ for (const step of STEPS.filter(s => s.check)) {
   ok(!notDone(dir).length, `and its mend as written makes it done`, report(notDone(dir)));
   STAGES[step.lead].after?.(dir);
 }
+// (the project's tests at the pace of a release, read exactly: all four types, and a condition that skips a draft;
+// #733, point 7)
+{
+  const READY_LEAD = "19 November 2026, the project's tests at the pace of a release", file = path.join(dir, ".github/workflows/ready-exact.yml");
+  const flow = (types, cond) => `name: ready-exact\n\non:\n  pull_request:\n    types: [${types}]\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    if: \${{ ${cond} }}\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/install.mjs all\n      - run: node core/scripts/shape.mjs checks/shape.json --suite unit -- node --test\n`;
+  const reads = (types, cond) => { fs.writeFileSync(file, flow(types, cond)); execFileSync("git", ["add", "-A"], { cwd: dir }); const m = notDone(dir).some(x => x.lead === READY_LEAD); fs.rmSync(file); execFileSync("git", ["add", "-A"], { cwd: dir }); return m; };
+  ok(reads("ready_for_review", "!github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "github.event.pull_request.draft") && !reads("opened, synchronize, reopened, ready_for_review", "github.event.pull_request.draft == false") && !reads("opened, synchronize, reopened, ready_for_review", "github.actor != 'x' && !github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "always() || !github.event.pull_request.draft") && !reads("opened, synchronize, reopened, ready_for_review", "!cancelled() && !github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "!cancelled() && !(github.event.pull_request.draft || x)") && reads("opened, synchronize, reopened, ready_for_review", "always() }} && !github.event.pull_request.draft && ${{ true") && reads("opened, synchronize, reopened, ready_for_review", "github.actor != ' && !github.event.pull_request.draft && '") && !reads("opened, synchronize, reopened, ready_for_review", "github.actor != 'it''s && x' && !github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "github.event.pull_request.labels[github.actor && !github.event.pull_request.draft && 1]"),
+    "a job that starts a suite reads done only with all four types and a condition of parts joined by && that skips a draft, a status function such as `!cancelled()` among them and a quoted string one word, not one that runs on drafts alone, an || that lets one through, text outside its ${{ }}, an index or a draft part inside a string");
+}
 // several at once, in a project of another kind: exactly those
 const lockProject = dirs["an-npm-project"];
 const some = STEPS.filter(s => s.check).filter((_, i) => i % 2 === 0).map(s => s.lead);
@@ -134,6 +135,15 @@ ok(JSON.stringify(notDone(lockProject).map(m => m.lead)) === JSON.stringify(some
 for (const lead of Object.keys(STAGES).filter(l => some.includes(l))) STAGES[lead].mend(lockProject);
 ok(!notDone(lockProject).length, "and their mends make every one done");
 for (const lead of some) STAGES[lead].after?.(lockProject);
+// (two whose stages both write a job that selects, taken out together: each still reported, as the upgrade test's
+// random draw takes them, #457)
+{
+  const pair = ["16 November 2026, the tests a change can reach", "18 November 2026, a tree that passed is not run again"];
+  for (const lead of pair) STAGES[lead].stage(lockProject);
+  ok(pair.every(lead => notDone(lockProject).some(m => m.lead === lead)), "the tests a change can reach and a tree that passed, taken out together, are each reported", report(notDone(lockProject)));
+  for (const lead of Object.keys(STAGES).filter(l => pair.includes(l))) STAGES[lead].mend(lockProject);
+  for (const lead of pair) STAGES[lead].after?.(lockProject);
+}
 
 // ---- a suite's path filter, read as GitHub reads one: `?` and `+` repeat the character before them (#379) ----
 const SUITE_LEAD = "12 November 2026, a sync and the project's own suites";
@@ -155,12 +165,31 @@ ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.y
   fs.rmSync(suiteFile);
 }
 
+// ---- a tree that passed (#457): a job that selects on a push alone ran nowhere else, and is not asked --passed ----
+{
+  const PASSED_LEAD = "18 November 2026, a tree that passed is not run again", pushed = path.join(lockProject, ".github/workflows/pushed.yml");
+  const asked = on => { fs.writeFileSync(pushed, `name: p\non:\n${on}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/select.mjs --env RUN\n`); return notDone(lockProject).some(m => m.lead === PASSED_LEAD); };
+  ok(!asked("  push:\n    branches: [main]") && asked("  push:\n  pull_request:") && asked("  pull_request:\n  push:\n    branches: [main]"),
+    "a job that selects on a push alone is not asked --passed, since its suite ran nowhere else; one a pull request runs too is");
+  const job = (select, runner) => { fs.writeFileSync(pushed, `name: p\non:\n  pull_request:\n  push:\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ${select}\n      - ${runner}\n`); return notDone(lockProject).some(m => m.lead === PASSED_LEAD); };
+  const sel = 'node core/scripts/select.mjs --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}';
+  ok(job(sel, 'run: if [ "$RUN" = all ]; then node --test; else node --test $RUN; fi') && !job(sel, 'run: if [ "$RUN" = all ]; then node --test; elif [ "$RUN" != none ]; then node --test $RUN; fi')
+    && !job(sel, "if: env.RUN == 'all'\n        run: node --test") && !job(sel, "if: ${{ env.RUN == 'all' || contains(env.RUN, ' test/a.test.mjs ') }}\n        run: node --test test/a.test.mjs")
+    && job(sel, "if: env.RUN == 'all'\n        run: node --test\n      - if: env.RUN != 'all'\n        run: node --test $RUN") && job(sel, "if: contains(env.RUN, 'no')\n        run: node --test")
+    && job(sel, "if: ${{ !(env.RUN == 'all') }}\n        run: node --test") && job(sel, "if: ${{ env.RUN == 'all' || github.event_name == 'push' }}\n        run: node --test")
+    && !job(sel, "if: ${{ !cancelled() && (env.RUN == 'all' || contains(env.RUN, ' test/a.test.mjs ')) }}\n        run: node --test test/a.test.mjs")
+    && job(sel, 'run: [ "$RUN" != none ] || true; node --test $RUN')
+    && job("node core/scripts/select.mjs --env RUN", 'run: if [ "$RUN" = all ]; then node --test; elif [ "$RUN" != none ]; then node --test $RUN; fi'),
+    "it reads done only where the selection gives --passed and every step that reads RUN runs nothing on \"none\", in a shape it can read so: an if: whose parts joined by && hold RUN in one part, nothing but == 'all' and contains(env.RUN, ' <file> ') joined by ||, or the run line the mend gives; any other shape is reported: != 'all', a negation, an || with another term, a contains that \"none\" could hold, a run line of another shape");
+  fs.rmSync(pushed);
+}
+
 // ---- a shape baseline written before the check read C#, Python, JSX and shared scripts (#354): its mend names them ----
 const shapeBaseline = path.join(lockProject, "checks/shape-baseline.json"), shapeAsKit = fs.readFileSync(shapeBaseline, "utf8");
 fs.writeFileSync(shapeBaseline, "{\n  \"listed\": {}\n}\n");
 let shapeMissed = notDone(lockProject);
-ok(shapeMissed.length === 1 && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, Python, scripts that share one global space/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
-  "a shape baseline that names no reader is reported, its mend to write it with every reader", report(shapeMissed));
+ok(shapeMissed.length === 2 && shapeMissed[1].lead === "18 November 2026, the shape check reads C#'s functions on the parser" && /written before the check read C#, its functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[1].mend) && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, its functions by the lexer, Python, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process:/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
+  "a shape baseline that names no reader is reported by both its steps, each mend to write it with every reader", report(shapeMissed));
 execFileSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: lockProject, env: { ...process.env, SHAPE_BASE: "" } });
 shapeMissed = notDone(lockProject);
 ok(!shapeMissed.length && JSON.parse(fs.readFileSync(shapeBaseline, "utf8")).reads.length === Object.keys(READERS).length, "and the mend as written makes it done", report(shapeMissed));
@@ -265,11 +294,11 @@ found = differences(project(plainProject), fresh(project(plainProject)));
 ok(found.includes("checks/sizes.json: missing (the starter kit writes it today)") && found.some(d => d.startsWith("checks/copies-baseline.json: lacks the key \"windows\"")) && found.length === 2,
   "a config the kit writes beside its templates, missing or lacking a key, is listed", found.join("\n"));
 const secWorkflow = path.join(plainProject, ".github/workflows/security-review.yml");
-fs.writeFileSync(secWorkflow, fs.readFileSync(secWorkflow, "utf8").replace(/^jobs:/m, "env: {SAMPLE: value}\n\njobs:"));
+fs.writeFileSync(secWorkflow, fs.readFileSync(secWorkflow, "utf8").replace(/^jobs:/m, "env: [SAMPLE\n\njobs:"));
 const unread = notDone(plainProject);
 const unreadSec = unread.find(m => m.lead.endsWith("the security review shown on every pull request"));
 ok(unreadSec?.mend.includes("could not read the project") && unreadSec.mend.includes("security-review.yml") && unread.every(m => m.mend.includes("could not read the project")),
-  "a workflow in a form the core's reader does not know is reported as not read, never as a call that is missing or a step done", report(unread));
+  "a workflow the core's reader cannot read, a flow sequence never closed, is reported as not read, never as a call that is missing or a step done", report(unread));
 
 // ---- a path a project's own file names is read only inside the project ----
 fs.writeFileSync(path.join(plainProject, "checks/copies.json"), JSON.stringify({ baseline: "../a-game/checks/copies-baseline.json", code: [], prose: [], proseFromSecurity: true }));
@@ -590,8 +619,10 @@ ok(["cat <<'EOF' | bash\nnode core/scripts/copies.mjs config/custom.json\nEOF", 
   "bash <<<'node core/scripts/copies.mjs config/custom.json'", "pwsh -c node core/scripts/copies.mjs config/custom.json", "powershell -NoProfile -Command node ./core/scripts/copies.mjs config/custom.json",
   "pwsh -c 'Push-Location app; node ../core/scripts/copies.mjs ../config/custom.json'"].every(run => notRead("copies", { "a.yml": stepped(run) })),
   "a naming of the script the reader does not account for leaves the run not read, in whatever form of the shell's");
-ok(notRead("copies", { "a.yml": stepped('echo "$(node core/scripts/copies.mjs config/custom.json)"') }) && notRead("copies", { "a.yml": stepped("echo `node core/scripts/copies.mjs config/custom.json`") }),
-  "a command's output in a line that runs no script itself runs the script all the same");
+// (on the parser, #530: a command in $( ) or ` ` is a command, as the reader's definition parts commands at ( and ), and
+// its run is read as any other)
+ok(copiesOf({ "a.yml": stepped('echo "$(node core/scripts/copies.mjs config/custom.json)"') }) === "config/custom.json" && copiesOf({ "a.yml": stepped("echo `node core/scripts/copies.mjs config/custom.json`") }) === "config/custom.json",
+  "a command whose output a line takes runs the script all the same, and is read as its run");
 // (the review of 6757c34: commands that can run another are no text; every naming of scripts/<name> is counted, as
 // a run's is matched; quotes read in one pass)
 ok(["awk 'BEGIN{system(\"node core/scripts/copies.mjs bad.json\")}'", "git -c alias.r='!node core/scripts/copies.mjs bad.json' r", "sed -n '1e node core/scripts/copies.mjs bad.json' x",
@@ -674,7 +705,9 @@ ok(["c?(x)opies.mjs", "+(c)opies*.mjs", "!(x)*.mjs", "@(copies|x).mjs", "!(x).mj
 const slashes = Date.now();
 ok(copiesOf({ "a.yml": stepped(`node core/scripts${"/".repeat(100000)}x*.mjs c.json\nnode core/scripts/copies.mjs c.json`) }) === "c.json" && Date.now() - slashes < 1500, "a run of \"/\" is read in one pass", `${Date.now() - slashes} ms`);
 const globs = Date.now();
-ok(copiesOf({ "a.yml": stepped(`echo ${"a?(b)".repeat(100000)}\nnode core/scripts/copies.mjs c.json`) }) === "c.json" && Date.now() - globs < 1500, "a long line of extended globs is read in one pass", `${Date.now() - globs} ms`);
+// (on the parser, #530: a text the grammar cannot read within its time is not read at all, since a line read alone
+// would misread a quote or a continued line over it; the fallback reviewer's review of 4ffb50d)
+ok(notRead("copies", { "a.yml": stepped(`echo ${"a?(b)".repeat(100000)}\nnode core/scripts/copies.mjs c.json`) }) && Date.now() - globs < 1500, "a long line of extended globs leaves its step not read, within the time mark", `${Date.now() - globs} ms`);
 const bigEnv = Object.fromEntries(Array.from({ length: 99000 }, (_, k) => [`E${k}`, `v${k}`]));
 const oneRun = { ".github/actions/a/action.yml": "runs:\n  using: composite\n  steps:\n    - run: echo x\n      shell: bash\n" };
 const givenStarted = Date.now();
@@ -836,6 +869,49 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
   const left = of(wf("core.yml", "core.yml", "    with:\n      description: true\n")), twice = of(wf("core.yml", "core.yml", all), wf("s.yml", "signatures.yml")), bare = of(wf("core.yml", "core.yml", "    with:\n      copies: c.json\n      description: true\n"));
   ok(/pass it `copies: checks\/copies\.json`/.test(left ?? "") && /`signatures\.yml`, which its `signatures:` runs too/.test(twice ?? "") && /`sizes: checks\/sizes\.json` beside its `copies:`/.test(bare ?? ""),
     "one that leaves the copies checks out, runs the signature check twice, or passes copies without its marks is reported, each with its mend", [left, twice, bare].join("\n"));
+}
+
+// ---- a step's commands on the parser's bash grammar (bash-commands.mjs; #530, item 3): where the grammar the core
+// installs reads otherwise than bash, the reader mends it from the tree ----
+{
+  const { bashCommands } = await import("../scripts/bash-commands.mjs");
+  const shown = run => bashCommands(run).map(c => c.map(w => `${w.text}${w.dynamic ? "*" : ""}`).join(" "));
+  ok(JSON.stringify(shown("a=1 b=2\nnode core/scripts/copies.mjs c.json")) === JSON.stringify(["a=1 b=2", "node core/scripts/copies.mjs c.json"]),
+    "assignments on a line of their own are a command apart from the next line's, where the grammar joins them");
+  ok(JSON.stringify(shown("node core/scripts/copies.mjs > log c.json 2>&1 d.json")) === JSON.stringify(["node core/scripts/copies.mjs c.json d.json"]),
+    "the words after a redirection's file are the command's arguments, as bash gives them, where the grammar gives them to the redirection");
+  ok(JSON.stringify(shown("node core/scripts/c?(x)opies.mjs c.json")) === JSON.stringify(["node core/scripts/c?(x)opies.mjs* c.json"]) && JSON.stringify(shown('echo "a?(b)"')) === JSON.stringify(["echo a?(b)"]),
+    "an extended glob is part of its word, filled when it runs, where the grammar reads a subshell; in quotes it is text");
+  ok(JSON.stringify(shown("echo ${{ inputs.a }}x 'y${{ b }}'\ncat <<EOF\nnode no\nEOF\nnode yes")) === JSON.stringify(["echo ${{ inputs.a }}x* y${{ b }}*", "cat", "node yes"]),
+    "an expression of GitHub's is filled when it runs, quoted or not, and a here-document's lines are no commands");
+  ok(JSON.stringify(shown("cat <<OPEN\nnode core/scripts/copies.mjs c.json")) === JSON.stringify(["cat", "node core/scripts/copies.mjs c.json"]),
+    "a here-document with no line that ends it leaves its lines read as commands, so that no run is missed");
+  ok(JSON.stringify(shown('echo "$(node a.mjs)" `node b.mjs`')) === JSON.stringify(['echo $(node a.mjs)* `node b.mjs`*', "node a.mjs", "node b.mjs"]),
+    "a command inside $( ) or ` ` is a command of its own, its output a word filled when it runs");
+  // (Codex's security review of 76119ae: "!" turns a command's status over, so a check run under it cannot fail)
+  ok(JSON.stringify(shown("! node core/scripts/lookup.mjs c.json\nif ! node a.mjs; then x; fi")) === JSON.stringify(["! node core/scripts/lookup.mjs c.json", "! if", "! node a.mjs", "! x"])
+    && notRead("copies", { "a.yml": stepped("! node core/scripts/copies.mjs config/c.json") }),
+    "a \"!\" in a step leads each of its commands, and a check's run under it is not read as its run");
+// (Codex's review of d32e5f0: a command inside a function, a loop, an if, a case or a { } group may run once, many
+// times or never, so its keyword is a command of its own, and the step is never one command run once)
+ok(["check() { node core/scripts/lookup.mjs c.json; }", "for f in; do node core/scripts/lookup.mjs c.json; done", "case x in y) node core/scripts/lookup.mjs c.json;; esac",
+  "while false; do node core/scripts/lookup.mjs c.json; done", "{ node core/scripts/lookup.mjs c.json; }"].every(run => { const c = shown(run); return c.length > 1 && c.includes("node core/scripts/lookup.mjs c.json"); })
+  && JSON.stringify(shown("until x; do y; done")) === JSON.stringify(["until", "x", "y"]),
+  "a command inside a function, a loop, a case or a group is read with its keyword as a command before it, so no such step reads as one command run once");
+// (the fallback reviewer's check of ccee6c9: a here-document opened in a subshell is data to its delimiter's line, as
+// bash reads it; a subshell at a step's start is no extended glob)
+ok(copiesOf({ "a.yml": stepped("(cat <<E)\nnode core/scripts/copies.mjs config/fake.json\nE\nnode core/scripts/copies.mjs config/c.json") }) !== "config/fake.json"
+  && JSON.stringify(shown("(cat <<\"E\")\nnode fake.mjs\nE\nnode real.mjs")) === JSON.stringify(["cat", "node real.mjs"])
+  && JSON.stringify(shown("cat <<A <<-B\nnode x.mjs\nA\nnode y.mjs\n\tB\nnode z.mjs")) === JSON.stringify(["cat", "node z.mjs"])
+  && JSON.stringify(shown("cat <<E\n\tE\nnode fake.mjs\nE\nnode real.mjs")) === JSON.stringify(["cat", "node real.mjs"])
+  && JSON.stringify(shown("cat <<-E\n\tE\nnode real.mjs")) === JSON.stringify(["cat", "node real.mjs"])
+  && JSON.stringify(shown("( node core/scripts/lookup.mjs c.json )")) === JSON.stringify(["node core/scripts/lookup.mjs c.json"]),
+  "a here-document opened in a subshell, or second on its line, holds its lines as data to its delimiter's line, tabs before it ending only a '<<-', and a subshell at a step's start is read as one");
+// (the fallback reviewer's check of d32e5f0: a folder changed behind "!" is changed, and a pipeline under it is led by
+// it in each of its commands)
+ok(["! cd app; node core/scripts/copies.mjs config/c.json", "! pushd app\nnode core/scripts/copies.mjs config/c.json", "! echo x | node core/scripts/copies.mjs config/c.json",
+  "! { echo x; } | node core/scripts/copies.mjs config/c.json", "true\n! false\nnode core/scripts/copies.mjs config/c.json"]
+  .every(run => notRead("copies", { "a.yml": stepped(run) })), "a folder changed behind \"!\" leaves the run after it not read, and so does a check's run in a step that holds \"!\" anywhere, a pipeline's or a group's under it among them");
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);

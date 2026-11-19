@@ -55,7 +55,7 @@ code is held to: `tasks/code-shape.md`.
   last one's, and records the audit in the baseline (`core/scripts/dose.mjs --audited`), in one pull request.
   - **The brief:** the reader reads, and changes nothing. It answers for the project's owner and for the cleaning
     lane: where the code resists change, what to clean up first, and what no check sees.
-  - **Eight questions, the same at every audit,** each answered with its evidence (a file, a count, a pull request)
+  - **Nine questions, the same at every audit,** each answered with its evidence (a file, a count, a pull request)
     and on one scale, so that two audits can be set side by side: 0, nothing found; 1, found, and it costs no work
     yet; 2, it costs work today; 3, it stops a lane or makes work *one at a time*.
     1. Can what each system offers be said in a sentence, and do the others use only that?
@@ -64,8 +64,12 @@ code is held to: `tasks/code-shape.md`.
     4. Which files always change together and live apart?
     5. Can each part be tested alone, and how long does it take?
     6. Does any data have two owners?
-    7. What ties the code to one platform, and is each tie needed?
+    7. What ties the code to one platform, and is each tie needed? And where do the tests of the code outside the
+       domain `platform` run, and what does that cost beside the cheapest place they could run (#457)?
     8. What does a reader see that no check does?
+    9. Which of the project's *descriptions* (its README, its design notes, what it tells a user, the pointers in its
+       rule files) no longer say what the code does, each by its document and line and the file or behaviour it no
+       longer matches? Each it finds is a task of the cleaning lane, taken at the dose (#563).
   - **A limit on its own proposals:** it proposes a new check only where a finding came up at two audits or costs
     work today.
   - The tests are audited by the same reader. Where the project names a *mutation tool*, the session that takes the
@@ -77,8 +81,10 @@ code is held to: `tasks/code-shape.md`.
     reader decides on each test it proposes (`tasks/tests.md`).
 
   It does not mean that the reader mends what it finds, nor that an audit made before these questions stood is made
-  again: what it left unanswered is answered at the next. Reason: what was measured was fixed and what was judged had
-  no standard, so two audits could not be compared; and checks piled on make code harder to change. Held by the
+  again: what it left unanswered is answered at the next. Nor does it mean that a dated record is brought up to date
+  (`roles/shared/how-to-work.md`, "No description left untrue"), or that a job is added for the ninth. Reason: what
+  was measured was fixed and what was judged had no standard, so two audits could not be compared; checks piled on make
+  code harder to change; and a description a change missed stays untrue until someone happens to read it. Held by the
   scheduled look, whose issue for an audit says this brief, and by the reviews of the pull request that holds the
   report, which read that each question is answered on the scale.
 - **The state report leads with the outcomes** (#302). By default the monthly state report names the five outcomes the

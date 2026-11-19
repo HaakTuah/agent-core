@@ -36,9 +36,9 @@ import { fileURLToPath } from "node:url";
 import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
 import { twice } from "./yaml-keys.mjs";
+import { loadSync, unreached } from "./packages.mjs";
 import { projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
-import { parseDocument } from "../third-party/yaml/dist/index.js";
 
 const WORD = "pull_request_target";
 const BREAK = "\\r\\n|[\\r\\n\\u0085\\u2028\\u2029]"; // every line break YAML 1.1 or 1.2 knows
@@ -105,9 +105,10 @@ const CHECKS = /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nu
 // pull_request`, `on: [push, pull_request]`), as []; null where it has no such trigger.
 const typesOf = on => typeof on === "string" || Array.isArray(on) ? ([].concat(on).includes("pull_request") ? [] : null)
   : on && typeof on === "object" && "pull_request" in on ? [].concat(on.pull_request?.types ?? []).map(String) : null;
-// A workflow's text read as YAML by the package the core carries (as yaml-keys.mjs reads it; flow mappings and every
+// A workflow's text read as YAML by the package the core installs (as yaml-keys.mjs reads it; flow mappings and every
 // form GitHub reads), every scalar as text; null where it is no YAML, which GitHub's own reader refuses all the same.
 function yamlOf(text) {
+  const { parseDocument } = loadSync("yaml");
   try {
     const doc = parseDocument(String(text).replace(/^\ufeff/u, ""), { schema: "failsafe", uniqueKeys: false, prettyErrors: false });
     return doc.errors.length ? null : doc.toJS({ maxAliasCount: 100 });
@@ -165,7 +166,13 @@ if (started(import.meta.url)) {
     for (const line of found.slice(0, 5)) console.log(`FAIL ${logged(file)}:${line}: ${WORD} runs a pull request with the repository's own token and secrets. Mend: take the word out, in a comment too, and trigger the workflow on pull_request, which runs one without them`);
     if (found.length > 5) console.log(`FAIL ${logged(file)}: and on ${found.length - 5} more lines. Mend: take the word out of each, as above`);
   }
-  const against = core ? () => null : base ? show : null, keys = repeated(texts, against), ready = unreadied(texts, against);
+  // (where the job's install could not reach the registry, in a project's pull request, the keys given twice and the
+  // calls a draft skips, which the YAML package reads, did not run, said as a warning; every failure above still fails:
+  // #654, point 4)
+  const skipped = unreached("yaml");
+  if (skipped) console.log("::warning::The check for a key given twice did not run, nor the one for a call a draft skips: the package yaml could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault");
+  const against = core ? () => null : base ? show : null;
+  const keys = skipped ? { fails: [], notes: [] } : repeated(texts, against), ready = skipped ? { fails: [], notes: [] } : unreadied(texts, against);
   for (const line of [...keys.notes, ...ready.notes, ...keys.fails, ...ready.fails]) console.log(logged(line));
   failed += keys.fails.length + ready.fails.length;
   keys.notes.push(...ready.notes);

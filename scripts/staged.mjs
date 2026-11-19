@@ -32,13 +32,15 @@ import * as noQuestion from "./staged/no-question.mjs";
 import * as oldContent from "./staged/old-content.mjs";
 import * as orderForNow from "./staged/order-for-now.mjs";
 import * as outsider from "./staged/outsider.mjs";
+import * as relay from "./staged/relay.mjs";
 import { OWNER, REPO, Unreadable, folderFit, memo, memoOf, seal, sealOf } from "./staged/scratch.mjs";
 import * as secret from "./staged/secret.mjs";
 import * as stackChoice from "./staged/stack-choice.mjs";
 import * as steps from "./staged/steps.mjs";
 import * as stop from "./staged/stop.mjs";
+import * as weakness from "./staged/weakness.mjs";
 
-export const CASES = [outsider, stop, noQuestion, secret, finish, oldContent, orderForNow, steps, stackChoice, carried, noFloor, fetched];
+export const CASES = [outsider, stop, noQuestion, secret, finish, oldContent, orderForNow, steps, stackChoice, carried, noFloor, fetched, weakness, relay];
 export const RECORD = "reports/staged-cases.json";
 export const TITLE = "Staged cases to run";
 // How many months in a row every case must have run with no verdict found wrong before a failing one holds a release.
