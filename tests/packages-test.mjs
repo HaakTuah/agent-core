@@ -254,7 +254,7 @@ try {
     delete list.dependencies; delete list.devDependencies;
     fs.writeFileSync(path.join(pk, "package.json"), JSON.stringify(list, null, 2));
     fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify({ name: list.name, lockfileVersion: 3, requires: true, packages: { "": { name: list.name, license: list.license } } }, null, 2));
-    leftoverCases.push(["a package list and lock that name nothing", call("yaml-keys.mjs", CALLS["yaml-keys.mjs"])]);
+    leftoverCases.push(["a package list and lock that name nothing", call("yaml-keys.mjs", callOf("yaml-keys.mjs"))]);
   }
   {
     const list = JSON.parse(keptMainList), lock = JSON.parse(keptMainLock);
@@ -263,7 +263,7 @@ try {
     lock.packages["node_modules/yaml"] = { ...lock.packages["node_modules/yaml"], version: "2.8.0", resolved: "https://registry.npmjs.org/yaml/-/yaml-2.8.0.tgz", integrity: `sha512-${Buffer.alloc(64, 9).toString("base64")}`, dev: true };
     fs.writeFileSync(path.join(pk, "package.json"), JSON.stringify(list, null, 2));
     fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify(lock, null, 2));
-    leftoverCases.push(["the package's own entry flagged dev at another version", call("yaml-keys.mjs", CALLS["yaml-keys.mjs"])]);
+    leftoverCases.push(["the package's own entry flagged dev at another version", call("yaml-keys.mjs", callOf("yaml-keys.mjs"))]);
   }
   fs.writeFileSync(path.join(pk, "package.json"), keptMainList);
   fs.writeFileSync(path.join(pk, "package-lock.json"), keptMainLock);
