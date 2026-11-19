@@ -609,8 +609,10 @@ ok(["cat <<'EOF' | bash\nnode core/scripts/copies.mjs config/custom.json\nEOF", 
   "bash <<<'node core/scripts/copies.mjs config/custom.json'", "pwsh -c node core/scripts/copies.mjs config/custom.json", "powershell -NoProfile -Command node ./core/scripts/copies.mjs config/custom.json",
   "pwsh -c 'Push-Location app; node ../core/scripts/copies.mjs ../config/custom.json'"].every(run => notRead("copies", { "a.yml": stepped(run) })),
   "a naming of the script the reader does not account for leaves the run not read, in whatever form of the shell's");
-ok(notRead("copies", { "a.yml": stepped('echo "$(node core/scripts/copies.mjs config/custom.json)"') }) && notRead("copies", { "a.yml": stepped("echo `node core/scripts/copies.mjs config/custom.json`") }),
-  "a command's output in a line that runs no script itself runs the script all the same");
+// (on the parser, #530: a command in $( ) or ` ` is a command, as the reader's definition parts commands at ( and ), and
+// its run is read as any other)
+ok(copiesOf({ "a.yml": stepped('echo "$(node core/scripts/copies.mjs config/custom.json)"') }) === "config/custom.json" && copiesOf({ "a.yml": stepped("echo `node core/scripts/copies.mjs config/custom.json`") }) === "config/custom.json",
+  "a command whose output a line takes runs the script all the same, and is read as its run");
 // (the review of 6757c34: commands that can run another are no text; every naming of scripts/<name> is counted, as
 // a run's is matched; quotes read in one pass)
 ok(["awk 'BEGIN{system(\"node core/scripts/copies.mjs bad.json\")}'", "git -c alias.r='!node core/scripts/copies.mjs bad.json' r", "sed -n '1e node core/scripts/copies.mjs bad.json' x",
@@ -693,7 +695,9 @@ ok(["c?(x)opies.mjs", "+(c)opies*.mjs", "!(x)*.mjs", "@(copies|x).mjs", "!(x).mj
 const slashes = Date.now();
 ok(copiesOf({ "a.yml": stepped(`node core/scripts${"/".repeat(100000)}x*.mjs c.json\nnode core/scripts/copies.mjs c.json`) }) === "c.json" && Date.now() - slashes < 1500, "a run of \"/\" is read in one pass", `${Date.now() - slashes} ms`);
 const globs = Date.now();
-ok(copiesOf({ "a.yml": stepped(`echo ${"a?(b)".repeat(100000)}\nnode core/scripts/copies.mjs c.json`) }) === "c.json" && Date.now() - globs < 1500, "a long line of extended globs is read in one pass", `${Date.now() - globs} ms`);
+// (on the parser, #530: a text the grammar cannot read within its time is not read at all, since a line read alone
+// would misread a quote or a continued line over it; the fallback reviewer's review of 4ffb50d)
+ok(notRead("copies", { "a.yml": stepped(`echo ${"a?(b)".repeat(100000)}\nnode core/scripts/copies.mjs c.json`) }) && Date.now() - globs < 1500, "a long line of extended globs leaves its step not read, within the time mark", `${Date.now() - globs} ms`);
 const bigEnv = Object.fromEntries(Array.from({ length: 99000 }, (_, k) => [`E${k}`, `v${k}`]));
 const oneRun = { ".github/actions/a/action.yml": "runs:\n  using: composite\n  steps:\n    - run: echo x\n      shell: bash\n" };
 const givenStarted = Date.now();
@@ -855,6 +859,49 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
   const left = of(wf("core.yml", "core.yml", "    with:\n      description: true\n")), twice = of(wf("core.yml", "core.yml", all), wf("s.yml", "signatures.yml")), bare = of(wf("core.yml", "core.yml", "    with:\n      copies: c.json\n      description: true\n"));
   ok(/pass it `copies: checks\/copies\.json`/.test(left ?? "") && /`signatures\.yml`, which its `signatures:` runs too/.test(twice ?? "") && /`sizes: checks\/sizes\.json` beside its `copies:`/.test(bare ?? ""),
     "one that leaves the copies checks out, runs the signature check twice, or passes copies without its marks is reported, each with its mend", [left, twice, bare].join("\n"));
+}
+
+// ---- a step's commands on the parser's bash grammar (bash-commands.mjs; #530, item 3): where the grammar the core
+// installs reads otherwise than bash, the reader mends it from the tree ----
+{
+  const { bashCommands } = await import("../scripts/bash-commands.mjs");
+  const shown = run => bashCommands(run).map(c => c.map(w => `${w.text}${w.dynamic ? "*" : ""}`).join(" "));
+  ok(JSON.stringify(shown("a=1 b=2\nnode core/scripts/copies.mjs c.json")) === JSON.stringify(["a=1 b=2", "node core/scripts/copies.mjs c.json"]),
+    "assignments on a line of their own are a command apart from the next line's, where the grammar joins them");
+  ok(JSON.stringify(shown("node core/scripts/copies.mjs > log c.json 2>&1 d.json")) === JSON.stringify(["node core/scripts/copies.mjs c.json d.json"]),
+    "the words after a redirection's file are the command's arguments, as bash gives them, where the grammar gives them to the redirection");
+  ok(JSON.stringify(shown("node core/scripts/c?(x)opies.mjs c.json")) === JSON.stringify(["node core/scripts/c?(x)opies.mjs* c.json"]) && JSON.stringify(shown('echo "a?(b)"')) === JSON.stringify(["echo a?(b)"]),
+    "an extended glob is part of its word, filled when it runs, where the grammar reads a subshell; in quotes it is text");
+  ok(JSON.stringify(shown("echo ${{ inputs.a }}x 'y${{ b }}'\ncat <<EOF\nnode no\nEOF\nnode yes")) === JSON.stringify(["echo ${{ inputs.a }}x* y${{ b }}*", "cat", "node yes"]),
+    "an expression of GitHub's is filled when it runs, quoted or not, and a here-document's lines are no commands");
+  ok(JSON.stringify(shown("cat <<OPEN\nnode core/scripts/copies.mjs c.json")) === JSON.stringify(["cat", "node core/scripts/copies.mjs c.json"]),
+    "a here-document with no line that ends it leaves its lines read as commands, so that no run is missed");
+  ok(JSON.stringify(shown('echo "$(node a.mjs)" `node b.mjs`')) === JSON.stringify(['echo $(node a.mjs)* `node b.mjs`*', "node a.mjs", "node b.mjs"]),
+    "a command inside $( ) or ` ` is a command of its own, its output a word filled when it runs");
+  // (Codex's security review of 76119ae: "!" turns a command's status over, so a check run under it cannot fail)
+  ok(JSON.stringify(shown("! node core/scripts/lookup.mjs c.json\nif ! node a.mjs; then x; fi")) === JSON.stringify(["! node core/scripts/lookup.mjs c.json", "! if", "! node a.mjs", "! x"])
+    && notRead("copies", { "a.yml": stepped("! node core/scripts/copies.mjs config/c.json") }),
+    "a \"!\" in a step leads each of its commands, and a check's run under it is not read as its run");
+// (Codex's review of d32e5f0: a command inside a function, a loop, an if, a case or a { } group may run once, many
+// times or never, so its keyword is a command of its own, and the step is never one command run once)
+ok(["check() { node core/scripts/lookup.mjs c.json; }", "for f in; do node core/scripts/lookup.mjs c.json; done", "case x in y) node core/scripts/lookup.mjs c.json;; esac",
+  "while false; do node core/scripts/lookup.mjs c.json; done", "{ node core/scripts/lookup.mjs c.json; }"].every(run => { const c = shown(run); return c.length > 1 && c.includes("node core/scripts/lookup.mjs c.json"); })
+  && JSON.stringify(shown("until x; do y; done")) === JSON.stringify(["until", "x", "y"]),
+  "a command inside a function, a loop, a case or a group is read with its keyword as a command before it, so no such step reads as one command run once");
+// (the fallback reviewer's check of ccee6c9: a here-document opened in a subshell is data to its delimiter's line, as
+// bash reads it; a subshell at a step's start is no extended glob)
+ok(copiesOf({ "a.yml": stepped("(cat <<E)\nnode core/scripts/copies.mjs config/fake.json\nE\nnode core/scripts/copies.mjs config/c.json") }) !== "config/fake.json"
+  && JSON.stringify(shown("(cat <<\"E\")\nnode fake.mjs\nE\nnode real.mjs")) === JSON.stringify(["cat", "node real.mjs"])
+  && JSON.stringify(shown("cat <<A <<-B\nnode x.mjs\nA\nnode y.mjs\n\tB\nnode z.mjs")) === JSON.stringify(["cat", "node z.mjs"])
+  && JSON.stringify(shown("cat <<E\n\tE\nnode fake.mjs\nE\nnode real.mjs")) === JSON.stringify(["cat", "node real.mjs"])
+  && JSON.stringify(shown("cat <<-E\n\tE\nnode real.mjs")) === JSON.stringify(["cat", "node real.mjs"])
+  && JSON.stringify(shown("( node core/scripts/lookup.mjs c.json )")) === JSON.stringify(["node core/scripts/lookup.mjs c.json"]),
+  "a here-document opened in a subshell, or second on its line, holds its lines as data to its delimiter's line, tabs before it ending only a '<<-', and a subshell at a step's start is read as one");
+// (the fallback reviewer's check of d32e5f0: a folder changed behind "!" is changed, and a pipeline under it is led by
+// it in each of its commands)
+ok(["! cd app; node core/scripts/copies.mjs config/c.json", "! pushd app\nnode core/scripts/copies.mjs config/c.json", "! echo x | node core/scripts/copies.mjs config/c.json",
+  "! { echo x; } | node core/scripts/copies.mjs config/c.json", "true\n! false\nnode core/scripts/copies.mjs config/c.json"]
+  .every(run => notRead("copies", { "a.yml": stepped(run) })), "a folder changed behind \"!\" leaves the run after it not read, and so does a check's run in a step that holds \"!\" anywhere, a pipeline's or a group's under it among them");
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);
