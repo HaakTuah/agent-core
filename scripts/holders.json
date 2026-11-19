@@ -233,7 +233,7 @@
     "AGENTS.md: The core's state report reads the projects that take it": [218],
     "AGENTS.md: The size caps keep the rules lean and decide nothing else": [179, 181, 182, 201, 234],
     "AGENTS.md: Whose words an issue holds": [211, 212],
-    "floor/security.md: 11. Nothing personal, ever": [30, 43, 202, 221, "#783.1"],
+    "floor/security.md: 11. Nothing personal, ever": [30, 43, 202, 221, "#783"],
     "floor/security.md: 12. `main` is the owners'": [113, 236, 261],
     "floor/security.md: 13. Each project's files stay in its own repository": [4],
     "floor/security.md: 14. Nothing waits for the owner but the yeses the floor names": [76, 134, 195, 236],

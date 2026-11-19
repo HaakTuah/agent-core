@@ -1,8 +1,8 @@
-# The reasons behind the core: issue #783, point 1
+# The reasons behind the core: issue #783
 
 The index, and how an item is written: `archive/instructions.md`.
 
-#783.1. **19 November 2026**, #783. What sessions and the owner write on GitHub outside a pull request is read for the
+#783. **19 November 2026**, #783. What sessions and the owner write on GitHub outside a pull request is read for the
      personal terms too: once a day the daily look's job reads each issue's title and description, each pull request's
      once it is merged or closed, and each comment written or edited in the week before, and takes each term out of the
      text, printing counts alone, never a term or where one stood; a session the owner works with names, in its own
