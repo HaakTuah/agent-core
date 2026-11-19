@@ -1,7 +1,8 @@
 // Tests rules.mjs (what counts as a rule, and its text), holders.mjs (what holds each, the archive's items behind each,
 // and what it fails; and, with --own, a project's own rules, which fail nothing: #662) and archive.mjs (the archive's two forms in step), on
 // rule files and holders written in a scratch folder, and on the core's own. Its tests workflow runs it on every pull
-// request here. Node's own modules.
+// request here, after the core's install: the file's form is read by ajv (schemas.mjs), and the script as a check is run
+// once on a copy with no packages.
 //
 //   node tests/holders-test.mjs
 import { spawnSync } from "node:child_process";
@@ -9,11 +10,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { inStep } from "../scripts/archive.mjs";
+import { inStep as inStepAt, itemsIn, KEY, LAST_NUMBERED } from "../scripts/archive.mjs";
 import { OWN, counts, holders, ownHolders, ownReport, report } from "../scripts/holders.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { fingerprint, rules, rulesOf } from "../scripts/rules.mjs";
+import { shapeFaults } from "../scripts/schemas.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
@@ -67,6 +69,9 @@ ok(holders(project("{ not json"), []).wrong.length === 1, "holders.json that can
 ok(report(root).length >= 1 && /^- Of \d+ rules/.test(report(root)[0]), "the state report's lines begin with the counts");
 
 // ---- the archive's items behind each rule, and its two forms ----
+// (each small archive here is read with its own last numbered item as the last that keeps its number; the core's own,
+// 262, is read where a test names it)
+const inStep = dir => inStepAt(dir, Math.max(0, ...[...itemsIn(dir, "archive/instructions").items.keys()].filter(Number.isInteger)));
 const archive = (reasons, words = {}) => {
   const dir = project({}, {});
   for (const [folder, files] of [["archive/instructions", reasons], ["words", words]]) {
@@ -82,29 +87,78 @@ const outWrong = inStep(outOf);
 const late = archive({ "items-001.md": "1. **1 Nov**. Decided: a.\n" }, { "items-001.md": "1. **1 Nov**: words.\n\n246. **17 Nov**: new words.\n" });
 ok(inStep(late).some(w => w.includes("item 246 adds the owner's words") && /Mend: /.test(w)), "the owner's words past item 245 fail, saying the mend", inStep(late).join("\n"));
 ok(["item 4 stands twice", "item 2 has no reasoning", "item 2 is missing", "item 3 quotes", "item 1 does not say what was decided", "item 4 names no issue"].every(w => outWrong.some(x => x.includes(w))) && outWrong.every(w => /Mend: /.test(w)),
-  "an item twice, words with no reasoning, a gap, a quote, no decision and a new item with no issue each fail, saying the mend", outWrong.join("\n"));
-// (#394: of an item numbered twice, the one outside the file its number puts it in is the one to move, with the next
-// free number at the end of the newest file; one alone outside its file fails too; in the words, a twice-numbered item
-// takes its reasoning's number)
+  "an item twice, words with no reasoning, a numbered item taken out, a quote, no decision and a new item with no issue each fail, saying the mend", outWrong.join("\n"));
+// (#394: of an item numbered twice, the one outside the file its number puts it in is the one to move, keyed by its
+// issue since #744; one alone outside its file fails too; in the words, a twice-numbered item takes its reasoning's
+// number)
 const r3 = "3. **3 Nov**, #3: c.\n", r1 = "1. **1 Nov**, #1: a.\n\n2. **2 Nov**, #2: b.\n";
 const twiceAcross = inStep(archive({ "items-001.md": `${r1}\n3. **3 Nov**, #4: d.\n`, "items-003.md": r3 }));
-ok(twiceAcross.some(w => /archive\/instructions: item 3 stands twice, at archive\/instructions\/items-001\.md:5 and archive\/instructions\/items-003\.md:1\. Mend: give the one at archive\/instructions\/items-001\.md:5 the next free number, 4, at the end of archive\/instructions\/items-003\.md/.test(w)),
-  "of an item numbered twice, the one outside its number's file moves, whichever stands first, with the next free number (#394's own case)", twiceAcross.join("\n"));
+ok(twiceAcross.some(w => /archive\/instructions: item 3 stands twice, at archive\/instructions\/items-001\.md:5 and archive\/instructions\/items-003\.md:1\. Mend: give the one at archive\/instructions\/items-001\.md:5 a key by the issue that carries its owner's word, "#N", in a file of its own, archive\/instructions\/issue-N\.md, and change each "core archive 3" that means it/.test(w)),
+  "of an item numbered twice, the one outside its number's file moves, whichever stands first, keyed by its issue (#394's own case; #744)", twiceAcross.join("\n"));
 const twiceIn = inStep(archive({ "items-001.md": `${r1}\n2. **2 Nov**, #5: e.\n` }));
-ok(twiceIn.some(w => /item 2 stands twice, at [^ ]*items-001\.md:3 and [^ ]*items-001\.md:5\. Mend: give the one at archive\/instructions\/items-001\.md:5 the next free number, 3/.test(w)), "of two in their file, the later moves", twiceIn.join("\n"));
+ok(twiceIn.some(w => /item 2 stands twice, at [^ ]*items-001\.md:3 and [^ ]*items-001\.md:5\. Mend: give the one at archive\/instructions\/items-001\.md:5 a key by the issue/.test(w)), "of two in their file, the later moves", twiceIn.join("\n"));
 const outside = inStep(archive({ "items-001.md": `${r1}\n4. **4 Nov**, #4: d.\n`, "items-003.md": r3 }));
-ok(outside.some(w => /archive\/instructions\/items-001\.md:5: item 4 stands outside archive\/instructions\/items-003\.md, the file its number puts it in\. Mend: /.test(w)), "an item alone in a file its number does not put it in fails, saying the mend", outside.join("\n"));
+ok(outside.some(w => /archive\/instructions\/items-001\.md:5: item 4 stands outside archive\/instructions\/items-003\.md, the file its key puts it in\. Mend: /.test(w)), "an item alone in a file its number does not put it in fails, saying the mend", outside.join("\n"));
 const twoTwice = inStep(archive({ "items-001.md": `${r1}\n1. **1 Nov**, #6: f.\n\n2. **2 Nov**, #7: g.\n` }));
-ok(twoTwice.some(w => /item 1 stands twice.* the next free number, 3,/.test(w)) && twoTwice.some(w => /item 2 stands twice.* the next free number, 4,/.test(w)), "two numbers each used twice are each given a free number of their own", twoTwice.join("\n"));
+ok(twoTwice.some(w => /item 1 stands twice.* a key by the issue .*"core archive 1"/.test(w)) && twoTwice.some(w => /item 2 stands twice.* a key by the issue .*"core archive 2"/.test(w)), "two numbers each used twice are each given a key of their issue", twoTwice.join("\n"));
 const below = inStep(archive({ "items-005.md": "5. **5 Nov**, #5: e.\n\n1. **1 Nov**, #1: a.\n" }));
 ok(below.some(w => /item 1 stands outside no file of archive\/instructions\/, since none starts at or below 1, .* Mend: /.test(w)) && !below.some(w => w.includes("undefined")), "an item below every file's first number says so, and never \"undefined\"", below.join("\n"));
 const wordsAstray = inStep(archive({ "items-001.md": `${r1}\n3. **3 Nov**, #3: c.\n` }, { "items-001.md": "1. **1 Nov**: a.\n\n3. **3 Nov**: c.\n", "items-003.md": "# Words\n" }));
-ok(wordsAstray.some(w => /words\/items-001\.md:3: item 3 stands outside words\/items-003\.md, the file its number puts it in\. Mend: move it there$/.test(w)), "in the words, an item outside its file is moved there, and given no other number", wordsAstray.join("\n"));
+ok(wordsAstray.some(w => /words\/items-001\.md:3: item 3 stands outside words\/items-003\.md, the file its key puts it in\. Mend: move it there$/.test(w)), "in the words, an item outside its file is moved there, and given no other number", wordsAstray.join("\n"));
 const wordsTwice = inStep(archive({ "items-001.md": "1. **1 Nov**. Decided: a.\n" }, { "items-001.md": "1. **1 Nov**: words.\n\n1. **1 Nov**: more.\n" }));
 ok(wordsTwice.some(w => /words: item 1 stands twice, .* Mend: give the one at words\/items-001\.md:3 the number its reasoning has in archive\/instructions\//.test(w)), "in the words, an item numbered twice takes the number its reasoning has, never a new one", wordsTwice.join("\n"));
+// (#756, point 3: an item that changes an earlier one says so, and the earlier one is marked back)
+const marked = (one, two, three = "") => archive({ "items-001.md": `1. **1 Nov**, #1: a.${one}\n\n2. **2 Nov**, #2: b.${two}\n\n3. **3 Nov**, #3: c.${three}\n` });
+ok(!inStep(marked("\n   Changed by: 2, 3.", "\n   Changes: 1.", "\n   Changes: 1.")).length, "items that change an earlier one, each marked back on it, are in step", inStep(marked("\n   Changed by: 2, 3.", "\n   Changes: 1.", "\n   Changes: 1.")).join("\n"));
+const notBack = inStep(marked("\n   Changed by: 3.", "\n   Changes: 1.", "\n   Changes: 1."));
+ok(notBack.length === 1 && /item 2 changes item 1, which is not marked so\. Mend: give item 1, in archive\/instructions\/items-001\.md, the line "Changed by: 3, 2\."/u.test(notBack[0]), "an item that names one it changes, not marked back, fails, its mend the whole line to write", notBack.join("\n"));
+const noMatch = inStep(marked("\n   Changed by: 2.", ""));
+ok(noMatch.length === 1 && /item 1 says item 2 changed it, but item 2 names no change of it\. Mend: give item 2, .* the line "Changes: 1\."/u.test(noMatch[0]), "a \"Changed by:\" with no \"Changes:\" to match fails, saying the mend", noMatch.join("\n"));
+const strays = inStep(marked("\n   Changes: 1.", "\n   Changes: 9, #4.", "\n   Changed by: 7."));
+ok(["item 1 says it changes 1, which is itself", "item 2 says it changes 9, which is no item", "item 2 says it changes #4, which is no item", "item 3 says 7 changed it, which is no item"].every(w => strays.some(x => x.includes(w))) && strays.every(w => /Mend: /u.test(w)), "a mark naming its own item or no item of the archive fails, saying the mend", strays.join("\n"));
+const forms = inStep(marked("\n   Changed by: 2", "\n   Changes: 1.\n   Changes: 1.", "\n   Changes: one."));
+const hidden = inStep(marked("\n   Changed by: 2.\rhidden", "\n   Changes: 1.\rX"));
+ok(hidden.filter(w => w.includes("a mark not in its form or given twice")).length === 2 && !hidden.some(w => /[\r\n]/u.test(w)) && hidden.some(w => w.includes("\\rhidden")), "a mark that holds a lone carriage return is read whole, fails its form, and is quoted with it escaped, so no log line starts inside it", hidden.join("\n"));
+ok(forms.filter(w => w.includes("a mark not in its form or given twice")).length === 3 && forms.every(w => /Mend: /u.test(w)), "a mark with no stop, one given twice and one with no key each fail, saying the form", forms.join("\n"));
+ok(!inStep(marked("", "", "")).length && !inStep(archive({ "items-001.md": "1. **1 Nov**, #1: Changes: 2. on its opening line, which is prose.\n" })).length, "an item with no mark, and prose on an opening line, are no marks");
+const markKeyed = archive({ "items-001.md": "1. **1 Nov**, #1: a.\n   Changed by: #9.1.\n", "issue-9.1.md": "# Issue 9.1\n\n#9.1. **19 Nov**, #9: b.\n     Changes: 1.\n" });
+ok(!inStep(markKeyed).length, "a mark keyed by an issue's point is read as the archive keys it", inStep(markKeyed).join("\n"));
 const behindBad = holders(project({}, { behind: { "tasks/x.md: Gone": [1], "tasks/x.md: Numbered": [7], "tasks/x.md: Its own item": "1", "tasks/x.md": [1] }, "tasks/y.md": "# Y\n\n- **A rule** (core archive 1).\n" }), []);
-ok(["names \"tasks/x.md: Gone\"", "core archive 7 is no item", "is no list of item numbers", "tasks/y.md:3 points to the archive"].every(w => behindBad.wrong.some(x => x.includes(w))) && !behindBad.wrong.some(x => x.includes("names \"tasks/x.md\"")) && behindBad.wrong.every(w => /Mend: /.test(w)),
+ok(["names \"tasks/x.md: Gone\"", "core archive 7 is no item", "\"behind\", \"tasks/x.md: Its own item\" must be array. Mend: write it as a list of the keys", "tasks/y.md:3 points to the archive"].every(w => behindBad.wrong.some(x => x.includes(w))) && !behindBad.wrong.some(x => x.includes("names \"tasks/x.md\"")) && behindBad.wrong.every(w => /Mend: /.test(w)),
   "behind: a key that is no rule, an item not in the archive, no list, and a pointer in a rule file each fail, saying the mend; a rule file alone is a key", behindBad.wrong.join("\n"));
+
+// (#744: an item after the last numbered one is keyed by its issue, or one point of it, in a file of its own named by its
+// key (#750, point 1); a key used twice, one in another's file, one in the words and a number past the last each fail;
+// "behind" names keys)
+const keyed = archive({ "items-001.md": r1, "issue-9.md": "# Issue 9\n\n#9. **19 Nov**: h.\n", "issue-9.2.md": "#9.2. **19 Nov**: i.\n", "issue-12.1.md": "#12.1. **19 Nov**: j.\n" });
+ok(!inStep(keyed).length, "items keyed by their issue, or a point of it, each in a file of its own named by its key, are in step", inStep(keyed).join("\n"));
+const lastNumbered = inStepAt(archive({ "items-001.md": `${r1}\n262. **19 Nov**, #8: the last numbered.\n` }));
+ok(!lastNumbered.some(w => w.includes("keyed by a running number")) && lastNumbered.some(w => w.includes("item 3 is missing, though items 1 to 262 keep their numbers") && /Mend: /.test(w)), "the last numbered item, 262, keeps its number, and one of 1 to 262 taken out fails, saying the mend", lastNumbered.slice(0, 3).join("\n"));
+const lastTaken = inStepAt(archive({ "items-001.md": `${r1}\n261. **19 Nov**, #8: the one before.\n` }));
+ok(lastTaken.some(w => w.includes("item 262 is missing") && /Mend: /.test(w)), "the last numbered item taken out fails too, as the top of the range is read to 262 whatever stands", lastTaken.filter(w => w.includes("262")).join("\n"));
+const keyedBad = inStepAt(archive({ "items-001.md": `${r1}\n#9. **19 Nov**: h.\n`, "items-263.md": "263. **19 Nov**, #8: k.\n", "issue-12.1.md": "#12.1. **19 Nov**: j.\n\n#12.1. **19 Nov**: l.\n", "issue-13.md": "#13. **19 Nov**: m.\n\n#13.2. **19 Nov**: n.\n" }, { "issue-12.1.md": "#12.1. **19 Nov**: words.\n" }));
+ok([/items-001\.md:5: item #9 stands outside archive\/instructions\/issue-9\.md, the file its key puts it in\. Mend: move it there$/, /item #12\.1 stands twice, .* Mend: give the one at archive\/instructions\/issue-12\.1\.md:3 a key of its own, "#12\.P"/,
+  /issue-13\.md:3: item #13\.2 stands outside archive\/instructions\/issue-13\.2\.md, the file its key puts it in\. Mend: move it there$/,
+  /item 263 is keyed by a running number, a key that names no issue, .* Mend: key it "#N"/, /words\/issue-12\.1\.md: item #12\.1 adds the owner's words here/].every(re => keyedBad.some(w => re.test(w))) && keyedBad.every(w => /Mend: /.test(w)),
+  "a keyed item in another file, two items in one file, a key used twice, a number past the last and a keyed item in the words each fail, saying the mend", keyedBad.join("\n"));
+const keysAt = archive({ "items-001.md": r1, "issue-9.md": "#9. **19 Nov**: h.\n", "issue-9.2.md": "#9.2. **19 Nov**: i.\n" });
+fs.writeFileSync(path.join(keysAt, "scripts", "holders.json"), JSON.stringify({ holders: {}, behind: { "tasks/x.md: Numbered": [1, "#9", "#9.2"], "tasks/x.md: Its own item": ["9", "#x", 7.5], "tasks/x.md: A last item": ["#10"] } }));
+fs.writeFileSync(path.join(keysAt, "tasks", "y.md"), "# Y\n\n- **A rule** (core archive #9).\n");
+const behindKeys = holders(keysAt, []);
+ok([...[0, 1, 2].map(i => `"tasks/x.md: Its own item", item ${i} `), "core archive #10 is no item", "tasks/y.md:3 points to the archive"].every(w => behindKeys.wrong.some(x => x.includes(w))) && behindKeys.wrong.filter(x => x.includes("Its own item")).every(x => x.includes("Mend: write an item's key as the archive keys it")) && !behindKeys.wrong.some(x => x.includes("\"tasks/x.md: Numbered\"")) && behindKeys.wrong.every(w => /Mend: /.test(w)),
+  "behind: a number and keys by an issue that stand pass; a key that names no issue, one not in the archive and a keyed pointer in a rule file each fail, saying the mend", behindKeys.wrong.join("\n"));
+
+// ---- the file's form, its schema's (#530) ----
+const formOf = j => shapeFaults("holders", j, "", "scripts/holders.json");
+const shapes = [null, [], { holders: [] }, { behind: "a" }, { numbers: 3 }, { holders: { a: 5 } }, { holders: { a: "" } }, { holders: { a: ["audit", ""] } }, { holders: { a: [4] } },
+  { behind: { a: [] } }, { behind: { a: [0] } }, { behind: { a: [LAST_NUMBERED + 1] } }, { behind: { a: ["#"] } }, { behind: { a: ["#9.x"] } }, { behind: { a: [null] } }, { numbers: { a: "" } }, { numbers: { a: 3 } }];
+const refused = shapes.map(j => formOf(j));
+ok(refused.every(f => f.length === 1 && /^scripts\/holders\.json.* Mend: \S/u.test(f[0])), "each part in no form the file holds is refused once, said of the file and where in it, with its mend",
+  refused.map((f, i) => `${JSON.stringify(shapes[i])}: ${JSON.stringify(f)}`).join("\n"));
+ok(JSON.stringify(formOf(JSON.parse(fs.readFileSync(path.join(root, "scripts", "holders.json"), "utf8")))) === "[]" && JSON.stringify(formOf({ holders: { a: [] }, behind: { a: [1, LAST_NUMBERED, "#9", "#9.2"] }, numbers: { a: "x" }, other: 1 })) === "[]",
+  "the core's own file holds its form, as do a number up to the last numbered item and keys by an issue or one point of it; a key the file does not name is let be, as the script let it");
+const keyRule = JSON.parse(fs.readFileSync(path.join(root, "scripts", "schemas", "holders.json"), "utf8")).properties.behind.additionalProperties.items;
+ok(keyRule.pattern === KEY.source && keyRule.maximum === LAST_NUMBERED && keyRule.mend.includes(`up to ${LAST_NUMBERED} `), "the schema's form of a key is the archive's own (archive.mjs's KEY and LAST_NUMBERED), its mend naming the last numbered item", JSON.stringify(keyRule));
 
 // ---- the core's own, and the script as a check ----
 const own = spawnSync(process.execPath, [path.join(root, "scripts", "holders.mjs")], { encoding: "utf8" });
@@ -114,11 +168,13 @@ ok(numbersBad.wrong.length === 2 && numbersBad.wrong.some(w => w.includes("\"num
 ok(own.status === 0 && !own.stderr, "the core's own holders.json names only rules that stand, and checks that are there", own.stderr);
 const failing = project({ "tasks/x.md: Gone": "audit" });
 fs.mkdirSync(path.join(failing, "scripts", "staged"));
-for (const f of ["archive.mjs", "core-address.mjs", "core-path.mjs", "guards.mjs", "holders.mjs", "rule-files.mjs", "rules.mjs", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
+fs.mkdirSync(path.join(failing, "scripts", "schemas"));
+for (const f of ["archive.mjs", "core-address.mjs", "core-path.mjs", "guards.mjs", "holders.mjs", "packages.mjs", "rule-files.mjs", "rules.mjs", "schemas.mjs", "schemas/holders.json", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
 fs.writeFileSync(path.join(failing, "scripts", "staged.mjs"), "export const CASES = [];\n");
 fs.writeFileSync(path.join(failing, "scripts", "outcomes.mjs"), "export const NUMBER = /^$/u;\n");
 const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.mjs")], { encoding: "utf8" });
-ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`), "where holders.json is wrong the check fails, each failure saying its mend", `${run.stdout}${run.stderr}`);
+ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`) && /^::warning::The form of scripts\/holders\.json was not checked: the package ajv is not installed\. Mend: run node scripts\/install\.mjs/mu.test(run.stdout),
+  "where holders.json is wrong the check fails, each failure saying its mend; on a copy with no packages its form goes unchecked, said as a warning with its mend, and the rest is read as ever", `${run.stdout}${run.stderr}`);
 
 // ---- a project's own rules (#662) ----
 // (a scratch project: its AGENTS.md with one rule held and one not, the file it pulls in, its SECURITY.md with the rule
