@@ -58,6 +58,8 @@ ok(fails(copies("")), `${MEND} an empty config`);
 {
   const kit = JSON.parse(fs.readFileSync(path.join(root, "setup/template/copies.json.tmpl"), "utf8"));
   const said = [null, [], { baseline: 5 }, { baseline: "b.json", code: "a.md" }, { baseline: "b.json", prose: [""] }, { baseline: "b.json", extra: true }, { baseline: "b.json", proseFromSecurity: "yes" }].map(c => shapeFaults("copies", c, "core/"));
+  const many = shapeFaults("copies", { baseline: "b.json", code: Array(5000).fill("") }, "core/");
+  ok(many.length === 21 && /holds 4980 more faults than those said\. Mend: \S/u.test(many[20]), `${MEND} its schema: a config of many bad items says the first 20 and a count of the rest`);
   ok(JSON.stringify(shapeFaults("copies", kit, "core/")) === "[]" && said.every(f => f.length && f.every(l => /^the config(?:'s "[^"]+")?\b.* Mend: \S/u.test(l))) && said[5][0].includes('"extra"') && said[0][0].includes("core/setup/template/copies.json.tmpl"),
     `${MEND} its schema: the starter kit's config holds, and each config of the wrong shape fails, naming where, with its mend`);
 }

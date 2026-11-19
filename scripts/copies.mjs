@@ -39,6 +39,7 @@ import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { readBlobs } from "./blobs.mjs";
 import { projectAt } from "./core-path.mjs";
 import { keysOf, shapeFaults } from "./schemas.mjs";
+import { unreached } from "./packages.mjs";
 import { uncommented } from "./yaml-keys.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
 // core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
@@ -66,10 +67,14 @@ process.chdir(ROOT);
 // job of a project's own that ran the check before they came, the shape is not checked, said as a warning, and the
 // check goes on (AGENTS.md of the core, "Nothing locks a project"; steps.mjs asks the install).
 const KEYS = keysOf("copies"), faults = shapeFaults("copies", config, CORE);
-if (faults === null) console.log(`::warning::The config's shape was not checked: the package ajv is not installed beside the core's copy. Mend: in a pull request of its own, add the step node ${CORE}scripts/install.mjs to this job before the step that runs this check`);
+// (a registry that did not answer asks the job again, as install.mjs's warning does)
+if (faults === null) console.log(unreached("ajv") ? "::warning::The config's shape was not checked: the package ajv could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault"
+  : `::warning::The config's shape was not checked: the package ajv is not installed beside the core's copy. Mend: in a pull request of its own, add the step node ${CORE}scripts/install.mjs to this job before the step that runs this check`);
 for (const f of faults ?? []) console.error(`FAIL: ${logged(f)}`);
 if (faults?.length) process.exit(1);
-const list = v => (Array.isArray(v) ? v : []);
+// (unchecked, what the check itself reads must still be there: an object that names its baseline, lists of paths alone)
+if (faults === null && !(config && typeof config === "object" && !Array.isArray(config) && typeof config.baseline === "string" && config.baseline)) fail(`the config is not a JSON object that names its "baseline". Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`);
+const list = v => (Array.isArray(v) ? v.filter(x => typeof x === "string" && x) : []);
 // (the baseline is read, and written, only inside the project, as a file of its own reached through no link out of it)
 if (!inProject(config.baseline) || leadsOut(ROOT, path.join(ROOT, config.baseline))) fail(`the config's "baseline", ${config.baseline}, lies outside the project. Mend: name the baseline by its path from the project's root, with no ".." that leads above it, as a file of the project's own reached through no link that leads out of it (${TEMPLATE})`);
 const BASELINE = config.baseline;
@@ -82,7 +87,7 @@ const withTools = (read, list) => {
   return rules.concat(toolFiles(read, list).filter(f => !named.has(f)).map(f => `:(literal)${f}`));
 };
 const security = () => { if (!fromSecurity) try { fromSecurity = withTools(); } catch (e) { fail(e.message); } return fromSecurity; };
-const proseSpecs = PROSE_SPECS.concat(config.proseFromSecurity ? security() : []);
+const proseSpecs = PROSE_SPECS.concat(config.proseFromSecurity === true ? security() : []);
 const TOOLS = process.argv.includes("--tools"), WRITE = TOOLS || process.argv.includes("--write");
 if (!CODE_SPECS.length && !proseSpecs.length) fail('the config names nothing to check. Mend: list the code in "code" and the prose in "prose", as git pathspecs, or set "proseFromSecurity" to true');
 const LINES = 8, MIN_CHARS = 240, WORDS = 12;

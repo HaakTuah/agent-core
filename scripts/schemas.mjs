@@ -48,8 +48,11 @@ export function shapeFaults(name, value, core = "") {
   if (!installed("ajv")) return null;
   const { validate, schema } = checker(name);
   if (validate(value)) return [];
-  return validate.errors.map(e => {
+  // (the first SHOWN alone, and a count of the rest: a config of many bad items says each kind once, not a line each)
+  const left = validate.errors.length - SHOWN;
+  return validate.errors.slice(0, SHOWN).map(e => {
     const extra = e.params?.additionalProperty !== undefined ? ` (${JSON.stringify(e.params.additionalProperty)})` : "";
     return `${where(e.instancePath)} ${e.message}${extra}. Mend: ${String(mendOf(schema, e.schemaPath, e.keyword) ?? "write it as the starter kit does").replaceAll("{core}", core)}`;
-  });
+  }).concat(left > 0 ? [`the config holds ${left} more faults than those said. Mend: mend those said, then run the check again to see the rest`] : []);
 }
+const SHOWN = 20;

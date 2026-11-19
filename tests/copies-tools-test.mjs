@@ -164,5 +164,18 @@ try {
     r = check({ COPIES_BASE: through });
     ok(r.status === 0 && !/EISDIR/.test(r.out) && /not yet in the baseline: .*through\.md.*the pull request's base held it/.test(r.out), "a link to a folder in a tool's folder is passed over, and a file reached through a linked folder is read through it at the base too", r.out);
   }
+  // (with the core's packages not installed, its shape is left unchecked, said as a warning, and a config the check
+  // cannot read still fails with its mend: Codex's review of 95abcdb)
+  {
+    const packages = path.join(dir, "core/.packages/node_modules"), aside = `${packages}-aside`;
+    fs.renameSync(packages, aside);
+    try {
+      const unchecked = text => { put("checks/raw.json", text); const c = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/raw.json"], { cwd: dir, encoding: "utf8", env: { ...process.env, COPIES_BASE: "" } }); return { status: c.status, out: `${c.stdout}${c.stderr}` }; };
+      const bad = ["null", "[]", '{"code":["docs"]}', '{"baseline":5}'].map(unchecked), odd = unchecked('{"baseline":"checks/raw-baseline.json","code":[{"toString":1},5,""],"prose":"docs","proseFromSecurity":"no"}');
+      ok(bad.every(r => r.status === 1 && mended(r.out) && /^FAIL: the config is not a JSON object that names its "baseline"\./m.test(r.out) && /::warning::The config's shape was not checked/.test(r.out) && !/TypeError/.test(r.out)),
+        "with the packages not installed, a config that is no object, or names no baseline, fails with its mend, the shape's warning said", bad.map(r => r.out).join("\n"));
+      ok(!/TypeError|at file:/.test(odd.out) && /::warning::The config's shape was not checked/.test(odd.out) && !/AGENTS\.md/.test(odd.out), "and lists of the wrong shape are read as no paths, and a proseFromSecurity that is not true reads no rule file, never crashing", odd.out);
+    } finally { fs.renameSync(aside, packages); }
+  }
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 process.exit(failed ? 1 : 0);
