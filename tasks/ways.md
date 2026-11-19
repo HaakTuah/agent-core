@@ -75,10 +75,10 @@ recorded; that the runs are made, by nothing yet.
 - *Task:* the orchestrator starts each session through the tool that runs them, from its command line, with the
   session's brief (`roles/orchestrator.md`, "Where the agents run side by side"); the machine: `setup/server.md`.
 - *State:* the tool tells the orchestrator when a session's state changes, which it reads and gives
-  `scripts/stalled.mjs`; which states it names, not yet: #397.
+  `scripts/stalled.mjs`; which states it names, not yet: #847.
 - *Review:* a fresh session started through it, given the review's brief, takes it; each tool's command stands in its
   part, under *Side by side:*.
-- *Installs:* not yet: #397.
+- *Installs:* not yet: #847.
 - *Floor:* each session it starts is started from the orchestrator the owner started there, in a pane and a clone of
   its own, under the agents' account; it is given no sign-in of its own, each tool keeping its own, a second tool's
   under an account of its own (`setup/server.md`, point 6).
