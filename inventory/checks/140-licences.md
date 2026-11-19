@@ -22,4 +22,6 @@
   version; licensee reads npm's own tree (`loadActual`); and CycloneDX's npm tool runs `npm ls --long --all`: each would
   read the `@block` case as npm does. *Replayed:* #444 not read (its cases, lock entries not written as npm writes one,
   lie in the lock file, which npm's reading of what is installed never opens); #339, #364, #366, #386 and #447 not run
-  (their cases lie in where the config stands, the steps and the scan, which no tool tried here takes over).
+  (their cases lie in where the config stands, the steps and the scan, which no tool tried here takes over). The
+  config's form is held by a schema and ajv where the core's packages are installed, and by the check's own checks of
+  it where they are not (`scripts/schemas/licences.json`; #530, item 7).
