@@ -64,10 +64,10 @@
 //                                                     "grown" gives a reason for, what a reader the baseline did
 //                                                     not name finds, and, with SHAPE_BASE set, what that branch
 //                                                     held already, where the config reads more
-//   node core/scripts/shape.mjs <config> --suite <name> -- <command>...   run a suite (with no shell) and hold its
-//                                                     time to its mark
-//   node core/scripts/shape.mjs <config> --suite <name> --since <seconds>  hold the time since a start the workflow
-//                                                     took (date +%s) to the suite's mark
+//   node core/scripts/shape.mjs <config> --suite <name> -- <command>...   run a suite (with no shell) and measure its
+//                                                     time against its mark, a warning past it, never a failure
+//   node core/scripts/shape.mjs <config> --suite <name> --since <seconds>  measure the time since a start the
+//                                                     workflow took (date +%s) against the suite's mark
 // Run from the project's root, by the copies workflow (.github/workflows/copies.yml) on every pull request; in the
 // core by its size workflow. Reads only, but for the baseline it writes when told; git and Node's own modules.
 import { execFileSync, spawnSync } from "node:child_process";
@@ -580,8 +580,8 @@ const SAID = {
   cycle: n => [`${plural(n, "import lies", "imports lie")} on a cycle between files that did not stand before`, "turn one import of the cycle round: move what both files need into a file that imports neither, or pass it in"],
   platform: n => [`${plural(n, "import binds", "imports bind")} code to one platform outside the system declared for that`, "move the code that needs it into the system of the domain \"platform\", and have the rest call what that system offers, so that the rest builds and tests wherever the project's checks run"],
   package: n => [`${plural(n, "import takes", "imports take")} a package the project ships with outside the one system that wraps it`, "import it in one system alone, named under that system's \"wraps\" in the config, and have the others use what that system offers"],
-  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (an element of JSX that never closes, a type's parameter in .tsx it takes for one, as in <T>(x: T) => T, code nested more than 200 levels deep, or C# the grammar the core installs cannot read whole, or in two minutes), so ${n === 1 ? "its" : "their"} functions are not held`,
-    "write it so that the reader can follow it: close each element, give a type's parameter in .tsx a comma or a bound (<T,>, <T extends U>), or nest less deep; where it is C# that builds, newer than the grammar reads, list the entry under \"grown\" with that reason, by its id, and tell the core which construct it is, never the project's code (the core's README.md, \"Reporting to the core\"); the check's failure on the file then names what it holds"],
+  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (JavaScript, TypeScript or C# the grammar the core installs cannot read whole, or within its time, a file of them past 2 MB, or C# or Python nested more than 200 levels deep), so ${n === 1 ? "its" : "their"} functions are not held`,
+    "write it so that the reader can follow it: close each element of JSX, write a } or > in JSX's text as {'}'} or {'>'}, and nest less deep; where a script wrote it as data past 2 MB, leave it out of the config's \"code\" (\"!\" before its pathspec); where it is code that builds, newer than the grammar reads, list the entry under \"grown\" with that reason, by its id, and tell the core which construct it is, never the project's code (the core's README.md, \"Reporting to the core\"); the check's failure on the file then names what it holds"],
   global: n => [`${plural(n, "name joins", "names join")} the global space that scripts with no import or export share: a second name of one file there, or a name another such file declares too`,
     "make the file a module that imports what it uses and exports what it offers; where the page cannot load it so, put what it adds under the one name the file declares there already (an object of its functions), and give a name that two files declare one home"],
   screen: n => [`${plural(n, "test imports", "tests import")} what opens a screen, a window or a device, where no test of ${n === 1 ? "its" : "their"} file did before`,
@@ -647,14 +647,19 @@ const readAt = (base, config) => {
   return base;
 };
 
-// What the base's own check read under its baseline: each breach of the base's, of a reader the baseline names, to the
-// id of the entry it claims, as a breach claims one now (`claims`), all of them at once. An entry none claims, mended
+// The base's breaches a baseline's entries may stand for: each of a reader the baseline names, and of one it does not
+// (a reader renamed since among them: shape-readers.mjs, READERS), only the one an entry at its own id is listed for
+// (`own`), which `claims` gives that entry before any other claim; so such a breach takes no entry of another's.
+const readUnder = (stood, reads, readers, own) => new Map([...stood].filter(([id, n]) => reads.includes(readerOf(id, readers)) || own(id, n)));
+
+// What the base's own check read under its baseline: each of those breaches of the base's (`readUnder`) to the id of
+// the entry it claims, as a breach claims one now (`claims`), all of them at once. An entry none claims, mended
 // where an earlier pull request left it listed, covers no breach, in its own place or elsewhere, and one that only a
 // group-mate's grown breach stands by covers that one (#750, point 5).
-function heldAt({ listed, reads }, base, marks) {
-  if (!listed.size) return listed;
-  const readers = base.found().readers, stood = new Map([...base.stood()].filter(([id]) => reads.includes(readerOf(id, readers))));
-  return claims(stood, listed, marks).taken;
+function heldAt(baseline, base, marks) {
+  if (!baseline.listed.size) return baseline.listed;
+  const { listed, reads } = baseline, own = (id, n) => listed.has(id) && within(n, listed.get(id), marks);
+  return claims(readUnder(base.stood(), reads, base.found().readers, own), listed, marks).taken;
 }
 
 // What a baseline the change wrote covers against the base (`then`, the base's own baseline; `held`, what the base's
@@ -667,7 +672,7 @@ function coverAt({ listed, reads, grown }, base, marks, then, held) {
   if (!listed.size) return listed;
   const before = then?.listed ?? new Map(), readers = base.found().readers;
   const joins = new Map([...listed].filter(([id, n]) => said(grown, id) && !(before.has(id) && within(n, before.get(id), {}))));
-  const under = new Map([...base.stood()].filter(([id]) => reads.includes(readerOf(id, readers)) && !joins.has(id)).map(([id, n]) => [id, held.get(id) ?? n]));
+  const under = new Map([...readUnder(base.stood(), reads, readers, id => listed.has(id))].filter(([id]) => !joins.has(id)).map(([id, n]) => [id, held.get(id) ?? n]));
   const backed = claims(new Map([...listed].filter(([id]) => !joins.has(id))), under, marks).taken;
   return new Map([...listed].filter(([id]) => joins.has(id) || backed.has(id)));
 }
@@ -770,7 +775,8 @@ function unlisted({ config, at, self, reads, later, reread }) {
 
 // ---- the commands ----
 
-// A suite held to its time mark: the command after --, run and timed, or the time since a start the workflow took.
+// A suite measured against its time mark: the command after --, run and timed, or the time since a start the workflow
+// took.
 function timed(name, rest, usage) {
   if (rest[0] === "--since" && /^\d+$/u.test(rest[1] ?? "") && rest.length === 2) return { took: Date.now() / 1000 - Number(rest[1]), status: 0 };
   if (rest[0] !== "--" || rest.length < 2) refuse("--suite takes a name, then -- and the suite's command, or --since and the second its run started at", usage);
@@ -786,9 +792,10 @@ function suite(config, at, self, [name, ...rest]) {
   const limit = isObject(mark) ? mark[process.platform] : mark;
   const { took, status } = timed(name, rest, `run node ${self} ${at} --suite ${name} -- <command>`);
   if (status !== 0) return status; // (the suite's own failure, which says its own mend)
+  // (a time mark measures and never fails, tasks/tests.md; #733, point 5: past it, a warning, which the run shows)
   if (limit !== undefined && took > limit) {
-    console.error(`FAIL: the suite ${name} took ${Math.round(took)} s, past its mark of ${limit}. Mend: make it faster (set up only what each test needs, run only what the change can reach), or split it so that each part runs alone under a mark of its own; only where it cannot be, raise its mark in ${at} with the reason under "grown" in ${config.baseline} and in the pull request`);
-    return 1;
+    console.log(`::warning::the suite ${name} took ${Math.round(took)} s, past its mark of ${limit}, which fails nothing. Mend: add it to the open task on the tests' time, or file one where none is open: make it faster (set up only what each test needs, run only what the change can reach), or split it so that each part runs alone under a mark of its own; only where it cannot be, raise its mark in ${at} with the reason under "grown" in ${config.baseline} and in the pull request`);
+    return 0;
   }
   console.log(`ok   the suite ${name} took ${Math.round(took)} s${limit === undefined ? `; ${at} gives it no mark on ${process.platform}` : `, within its mark of ${limit}`}`);
   return 0;
@@ -908,7 +915,7 @@ function main(argv) {
   if (rest.length > 1 || (rest.length && !command)) refuse(`the check does not know ${rest.join(" ")}`, `run node ${self} [<config>] [--first | --write], or --suite <name> with -- <command> or --since <seconds>`);
   const now = standing(config), found = survey(now.texts, config, now.tests);
   // (a baseline is written only where every reader of a file the project holds could run: one that has no file to read
-  // is no reason to refuse, so a project with no C# writes its own with the parser's packages not installed)
+  // is no reason to refuse, so a project of Python alone writes its own with the parser's packages not installed)
   const skipped = unreachedReaders().filter(r => [...found.readers.values()].includes(r));
   if (command && skipped.length) refuse(`the core's packages are not installed, so ${skipped.map(r => READERS[r]).join(", ")} cannot be read and a baseline written now would leave out what stands there`, `run node ${path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)))}${unnamedReaders().length ? " all" : ""} until it installs them, then run this again`);
   if (!command) return check(config, at, self, found, base, named);

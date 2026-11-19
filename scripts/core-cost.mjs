@@ -216,7 +216,7 @@ export function mergedPulls(rules, since = null) {
         if (classify("", [file], rules) === "own" && /^\d+$/.test(add)) lines += Number(add) + Number(del);
       }
     }
-    merged.push({ number: Number(m[1]), when, kind, lines });
+    merged.push({ number: Number(m[1]), sha, when, kind, lines });
   }
   return { repo, merged };
 }
