@@ -10,6 +10,7 @@
 // models' families; a tally no run has touched for 90 days is removed. Node's own modules only.
 //
 //   node core/scripts/session-cost.mjs
+//   node core/scripts/session-cost.mjs --context    the tokens of context the session's newest answer was given
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -95,6 +96,26 @@ export function records(home, session) {
   return found;
 }
 
+/** The tokens of context the newest answer in a session's own record was given (its input, cache written and cache
+ *  read), which "A builder hands over by its context" reads (roles/shared/work-flow.md, "Sessions"); 0 where it holds
+ *  none. */
+export function context(text) {
+  let last = 0;
+  for (const [, counts] of answersIn([text])) last = counts[0] + counts[1] + counts[2];
+  return last;
+}
+
+/** A session's own record under Claude Code's folder, without its helpers', or "". */
+export function ownRecord(home, session) {
+  if (!SESSION.test(session ?? "")) return "";
+  let folders = [];
+  try { folders = fs.readdirSync(path.join(home, "projects"), { withFileTypes: true }).filter((e) => e.isDirectory()); } catch { return ""; }
+  for (const folder of folders) {
+    try { return fs.readFileSync(path.join(home, "projects", folder.name, `${session}.jsonl`), "utf8"); } catch { /* (not this project's) */ }
+  }
+  return "";
+}
+
 /** A session's tally under Claude Code's folder, or null for a session id of another shape. */
 export const tallyOf = (home, session) => (SESSION.test(session ?? "") ? path.join(home, "session-cost", `${session}.json`) : null);
 
@@ -122,7 +143,10 @@ if (started(import.meta.url)) {
   try {
     const home = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
     const file = tallyOf(home, process.env.CLAUDE_CODE_SESSION_ID);
-    if (file) {
+    if (process.argv.includes("--context")) {
+      const now = context(ownRecord(home, process.env.CLAUDE_CODE_SESSION_ID));
+      if (now) console.log(`Context now: ${now.toLocaleString("en-US")} tokens.`);
+    } else if (file) {
       const counted = cost(records(home, process.env.CLAUDE_CODE_SESSION_ID), keptIn(tallyText(file)));
       const out = line(counted);
       if (out) { console.log(out); keep(file, counted.all); }

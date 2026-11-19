@@ -74,8 +74,9 @@ import { started } from "./started.mjs";
 // not made, for 312 over. The reviewer's, raised one step the same day for #307's worked examples in the review
 // guidelines, merged after #829: an eighth fresh leanness check found 51 bytes of room in the guidelines, made, for
 // 1,073 over. The builder's and the orchestrator's, raised one step each on 19 November 2026 for #750, point 7, "A
-// builder hands over by its context": a ninth fresh leanness check found about 68 bytes of room in the builder's start
-// for 282 over, the rest of what it named resting on a misread or cutting a rule's name, so neither made.
+// builder hands over by its context": a ninth fresh leanness check found about 68 bytes of room in the builder's start,
+// for 282 over, and about 142 in the orchestrator's, for 69 over; of those, 57 rested on a misread, 74 cut a rule's
+// name and 11 a restatement it called marginal, so none was made, and the design check's fixes grew both starts.
 export const CAPS = {
   builder: 32 * 1024,
   design: 33 * 1024,
