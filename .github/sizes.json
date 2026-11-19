@@ -27,6 +27,18 @@
       "mark": 25832,
       "why": "#884: the text the parser reads (the preprocessor, C# 14's extension headers) apart from the reading of the tree."
     },
+    "scripts/holders.mjs": {
+      "mark": 24459,
+      "why": "#888: the reader of a project's own list apart from the core's own list."
+    },
+    "scripts/pr-description.mjs": {
+      "mark": 27425,
+      "why": "#888: each line's check in a file of its own beside a short reader."
+    },
+    "scripts/pruning.mjs": {
+      "mark": 33545,
+      "why": "#888: the list it prints apart from what it reads from the host and its record."
+    },
     "scripts/read-total.mjs": {
       "mark": 20690,
       "why": "Whoever changes how the total is counted reads its tree reader, its readers, its cut and its conditions together, each calling the others; split, that session opens more files and reads no less, and no other task reads it."
