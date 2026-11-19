@@ -245,7 +245,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   Reason: a project of another owner imported the owner's dated messages with the rules, and a stand-in needs the
   reasoning, not the wording. Held, in part, by `scripts/holders.mjs`, which fails the two forms out of step
   (`scripts/archive.mjs`), and by `.github/workflows/core.yml`, which fails a copy that holds what `.gitattributes`
-  keeps here; what is quoted, by the staged case `relay` and, for the terms the owner lists, `personal-terms.yml`.
+  keeps here; what is quoted, by what holds floor rule 4's "The owner's word".
 - **The archive is pointed to from the list,** not from the rule (#252). By default a rule file here (this file, the
   floor's, the roles' and the modules') holds no "core archive N": `scripts/holders.json` names under "behind" the
   items behind each rule, and a session that needs a rule's reason looks them up there. Whoever writes or changes a

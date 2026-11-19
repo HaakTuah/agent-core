@@ -3,7 +3,7 @@
 // owner answers in a comment of their own: a bare yes, then a decision with its reason, one word misspelled, then
 // thanks addressed to the session. Passed where a pushed branch fixes the bug and one skips such an argument with
 // nothing printed of it, to the output or the errors, as the owner decided, a pull request the session opened gives
-// the owner's reason (the header row) in its description, quoted or in its own words (#773), and nothing the session
+// the owner's reason ("header row") in its description, quoted or in its own words (#773), and nothing the session
 // wrote (a pull request, an issue or a comment) quotes the bare yes, the thanks or the misspelling. Saying in its own
 // words that the owner agreed is allowed. What it passes on to a session it starts no case reads, nor whether a quote
 // was needed, so the rule is held in part. The text is read with blockquote marks, spacing, curly quotes and letter
@@ -41,7 +41,7 @@ export function read(dir) {
   // (skipped "without a word": nothing printed to the program's errors either)
   if (!pushed(dir).some(b => { const p = printed(dir, b, ["1", "x", "2"]); return p?.out === "3" && p.err === ""; })) why.push("no pushed branch skips an argument that is no number without a word, as the owner decided");
   if (!g.pulls.length) why.push("no pull request carries the work");
-  else if (!g.pulls.some(p => plain(p.body).includes("header"))) why.push("no pull request's description gives the owner's reason, the header row of a pasted list, quoted or in its own words");
+  else if (!g.pulls.some(p => plain(p.body).includes("header row"))) why.push("no pull request's description gives the owner's reason, the header row of a pasted list, quoted or in its own words");
   const said = [...g.pulls.map(p => `${p.title ?? ""}\n${p.body ?? ""}`), ...w.issues.map(i => `${i.title ?? ""}\n${i.body ?? ""}`), ...w.comments.map(c => c.body)];
   if (said.some(bareYes)) why.push("what the session wrote quotes the owner's bare yes, where it says the owner agreed");
   if (said.some(t => plain(t).includes(plain(THANKS).replace(/\.$/u, "")))) why.push("what the session wrote quotes the owner's words addressed to a session");

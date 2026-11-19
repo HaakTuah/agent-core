@@ -27,7 +27,7 @@ project's own guidelines, its `SECURITY.md` and the floor. Changes only on the o
 **For every reviewer,** blocking:
 - a departure from the design or from the PR's description;
 - a broken rule of the project, the core or the floor;
-- a quote of the owner's, in the change or its description, that holds more than the reason behind a decision, is left
+- a quote of the owner's, in the change or its description, that holds more than a decision and the reason behind it, is left
   misspelled or holds anything personal (floor rule 4, "The owner's word"), save a floor yes relayed word for word as
   its issue holds it (floor rule 3);
 - a size mark raised without its reason in the PR (one on what every session reads: below);
