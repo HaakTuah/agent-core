@@ -84,9 +84,10 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      blocks or what a builder mends (point 5; #315), that they stand in for the findings written out, that Codex's own
      reviews, read by their badges, are asked anything, nor that a comment covering two kinds is read as both. Reason:
      run on 10 to 15 November 2026, the count of what the reviews find read 4 of 24 posted security reviews, their
-     wording varying, and the findings that do not block are to be counted before #315 is decided. Held by no check
-     yet: `core/scripts/review-record.mjs` counts a review without its line as "not read", never as none, so the share
-     not read shows where the form is not kept, and no check fails a pull request for it.
+     wording varying, and the findings that do not block are to be counted before #315 is decided. Held by the
+     `code-review` status, which waits while the newest posted review of a kind declares no line
+     (`core/scripts/review-marks.mjs`; #551); `core/scripts/review-record.mjs` counts one without its line as "not
+     read".
 4. **The design check:** once before the merge, a fresh reviewer judges the work against the design alone, and its
    "Readings taken" as the stand-in would.
    - **It goes down the lines** (#305). By default, where the pull request's entry has "Done when"

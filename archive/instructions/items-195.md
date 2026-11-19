@@ -37,7 +37,7 @@ The index, and how an item is written: `archive/instructions.md`.
      among them), which could be added, while licences that carry conditions someone should read (LGPL, MPL, Microsoft's
      own terms, a paid component) stayed with the owner's yes each time. Decided: The session found no reason that held:
      the check could be proven on real packages on GitHub's own machines, and proving it in a project first would spend
-     another owner's usage on shared tooling. The owner agreed to add all of the licences. The owner also asked what
+     a project's own resources on shared tooling. The owner agreed to add all of the licences. The owner also asked what
      steps the owner has to take for the release, which the owner could not find on the core's GitHub page, and said the
      name on the owner's profile will remain. Behind: the six licences added to floor rule 10's list; the NuGet check
      built in the core, not in a project first; floor rule 11's exception for the name and address GitHub writes into a
@@ -100,8 +100,8 @@ The index, and how an item is written: `archive/instructions.md`.
      section 0, the owner asked for a guarantee that nothing of this will stun lock the owner's projects. On section 1,
      the three ideas are filed as three issues; the owner might do them, but not right now. On section 2, the owner
      agreed if the test is quick, since the owner does not want much overhead, and asked whether a private repository
-     spends action points on such checks, and if so wanted it made an opt-in so the owner's private project does not go
-     broke over it. The session answered that the scan adds seconds inside the job that already runs and no billed
+     spends action points on such checks, and if so wanted it made an opt-in so that a private project does not pay
+     for it. The session answered that the scan adds seconds inside the job that already runs and no billed
      minute, so it is on for every project. On failing where the secret `PERSONAL_TERMS` is missing, the owner decided
      it must be optional. The owner agreed to sections 3 to 7, to all in "agent-core itself", to all in "Reading and
      size", to "Games" and to all in "Extra". The owner agreed to all in the .NET section with a condition: the point on
@@ -121,7 +121,7 @@ The index, and how an item is written: `archive/instructions.md`.
      upgrade test starting from the previous release alone, while a project that missed a release jumps two. The owner
      also asked, later, how the check should treat a listed name that a machine's git writes into each commit, and
      whether it would block the owner's own account. Decided: The owner agreed to make all of the fixes, big and small.
-     Item 201 had described the project of another owner from what the brief said of it, which was incorrect, so the
+     Item 201 had described a project of another owner from what the brief said of it, which was incorrect, so the
      owner had that description removed. The first fix reported such a name in a private repository and failed it in a
      public one; Codex's security review and the fallback reviewer each found that it broke floor rule 11 and the threat
      model, in which everything counts as public. The session answered that the agents commit as Claude or under the
@@ -150,18 +150,16 @@ The index, and how an item is written: `archive/instructions.md`.
      session saying of each other file changed why it runs neither by itself nor with credentials; `modules/reviews.md`,
      point 3, the "Security review:" comment giving what it printed and that word, which the code reviewer checks.
 
-204. **14 November 2026** (the core, design chat). Asked: whether a new game being designed, which is only ever added
-     to, could be played from its first stage on, unlike Amarna, which was built toward its finished form; and whether
-     the core should say that each stage of a build ends in a game someone can play from start to finish and enjoy, a
-     feature making sense only once later ones exist waiting for them. Decided: The owner confirmed that, unlike Amarna,
-     this is a game that is only added to. Amarna still does not feel like a game, which the owner wants to get better
-     at: MVPs and stages that feel playable. With Amarna the owner was trying to get to the end station, which was a
-     mistake, but the owner still wants to see it through. The new game is inherently limited by scope at the core, but
-     can have many fun additions around, and is maybe the easiest game to actually get someone else to play with the
-     owner and the models. To the second question the owner agreed, but said the bigger problem is the UI in Amarna
-     right now: it is a mess, and no one can play a game this complex when the screen does not show what is going on.
-     Behind: "Every stage is a game" in `modules/game-design.md`, and the glance in its "Readable by every player"; a
-     first playable slice of Amarna, and its screen, were taken up in Amarna.
+204. **14 November 2026** (the core, design chat). Asked: whether a planned project, which is only ever added to, could
+     be played from its first stage on, unlike Amarna, which was built toward its finished form; and whether the core
+     should say that each stage of a build ends in a game someone can play from start to finish and enjoy, a feature
+     making sense only once later ones exist waiting for them. Decided: The owner confirmed that, unlike Amarna, the
+     planned project is only added to. Amarna still does not feel like a game, which the owner wants to get better at:
+     MVPs and stages that feel playable. With Amarna the owner was trying to get to the end station, which was a
+     mistake, but the owner still wants to see it through. To the second question the owner agreed, but said the bigger
+     problem is the UI in Amarna right now: it is a mess, and no one can play a game this complex when the screen does
+     not show what is going on. Behind: "Every stage is a game" in `modules/game-design.md`, and the glance in its
+     "Readable by every player"; a first playable slice of Amarna, and its screen, were taken up in Amarna.
 
 205. **14 November 2026** (the core, design chat, the same as item 204). Asked: whether the rules about playability must
      apply equally to what a model seat sees in any game. The session had told the owner how a game's screen would be
