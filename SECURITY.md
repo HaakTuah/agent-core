@@ -4,7 +4,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
 `floor/threat-model.md`. What this repository adds under the floor's numbers:
 
 3. **The protected files:** every file here, changed by the sessions the owner starts in this repository, of any
-   agent tool, and the builder sessions an orchestrator among them starts (`AGENTS.md`, "The queue").
+   agent tool, and any session started from one at any depth, none on an outsider's text, as the builders of an
+   orchestrator the owner's adviser started (`AGENTS.md`, "The queue").
 5. **Untrusted input, and its checks:** the core's scripts read what others shape, here and in each project that runs
    them from its `core/` copy. Each input below is data (floor rule 4), which the scripts it names check against its
    shape and refuse where it fails, as floor topic 5 asks, its hostile tests trying each case.
@@ -21,6 +22,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
      a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`); hostile tests:
      `tests/hostile-pr-changes-test.mjs`.
+   - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
+     GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`); hostile tests:
+     `tests/queue-test.mjs`.
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the
      reviews' records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look
      (`scripts/look.mjs`), the inbox (`scripts/inbox.mjs`) and the personal terms' take-out (`scripts/issue-terms.mjs`,

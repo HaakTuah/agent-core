@@ -7,6 +7,9 @@
 # .gitignore leaves such files, or dot folders, out.
 !/.packages/
 /.packages/node_modules
+# (and, in the core's own repository alone, the install of its own mutation tool from tests/mutation/, a folder no copy
+# carries; #581)
+/tests/mutation/node_modules
 /.packages/parser/node_modules
 /.packages/pypi
 /node_modules

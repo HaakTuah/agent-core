@@ -129,14 +129,18 @@ const SPEC_FIELDS = ["dependencies", "devDependencies", "optionalDependencies", 
 const registrySpec = v => typeof v === "string" && /^[\w.^~<>=|*+ -]*$/u.test(v) && !/^\./u.test(v) && !/\.t(?:gz|ar)/iu.test(v);
 const KEY = /^(?:node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*\/)*node_modules\/(?:@[\w~-][\w.~-]*\/)?[\w~-][\w.~-]*$/u;
 const plainAddress = r => { try { return /^https:\/\/registry\.npmjs\.org\//u.test(r) && new URL(r).href === r; } catch { return false; } };
-export function lockFaults(list, lock) {
+// `overrides` lets the package list hold npm's field of that name, each at one exact version of npm's registry: given
+// for the core's own mutation tool's install alone (install.mjs, #581), never for an install a copy carries, since npm
+// acts on it in place of what the packages ask.
+export function lockFaults(list, lock, { overrides = false } = {}) {
   const out = [], specs = (where, o) => { for (const [n, v] of Object.entries(o ?? {})) if (!registrySpec(v)) out.push(`${where}: the spec ${JSON.stringify(n)}: ${JSON.stringify(v)} names no version, range or tag of npm's registry`); };
   if (!plainObject(list)) return ["package.json: not an object of fields"];
   if (!plainObject(lock)) return ["package-lock.json: not an object of fields"];
-  for (const k of Object.keys(list ?? {})) if (!LIST_FIELDS.includes(k)) out.push(`package.json: the field ${JSON.stringify(k)}, which the core's package list does not hold`);
-  for (const f of SPEC_FIELDS) specs(`package.json ${f}`, list?.[f]);
+  const own = overrides ? ["overrides"] : [];
+  for (const k of Object.keys(list ?? {})) if (![...LIST_FIELDS, ...own].includes(k)) out.push(`package.json: the field ${JSON.stringify(k)}, which the core's package list does not hold`);
+  for (const f of [...SPEC_FIELDS, ...own]) specs(`package.json ${f}`, list?.[f]);
   // (the package list's own packages at one exact version each: floor rule 7)
-  for (const f of ["dependencies", "devDependencies"]) for (const [n, v] of Object.entries(list?.[f] ?? {})) if (!/^\d+\.\d+\.\d+$/u.test(String(v))) out.push(`package.json ${f}: ${JSON.stringify(n)} at ${JSON.stringify(v)}, not one exact version`);
+  for (const f of ["dependencies", "devDependencies", ...own]) for (const [n, v] of Object.entries(list?.[f] ?? {})) if (!/^\d+\.\d+\.\d+$/u.test(String(v))) out.push(`package.json ${f}: ${JSON.stringify(n)} at ${JSON.stringify(v)}, not one exact version`);
   out.push(...formFaults(lock));
   for (const [k, e] of Object.entries(lock?.packages ?? {})) out.push(...(k ? entryFaults(k, e ?? {}, specs) : rootFaults(e, list)));
   return out;

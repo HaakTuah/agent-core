@@ -7,10 +7,9 @@ the checks and stays the word on them: a line here points to it where a part hol
 part. It lists too, under a heading of its own, what the core lacks that a maintained tool gives at once, first a
 general linter for its own scripts.
 
-It decides nothing by itself. A **replace** or a **try** becomes a line of `QUEUE.md` only on the owner's word, each a
-pull request of its own that shows the comparison, old against new (#534, point 2); no tool or package arrives before
-#488's points 1, 3, 4 and 5 have merged; and the order is #534's, point 7: the tools that only run first, then the
-packages installed from the core's lock file (#654), then the form the rules are delivered in.
+It decides nothing by itself. A **replace** or a **try** becomes a line of `QUEUE.md` only on the owner's word, and is
+built as `AGENTS.md`, "A part of the core gives way to what is maintained", says: its comparison, old against new, in a
+pull request of its own, in that rule's order.
 
 Weighed whole: 2026-11-17
 
@@ -19,20 +18,20 @@ Challenged whole: 2026-11-17, by a session that wrote no part of it ("The challe
 **How a line reads.** The part's files, then what it does: before its first colon, the files it claims, a folder by its
 path ending in `/`, and a script's line its test (`tests/<its name>-test.mjs`) too. Every file git tracks is claimed by
 a line, or lies under a path "What the inventory leaves out" names with the reason, as its check reads (#593, point 2).
-*Runs:* where it must run: in a session's hook, in any session, on the host's runners, on the owner's own computer; a
-check that may decide a pull request runs in all three places that hold a session or a runner (#534, point 5). *Else:*
-what else does the job, found on the web and in the registries on 17 November 2026, each kept or dropped in a few words,
-a drop marked as a fact, as a measure, or as an assumption to measure (`tasks/choices.md`, "a drop says whether it rests
-on a fact"). A verdict or a candidate the challenge changed says "proposed" and waits on the owner's word ("What waits
-on the owner", below). *Bugs:* the issues labelled `bug` that name the part's files, of the 61 so labelled. A trial of a
-tool in its place run from 18 November 2026 on is recorded on the line as *Tried:*, with *Replayed:* saying by number
-which of the part's bugs the tool reads and which it does not (`tasks/choices.md`, "A trial of a maintained tool replays
-the part's past bugs"; #593, point 7); the trials of 17 November below came before that rule and replayed none. Then the
-verdict: **replace** where a maintained tool does the job at the same level or better, the comparison to be shown when
-it is made; **try** where only a trial can tell; **keep**, with the exception of #486, point 6, it rests on: small and
-stable, nothing fits, fitting costs more than keeping, or it brings too much. A part that gives way keeps the core's
-glue (#534, point 10): its lists and baseline, the failure that says the mend, the word that it could read nothing, and
-"Nothing locks a project".
+*Runs:* where it must run: in a session's hook, in any session, on the host's runners, on the owner's own computer;
+where a check that may decide a pull request runs is `AGENTS.md`'s "A tool that only runs is fetched at set-up, as its
+own program". *Else:* what else does the job, found on the web and in the registries on 17 November 2026, each kept or
+dropped in a few words, a drop marked as a fact, as a measure, or as an assumption to measure (`tasks/choices.md`, "a
+drop says whether it rests on a fact"). A verdict or a candidate the challenge changed was agreed by the owner on 18
+November 2026 ("The owner's word on the challenge", below). *Bugs:* the issues labelled `bug` that name the part's
+files, of the 61 so labelled. A trial of a tool in its place run from 18 November 2026 on is recorded on the line as
+*Tried:*, with *Replayed:* saying by number which of the part's bugs the tool reads and which it does not
+(`tasks/choices.md`, "A trial of a maintained tool replays the part's past bugs"; #593, point 7); the trials of 17
+November below came before that rule and replayed none. Then the verdict: **replace** where a maintained tool does the
+job at the same level or better, the comparison to be shown when it is made; **try** where only a trial can tell;
+**keep**, with the exception of #486, point 6, it rests on: small and stable, nothing fits, fitting costs more than
+keeping, or it brings too much. A part that gives way keeps what `AGENTS.md`, "A part of the core gives way to what is
+maintained", keeps the core's own.
 
 **Trials of 17 November 2026,** each in a scratch folder outside the repository, at one exact version, with install
 scripts off, nothing committed, as the owner allowed for #486's trial on 16 November:
@@ -52,15 +51,14 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
 
 - `scripts/copies.mjs`, `.github/workflows/copies.yml`, `scripts/blobs.mjs`, `scripts/whole-output.mjs`,
   `scripts/schemas.mjs`, `scripts/schemas/`, `.github/copies.json`, `.github/copies-baseline.json`,
-  `tests/copies-tools-test.mjs`: fails a run of code (8 lines) or
-  of the rule files' prose (12 words) that stands in two places, unless its baseline lists it; `copies.yml` runs it and
-  the other checks of the part "copies" through `scripts/checks.mjs`. *Runs:* any session and the runners. *Else:* jscpd
-  (MIT, maintained, a program for each system, 224 languages, Markdown among them), kept, tried above; PMD's CPD,
-  dropped on fact: a Java runtime; Simian, dropped on fact: no licence the Open Source Initiative approves. *Bugs:* 9,
-  and 4 naming `copies.yml`, the most of any check. **Try** jscpd for the finding, its definition taking the core's
-  place by default (#534, point 3); the baseline and the near-copies the audit reads stay the core's glue. This weighs
-  again the "Kept" of #486's inventory, whose reason was the core's own definition. Its config's shape is held by a
-  schema and ajv (`scripts/schemas.mjs`; #530, item 7).
+  `tests/copies-tools-test.mjs`: fails a run of code (8 lines) or of the rule files' prose (12 words) that stands in two
+  places, unless its baseline lists it; `copies.yml` runs it and the other checks of the part "copies" through
+  `scripts/checks.mjs`. *Runs:* any session and the runners. *Else:* jscpd (MIT, maintained, a program for each system,
+  224 languages, Markdown among them), kept, tried above; PMD's CPD, dropped on fact: a Java runtime; Simian, dropped on
+  fact: no licence the Open Source Initiative approves. *Bugs:* 9, and 4 naming `copies.yml`, the most of any check.
+  **Try** jscpd for the finding, its definition taking the core's place by default (#534, point 3); the baseline and the
+  near-copies the audit reads stay the core's glue. This weighs again the "Kept" of #486's inventory, whose reason was
+  the core's own definition. Its config's shape is held by a schema and ajv (`scripts/schemas.mjs`; #530, item 7).
 - `scripts/pointers.mjs`, `scripts/rule-files.mjs`, `scripts/markdown.mjs`: fails a pointer in the rule files, to a
   file, a section, a numbered point, a floor rule or an archive item, that leads nowhere. *Runs:* any session and the
   runners. *Else:* lychee (offline, with Markdown's anchors), remark-validate-links, markdown-link-check and linkinator,
@@ -79,8 +77,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   actionlint, which read far more of floor rule 2 than a word and a key; the core's list of what is forbidden stays its
   own policy, given as the tools' configs, and a finding the core judged safe is allowed there with its reason. This
   takes `yaml-keys.mjs` out of #486's YAML package. Found by the challenge, untried: ghalint (MIT, one program, 1.6.0)
-  and poutine (Apache-2.0, one program, 1.1.6), each reading a workflow's security policy; proposed for the
-  replacement's comparison beside zizmor and actionlint.
+  and poutine (Apache-2.0, one program, 1.1.6), each reading a workflow's security policy; agreed for the replacement's
+  comparison beside zizmor and actionlint.
 - `scripts/entry-files.mjs`: fails an agent tool's entry file that does not pull in every file `AGENTS.md` names.
   *Runs:* any session and the runners. *Else:* the generators of each tool's rule files (ruler, rulesync), dropped on
   fact: the core keeps one `AGENTS.md` that each tool's file imports, and needs nothing generated. *Bugs:* 0. **Keep:**
@@ -97,18 +95,21 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   schemas.
 - `scripts/shape.mjs`, `scripts/code-shape.mjs`, `scripts/shape-readers.mjs`, `scripts/shape-csharp.mjs`,
   `scripts/shape-python.mjs`, `scripts/csharp-functions.mjs`, `scripts/javascript-functions.mjs`,
-  `scripts/tree-walk.mjs`, `scripts/dose.mjs`, `scripts/wait.mjs`, `.github/shape.json`, `.github/shape-baseline.json`,
-  `tests/readers-test.mjs`: fails what is new in how the code is put together: a function past its marks for lines,
+  `scripts/python-functions.mjs`, `scripts/tree-walk.mjs`, `scripts/dose.mjs`, `scripts/wait.mjs`, `.github/shape.json`,
+  `.github/shape-baseline.json`, `tests/readers-test.mjs`: fails what is new in how the code is put together: a function past its marks for lines,
   depth and branching, an import on a cycle, a file in no system. *Runs:* any session and the runners. *Else:* Lizard
   (MIT, Python, some 30 languages), dropped on fact: its definitions of a branch are fixed in its code (#519's record);
   ESLint's `complexity` and `max-lines-per-function`, dropped on fact: JavaScript alone; dependency-cruiser (MIT, 18
   packages) and madge, for cycles and boundaries, dropped on fact: JavaScript and TypeScript alone, where the check
   reads C# and Python too. *Bugs:* 3. **Keep:** fitting costs more than keeping, each tool knowing one language or
   fixing its definitions; its readers go to the parser, as #486's group 3 and #519's path say, C#'s functions the first
-  (`scripts/csharp-functions.mjs`, #529), then JavaScript's and TypeScript's (`scripts/javascript-functions.mjs`).
-  *Tried:* 19 November 2026 (#723), tree-sitter's JavaScript grammar 0.25.0 and TypeScript's 0.23.2, on the core's 204
-  files of JavaScript and every case of the lexer's tests: the same where the lexer read by its definition, mended where
-  it misread. *Replayed:* none: no bug filed names the reader; the review findings its tests hold all read.
+  (`scripts/csharp-functions.mjs`, #529), then JavaScript's and TypeScript's (`scripts/javascript-functions.mjs`), then
+  Python's (`scripts/python-functions.mjs`). *Tried:* 19 November 2026 (#723), tree-sitter's JavaScript grammar 0.25.0
+  and TypeScript's 0.23.2, on the core's 204 files of JavaScript and every case of the lexer's tests: the same where the
+  lexer read by its definition, mended where it misread; the same day, its Python grammar 0.25.0, on 30,902 files of
+  Python, likewise. *Replayed:* none: no bug filed names a reader of functions (Python's were of its imports, which
+  stay); the review findings its tests hold all read. Its config's shape is held by a schema and ajv
+  (`scripts/schemas/shape.json`; #530, item 7).
 - `scripts/choices.mjs`: fails a choice record a pull request adds without its lines, says when the pass is due, and
   reads each sign written in a measure. *Runs:* any session and the runners. *Else:* none found; the decision records'
   tools (adr-tools, log4brains) write records and check no form. *Bugs:* 1. **Keep:** nothing fits; the form is the
@@ -117,6 +118,12 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   the checks that need no secret, part by part, as the workflows do and as a session may by hand. *Runs:* any session
   and the runners. *Else:* a task runner (npm scripts, just, make), dropped on fact: a project in another stack has none
   of npm's, and the others are installs. *Bugs:* 2. **Keep:** small and stable glue.
+- `scripts/queue.mjs`: reads the *progress file* (`QUEUE.md` here) as its readers take it, a line of a closed issue
+  skipped and waited on no more, takes those lines out with `--clear`, and, run here by `own-description.yml`, fails a
+  ready pull request that changes the queue and leaves one, saying so of a draft (#750, point 1). *Runs:* any session
+  and the runners. *Else:* GitHub Projects, whose board hides a closed item by its own workflow, dropped on fact: the
+  queue is a file a pull request changes, the trust gate (`AGENTS.md`, "The queue"), and a board is no file of the
+  repository. *Bugs:* 0. **Keep:** small and stable.
 - `scripts/pr-description.mjs`, `.github/workflows/pr-description.yml`, `.github/workflows/own-description.yml`,
   `scripts/milestones.mjs`, `scripts/done-when.mjs`, `scripts/owner-yes.mjs`: fail a ready pull request whose
   description lacks a heading the project names, and, here, the lines the core asks, saying so of a draft. *Runs:* the
@@ -130,7 +137,7 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   *Else:* gitleaks (MIT, Go), kept: its rules may be written when the job runs, from the secret, and it reads text given
   on its input too; its maker now issues only security fixes for it and builds Betterleaks, which reads the same rules
   (fact, as reported in March 2026), so the lookup of #488 picks between them; TruffleHog (AGPL-3.0, allowed for a tool
-  that only runs), dropped on an assumption that the challenge measured wrong, and so proposed for the replacement's
+  that only runs), dropped on an assumption that the challenge measured wrong, and so agreed for the replacement's
   comparison: its live check of a secret turns off (`--no-verification`), as does its look for a newer version of itself
   when it starts (`--no-update`), and so run, offline, with both, over the core's files with a fake key and a term
   planted, 3.99.7 found what gitleaks 8.30.1 found (the key, and the term through a rule of its own) and two addresses
@@ -163,7 +170,9 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   version; licensee reads npm's own tree (`loadActual`); and CycloneDX's npm tool runs `npm ls --long --all`: each would
   read the `@block` case as npm does. *Replayed:* #444 not read (its cases, lock entries not written as npm writes one,
   lie in the lock file, which npm's reading of what is installed never opens); #339, #364, #366, #386 and #447 not run
-  (their cases lie in where the config stands, the steps and the scan, which no tool tried here takes over).
+  (their cases lie in where the config stands, the steps and the scan, which no tool tried here takes over). The
+  config's form is held by a schema and ajv where the core's packages are installed, and by the check's own checks of
+  it where they are not (`scripts/schemas/licences.json`; #530, item 7).
 - `scripts/exact-versions.mjs`: fails a dependency of the project's own written as a range. *Runs:* any session and the
   runners. *Else:* npm's `save-exact`, dropped on fact: it writes exact versions and checks none already written.
   *Bugs:* 1. **Keep:** small and stable, a read of `package.json`.
@@ -240,7 +249,7 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
 - `scripts/own-modules.mjs`, `scripts/holders.mjs`, `scripts/archive.mjs`, `scripts/rules.mjs`, `scripts/holders.json`:
   fail a module the core's `AGENTS.md` neither takes nor gives a reason for, and a rule's holder that is not there.
   *Runs:* any session and the runners. *Else:* none. *Bugs:* 0. **Keep:** nothing fits; both read the core's own rule
-  files.
+  files. The list's form is held by a schema and ajv (`scripts/schemas/holders.json`; #530, item 7).
 - `.github/workflows/codeql.yml`: runs the host's CodeQL on a public project's pull requests, its pushes and weekly.
   *Runs:* the runners. *Else:* it is the host's maintained tool already. On a private repository it is paid, so a
   private project does not call it (`README.md`, "A private repository"), and `scripts/code-scan.mjs` scans it in
@@ -280,13 +289,23 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   `select.mjs`. **Keep** the selection: nothing fits. The upgrade test's runner of workflows
   (`scripts/workflow-run.mjs`) stays as #486 says: `act`, dropped on fact, needs a container a session cannot start;
   its YAML is read by the YAML package (#530).
-- `scripts/mutate.mjs`, `scripts/strength.mjs`: the mutation tool puts faults into the lines a change touches, one at a
-  time, and writes the open mutation report, which the strength check reads to say how strong the tests are. *Runs:* any
-  session and the runners. *Else:* StrykerJS (Apache-2.0, 176 packages) and Stryker.NET, kept, tried above; mutmut and
-  Cosmic Ray for Python, kept for a Python project. *Bugs:* 0. **Replace** `mutate.mjs` with Stryker (a tool that only
-  runs, fetched at set-up), which put nine times as many faults into the same lines, 63 of them surviving against the
-  core's 4, and reaches .NET, which the core's tool does not; its packages are what #488's lookup weighs. **Keep**
-  `strength.mjs`: it reads the report every such tool writes, and holds the core's measure.
+- `scripts/mutate.mjs`, `scripts/strength.mjs`, `scripts/stryker.mjs`, `scripts/stryker-plugin.mjs`, `tests/mutation/`:
+  the mutation tool puts faults into the lines a change touches, one at a time, and writes the open mutation report,
+  which the strength check reads to say how strong the tests are. *Runs:* any session and the runners. *Else:* StrykerJS
+  (Apache-2.0, 172 packages) and Stryker.NET, kept, tried above; mutmut and Cosmic Ray for Python, kept for a Python
+  project. *Bugs:* 0 naming `mutate.mjs`; #636, open, names `strength.mjs` and lies in four of the core's tests.
+  **Replace** `mutate.mjs` with Stryker (a tool that only runs, fetched at set-up), which put nine times as many faults
+  into the same lines, 63 of them surviving against the core's 4, and reaches .NET, which the core's tool does not; its
+  packages are what #488's lookup weighs. **Keep** `strength.mjs`: it reads the report every such tool writes, and holds
+  the core's measure. *Tried:* 18 November 2026 (#581), each tool as the core runs it, against every test that names the
+  file, on the same four files: `core-path.mjs`, the core's 24 faults (4 survived) in 39 s, Stryker's 212 (62) in 407 s;
+  `session-cost.mjs`, 39 (9) in 5 s against 221 (63) in 28 s; `dose.mjs`, 72 (13) in 24 s against 428 (98) in 126 s;
+  `mend.mjs`, 4 (0) in 1 s against 32 (2) in 513 s, 48 tests naming it. Each line where a fault of the core's survived
+  holds a surviving one of Stryker's. *Replayed:* none (no bug was filed against `mutate.mjs`; #636 has no merged fix).
+  Replaced in #651: Stryker, installed from `tests/mutation/`'s lock file (its package list, lock file, `.npmrc`, in
+  `tests/`, which no copy carries, installed by `install.mjs mutation`), is run by `stryker.mjs` with the core's glue
+  (the tests that name each file, a working copy, the budget, a report written as the run goes); `mutate.mjs` stays for
+  a project that names it, and for `--every`, which names each test that caught a fault.
 
 ## Jobs on a schedule or by hand
 
@@ -339,9 +358,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   running it over this session's own record; for the labels, the host's CLI (`gh label create --force`), which writes a
   list of labels, dropped on fact: `labels.mjs` writes none and reads the issues' labels and openers, which no tool
   found does; for the state report, pruning and the records, none found: each reads the core's own forms. *Bugs:* 2, 1,
-  0, 0, 0, 2 and 2. **Try**, proposed, ccusage under the cost line, the line's form and its tally staying the core's;
-  **keep** the rest: nothing fits. The libraries of the parts above are named on their parts' lines, and weighed with
-  them.
+  0, 0, 0, 2 and 2. **Try** ccusage under the cost line, the line's form and its tally staying the core's; **keep** the
+  rest: nothing fits. The libraries of the parts above are named on their parts' lines, and weighed with them.
 
 ## Hooks and set-up
 
@@ -358,27 +376,30 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
 - `scripts/node.sh`, `.node-version`, `.node-least`: keeps the pinned Node on a session's machine, fetched by its
   digest. *Runs:* the cloud set-up, from `main`. *Else:* nvm, fnm, Volta and mise, dropped on fact: each must be
   installed first, by digest too; the host's `setup-node`, which the runners already use. *Bugs:* 0. **Keep:** small and
-  stable, for Node. #534's point 5 widens it to the tools that only run, and there the challenge proposes **try**: aqua
-  (MIT) and mise (MIT), found again, each keep a file of every tool's digest for each system (`aqua-checksums.json`,
-  `mise.lock`) and refuse a download that does not match, which is the list of digests point 5 asks, kept by a
-  maintained program in place of one script line per tool; each is itself fetched first, by its digest, as Node is. Not
-  measured: this session's network refused the host's release downloads, from which both, and most of the tools, are
-  fetched (the tools tried here came through the Go and npm registries instead).
+  stable, for Node. #534's point 5 widens it to the tools that only run, and there the owner's word of 18 November 2026
+  sets the **try**: first a registry's own lock file, for each tool a registry carries (#654), and aqua (MIT) or mise
+  (MIT) only for what no registry carries, mise through only its backends that check a download against its digest
+  (aqua, github and http), never asdf's or vfox's, which run a plugin's scripts that no digest pins (floor rule 15).
+  Those two, found again, each keep a file of every tool's digest for each system (`aqua-checksums.json`, `mise.lock`)
+  and refuse a download that does not match, which is the list of digests point 5 asks, kept by a maintained program in
+  place of one script line per tool; each is itself fetched first, by its digest, as Node is. Not measured: this
+  session's network refused the host's release downloads, from which both, and most of the tools, are fetched (the tools
+  tried here came through the Go and npm registries instead).
 - `scripts/init.mjs`, `scripts/steps.mjs`, `scripts/sync.mjs`, `scripts/fresh.mjs`, `scripts/check-configs.mjs`,
   `scripts/steps-stage.mjs`, `scripts/bash-commands.mjs`, `scripts/own-files.mjs`, `scripts/runners.mjs`,
-  `setup/sync-notes.md`, `tests/init-dotnet-test.mjs`: the starter kit writes a new project's
-  files; the sync writes the copy at a newer commit and moves the pins; each step of the sync notes reads done or not.
-  *Runs:* any session, in the project. *Else:* Copier and Cookiecutter, dropped on fact: Python and an install in the
-  project, and #519 weighed the template; `git archive`, which the sync already uses. *Bugs:* 2, 8 and 4. **Keep:**
-  nothing fits; what a release asks is the core's.
+  `setup/sync-notes.md`, `tests/init-dotnet-test.mjs`: the starter kit writes a new project's files; the sync writes the
+  copy at a newer commit and moves the pins; each step of the sync notes reads done or not. *Runs:* any session, in the
+  project. *Else:* Copier and Cookiecutter, dropped on fact: Python and an install in the project, and #519 weighed the
+  template; `git archive`, which the sync already uses. *Bugs:* 2, 8 and 4. **Keep:** nothing fits; what a release asks
+  is the core's.
 - `scripts/install.mjs`, `scripts/packages.mjs`, `scripts/parser.mjs`, `scripts/parser-worker.mjs`, `.packages/`,
-  `.gitignore`: install the packages of other publishers the scripts run from the
-  core's lock file in `.packages/` into `.packages/node_modules/`, and the parser's from `.packages/parser/` only where
-  a job names it (#719), and load each from its own install alone, a missing one saying its mend (#654); and, named, the code scan's engine from `.packages/requirements.txt` into
-  `.packages/pypi/` with pip (#546). *Runs:* any session, at its start and at each sync, and on the host's runners before each check.
-  *Else:* npm's own `npm ci` and pip's `install --require-hashes`, which do the installs, kept; a folder of carried packages (#528), dropped on the owner's
-  decision of 18 November 2026. *Bugs:* none. **Keep:** the install is npm's; the scripts run it once more after a
-  failed fetch and say the mend.
+  `.gitignore`: install the packages of other publishers the scripts run from the core's lock file in `.packages/` into
+  `.packages/node_modules/`, and the parser's from `.packages/parser/` only where a job names it (#719), and load each
+  from its own install alone, a missing one saying its mend (#654); and, named, the code scan's engine from
+  `.packages/requirements.txt` into `.packages/pypi/` with pip (#546). *Runs:* any session, at its start and at each
+  sync, and on the host's runners before each check. *Else:* npm's own `npm ci` and pip's `install --require-hashes`,
+  which do the installs, kept; a folder of carried packages (#528), dropped on the owner's decision of 18 November 2026.
+  *Bugs:* none. **Keep:** the install is npm's; the scripts run it once more after a failed fetch and say the mend.
 - **What the starter kit holds** (`setup/template/`, 32 files on 17 November 2026), weighed by the challenge: eight
   templates of rule files and records, exempt as content (#534, point 9); three of hooks, weighed in the hook's line
   above; three of Dependabot, the host's own format already; three configs of the core's checks and twelve workflows,
@@ -398,7 +419,7 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   made for organisations; Terraform or OpenTofu with the host's provider, dropped on fact: an install and a state file
   to keep for a handful of settings; ghset, a young program, dropped on fact: the host's JSON and its CLI do what it
   does. The app, `NOTICE`, the profile and git's name are no setting a file can hold: an install, the holder's own
-  typing, a profile and each machine's config. *Bugs:* 2 naming a ruleset. **Try**, proposed: the rulesets of
+  typing, a profile and each machine's config. *Bugs:* 2 naming a ruleset. **Try**: the rulesets of
   `README.md` kept as the host's JSON, which the owner applies with one command, where the plan has rulesets (a private
   repository on the free plan has none).
 - **The definition of a session's environment,** weighed by the challenge: what each tool's cloud session is set up
@@ -416,7 +437,7 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   (Claude Code's `.claude/rules/` with `paths`, Copilot's `.github/instructions/` with `applyTo`, Kiro's steering files,
   whose matching by path was not confirmed), which load a file's rules when a session reads a path they name, as
   `reading.mjs` does for a pull request's changed paths, but each in its own form; and `claude plugin eval`, which reads
-  whether Claude Code loads a skill by itself, half of point 8's trial for one tool. Both proposed for the trial.
+  whether Claude Code loads a skill by itself, half of point 8's trial for one tool. Both agreed for the trial.
   *Bugs:* 1. **Try**, as #534's point 8 sets out: one or two task modules laid out as skills, each tool the core
   supports given a task that calls for one.
 - **How the core reaches a project:** the copy, its check and its sync, in the lines above. **Keep**, #519's record.
@@ -424,14 +445,14 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   `scripts/staged/`, 1,531 lines, and `scripts/staged-tools.json`, the tools they are run under), which give a fresh
   session a task and read what it did. *Runs:* any session; the staged cases in a session, each a helper started by its
   own tool. *Else:* for the staged cases, Inspect AI (MIT, with agents for Claude Code and Codex) and Harbor
-  (Terminal-Bench's harness), kept; promptfoo, dropped on an assumption that the challenge measured wrong, and so
-  proposed for the trial: since its maker's sale on 9 March 2026 it has published 28 releases (66 in the seven months
-  before), and its newest, 0.125.1 of 25 October 2026, still names Claude's agent SDK and Codex's among its packages;
-  its upkeep slowed and goes on. Claude Code's own `claude plugin eval`, found by the challenge, runs a skill's cases
-  with it and without it and scores the difference, on the session's own sign-in; dropped as the harness on fact: Claude
-  Code's alone. *Bugs:* 3 naming `staged.mjs`. **Try** a harness under the cases, the cases staying the core's; what
-  decides is whether it runs where a session runs, with no container and on the session's own sign-in rather than a paid
-  key, both unmeasured.
+  (Terminal-Bench's harness), kept; promptfoo, dropped on an assumption that the challenge measured wrong, and so agreed
+  for the trial: since its maker's sale on 9 March 2026 it has published 28 releases (66 in the seven months before),
+  and its newest, 0.125.1 of 25 October 2026, still names Claude's agent SDK and Codex's among its packages; its upkeep
+  slowed and goes on. Claude Code's own `claude plugin eval`, found by the challenge, runs a skill's cases with it and
+  without it and scores the difference, on the session's own sign-in; dropped as the harness on fact: Claude Code's
+  alone. *Bugs:* 3 naming `staged.mjs`. **Try** a harness under the cases, the cases staying the core's; what decides is
+  whether it runs where a session runs, with no container and on the session's own sign-in rather than a paid key, both
+  unmeasured.
 - **The mutation tool:** the line above. **Replace.**
 - **The reviews:** Codex's code and security reviews and the fallback reviewer, with the statuses above. *Else:* hosted
   review products, dropped on fact: paid on a private repository and hosted (#534, point 6). **Keep**, looked at again
@@ -536,10 +557,15 @@ weeks before or more where one was, with install scripts off and nothing committ
 fake, built when the trial ran. The programs came from the Go and npm registries, since this session's network refused
 the host's release downloads.
 
-### What waits on the owner
+### The owner's word on the challenge
 
-Each is proposed, and none becomes a line, or widens one, before the owner's word; the twelve agreed verdicts do not
-wait on any of them.
+The challenge left seven proposals here. On 18 November 2026 the owner agreed to all seven, and changed the fetcher's
+trial, in words the orchestrator passed on:
+
+> 5. #534: the inventory challenge's seven proposals are all agreed. The fetcher trial changed: a registry's own lock
+> file is the first candidate, which #654 now makes the rule; aqua or mise only for what no registry carries.
+
+Each now stands on its part's line above and in the order below:
 
 1. TruffleHog joins the comparison of the personal-terms check's replacement, beside gitleaks or Betterleaks, run only
    with `--no-verification` and `--no-update`, offline, as the trial ran it.
@@ -547,22 +573,28 @@ wait on any of them.
 3. promptfoo joins the trial of a harness under the staged cases, beside Inspect AI and Harbor.
 4. The trial of the skill format (#534, point 8) weighs each tool's own rule files for paths too, and uses
    `claude plugin eval` for Claude Code's part.
-5. `scripts/node.sh`, where point 5 widens it to the tools that only run: **try** aqua or mise as the fetcher, its file
-   of digests standing as point 5's list, in place of **keep**.
+5. The fetcher of the tools that only run (`scripts/node.sh`, as `AGENTS.md`'s "A tool that only runs is fetched at
+   set-up, as its own program" widens it): **try** a registry's own lock file first, for each tool a registry carries
+   (#654), and aqua or mise only for what no registry carries, mise through only its backends that check a download
+   against its digest (aqua, github and http), never asdf's or vfox's (floor rule 15).
 6. The owner's steps on the host's account: **try** the rulesets of `README.md` kept as the host's own JSON, applied
    with one command, a new line.
 7. What a session runs by hand: **try** ccusage under the cost line (`scripts/session-cost.mjs`), a new line.
 
 ## What the verdicts ask, in #534's order
 
-The owner agreed to all twelve on 17 November 2026, each a line of `QUEUE.md` of its own; none arrives before #488's
-points 1, 3, 4 and 5 have merged. What the challenge proposes is not among them until the owner's word.
+The owner agreed to all twelve on 17 November 2026, and to the challenge's seven on 18 November 2026, each a line of
+`QUEUE.md` of its own or a widening of the line it belongs to.
 
 1. The tools that only run: **replace** the matching of `personal-terms.yml` with gitleaks or Betterleaks; **replace**
    `scripts/workflows.mjs` with zizmor and actionlint; **replace** `scripts/mutate.mjs` with Stryker; **try** a link
    checker, offline, under `scripts/pointers.mjs`; **try** jscpd under `scripts/copies.mjs`; **try** a harness under the
    staged cases; and of what the core lacks, **try** a general linter for its scripts (oxlint, then Biome), ShellCheck
-   with actionlint, and knip after the linter.
+   with actionlint, and knip after the linter. The challenge's seven widen these: TruffleHog beside gitleaks, ghalint
+   and poutine beside zizmor and actionlint, promptfoo in the harness's trial; and they add, ahead of the first such
+   tool, the **try** of its fetcher, a registry's own lock file first (#654), and the **try**s of the rulesets as the
+   host's JSON and of ccusage under the cost line.
 2. The reading under the package checks: **replace** with `npm sbom`; **try** nuget-license and the SDK's own list.
 3. The packages, installed from the core's lock file (#654): as #486's inventory and #519's path have them.
-4. The form the rules are delivered in: **try** the skill format (#534, point 8).
+4. The form the rules are delivered in: **try** the skill format (#534, point 8), weighing each tool's own rule files
+   for paths too, with `claude plugin eval` for Claude Code's part.

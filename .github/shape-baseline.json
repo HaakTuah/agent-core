@@ -11,6 +11,7 @@
     "csharp",
     "csharp-tree",
     "python",
+    "python-tree",
     "scripts",
     "screens",
     "clocks",
@@ -19,6 +20,8 @@
   "grown": {
     "timed: tests/code-scan-test.mjs -> Date.now": "The clock is what it guards: a description far past any real one is read in under 2 s, so the scan's reading of \"Scan false alarm:\" and \"Scan unread:\" lines cannot hang on a hostile description (#612).",
     "process: tests/code-scan-test.mjs -> node:child_process": "Starting the programs is what it guards: the scan reads a pull request's diff through git, its own step installs the real engine with pip and runs it, and the test reads the scan's command line, exit code and printed mend on repositories it builds with git (#612).",
+    "timed: tests/stryker-test.mjs -> Date.now": "It holds Stryker's run to its budget and a test to its limit with a fault in, both measured on the clock the run itself reads, which is what the test guards (#581).",
+    "process: tests/stryker-test.mjs -> node:child_process": "It runs Stryker, another publisher's tool, as the strength step runs it, and stops a run by a signal: the process and its group are what the test guards (#581).",
     "process: tests/issue-terms-test.mjs -> node:child_process": "It runs the personal-terms check's own shell lines (its link and unlinked) in bash on each text, which is what holds the two matchers in step (#783).",
     "process: tests/mend-test.mjs -> node:child_process": "The inventory's check reads its coverage from the files git tracks (#593, point 2: a sweep reads its scope from a source a script counts it from), so what `git ls-files` prints is what the test guards; no code of the core's stands beneath that process to call instead.",
     "process: tests/reasons-test.mjs -> node:child_process": "Its last three tests run the script as a command, since what they guard is the command itself: its exit code and the failure line with its mend that a session reads (#756)."
@@ -128,6 +131,7 @@
     "process: tests/started-test.mjs -> node:child_process": true,
     "process: tests/steps-test.mjs -> node:child_process": true,
     "process: tests/strength-test.mjs -> node:child_process": true,
+    "process: tests/stryker-test.mjs -> node:child_process": true,
     "process: tests/test-record-test.mjs -> node:child_process": true,
     "process: tests/tools-read-test.mjs -> node:child_process": true,
     "process: tests/upgrade-test.mjs -> node:child_process": true,
@@ -162,6 +166,7 @@
     "timed: tests/shape-test.mjs -> Date.now": true,
     "timed: tests/staged-test.mjs -> Date.now": true,
     "timed: tests/steps-test.mjs -> Date.now": true,
+    "timed: tests/stryker-test.mjs -> Date.now": true,
     "timed: tests/work-saved-test.mjs -> Date.now": true,
     "timed: tests/workflows-test.mjs -> Date.now": true
   }

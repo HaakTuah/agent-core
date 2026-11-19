@@ -35,8 +35,11 @@ const own = fs.existsSync(path.join(root, "tests"));
 // only through the shell, and each argument is the script's own)
 // (each of the core's npm installs, INSTALLS in packages.mjs, in its own folder, where npm reads that folder's .npmrc alone)
 const npmCi = cwd => spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--allow-git=none", "--allow-remote=none", "--allow-file=none", "--allow-directory=none", "--workspaces=false", ...(own ? [] : ["--omit=dev"])], { cwd, encoding: "utf8", shell: windows });
+// (and, in the core's own repository alone, the install of its own mutation tool, Stryker, in tests/mutation/, which no
+// copy carries (.gitattributes) and `all` leaves out: only the job of the strength check names it (#581, #654))
+const OWN_ONLY = own ? { mutation: "tests/mutation" } : {};
 export const REGISTRIES = {
-  ...Object.fromEntries(Object.entries(INSTALLS).map(([name, folder]) =>
+  ...Object.fromEntries(Object.entries({ ...INSTALLS, ...OWN_ONLY }).map(([name, folder]) =>
     [name, { folder, lock: `${folder}/package-lock.json`, into: `${folder}/node_modules/`, run: () => npmCi(path.join(root, folder)) }])),
   // (the code scan's engine alone, #546: pip takes each wheel at the hash requirements.txt names, binaries only, none
   // of their dependencies and none of their code run, into .packages/pypi/; Python 3.10 or later, as every GitHub
@@ -71,7 +74,7 @@ function refusal(name) {
   // (what the package list and lock file hold, read before npm runs: the npm that comes with the least Node fetches
   // whatever source a spec names, and runs its prepare script, whatever setting says otherwise)
   let faults;
-  try { faults = lockFaults(JSON.parse(fs.readFileSync(at("package.json"), "utf8")), JSON.parse(fs.readFileSync(at("package-lock.json"), "utf8"))); }
+  try { faults = lockFaults(JSON.parse(fs.readFileSync(at("package.json"), "utf8")), JSON.parse(fs.readFileSync(at("package-lock.json"), "utf8")), { overrides: Object.hasOwn(OWN_ONLY, name) }); }
   catch (e) { faults = [`${lock} or ${own}/package.json cannot be read (${e.message})`]; }
   if (faults.length) return `${faults[0]}${faults.length > 1 ? `, and ${faults.length - 1} more` : ""}. Mend: write the package list and lock file as npm's own install from its registry writes them, with no other source`;
   const stray = strays(dir, at);
@@ -108,8 +111,9 @@ function namesNothing(name) {
 
 const named = [...new Set(process.argv.slice(2).flatMap(n => (n === "all" ? Object.keys(INSTALLS) : [n])))];
 const unknown = named.filter(n => !Object.hasOwn(REGISTRIES, n));
+const notAll = Object.keys(REGISTRIES).filter(n => !Object.hasOwn(INSTALLS, n)); // (what `all` leaves out: mutation, pypi)
 if (unknown.length) {
-  console.error(`FAIL: install.mjs knows no install ${unknown.join(", ")}. Mend: name one of ${Object.keys(REGISTRIES).join(", ")}, all for every one, or none for the first`);
+  console.error(`FAIL: install.mjs knows no install ${unknown.join(", ")}. Mend: name one of ${Object.keys(REGISTRIES).join(", ")}, all for every one${notAll.length ? ` but ${notAll.join(" and ")}` : ""}, or none for the first`);
   process.exit(1);
 }
 const first = Object.keys(REGISTRIES)[0]; // (npm's, where none is named)

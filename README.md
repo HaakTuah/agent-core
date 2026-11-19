@@ -191,16 +191,20 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `STRENGTH_BASE` the pull request's base: it runs the project's mutation tool (the *mutation tool*) on the lines
      the pull request changes and shows how many faults put in on purpose a test caught; once a whole run at an audit
      has written its baseline, beside the shape check's, a fault that survives there unlisted fails
-     (`tasks/code-shape.md`). `mutate.mjs` is the core's own tool, for code run by Node with tests that are files
-     run by `node`, which with `--every` names each test that catches a fault.
+     (`tasks/code-shape.md`). For code run by Node with tests that are files run by `node`, `stryker.mjs` runs
+     Stryker as such a tool, installed from a lock file of the project's (the core's own, in `tests/mutation/`), and
+     `mutate.mjs` is a tool the core wrote, with fewer kinds of fault, which with `--every` names each test that catches
+     one.
    - **What the tests cost** (`tasks/tests.md`): `select.mjs`, a step of the same job before the tests, with
      `SELECT_BASE` the pull request's base, selects the tests the change can reach, with the project's proof, never
      selected out, and the whole suite where a changed file's reach cannot be told or no base is told; the job runs
      those it names. At the audit, `test-record.mjs` reads each test's time, its failures and what it alone catches;
-     each month the state report gives what a push waits on (`wait.mjs`) beside its mark. The shape check counts the
-     tests that open a screen, reach a real clock or start another process, and the record the share of the tests' time
-     each takes; it measures each suite against its time mark, a warning past it and never a failure, holds the marks
-     and a push's never worse, and reads the selection's lists from its config.
+     each month the state report gives what a push waits on (`wait.mjs`) beside its mark, and the minutes GitHub bills a
+     pull request, the median of the last 30 merged, each job rounded up, which the core's report carries for each
+     project it reads. The shape check counts the tests that open a screen, reach a real clock or start another process,
+     and the record the share of the tests' time each takes; it measures each suite against its time mark, a warning
+     past it and never a failure, holds the marks and a push's never worse, and reads the selection's lists from its
+     config.
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `roles/shared/work-flow.md` names (or those the project gives it), the line that says
      what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`), or the cost
@@ -433,6 +437,7 @@ for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit
 | *choice records* | the file that holds its records of the choices that are hard to undo, in backticks (`tasks/choices.md`; `scripts/choices.mjs` reads it) | choice: left out, `docs/choices.md`, which the starter kit writes |
 | *owner's choices* | the kinds of choice the owner keeps, each asked of the owner (`tasks/choices.md`) | choice: left out, none |
 | *other builders' checks* | what a session of another tool than Claude Code runs before it finishes (`tools/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync | choice: left out, the project's own tests |
+| *quick check* | the command, in backticks, that a session runs before its first change, to tell a `main` that is broken from a fault of its own, in about a minute (`roles/shared/work-flow.md`, "Sessions"); the start hook names it from main's manifest, and never runs it (`scripts/work-saved.sh`) | choice: left out, the *other builders' checks* |
 | *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so (`tasks/roles.md`, "Tools are preferences") | read: from the last merged pull requests, as `tasks/roles.md` says ("Tools are preferences") (`scripts/tools-read.mjs`) |
 | *pace* | the manifest's lines under "Pace", each a pace the owner sets, of the kinds `roles/orchestrator.md`, "The pace is the owner's", names | choice: left out, no pace but the default |
 | *users get* | `merges` or `releases`, in backticks: whether the project still publishes what its users get on each merge to its default branch (a site deployed on each push), or only from that branch's green newest commit or a release cut there (floor rule 12; `tasks/hosts.md`) | cannot be read: a deploy on each push and a release workflow each say it only in part; left out, `merges`, under which a pull request is brought up to date first, until the project's publishing waits on a green branch and its row says `releases` |
@@ -483,6 +488,9 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
 
 ## Setting up (the owner's part)
 
+- An adviser (`roles/adviser.md`): its session started with every repository of the owner's it is to advise on, so it
+  can read them, file in them and start each one's orchestrator, reading what another account can write only through
+  that repository's orchestrator (`roles/adviser.md`); at the effort its tool's part advises (`tools/claude.md`).
 - Where Codex reviews: its GitHub app on the owner's repositories, its own automatic code review off (core archive 18);
   its security review on, for team PRs (Dependabot's own need none: floor rule 8), on PR open, reporting Medium and
   above, reading the project's threat model and `SECURITY.md` with the floor (core archive 51).

@@ -32,8 +32,8 @@ Read when a task calls for it, each saying when in its opening line: the files o
 `floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
 `tasks/tools.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`, `tools/antigravity.md`,
 `tasks/github-calls.md`, `tasks/hosts.md`, `tasks/repositories.md`, `roles/shared/teams.md`, `roles/orchestrator.md`,
-`tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md`, `tasks/done-when.md`
-and `tasks/planning.md`.
+`tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md`, `tasks/done-when.md`,
+`tasks/planning.md` and `roles/shared/records.md`.
 
 Not taken, each for its reason:
 
@@ -47,7 +47,8 @@ then one release"; #322), and of `tasks/planning.md` the point on a task's relea
 holds no copy; the *report*: the PR's description (`reports/` keeps
 those written before 12 November 2026, and the staged cases' record); the *audits*: `reports/`; the *choice records*:
 `CHOICES.md`; the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
-the *mutation tool*: `node scripts/mutate.mjs --report {report} {lines}`, the core's own, in `tests.yml`;
+the *mutation tool*: `node scripts/stryker.mjs --tool tests/mutation --report {report} {lines}`, Stryker at the version
+`tests/mutation/`'s lock file pins (#581), in `tests.yml`;
 the archive is `archive/instructions.md`, the items behind each rule listed in `scripts/holders.json`; the *settling references* and the *descriptions*:
 `README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
 `tests.yml`, its baseline empty (#259); the *owner's account*: `HaakTuah`; the *users get*:
@@ -59,7 +60,7 @@ queue's order; the
 issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`tasks/roles.md`,
 `roles/orchestrator.md`); the *hard work*: a new or changed rule; the *size marks*: the caps of
 `scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*:
-the suites of `.github/workflows/tests.yml`; *planning design*: none; the *other builders' checks*: those suites, which any tool's
+the suites of `.github/workflows/tests.yml`; *planning design*: none; the *quick check*: `node scripts/holders.mjs && node scripts/size.mjs && node scripts/reading.mjs --check && node tests/holders-test.mjs && node tests/manifest-reads-test.mjs && node tests/general-test.mjs`; the *other builders' checks*: those suites, which any tool's
 session here runs before it finishes, every file here being protected (`SECURITY.md`).
 
 ## The queue
@@ -72,16 +73,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   joins only where that PR relays the owner's yes to its issue, as the chat session records it ("Whose words an issue
   holds"): that PR is the gate, so no verdict of the stand-in's queues one here, a difference from `roles/shared/inbox.md`.
   A test, a check for a rule that already stands, a task the scheduled look opens (#248) and a small finding of an
-  audit (#259) join without the owner's word. A bug waits for no line, as that module says. A line leaves in the PR
-  that closes its issue.
+  audit (#259) join without the owner's word. A bug waits for no line, as that module says. A line does not leave in
+  the PR that closes its issue: the readers of the file skip the line of a closed issue, and the next PR that changes
+  the file takes such lines out together (`node scripts/queue.mjs --clear`; #750, point 1), as that module says, since
+  PRs merging side by side collided on it. Held here by `own-description.yml`, which fails a ready PR that changes the
+  file and leaves one.
 - **Queued means wanted: nothing queued waits for a second word.** Where the floor asks the owner's
   yes in a PR (floor rule 3: a change to the floor or the review guidelines), the yes the owner gave when its issue was
   queued is that yes: the builder relays it into the PR word for word as it was recorded (floor rule 3), and it covers
   the change as the issue describes it. A PR that goes beyond its issue is not covered by it, and the design check
   says so.
 - **The file holds no note.** Where a module asks for one in the *progress file* (a lane that waits), it goes in the
-  description of the line's own PR, which the next builder reads with the branch, as a passed gate's note does
-  (`roles/shared/work-flow.md`).
+  description of the line's own PR, which the next builder reads with the branch, as a hand-off note does
+  (`tasks/tools.md`, "A change of tool loses nothing").
 - **Whose words an issue holds.** Of the issues open on 14 November 2026 and labelled `queued` and `by:chat`, the owner
   said the decisions quoted in them are the owner's, and so are the answers on other issues that their notes name.
   What the chat session records is the owner's word on any day: an issue or note from the
@@ -98,7 +102,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   writes it from the owner's word recorded on the issue ("Whose words an issue holds"), adds it to the archive as an
   item of its own, naming the issue as its source, and takes what it leaves open as `roles/shared/inbox.md` says of any
   open point. This is the second
-  difference from that module, where only the design session writes rules from the owner's words.
+  difference from that module and `roles/shared/records.md`, where only the design session writes rules from the owner's
+  words.
 - **A bug fix and a rework of tests are built on Sonnet** (#767). By default, where "The builders" of
   `roles/orchestrator.md` picks Claude for a line that fixes a bug or reworks tests, the orchestrator starts its builder
   on Sonnet at high effort; a line that writes or changes a rule, touches security or reads a format another publisher
@@ -121,7 +126,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   by `scripts/builder-trial.mjs`, which counts each kind by its builder from what `scripts/review-record.mjs` reads and
   from the session-cost lines; which model and effort the orchestrator starts, by nothing yet.
 - **An orchestrator may work the file** (`roles/orchestrator.md`) while it holds a line a session can take. The
-  owner starts it; once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
+  owner starts it, or the owner's adviser on the owner's word (`roles/adviser.md`); once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
   wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from
   a project's root and there is no copy here, and what `setup/sync-notes.md` asks, which it asks of projects.
 - **One batch, then one release.** A batch is the lines the file holds between two releases, and the release after it
@@ -249,6 +254,59 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   conclusions are carried, nothing of its code or its discussions. It does not mean a project that is merely public is
   read for the report, though a task may read it (`roles/shared/how-to-work.md`). Reason: the owner wants to see how the
   core works in other projects, and only those that hold use to read.
+- **A part of the core gives way to what is maintained** (#534). By default the core keeps the parts it has. The one
+  condition that changes it: a maintained tool, package or standard, free to use, does a part's job at the same level or
+  better. The trigger is a line of `QUEUE.md` that names the part, as a verdict of the inventory (`INVENTORY.md`) joins
+  it on the owner's word: whoever takes that line replaces the part, and from then on the core follows the tool's
+  releases by `tasks/updates.md` in place of keeping a version of its own. "The same level or better" is shown: the tool
+  and the part run on the same inputs (the core's own repository, the projects the upgrade test writes of each kind, and
+  the part's own fixtures), and the pull request states what each found that the other did not, as `tasks/choices.md`
+  asks of a trial. Where the tool defines the thing otherwise than the core (what a copy is, what counts as a branch),
+  its definition is taken unless the comparison shows it worse for what the rule is for, and the pull request says
+  which; and that pull request adds a sync note whose step has a project's list for that check written anew at the sync
+  that brings the replacement, the pull request's base counting as the list until then. A part rests on one of the
+  exceptions of `tasks/code-shape.md`, "A job a maintained package does is done by it", to stay. The writer of
+  `QUEUE.md` queues the replacements in one order: the inventory, then the tools that only run, which hand over the most
+  upkeep for the least work (secrets and personal terms, then the workflow checks, then mutation testing, then links),
+  then the packages installed from the core's lock file (#654), then the form the rules are delivered in, each
+  replacement a line and a pull request of its own. Whatever gives way, the core keeps: the floor and the policy a check
+  applies (what is allowed, its lists); the content of the rule text, which another's text never replaces, though its
+  form and delivery may change, the text that describes a check that gave way shrinks to a pointer to the tool's own
+  documentation, and what others do may be written anew as the core's own, joining as any rule does; and the glue around
+  every check: a baseline that may only shrink, a failure that says the mend, the word that it could read nothing
+  (#459), and "Nothing locks a project"; the tool finds, and the core decides and words the failure. It does not mean a
+  part is replaced for the sake of it, nor that a sync asks a project to replace anything of its own. Reason: what the
+  core writes itself, the core alone maintains, in every project that takes it; and rule text breaks on no update, holds
+  the owner's decisions with their reasons, would run with the agents' rights where another's (floor rule 4), and cannot
+  be shown "the same level or better" without trials of behaviour. Held by no check: the comparison and the definition
+  taken are stated in each replacement's pull request, which the reviews read, and the inventory is held by its own
+  check (`tests/mend-test.mjs`).
+- **A tool that only runs is fetched at set-up, as its own program** (#534). By default a check of the core is a script
+  of its own. Where a part gives way to a tool that only runs, whoever builds the replacement has the tool fetched at
+  set-up, never while a check runs: one exact version, its digest in a list a test reads (a registry's own lock file
+  first, for a tool a registry carries; #654), an entry for each platform a check runs on, fetched to a place outside
+  the repository when a session is set up and in the set-up step of the job on the host's runners, as `scripts/node.sh`
+  fetches Node. The check then runs wherever the tool is, in a cloud session, on the owner's own computer or on the
+  runners; where the tool is not there and cannot be fetched, the check says that it did not run and why, and decides
+  nothing. The tool runs as its own program, never through a vendor's action for the host, a hosted service or a feature
+  of the host's paid plans, and passes floor rules 7, 10 and 15 and the lookup (`floor/topics/dependencies.md`). It adds
+  no job: what adds minutes, mutation testing above all, stays on the lines a change touches. It does not mean a check
+  that exists on the host's runners alone. Reason: a private repository on the host's free plan stops its jobs once the
+  month's minutes are spent, a project built on its owner's own computer gets least from a check it cannot run there,
+  and a wrapper or a hosted feature brings terms of its own (a licence key for an organisation's repositories, a price
+  for each committer) and may send data out of the repository. Held, for the pin, by the licence scan's check that a
+  program a file downloads is pinned by version and checksum (`scripts/licence-scan.mjs`; #488); that no workflow runs
+  such a tool through another's action, by no check yet (#639).
+- **A part is asked again** (#534). By default the pass twice a year over the choice records (`tasks/choices.md`) asks
+  of each part the inventory marks keep or try whether something maintained now does it, and writes the day on the
+  inventory's line `Weighed whole:`. The trigger that asks sooner: a bug filed that names such a part, or a pull request
+  that widens what such a part reads or checks (a new case, a new format, a new language) and does not only mend it;
+  whoever takes that work puts the question and answers it in that pull request. A tool the core holds is followed by
+  the update rules and looked up again by the scheduled look (#488). It does not mean that an answer replaces a part: a
+  replace joins the queue on the owner's word, as above. Reason: twice a year is slow for a part that has begun to cost,
+  and a bug or a widening is the sign that it has. Held, for the pass, by its issue, which the scheduled look opens and
+  which asks it of the inventory (`scripts/choices.mjs`); the sooner asking, by no check, since none can tell a mend
+  from a widening without guessing.
 - **A rule is for what an agent can do** (#303). By default a rule moves here, into the floor or a module, only where
   it holds in every project, an agent can carry it out, and it makes the product better or sturdier, as the licence
   check does: an agent keeps the project within it, and the project is safer for it. It comes from a standing word of

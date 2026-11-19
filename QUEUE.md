@@ -9,13 +9,14 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
+| #810 | rule builder; it changes `tests.yml` and `tasks/tests.md` | |
+| #812 | builder; on Sonnet (#767); `tests.yml` timing | #715 |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
 | #704 | builder; `tests.yml` | #715 |
 | #770 | builder; `tests.yml` | #704 |
 | #772 | builder; `tests.yml` | #770 |
 | #530, step 5 | builder; licence readers | |
-| #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md` | |
-| #593, points 8 and 9 | rule builder | |
+| #534, point 12 | rule builder; it changes `tasks/cleaning.md` | |
 | #625 | builder | #624 |
 | #626 | builder | #624 |
 | #627 | builder | #624 |
@@ -24,7 +25,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #579 | builder | |
 | #580 | builder | |
-| #581 | rule builder; it changes `AGENTS.md`'s *mutation tool* | |
 | #582 | builder | |
 | #583 | builder | |
 | #584 | rule builder | |
@@ -32,7 +32,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #590 | builder | #580 |
 | #591 | builder | #589 |
 | #587 | rule builder; it may change the floor's topics and what every role reads at its start | #530 |
-| #306 | rule builder | |
 | #307 | rule builder | |
 | #308 | rule builder | |
 | #309 | rule builder | |
@@ -62,7 +61,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #460, point 3 (a copy in a test) | builder | |
 | #460, point 4 (names in descriptions) | builder | |
 | #460, point 5 (a report's size) | builder | |
-| #460, point 6 (billed minutes) | builder | |
 | #502, case 2 | rule builder; it changes what every role reads at its start | |
 | #593, points 4 and 12 | rule builder; it changes what a builder reads at its start | |
 | #594 | rule builder; it changes the README | |
@@ -76,6 +74,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #701 | builder | |
 | #716 | builder | |
 | #739 | rule builder; it changes the game module (`tasks/game-design.md`) | |
+| #786 | rule builder; it changes the floor (the threat model) | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
@@ -86,7 +85,8 @@ They read and change no rule.
 | --- | --- | --- |
 | #550 | builder; a case a PR | |
 | #765 | builder | |
-| #552 | builder | #793 |
+| #809 | builder | |
+| #552 | builder | |
 | #553 | builder | #552 |
 | #554 | builder | #553 |
 | #555 | builder | #534's tools, and #554 |
