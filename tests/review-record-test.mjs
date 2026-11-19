@@ -2,12 +2,12 @@
 // which inline comments are finds of Codex's and of which review, what each review did on a pull request, the tally by
 // kind, the second security review's finds, which bugs are tied to a pull request, and which rules the findings of two
 // pull requests name (AGENTS.md, "A finding seen twice becomes a check"), and the trial of #767 read from them
-// (builder-trial.mjs: a pull request's kind and builder, and whether Sonnet's numbers come out worse). Node's own modules only; the
+// (builder-trial.mjs: a pull request's kind, builder and effort, and whether one group's numbers come out worse). Node's own modules only; the
 // calls to git and gh are the program's own and are not made here.
 //
 //   node tests/review-record-test.mjs
 import { fileURLToPath } from "node:url";
-import { blockingOf as trialBlocking, builderOf, changedOf, kindOf, print as trialPrint, verdict } from "../scripts/builder-trial.mjs";
+import { blockingOf as trialBlocking, builderOf, changedOf, effortOf, findingsOf, groupOf, kindOf, print as trialPrint, verdict } from "../scripts/builder-trial.mjs";
 import { blockingOf, broughtBy, bugs, codexFind, foundTwice, otherOf, perPull, postedKind, print, ruleOf, rulesIn, rulesNamed, secondFound, standing, tally } from "../scripts/review-record.mjs";
 
 let failed = 0, count = 0;
@@ -188,18 +188,31 @@ ok(same(changedOf("3\t2\ttests/a-test.mjs\n4\t1\tscripts/a.mjs\n-\t-\ttests/b.pn
 ok(verdict([1, 2, 3], [1, 2, 3]) === "no worse within noise" && verdict([9, 10, 11], [1, 2, 3]) === "worse, by 8.00 a pull request" && verdict([2, 3, 4], [1, 2, 3]) === "no worse within noise"
   && verdict([1], [1, 2]) === "too few to tell" && verdict([2, 2], [1, 1]) === "worse, by 1.00 a pull request" && verdict([1, 1], [2, 2]) === "no worse within noise",
   "Sonnet is worse only where its mean is above Opus's by more than twice the standard error of the difference");
-const ran = (blocked, points) => ({ got: true, blocked, points, other: 0, otherUnread: false }), idle = { got: false, blocked: null, points: 0, other: 0, otherUnread: false };
+const ran = (blocked, points, other = 0, otherUnread = false) => ({ got: true, blocked, points, other, otherUnread }), idle = { got: false, blocked: null, points: 0, other: 0, otherUnread: false };
 const five = (code, security) => ({ codexCode: code, postedCode: idle, codexSecurity: security, postedSecurity: idle, postedDesign: idle });
-ok(trialBlocking(five(ran("yes", 2), ran("no", 0))) === 2 && trialBlocking(five(ran("yes", 2), ran("unread", 0))) === null && trialBlocking(five(idle, idle)) === 0,
-  "the trial's blocking points are each review's, and unknown where one that ran was not read, never none");
+ok(trialBlocking(five(ran("yes", 2, 3), ran("no", 0, 1))) === 2 && findingsOf(five(ran("yes", 2, 3), ran("no", 0, 1))) === 6
+  && trialBlocking(five(ran("yes", 2), ran("unread", 0))) === null && findingsOf(five(ran("yes", 2), ran("unread", 0))) === null
+  && trialBlocking(five(ran("no", 0, 1, true), idle)) === 0 && findingsOf(five(ran("no", 0, 1, true), idle)) === null && findingsOf(five(idle, idle)) === 0,
+  "the trial's findings are each review's, blocking and other, and unknown where a count of a review that ran was not read, never none");
+ok(effortOf("Fixes #3 (a builder on Sonnet at medium).") === "medium" && effortOf("Fixes #3, on Sonnet at High.") === "high" && effortOf("Fixes #3, a high-risk fix.") === null
+  && effortOf("at medium, then at high") === null && effortOf("x\non Sonnet at medium") === null,
+  "the effort is the one the first line names, \"at medium\" or \"at high\"; anything else is not read");
+ok(groupOf({ model: "Opus", effort: null }, "model") === "Opus" && groupOf({ model: null, effort: "high" }, "model") === null
+  && groupOf({ model: "Sonnet", effort: "medium" }, "effort") === "Sonnet at medium" && groupOf({ model: "Opus", effort: "high" }, "effort") === null && groupOf({ model: "Sonnet", effort: null }, "effort") === null,
+  "the groups are Sonnet and Opus, or with --effort Sonnet at medium and at high");
+const row = (number, kind, group, findings, extra = {}) => ({ number, kind, group, findings, blocking: 0, rounds: 1, bugs: 0, answers: 10, out: 5, into: 100, ...extra });
 const trial = trialPrint("o/r", "2026-11-18", [
-  { number: 1, kind: "bug fix", builder: "Sonnet", blocking: 1, rounds: 2, bugs: 0, answers: 10, out: 5, into: 100 },
-  { number: 2, kind: "bug fix", builder: "Opus", blocking: 3, rounds: null, bugs: 1, answers: null, out: null, into: null },
-  { number: 3, kind: "tests", builder: null, blocking: 0, rounds: 1, bugs: 0, answers: 1, out: 1, into: 1 },
+  row(1, "bug fix", "Sonnet", 1, { rounds: 2 }), row(2, "bug fix", "Opus", 3, { rounds: null, answers: null, out: null, into: null }),
+  row(3, "tests", null, 0), row(4, "tests", "Sonnet", 9), row(5, "tests", "Sonnet", 10), row(6, "tests", "Opus", 1), row(7, "tests", "Opus", 2),
 ]);
-ok(/Sonnet built 1 of the 20/.test(trial) && /bug fix, Sonnet\s+1\s+1 \(1\)\s+2 \(1\)/.test(trial) && /bug fix, Opus\s+1\s+3 \(1\)\s+-/.test(trial)
-  && /- rounds: too few to tell/.test(trial) && !/- answers:/.test(trial) && /Builder not read [^\n]*: #3/.test(trial),
-  "the trial's printout gives each kind and builder, what was read of each, the verdicts and the pull requests whose builder was not read", trial);
+ok(/Sonnet built 3 of the 20[^\n]*, 1 of them bug fixes/.test(trial) && /bug fix, Sonnet\s+1\s+1 \(1\)\s+0 \(1\)\s+2 \(1\)/.test(trial) && /bug fix, Opus\s+1\s+3 \(1\)\s+0 \(1\)\s+-/.test(trial)
+  && /- bug fix: findings too few to tell; rounds too few to tell; bugs that reached main too few to tell/.test(trial)
+  && /- tests: findings worse, by 8\.00 a pull request; rounds no worse within noise; bugs that reached main no worse within noise/.test(trial)
+  && !/answers (too|no|worse)/.test(trial) && /In neither group [^\n]*: #3/.test(trial),
+  "the trial's printout gives each kind and group, what was read of each, a verdict kind by kind on what decides, and the pull requests in neither group", trial);
+const second = trialPrint("o/r", "2026-12-01", [row(1, "bug fix", "Sonnet at medium", 1), row(2, "bug fix", "Sonnet at high", 1)], "effort");
+ok(/second trial of #767, of effort alone/.test(second) && /Sonnet at medium built 1 /.test(second) && /bug fix, Sonnet at high\s+1/.test(second) && /Sonnet at medium against Sonnet at high/.test(second),
+  "with --effort the printout sets Sonnet at medium against Sonnet at high", second);
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);

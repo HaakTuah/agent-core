@@ -431,7 +431,7 @@
     "tasks/tests.md: The slow suites run once per batch, wherever they run": [264]
   },
   "numbers": {
-    "AGENTS.md: A bug fix and a rework of tests are built on Sonnet": "findings; outcome: fast",
+    "AGENTS.md: A bug fix and a rework of tests are built on Sonnet": "findings; outcome: robust",
     "tasks/code-shape.md: A job a maintained package does is done by it": "findings; outcome: robust",
     "tasks/updates.md: Node": "correction: does not work; outcome: robust",
     "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",
