@@ -67,11 +67,15 @@ import { started } from "./started.mjs";
 // (824 once point 1 was written whole), in the stop switch's words, which the staged case stop holds; a sixth found 45
 // in roles/design.md for the design session's 122 over, and 231 in the orchestrator's start for its 219, of which 80
 // cut a rule's explanation, leaving 151 that a trim may take: too little each time, in rules and lines #829 did not
-// ask for, and so not made.
+// ask for, and so not made. The orchestrator's, raised one step again on 19 November 2026 for #471's "Never held back in
+// silence", merged after #829: a seventh fresh leanness check found no room in the sections #471 changes that cuts no
+// condition, reason, design point or holder (89 bytes would cut the pace rule's reason and holder, and the design check
+// had refused cutting the rule's condition and its design's point 5), and about 47 bytes in rules it did not ask for,
+// not made, for 312 over.
 export const CAPS = {
   builder: 31 * 1024,
   design: 33 * 1024,
-  orchestrator: 47 * 1024,
+  orchestrator: 48 * 1024,
   adviser: 33 * 1024,
   reviewer: 25 * 1024,
   "stand-in": 20 * 1024,

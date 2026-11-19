@@ -3,7 +3,7 @@
 // report's parts. Node's own modules only; the calls to gh and git are the program's own and are not made here.
 //
 //   node tests/look-test.mjs
-import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, staleFinding, lateFinding, LATE_PAGES, LATE_PULLS, text, TITLES, updating, FAILED, redBody } from "../scripts/look.mjs";
+import { BOT, checksOf, noticesOf, stillFinding, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, staleFinding, lateFinding, LATE_PAGES, LATE_PULLS, text, TITLES, updating, FAILED, redBody } from "../scripts/look.mjs";
 import { parse, signKey, tripped, trippedBody } from "../scripts/choices.mjs";
 import { before, body, copies, countsFrom, reportOf, share, SHARES, shownAs } from "../scripts/state-report.mjs";
 import fs from "node:fs";
@@ -223,6 +223,46 @@ ok(stale(0, "Packages the project holds that have gone stale\n\n- a\n").what ===
   let calls = 0; const flood = [];
   lateFinding("o/r", (title, w, unread = null) => flood.push({ what: w, unread }), "2026-11-18T12:00:00Z", route => { calls++; return JSON.stringify(route.startsWith("repos/o/r/pulls/comments") ? full : {}); });
   ok(calls === LATE_PAGES && flood[0].what === null && /past the first 5000 of the week could not be read/.test(flood[0].unread), "a flood of comments is read to the pages' cap alone, and the issue is left as it stands", `${calls} ${flood[0].unread}`);
+}
+
+// ---- the work standing still (#471): read cheapest first, the notice only the owner's, the progress file placed ----
+{
+  const now = Date.parse("2026-11-19T12:00:00Z"), day = "2026-11-17T12:00:00Z", fresh = "2026-11-19T09:00:00Z";
+  const queue = "| Issue | Who | Waits on |\n| --- | --- | --- |\n| #5 | builder | |\n";
+  const still = (o = {}) => {
+    const calls = [], found = [];
+    const gh = (route, ...rest) => {
+      calls.push(route);
+      if (route.startsWith("repos/o/r/commits")) return `${o.latest ?? day}\n`;
+      if (route.startsWith("search/issues")) return JSON.stringify(o.notices ?? []);
+      if (route.startsWith("repos/o/r/issues?state=open")) return JSON.stringify(/page=1&|page=1$/.test(route) ? [{ number: 5, state: "open" }] : []);
+      throw new Error(`unexpected ${route}`);
+    };
+    stillFinding({ repo: "o/r", manifest: o.manifest ?? null, owner: "Owner", pulls: o.pulls ?? [{ own: true, at: day }], now, gh: o.gh ?? gh, read: () => o.queue ?? queue }, (title, what, unread = null) => found.push({ title, what, unread }));
+    return { calls, ...found[0] };
+  };
+  const w = still();
+  ok(w.title === TITLES.still && /#5, the first that waits on nothing open/.test(w.what) && w.unread === null, "work that stands still with a line free opens the issue", JSON.stringify(w));
+  const pushed = still({ pulls: [{ own: true, at: fresh }] });
+  ok(pushed.what === null && pushed.calls.length === 0, "a push of the repository's own in the last day: nothing reported, nothing more read", JSON.stringify(pushed));
+  const merged = still({ latest: fresh });
+  ok(merged.what === null && merged.unread === null && merged.calls.length === 1, "a commit on the default branch in the last day, a merge among them, is work going on: the issues are not read", JSON.stringify(merged));
+  ok(still({ notices: [{ title: "Builders held back for usage until Friday", login: "owner" }] }).what === null, "the owner's account's notice says why: nothing is reported");
+  const forged = still({ notices: [{ title: "Builders held back for usage", login: "someone-else" }, { title: "Builders held back", login: "Owner" }] });
+  ok(/#5/.test(forged.what ?? ""), "a notice another account opened, or one titled otherwise, silences nothing (anyone may open an issue in a public repository)", JSON.stringify(forged));
+  for (const at of ["../../.ssh/authorized_keys", "/etc/passwd", ".git/config", "core/QUEUE.md", "notes.txt", "AGENTS.md", ".github/x.md"]) {
+    const r = still({ manifest: `| *progress file* | \`${at}\` |\n` });
+    ok(r.what === null && /^the progress file was not read: .*Mend:/.test(r.unread ?? "") && !r.calls.some(c => c.startsWith("search/")), `a progress file the manifest places outside what queue.mjs reads is not read, and says so: ${at}`, JSON.stringify(r));
+  }
+  const right = (login, role = "write", type = "User") => ({ role_name: role, permission: role === "admin" ? "admin" : "write", user: { login, type, permissions: { push: true } } });
+  const team = still({ notices: [{ title: "Builders held back for usage", login: "co-owner" }], gh: (route, ...rest) => (/collaborators\/co-owner\/permission$/.test(route) ? JSON.stringify(right("co-owner")) : route.startsWith("search/") ? JSON.stringify([{ title: "Builders held back for usage", login: "co-owner" }]) : route.startsWith("repos/o/r/commits") ? `${day}\n` : (() => { throw new Error(route); })()) });
+  ok(team.what === null && team.unread === null, "in a team, another owner's notice, an account the host lets write, says why too", JSON.stringify(team));
+  const asked = [];
+  const counted = noticesOf([{ title: "A", login: "Owner" }, { title: "B", login: "reader" }, { title: "C", login: "bot-app" }, { title: "D", login: "gone" }, { title: "E", login: "../x" }, ...["a1", "a2", "a3", "a4", "a5", "a6"].map(l => ({ title: l, login: l }))], "owner", login => { asked.push(login); if (login === "gone") throw new Error("HTTP 404"); return login === "reader" ? right(login, "read") : login === "bot-app" ? right(login, "write", "Bot") : right(login); });
+  ok(JSON.stringify(counted) === JSON.stringify(["A", "a1", "a2"]) && asked.length === 5 && !asked.includes("../x"), "a notice counts from the owner's account or one that may write, read strictly: a reader, an app, a right not read and a login of no form count for nothing, and at most five rights are read", JSON.stringify({ counted, asked }));
+  ok(still({ queue: "" }).what === null, "no progress file, or an empty one: no line to take, nothing reported");
+  const blind = still({ gh: () => { throw new Error("HTTP 403"); } });
+  ok(blind.what === null && /could not be read/.test(blind.unread ?? ""), "a call that fails leaves the issue as it stands, saying what could not be read", JSON.stringify(blind));
 }
 
 console.log(`\n${count - failed} of ${count} passed`);

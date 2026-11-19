@@ -11,6 +11,7 @@
 //   node core/scripts/stalled.mjs [--hours N] [--repo owner/name]
 import { execFileSync } from "node:child_process";
 import { REPO } from "./core-cost.mjs";
+import { read } from "./queue.mjs";
 import { timeOf } from "./moment.mjs";
 import { started } from "./started.mjs";
 
@@ -38,6 +39,23 @@ export function print(lanes, open, hours) {
   if (!lanes.length) return `No lane stalled: ${open} open, none without a push for over ${hours} h.`;
   return [`Stalled, no push for over ${hours} h: ${lanes.length} of ${open} open`,
     ...lanes.map(l => `  #${l.number} ${plain(l.ref)}: ${l.waited.toFixed(1)} h since ${l.at} (${plain(l.title)})${handedOff(l.body) ? "" : "; no hand-off note"}`)].join("\n");
+}
+
+// Whether work went on in the last `hours` (a day by default) at `now`: a push to a pull request of the repository's
+// own (a fork's counts for nothing), or `latest`, the default branch's newest commit, a merge among them.
+export const goesOn = ({ pulls, latest = null, now, hours = 24 }) =>
+  [...pulls.filter(p => p.own).map(p => p.at), latest].some(at => timeOf(at) !== null && now - timeOf(at) < hours * 3600 * 1000);
+
+// The work standing still (roles/orchestrator.md, "Never held back in silence"; #471): the *progress file*'s next line,
+// as its readers read it (queue.mjs's `read`, given `closed`: a closed issue's line skipped, one held for the owner, or
+// waiting on anything open or on a hold, not taken), where no work went on (goesOn) and no notice is open (`notices`,
+// the titles of the open issues that the orchestrator's account opened; one that opens NOTICE is its word to the owner
+// that it holds builders back). The issue numbers that line names first, or null where the work goes on, a notice says
+// why it does not, or no line could be taken.
+export const NOTICE = "Builders held back for usage";
+export function standingStill({ queue, closed, pulls, notices, now, latest = null, hours = 24 }) {
+  if (notices.some(t => String(t).startsWith(NOTICE)) || goesOn({ pulls, latest, now, hours })) return null;
+  return read(String(queue ?? ""), closed).next?.issues ?? null;
 }
 
 // The open pull requests of `repo`, through `api` (gh api's route and --jq, as main gives it), page by page, since a
