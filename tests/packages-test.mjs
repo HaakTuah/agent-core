@@ -246,7 +246,7 @@ try {
   fs.rmSync(path.join(project, ".codex"), { recursive: true, force: true });
   fs.rmSync(path.join(project, "licences.json"));
   // (the shape check's reader of C#, which reads on the parser's files (installedFile), with nothing installed: it did
-  // not run, saying the mend; where the job's install could not reach the registry, it reads no function of C#, says so
+  // not run, saying the mend; where the job's install could not reach the registry, it reads nothing of C#, says so
   // as a warning and fails nothing by that alone, and writes no baseline then (#654, point 4))
   {
     const cs = path.join(tmp, "cs");
@@ -396,7 +396,7 @@ try {
     "in a copy whose job installed the first install alone, a package of the parser's reads as unreached, so its reader warns and fails nothing; in the core, never", `${asked.stdout}${asked.stderr}${askedInCore.stdout}${askedInCore.stderr}`);
   {
     // (the shape check in such a job, its copy's parser list naming the parser's own packages, as the core's does: it
-    // reads no function of C#, and its warning names the install step's mend, not a run again)
+    // reads nothing of C#, and its warning names the install step's mend, not a run again)
     const cs = path.join(tmp, "cs-unnamed");
     fs.mkdirSync(cs);
     fs.cpSync(copy, path.join(cs, "core"), { recursive: true });
@@ -408,7 +408,7 @@ try {
     execFileSync("git", ["add", "-A"], { cwd: cs });
     const r = spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json"], { cwd: cs, encoding: "utf8", timeout: 120000, env: { ...env, SHAPE_BASE: "" } }), out = `${r.stdout}${r.stderr}`;
     ok(r.status === 0 && /^::warning::The shape check did not read C#, by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone, .*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(out),
-      "and the shape check there reads no function of C#, failing nothing, and its warning says to name every install in the job's install step", out);
+      "and the shape check there reads nothing of C#, failing nothing, and its warning says to name every install in the job's install step", out);
   }
   const parser = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
   const named = loadParser();
