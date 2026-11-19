@@ -32,8 +32,8 @@ Read when a task calls for it, each saying when in its opening line: the files o
 `floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
 `tasks/tools.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`, `tools/antigravity.md`,
 `tasks/github-calls.md`, `tasks/hosts.md`, `tasks/repositories.md`, `roles/shared/teams.md`, `roles/orchestrator.md`,
-`tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md`, `tasks/done-when.md`
-and `tasks/planning.md`.
+`tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md`, `tasks/done-when.md`,
+`tasks/planning.md` and `roles/shared/records.md`.
 
 Not taken, each for its reason:
 
@@ -101,7 +101,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   writes it from the owner's word recorded on the issue ("Whose words an issue holds"), adds it to the archive as an
   item of its own, naming the issue as its source, and takes what it leaves open as `roles/shared/inbox.md` says of any
   open point. This is the second
-  difference from that module, where only the design session writes rules from the owner's words.
+  difference from that module and `roles/shared/records.md`, where only the design session writes rules from the owner's
+  words.
 - **A bug fix and a rework of tests are built on Sonnet** (#767). By default, where "The builders" of
   `roles/orchestrator.md` picks Claude for a line that fixes a bug or reworks tests, the orchestrator starts its builder
   on Sonnet at high effort; a line that writes or changes a rule, touches security or reads a format another publisher
@@ -124,7 +125,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   by `scripts/builder-trial.mjs`, which counts each kind by its builder from what `scripts/review-record.mjs` reads and
   from the session-cost lines; which model and effort the orchestrator starts, by nothing yet.
 - **An orchestrator may work the file** (`roles/orchestrator.md`) while it holds a line a session can take. The
-  owner starts it; once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
+  owner starts it, or the owner's adviser on the owner's word (`roles/adviser.md`); once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
   wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from
   a project's root and there is no copy here, and what `setup/sync-notes.md` asks, which it asks of projects.
 - **One batch, then one release.** A batch is the lines the file holds between two releases, and the release after it

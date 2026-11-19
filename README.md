@@ -481,6 +481,9 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
 
 ## Setting up (the owner's part)
 
+- An adviser (`roles/adviser.md`): its session started with every repository of the owner's it is to advise on, so it
+  can read them, file in them and start each one's orchestrator, reading what another account can write only through
+  that repository's orchestrator (`roles/adviser.md`); at the effort its tool's part advises (`tools/claude.md`).
 - Where Codex reviews: its GitHub app on the owner's repositories, its own automatic code review off (core archive 18);
   its security review on, for team PRs (Dependabot's own need none: floor rule 8), on PR open, reporting Medium and
   above, reading the project's threat model and `SECURITY.md` with the floor (core archive 51).
