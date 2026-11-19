@@ -20,7 +20,7 @@ const FAILED = `not ok 2 - ${TEST}: the package's metadata could not be fetched 
 
 // The test that reaches the registry, and the workflow that runs both tests on main.
 const FILES = {
-  "test/registry.test.mjs": `// The name the tool would publish under is free on ${SOURCE}: it asks the registry, where it can be reached.\nimport assert from "node:assert/strict";\nconst r = await fetch("https://${SOURCE}/scratch-sums-tool", { signal: AbortSignal.timeout(10000) });\nassert.equal(r.status, 404);\nconsole.log("ok registry");\n`,
+  "test/registry.test.mjs": `// The name the tool would publish under is free on ${SOURCE}: it asks the registry, where it can be reached, on CI alone.\nimport assert from "node:assert/strict";\nif (!process.env.CI) { console.log("skip registry: runs on CI alone"); process.exit(0); }\nconst r = await fetch("https://${SOURCE}/scratch-sums-tool", { signal: AbortSignal.timeout(10000) });\nassert.equal(r.status, 404);\nconsole.log("ok registry");\n`,
   ".github/workflows/tests.yml": "name: tests\non:\n  push:\n    branches: [main]\n  pull_request:\npermissions:\n  contents: read\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          persist-credentials: false\n      - run: npm test && node test/registry.test.mjs\n",
 };
 
