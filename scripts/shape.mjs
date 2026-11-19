@@ -247,12 +247,13 @@ function opensScreen(ctx, from, names) {
   const under = s => names.some(n => n === s || n.startsWith(`${s}/`) || n.startsWith(`${s}.`));
   const what = ctx.config.screens.find(under);
   if (what !== undefined) add(ctx, "screen", `${from.file} -> ${what}`, what);
-  for (const kind of ["clock", "process"]) for (const name of [...IMPORTS[kind], ...ctx.config[LISTS[kind]]].filter(under)) reached(ctx, kind, from.file, name);
+  // (an import of types alone, which the program never loads, reaches nothing)
+  if (!from.types) for (const kind of ["clock", "process"]) for (const name of [...IMPORTS[kind], ...ctx.config[LISTS[kind]]].filter(under)) reached(ctx, kind, from.file, name);
 }
 // A module of the project's own that the config names under "clocks" or "processes" (a helper that sleeps or starts
 // a program), by its path or by the name the test imports it under.
 function configuredReach(ctx, from, names) {
-  if (!ctx.tests.has(from.file)) return;
+  if (!ctx.tests.has(from.file) || from.types) return;
   const under = s => names.some(n => n === s || n.startsWith(`${s}/`) || n.startsWith(`${s}.`));
   for (const kind of ["clock", "process"]) for (const name of ctx.config[LISTS[kind]].filter(under)) reached(ctx, kind, from.file, name);
 }
@@ -261,8 +262,11 @@ function configuredReach(ctx, from, names) {
 // REACH): each test file is one entry of each kind it reaches, "timed: <test> -> <what>" or "process: <test> ->
 // <what>", its first name in order; found by the readers "clocks" and "processes".
 const KINDS = { clock: "timed", process: "process" }, LISTS = { clock: "clocks", process: "processes" };
-// (what installs a fake clock: Jest's, Vitest's and Sinon's timers, .NET's FakeTimeProvider, freezegun's freeze_time)
-const FAKE_CLOCKS = ["useFakeTimers", "FakeTimeProvider", "freeze_time"], REAL_AGAIN = ["useRealTimers"];
+// (what a fake clock replaces, by the call that installs it: Jest's, Vitest's and Sinon's timers, the timers and the
+// time a test reads; freezegun's freeze_time, the time read, never a sleep. One the test hands in, as .NET's
+// FakeTimeProvider, replaces no call of the real clock, so it is none)
+const FAKES = { useFakeTimers: ["setTimeout", "setInterval", "Date.now", "performance.now", "new Date()"], freeze_time: ["time.time", "time.monotonic", "time.perf_counter", "datetime.now", "datetime.utcnow", "datetime.datetime.now", "datetime.datetime.utcnow"] };
+const REAL_AGAIN = ["useRealTimers"];
 const IMPORTS = Object.fromEntries(Object.keys(KINDS).map(kind => [kind, [...new Set(Object.values(REACH).flatMap(l => l[kind].imports))]]));
 function reached(ctx, kind, file, name) {
   const of = ctx.reached.get(file) ?? { clock: new Set(), process: new Set() };
@@ -276,22 +280,24 @@ function runAt(toks, run, k) {
   const next = toks[k + run.length];
   return !isPunct(next, ":") && !(isPunct(next, "=") && !isPunct(toks[k + run.length + 1], "="));
 }
-// Whether a test installs a fake clock, by a call, and never goes back to the real one: it hands the time in already.
-function fakesClock(toks) {
+// The names of the clock a test replaces with a fake one it installs by a call and never goes back from: those it
+// reaches only through the fake.
+function fakedNames(toks) {
   const called = name => toks.some((t, k) => t.v === name && t.t !== "str" && isPunct(toks[k + 1], "("));
-  return FAKE_CLOCKS.some(called) && !REAL_AGAIN.some(called);
+  return REAL_AGAIN.some(called) ? [] : Object.entries(FAKES).filter(([name]) => called(name)).flatMap(([, names]) => names);
 }
 function testReach(ctx, file, r) {
   if (!ctx.tests.has(file)) return;
-  if (fakesClock(r.toks)) ctx.faked.add(file);
+  ctx.faked.set(file, new Set(fakedNames(r.toks)));
   for (const kind of ["clock", "process"]) {
     const own = REACH[r.lang]?.[kind]?.runs ?? [], named = reachRuns(ctx.config[LISTS[kind]]);
     for (const { run, what } of [...own, ...named]) for (let k = 0; k + run.length <= r.toks.length; k++) if (runAt(r.toks, run, k)) { reached(ctx, kind, file, what); break; }
   }
 }
 function reachEntries(ctx) {
-  for (const [file, of] of ctx.reached) for (const kind of ctx.faked.has(file) ? ["process"] : ["clock", "process"]) {
-    const what = [...of[kind]].sort()[0];
+  for (const [file, of] of ctx.reached) for (const kind of ["clock", "process"]) {
+    const faked = kind === "clock" ? ctx.faked.get(file) ?? new Set() : new Set();
+    const what = [...of[kind]].filter(name => !faked.has(name)).sort()[0];
     if (what !== undefined) add(ctx, KINDS[kind], `${file} -> ${what}`, file);
   }
 }
@@ -310,8 +316,8 @@ function oneImport(ctx, from, imp) {
   const alias = Object.keys(ctx.config.aliases).filter(a => imp.spec.startsWith(a)).sort((a, b) => b.length - a.length)[0];
   const spec = alias === undefined ? imp.spec : `./${path.posix.relative(path.posix.dirname(from.file), path.posix.join(ctx.config.aliases[alias], imp.spec.slice(alias.length))) || "."}`;
   const to = resolve(from.file, spec, ctx.files, ctx.packages);
-  if (!to) { outside(ctx, from, imp.spec, alias !== undefined); return; }
-  configuredReach(ctx, from, [to, imp.spec]);
+  if (!to) { outside(ctx, imp.types ? { ...from, types: true } : from, imp.spec, alias !== undefined); return; }
+  configuredReach(ctx, imp.types ? { ...from, types: true } : from, [to, imp.spec]);
   // (a package of the project's own that maps its entrances, "exports" or "imports", may load another file than this)
   if (!isRelative(spec) && ctx.packages.get(packageOf(spec))?.exports) ctx.unsure.add(from.file);
   if (to !== from.file) ctx.reach.set(from.file, (ctx.reach.get(from.file) ?? new Set()).add(to));
@@ -405,7 +411,7 @@ export function survey(texts, config, tests = new Set()) {
   const readings = code.map(file => [file, reading(file, texts[file])]);
   const idx = index(readings, texts), js = manifests(texts);
   const ctx = { config, tests, texts, unsure: new Set(), files: new Set(Object.keys(texts)), idx, packages: js.packages, ships: new Set([...js.ships, ...idx.ships]), declared: new Set([...js.declared, ...idx.declared]),
-    entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map(), reached: new Map(), faked: new Set() };
+    entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map(), reached: new Map(), faked: new Map() };
   for (const [file, r] of readings) oneFile(ctx, file, r);
   reachEntries(ctx);
   sharedSpace(ctx);
