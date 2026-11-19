@@ -99,9 +99,11 @@ const takeSteps = (d, leave = null) => {
     gemini: { "docs/trial/GEMINI.md": null },
     look: { ".github/workflows/look.yml": look, ".github/workflows/core-moved.yml": null },
     choices: { "docs/choices.md": fs.readFileSync(path.join(s.core, "setup", "template", "choices.md.tmpl"), "utf8").replace("Read whole: FILL IN: the day the first record is written, as 2026-11-15; each pass twice a year writes its own day.", "Read whole: 2026-11-20.").replace(/## Choice: FILL IN.*/, "## Choice: Node").replace(/- Reopens it: FILL IN.*/, "- Reopens it: a user with no Node.") },
+    words: { "docs/decisions.md": read(d, "docs/decisions.md").replace(/ I am typing this[^\n]*/, "") },
     private: { ".github/workflows/security-review.yml": `${read(d, ".github/workflows/security-review.yml").trimEnd()}\n    with:\n      private: true\n` },
   };
   for (const [name, files] of Object.entries(work)) if (name !== leave) branch(d, `step-${name}`, files);
+  if (leave !== "words" && leave !== "issue") gh(d, "PATCH", "issues/2", { body: "## The owner's word\n\nTotals are whole numbers, since no one who reads them wants the cents.\n" });
   if (leave !== "labels") for (const l of LABELS) gh(d, "POST", "labels", l);
   if (leave !== "scanning") gh(d, "POST", "issues", { title: "Switch on secret scanning with push protection", body: "Settings, Advanced Security: secret scanning and its push protection. The repository is private, so it is the owner's (floor rule 14).", labels: ["needs-owner", "by:builder"] });
 };
@@ -191,6 +193,8 @@ check("order-for-now", fresh("order-for-now"),
 check("steps", fresh("steps"), d => takeSteps(d), d => takeSteps(d, "gemini"), /not done: 13 November 2026, every file a tool takes its instructions from/);
 const noLabels = fresh("steps"); takeSteps(noLabels, "labels");
 ok(/labels and openers/.test(verdict("steps", noLabels).why), "steps: labels left unmade are read from GitHub's answer", verdict("steps", noLabels).why);
+const wordsLeft = fresh("steps"); takeSteps(wordsLeft, "issue");
+ok(/not done: 19 November 2026, the owner's words that stand, cleaned once/.test(verdict("steps", wordsLeft).why), "steps: the owner's quote cleaned in the files but left in its issue is read from GitHub's answer", verdict("steps", wordsLeft).why);
 const noScanning = fresh("steps"); takeSteps(noScanning, "scanning");
 ok(/not done: 16 November 2026, secret scanning with push protection/.test(verdict("steps", noScanning).why), "steps: secret scanning left off, and not named to the owner, is read from GitHub's answer", verdict("steps", noScanning).why);
 const fields = ["-F", "security_and_analysis[secret_scanning][status]=enabled", "-F", "security_and_analysis[secret_scanning_push_protection][status]=enabled"];
