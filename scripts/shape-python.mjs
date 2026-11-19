@@ -309,9 +309,37 @@ function bySuffix(parts, files) {
     return known.get(key);
   }
   const ends = [`${p}.py`, `${p}/__init__.py`];
-  const found = ends.flatMap(e => (byName(files).get(path.posix.basename(e) === "__init__.py" ? `${parts.at(-1)}/__init__.py` : path.posix.basename(e)) ?? []).filter(f => f === e || f.endsWith(`/${e}`)));
-  known.set(key, found.length === 1 ? found[0] : null);
+  let count = 0, file = null;
+  for (const e of ends) {
+    let node = suffixTree(files, path.posix.basename(e) === "__init__.py" ? `${parts.at(-1)}/__init__.py` : path.posix.basename(e));
+    const segs = e.split("/");
+    for (let k = segs.length - 1; k >= 0 && node; k--) node = node.get(segs[k]);
+    if (node) { count += node.count; file = node.file; }
+  }
+  known.set(key, count === 1 ? file : null);
   return known.get(key);
+}
+
+// The files byName holds under one name, by their path read from its end: each node the count of files under it and
+// one of them; made once for each name and set of files.
+const SUFFIXES = new WeakMap();
+function suffixTree(files, name) {
+  if (!SUFFIXES.has(files)) SUFFIXES.set(files, new Map());
+  const trees = SUFFIXES.get(files);
+  if (!trees.has(name)) {
+    const root = new Map();
+    for (const f of byName(files).get(name) ?? []) {
+      const segs = f.split("/");
+      let node = root;
+      for (let k = segs.length - 1; k >= 0; k--) {
+        if (!node.has(segs[k])) node.set(segs[k], Object.assign(new Map(), { count: 0, file: f }));
+        node = node.get(segs[k]);
+        node.count++;
+      }
+    }
+    trees.set(name, root);
+  }
+  return trees.get(name);
 }
 
 // The project's Python files by their name (a package's __init__.py by its folder's: "pkg/__init__.py"), made once
@@ -401,7 +429,9 @@ function relative(from, imp, files) {
 export function resolvePython(from, imp, files, known) {
   if (imp.level > 0) return { to: relative(from, imp, files) };
   const parts = imp.module.split("."), most = deepest(files), p = parts.join("/");
-  const find = q => (q.length > most ? null : moduleAt(q, from, files) ?? (known(parts[0]) ? null : bySuffix(q, files)));
+  let top;
+  const isKnown = () => (top ??= known(parts[0]));
+  const find = q => (q.length > most ? null : moduleAt(q, from, files) ?? (isKnown() ? null : bySuffix(q, files)));
   // (a module of more parts than the deepest file's path holds is no file of the project, nor is any name under it)
   const names = imp.names.filter(n => n !== "*"), seen = new Map();
   let roots, all;
@@ -409,7 +439,7 @@ export function resolvePython(from, imp, files, known) {
     if (!plain(n)) return find([...parts, n]);
     roots ??= ROOTS(from).map(root => heldIn(files, `${root}${p}/`));
     for (const held of roots) { const f = inFolder(held, n); if (f) return f; }
-    if (known(parts[0])) return null;
+    if (isKnown()) return null;
     all ??= endingIn(files, p.split("/"));
     return one(all, n);
   };

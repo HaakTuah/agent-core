@@ -136,6 +136,12 @@ ok(Array.from({ length: 20000 }, () => resolvePython("a.py", { level: 0, module:
   && Array.from({ length: 20000 }, (_, i) => resolvePython("a.py", { level: 0, module: `a${i}.b`, names: [] }, wide, std)).every((r, i) => r.outside === `a${i}.b`)
   && same(resolvePython("a.py", { level: 0, module: "d7.b", names: [] }, wide, std).to, ["d7/b.py"]),
   "Python: a module many files end in, imported again and again, or under many names, is led each time");
+const inits = new Set(Array.from({ length: 20000 }, (_, i) => `d${i}/__init__/__init__.py`));
+const longTop = "t".repeat(100000), distinct = Array.from({ length: 100000 }, (_, i) => `b${i}`);
+ok(Array.from({ length: 20000 }, (_, i) => resolvePython("a.py", { level: 0, module: `a${i}.__init__`, names: [] }, inits, std)).every((r, i) => r.outside === `a${i}.__init__`)
+  && same(resolvePython("a.py", { level: 0, module: "d7.__init__", names: [] }, inits, std).to, ["d7/__init__/__init__.py"])
+  && resolvePython("a.py", { level: 0, module: longTop, names: distinct }, wide, std).outside === longTop,
+  "Python: modules of any last part many files end in, and many names from a module of a long name, are led");
 const pyPackages = pythonPackages({
   "pyproject.toml": "[project]\nname = \"game\"\ndependencies = [\n  \"requests[socks]>=2\",\n  \"PyYAML\",  # a comment\n]\n[project.optional-dependencies]\ntest = [\"pytest\"]\n[tool.poetry.dependencies]\npython = \"^3.11\"\nflask = \"*\"\n[tool.poetry.group.dev.dependencies]\nblack = \"*\"\n",
   "requirements-dev.txt": "ruff==1\n-r requirements.txt\n", "requirements.txt": "numpy # x\n-e .\nscikit_learn>=1\n",
