@@ -6,18 +6,23 @@
 // only holders are hooks is listed with them (tasks/tools.md, "Hooks save time; checks are the guarantee"). It fails where holders.json names a rule that no
 // longer stands, a check whose file is not there, or a holder in no form it reads; a rule with no holder fails nothing.
 // It reads too the archive's items behind each rule ("behind" in holders.json; #252): it fails a key that is no rule nor
-// rule file, an item that is not in the archive, a pointer to the archive ("core archive N") written in a rule file
+// rule file, an item's key that names no issue (#744), an item that is not in the archive, a pointer to the archive ("core archive N") written in a rule file
 // itself, and the archive's two forms out of step (archive.mjs, beside this file). And the number each rule names
 // ("numbers" in holders.json; #303): it fails a key that is no rule, and a number in no form outcomes.mjs's NUMBER reads.
-// The core's own repository alone; its tests workflow runs it on every pull request here. Node's own modules only.
+// The file's form (each part an object, a holder a string or a list of them, a list behind a rule of keys in the
+// archive's form, a number a string) is its schema's, scripts/schemas/holders.json, read by ajv (schemas.mjs; #530);
+// where ajv is not installed the form goes unchecked, said as a warning, and what holds its form is read as ever.
+// The core's own repository alone; its tests workflow runs it on every pull request here, after the core's install.
 //
 //   node scripts/holders.mjs          the counts, and each wrong entry with its mend
 //   node scripts/holders.mjs --list   the counts, and each rule with no holder
 import fs from "node:fs";
 import path from "node:path";
-import { inStep, items } from "./archive.mjs";
+import { inStep, items, KEY, LAST_NUMBERED } from "./archive.mjs";
 import { NUMBER } from "./outcomes.mjs";
+import { installed, unreached } from "./packages.mjs";
 import { FOLDERS, ROOT, rules } from "./rules.mjs";
+import { shapeFaults } from "./schemas.mjs";
 import { started } from "./started.mjs";
 import { CASES } from "./staged.mjs";
 
@@ -27,20 +32,26 @@ const FORM = /^(?:(check): (.+?)|(audit)|(describes))(, in part)?$/u;
 export const HOOKS = new Set(["scripts/work-saved.sh", "scripts/helper-call.mjs", "setup/template/claude-settings.json.tmpl"]);
 const hook = x => x.kind === "check" && HOOKS.has(x.by);
 
-// One holder as holders.json names it for the rule `key`: { kind, by, part }, or the line of what is wrong, with its mend.
+// One holder as holders.json names it for the rule `key`: { kind, by, part }, the line of what is wrong, with its mend,
+// or null for one that is no string or an empty one, which the schema says.
 function holderOf(key, value, root) {
-  const m = FORM.exec(String(value));
+  if (typeof value !== "string" || !value) return null;
+  const m = FORM.exec(value);
   if (!m) return `${FILE}: "${key}" has the holder "${value}", in no form it reads. Mend: write "check: <its script, workflow or GitHub's setting>", "audit" or "describes", each with ", in part" where it holds only some of the rule; a staged case names its rules in its own file`;
   const kind = m[1] ?? m[3] ?? m[4], what = m[2] ?? "";
   if (kind === "check" && /^(?:scripts|\.github|setup|floor|roles|tasks|tools)\//u.test(what) && !fs.existsSync(path.join(root, what))) return `${FILE}: "${key}" is held by ${what}, which is not there. Mend: name the check as it now stands, or take the holder out`;
   return { kind, by: what, part: Boolean(m[5]) };
 }
 
-// What holders.json names, and the items behind each rule, or the line of why it cannot be read.
-function named(root) {
-  try { const j = JSON.parse(fs.readFileSync(path.join(root, FILE), "utf8")); return { named: j.holders ?? {}, behind: j.behind ?? {}, numbers: j.numbers ?? {} }; }
+// What holders.json names, and the items behind each rule, or the line of why it cannot be read (reasons.mjs, beside
+// this file, reads it too).
+export function named(root) {
+  try { const j = JSON.parse(fs.readFileSync(path.join(root, FILE), "utf8")); return { json: j, named: part(j?.holders), behind: part(j?.behind), numbers: part(j?.numbers) }; }
   catch (e) { return { named: {}, behind: {}, numbers: {}, wrong: `${FILE} cannot be read (${e.message}). Mend: write it as JSON, its "holders" an object keyed by each rule's file and lead` }; }
 }
+
+// (a part of the file as it holds its form, an object, else none: the schema says what it is)
+const part = v => (v !== null && typeof v === "object" && !Array.isArray(v) ? v : {});
 
 // The rule files a pointer to the archive may not stand in: the core's AGENTS.md and the files of the floor and the
 // modules, as rules.mjs reads them.
@@ -53,18 +64,21 @@ export function ruleFilesOf(root) {
   return out;
 }
 
+// A key in the archive's form, as the schema reads it: a number up to the last numbered item, or "#N" or "#N.P".
+const inForm = n => (Number.isInteger(n) && n >= 1 && n <= LAST_NUMBERED) || (typeof n === "string" && KEY.test(n));
+
 // What is wrong with the items behind the rules, each a line with its mend.
 function behindWrong(root, behind) {
   const wrong = [], files = ruleFilesOf(root), keys = new Set([...rules(root, { agents: true }).map(r => r.key), ...files]);
   const { reasons } = items(root);
   for (const [key, list] of Object.entries(behind)) {
     if (!keys.has(key)) { wrong.push(`${FILE}, "behind", names "${key}", which is no rule, nor rule file, as they stand. Mend: write the key as the rule's file and bold lead now read, or the file alone for its text outside any rule, or take it out where the rule has gone`); continue; }
-    if (!Array.isArray(list) || !list.length || !list.every(Number.isInteger)) { wrong.push(`${FILE}, "behind", "${key}": ${JSON.stringify(list)} is no list of item numbers. Mend: write it as a list of the archive's item numbers, such as [134, 232]`); continue; }
-    for (const n of list.filter(n => !reasons.has(n))) wrong.push(`${FILE}, "behind", "${key}": core archive ${n} is no item of the archive. Mend: name an item that stands in archive/instructions/, or add the item first`);
+    if (!Array.isArray(list)) continue; // (the schema says it is no list, and a key in no form)
+    for (const n of list.filter(n => inForm(n) && !reasons.has(n))) wrong.push(`${FILE}, "behind", "${key}": core archive ${n} is no item of the archive. Mend: name an item that stands in archive/instructions/, or add the item first, keyed by its issue (archive/instructions.md)`);
   }
   for (const f of files) {
     fs.readFileSync(path.join(root, f), "utf8").split(/\r?\n/u).forEach((line, i) => {
-      if (/\bcore\s+archive\s+\d/iu.test(line) || /\bcore\s+archive\s*$/iu.test(line)) wrong.push(`${f}:${i + 1} points to the archive in the rule's own text ("core archive"). Mend: take the pointer out and add its items to the rule's list under "behind" in ${FILE}`);
+      if (/\bcore\s+archive\s+#?\d/iu.test(line) || /\bcore\s+archive\s*$/iu.test(line)) wrong.push(`${f}:${i + 1} points to the archive in the rule's own text ("core archive"). Mend: take the pointer out and add its items to the rule's list under "behind" in ${FILE}`);
     });
   }
   return [...wrong, ...inStep(root)];
@@ -76,7 +90,7 @@ function numbersWrong(root, numbers) {
   const keys = new Set(rules(root, { agents: true }).map(r => r.key)), wrong = [];
   for (const [key, n] of Object.entries(numbers)) {
     if (!keys.has(key)) wrong.push(`${FILE}, "numbers", names "${key}", which is no rule as they stand. Mend: write the key as the rule's file and bold lead now read, or take it out where the rule has gone`);
-    else if (!NUMBER.test(String(n))) wrong.push(`${FILE}, "numbers", "${key}": "${n}" is in no form it reads. Mend: write "<findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for, with "; rare harm" at its end where the rule guards against rare and severe harm`);
+    else if (typeof n === "string" && n && !NUMBER.test(n)) wrong.push(`${FILE}, "numbers", "${key}": "${n}" is in no form it reads. Mend: write "<findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for, with "; rare harm" at its end where the rule guards against rare and severe harm`);
   }
   return wrong;
 }
@@ -84,11 +98,12 @@ function numbersWrong(root, numbers) {
 // Each rule with its holders ([{ kind, by, part }]), and what is wrong with holders.json, each a line with its mend.
 export function holders(root = ROOT, cases = CASES) {
   const all = rules(root), keys = new Set(all.map(r => r.key)), read = named(root), wrong = read.wrong ? [read.wrong] : [];
+  if (!read.wrong) wrong.push(...(shapeFaults("holders", read.json, "", FILE) ?? []));
   const by = new Map(all.map(r => [r.key, []]));
   for (const [key, value] of Object.entries(read.named)) {
     if (!keys.has(key)) { wrong.push(`${FILE} names "${key}", which is no rule of the floor or the modules as they stand. Mend: write the key as the rule's file and bold lead now read ("floor/security.md: 1. Nothing secret in the repository"), or take it out where the rule has gone`); continue; }
     for (const h of (Array.isArray(value) ? value : [value]).map(v => holderOf(key, v, root))) {
-      if (typeof h === "string") wrong.push(h); else by.get(key).push(h);
+      if (typeof h === "string") wrong.push(h); else if (h) by.get(key).push(h);
     }
   }
   for (const c of cases) for (const key of c.holds) if (by.has(key)) by.get(key).push({ kind: "case", by: c.name, part: c.inPart.includes(key) });
@@ -120,7 +135,15 @@ export function report(root = ROOT) {
   ];
 }
 
+// Where ajv is not installed the file's form went unchecked: said as a warning, and the check goes on.
+function unchecked() {
+  if (installed("ajv")) return;
+  console.log(unreached("ajv") ? `::warning::The form of ${FILE} was not checked: the package ajv could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`
+    : `::warning::The form of ${FILE} was not checked: the package ajv is not installed. Mend: run node scripts/install.mjs, then this check again`);
+}
+
 if (started(import.meta.url)) {
+  unchecked();
   const h = holders();
   const lines = report().map(l => l.slice(2));
   console.log(process.argv.includes("--list") ? lines.join("\n") : lines[0]);

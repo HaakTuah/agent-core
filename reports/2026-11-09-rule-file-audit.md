@@ -59,5 +59,4 @@ their cut.
 
 ## Questions for the owner
 
-- [#16](https://github.com/HaakTuah/agent-rules/issues/16): may an orchestrator ever run on your own computer, or only
-  on a server? Reading taken: the floor stays; the orchestrator module now says never on your machine.
+- [#16](https://github.com/HaakTuah/agent-rules/issues/16): may an orchestrator ever run on your own computer? Reading taken: the floor stays; the orchestrator module now says never on your machine.

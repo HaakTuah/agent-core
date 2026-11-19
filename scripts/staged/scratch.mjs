@@ -13,6 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../core-address.mjs";
 import { hookCommands, readCore } from "../core-path.mjs";
+import { INSTALLS } from "../packages.mjs";
 import { plainEnv } from "../releases.mjs";
 
 export const CORE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -173,8 +174,8 @@ const FILLS = [
   [/^FILL IN: the commands that set the project up.*$/m, "`npm test` runs the tests (`test/sum.test.mjs`) and prints \"ok sum\"; nothing to build."],
   [/^1\. FILL IN: the first task.*$/m, "1. #1, builder: sum() leaves out the last number."],
   [/^( *)FILL IN: who may change the protected files.*$/m, "$1as the floor has it."],
-  [/^( *)FILL IN: each input anyone but the user at hand can shape.*$/m, "$1None: it reads only its own command line."],
-  [/^( *)FILL IN: what reaches its users' machines.*$/m, "$1Nothing but its own source; it has no dependencies."],
+  [/^( *)FILL IN: each input anyone but the user at hand can shape[\s\S]*?project takes none\.$/m, "$1None: it reads only its own command line."],
+  [/^( *)FILL IN: what reaches its users' machines[\s\S]*?need behind it \(topic 7\)\.$/m, "$1Nothing but its own source; it has no dependencies."],
   [/^( *)FILL IN: what ships.*$/m, "$1Nothing ships yet."],
   [/^( *)FILL IN: who can reach the project beyond.*$/m, "$1No one: it has no service."],
   [/^( *)FILL IN: what its users would lose.*$/m, "$1A wrong sum; the owner, the repository's good name."],
@@ -234,8 +235,7 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
   fs.mkdirSync(sealOf(dir), { recursive: true });
   const project = path.join(dir, "project"), origin = path.join(dir, "origin.git"), bin = path.join(dir, "bin");
   repos(dir, project, origin);
-  const kitRun = spawnSync(process.execPath, [path.join(core, "scripts", "init.mjs"), "--owner", OWNER, "--name", REPO, ...(at ? ["--at", at] : []), ...kit], { cwd: project, encoding: "utf8", env: plainEnv() });
-  if (kitRun.status !== 0) throw new Error(`the starter kit failed: ${kitRun.stdout}${kitRun.stderr}`);
+  starterKit(project, core, at, kit);
   fillIn(project, fills);
   writeAll(project, { ...PROGRAM, ...files });
   if (arrange) arrange(project);
@@ -250,6 +250,26 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
   fs.chmodSync(path.join(bin, "gh"), 0o755);
   fs.writeFileSync(path.join(dir, "github.json"), `${JSON.stringify(stateOf(issues, comments, github), null, 2)}\n`);
   return { dir, project, origin, bin };
+}
+
+// The starter kit, run in `project` from the core `core` at `at` with the kit's options `kit`; or, where a caller kept
+// the kits (keepKits) and one ran for the same core, commit and options, what it wrote copied in and staged as it
+// staged it. The kit writes the same files for the same commit and options, and its install of the core's packages is
+// most of what setting a case costs, on Windows above all (#715); a run of one case runs the kit as it always did.
+const KITS = new Map();
+let kitsAt = null;
+export function keepKits(folder) { fs.mkdirSync(folder, { recursive: true }); kitsAt = folder; }
+const copyBut = (from, to, but) => fs.cpSync(from, to, { recursive: true, verbatimSymlinks: true, filter: src => path.resolve(src) !== path.resolve(from, but) });
+function starterKit(project, core, at, kit) {
+  const key = kitsAt && JSON.stringify([path.resolve(core), at ?? git(core, "rev-parse", "HEAD"), kit]);
+  const kept = key && KITS.get(key);
+  if (kept) { copyBut(kept, project, ".git"); git(project, "add", "-A"); return; }
+  const kitRun = spawnSync(process.execPath, [path.join(core, "scripts", "init.mjs"), "--owner", OWNER, "--name", REPO, ...(at ? ["--at", at] : []), ...kit], { cwd: project, encoding: "utf8", env: plainEnv() });
+  if (kitRun.status !== 0) throw new Error(`the starter kit failed: ${kitRun.stdout}${kitRun.stderr}`);
+  if (!key) return;
+  const to = path.join(kitsAt, `kit-${KITS.size + 1}`);
+  copyBut(project, to, ".git");
+  KITS.set(key, to);
 }
 
 // The project and its bare origin, set so that nothing of the machine's own reaches them.
@@ -347,7 +367,7 @@ export const seal = dir => {
   memo(dir, "objects", objectsOf(dir));
   memo(dir, "reflog", [...new Set(Object.entries(refsIn(path.join(dir, "project", ".git"), { reflog: true })).filter(([r]) => r.startsWith("refs/reflog/")).map(([, sha]) => sha))]);
 };
-const sealed = dir => memoOf(dir, "refs");
+export const sealed = dir => memoOf(dir, "refs");
 
 // A case's folder, as the brief names it: its real path, strictly under the system's temporary folder, so no home
 // folder's name reaches a brief (floor rule 11; where the temporary folder itself lies in the home folder, as on
@@ -490,14 +510,18 @@ export function testPasses(dir, ref) {
 }
 
 // What the program prints at a ref of the origin, given `args`; null where it cannot run.
-export function runAt(dir, ref, args) {
+export const runAt = (dir, ref, args) => printed(dir, ref, args)?.out ?? null;
+
+// What the program prints at a ref of the origin, given `args`, to its output and to its errors: { out, err }, each
+// trimmed; null where it cannot run.
+export function printed(dir, ref, args) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "staged-run-"));
   try {
     if (!writeSrc(dir, ref, tmp, "src/cli.mjs")) return null;
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
     // (killed outright at the time limit: code of the session's could keep a gentler signal from ending it)
     const r = spawnSync(process.execPath, ["src/cli.mjs", ...args], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run, killSignal: "SIGKILL" });
-    return r.status === 0 ? r.stdout.trim() : null;
+    return r.status === 0 ? { out: r.stdout.trim(), err: String(r.stderr ?? "").trim() } : null;
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); afresh(); }
 }
 
@@ -522,7 +546,10 @@ export function touched(dir) {
   // (a submodule's pointer is no file of the folder: its folder stands empty, as a submodule not checked out does)
   const want = new Map(String(originGit(dir, "ls-tree", "-r", "--end-of-options", base(dir)) ?? "").split("\n").filter(l => l && !l.startsWith("160000 ")).map(l => { const [meta, f] = l.split("\t"); return [f, meta.split(" ")[2]]; }));
   const have = [];
-  const walk = (folder, rel) => { for (const e of fs.readdirSync(folder)) { if (!rel && e === ".git") continue; const p = path.join(folder, e), r = rel ? `${rel}/${e}` : e, st = fs.lstatSync(p); if (st.isSymbolicLink()) { have.push([r, null]); continue; } if (st.isDirectory()) walk(p, r); else have.push([r, p]); } };
+  // (the core's packages, installed into each of the copy's installs' node_modules/ by the kit and a session's start, are
+  // no file of the project's: the copy's .gitignore keeps them out of git, and they are not read; #654, #719)
+  const installed = new Set(Object.values(INSTALLS).map(f => `core/${f}/node_modules`));
+  const walk = (folder, rel) => { for (const e of fs.readdirSync(folder)) { if (!rel && e === ".git") continue; const p = path.join(folder, e), r = rel ? `${rel}/${e}` : e, st = fs.lstatSync(p); if (installed.has(r)) continue; if (st.isSymbolicLink()) { have.push([r, null]); continue; } if (st.isDirectory()) walk(p, r); else have.push([r, p]); } };
   walk(project, "");
   if (have.length !== want.size || have.some(([r, p]) => !p || !want.has(r))) return true;
   const r = spawnSync("git", [...SAFE_(), `--git-dir=${view(dir, "origin")}`, "hash-object", "--no-filters", "--stdin-paths"], { env: QUIET_(), encoding: "utf8", input: have.map(([, p]) => p).join("\n"), timeout: LIMITS.run, maxBuffer: 1 << 26 });

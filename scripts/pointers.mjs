@@ -1,8 +1,9 @@
 // The pointer check ("One fact, one place" in roles/shared/how-to-work.md), for every project that takes the core: every
 // pointer in the project's rule files (rule-files.mjs, beside this file) to a file, a section or a numbered point must
 // lead to one that exists, or it fails, saying which. A pointer is read from the forms below; a form it cannot read is
-// listed, never guessed. Node's own modules only. It checks the project it lies in (core/scripts/ there), whatever the
-// directory it is started from; the copies workflow (.github/workflows/copies.yml) runs it on every PR.
+// listed, never guessed. It reads Markdown with the package marked, which the core installs from its lock file
+// (markdown.mjs, install.mjs), and Node's own modules besides. It checks the project it lies in (core/scripts/ there),
+// whatever the directory it is started from; the copies workflow (.github/workflows/copies.yml) runs it on every PR.
 //
 //   `path`                     a tracked file or folder (a bare name, such as `net.js`, if exactly one file has it)
 //   [text](path)               a tracked file or folder, relative to the file it is in (a web address is not checked)
@@ -14,7 +15,8 @@
 //   ("Section"), point 6       with no file: the file the pointer is in; a lone point: its own section's list
 //   floor rule 3               a rule of the floor, by its bold number in any of the floor's files (floor rules 3 and 10
 //                              too); in the floor's own files, a lone rule is the floor's
-//   core archive 134           an item of the core's archive, by its number in its item files (134 and 138, 118 to 120)
+//   core archive 134           an item of the core's archive, by its key in its item files (134 and 138, 118 to 120; an
+//                              item keyed by its issue, #744 or #733.1, since #744)
 // A run of these joined only by a comma, "and", "in", "of" or an opening bracket is one pointer: one file, its sections
 // and its points; a floor rule and an archive item stand alone. One of those two that leads nowhere fails the core's
 // own run, and is listed in a project's, so that a sync never fails a project's check over a citation of its own
@@ -29,18 +31,30 @@
 //
 // In the core's own repository, `node scripts/pointers.mjs --core` checks its floor, its roles' files, its modules and
 // the files that point from the paths they left the same way (its tests workflow runs it): there a path under `core/` is the core's own, read without that folder, and what only a
-// project has (`.claude/`, the cloud proxy's `ccr/` routes) is not looked for. Its agent tools' files are read too.
+// project has (`.claude/`, the cloud proxy's `ccr/` routes, its manifest `core-manifest.md`) is not looked for. Its agent tools' files are read too.
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { corePath, projectAt } from "./core-path.mjs";
 import { logged } from "./guards.mjs";
+import { markdownReader } from "./markdown.mjs";
+import { installed, unreached } from "./packages.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
+// (in a project, where the package is not installed, the check did not run, said as a warning that fails nothing: a job
+// of the project's own that ran it before the core's packages came installs nothing yet, and the sync never turns it
+// red (AGENTS.md of the core, "Nothing locks a project"; steps.mjs asks the step), nor does a registry that did not
+// answer (#654, point 4); in the core's own run a package not installed fails, saying the mend: packages.mjs)
+if (!process.argv.includes("--core") && !installed("marked")) {
+  console.log(unreached("marked") ? "::warning::The pointer check did not run: the package marked could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault"
+    : `::warning::The pointer check did not run: the package marked is not installed beside the core's copy. Mend: in a pull request of its own, add the step node ${corePath(".") || "core/"}scripts/install.mjs to this job before the step that runs this check`);
+  process.exit(0);
+}
+const readMarkdown = await markdownReader();
 // (`--tools-at <commit>`, which this script gives itself alone: it reads that commit's tree, as git holds it, and prints
 // the broken pointers in its agent tools' files, each by its file and its words, as one JSON list; #405)
 const AT = process.argv.includes("--tools-at") ? process.argv[process.argv.indexOf("--tools-at") + 1] : null;
@@ -70,22 +84,23 @@ const plain = s => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g
 // manifest names (core-path.mjs)
 const HOME = CORE ? "" : corePath(".") || "core/";
 const FLOOR = tracked.filter(f => f.startsWith(`${HOME}floor/`) && f.endsWith(".md"));
-const ITEMS = tracked.filter(f => new RegExp(`^${HOME}archive/instructions/items-\\d+\\.md$`).test(f));
+const ITEMS = tracked.filter(f => new RegExp(`^${HOME}archive/instructions/(?:items-\\d+|issue-\\d+(?:\\.\\d+)?)\\.md$`).test(f));
 
-// A file's anchors: its headings and bold lead-ins, each with the lines it spans (to the next heading of its level or
-// above), and its numbered points by line (a list item, or a paragraph led by its bold number, as the core's floor
-// writes its rules).
+// A file's anchors: its headings and bold lead-ins, as Markdown reads them (markdown.mjs), each with the lines it spans
+// (to the next heading of its level or above), its blocks, and its lines, where its numbered points are read (a list
+// item, or a paragraph led by its bold number, as the core's floor writes its rules).
 const parsed = new Map();
 function parse(file) {
   if (parsed.has(file)) return parsed.get(file);
-  const lines = text(file).split(/\r?\n/), anchors = [], heads = []; // (a Windows checkout's line endings too)
-  lines.forEach((l, i) => {
-    const h = /^(#+)\s+(.*)$/.exec(l);
-    if (h) { heads.push({ level: h[1].length, i }); anchors.push({ title: plain(h[2]), level: h[1].length, from: i }); }
-    for (const b of l.matchAll(/\*\*([^*]+?)[.:,]?\*\*/g)) anchors.push({ title: plain(b[1]), level: 9, from: i });
-  });
+  const lines = text(file).split(/\r\n?|\n/u); // (lines end as the lexer ends them, a Windows checkout's too)
+  let md;
+  // (a file nested deeper than the lexer can follow, thousands of quotes or lists, fails, saying so, never in silence)
+  try { md = readMarkdown(text(file)); } catch (e) { console.error(`FAIL: ${logged(`${file} could not be read as Markdown (${e.message})`)}. Mend: nest its quotes and lists less deep`); process.exit(1); }
+  const heads = md.heads.map(h => ({ level: h.level, i: h.i }));
+  const anchors = [...md.heads.map(h => ({ title: plain(h.text), level: h.level, from: h.i })), ...md.bolds.map(b => ({ title: plain(b.text.replace(/[.:,]$/u, "")), level: 9, from: b.i }))]
+    .sort((a, b) => a.from - b.from || a.level - b.level);
   for (const a of anchors) a.to = (heads.find(h => h.i > a.from && h.level <= a.level) || { i: lines.length }).i;
-  const p = { lines, anchors, heads };
+  const p = { lines, anchors, heads, blocks: md.blocks };
   parsed.set(file, p);
   return p;
 }
@@ -113,10 +128,13 @@ const hasPoint = (file, from, to, n) => parse(file).lines.slice(from, to).some(l
 
 // The atoms of a block (a paragraph or a list item, its lines joined): files, quoted titles and numbered points.
 // (a range written backwards is kept as written, so it leads nowhere and is named)
-const numbers = text => text.split(/, | and | or /).flatMap(s => s.includes(' to ') ? (([a, b]) => b < a ? [s] : Array.from({ length: b - a + 1 }, (_, k) => a + k))(s.split(' to ').map(Number)) : [Number(s)]);
+// (an archive item keyed by its issue, "#744" or "#733.1", and a range with one in it, are kept as written, as is a range
+// wider than WIDEST, so each leads nowhere and is named, never read as nothing or built whole)
+const WIDEST = 1000;
+const numbers = text => text.split(/, | and | or /).flatMap(s => s.includes('#') ? [s] : s.includes(' to ') ? (([a, b]) => b < a || b - a >= WIDEST ? [s] : Array.from({ length: b - a + 1 }, (_, k) => a + k))(s.split(' to ').map(Number)) : [Number(s)]);
 function atoms(text) {
   const out = [];
-  const re = /\b[Ff]loor (rules?) (\d+(?:(?:, | and | to | or )\d+)*)\b|\b[Cc]ore archive (\d+(?:(?:, | and | to | or )\d+)*)\b|`([^`\s]+)`|"([A-Z][^"]{1,60})"|“([A-Z][^”]{1,60})”|\b(rules?|points?) (\d+(?:(?:, | and | to | or )\d+)*)\b/g;
+  const re = /\b[Ff]loor (rules?) (\d+(?:(?:, | and | to | or )\d+)*)\b|\b[Cc]ore archive ((?:#\d+(?:\.\d+)?|\d+)(?:(?:, | and | to | or )(?:#\d+(?:\.\d+)?|\d+))*)\b|`([^`\s]+)`|"([A-Z][^"]{1,60})"|“([A-Z][^”]{1,60})”|\b(rules?|points?) (\d+(?:(?:, | and | to | or )\d+)*)\b/g;
   for (const m0 of text.matchAll(re)) {
     const at = { start: m0.index, end: m0.index + m0[0].length };
     if (m0[2] !== undefined) { out.push({ ...at, floor: numbers(m0[2]), word: `floor ${m0[1]}` }); continue; }
@@ -150,16 +168,8 @@ for (const rf of RULES) {
     count++;
     if (!files.has(posix.normalize(posix.join(posix.dirname(rf), to)))) (CORE ? broken : unread).push(`${rf}:${i + 1}: the import line @${to} leads to no tracked file`);
   });
-  // blocks: list items and paragraphs, outside code fences
-  const blocks = [];
-  let fence = false, cur = null;
-  lines.forEach((l, i) => {
-    if (/^\s*```/.test(l)) { fence = !fence; cur = null; return; }
-    if (fence || !l.trim() || /^#/.test(l) || /^\|/.test(l)) { cur = null; if (/^[#|]/.test(l)) blocks.push({ i, text: l }); return; }
-    if (!cur || /^\s*([-*]|\d+\.)\s/.test(l)) { cur = { i, text: '' }; blocks.push(cur); }
-    cur.text += ' ' + l.trim();
-  });
-  for (const b of blocks) {
+  // blocks: list items, paragraphs, headings and table rows, outside code and HTML (markdown.mjs)
+  for (const b of parse(rf).blocks) {
     const own = parse(rf).heads.filter(h => h.i <= b.i).pop();
     // a link's destination, when it is in this repository, must be a tracked file or folder too
     for (const m of b.text.matchAll(/\]\(([^)\s]+)\)/g)) {
@@ -204,7 +214,7 @@ for (const rf of RULES) {
         count++;
         let p = f.file.replace(/\/$/, '');
         if (CORE) {
-          if (/^(\.claude(\/|$)|ccr$)/.test(p)) continue;
+          if (/^(\.claude(\/|$)|ccr$|core-manifest\.md$)/.test(p)) continue;
           p = p.replace(/^core(\/|$)/, '');
           if (!p) continue;
           // (no project's copy holds the core's reports: .gitattributes)

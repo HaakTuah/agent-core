@@ -1,0 +1,51 @@
+{
+  "$comment": "The form of the list of what holds each rule (scripts/holders.json, which scripts/holders.mjs reads; its \"about\" says what each part means). The keys' form, \"#N\" or \"#N.P\" beside the numbers up to the last numbered item, is archive.mjs's KEY and LAST_NUMBERED, which the holders check's own test holds this schema to. What a schema cannot say stays with the script: that a key names a rule as it stands, that a check named is there, a holder's form (its parts are read there), an item that is not in the archive, and a number's form, which outcomes.mjs builds from its lists. Each rule's mend is what a failure of it says (scripts/schemas.mjs).",
+  "title": "scripts/holders.json",
+  "type": "object",
+  "mend": "write it as a JSON object: \"holders\", \"behind\" and \"numbers\", each an object keyed by each rule's file and lead, as its \"about\" says",
+  "properties": {
+    "about": {
+      "type": "string",
+      "mend": "write the note as one string"
+    },
+    "holders": {
+      "type": "object",
+      "mend": "write \"holders\" as an object keyed by each rule's file and lead (\"floor/security.md: 1. Nothing secret in the repository\")",
+      "additionalProperties": {
+        "type": ["string", "array"],
+        "minLength": 1,
+        "mend": "write the rule's holder as \"check: <its script, workflow or GitHub's setting>\", \"audit\" or \"describes\", each with \", in part\" where it holds only some of the rule, or a list of them",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "mend": "write each holder as \"check: <its script, workflow or GitHub's setting>\", \"audit\" or \"describes\", each with \", in part\" where it holds only some of the rule"
+        }
+      }
+    },
+    "behind": {
+      "type": "object",
+      "mend": "write \"behind\" as an object keyed by each rule's file and lead, or a rule file alone, each the list of the keys of the items behind it",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "mend": "write it as a list of the keys of the items behind the rule, such as [134, \"#744\"]",
+        "items": {
+          "type": ["integer", "string"],
+          "minimum": 1,
+          "maximum": 262,
+          "pattern": "^#(\\d+(?:\\.\\d+)?)$",
+          "mend": "write an item's key as the archive keys it: its number up to 262 (a number, not a string), or \"#N\" for the issue that carries the owner's word, or \"#N.P\" for one point of it (#744)"
+        }
+      }
+    },
+    "numbers": {
+      "type": "object",
+      "mend": "write \"numbers\" as an object keyed by each rule's file and lead, each the number the rule names",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "mend": "write \"<findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>\", the count the rule is meant to lower and the outcome it stands for, with \"; rare harm\" at its end where the rule guards against rare and severe harm"
+      }
+    }
+  }
+}
