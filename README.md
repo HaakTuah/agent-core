@@ -39,7 +39,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   (`how-to-work.md`, `inbox.md`, `work-flow.md`, which holds the rules on git since the two were always read together,
   `review-guidelines.md` and, read in a team's project, `teams.md`); `tools/` each agent tool's part, read when that
   tool is asked (`claude.md`, `codex.md`, `copilot.md`, `kiro.md`, `antigravity.md`, and `other-builders.md` for every
-  tool but Claude); `tasks/` what a task calls for (`roles.md`, `helpers.md`, `reviews.md`, `tools.md`,
+  tool but Claude); `tasks/` what a task calls for (`roles.md`, `helpers.md`, `reviews.md`, `tools.md`, `ways.md`,
   `github-calls.md`, `hosts.md`, `repositories.md`, `updates.md`, `choices.md`, `code-shape.md`, `tests.md`,
   `cleaning.md`; for a queue planned, `planning.md`; for a change its users will notice, `done-when.md`; for a project
   people use through a screen, `screens.md`; and, for games only, `game-design.md`). A manifest takes or leaves out a
@@ -492,7 +492,7 @@ for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit
 | *owner's choices* | the kinds of choice the owner keeps, each asked of the owner (`tasks/choices.md`) | choice: left out, none |
 | *other builders' checks* | what a session of another tool than Claude Code runs before it finishes (`tools/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync | choice: left out, the project's own tests |
 | *quick check* | the command, in backticks, that a session runs before its first change, to tell a `main` that is broken from a fault of its own, in about a minute (`roles/shared/work-flow.md`, "Sessions"); the start hook names it from main's manifest, and never runs it (`scripts/work-saved.sh`) | choice: left out, the *other builders' checks* |
-| *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so (`tasks/roles.md`, "Tools are preferences") | read: from the last merged pull requests, as `tasks/roles.md` says ("Tools are preferences") (`scripts/tools-read.mjs`) |
+| *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and each way the core has no part for (`tasks/ways.md`), and which of a reviewer's findings block where it marks none so (`tasks/roles.md`, "Tools are preferences") | read: from the last merged pull requests, as `tasks/roles.md` says ("Tools are preferences") (`scripts/tools-read.mjs`) |
 | *pace* | the manifest's lines under "Pace", each a pace the owner sets, of the kinds `roles/orchestrator.md`, "The pace is the owner's", names | choice: left out, no pace but the default |
 | *users get* | `merges` or `releases`, in backticks: whether the project still publishes what its users get on each merge to its default branch (a site deployed on each push), or only from that branch's green newest commit or a release cut there (floor rule 12; `tasks/hosts.md`) | cannot be read: a deploy on each push and a release workflow each say it only in part; left out, `merges`, under which a pull request is brought up to date first, until the project's publishing waits on a green branch and its row says `releases` |
 | *merge queue* | `on`, `offered` or `none`, in backticks: whether the host offers the repository a merge queue and whether it is on (`tasks/hosts.md`, "The merge line follows the host") | read: from who holds the repository, whether it is private and its rules on the default branch (`scripts/merge-line.mjs`) |
@@ -605,7 +605,9 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   yeses (`roles/shared/teams.md`); nothing is kept in a list.
 - The stop switch, in each project: create the branch `agents-stop` (on GitHub, from any device) to stop its agents,
   and delete it to let them go on (`roles/shared/work-flow.md`). It stops only that repository's agents.
-- The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up.
+- The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up. How a
+  session is handed work, read and reviewed in each way of running sessions, side by side, the cloud or a plain
+  terminal: `tasks/ways.md`.
 - Any other machine the sessions run on is the owner's to set up (floor rule 18), who chooses knowing what a setup like
   `setup/server.md`'s buys: an account of the agents' own and a throwaway box for the project's code mean that
   an agent fooled by planted text (in a dependency, a web page, an issue) reaches only what that account holds and runs
