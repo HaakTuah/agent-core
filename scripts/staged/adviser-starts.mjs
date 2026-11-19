@@ -32,18 +32,23 @@ export function set(dir, opts = {}) {
 }
 
 // The models of the strongest tier, as the tools' parts of the core that runs the case map the tiers ("strongest,
-// Opus" in tools/claude.md), never as the session's project holds them, which it could change.
-const TOOLS = path.join(CORE_ROOT, "tools");
-export const STRONGEST = fs.readdirSync(TOOLS).filter(f => f.endsWith(".md"))
-  .flatMap(f => [...fs.readFileSync(path.join(TOOLS, f), "utf8").matchAll(/\bstrongest, ([A-Z][\w.-]*)/gu)].map(m => m[1]));
+// Opus" in tools/claude.md), never as the session's project holds them, which it could change; read when a start is
+// judged, never as the case is imported (a copy of the scripts alone has no tools/), and none where they cannot be read.
+export const strongest = () => {
+  const tools = path.join(CORE_ROOT, "tools");
+  try {
+    return fs.readdirSync(tools).filter(f => f.endsWith(".md"))
+      .flatMap(f => [...fs.readFileSync(path.join(tools, f), "utf8").matchAll(/\bstrongest, ([A-Z][\w.-]*)/gu)].map(m => m[1]));
+  } catch { return []; }
+};
 // (the project named alone, never the other, whose name begins with it; and the owner named apart from the login)
 const PROJECT = new RegExp(`(?<![\\w-])${REPO}(?![\\w-])`, "u");
 // What is wrong with a start of the project's orchestrator, each a reason.
 function faults(s) {
   const why = [], brief = String(s.brief ?? ""), repos = Array.isArray(s.repositories) ? s.repositories.map(String) : [];
   if (repos.length !== 1 || repos[0] !== OWN) why.push(`it reaches ${repos.join(", ") || "no repository"}, not ${OWN} alone`);
-  const model = String(s.model ?? "").trim();
-  if (!STRONGEST.some(m => new RegExp(`\\b${m}\\b`, "iu").test(model))) why.push(`its model is ${model || "not given"}, not the strongest tier (${STRONGEST.join(", ") || "which the tools' parts did not give"})`);
+  const model = String(s.model ?? "").trim(), top = strongest();
+  if (!top.some(m => new RegExp(`\\b${m}\\b`, "iu").test(model))) why.push(`its model is ${model || "not given"}, not the strongest tier (${top.join(", ") || "which the tools' parts did not give"})`);
   if (String(s.effort ?? "").trim().toLowerCase() !== "high") why.push(`its effort is ${String(s.effort ?? "").trim() || "not given"}, not high`);
   const lacks = [[/\borchestrator\b/iu, "its role"], [/\broles\/orchestrator\.md\b/u, "its role's file (roles/orchestrator.md)"], [PROJECT, "the project"], [/\bowner\b/iu, "the owner's word that started it"]]
     .filter(([re]) => !re.test(brief.replaceAll(OWNER, ""))).map(([, what]) => what);
