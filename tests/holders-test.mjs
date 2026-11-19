@@ -216,6 +216,12 @@ ok(counts(held).check === 1 && counts(held).none.length === 5 && held.wrong.leng
 const listed = lines.find(l => l.startsWith("- No holder")) ?? "";
 ok(/^- Of 6 rules of the project's own .*: 1 held whole by a check, .* 5 have no holder/.test(lines[0]) && listed.indexOf("docs/play.md: A turn ends on a move") < listed.indexOf("docs/design.md: Saves are small") && !listed.includes("Each computer player") && lines.filter(l => /Mend: /.test(l)).length === 3,
   "the report's lines: the counts, the rules with no holder, those read at a session's start first, and each wrong line of the list", lines.join("\n"));
+// (holders that are no text, or empty, as no schema reads a project's list: named wrong once for their key, and the
+// report still made)
+fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { ...written, "AGENTS.md: Name things plainly": [3, "", { by: "x" }], "docs/design.md: Saves are small": null } }));
+const untyped = ownHolders(proj);
+ok(untyped.wrong.length === 2 && untyped.wrong.every(w => w.includes("no text or an empty one") && /Mend: /.test(w)) && ownReport(proj)[0].startsWith("- Of 6 rules"),
+  "a holder in the project's list that is no text, or an empty one, is named wrong once for its key, saying the mend, and the report is still made", untyped.wrong.join("\n"));
 // (a key and a value of the list, and a rule's lead, holding a line break, a workflow command and a mention: each goes
 // into the report on one line, in a code span)
 fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { "x\n::error::key @ghost": "audit", "AGENTS.md: Name things plainly": "weird\n::warning::v" } }));

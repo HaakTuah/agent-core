@@ -189,7 +189,8 @@ export function ownHolders(root = process.cwd()) {
     for (const v of (Array.isArray(value) ? value : [value]).filter(v => v !== "none")) {
       const h = holderOf(key, v, root, OWN, OWN_PATHS, span);
       // (a review reads what a session judged, and fails nothing by itself: it holds no rule)
-      if (h === null) wrong.push(`${OWN}: ${span(key)} has a holder that is no text or an empty one. Mend: write each holder as "check: <its test, check, simulation or script>", "audit", "describes" or "none"`);
+      // (a holder that is no text, or an empty one, named once for its key however many it has)
+      if (h === null) { const w = `${OWN}: ${span(key)} has a holder that is no text or an empty one. Mend: write each holder as "check: <its test, check, simulation or script>", "audit", "describes" or "none"`; if (!wrong.includes(w)) wrong.push(w); }
       else if (typeof h !== "string" && h.kind === "check" && /\breview/iu.test(h.by)) wrong.push(`${OWN}: ${span(key)} is held by ${span(h.by)}, a review, which holds no rule. Mend: name the test, check, simulation or script that fails where the rule is broken, or write "none"`);
       else if (typeof h === "string") wrong.push(h); else by.get(key).push(h);
     }
