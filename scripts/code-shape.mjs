@@ -52,7 +52,8 @@ const SAFE = ["-c", "core.fsmonitor=false"];
 const BULK = 30; // a commit that touches more of the measured files than this is a move or a sweep, not a sign
 
 // The tokens of a file's text: { t: "id" | "num" | "str" | "regex" | "punct", v, line, at }, `at` where it starts in the
-// text (for a template's runs, where the run ends). Comments and white space are dropped; a template literal is a
+// text (for a template's runs, where the run ends). Comments and white space are dropped, each comment's lines kept in
+// the list's `comments` ({ line, text }; shape.mjs reads them for a change's mark); a template literal is a
 // "str" token for each run of its text, with the code of each ${ } between them. With
 // `jsx` (jsxIn, below), an element of JSX is a "jsx" token at its <, with the code of each { } in it between ( and );
 // where one never closes, the list's `lost` is true, and the file is read again without JSX.
@@ -60,7 +61,22 @@ export function tokens(src, jsx = false) {
   const lex = new Lexer(src, jsx);
   lex.code(false);
   lex.out.lost = lex.lost;
+  lex.out.comments = lex.comments;
   return lex.out;
+}
+
+// Each line of a comment, from `a` (where its text starts) to `b`, as { line, text }, from the line `line` on, added to
+// `to` one at a time, so that a comment of any length overflows nothing; of each line its first COMMENT_READ characters
+// alone, all a mark is read in.
+export const COMMENT_READ = 400;
+export function commentLines(to, src, a, b, line) {
+  const text = src.slice(a, b);
+  let k = 0;
+  for (let at = 0; at <= text.length; k++) {
+    const end = text.indexOf("\n", at), stop = end < 0 ? text.length : end;
+    to.push({ line: line + k, text: text.slice(at, Math.min(stop, at + COMMENT_READ)) });
+    at = stop + 1;
+  }
 }
 
 // Whether a file's tokens are read with JSX: a file of .jsx or .tsx, and one of JavaScript, where no expression may
@@ -74,7 +90,7 @@ const TYPE_PARAMETER = /^<\s*(?:const\s+)?[A-Za-z_$][\w$]*\s*(?:,|=|extends\b)/u
 
 class Lexer {
   constructor(src, jsx) {
-    Object.assign(this, { src, jsx, n: src.length, out: [], parens: [], prev: null, line: 1, lost: false, nest: 0 });
+    Object.assign(this, { src, jsx, n: src.length, out: [], parens: [], prev: null, line: 1, lost: false, nest: 0, comments: [] });
     // (parens: for each open (, whether it opens an if, for, while or with's condition)
     this.i = src.startsWith("#!") ? src.indexOf("\n") : 0;
     if (this.i < 0) this.i = this.n;
@@ -112,9 +128,10 @@ class Lexer {
     const { src, i, n } = this;
     if (c === "\n") { this.line++; this.i++; return true; }
     if (c === " " || c === "\t" || c === "\r" || c === "\f" || c === "\v" || c === "\ufeff") { this.i++; return true; }
-    if (c === "/" && src[i + 1] === "/") { while (this.i < n && src[this.i] !== "\n") this.i++; return true; }
+    if (c === "/" && src[i + 1] === "/") { while (this.i < n && src[this.i] !== "\n") this.i++; commentLines(this.comments, src, i + 2, this.i, this.line); return true; }
     if (c !== "/" || src[i + 1] !== "*") return false;
     const e = src.indexOf("*/", i + 2), end = e < 0 ? n : e + 2;
+    commentLines(this.comments, src, i + 2, e < 0 ? n : e, this.line);
     this.lines(i, end);
     this.i = end;
     return true;

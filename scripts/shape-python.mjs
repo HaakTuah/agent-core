@@ -7,7 +7,7 @@
 // An import is read with where it stands: in a def, it runs when the function is called (as a dynamic import does in
 // JavaScript), and under `if TYPE_CHECKING:` it takes types alone; neither makes a cycle.
 import path from "node:path";
-import { NEST } from "./code-shape.mjs";
+import { COMMENT_READ, NEST } from "./code-shape.mjs";
 import { unreachedFor } from "./parser.mjs";
 import { pythonFunctions } from "./python-functions.mjs";
 
@@ -51,11 +51,12 @@ export function logicalLines(src) {
   lex.code(false);
   lex.close();
   lex.lines.lost = lex.lost;
+  lex.lines.comments = lex.comments;
   return lex.lines;
 }
 
 class Lexer {
-  constructor(src) { Object.assign(this, { src, n: src.length, i: 0, line: 1, depth: 0, indent: 0, start: true, current: null, lines: [], nest: 0, lost: false }); }
+  constructor(src) { Object.assign(this, { src, n: src.length, i: 0, line: 1, depth: 0, indent: 0, start: true, current: null, lines: [], nest: 0, lost: false, comments: [] }); }
 
   push(t, v, l = this.line) {
     if (!this.current) this.current = { indent: this.indent, line: l, end: l, toks: [] };
@@ -97,7 +98,9 @@ class Lexer {
     if (c === "\\" && this.src.startsWith("\r\n", this.i + 1)) { this.line++; this.i += 3; return true; }
     if (c === " " || c === "\t" || c === "\r" || c === "\f" || c === "﻿") { this.i++; return true; }
     if (c !== "#") return false;
+    const from = this.i + 1;
     while (this.i < this.n && this.src[this.i] !== "\n") this.i++;
+    this.comments.push({ line: this.line, text: this.src.slice(from, Math.min(this.i, from + COMMENT_READ)) });
     return true;
   }
 
@@ -231,7 +234,7 @@ export function readPython(src) {
     for (const part of statements(ln.toks, st)) for (const imp of importsOf(part)) imports.push({ ...imp, dynamic, types });
     if (st.word) stack.push({ indent: ln.indent, def: st.word === "def", types: st.word === "if" && isTypeChecking(ln.toks) });
   }
-  return { functions: lines.lost ? null : unreachedFor("python") ? [] : pythonFunctions(src), imports, toks: lines.flatMap(l => l.toks) };
+  return { functions: lines.lost ? null : unreachedFor("python") ? [] : pythonFunctions(src), imports, toks: lines.flatMap(l => l.toks), comments: lines.comments };
 }
 
 // A logical line's simple statements: those after `;`, and of a compound statement those after its header's colon
