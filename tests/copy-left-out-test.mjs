@@ -20,6 +20,7 @@ import { judge as codeReview } from "../scripts/code-review-wait.mjs";
 import { CODEX, judge as securityReview } from "../scripts/security-review.mjs";
 import { verdict as entryFiles } from "../scripts/entry-files.mjs";
 import { run as licenceScan, write as licenceWrite } from "../scripts/licence-scan-stage.mjs";
+import { targets as scanTargets } from "../scripts/code-scan.mjs";
 import { check as nuget } from "../scripts/nuget.mjs";
 import { calledByPaths, library, ownOf } from "../scripts/reading.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
@@ -194,6 +195,11 @@ const PAIRS = {
     const b = moved("a/one.js", "one.js");
     return [a.failed, b.failed, `inside: ${a.out}\noutside: ${b.out}`];
   }],
+  "code-scan.mjs": ["in-process, targets(): a file of code the change adds, handed to the engine", () =>
+    inProject({}, { "core/scripts/added.mjs": "export const x = 1;\n" }, { "scripts/added.mjs": "export const x = 1;\n" }, ({ dir, base }) => {
+      const handed = scanTargets(dir, base);
+      return { failed: handed.length > 0, out: handed.join(", ") };
+    })],
   "pointers.mjs": ["the script, from the copy: a pointer to a heading that is not there", () =>
     inProject(pointing, { "core/AGENTS.md": broken }, { "AGENTS.md": broken }, ({ dir }) => node(dir, "pointers.mjs", [], { POINTERS_BASE: "" }))],
   "reading-size.mjs": ["the script, from the copy: a file past the split mark changed, and a file under \"read\" past the total", () => {

@@ -112,6 +112,10 @@ const srcRoot = { "src/pkg/rules.py": "def r():\n    return 1\n", "tests/test_dy
 const srcConfig = parseConfig(JSON.stringify({ baseline: "b.json", code: ["src", "tests"], tests: ["tests/"] })), srcTests = new Set(["tests/test_dyn.py", "tests/test_none.py"]), srcFound = survey(srcRoot, srcConfig, srcTests);
 ok(selection({ changed: ["src/pkg/rules.py"], texts: srcRoot, tests: srcTests, reach: srcFound.reach, unsure: srcFound.unsure, config: srcConfig }).tests.includes("tests/test_dyn.py"),
   "Python's import_module, a plain string's too, marks its test as reaching any file: the name resolves against roots the readers do not know", JSON.stringify([...srcFound.unsure]));
+const lostPy = { "src/pkg/a.py": "def a():\n    return 1\n", "src/pkg/b.py": "def b():\n    return 2\n", "tests/test_lost.py": "import src.pkg.a\nx = (\nfrom src.pkg import (b,", "tests/test_none.py": "def test():\n    pass\n" };
+const lostConfig = parseConfig(JSON.stringify({ baseline: "b.json", code: ["src", "tests"], tests: ["tests/"] })), lostTests = new Set(["tests/test_lost.py", "tests/test_none.py"]), lostFound = survey(lostPy, lostConfig, lostTests);
+const lostRun = selection({ changed: ["src/pkg/b.py"], texts: lostPy, tests: lostTests, reach: lostFound.reach, unsure: lostFound.unsure, config: lostConfig }).tests;
+ok(lostFound.unsure.has("tests/test_lost.py") && same(lostRun, ["tests/test_lost.py"]), "a file of Python the grammar cannot read whole may import, in the part it lost, what no reader sees: a test that reaches it runs on any change", JSON.stringify({ lostRun, unsure: [...lostFound.unsure] }));
 ok(pick2("pkg/db.py").includes("tests/test_x.py") && pick2("pkg/db.py").includes("tests/test_child.py") && pick2("pkg/plugins.py").includes("tests/test_load.py"),
   "Python: a folder's conftest.py, a fixture run by its path among the tests, and a module named by its dotted name in a string reach the tests that use them", JSON.stringify({ db: pick2("pkg/db.py"), plugins: pick2("pkg/plugins.py") }));
 s = selection({ changed: ["package.json"], texts: { ...texts, "package.json": "{\"dependencies\":{\"x\":\"1.0.0\"}}" }, tests, reach, config });

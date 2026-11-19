@@ -38,6 +38,9 @@
 // line under the manifest's "Differences" (read from git, the merge commit against its base), the line "Reasons read:"
 // (tasks/updates.md, "A question or difference about a rule of the core starts from its reasons"; #756). A line asked
 // for passes where it begins in its form, whatever follows it (#750, point 4).
+// And, of one opened since the copy on its base held CHANGED_SINCE, each test file it leaves with fewer lines that
+// assert, or in which it skips a case, named on the line weakened.mjs, beside this file, asks, and each whose
+// assertions it only changes listed for the reviewer (#307).
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
 //
@@ -51,6 +54,7 @@ import { NUMBER } from "./outcomes.mjs";
 import { asking, coreAtBase, issuesOf, textsOf, yesOf } from "./owner-yes.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, pathIn, taken, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
+import { changedMend, plain, testsChanged } from "./weakened.mjs";
 
 // The line a description ends with, saying what the pull request waits on: nothing (its builder goes on), a review, its
 // checks, another item ("#241"), or the owner, with the question in one sentence after a colon. A line that begins with
@@ -73,6 +77,11 @@ export const NO_COST = "No cost line: the script printed none.";
 // rule says what holds it"; #303), as the lines above are.
 export const NUMBER_SINCE = "2026-11-17T00:00:00Z";
 export const HOLDS = "What holds it";
+// The day from which a description names, on weakened.mjs's line, each test file the pull request leaves with fewer
+// lines that assert, or in which it skips a case (tasks/code-shape.md, "A test taken out or weakened is said"; #307), as
+// the lines above are.
+export const CHANGED_SINCE = "2026-11-18T00:00:00Z";
+
 // The day from which a pull request that adds a difference is asked the line REASONS (#756), as the lines above are.
 export const REASONS_SINCE = "2026-11-19T00:00:00Z";
 export const REASONS = "Reasons read:";
@@ -261,6 +270,16 @@ if (started(import.meta.url)) {
     } else console.log(`ok   the milestones are not asked here: ${planAsked(created, then) ? "the change could not be read against its base" : why}`);
     if (created >= COST_SINCE && then?.includes("export const COST_SINCE")) { const mend = costMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log("ok   the description has its cost line, or the mark that the script printed none"); }
     else console.log(`ok   the cost line or its mark is not asked here: ${why}`);
+    if (created >= CHANGED_SINCE && then?.includes("export const CHANGED_SINCE")) {
+      const found = testsChanged(process.cwd());
+      if (found === null) console.log("ok   the tests this pull request edits are not asked here: the change, or the shape check's config at its base, could not be read, or that config names no tests");
+      else {
+        // (each file whose assertions are only changed is listed for the reviewer, and asks nothing: one made stricter is no worse)
+        for (const f of found.filter(f => !f.weaker)) console.log(`ok   for the reviewer: ${plain(f.file)} has ${f.asserts.length} line${f.asserts.length === 1 ? "" : "s"} that assert changed, none fewer`);
+        const mend = changedMend(process.env.PR_BODY, found, `node ${coreAt(process.cwd()) ?? ""}scripts/weakened.mjs`);
+        if (mend) mends.push(mend); else console.log(`ok   the description names each test file this pull request leaves with fewer lines that assert, or in which it skips a case (${found.filter(f => f.weaker).length})`);
+      }
+    } else console.log(`ok   the tests this pull request edits are not asked here: ${why}`);
     // (asked only where the part is, which is where the rules change)
     if (parts.includes(HOLDS) && created >= NUMBER_SINCE && then?.includes("export const NUMBER_SINCE")) { const mend = numberMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log(`ok   the part "${HOLDS}" names a rule's number, or "None"`); }
     else if (parts.includes(HOLDS)) console.log(`ok   the number under "${HOLDS}" is not asked here: ${why}`);
