@@ -28,23 +28,24 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      answer (256 MB for the comments proof and the selection, 16 MB for the manifest, past which it is reported
      unread), and none in count, since every changed path is read; hostile tests: `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
-     GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`); limits: none of its own on the
-     file, a project's own, read whole; 64 MB of an answer and 100 pages of 100 for the open issues, past which it
-     stops; hostile tests: `tests/queue-test.mjs`.
-   - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the
-     reviews' records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look
-     (`scripts/look.mjs`), the inbox (`scripts/inbox.mjs`) and the personal terms' take-out (`scripts/issue-terms.mjs`,
-     which edits only an insider's text); limits: 256 MB of an answer (16 MB for the look and the inbox), 500 pages of
-     100; hostile tests: `tests/hostile-issues-test.mjs`, and for the take-out `tests/issue-terms-test.mjs`.
-   - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository
-     (the workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`,
-     `scripts/releases.mjs`, `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`,
-     `scripts/clean-merges.mjs`, `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs` and
-     `scripts/tools-offer.mjs`, and an account's rights by the code-review wait (`scripts/code-review-wait.mjs`), the
-     scheduled look (`scripts/look.mjs`) and the size check (`scripts/size.mjs`, from `size.yml`) through
-     `security-review.mjs`'s reader; limits: 1 MB of an answer to `core-moved.mjs`, 64 MB or 256 MB to the others, 30
-     merged pull requests for the wait, 50 pages for the stalled look, 200 for the cost, 10 for the merge line, 20 s
-     for the tools' offer, 30 s for the host's account; hostile tests: `tests/hostile-github-test.mjs`.
+     GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`); limits: 1 MB of the file, past
+     which it is refused unread; 64 MB of an answer and 100 pages of 100 for the open issues, past which it stops;
+     hostile tests: `tests/queue-test.mjs`.
+   - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the reviews'
+     records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look (`scripts/look.mjs`), the
+     inbox (`scripts/inbox.mjs`) and the personal terms' take-out (`scripts/issue-terms.mjs`, which edits only an
+     insider's text); limits: 256 MB of an answer, 500 pages of 100, and for the take-out 1,048,576 characters of a
+     text, past which it is left unread, and the first 100 edits of its history; hostile tests:
+     `tests/hostile-issues-test.mjs`, and for the take-out `tests/issue-terms-test.mjs`.
+   - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository (the
+     workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`, `scripts/releases.mjs`,
+     `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`, `scripts/clean-merges.mjs`,
+     `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs` and `scripts/tools-offer.mjs`, and
+     an account's rights by the code-review wait (`scripts/code-review-wait.mjs`), the scheduled look
+     (`scripts/look.mjs`) and the size check (`scripts/size.mjs`, from `size.yml`) through `security-review.mjs`'s
+     reader; limits: 1 MB of an answer to `core-moved.mjs` and `releases.mjs`, 64 MB or 256 MB to the others, 30 merged
+     pull requests for the wait, 50 pages for the stalled look, 200 for the cost, 10 for the merge line, 20 s for the
+     tools' offer, 30 s for the host's account; hostile tests: `tests/hostile-github-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`), the sync and its steps
@@ -55,13 +56,14 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      the work tree and a pull request's base hold them: read by the copies and pointer checks (`scripts/copies.mjs`,
      `scripts/pointers.mjs`, through `scripts/rule-files.mjs`); limits: 1 MB of a file, past which it is not read, 40
      links followed from one path; hostile tests: `tests/copies-tools-test.mjs`.
-   - a project's build, package and workflow files: read by the licence, exact-versions, NuGet, workflow and
-     agent-tools checks and the reader of where the tests run (`scripts/licences.mjs`, `scripts/exact-versions.mjs`,
+   - a project's build, package and workflow files: read by the licence, exact-versions, NuGet, workflow and agent-tools
+     checks and the reader of where the tests run (`scripts/licences.mjs`, `scripts/exact-versions.mjs`,
      `scripts/nuget.mjs`, `scripts/workflows.mjs`, `scripts/agent-tools.mjs`, `scripts/runners.mjs`) and the sync's move
      of the pins (`scripts/sync.mjs`); limits: 64 MB of a file for the licence check (256 MB for NuGet's), 1 MB of an
-     action and 5,000 steps of a workflow, 60 s for git's filters, none of their own for the reader of where the tests
-     run and the move of the pins, which read the project's own workflows whole, and NuGet's lock file version 2, a
-     newer refused (npm's lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`.
+     action and 5,000 steps of a workflow, 60 s for git's filters, 64 MB of a workflow for the move of the pins, past
+     which it is reported unread, and none on a file for the reader of where the tests run, a project's own, read whole,
+     whose walk of a job's labels stops at 500 and 8 deep, and NuGet's lock file version 2, a newer refused (npm's lock
+     file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`.
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
