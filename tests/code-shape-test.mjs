@@ -51,9 +51,9 @@ ok(same(regexes("x = /[/]/g;\n"), ["/[/]/g"]) && same(regexes("x = /a\\/b/;\n"),
 ok(tokens(`x = ${"/[".repeat(300000)}\n`).length === 600002, "a large line is read in time, in step with its size");
 // (a large file whose brackets do not pair is not JavaScript, so its functions cannot be told: the grammar's recovery
 // from it grows faster than its size, and its time is cut at the reader's budget; one of slashes, unbudgeted, took more
-// than two minutes)
+// than two minutes, and one just under the largest the grammar is given is cut at the budget, not left out by its size)
 const unclosed = functions(`function f() {\n${"x =(:\n".repeat(10000)}${"[\n".repeat(10000)}${"]".repeat(5000)}}\n`);
-const slashed = functions(`x = ${"/[".repeat(300000)}\n`);
+const slashed = functions(`x = ${"/[".repeat(LARGEST.javascript / 2 - 3)}\n`);
 ok(unclosed === null && slashed === null, "a large file that is no JavaScript is lost, its functions not told, within the suite's time mark");
 // (one past the largest the grammar is given, valid or not, is lost unread: its tree's memory, not its time, is what a
 // generated file of data would cost; the fallback security review of #785)

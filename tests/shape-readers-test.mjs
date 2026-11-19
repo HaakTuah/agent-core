@@ -186,7 +186,7 @@ const pySized = n => `${"x = 1\n".repeat(n)}def f():\n    pass\n`, pyUnder = Mat
 ok(same(shown(readPython(pySized(pyUnder)).functions), [`f:${pyUnder + 1}:2:0:0`]) && readPython(pySized(LARGEST.python / 5)).functions === null,
   "Python: a file past the largest the grammar is given is lost unread, and one under it is read whole");
 const pyStarted = Date.now();
-const pyHostile = [`def f():\n    x = ${"([{".repeat(280000)}\n`, `def f():\n    ${"['".repeat(300000)}\n`].map(t => readPython(t).functions);
+const pyHostile = [`def f():\n    x = ${"([{".repeat(160000)}\n`, `def f():\n    ${"['".repeat(240000)}\n`].map(t => readPython(t).functions);
 ok(pyHostile.every(f => f === null) && Date.now() - pyStarted < 10000, `Python: brackets and strings that never close are lost within the grammar's budget (${Date.now() - pyStarted} ms)`);
 const inline = readPython("import a; import b\nif sys.platform == 'win32': import winreg\nif TYPE_CHECKING: from t import T\ndef f(): import lazy\n");
 ok(same(inline.imports.map(i => `${i.module}${i.dynamic ? " dynamic" : ""}${i.types ? " types" : ""}`), ["a", "b", "winreg", "t types", "lazy dynamic"]), "Python: imports after a ; and in a one-line suite are read, with where they stand", JSON.stringify(inline.imports));
