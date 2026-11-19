@@ -849,7 +849,7 @@ ok(notRead("copies", { "a.yml": { env: { CHECK: "core/scripts/copies.mjs" }, job
   && copiesOf({ "a.yml": stepped("node ${{ github.action_path }}/index.js\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json",
   "a local action is read with what its caller gives it; a file of another plain name past an expression is no run of the script");
 // (the review of 165db25: actions read once, and their steps, calls and depth bounded; a glob or a "/" after the name)
-// (past the bound the run is not read, so the work stops there: of the two sizes, each above it, the larger takes no more)
+// (past the bound the run is not read and the work stops there, so it grows no faster than the input, though the bound does not hold it flat)
 const fan = linear(n => {
   const files = { ".github/actions/a/action.yml": `runs:\n  using: composite\n  steps:\n${"    - uses: ./.github/actions/b\n".repeat(n - 1)}`, ".github/actions/b/action.yml": `runs:\n  using: composite\n  steps:\n${"    - run: echo x\n      shell: bash\n".repeat(n)}` };
   return () => notRead("copies", { "a.yml": { jobs: { j: { steps: [{ uses: "./.github/actions/a" }] } } } }, files);
@@ -890,7 +890,7 @@ const slashes = linear((n, k) => copiesOf({ "a.yml": stepped(`node core/scripts$
 ok(slashes.right && slashes.linear, "a run of \"/\" is read in one pass", slashes.shown);
 // (on the parser, #530: a text the grammar cannot read within its time is not read at all, since a line read alone
 // would misread a quote or a continued line over it; the fallback reviewer's review of 4ffb50d)
-ok(notRead("copies", { "a.yml": stepped(`echo ${"a?(b)".repeat(100000)}\nnode core/scripts/copies.mjs c.json`) }), "a long line of extended globs leaves its step not read, within the time mark");
+ok(notRead("copies", { "a.yml": stepped(`echo ${"a?(b)".repeat(100000)}\nnode core/scripts/copies.mjs c.json`) }), "a long line of extended globs leaves its step not read, which the grammar's own budget decides");
 const oneRun = { ".github/actions/a/action.yml": "runs:\n  using: composite\n  steps:\n    - run: echo x\n      shell: bash\n" };
 const givenEnv = linear(n => {
   const bigEnv = Object.fromEntries(Array.from({ length: n }, (_, k) => [`E${k}`, `v${k}`]));
