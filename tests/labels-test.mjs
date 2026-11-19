@@ -1,7 +1,8 @@
-// Tests of the labels and openers (labels.mjs): the list's shape, an agent's attribution line, a comment's opening line,
-// the "Found while:" line, a view's heading, the labels to make, what the check reports of each kind and of none; and,
-// on Linux and macOS, the script itself where gh gives no answer, which reports that and fails nothing, and the day it
-// reads from in a full clone, a shallow one and where git cannot start. Node's own modules and git.
+// Tests of the labels and openers (labels.mjs): the list's shape, by its schema, an agent's attribution line, a
+// comment's opening line, the "Found while:" line, a view's heading, the labels to make, what the check reports of each
+// kind and of none; and, on Linux and macOS, the script itself where gh gives no answer, which reports that and fails
+// nothing, and the day it reads from in a full clone, a shallow one and where git cannot start. Node's own modules, git,
+// and ajv for the schema (schemas.mjs).
 //
 //   node tests/labels-test.mjs
 import { spawnSync } from "node:child_process";
@@ -11,14 +12,33 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LIST, SENDERS, SEVERAL, SINCE, STATES, byAgent, cameOn, check, found, opens, report, strayViews, toMake } from "../scripts/labels.mjs";
 import { SENDERS as FILE_SENDERS, STATES as FILE_STATES } from "../scripts/inbox.mjs";
+import { shapeFaults } from "../scripts/schemas.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
 
 ok(STATES.join() === "queued,needs-owner,later,on-hold" && SENDERS.length === 8 && SENDERS.every(s => s.startsWith("by:")),
   "the list: four states and eight senders", `${STATES} ${SENDERS}`);
-ok(Object.values({ ...LIST.state, ...LIST.sender, ...LIST.mark }).every(l => /^[0-9a-f]{6}$/.test(l.color) && l.description.length <= 100),
-  "each label has a colour GitHub takes and a description of at most 100 characters");
+// (the list's shape, by its schema: scripts/schemas/labels.json, through schemas.mjs; #530)
+ok(JSON.stringify(shapeFaults("labels", LIST, "core/")) === "[]", "the list holds to its schema: each label a colour and a description GitHub takes, each sender by:, the openers and the headings",
+  JSON.stringify(shapeFaults("labels", LIST, "core/")));
+{
+  const bent = change => { const l = structuredClone(LIST); change(l); return shapeFaults("labels", l, "core/"); };
+  const said = [
+    [l => { l.state.queued.color = "#0e8a16"; }, '"queued", "color"', "six lower-case hex digits"],
+    [l => { l.state.queued.color = "0E8A16"; }, '"queued", "color"', "six lower-case hex digits"],
+    [l => { l.mark.correction.description = "x".repeat(101); }, '"correction", "description"', "1 to 100 characters"],
+    [l => { l.sender.owner = { color: "000000", description: "x" }; }, '("owner")', "by:<who>"],
+    [l => { l.state["x".repeat(51)] = { color: "000000", description: "x" }; }, '"state" names a key', "1 to 50 characters"],
+    [l => { l.mark.x = { color: "000000", description: "x", name: "x" }; }, '("name")', '"color" and "description" alone'],
+    [l => { l.openers.push("Security review:"); }, '"openers", item', "no colon"],
+    [l => { delete l.headings.view; }, "'view'", '"word", "design", "view"'],
+    [l => { l.extra = 1; }, '("extra")', "take it out"],
+    [l => { delete l.mark; }, "'mark'", "core/scripts/labels.json"],
+  ].map(([change, where, mend]) => [bent(change), where, mend]);
+  ok(said.every(([f, where, mend]) => f?.length === 1 && f[0].startsWith("the list") && f[0].includes(where) && f[0].split(" Mend: ")[1]?.includes(mend)),
+    "a list of the wrong shape fails, saying where and its mend", JSON.stringify(said.filter(([f, where, mend]) => !(f?.length === 1 && f[0].includes(where) && f[0].split(" Mend: ")[1]?.includes(mend)))));
+}
 ok(FILE_STATES.join() === STATES.join() && FILE_SENDERS.join() === SENDERS.map(s => s.slice(3)).join(),
   "the inbox's two lines take the same names, a sender without its by:");
 
@@ -104,6 +124,12 @@ const corr = check({ owner, have: all, issues: [fix(40, "Correction: misread\nBr
 ok(corr?.items.join() === "#41,#42", "an open correction without the pull request it names, or without its kind where it is no bug, is to mend; a note of the owner's holds them as well, and another account's issue is not asked", JSON.stringify(corr));
 const marked = check({ owner, have: all, notes: new Map([[8, [yes]], [9, [yes, { user: me, created_at: "2026-11-14T06:00:00Z", body: "The owner's own: yes." }]], [10, [yes, note("2026-11-14T06:00:00Z", "From a builder session, on #10: started.")]], [11, [yes]]]),
   issues: [8, 9, 10, 11].map(number => ({ number, user: me, labels: L("queued", "by:builder", ...(number === 9 || number === 11 ? ["stand-in-yes"] : [])), body: "x", created_at: early })) });
+ok(!check({ owner, have: all, notes: new Map([[8, [yes]]]), issues: [{ number: 8, user: me, labels: L("queued", "by:builder"), body: "x", created_at: early }], core: true }).some(f => f.what.includes("stand-in-yes")),
+  "in the core's own repository, where no verdict queues an issue, the mark is not asked");
+const named = note("2026-11-14T03:30:00Z", `${chat} The description above is updated in the same step and is the issue's current text.`);
+const dated = check({ owner, have: all, issues: [{ number: 12, user: me, labels: L("queued", "by:chat"), body: "x", created_at: early }],
+  notes: new Map([[12, [note("2026-11-14T01:00:00Z", chat), note("2026-11-14T02:00:00Z", chat), note("2026-11-14T03:00:00Z", chat), named, note("2026-11-14T04:00:00Z", chat)]]]) });
+ok(!dated.some(f => f.what.includes("current text")), "a note that says the description above is updated in the same step and is the current text dates it, so the notes before it are gathered", JSON.stringify(dated));
 ok(marked.find(f => f.what.includes("stand-in-yes"))?.items.join() === "#8 (to mark),#10 (to mark),#9 (to take off)",
   "queued on the stand-in's sure yes: marked until a note in the owner's voice follows, and the mark taken off once one does; an agent's note changes nothing",
   JSON.stringify(marked));

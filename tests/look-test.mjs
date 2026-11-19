@@ -3,7 +3,7 @@
 // report's parts. Node's own modules only; the calls to gh and git are the program's own and are not made here.
 //
 //   node tests/look-test.mjs
-import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, staleFinding, text, TITLES, updating } from "../scripts/look.mjs";
+import { BOT, checksOf, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, staleFinding, lateFinding, LATE_PAGES, LATE_PULLS, text, TITLES, updating, FAILED, redBody } from "../scripts/look.mjs";
 import { parse, signKey, tripped, trippedBody } from "../scripts/choices.mjs";
 import { before, body, copies, countsFrom, reportOf, share, SHARES, shownAs } from "../scripts/state-report.mjs";
 import fs from "node:fs";
@@ -24,8 +24,8 @@ ok(plan(null, open, true) === "nothing" && plan("b", open, true) === "nothing", 
 const readers = [() => null, () => ({ title: "One", body: "a" }), () => ({ title: "Two", body: null, unread: "its file is no file" }), () => ({ title: "Three", body: "c", owner: true })];
 ok(JSON.stringify(dueNow({}, readers)) === JSON.stringify([{ title: "One", what: "a", unread: null }, { title: "Two", what: null, unread: "its file is no file" }, { title: "Three", what: "c", unread: null, owner: true }]),
   "each reader of what is due gives its issue, one that has nothing to say gives none, and one says whether it is the owner's to see");
-ok(DUE.length === 6 && dueNow({ manifest: "# Core manifest\n", at: "2026-11-16T05:00:00Z", root: os.tmpdir() }).map(d => d.title).join("; ") === "Choices to read again; A choice's measured sign to act on; Cleaning due: how the code is put together; An audit of how the code is put together is due",
-  "the look keeps an issue for the pass over the choices, for a sign of theirs that has tripped, for cleaning and for the audit by a reader (and, in the core alone, the staged cases)");
+ok(DUE.length === 7 && dueNow({ manifest: "# Core manifest\n", at: "2026-11-16T05:00:00Z", root: os.tmpdir() }).map(d => d.title).join("; ") === "Choices to read again; A choice's measured sign to act on; Cleaning due: how the code is put together; An audit of how the code is put together is due",
+  "the look keeps an issue for the pass over the choices, for a sign of theirs that has tripped, for cleaning and for the audit by a reader (and, in the core alone, the staged cases and a cap passed)");
 ok(relabelled(["queued", "by:look"], false) === null && relabelled(["needs-owner", "by:look"], true) === null && relabelled(["queued", "by:look", "cleaning"], true).join() === "by:look,cleaning,needs-owner"
   && relabelled(["needs-owner", "by:look"], false).join() === `by:look,${LABELS[0]}` && relabelled(["queued", "needs-owner"], true).join() === OWNERS && relabelled([], false).join() === "queued" && relabelled(["later", "by:look"], true) === null && relabelled(["on-hold"], false) === null,
   "an issue that is the owner's to see carries needs-owner in place of queued, and queued again once it is not; its other labels stay");
@@ -78,6 +78,16 @@ ok(checksOf([run("completed", "success")], { state: "pending", total_count: 2 })
   "the commit's statuses count beside its check runs: a review's status still pending is waiting, one failed is red; none set changes nothing");
 ok(checksOf([run("completed", "success"), run("in_progress", null)]) === "waiting" && checksOf([run("in_progress", null), run("completed", "failure")]) === "red" && checksOf([run("completed", "timed_out")]) === "red",
   "one still running is waiting; one that failed or timed out is red, whatever else runs");
+
+// ---- checks failed on the default branch (#542) ----
+const SHA = "a".repeat(40), job = (name, conclusion, extra = {}) => ({ name, status: "completed", conclusion, head_sha: SHA, html_url: "https://github.com/o/r/actions/runs/1/job/2", ...extra });
+const red = redBody([job("suites (ubuntu-latest, rest)", "success"), job("suites (windows-latest, core)", "failure"), job("upgrade", "timed_out", { html_url: "https://example.invalid/x" }), job("moved", "cancelled"), { name: "running", status: "in_progress", conclusion: null }], "main");
+ok(red.includes("`suites (windows-latest, core)`: failure (https://github.com/o/r/actions/runs/1/job/2).") && red.includes("`upgrade`: timed_out.") && !red.includes("example.invalid") && !/rest\)|moved|running/.test(red) && red.includes("`aaaaaaa`") && red.includes("A check that fails on the default branch has an owner"),
+  "a check failed on the default branch's newest commit is listed, its address only where it is GitHub's own; one passed, cancelled or still running is not");
+ok(redBody([job("a", "success"), job("b", "skipped"), job("c", "cancelled")], "main") === null && redBody([], "main") === null && plan(null, { state: "open" }) === "close" && FAILED.includes("startup_failure"),
+  "where none failed there is nothing, and the issue the look keeps closes");
+ok(!redBody([job("x`\n@team", "failure")], "ma`in").includes("\n@team") && redBody([job("x`y", "failure")], "main").includes("`x'y`"),
+  "a check's name and the branch are written as data: no line break or backtick of theirs reaches the issue");
 
 // ---- the idle list ----
 const lane = (number, draft, checks, waited, bodyText, labels = []) => ({ number, draft, checks, waited, body: bodyText, labels });
@@ -160,6 +170,58 @@ const stale = (status, stdout = "") => staleFinding(() => ({ status, stdout }));
 ok(stale(0, "Packages the project holds that have gone stale\n\n- a\n").what === "Packages the project holds that have gone stale\n\n- a" && stale(0).what === null && stale(0).title === TITLES.stale
   && stale(3).unread && stale(null).unread && plan(stale(3).what, { state: "open" }, stale(3).unread) === "nothing",
   "the packages gone stale: listed where held.mjs finds some, closed where it finds none, left as they stand where it could not look");
+
+// late review findings (review-marks.mjs; #551): Codex's findings made after their pull request merged, with no reply
+{
+  const badge = p => `<sub><sub>![${p} Badge](https://img.shields.io/badge/${p}-orange?style=flat)</sub></sub>`;
+  const codex = (id, pull, at, body, extra = {}) => ({ id, pull_request_url: `https://api.github.com/repos/o/r/pulls/${pull}`, html_url: `https://github.com/o/r/pull/${pull}#discussion_r${id}`, created_at: at, user: { login: "chatgpt-codex-connector[bot]", type: "Bot" }, body, ...extra });
+  const inline = [codex(1, 7, "2026-11-18T10:00:00Z", `${badge("P1")} A late code finding`), codex(2, 7, "2026-11-18T08:00:00Z", `${badge("P2")} Made before the merge`),
+    codex(3, 8, "2026-11-18T10:00:00Z", `${badge("P1")} Answered`), { id: 4, in_reply_to_id: 3, pull_request_url: "https://api.github.com/repos/o/r/pulls/8", created_at: "2026-11-18T11:00:00Z", user: { login: "owner", type: "User" }, author_association: "OWNER", body: "Fixed in #9." },
+    codex(5, 9, "2026-11-18T10:00:00Z", `${badge("P1")} On an open pull request`), { ...codex(6, 7, "2026-11-18T10:00:00Z", `${badge("P1")} Not Codex's`), user: { login: "someone", type: "User" } },
+    codex(7, 7, "2026-11-18T10:00:00Z", `<!-- codex-security-review-finding:v1 -->\n${badge("P0")} A late security finding`),
+    codex(8, 7, "2026-11-18T10:00:00Z", `${badge("P1")} Replied to by another account alone`), { id: 9, in_reply_to_id: 8, pull_request_url: "https://api.github.com/repos/o/r/pulls/7", created_at: "2026-11-18T11:00:00Z", user: { login: "someone", type: "User" }, author_association: "NONE", body: "Done." },
+    codex(10, 11, "2026-11-01T10:00:00Z", `${badge("P1")} Made before the week, edited since`),
+    codex(12, 7, "2026-11-18T10:00:00Z", `${badge("P1")} Replied to by a member who may only read`), { id: 13, in_reply_to_id: 12, pull_request_url: "https://api.github.com/repos/o/r/pulls/7", created_at: "2026-11-18T11:00:00Z", user: { login: "reader", type: "User" }, author_association: "MEMBER", body: "Done." }];
+  const merged = { 7: "2026-11-18T09:00:00Z", 8: "2026-11-18T09:00:00Z", 9: null, 11: "2026-10-30T09:00:00Z" };
+  // the host's rights, as GitHub's collaborators/<login>/permission gives them: the owner's admin, a member's read
+  const right = (login, role_name, permission, push) => ({ role_name, permission, user: { login, type: "User", permissions: { push } } });
+  const rights = { owner: right("owner", "admin", "admin", true), reader: right("reader", "read", "read", false) };
+  const gh = route => { if (route.startsWith("repos/o/r/pulls/comments")) return JSON.stringify(route.includes("page=1") ? inline : []); const who = /collaborators\/([^/]+)\/permission$/.exec(route)?.[1]; if (who) { if (!rights[who]) throw new Error("HTTP 404"); return JSON.stringify(rights[who]); } const n = /pulls\/(\d+)$/.exec(route)?.[1]; return JSON.stringify({ merged_at: merged[n] ?? null }); };
+  const found = [];
+  lateFinding("o/r", (title, what, unread = null) => found.push({ title, what, unread }), "2026-11-18T12:00:00Z", gh);
+  const what = found[0]?.what ?? "";
+  ok(found.length === 1 && found[0].title === TITLES.late && what.includes("discussion_r1") && !/discussion_r([23456]|10)\b/.test(what) && !what.includes("Not read"),
+    "when a finding stands unanswered on a merged pull request, the look lists it; one made before the merge, one answered, one on an open pull request, one made before the week and another account's are not", what);
+  ok(what.includes("discussion_r8"), "a reply from an account the host does not let write answers no finding (floor rule 4)", what);
+  ok(what.includes("discussion_r12"), "a reply from a member whose right, as the host gives it, is to read alone answers no finding", what);
+  const blind = [];
+  lateFinding("o/r", (title, w, unread = null) => blind.push({ what: w, unread }), "2026-11-18T12:00:00Z", route => (/collaborators\/owner\/permission$/.test(route) ? (() => { throw new Error("HTTP 403"); })() : gh(route)));
+  ok(blind[0].what?.includes("discussion_r3") && /Not read this run: the rights of 1 account that replied, whose replies are counted as none/.test(blind[0].what), "where the right of an account that replied cannot be read, its reply answers nothing, and the issue says so", blind[0].what);
+  // past LATE_PULLS accounts that replied, no right is read: the rest's replies count as none, and that is said
+  const crowd = Array.from({ length: LATE_PULLS + 1 }, (_, i) => [codex(500 + i, 7, "2026-11-18T10:00:00Z", `${badge("P1")} One of a crowd`), { id: 600 + i, in_reply_to_id: 500 + i, pull_request_url: "https://api.github.com/repos/o/r/pulls/7", created_at: "2026-11-18T11:00:00Z", user: { login: `m${i}`, type: "User" }, author_association: "MEMBER", body: "Done." }]).flat();
+  const crowded = [], askedRights = [];
+  lateFinding("o/r", (title, w, unread = null) => crowded.push({ what: w, unread }), "2026-11-18T12:00:00Z", route => { const who = /collaborators\/([^/]+)\/permission$/.exec(route)?.[1]; if (who) { askedRights.push(who); return JSON.stringify(right(who, "write", "write", true)); } return route.startsWith("repos/o/r/pulls/comments") ? JSON.stringify(/page=1$/.test(route) ? crowd : []) : gh(route); });
+  ok(askedRights.length === LATE_PULLS && (crowded[0].what?.match(/discussion_r5\d\d/g) ?? []).length === 1 && /the rights of 1 account that replied, whose replies are counted as none/.test(crowded[0].what), "past the cap on the accounts whose rights are read, the rest's replies answer nothing, and the issue says so", crowded[0].what);
+  ok(/#7, a finding of Codex's security review/.test(what) && !what.includes("discussion_r7") && !what.includes("A late security finding"), "a security finding is listed by its pull request alone, nothing of it written (floor rule 9)", what);
+  const none = [];
+  lateFinding("o/r", (title, what2, unread = null) => none.push({ what: what2, unread }), "2026-11-18T12:00:00Z", route => JSON.stringify(route.startsWith("repos/o/r/pulls/comments") ? [] : {}));
+  const lost = [];
+  lateFinding("o/r", (title, what2, unread = null) => lost.push({ what: what2, unread }), "2026-11-18T12:00:00Z", () => { throw new Error("HTTP 403"); });
+  ok(none[0].what === null && none[0].unread === null && lost[0].what === null && /could not be read/.test(lost[0].unread), "with none, its issue closes; where the comments cannot be read, it is left as it stands");
+  // only pull requests that hold a finding of Codex's are looked up, the newest first; what is past the caps is said
+  const others = Array.from({ length: LATE_PULLS + 5 }, (_, i) => ({ id: 100 + i, pull_request_url: `https://api.github.com/repos/o/r/pulls/${200 + i}`, created_at: "2026-11-18T10:00:00Z", user: { login: "someone", type: "User" }, body: "a comment" }));
+  const asked = [], seen = [];
+  lateFinding("o/r", (title, w, unread = null) => seen.push({ what: w, unread }), "2026-11-18T12:00:00Z", route => { asked.push(route); return route.startsWith("repos/o/r/pulls/comments") ? JSON.stringify(/page=1$/.test(route) ? [...others, ...inline] : []) : gh(route); });
+  ok(seen[0].what?.includes("discussion_r1") && !asked.some(r => /pulls\/2\d\d$/.test(r)) && asked.some(r => r.includes("sort=created&direction=desc")), "another account's comments on other pull requests push no finding of Codex's past the cap, and the week's comments are read newest first, a reply before its finding", asked.filter(r => /pulls\/\d+$/.test(r)).join(" "));
+  const many = Array.from({ length: LATE_PULLS + 2 }, (_, i) => codex(300 + i, 400 + i, "2026-11-18T10:00:00Z", `${badge("P1")} One of many`));
+  const capped = [];
+  lateFinding("o/r", (title, w, unread = null) => capped.push({ what: w, unread }), "2026-11-18T12:00:00Z", route => JSON.stringify(route.startsWith("repos/o/r/pulls/comments") ? (/page=1$/.test(route) ? many : []) : { merged_at: "2026-11-18T09:00:00Z" }));
+  ok(capped[0].what?.includes("discussion_r331") && !capped[0].what.includes("discussion_r300") && /Not read this run: Codex's findings on 2 older pull requests/.test(capped[0].what), "past the pull requests' cap the newest are read, and the rest are said to be unread, never dropped", capped[0].what);
+  const full = Array.from({ length: 100 }, (_, i) => ({ id: i, pull_request_url: "https://api.github.com/repos/o/r/pulls/1", created_at: "2026-11-18T10:00:00Z", user: { login: "someone", type: "User" }, body: "x" }));
+  let calls = 0; const flood = [];
+  lateFinding("o/r", (title, w, unread = null) => flood.push({ what: w, unread }), "2026-11-18T12:00:00Z", route => { calls++; return JSON.stringify(route.startsWith("repos/o/r/pulls/comments") ? full : {}); });
+  ok(calls === LATE_PAGES && flood[0].what === null && /past the first 5000 of the week could not be read/.test(flood[0].unread), "a flood of comments is read to the pages' cap alone, and the issue is left as it stands", `${calls} ${flood[0].unread}`);
+}
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);

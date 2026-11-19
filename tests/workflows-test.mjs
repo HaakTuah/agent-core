@@ -10,7 +10,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { parseYaml } from "../scripts/workflow-run.mjs";
-import { lines, readable, reads, repeated, unlinked } from "../scripts/workflows.mjs";
+import { draftHoles, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { twice, uncommented } from "../scripts/yaml-keys.mjs";
 
 let failed = 0;
@@ -64,6 +65,24 @@ ok(base.notes.length === 2 && base.fails.length === 2 && base.notes.every(l => /
 const none = repeated([{ file: "a.yml", text: now }], null), fresh = repeated([{ file: "a.yml", text: now }], () => null);
 ok(none.fails.length === 0 && none.notes.length === 3 && !none.notes[0].includes("base") && fresh.fails.length === 3 && fresh.notes.length === 0, "with no base each is noted and none fails, and where nothing stood before (the core's own) each fails");
 
+// a call skipped on a draft whose trigger leaves out ready_for_review (#502): by its if:, or by a check that skips a draft
+// itself (the description check, or core.yml's description:); the full trigger, another's workflow and a call that
+// never skips a draft pass
+const call = (on, uses, extra = "") => `on:\n${on}\njobs:\n  check:\n    uses: ${CORE}/.github/workflows/${uses}@${"a".repeat(40)}\n${extra}`;
+const NOT_DRAFT = "    if: ${{ !github.event.pull_request.draft }}\n";
+const TYPES = "  pull_request:\n    types: [opened, synchronize]\n", FULL = "  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\n";
+ok(draftHoles(call(TYPES, "copies.yml", NOT_DRAFT)).join() === "check" && draftHoles(call("  pull_request:\n", "personal-terms.yml", NOT_DRAFT)).length === 1
+  && draftHoles(call(TYPES, "pr-description.yml")).length === 1 && draftHoles(call(TYPES, "core.yml", "    with:\n      description: true\n")).length === 1,
+  "a call skipped on a draft, by its if: or by a check that skips one itself, whose trigger leaves out ready_for_review is found");
+ok(!draftHoles(call(FULL, "copies.yml", NOT_DRAFT)).length && !draftHoles(call(TYPES, "copies.yml")).length && !draftHoles(call(TYPES, "core.yml", "    with:\n      copies: c.json\n")).length
+  && !draftHoles(call(TYPES, "copies.yml", NOT_DRAFT).replace(CORE, "someone/else")).length && !draftHoles("on: push\njobs: {}\n").length && !draftHoles("on: [unclosed\n  - :").length
+  && draftHoles(`on: {pull_request: {types: [opened, synchronize]}}\njobs: {check: {uses: "${CORE}/.github/workflows/pr-description.yml@${"a".repeat(40)}"}}\n`).length === 1,
+  "the full trigger, a call that never skips a draft, another's workflow, no pull_request trigger and text not read as YAML pass; a workflow in YAML's flow form is read");
+const holes = unreadied([{ file: "a.yml", text: call(TYPES, "copies.yml", NOT_DRAFT) }, { file: "b.yml", text: call(TYPES, "pr-description.yml") }], f => (f === "a.yml" ? call(TYPES, "copies.yml", NOT_DRAFT) : call(FULL, "pr-description.yml")));
+ok(holes.notes.length === 1 && /^note a\.yml: .*as on the base\. Mend: add ready_for_review/.test(holes.notes[0]) && holes.fails.length === 1 && /^FAIL b\.yml: its job "check"/.test(holes.fails[0]) && mended(holes.fails[0])
+  && unreadied([{ file: "b.yml", text: call(TYPES, "pr-description.yml") }], null).fails.length === 0,
+  "a call the base already held so is noted, a new one fails with its mend, and with no base each is noted", JSON.stringify(holes));
+
 const core = fileURLToPath(new URL("..", import.meta.url));
 const own = fs.readdirSync(`${core}.github/workflows`).filter(f => /\.ya?ml$/u.test(f));
 ok(own.length > 0 && own.every(f => !fails(fs.readFileSync(`${core}.github/workflows/${f}`, "utf8"))), "the core's own workflows pass");
@@ -72,8 +91,10 @@ ok(own.length > 0 && own.every(f => !fails(fs.readFileSync(`${core}.github/workf
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-test-"));
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
-  fs.cpSync(fileURLToPath(new URL("../third-party", import.meta.url)), path.join(tmp, "core/third-party"), { recursive: true });
+  for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
+  // (the install with the lock file it is read against)
+  fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(tmp, "core/.packages"), { recursive: true });
+  fs.writeFileSync(path.join(tmp, "core/.gitignore"), "/.packages/node_modules/\n"); // (as the copy holds it)
   fs.mkdirSync(path.join(tmp, ".github/workflows"), { recursive: true });
   fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), `on:\n${"  pull_request_target:\n".repeat(7)}`);
   fs.writeFileSync(path.join(tmp, ".github/workflows/b.yml"), Buffer.from("on: push\n", "utf16le"));
@@ -93,16 +114,26 @@ try {
   ok(kGood, `run against a base, a key twice the base held is noted and a new one fails, with its mend${kGood ? "" : `:\n${kOut}`}`);
   const kNone = keyRun([]), kCore = keyRun(["--core"], { WORKFLOWS_BASE: "HEAD" });
   ok(kNone.status === 0 && /0 failing, 2 noted$/m.test(kNone.stdout) && kCore.status === 1 && /2 failing\. Mend:/.test(kCore.stdout), "run with no base, each is noted and it passes; in the core's own repository each fails, whatever the base");
+  // (where the job's install could not reach the registry, the keys given twice and the calls a draft skips did not run,
+  // said so, and the package's absence fails nothing; every other failure still fails, so no pull request turns the check
+  // green by making the install fail: #654, point 4)
+  fs.writeFileSync(path.join(tmp, ".github/workflows/d.yml"), "on:\n  pull_request_target:\n");
+  fs.writeFileSync(path.join(tmp, ".github/workflows/e.yml"), call(TYPES, "copies.yml", NOT_DRAFT));
+  execFileSync("git", ["add", ".github/workflows/d.yml", ".github/workflows/e.yml"], { cwd: tmp, stdio: "ignore" });
+  fs.rmSync(path.join(tmp, "core/.packages/node_modules"), { recursive: true, force: true });
+  const u = keyRun([], { CORE_PACKAGES_UNREACHED: "1" }), uOut = u.stdout + u.stderr;
+  ok(u.status === 1 && /^::warning::The check for a key given twice did not run, nor the one for a call a draft skips/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && !/e\.yml|is not installed/.test(uOut) && mended(uOut), `where the install could not reach the registry, the keys given twice and the calls a draft skips did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 // ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
 // Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and
 // the pull request, cancelled once a newer run starts for it; a run on main, a schedule or a start by hand is a group of
 // its own (its run id), and never cancelled. Left out, each for its reason: the security-review check, whose runs go one
 // at a time in order so the last has read the newest comments, the release, the preview's queue and the deletion of
-// merged branches, which no pull request starts and which never cancel, and the scheduled ones.
+// merged branches, which no pull request starts and which never cancel, the scheduled ones, and the core's tests, read
+// below for their own groups (#733).
 const KEY = "${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}";
 const CANCEL = "${{ github.event_name == 'pull_request' }}";
-const APART = new Set(["security-review.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml"]);
+const APART = new Set(["security-review.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml", "tests.yml"]);
 const wfDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".github", "workflows");
 const loose = [];
 // (a workflow in a form the test's reader does not know, a flow mapping say, is read for its group at the top, by its
@@ -122,5 +153,73 @@ const groups = Object.fromEntries(["codeql.yml", "signatures.yml", "nuget.yml", 
 ok(Object.values(groups["codeql.yml"].jobs)[0].concurrency.group.includes("${{ matrix.language }}") && groups["signatures.yml"].jobs.signatures.concurrency.group.includes("${{ inputs.directory }}") && groups["nuget.yml"].jobs.nuget.concurrency.group.includes("${{ inputs.config }}"),
   "and jobs of one run that differ (a matrix, a call for each lock folder or config) are groups of their own, so none cancels another");
 ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] === false, "while the security-review check's runs go one at a time, never cancelled");
+
+// ---- when the core's tests run (#733, points 2 to 4 and 6) ----
+// A pull request's run starts once it is ready, never on a draft, on Linux alone; main is tested on Linux at its newest
+// commit, each run giving way to the next merge's; Windows once an hour at main's newest commit where it moved, with the
+// tests that reach the network on both; both in full on a start by hand, which a release waits on.
+{
+  const tests = parseYaml(fs.readFileSync(path.join(wfDir, "tests.yml"), "utf8"));
+  const release = parseYaml(fs.readFileSync(path.join(wfDir, "release.yml"), "utf8"));
+  const DRAFT = "!(github.event_name == 'pull_request' && github.event.pull_request.draft)";
+  const MOVED = "(github.event_name != 'schedule' || needs.moved.outputs.run == 'true')";
+  const gate = tests.jobs.tests, gateStep = gate.steps.at(-1);
+  ok(tests.on.pull_request.types.includes("ready_for_review") && !tests.on.pull_request.types.includes("edited") && ["suites", "upgrade"].every(j => String(tests.jobs[j].if).includes(DRAFT) && String(tests.jobs[j].if).includes(MOVED)),
+    "no run on a draft: a pull request's run starts when it is marked ready, and each job of tests skips a draft and an hourly run where main did not move (point 2)");
+  ok(!String(gate.if).includes("draft") && String(gate.if).startsWith("${{ always()") && String(gate.if).includes(MOVED) && /github\.event\.pull_request\.draft/.test(gateStep.env.DRAFT) && /if \[ -n "\$DRAFT" \]; then[\s\S]*Mend:[\s\S]*exit 1/.test(gateStep.run),
+    "but the gate the ruleset requires runs on a draft and fails there, saying its mend, since a required check whose job is skipped passes");
+  // (the gate's step run in a shell, as the runner runs it: each of its failures says its mend, its pass none)
+  if (process.platform !== "win32") {
+    const gateRun = env => spawnSync("bash", ["-e", "-c", gateStep.run], { encoding: "utf8", env: { PATH: process.env.PATH, ...env } });
+    const said = r => `${r.stdout}${r.stderr}`.replace(/::error::/g, "FAIL: ").replace(/" \\\n\s*"/g, " ");
+    const runs = [gateRun({ DRAFT: "yes", SUITES: "skipped", UPGRADE: "skipped" }), gateRun({ SUITES: "cancelled", UPGRADE: "success" }), gateRun({ SUITES: "success", UPGRADE: "failure" })];
+    const passes = gateRun({ SUITES: "success", UPGRADE: "success" });
+    ok(runs.every(r => r.status === 1 && mended(said(r))) && passes.status === 0, "the gate fails a draft, a cancelled job and a failed one, each with its mend, and passes where all passed", runs.map(said).join(" | "));
+  }
+  // (each matrix is set whole for each event: GitHub adds back an entry of `include` that no combination left after
+  // `exclude` matches, so the jobs are read from the lists the expression holds: a pull request's and a push's, the
+  // hourly run's, and all the others')
+  const lists = expr => { const m = /^\$\{\{ fromJSON\(\(github\.event_name == 'pull_request' \|\| github\.event_name == 'push'\) && '(\[[^']*\])' \|\| github\.event_name == 'schedule' && '(\[[^']*\])' \|\| '(\[[^']*\])'\) \}\}$/.exec(String(expr)); return m ? m.slice(1).map(x => JSON.parse(x)) : null; };
+  const suites = lists(tests.jobs.suites.strategy.matrix.include), upgrades = lists(tests.jobs.upgrade.strategy.matrix.include);
+  const only = (l, os) => l.length > 0 && l.every(x => x.os === os);
+  const NETWORK = "suites-network";
+  const WINDOWS = ["suites-projects", "suites-sync", "suites-kit", "suites-core", "suites-core-places", "suites-licences", "suites-rest", "suites-tools"];
+  const named = l => [...new Set(l.map(x => x.suite))].sort().join();
+  ok(suites && Object.keys(tests.jobs.suites.strategy.matrix).join() === "include" && suites.every(l => l.every(x => x.node && x.suite && x.os && x.parts))
+    && only(suites[0], "ubuntu-latest") && only(suites[1].filter(x => x.suite !== NETWORK), "windows-latest") && named(suites[1].filter(x => x.suite !== NETWORK)) === [...WINDOWS].sort().join()
+    && suites[2].length === suites[0].length + suites[1].length && [".node-version", ".node-least"].every(n => suites[2].filter(x => x.node === n).length === suites[2].length / 2)
+    && upgrades && only(upgrades[0], "ubuntu-latest") && only(upgrades[1], "windows-latest") && upgrades[2].length === upgrades[0].length + upgrades[1].length,
+    "a pull request's run and a push's are on Linux alone, the hourly run on Windows but for the network's jobs, every job named whole, and a start by hand runs them all, on both Nodes (points 3, 4 and 6)", String(tests.jobs.suites.strategy.matrix.include).slice(0, 300));
+  // (the tests that reach the network, in the part of that name: in no pull request's run nor a push's, and once an hour
+  // and by hand on both systems and both Nodes; #733, point 9)
+  const steps = tests.jobs.suites.steps.filter(s => /contains\(matrix\.parts, 'network'\)/.test(String(s.if))).map(s => s.run).sort();
+  const nets = l => l.filter(x => x.parts.split(" ").includes("network"));
+  ok(suites && nets(suites[0]).length === 0 && nets(suites[1]).length === 4 && nets(suites[1]).every(x => x.suite === NETWORK && x.parts === "network") && ["ubuntu-latest", "windows-latest"].every(os => [".node-version", ".node-least"].every(n => nets(suites[1]).some(x => x.os === os && x.node === n))) && nets(suites[2]).length === 4
+    && steps.join() === ["node tests/init-dotnet-test.mjs", "node tests/nuget-fetch-test.mjs"].join(),
+    "the tests that reach the network run in no pull request's run nor a push's, and once an hour and by hand in a job of their own on each system and Node (point 9)", steps.join(", "));
+  ok(tests.concurrency.group.includes("format('pr-{0}', github.event.pull_request.number)") && tests.concurrency.group.includes("(github.event_name == 'push' || github.event_name == 'schedule') && format('{0}-main', github.event_name) || github.run_id")
+    && tests.concurrency["cancel-in-progress"] === "${{ github.event_name == 'pull_request' || github.event_name == 'push' }}",
+    "a run on main after a merge gives way to the next merge's, main tested at its newest commit; the hourly runs wait their turn; a start by hand or a call is never cancelled (point 4)");
+  ok(tests.on.schedule?.length === 1 && /^\d{1,2} \* \* \* \*$/.test(tests.on.schedule[0].cron) && tests.jobs.moved.if === "${{ github.event_name == 'schedule' }}" && /event == "schedule" or \.event == "workflow_dispatch"/.test(tests.jobs.moved.steps.at(-1).run) && /\(\.id \| tostring\) != env\.GITHUB_RUN_ID/.test(tests.jobs.moved.steps.at(-1).run) && /if any\(\.\[\]; \.status != "completed"\) then "running"/.test(tests.jobs.moved.steps.at(-1).run) && /if gh api --paginate /.test(tests.jobs.moved.steps.at(-1).run) && /jq -rs /.test(tests.jobs.moved.steps.at(-1).run) && /-f branch=main/.test(tests.jobs.moved.steps.at(-1).run) && /sort_by\(\[\.run_started_at \/\/ "", \.id\]\) \| last \| \.conclusion/.test(tests.jobs.moved.steps.at(-1).run) && /if \[ "\$done" = success \]; then echo "run=false"/.test(tests.jobs.moved.steps.at(-1).run),
+    "Windows once an hour, at main's newest commit, skipped only where no other full run there, every page of them read, is still going and the newest, by when it last started, passed, so no skipped run hides a failure from the release (point 6)");
+  const cut = release.jobs.release.steps.at(-1).run;
+  ok("workflow_dispatch" in tests.on && !("workflow_call" in tests.on) && /actions\/runs" -f head_sha="\$GITHUB_SHA" -f branch=main -f event=push /.test(cut) && /gh api --paginate -X GET "repos\/\$GITHUB_REPOSITORY\/actions\/workflows\/tests\.yml\/runs" -f head_sha="\$GITHUB_SHA"/.test(cut) && /jq -s '\{ workflow_runs: \. \}' "\$full\.pages" > "\$full"/.test(cut) && /--runs "\$runs" --full "\$full"/.test(cut),
+    "and both in full by hand, which the release waits on: it reads the push's runs and, apart, the tests' runs on its commit, every page, none unfinished and the newest passed, and the tests stay a workflow no project calls (point 6; release.mjs, fullRun)", cut);
+}
+
+// (#802: the copy's check removes the folders it fetched into, so no fetch there may leave git's own upkeep running
+// behind the step, which raced that removal on main: each fetch in a step's script, its lines joined where a line ends
+// in a backslash and a comment taken off only where the shell reads one, and the checkout of the core into a folder)
+{
+  const core = parseYaml(fs.readFileSync(path.join(wfDir, "core.yml"), "utf8"));
+  const steps = Object.values(core.jobs).flatMap(j => j.steps ?? []);
+  const commands = steps.flatMap(s => String(s.run ?? "").replace(/\\\n/g, " ").split("\n").map(l => l.replace(/(^|\s)#.*$/, "")));
+  const fetches = commands.flatMap(l => l.split(/\|\||&&|[|;]/)).filter(c => /\bgit\b.*\sfetch\s/.test(c));
+  const checkouts = steps.filter(s => String(s.uses ?? "").startsWith("actions/checkout@") && s.with?.path);
+  const off = s => s.env?.GIT_CONFIG_COUNT === "1" && s.env?.GIT_CONFIG_KEY_0 === "maintenance.auto" && s.env?.GIT_CONFIG_VALUE_0 === "false";
+  ok(fetches.length >= 3 && fetches.every(l => l.includes("--no-auto-maintenance")) && checkouts.length >= 1 && checkouts.every(off),
+    "each fetch of the copy's check, and its checkout of the core into a folder, starts no upkeep of git's own, which would race the check's removal of what it fetched (#802)",
+    [...fetches.filter(l => !l.includes("--no-auto-maintenance")), ...checkouts.filter(s => !off(s)).map(s => s.with.path)].join(" | "));
+}
 
 process.exit(failed ? 1 : 0);

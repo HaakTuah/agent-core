@@ -13,14 +13,21 @@
 // the copies workflow sets it), a key twice that the base already held in the same file is noted and fails nothing;
 // with no base, as on a push to main, each is noted; and the sync's step "16 November 2026, no workflow gives a key
 // twice" (steps.mjs) names each old one at every sync until it is gone. In the core's own repository (`--core`) each fails.
+// It fails, too, a call to one of the core's pull-request checks that is skipped on a draft while its pull_request
+// trigger leaves out ready_for_review (floor rule 8, a weakened check; #375, #502): its job's if: names the draft, or the
+// check skips a draft by itself (the description check, called on its own or by core.yml's `description:`). Once such a
+// pull request is marked ready, the call runs on no head, and a ruleset counts the draft's skip as passed. As with a key
+// twice, a call the base's same file already held so is noted, each is noted with no base, and the sync's step "16
+// November 2026, checks once a pull request is ready" (steps.mjs, which reads it by draftHoles() below) names it.
 // What it does not chase: a value given as binary (a YAML tag) holds a word no search can see, and a tag can itself be
 // spelled in more ways than a search can follow. GitHub's own workflow reader refuses a binary value where a trigger
 // belongs, so that is no way to write one; the reviews hold it, as they hold any odd tag in a workflow.
 // The rest of rule 2 is held elsewhere: that every action is pinned to a full commit SHA by GitHub's own setting, which
 // reads a workflow as GitHub runs it (README.md, "Setting up"); workflow_run, the fewest permissions and untrusted text
 // in a script by the reviews, and by CodeQL where the repository has it. The copy of the core (core/) is checked in the
-// core, which runs this on itself. Reads only; git and Node's own modules. It checks the project it lies in, whatever the
-// directory it is started from. Run by the copies workflow (.github/workflows/copies.yml).
+// core, which runs this on itself. Reads only; git, Node's own modules and the YAML package the core installs
+// (packages.mjs). It checks the project it lies in, whatever the directory it is started from. Run by the copies workflow
+// (.github/workflows/copies.yml).
 //
 //   node core/scripts/workflows.mjs           from a project's root, as the copies workflow runs it
 //   node scripts/workflows.mjs --core         in the core's own repository
@@ -30,7 +37,9 @@ import { fileURLToPath } from "node:url";
 import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
 import { twice } from "./yaml-keys.mjs";
+import { loadSync, unreached } from "./packages.mjs";
 import { projectAt } from "./core-path.mjs";
+import { CORE } from "./core-address.mjs";
 
 const WORD = "pull_request_target";
 const BREAK = "\\r\\n|[\\r\\n\\u0085\\u2028\\u2029]"; // every line break YAML 1.1 or 1.2 knows
@@ -91,6 +100,53 @@ export function repeated(files, before) {
   return { fails, notes };
 }
 
+// The core's pull-request checks whose call may be skipped on a draft, and the two that skip a draft by themselves.
+const CHECKS = /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget|pr-description)\.yml@/i;
+// The types a workflow's pull_request trigger lists, GitHub's own where it lists none or names the event alone (`on:
+// pull_request`, `on: [push, pull_request]`), as []; null where it has no such trigger.
+const typesOf = on => typeof on === "string" || Array.isArray(on) ? ([].concat(on).includes("pull_request") ? [] : null)
+  : on && typeof on === "object" && "pull_request" in on ? [].concat(on.pull_request?.types ?? []).map(String) : null;
+// A workflow's text read as YAML by the package the core installs (as yaml-keys.mjs reads it; flow mappings and every
+// form GitHub reads), every scalar as text; null where it is no YAML, which GitHub's own reader refuses all the same.
+function yamlOf(text) {
+  const { parseDocument } = loadSync("yaml");
+  try {
+    const doc = parseDocument(String(text).replace(/^\ufeff/u, ""), { schema: "failsafe", uniqueKeys: false, prettyErrors: false });
+    return doc.errors.length ? null : doc.toJS({ maxAliasCount: 100 });
+  } catch { return null; }
+}
+
+// The jobs of a workflow (its YAML read, `yaml`, or its text) that call one of the core's pull-request checks skipped on a
+// draft while the trigger never starts it once the pull request is marked ready: [] where none, or where the text is
+// no YAML (GitHub's own reader then refuses it).
+export function draftHoles(yaml) {
+  if (typeof yaml === "string") yaml = yamlOf(yaml);
+  const types = typesOf(yaml?.on);
+  if (types === null || types.includes("ready_for_review")) return [];
+  const prefix = `${CORE}/`.toLowerCase();
+  return Object.entries(yaml.jobs ?? {}).filter(([, job]) => {
+    const uses = typeof job?.uses === "string" ? job.uses.toLowerCase() : "";
+    if (!uses.startsWith(prefix) || !CHECKS.test(uses)) return false;
+    const skips = /\bpull_request\.draft\b/.test(String(job.if ?? ""));
+    const itself = /\/pr-description\.yml@/.test(uses) || (/\/core\.yml@/.test(uses) && ![undefined, null, false, "false", ""].includes(job.with?.description));
+    return skips || itself;
+  }).map(([name]) => name);
+}
+
+// The calls draftHoles() finds in files, each { file, text }, as { fails, notes } (as repeated() gives them): `before`
+// gives a file's text on the base, or is null where there is no base, when each is a note.
+export function unreadied(files, before) {
+  const fails = [], notes = [];
+  for (const { file, text } of files) {
+    const held = new Set(before ? draftHoles(before(file) ?? "") : []);
+    for (const job of draftHoles(text)) {
+      const old = !before || held.has(job);
+      (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}: its job ${JSON.stringify(job)} calls one of the core's checks that is skipped on a draft, and its pull_request trigger leaves out ready_for_review, so once a pull request is marked ready the check runs on no head and the draft's skip reads as passed${old && before ? ", as on the base" : ""}. Mend: add ready_for_review to the types: under pull_request: (where it lists none, types: [opened, reopened, synchronize, ready_for_review])`);
+    }
+  }
+  return { fails, notes };
+}
+
 if (started(import.meta.url)) {
   const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
@@ -111,9 +167,16 @@ if (started(import.meta.url)) {
     for (const line of found.slice(0, 5)) console.log(`FAIL ${logged(file)}:${line}: ${WORD} runs a pull request with the repository's own token and secrets. Mend: take the word out, in a comment too, and trigger the workflow on pull_request, which runs one without them`);
     if (found.length > 5) console.log(`FAIL ${logged(file)}: and on ${found.length - 5} more lines. Mend: take the word out of each, as above`);
   }
-  const keys = repeated(texts, core ? () => null : base ? show : null);
-  for (const line of [...keys.notes, ...keys.fails]) console.log(logged(line));
-  failed += keys.fails.length;
+  // (where the job's install could not reach the registry, in a project's pull request, the keys given twice and the
+  // calls a draft skips, which the YAML package reads, did not run, said as a warning; every failure above still fails:
+  // #654, point 4)
+  const skipped = unreached("yaml");
+  if (skipped) console.log("::warning::The check for a key given twice did not run, nor the one for a call a draft skips: the package yaml could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault");
+  const against = core ? () => null : base ? show : null;
+  const keys = skipped ? { fails: [], notes: [] } : repeated(texts, against), ready = skipped ? { fails: [], notes: [] } : unreadied(texts, against);
+  for (const line of [...keys.notes, ...ready.notes, ...keys.fails, ...ready.fails]) console.log(logged(line));
+  failed += keys.fails.length + ready.fails.length;
+  keys.notes.push(...ready.notes);
   console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} failing${keys.notes.length ? `, ${keys.notes.length} noted` : ""}${failed ? ". Mend: mend each line above as it says" : ""}`);
   process.exit(failed ? 1 : 0);
 }
