@@ -331,6 +331,10 @@ check("review", fresh("review"),
   const titled = fresh("review");
   gh(titled, "POST", "pulls/2/reviews", { event: "COMMENT", body: "Codex Review", comments: items.map(l => ({ path: /`([^`]+)`/.exec(l)[1], line: 1, body: `**[P1] A finding**\n\n${l.replace(/^\d+\. Blocking: /, "")}` })) });
   ok(verdict("review", titled).pass, "review: a line comment with a title and its explanation in paragraphs of their own is read whole", verdict("review", titled).why);
+  // (the quote named by its section alone, with a curly apostrophe, as a review may write it)
+  const section = fresh("review");
+  gh(section, "POST", "issues/2/comments", { body: REVIEW.replace("9. Blocking: `description` quotes", "9. Blocking: The owner’s word quotes") });
+  ok(verdict("review", section).pass, "review: the owner's quote named by its section, \"The owner's word\", counts as named", verdict("review", section).why);
   const fpReview = fingerprints(caseOf("review"), s.core);
   ok(typeof fpReview["file: roles/shared/review-guidelines.md"] === "string", "review: the whole guidelines are fingerprinted, so any change to them makes the case due", JSON.stringify(Object.keys(fpReview)));
 }
