@@ -133,6 +133,15 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   // (the five seconds a hostile input may take are the run's own timeout: it is cut off, with no status, where it takes longer)
   const deep = spawnSync(process.execPath, ["core/scripts/workflows.mjs"], { cwd: deepRoot, encoding: "utf8", timeout: 5000 });
   ok(deep.status === 0 && /keys\.yml:\d+: the file nests.*Mend: /u.test(deep.stdout) && /flow\.yml:\d+: the file nests.*Mend: /u.test(deep.stdout) && !/many\.yml/u.test(deep.stdout) && !/\n\s+at /u.test(deep.stderr), "the workflow check reads explicit-key marks and flow mappings nested far past the depth read, and a file of many just under it, within five seconds, and says the first two with their mend");
+  // an oversized workflow that a pull request leaves as it is, where git writes line ends as CRLF on checkout, reads as the
+  // same text as its base, so it is only noted: the working tree's file and the base's blob differ in their bytes, never in the text (#752)
+  const crlfRoot = path.join(fresh({ "in/.github/workflows/big.yml": `on: push\n# ${"x".repeat(270000)}\n`, "in/.gitattributes": "*.yml text eol=crlf\n" }), "in");
+  fs.cpSync(path.join(root, "core"), path.join(crlfRoot, "core"), { recursive: true });
+  const gitAt = (...a) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...a], { cwd: crlfRoot, encoding: "utf8" });
+  gitAt("init", "-q"); gitAt("add", "-A"); gitAt("commit", "-q", "-m", "base");
+  fs.rmSync(path.join(crlfRoot, ".github/workflows/big.yml")); gitAt("checkout", "-q", "--", ".github/workflows/big.yml");
+  const crlf = spawnSync(process.execPath, ["core/scripts/workflows.mjs"], { cwd: crlfRoot, env: { ...process.env, WORKFLOWS_BASE: "HEAD" }, encoding: "utf8", timeout: 5000 });
+  ok(fs.readFileSync(path.join(crlfRoot, ".github/workflows/big.yml"), "utf8").includes("\r\n") && crlf.status === 0 && /big\.yml:1: the file is longer.*as it did on the base/u.test(crlf.stdout) && !/FAIL/u.test(crlf.stdout), "an oversized workflow left as it was, checked out with CRLF line ends, is only noted as on the base, never failed", crlf.stdout);
   // the sync's move of the pins, and NuGet's readers, on a workflow and a build file that are links out (#446)
   const call = `jobs:\n  a:\n    uses: ${CORE}/.github/workflows/x.yml@${"a".repeat(40)}\n`;
   const away = path.join(fresh({ "outside.yml": call, "outside.props": "<Project></Project>\n", "in/.github/workflows/b.yml": "on: push\n" }), "in");

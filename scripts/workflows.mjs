@@ -199,14 +199,18 @@ if (started(import.meta.url)) {
   process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
   const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean), files = reads(tracked);
   const core = process.argv.includes("--core"), base = core ? "" : process.env.WORKFLOWS_BASE ?? "";
-  const show = file => { try { return git(["show", `${base}:${file}`]); } catch { return null; } };
+  // (both texts with their line ends as "\n": git may convert them on checkout, so the working tree's file and the base's
+  // blob of one text must read as equal and as one length, #752)
+  const plain = text => text.replace(/\r\n?/gu, "\n");
+  const show = file => { try { return plain(git(["show", `${base}:${file}`])); } catch { return null; } };
   const links = new Set(unlinked(tracked).filter(f => fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()));
   let failed = links.size;
   const texts = [];
   for (const file of links) console.log(`FAIL ${logged(file)}: a link, not a file, and the check reads the project's own text only. Mend: put the file itself there in place of the link`);
   for (const file of files) {
     if (links.has(file)) continue;
-    const text = fs.readFileSync(file, "utf8"), found = lines(text);
+    const raw = fs.readFileSync(file, "utf8"), found = lines(raw);
+    const text = plain(raw);
     texts.push({ file, text });
     if (!readable(text)) { failed++; console.log(`FAIL ${logged(file)}: not UTF-8 text, so it cannot be searched. Mend: save it as UTF-8`); }
     failed += found.length;
