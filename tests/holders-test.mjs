@@ -9,7 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { inStep } from "../scripts/archive.mjs";
+import { inStep as inStepAt, itemsIn } from "../scripts/archive.mjs";
 import { counts, holders, report } from "../scripts/holders.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { fingerprint, rules, rulesOf } from "../scripts/rules.mjs";
@@ -66,6 +66,9 @@ ok(holders(project("{ not json"), []).wrong.length === 1, "holders.json that can
 ok(report(root).length >= 1 && /^- Of \d+ rules/.test(report(root)[0]), "the state report's lines begin with the counts");
 
 // ---- the archive's items behind each rule, and its two forms ----
+// (each small archive here is read with its own last numbered item as the last that keeps its number; the core's own,
+// 262, is read where a test names it)
+const inStep = dir => inStepAt(dir, Math.max(0, ...[...itemsIn(dir, "archive/instructions").items.keys()].filter(Number.isInteger)));
 const archive = (reasons, words = {}) => {
   const dir = project({}, {});
   for (const [folder, files] of [["archive/instructions", reasons], ["words", words]]) {
@@ -110,9 +113,11 @@ ok(["names \"tasks/x.md: Gone\"", "core archive 7 is no item", "is no list of th
 // "behind" names keys)
 const keyed = archive({ "items-001.md": r1, "issue-9.md": "# Issue 9\n\n#9. **19 Nov**: h.\n", "issue-9.2.md": "#9.2. **19 Nov**: i.\n", "issue-12.1.md": "#12.1. **19 Nov**: j.\n" });
 ok(!inStep(keyed).length, "items keyed by their issue, or a point of it, each in a file of its own named by its key, are in step", inStep(keyed).join("\n"));
-const lastNumbered = inStep(archive({ "items-001.md": `${r1}\n262. **19 Nov**, #8: the last numbered.\n` }));
+const lastNumbered = inStepAt(archive({ "items-001.md": `${r1}\n262. **19 Nov**, #8: the last numbered.\n` }));
 ok(!lastNumbered.some(w => w.includes("keyed by a running number")) && lastNumbered.some(w => w.includes("item 3 is missing, though items 1 to 262 keep their numbers") && /Mend: /.test(w)), "the last numbered item, 262, keeps its number, and one of 1 to 262 taken out fails, saying the mend", lastNumbered.slice(0, 3).join("\n"));
-const keyedBad = inStep(archive({ "items-001.md": `${r1}\n#9. **19 Nov**: h.\n`, "items-263.md": "263. **19 Nov**, #8: k.\n", "issue-12.1.md": "#12.1. **19 Nov**: j.\n\n#12.1. **19 Nov**: l.\n", "issue-13.md": "#13. **19 Nov**: m.\n\n#13.2. **19 Nov**: n.\n" }, { "issue-12.1.md": "#12.1. **19 Nov**: words.\n" }));
+const lastTaken = inStepAt(archive({ "items-001.md": `${r1}\n261. **19 Nov**, #8: the one before.\n` }));
+ok(lastTaken.some(w => w.includes("item 262 is missing") && /Mend: /.test(w)), "the last numbered item taken out fails too, as the top of the range is read to 262 whatever stands", lastTaken.filter(w => w.includes("262")).join("\n"));
+const keyedBad = inStepAt(archive({ "items-001.md": `${r1}\n#9. **19 Nov**: h.\n`, "items-263.md": "263. **19 Nov**, #8: k.\n", "issue-12.1.md": "#12.1. **19 Nov**: j.\n\n#12.1. **19 Nov**: l.\n", "issue-13.md": "#13. **19 Nov**: m.\n\n#13.2. **19 Nov**: n.\n" }, { "issue-12.1.md": "#12.1. **19 Nov**: words.\n" }));
 ok([/items-001\.md:5: item #9 stands outside archive\/instructions\/issue-9\.md, the file its key puts it in\. Mend: move it there$/, /item #12\.1 stands twice, .* Mend: give the one at archive\/instructions\/issue-12\.1\.md:3 a key of its own, "#12\.P"/,
   /issue-13\.md:3: item #13\.2 stands outside archive\/instructions\/issue-13\.2\.md, the file its key puts it in\. Mend: move it there$/,
   /item 263 is keyed by a running number, a key that names no issue, .* Mend: key it "#N"/, /words\/issue-12\.1\.md: item #12\.1 adds the owner's words here/].every(re => keyedBad.some(w => re.test(w))) && keyedBad.every(w => /Mend: /.test(w)),

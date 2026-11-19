@@ -83,16 +83,18 @@ function outOfPlace(root, r, w) {
   return wrong;
 }
 
-// What keeps the two forms out of step, each a line with its mend: an empty list where they are in step.
-export function inStep(root) {
+// What keeps the two forms out of step, each a line with its mend: an empty list where they are in step. `last` is the
+// last numbered item, LAST_NUMBERED but in a test.
+export function inStep(root, last = LAST_NUMBERED) {
   const r = itemsIn(root, REASONS), w = itemsIn(root, WORDS), wrong = [];
   wrong.push(...outOfPlace(root, r, w));
   for (const [n, it] of w.items) if (typeof n === "string" || n > LAST_WORDS) wrong.push(`${it.file}: item ${n} adds the owner's words here, where nothing is added after item ${LAST_WORDS}. Mend: take it out of ${WORDS}/ and write it in ${REASONS}/ alone, naming the issue that holds the words`);
   for (const [n, it] of w.items) if (!r.items.has(n)) wrong.push(`${it.file}: item ${n} has no reasoning under its number in ${REASONS}/. Mend: write it there, in the core's words, with what was asked, what was decided and what it stands behind (\`archive/instructions.md\`)`);
-  const last = Math.min(LAST_NUMBERED, Math.max(0, ...[...r.items.keys()].filter(n => typeof n === "number")));
-  for (let n = 1; n <= last; n++) if (!r.items.has(n)) wrong.push(`${REASONS}: item ${n} is missing, though items 1 to ${LAST_NUMBERED} keep their numbers. Mend: put it back where it stood (git log -p -- ${REASONS}/ shows it); an item is never taken out`);
+  // (an archive with no numbered item at all, as in a scratch project, is no archive whose items were taken out)
+  const numbered = [...r.items.keys()].some(Number.isInteger);
+  for (let n = 1; numbered && n <= last; n++) if (!r.items.has(n)) wrong.push(`${REASONS}: item ${n} is missing, though items 1 to ${last} keep their numbers. Mend: put it back where it stood (git log -p -- ${REASONS}/ shows it); an item is never taken out`);
   for (const [n, it] of r.items) {
-    if (typeof n === "number" && n > LAST_NUMBERED) wrong.push(`${it.file}: item ${n} is keyed by a running number, a key that names no issue, where items after ${LAST_NUMBERED} are keyed by their issue (#744). Mend: key it "#N" by the issue that carries the owner's word, or "#N.P" by the one point of it the item records, move it to a file of its own, ${REASONS}/issue-N.md or issue-N.P.md, and write that key for ${n} under "behind" in ${FILE_LIST}`);
+    if (typeof n === "number" && n > last) wrong.push(`${it.file}: item ${n} is keyed by a running number, a key that names no issue, where items after ${last} are keyed by their issue (#744). Mend: key it "#N" by the issue that carries the owner's word, or "#N.P" by the one point of it the item records, move it to a file of its own, ${REASONS}/issue-N.md or issue-N.P.md, and write that key for ${n} under "behind" in ${FILE_LIST}`);
     if (/^\s*>/mu.test(it.text)) wrong.push(`${it.file}: item ${n} quotes (a line opening with ">"). Mend: say in the core's own words what was decided; the owner's words stay on the issue, or in ${WORDS}/`);
     if (w.items.has(n) && !/\bDecided:/u.test(it.text)) wrong.push(`${it.file}: item ${n} does not say what was decided. Mend: add "Decided:" and what the owner decided, in plain words`);
     if (!w.items.has(n) && !/#\d+/u.test(it.text)) wrong.push(`${it.file}: item ${n} names no issue. Mend: name the issue that holds the owner's word ("#N"), as \`archive/instructions.md\` says a new item does`);
