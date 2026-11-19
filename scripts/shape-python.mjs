@@ -290,7 +290,10 @@ function moduleAt(parts, from, files) {
 }
 
 const DEEP = new WeakMap();
-const deepest = files => { if (!DEEP.has(files)) DEEP.set(files, Math.max(0, ...[...files].map(f => f.split("/").length)) + 1); return DEEP.get(files); };
+const deepest = files => {
+  if (!DEEP.has(files)) { let most = 0; for (const f of files) most = Math.max(most, f.split("/").length); DEEP.set(files, most + 1); }
+  return DEEP.get(files);
+};
 // Of a module none of those roots holds, the one file whose path ends in it; null where none does, or more than one.
 function bySuffix(parts, files) {
   const p = parts.join("/"), ends = [`${p}.py`, `${p}/__init__.py`];

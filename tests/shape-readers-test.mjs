@@ -123,6 +123,8 @@ ok(lead("main.py", { level: 0, module: "lib.util" }) === '{"to":["src/lib/util.p
   && lead("pkg/a/m.py", { level: 0, module: "pkg.a", names: ["x"] }) === '{"to":["pkg/a/x.py"]}', "Python: an absolute import leads to the project's own module under its root, src/ or the file's own folder");
 ok(lead("main.py", { level: 0, module: "json" }) === '{"outside":"json","top":"json"}' && lead("main.py", { level: 0, module: "dup" }) === '{"outside":"dup","top":"dup"}' && lead("main.py", { level: 0, module: "numpy.linalg" }) === '{"outside":"numpy.linalg","top":"numpy"}',
   "Python: the standard library is never taken for a file of the project's that ends in its name, and a name two files end in leads nowhere the reader can tell");
+const many = new Set(Array.from({ length: 200000 }, (_, i) => `f${i}.py`));
+ok(JSON.stringify(resolvePython("main.py", { level: 0, module: "os", names: [] }, many, std)) === '{"outside":"os","top":"os"}', "Python: an import is led in a project of any number of files");
 const pyPackages = pythonPackages({
   "pyproject.toml": "[project]\nname = \"game\"\ndependencies = [\n  \"requests[socks]>=2\",\n  \"PyYAML\",  # a comment\n]\n[project.optional-dependencies]\ntest = [\"pytest\"]\n[tool.poetry.dependencies]\npython = \"^3.11\"\nflask = \"*\"\n[tool.poetry.group.dev.dependencies]\nblack = \"*\"\n",
   "requirements-dev.txt": "ruff==1\n-r requirements.txt\n", "requirements.txt": "numpy # x\n-e .\nscikit_learn>=1\n",
