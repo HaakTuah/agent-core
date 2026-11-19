@@ -22,7 +22,7 @@ the 45,056 cap.
 
 The cuts the report did name, though they went against earlier words of his (the clean-up passes and rule-file audit,
 core archive 26, 54 and 67; the guard on what a 10 is, 23; each reviewer's one idea, 40; the monthly check of what
-players read, 49), stay cut, on the owner's word of 11 November: the owner agreed that they stay cut, ideas having
+players read, 49), stay cut, on the owner's word of 11 November: the owner judged that they could stay cut, ideas having
 moved to issues. So does the review-guideline block on an
 entry added to the copies baseline (core archive 56): the baseline is a protected file, so any entry added to it gets a
 code review. The one review of the core he agreed to for about a week after step 3 (core archive 96) already has a

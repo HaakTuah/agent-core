@@ -1,7 +1,7 @@
 # The owner's words behind the core
 
-The owner's own words behind items 1 to 245 of the core's archive, each under its item's number, with the game and
-archive entry it came from: an Amarna Letters entry by its item number, a Barkstreet Snakes entry by its date. They
+The record of the owner's word behind items 1 to 245 of the core's archive, each under its item's number, with the game
+and archive entry it came from: an Amarna Letters entry by its item number, a Barkstreet Snakes entry by its date. They
 stay in the core's own repository alone: `.gitattributes` keeps this folder out of every project's copy, which carries
 each item's reasoning in the core's words instead (`archive/instructions.md`; `AGENTS.md`, "The archive keeps the
 reasoning; the owner's words stay here").
