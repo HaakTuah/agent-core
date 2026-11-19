@@ -131,15 +131,22 @@ export const fileAt = manifest => {
 // where this file lies, never from a file a pull request could add.
 const inCopy = () => path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/") === "core/scripts/queue.mjs";
 
-function main([flag]) {
+// Where the command runs: { copy, file, repo } or { fail }, the failure with its mend.
+function placed() {
   const copy = inCopy(), manifest = copy && fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null;
   const file = copy ? fileAt(manifest ?? "") : FILE;
-  if (file === null || (fs.existsSync(file) && leadsOut(process.cwd(), file))) { console.error("FAIL: the progress file core-manifest.md names is no plain Markdown file inside the project (outside .git and core/, reached through no link). Mend: name the progress file in the manifest's row *progress file* as a path such as docs/PROGRESS.md"); return 1; }
-  if (fs.existsSync(file) && fs.statSync(file).size > LARGEST) { console.error(`FAIL: ${file} is ${fs.statSync(file).size} bytes, past the ${LARGEST} the reader takes. Mend: take out the lines of finished work and any notes, which belong in the pull requests' descriptions`); return 1; }
+  if (file === null || (fs.existsSync(file) && leadsOut(process.cwd(), file))) return { fail: "FAIL: the progress file core-manifest.md names is no plain Markdown file inside the project (outside .git and core/, reached through no link). Mend: name the progress file in the manifest's row *progress file* as a path such as docs/PROGRESS.md" };
+  if (fs.existsSync(file) && fs.statSync(file).size > LARGEST) return { fail: `FAIL: ${file} is ${fs.statSync(file).size} bytes, past the ${LARGEST} the reader takes. Mend: take out the lines of finished work and any notes, which belong in the pull requests' descriptions` };
   const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout;
   const repo = /^[\w.-]+\/[\w.-]+$/u.test(process.env.GITHUB_REPOSITORY ?? "") ? process.env.GITHUB_REPOSITORY : repoOf(origin) ?? (copy ? null : CORE);
-  if (repo === null) { console.error("FAIL: which repository on GitHub this is cannot be told: its origin is no address on github.com. Mend: set GITHUB_REPOSITORY to its owner/name, and run it again"); return 1; }
-  const { status, out } = command(flag, { file, project: copy, read: () => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null), write: text => fs.writeFileSync(file, text), closed: () => statesOf(repo) });
+  if (repo === null) return { fail: "FAIL: which repository on GitHub this is cannot be told: its origin is no address on github.com. Mend: set GITHUB_REPOSITORY to its owner/name, and run it again" };
+  return { copy, file, repo };
+}
+
+function main([flag]) {
+  const at = placed();
+  if (at.fail) { console.error(at.fail); return 1; }
+  const { status, out } = command(flag, { file: at.file, project: at.copy, read: () => (fs.existsSync(at.file) ? fs.readFileSync(at.file, "utf8") : null), write: text => fs.writeFileSync(at.file, text), closed: () => statesOf(at.repo) });
   (status ? console.error : console.log)(out);
   return status;
 }
