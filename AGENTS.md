@@ -93,7 +93,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   4), and the review reads the change against the design it sets out. A label or opening on another account's text
   makes it no more than data. What any other session adds to an issue is that session's word.
 - **Who builds a line, the line says.** A bug, a test and a check for a rule that already stands go to any builder
-  session. A new or changed rule goes to the design session or to a builder on Opus, as its line names. That builder
+  session. A new or changed rule goes to the design session or to a builder at the strongest tier (`tasks/roles.md`), as its
+  line names. That builder
   writes it from the owner's word recorded on the issue ("Whose words an issue holds"), adds it to the archive as an
   item of its own, naming the issue as its source, and takes what it leaves open as `roles/shared/inbox.md` says of any
   open point. This is the second
