@@ -57,7 +57,7 @@ export function facts({ repo, manifest = null, gh = ghApi }) {
   }
   const queueOver = override(manifest, "merge queue", ["on", "offered", "none"]);
   said.push(queueOver ? `its merge queue: ${queueOver}, as the manifest's row *merge queue* says (read: ${queue ?? "not read"})`
-    : `its merge queue: ${queue === "on" ? "on" : queue === "offered" ? "offered and off" : queue === "none" ? "not offered" : "not read (the organisation's plan did not answer), so taken as not offered"}, ${queued ? "by its rules on the default branch" : `the repository being ${r.private ? "private" : "public"} and ${r.owner?.type === "Organization" ? `an organisation's${plan ? ` on the plan ${oneLine(plan).slice(0, 40)}` : ""}` : "a person's account's"}`}`);
+    : `its merge queue: ${queue === "on" ? "on" : queue === "offered" ? "offered and off" : queue === "none" ? "not offered" : `not read (the organisation's plan ${plan === undefined ? "did not answer" : `is ${JSON.stringify(oneLine(plan).slice(0, 40))}, a name this script does not know`}), so taken as not offered`}, ${queued ? "by its rules on the default branch" : `the repository being ${r.private ? "private" : "public"} and ${r.owner?.type === "Organization" ? `an organisation's${plan ? ` on the plan ${oneLine(plan).slice(0, 40)}` : ""}` : "a person's account's"}`}`);
   const billedOver = override(manifest, "billed minutes", ["yes", "no"]);
   const billed = billedOver ? billedOver === "yes" : r.private === true;
   const billedRead = r.private === true ? "yes, the repository being private" : "no, the repository being public";
