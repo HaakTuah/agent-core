@@ -1,17 +1,17 @@
 // The core's archive in its two forms (#252): each item's reasoning, in the core's words, in archive/instructions/,
 // which a project's copy carries and "core archive N" leads to; and, for the items written before 16 November 2026, the
-// owner's words, in words/, which stays in the core's own repository (its .gitattributes line). An item is a line that
-// opens with its key and a stop, at the start of a line: items 1 to LAST_NUMBERED by their number, in a file named
-// items-NNN.md; every later one by the issue that carries the owner's word, and where it records one point of several by
-// that point, as "#733.1" (#744), in a file of its own named by its key, issue-733.1.md (#750, point 1), so that pull
-// requests merged side by side never claim one key nor edit one line. The two are in step where every item of the words has its reasoning under the same number, none past
-// LAST_WORDS and none keyed by an issue stands in the words, each form keys each item once and in the file its key puts
-// it in (#394), no item past LAST_NUMBERED is numbered, no reasoning item quotes (a line opening with ">"), each that has
-// words says what was decided ("Decided:"), and each written since (point 6 of #252) names the issue that holds the
-// owner's word ("#N"). Items 1 to LAST_NUMBERED stand with none taken out; no number is added past it (#744). An item that
-// changes an earlier one says so on a line "Changes: <keys>.", and each it names is marked back, "Changed by: <keys>."
-// (marksOf(); #756, point 3). holders.mjs, beside this file, reads it for the items its list names and fails what
-// inStep() finds. Node's own modules.
+// record of the owner's word, in words/, which stays in the core's own repository (its .gitattributes line). An item is
+// a line that opens with its key and a stop, at the start of a line: items 1 to LAST_NUMBERED by their number, in a
+// file named items-NNN.md; every later one by the issue that carries the owner's word, and where it records one point
+// of several by that point, as "#733.1" (#744), in a file of its own named by its key, issue-733.1.md (#750, point 1),
+// so that pull requests merged side by side never claim one key nor edit one line. The two are in step where every item
+// of the words has its reasoning under the same number, none past LAST_WORDS and none keyed by an issue stands in the
+// words, each form keys each item once and in the file its key puts it in (#394), no item past LAST_NUMBERED is
+// numbered, no reasoning item quotes (a line opening with ">"), each that has words says what was decided ("Decided:"),
+// and each written since (point 6 of #252) names the issue that holds the owner's word ("#N"). Items 1 to LAST_NUMBERED
+// stand with none taken out; no number is added past it (#744). An item that changes an earlier one says so on a line
+// "Changes: <keys>.", and each it names is marked back, "Changed by: <keys>." (marksOf(); #756, point 3). holders.mjs,
+// beside this file, reads it for the items its list names and fails what inStep() finds. Node's own modules.
 //
 //   import { items, inStep, KEY, marksOf } from "./archive.mjs";
 import fs from "node:fs";
@@ -145,7 +145,7 @@ export function inStep(root, last = LAST_NUMBERED) {
   wrong.push(...unmarked(r));
   for (const [n, it] of r.items) {
     if (typeof n === "number" && n > last) wrong.push(`${it.file}: item ${n} is keyed by a running number, a key that names no issue, where items after ${last} are keyed by their issue (#744). Mend: key it "#N" by the issue that carries the owner's word, or "#N.P" by the one point of it the item records, move it to a file of its own, ${REASONS}/issue-N.md or issue-N.P.md, and write that key for ${n} under "behind" in ${FILE_LIST}`);
-    if (/^\s*>/mu.test(it.text)) wrong.push(`${it.file}: item ${n} quotes (a line opening with ">"). Mend: say in the core's own words what was decided; the owner's words stay on the issue, or in ${WORDS}/`);
+    if (/^\s*>/mu.test(it.text)) wrong.push(`${it.file}: item ${n} quotes (a line opening with ">"). Mend: say in the core's own words what was decided; the owner's words stay on the issue`);
     if (w.items.has(n) && !/\bDecided:/u.test(it.text)) wrong.push(`${it.file}: item ${n} does not say what was decided. Mend: add "Decided:" and what the owner decided, in plain words`);
     if (!w.items.has(n) && !/#\d+/u.test(it.text)) wrong.push(`${it.file}: item ${n} names no issue. Mend: name the issue that holds the owner's word ("#N"), as \`archive/instructions.md\` says a new item does`);
   }

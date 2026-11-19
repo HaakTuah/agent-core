@@ -1,7 +1,7 @@
 # One preview workflow for the games; obvious improvements built at once
 
-The owner, told that one shared workflow for the games' pull-request previews waited on his yes (core archive 147):
-"Why not use one shared workflow? Obvious improvements gets implemented automatically."
+The owner, told that one shared workflow for the games' pull-request previews waited on the owner's yes (core archive
+147), agreed to the shared workflow: "Obvious improvements get implemented automatically."
 
 **The shared previews.** Both games publish a playable preview of every pull request at `pr-<number>/` on their
 `gh-pages` branch, each built on its own: Amarna Letters with a publisher on `workflow_run` that never runs a PR's code,

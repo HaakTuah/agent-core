@@ -164,8 +164,7 @@ The index, and how an item is written: `archive/instructions.md`.
     code review comes before the merge. The owner added that only Claude has to stop around 90%, since its remaining
     usage is kept for the owner's own use, so Codex or whatever else is added will be for project work only. Ideally
     they time so that 90% is never spent before 100% of them are spent, but that depends on their being in an
-    environment where they can track it, such as the owner's own computer, or a second set-up, even better a third,
-    where the owner believes they can track and start one another directly; the rules are calibrated for that. Right now
+    environment where they can track it and start one another directly; the rules are calibrated for that. Right now
     every cloud session wastes time establishing that it can track its usage, and wastes tokens posting about it on
     every PR, possibly more.
     Changed by: 146.
