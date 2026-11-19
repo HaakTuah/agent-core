@@ -24,7 +24,7 @@
 // neither list, it waits only for a review running, as it did before it read them. A list GitHub cut short (3000
 // files, 250 commits) is read as needing a review and as proving no update from main. A pull request that leaves this
 // script alone and whose head does not hold it as the default branch does (BOUND=false, which the workflow sets), and
-// that the host says was opened before the default branch's copy came (SINCE; boundOf in security-review.mjs), stood
+// that the host says was opened before the script first came to the default branch (SINCE; boundOf in security-review.mjs), stood
 // before the check came:
 // its missing review is said in the status, never waited for (AGENTS.md, "Nothing locks a project"); brought up to
 // date with main, it is held. A summary whose state cannot be read counts as no review of Codex's, with a warning. It

@@ -25,7 +25,7 @@
 # (scripts/security-review.mjs, whose header says what it does not hold). Where the pull request's files show a change
 # to what runs by itself beyond its pins, it asks floor rule 3's two security reviews (the same script says
 # which count, and when one is enough); of a pull request that leaves the check's scripts alone, whose head does
-# not hold them as the default branch does and that the host says was opened before the default branch's copy came,
+# not hold them as the default branch does and that the host says was opened before the script first came to the default branch,
 # which stood before the check came, what the check reads more is said, never waited for. A project
 # calls it (workflow_call) from
 # a workflow of its own of the same name, on pull_request (the types opened, reopened, synchronize and ready_for_review)
@@ -164,7 +164,7 @@ jobs:
           from_host files.json "list of files" --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100"
           # whether the pull request is held by what a script of the check reads more: not where it leaves the script
           # alone, its head holds it as it stood before this branch's, and the host says it was opened before the
-          # default branch's copy came (it stood before the check came, and is told, never waited for: AGENTS.md,
+          # script first came to the default branch (it stood before the check came, and is told, never waited for: AGENTS.md,
           # "Nothing locks a project"; the script decides that last from came, below); always where it changes the
           # script itself, where its list of files is cut short, or where the head's copy cannot be read for any reason
           # but its absence, or not by the step's 240th second, ten seconds at most (#632)
@@ -190,7 +190,7 @@ jobs:
           # spent, and the script then holds the pull request (it holds one opened since then whatever its head holds:
           # boundOf in security-review.mjs)
           came() {
-            local p="$ROOT/scripts/$1" c= page n at= left
+            local p="$ROOT/scripts/$1" c= page n parent at= left
             p="${p#./}"
             for page in 1 2 3 4 5; do
               left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
@@ -202,6 +202,17 @@ jobs:
               [ "$page" -lt 5 ] || return 0
             done
             [[ "$c" =~ ^[0-9a-f]{40}$ ]] || return 0
+            # (the host lists a path's commits by the dates their authors set: the oldest counts only where its first
+            # parent holds no such script, so that it brought it, or where it has no parent; else nothing is dated)
+            left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
+            parent=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits/$c" 2> /dev/null \
+              | jq -r 'if (.parents | type) != "array" then "" elif (.parents | length) == 0 then "none" else (.parents[0].sha // "") end' 2> /dev/null) || return 0
+            if [ "$parent" != none ]; then
+              [[ "$parent" =~ ^[0-9a-f]{40}$ ]] || return 0
+              left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
+              if timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/contents/$p?ref=$parent" > /dev/null 2> "$d/error"; then return 0; fi
+              grep -q "HTTP 404" "$d/error" || return 0
+            fi
             left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
             at=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits/$c/pulls" 2> /dev/null \
               | jq -r --arg b "$DEFAULT" '[.[] | select(.merged_at != null and .base.ref == $b) | .merged_at] | min // empty' 2> /dev/null) || at=

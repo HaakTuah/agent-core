@@ -38,10 +38,10 @@ ok(answered([comment("Leanness check: found", "MEMBER", "writer")], whoseOf("som
   && !answered([comment("Leanness check: found", "MEMBER", "reader")], whoseOf("someone", [right("reader", "read", "read", false)])) && !answered([comment("Leanness check: found", "COLLABORATOR", "reader")], owner)
   && !answered([comment("Leanness check: found")]) && !answered([comment("Leanness check: found", "MEMBER", "writer")], whoseOf("someone", [right("writer", "triage", "read", false)])),
   "a member's or collaborator's answers only where the host's rights let them write; one who may only read or triage, or whose right was not read, does not, nor does any, with no one counted");
-ok(!answered([]) && !answered([comment("About the Leanness check: none yet")]) && !answered([comment(" Leanness check: x")]) && !answered([comment("leanness check: x")]) && !answered([comment("Leanness check")]),
+ok(!answered([], owner) && !answered([comment("About the Leanness check: none yet")], owner) && !answered([comment(" Leanness check: x")], owner) && !answered([comment("leanness check: x")], owner) && !answered([comment("Leanness check")], owner),
   "one that only speaks of it, or opens any other way, does not");
-ok(["NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "MANNEQUIN", null, 5].every(who => !answered([comment("Leanness check: x", who)])), "nor does anyone else's, whatever it says");
-ok(!answered(null) && !answered({}) && !answered("Leanness check: x") && !answered([null, 1, "Leanness check: x", { author_association: "OWNER" }, { body: 5, author_association: "OWNER" }]), "nor a list in any other form, or an entry that is no comment");
+ok(["NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "MANNEQUIN", null, 5].every(who => !answered([comment("Leanness check: x", who)], owner)), "nor does anyone else's, whatever it says");
+ok(!answered(null, owner) && !answered({}, owner) && !answered("Leanness check: x", owner) && !answered([null, 1, "Leanness check: x", { author_association: "OWNER" }, { body: 5, author_association: "OWNER" }], owner), "nor a list in any other form, or an entry that is no comment");
 
 // a pull request's raise
 const yes = [comment("Leanness check: read whole; too little room.")];
