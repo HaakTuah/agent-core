@@ -88,9 +88,14 @@ export function readsOf(text, lead) {
 
 // Whether a changed path matches a pattern of a module's line.
 // A pattern as its parts: each character a literal, `*` any run of characters but "/", `**` (with a "/" after it, which
-// it takes) any run at all. Matched by walking the path once for each part, never by a regular expression, whose
-// backtracking takes time that grows exponentially with the stars a pattern a branch writes holds side by side.
-const partsOf = p => { const out = []; for (let i = 0; i < p.length; i++) { if (p[i] !== "*") out.push(p[i]); else if (p[i + 1] === "*") { out.push(ANY); i += p[i + 2] === "/" ? 2 : 1; } else out.push(STAR); } return out; };
+// it takes) any run at all, a line's end included. Matched by walking the path once for each part, never by a regular
+// expression, whose backtracking takes time that grows exponentially with the stars a pattern a branch writes holds side
+// by side; stars side by side are one part (`**` where either is), so a run of them costs one walk.
+const partsOf = p => {
+  const out = [], wild = part => { const last = out[out.length - 1]; if (last === STAR || last === ANY) out[out.length - 1] = last === ANY || part === ANY ? ANY : STAR; else out.push(part); };
+  for (let i = 0; i < p.length; i++) { if (p[i] !== "*") out.push(p[i]); else if (p[i + 1] === "*") { wild(ANY); i += p[i + 2] === "/" ? 2 : 1; } else wild(STAR); }
+  return out;
+};
 const STAR = Symbol("*"), ANY = Symbol("**");
 // (a pattern's parts once, and its literal runs, which must stand in the path in their order: a check in one pass that
 // turns away nearly every path before the walk)

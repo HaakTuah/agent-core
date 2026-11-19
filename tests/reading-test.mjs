@@ -42,6 +42,9 @@ ok(matches(".github/dependabot.yml", ".github/dependabot.yml") && !matches(".git
 const slowAt = Date.now();
 ok(matches("**/x", "x") && matches("**/x", "a/b/x") && matches("a*a", "aa") && !matches("a*a", "a") && matches("*b*", "abc") && !matches("x*", "abc") && matches("a?b", "a?b") && !matches("a?b", "axb") && matches("src/a.(x)", "src/a.(x)") && !matches(`${"*a".repeat(40)}b`, "a".repeat(200)) && !matches(`${"**/".repeat(40)}*z*z*z*q`, "a/".repeat(100)) && Date.now() - slowAt < 1000,
   "a pattern's stars, ** across folders and literal parts match as before, and one of many stars side by side that matches nothing answers at once");
+const walkAt = Date.now();
+ok(matches("*a".repeat(2000), "a".repeat(20000)) && matches(`x/${"*".repeat(100000)}y`, `x/${"z/".repeat(25000)}y`) && !matches(`x/${"*".repeat(99999)}q`, `x/${"z/".repeat(25000)}y`) && matches("a**b", "a\nb") && !matches("a*/b", "a\n/c") && Date.now() - walkAt < 2000,
+  "a pattern that passes the one-pass check is walked in time its parts times the path's length, a run of stars as one part, and ** crosses a line's end too (where the old expression did not, so such a path calls for more, never less)");
 
 // a small core
 const texts = {
