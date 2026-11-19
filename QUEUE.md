@@ -10,6 +10,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
 | #841 | builder; a rework of tests; `scripts/steps-stage.mjs` and `scripts/steps/` | #750's point 1 |
+| #853 | builder; a rework of tests; `scripts/holders.json`, `scripts/holders.mjs` and their readers | #841 |
 | #810 | the orchestrator, for its done-when: reads `main`'s runs, then closes it | a stretch of merges landing faster than a run; at the batch's end, if none came, the orchestrator reads `main`'s runs since #813 and closes #810 on that |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | #715 |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
@@ -33,7 +34,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #590 | builder | #580 |
 | #591 | builder | #589 |
 | #587 | rule builder; it may change the floor's topics and what every role reads at its start | #530 |
-| #307 | rule builder | |
 | #308 | rule builder | |
 | #309 | rule builder | |
 | #318 | rule builder | |
