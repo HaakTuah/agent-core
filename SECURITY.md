@@ -40,7 +40,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      alone is counted, and 8 MB of all their text, 200 rule files, 100 kinds of task, 300 names they give and 16
      million steps of each tree's tries, past which it fails with its mend; and of each file of code the selection
      reads through the shape check's readers (`scripts/shape-readers.mjs`), 500,000 characters of JavaScript,
-     TypeScript or Python and 250,000 of C#, past which the parser reads none of it (of Python and C#, neither
+     TypeScript or Python and 200,000 of C#, past which the parser reads none of it (of Python and C#, neither
      functions, imports nor tokens; of JavaScript and TypeScript, no functions, their imports read without it), and 2 s
      for the parser on each (`scripts/tree-walk.mjs`); hostile tests:
      `tests/hostile-pr-changes-test.mjs`.

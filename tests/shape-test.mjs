@@ -140,13 +140,13 @@ ok(same(changes, ["change: src/a.js: \"Ticket:\\u0020ABC-\"", "change: src/a.js:
   && marked.entries.get("change: src/a.js: a change's heading").n.count === 2 && marked.entries.get("change: src/a.js: the task that changed it").n.count === 1 && marked.entries.get("change: src/a.js: a change's date").n.count === 1 && readerOf("change: src/a.js: a change's date", marked.readers) === "changes" && fileOf("change: src/a.js: what the code was") === "src/a.js"
   && groupOf("change: src/a.js: \"Ticket:\\u0020ABC-\"").group === "\"Ticket:\\u0020ABC-\"",
   "a comment line that marks a change is an entry of the reader \"changes\", counted by file and mark, in JavaScript, C# and Python, a mark of the config's too; a string, a line going on in small letters, a reason and a pointer to an issue are none", changes.join("\n"));
-// (a block comment of 300,000 lines in JavaScript, and of 24,000 in C#, under the largest its reader takes, read
+// (a block comment of 300,000 lines in JavaScript, and of 19,000 in C#, under the largest its reader takes, read
 // whole and overflowing nothing; a file whose JSX the reader cannot follow gives no marks, since what it would take for
 // a comment may be the element's text)
 const tall = `/*\n * Changed: x\n${" * a line\n".repeat(300000)} */\nconst t = 1;\n`;
-const longMarked = survey({ "src/t.js": tall, "src/t.cs": `/*\n * Changed: x\n${" * a line\n".repeat(24000)} */\nclass T {}\n`, "src/l.jsx": "const cast = <T>(x: T) => x;\nconst p = <p>// Changed: the text</p>;\n" }, cfg({}));
+const longMarked = survey({ "src/t.js": tall, "src/t.cs": `/*\n * Changed: x\n${" * a line\n".repeat(19000)} */\nclass T {}\n`, "src/l.jsx": "const cast = <T>(x: T) => x;\nconst p = <p>// Changed: the text</p>;\n" }, cfg({}));
 ok(longMarked.entries.get("change: src/t.js: a change's heading")?.n.count === 1 && longMarked.entries.get("change: src/t.cs: a change's heading")?.n.count === 1 && !ids(longMarked).some(id => id.startsWith("change: src/l.jsx")),
-  "a block comment of 300,000 lines is read whole in JavaScript, and of 24,000 in C#, and a file whose JSX the reader cannot follow gives no marks", ids(longMarked).join("\n"));
+  "a block comment of 300,000 lines is read whole in JavaScript, and of 19,000 in C#, and a file whose JSX the reader cannot follow gives no marks", ids(longMarked).join("\n"));
 // (a minified file of 100,000 inline comments on one line, read in time: each comment's lines found within it alone)
 const minStart = Date.now(), minified = survey({ "src/min.js": `var a=${"/*#__PURE__*/f()+".repeat(100000)}1;\n` }, cfg({}));
 ok(Date.now() - minStart < 5000 && !ids(minified).some(id => id.startsWith("change: ")), "a minified file of 100,000 inline comments on one line is read in time", `${Date.now() - minStart} ms`);
@@ -234,7 +234,7 @@ const large = [
   // (C#'s grammar nests a dotted name a part a level, so one of 130,000 parts is past what its reader follows: the file is
   // counted as lost, and its usings as ones the readers cannot follow)
   [{ "src/a.cs": `using ${Array(130000).fill("a").join(".")};\n` }, f => f.unsure.has("src/a.cs") && ids(f).includes("lost: src/a.cs")],
-  [{ "src/a.cs": `${Array.from({ length: 7000 }, (_, i) => `using Z${i};`).join("\n")}\n${Array.from({ length: 7000 }, (_, i) => `namespace N${i} { }`).join("\n")}\n` }, f => f.read.nowhere === 7000],
+  [{ "src/a.cs": `${Array.from({ length: 6000 }, (_, i) => `using Z${i};`).join("\n")}\n${Array.from({ length: 6000 }, (_, i) => `namespace N${i} { }`).join("\n")}\n` }, f => f.read.nowhere === 6000],
   [{ "src/a.py": `from ${Array(32500).fill("a").join(".")} import ${Array(32500).fill("b").join(", ")}\n` }, f => f.read.nowhere === 1],
 ];
 ok(large.every(([texts, holds]) => holds(survey(texts, cfg({})))), "a large file of each kind of import is read in time, in step with its size, and what it holds still counted");

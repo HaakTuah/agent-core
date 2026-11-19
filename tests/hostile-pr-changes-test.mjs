@@ -196,7 +196,8 @@ branch("sel-nothing", () => {});
 r = select();
 ok(r.status === 0 && said() === "RUN=  \n", "select: an empty diff selects no test");
 // (the slowest code found for each reader at the largest it takes: one long list, braces nested as deep as the grammar
-// goes, and statements C# holds no such thing as, which its grammar recovers from at about 50 s a megabyte; each read
+// goes, one call of many arguments, a line of many statements, and statements C# holds no such thing as, which its
+// grammar recovers from at about 50 s a megabyte; each read
 // as the job reads it, the process, its parser's thread and the grammar started, stopped at SECURITY.md's 5 s)
 const filled = (head, unit, tail, size) => `${head}${unit.repeat(Math.floor((size - head.length - tail.length) / unit.length))}${tail}`;
 const nested = size => { const d = Math.floor((size - 22) / 2); return `class C { void M() ${"{".repeat(d)}${"}".repeat(d)} }\n`; };
@@ -205,6 +206,8 @@ const SLOWEST = {
   "src/list.js": size => filled("x = [", "a,", "];\n", size),
   "src/nested.cs": nested,
   "src/bare.cs": size => filled("class C { void M() {", "x;", "} }\n", size),
+  "src/call.cs": size => filled("class C { void M() { f(", "a,", "a); } }\n", size),
+  "src/statements.py": size => filled("", "a;", "a\n", size),
 };
 const largestOf = file => LARGEST[{ ".py": "python", ".js": "javascript", ".cs": "csharp" }[path.extname(file)]];
 for (const [file, made] of Object.entries(SLOWEST)) {
