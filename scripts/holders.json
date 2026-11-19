@@ -193,7 +193,9 @@
       "check: scripts/security-review.mjs, in part",
       "check: GitHub's ruleset on the default branch, in part"
     ],
-    "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part"
+    "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part",
+    "floor/security.md: The owner's yes in the PR": "check: scripts/pr-description.mjs, in part",
+    "roles/shared/teams.md: The higher right gives the floor's yeses": "check: scripts/pr-description.mjs, in part"
   },
   "behind": {
     "AGENTS.md": [208, 209, 213],
@@ -320,6 +322,7 @@
     "tasks/choices.md": [222, 231],
     "tasks/choices.md: a long list before the options": [251],
     "tasks/choices.md: a drop says whether it rests on a fact": [251],
+    "tasks/choices.md: what a standard mechanism gave": [263],
     "tasks/choices.md: the same trial for each option kept": [251],
     "tasks/choices.md: the blind pick": [251],
     "tasks/choices.md: the case against": [251],
@@ -414,8 +417,8 @@
     "tasks/tools.md: One door in: `AGENTS.md`": [232],
     "tasks/tools.md: One script says what to read": [234],
     "tasks/tools.md: Proven by the staged cases, tool by tool": [232],
-    "tasks/tools.md: What the core offers one tool, it offers each": [263],
-    "tasks/roles.md: The rules name tiers, never a model": [263],
+    "tasks/tools.md: What the core offers one tool, it offers each": [264],
+    "tasks/roles.md: The rules name tiers, never a model": [264],
     "tasks/updates.md: Node": [39, 253],
     "tasks/updates.md: The newest stable version, unless there is a reason": [37, 65],
     "tools/claude.md: Name models by family alone": [80, 81],
@@ -439,6 +442,7 @@
     "tasks/reviews.md: What a posted review stands for": "check fires; outcome: robust; rare harm",
     "tasks/choices.md: a long list before the options": "correction: misread; outcome: asked",
     "tasks/choices.md: a drop says whether it rests on a fact": "correction: misread; outcome: asked",
+    "tasks/choices.md: what a standard mechanism gave": "correction: rule missing; outcome: robust",
     "tasks/choices.md: the same trial for each option kept": "correction: misread; outcome: asked",
     "tasks/choices.md: the blind pick": "correction: misread; outcome: asked",
     "tasks/choices.md: the case against": "correction: misread; outcome: asked",

@@ -179,7 +179,15 @@ The index, and how an item is written: `archive/instructions.md`.
      happens to read it. The owner agreed to it in a chat session, as the third of three ways to gain on what the
      core already has. It stands behind "The audit's reader has a fixed brief and fixed questions" in
      `tasks/cleaning.md`.
-263. **16 November 2026**, #467. What the core offers one agent tool it offers each tool on its list, as far as that
+263. **18 November 2026**, #652. A choice record whose option does a job in a way of the project's own that an
+     ecosystem's standard mechanism does for most of its users lists what that mechanism gives beside its main job,
+     and for each what does it under the option, or that nothing does; the challenger reads the list for what it
+     lacks. The record that chose to carry packages in the core's copy never listed what a lock file gives beside the
+     install, and the host's alerts, update proposals, the registry's audit and the list of what is inside were each
+     found missing later, one at a time. The owner agreed to it in a chat session, asked what the core had lacked for
+     the carried packages to stand outside the host's alerts. It stands behind "what a standard mechanism gave" in
+     `tasks/choices.md`.
+264. **16 November 2026**, #467. What the core offers one agent tool it offers each tool on its list, as far as that
      tool allows, its own documentation saying where it cannot; one table, a row for each thing offered and a column for
      each tool, each cell carried, cannot or not yet, filled by whoever changes something for one tool; and the rules
      name a tier by the job, never a model, each tool's part mapping the tiers to its models: the owner set the standard
