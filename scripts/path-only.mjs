@@ -13,28 +13,55 @@
 // and that move's new path in the same place in the new; a path stands where no letter, digit, "_", ".", "/" or "-"
 // comes before it and no letter, digit, "_" or "-", nor "." or "/" before one, comes after. It refuses, never guessing,
 // a file that asks the yes and is added, deleted or moved itself, a move into or out of such a path, every other change
-// of a word, and every file where the pull request changes this script or owner-yes.mjs, so that the code that
-// proves is always `main`'s, as floor rule 3 asks, though the description check runs the pull request's copy. Git and Node's
+// of a word, and every file where the pull request changes this script, the description check or its workflow,
+// or a file of the repository either script imports at any depth, as the base holds them (ownFiles), so that the code
+// that proves is always `main`'s, as floor rule 3 asks, though the description check runs the pull request's copy. Git and Node's
 // own modules; it changes nothing.
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { asks } from "./owner-yes.mjs";
 
+export { INVALID };
 export const SELF = "scripts/path-only.mjs";
-// the files whose code the proof runs: where the pull request changes one, the copy that runs is not `main`'s
-export const OWN = [SELF, "scripts/owner-yes.mjs"];
+// Where the proof starts: the check that runs it, the workflow that runs the check, and itself. The files whose code
+// decides it are these and every file of the repository they import, at any depth (ownFiles): where the pull request
+// changes one, the copy that runs is not `main`'s.
+export const ROOTS = ["scripts/pr-description.mjs", SELF];
+export const WORKFLOW = ".github/workflows/own-description.yml";
+const IMPORT = /^\s*(?:import|export)\b[^"'`]*?\bfrom\s*["'](\.{1,2}\/[^"']+)["']|^\s*import\s*["'](\.{1,2}\/[^"']+)["']/gmu;
+
+// The files `ROOTS` import at any depth, as `textOf(path)` gives each (null: not there), with the workflow.
+export function ownFiles(textOf) {
+  const seen = new Set([WORKFLOW]), todo = [...ROOTS];
+  while (todo.length) {
+    const file = todo.pop();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const text = textOf(file);
+    if (text === null) continue;
+    for (const m of text.matchAll(IMPORT)) todo.push(path.posix.normalize(path.posix.join(path.posix.dirname(file), m[1] ?? m[2])));
+  }
+  return seen;
+}
 const REGULAR = "100644";
+const UTF8 = new TextDecoder("utf-8", { fatal: true }), INVALID = Symbol("no UTF-8");
 
 const escape = s => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
-// The spellings of each move, old to new: a file's path; a folder's, with its slash and without. Moves into or out of
-// a path that asks the yes are left out: they are refused, and justify no pointer.
+// The spellings of each move, old to new. A path is read bare where it has a "/" and names a file by its extension or a
+// folder by its closing "/"; otherwise only between backticks, so that no word of prose ("tests", "and/or") is read as
+// one. A move is left out where either path holds anything but ASCII letters, digits, ".", "_", "-" and "/", or asks
+// the yes: such a move is refused, and justifies no pointer.
+const SAFE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
+const bare = p => p.includes("/") && (p.endsWith("/") || /\.[A-Za-z0-9]+$/u.test(p.split("/").at(-1)));
 export function spellings(moves) {
   const pairs = new Map();
+  const add = (a, b) => { pairs.set(`\`${a}\``, `\`${b}\``); if (bare(a) && bare(b)) pairs.set(a, b); };
   for (const { from, to, folder } of moves) {
-    if (asks(from) || asks(to) || from === to) continue;
-    pairs.set(from, to);
-    if (folder) pairs.set(`${from}/`, `${to}/`);
+    if (asks(from) || asks(to) || from === to || !SAFE.test(from) || !SAFE.test(to)) continue;
+    add(from, to);
+    if (folder) add(`${from}/`, `${to}/`);
   }
   return pairs;
 }
@@ -43,7 +70,7 @@ export function spellings(moves) {
 export function tokens(text, names) {
   if (!names.length) return [text];
   const alt = [...names].sort((a, b) => b.length - a.length).map(escape).join("|");
-  const re = new RegExp(`(?<![\\p{L}\\p{N}_./-])(?:${alt})(?![\\p{L}\\p{N}_-]|[./][\\p{L}\\p{N}_])`, "gu");
+  const re = new RegExp(`(?<![\\p{L}\\p{M}\\p{N}_./-])(?:${alt})(?![\\p{L}\\p{M}\\p{N}_-]|[./][\\p{L}\\p{N}_])`, "gu");
   const out = [];
   let at = 0;
   for (const m of text.matchAll(re)) { out.push(text.slice(at, m.index), m[0]); at = m.index + m[0].length; }
@@ -74,9 +101,10 @@ export function verdicts({ changed, moves, self = false }) {
   const pairs = spellings(moves), proven = [], refused = [];
   for (const f of changed) {
     if (!asks(f.path)) continue;
-    const why = self ? `the pull request changes ${OWN.join(" or ")}, so the proof that would run is not main's`
+    const why = self ? `the pull request changes the proof, the check that runs it or a file they import, so the proof that would run is not main's`
       : f.status !== "M" ? "it is added, deleted or moved, not changed in place"
       : f.modes?.[0] !== REGULAR || f.modes?.[1] !== REGULAR ? "it is not a regular file on both sides, its mode kept"
+      : f.before === INVALID || f.after === INVALID ? "a side of it is no UTF-8 text"
       : follows(f.before, f.after, pairs);
     if (why) refused.push({ path: f.path, why }); else proven.push(f.path);
   }
@@ -115,7 +143,8 @@ function movesOf(cwd, base, head) {
 function fileOf(cwd, base, head, status, path) {
   if (!asks(path)) return { path, status };
   const mode = at => (run(cwd, ["ls-tree", at, "--", path]) ?? "").split(" ")[0];
-  const text = at => (status === "M" ? run(cwd, ["show", `${at}:${path}`]) : null);
+  // (read as bytes and refused where they are no UTF-8, which would decode two different bytes the same)
+  const text = at => { if (status !== "M") return null; const r = spawnSync("git", ["show", `${at}:${path}`], { cwd, maxBuffer: 1 << 26 }); try { return r.status === 0 ? UTF8.decode(r.stdout) : null; } catch { return INVALID; } };
   return { path, status, modes: [mode(base), mode(head)], before: text(base), after: text(head) };
 }
 
@@ -126,7 +155,8 @@ export function read(cwd, base, head) {
   const names = fields(all), changed = [];
   for (let i = 0; i + 1 < names.length; i += 2) changed.push(fileOf(cwd, base, head, names[i], names[i + 1]));
   if (changed.some(f => f.status === "M" && asks(f.path) && (f.before === null || f.after === null))) return null;
-  return { changed, moves, self: changed.some(f => OWN.includes(f.path)) };
+  const own = ownFiles(p => run(cwd, ["show", `${base}:${p}`]));
+  return { changed, moves, self: changed.some(f => own.has(f.path)) };
 }
 
 // The paths of `asked` (the files that ask the yes) that the change from base to head proves only follow moves: [] where

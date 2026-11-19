@@ -12,6 +12,7 @@ import { mended } from "../scripts/mend.mjs";
 import { asked, calledFor, copyAtBase, costMend, differencesAdded, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, numberMend, PARTS, reasonsMend, waitsMend, waitsOn } from "../scripts/pr-description.mjs";
 import { lineMend } from "../scripts/reading.mjs";
 import { asking, coreAtBase, found, issuesOf, readable, textsOf, yesOf } from "../scripts/owner-yes.mjs";
+import { proven } from "../scripts/path-only.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -109,6 +110,24 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   ok(copyAtBase(tmp) === "vendor/core/scripts/pr-description.mjs", "the copy is read where the base's manifest puts it, under another path than core/, whatever the head's manifest says");
   commit(null); commit(manifest("vendor/core/"));
   ok(copyAtBase(tmp) === "scripts/pr-description.mjs", "where the base holds no manifest, the core's own scripts/ are read, though the head adds one");
+}
+// the owner's yes is not asked of a file whose change only follows a file moved whole (path-only.mjs; #886, point 1)
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pr-description-moved-"));
+  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
+  const git = (...a) => execFileSync("git", a, { cwd: tmp, env, stdio: ["ignore", "pipe", "pipe"] }).toString();
+  const write = (f, text) => { fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), text); };
+  write("floor/security.md", "Read `scripts/old.mjs` and scripts/kit/ first.\n"); write("scripts/old.mjs", "x\n"); write("scripts/kit/a.mjs", "a\n"); write("roles/shared/review-guidelines.md", "Read `scripts/old.mjs`.\n");
+  git("init", "-q"); git("add", "-A"); git("commit", "-q", "-m", "the base");
+  git("mv", "scripts/old.mjs", "scripts/new.mjs"); git("mv", "scripts/kit", "scripts/tools");
+  write("floor/security.md", "Read `scripts/new.mjs` and scripts/tools/ first.\n"); write("roles/shared/review-guidelines.md", "Read `scripts/new.mjs` now.\n");
+  git("commit", "-qam", "the move");
+  const asked = ["floor/security.md", "roles/shared/review-guidelines.md"];
+  ok(JSON.stringify(proven(tmp, "HEAD^1", "HEAD", asked)) === JSON.stringify(["floor/security.md"]), "read from git, a file and a folder moved whole and followed are proven, and a file with a word changed beside them is not");
+  git("mv", "scripts/new.mjs", "scripts/newer.mjs"); write("scripts/path-only.mjs", "changed\n"); write("floor/security.md", "Read `scripts/newer.mjs` and scripts/tools/ first.\n");
+  git("add", "-A"); git("commit", "-qm", "the proof changed");
+  ok(proven(tmp, "HEAD^1", "HEAD", asked).length === 0, "where the pull request changes the proof, nothing is proven, however its paths follow");
 }
 // the line "Reasons read:", asked of a pull request that adds a line under the manifest's "Differences" (#756)
 {

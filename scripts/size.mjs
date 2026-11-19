@@ -79,8 +79,9 @@ import { started } from "./started.mjs";
 // name and 11 a restatement it called marginal, so none was made, and the design check's fixes grew both starts. The
 // adviser's and the reviewer's, raised one step each on 19 November 2026 for #886, point 1, floor rule 3's yes asked of
 // no path that follows a moved file: a tenth fresh leanness check found 22 bytes of room in the floor, 41 in the review
-// guidelines and 20 in the inbox, for about 82 over in each; the floor's and the guidelines' are changes the owner's yes
-// on #886 does not cover, so none was made, and the adviser's start would stay short all the same.
+// guidelines and 20 in the inbox, for 143 over in the adviser's and 140 in the reviewer's once the clause took its
+// reviewed words; the floor's and the guidelines' are changes the owner's yes on #886 does not cover, the inbox's cuts
+// the name of another rule ("Bugs don't wait"), so none was made, and neither start would fit all the same.
 export const CAPS = {
   builder: 32 * 1024,
   design: 33 * 1024,

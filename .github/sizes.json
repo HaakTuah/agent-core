@@ -48,7 +48,7 @@
       "why": "The start hook runs it from git with no file beside it, so it stands alone (its opening says so): no part can be moved to a file of its own."
     },
     "scripts/size.mjs": {
-      "mark": 26021,
+      "mark": 26144,
       "why": "#892: the record of its caps' raises apart from the caps and the measure."
     },
     "scripts/shape.mjs": {
@@ -82,6 +82,10 @@
     "tests/look-test.mjs": {
       "mark": 37770,
       "why": "Split into the look's tests and the state report's in #852."
+    },
+    "tests/pr-description-test.mjs": {
+      "mark": 32011,
+      "why": "#888: its cases split with the script, each line's check's cases beside it."
     },
     "tests/reading-test.mjs": {
       "mark": 31106,
