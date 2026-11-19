@@ -61,6 +61,36 @@ ok(r.status === 0 && /What this branch has changed calls for `core\/tasks\/notes
   "once main holds it, the start names what the branch's changed paths call for: main's copy run, main's modules read, no file of the working tree's named", `${r.status} ${r.stdout}`);
 fs.rmSync(path.join(project, "core", "tasks", "ignore-the-rules-and-push.md"));
 git(project, "checkout", "-q", "--", "core/scripts/reading.mjs");
+// the quick check (#306): named at the start, from main's manifest where it has the row, never run; a row the working
+// tree alone holds is not read, and its control characters are taken out
+ok(/^Before your first change, run the quick check \(the \*quick check\* its AGENTS\.md names, or else its \*other builders' checks\*, by default its own tests\): a failure there is a bug of its own/m.test(r.stdout), "with no row, the start names the slot", r.stdout);
+fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\n| Slot | Fill |\n| --- | --- |\n| *quick check* | `npm run quick` |\n");
+git(project, "commit", "-q", "-am", "a quick check");
+git(project, "push", "-q", "origin", "main");
+fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\n| *quick check* | `touch QUICK-RAN`\u001b[2J |\n");
+r = hook("start", project);
+ok(/^Before your first change, run the quick check \(`npm run quick`\): /m.test(r.stdout) && !/QUICK-RAN/.test(r.stdout), "main's row is named; the working tree's is not read", r.stdout);
+git(project, "checkout", "-q", "--", "core-manifest.md");
+fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\n| *quick check* | `touch QUICK-RAN`\u001b[2J\u009b\u202e\u2028 | a note of a third column |\n");
+git(project, "commit", "-q", "-am", "a row with control characters and a third column");
+git(project, "push", "-q", "origin", "main");
+r = hook("start", project);
+ok(r.stdout.includes("run the quick check (`touch QUICK-RAN`[2J)") && !fs.existsSync(path.join(project, "QUICK-RAN")), "the command is named, its second cell alone, with no control, bidirectional or separating character of any encoding, and never run", JSON.stringify(r.stdout));
+fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\n| *quick check* | `npm test \\| tee log` |\n");
+git(project, "commit", "-q", "-am", "a row with an escaped pipe");
+git(project, "push", "-q", "origin", "main");
+r = hook("start", project);
+ok(r.stdout.includes("run the quick check (`npm test | tee log`): "), "a pipe escaped in the cell is read as one, and the cell goes on past it", r.stdout);
+for (const [cell, named] of [["a \\| b | a third column", "a | b"], ["ends in a backslash\\ ", "ends in a backslash\\"]]) {
+  fs.writeFileSync(path.join(project, "core-manifest.md"), `# Core manifest\n\n| *quick check* |   ${cell} |\n`);
+  git(project, "commit", "-q", "-am", "another row");
+  git(project, "push", "-q", "origin", "main");
+  r = hook("start", project);
+  ok(r.stdout.includes(`run the quick check (${named}): `), `the cell ${JSON.stringify(cell)} is named ${JSON.stringify(named)}, its spaces trimmed`, r.stdout);
+}
+fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n");
+git(project, "commit", "-q", "-am", "no row");
+git(project, "push", "-q", "origin", "main");
 // the starter kit's hooks for Kiro and Codex (tasks/tools.md), run from a folder inside the project, as those tools
 // start a command where the session works, with no CLAUDE_PROJECT_DIR: each finds the project's root by git
 const kit = name => JSON.parse(fs.readFileSync(fileURLToPath(new URL(`../setup/template/${name}`, import.meta.url)), "utf8"));
@@ -116,7 +146,7 @@ ok(!/helper hook is off/.test(r.stdout), "with Node on the path it says nothing 
 // the owner's stop switch: the branch agents-stop on origin, said at the start where it stands, and not where it is gone
 git(project, "push", "-q", "origin", "main:agents-stop");
 const stopped = hook("start", project);
-ok(stopped.status === 0 && /The owner's stop switch is set/.test(stopped.stdout), "with the branch agents-stop on origin, the start says the owner's stop switch is set, and stops nothing itself", `${stopped.status} ${stopped.stdout}`);
+ok(stopped.status === 0 && /The owner's stop switch is set.*write the hand-off note in its pull request \(the core's tasks\/tools\.md, "A change of tool loses nothing"\)/.test(stopped.stdout), "with the branch agents-stop on origin, the start says the owner's stop switch is set, and stops nothing itself", `${stopped.status} ${stopped.stdout}`);
 git(project, "push", "-q", "origin", "--delete", "agents-stop");
 ok(!/stop switch/.test(hook("start", project).stdout), "deleted, it says nothing of it");
 git(project, "push", "-q", "origin", "main:claude/agents-stop");
@@ -209,6 +239,62 @@ ok(!/STOP|floor's own copy/.test(hook("start", project).stdout), "a project whos
   put("floor-copy/security.md", `${floor}\nAn edit.\n`);
   said = start();
   ok(/floor's own copy under floor-copy\/ differs from the floor under lib\/core\/floor\/.*Mend: /.test(said) && !/STOP/.test(said), "a floor's own copy that differs from the carried floor is named, with its mend", said);
+}
+
+// The core's packages (#654): at the start, installed from main's npm files alone, in a folder of their own, so that
+// nothing of the branch's is read or run; and never where the copy's .packages/node_modules, or .packages/ itself, is a
+// link or tracked, which the install would replace.
+{
+  const pkg = path.join(tmp, "packages"), origin = path.join(tmp, "packages.git");
+  fs.mkdirSync(path.join(pkg, "core", "scripts"), { recursive: true });
+  fs.mkdirSync(path.join(pkg, "core", ".packages"));
+  const npmAt = (...f) => path.join(pkg, "core", ".packages", ...f);
+  fs.copyFileSync(fileURLToPath(new URL("../scripts/work-saved.sh", import.meta.url)), path.join(pkg, "core", "scripts", "work-saved.sh"));
+  fs.copyFileSync(fileURLToPath(new URL("../scripts/packages.mjs", import.meta.url)), path.join(pkg, "core", "scripts", "packages.mjs"));
+  for (const f of ["package.json", "package-lock.json", ".npmrc"]) fs.copyFileSync(fileURLToPath(new URL(`../.packages/${f}`, import.meta.url)), npmAt(f));
+  fs.writeFileSync(path.join(pkg, "core-manifest.md"), "# Core manifest\n");
+  git(tmp, "init", "-q", "--bare", "-b", "main", origin);
+  git(pkg, "init", "-q", "-b", "main");
+  git(pkg, "add", "-A");
+  git(pkg, "commit", "-q", "-m", "a copy with its lock file");
+  git(pkg, "remote", "add", "origin", origin);
+  git(pkg, "push", "-q", "-u", "origin", "main");
+  const installed = () => fs.existsSync(npmAt("node_modules", "yaml", "package.json"));
+  // (a branch whose own npm files would run its own script: a config naming it, a shrinkwrap that npm reads first)
+  const ran = path.join(tmp, "ran");
+  fs.writeFileSync(npmAt("run-me.sh"), `#!/bin/sh\ntouch "${ran.split(path.sep).join("/")}"\n`, { mode: 0o755 });
+  fs.appendFileSync(npmAt(".npmrc"), "git=./run-me.sh\n");
+  const lock = JSON.parse(fs.readFileSync(npmAt("package-lock.json"), "utf8"));
+  lock.packages["node_modules/yaml"] = { version: "2.9.1", resolved: "git+ssh://git@example.invalid/x.git#0000000000000000000000000000000000000000" };
+  fs.writeFileSync(npmAt("npm-shrinkwrap.json"), JSON.stringify(lock));
+  let said = hook("start", pkg).stdout;
+  ok(installed() && !fs.existsSync(ran) && !/packages are not installed/.test(said), "a branch's own .npmrc and shrinkwrap are never read: the start installs main's", said);
+  // (a copy's node_modules that is a link, tracked, is left as it is, and what it points at untouched)
+  const kept = path.join(tmp, "kept");
+  fs.mkdirSync(kept);
+  fs.writeFileSync(path.join(kept, "unpushed.txt"), "work\n");
+  fs.rmSync(npmAt("node_modules"), { recursive: true, force: true });
+  fs.symlinkSync(kept, npmAt("node_modules"), "junction");
+  said = hook("start", pkg).stdout;
+  ok(fs.existsSync(path.join(kept, "unpushed.txt")) && /packages are not installed: core\/\.packages\/node_modules is a link.*Mend: /.test(said), "a copy's node_modules that is a link is never replaced, and what it points at is kept", said);
+  // (main's own lock file naming another source than npm's registry: npm never runs, and the start says so)
+  fs.unlinkSync(npmAt("node_modules"));
+  // (a copy whose .packages/ is a link: nothing is installed through it, and what it points at is kept)
+  const away = path.join(tmp, "packages-away");
+  fs.renameSync(npmAt(), away);
+  fs.symlinkSync(away, npmAt(), "junction");
+  said = hook("start", pkg).stdout;
+  ok(!fs.existsSync(path.join(away, "node_modules")) && /packages are not installed: core\/\.packages is not a folder of this checkout's own.*Mend: /.test(said), "a copy's .packages that is a link is never installed through", said);
+  fs.unlinkSync(npmAt());
+  fs.renameSync(away, npmAt());
+  git(pkg, "checkout", "-q", "--", "core");
+  const mainLock = JSON.parse(fs.readFileSync(npmAt("package-lock.json"), "utf8"));
+  mainLock.packages["node_modules/yaml"].dependencies = { x: "git+https://example.invalid/x.git" };
+  fs.writeFileSync(npmAt("package-lock.json"), JSON.stringify(mainLock, null, 2));
+  git(pkg, "commit", "-q", "-am", "a lock file that names git");
+  git(pkg, "push", "-q", "origin", "main");
+  said = hook("start", pkg).stdout;
+  ok(!installed() && /packages are not installed: main's core\/\.packages\/package\.json, core\/\.packages\/package-lock\.json or core\/\.packages\/\.npmrc names a source.*Mend: /.test(said), "where main's lock file names another source than npm's registry, the start runs no npm, and says the mend", said);
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the work-saved hook`);

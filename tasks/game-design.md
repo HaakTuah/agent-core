@@ -157,8 +157,10 @@ player can choose to use.
   - A model is called only where its judgement can change what happens; the obvious, the routine and the mechanical are
     the code's.
 - **In a game played online, everything new works online,** the same on every screen, with the
-  protocol's version raised when its messages change.
-- **Players always play the newest version.**
+  protocol's version raised when its messages change, which an older client refuses as floor topic 5 says ("A reader
+  refuses a version it does not know").
+- **Players always play the newest version:** the one built from the default branch's newest commit whose checks all
+  passed, published within one run of its merge (floor rule 12).
   - Opening the game starts its newest version; where it cannot load itself anew, the game says a newer one is out, with
     one click to play it.
   - A version that only fixes or looks different takes over by itself as soon as it interrupts no game in play (between

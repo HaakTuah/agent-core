@@ -57,6 +57,10 @@ export function readAt(commit) {
 // The files an agent tool takes its instructions from, as `read` and `list` find them: those of TOOL_FILES, then those
 // git tracks under FOLDERS, each that `read` reads (so a link that leads out of the project is none, at a commit too).
 export const toolFiles = (read = readHere, list = tracked) => TOOL_FILES.concat(FOLDERS.flatMap(d => list(d))).filter(f => read(f) !== null);
+// A rule file or protected folder by its name alone (floor rule 3): what a tool takes its instructions from, wherever
+// it lies, the threat model, the manifest, the copy of the core, and the folders of what runs by itself.
+export const RULES = /(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|GEMINI|REVIEW)(?:\.[\w-]+)?\.md$|threat-model|^core-manifest\.md$|^core\/|(?:^|\/)\.(?:github|claude|agents?)\//iu;
+
 export function ruleFiles(read = readHere, list = tracked, { tools = false } = {}) {
   const security = read("SECURITY.md");
   if (security === null) throw new Error('the project has no SECURITY.md yet, where the checks read its rule files. Mend: write it from the starter kit\'s template (core/setup/template/SECURITY.md.tmpl), its rule 3 with the line "**the rule files:** ...;"');

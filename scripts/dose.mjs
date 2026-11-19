@@ -22,7 +22,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { notLinked, parseBaseline, parseConfig, standing, survey, where } from "./shape.mjs";
+import { fileOf, notLinked, parseBaseline, parseConfig, standing, survey, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
 export const STATES = ["in debt", "paying down", "in standard"];
@@ -64,14 +64,8 @@ export function auditDue({ state, audited, listed, read, at }) {
   return batch ? { why: `a cleaning batch is done: the baseline lists ${listed}, a tenth or more under the ${last.listed} of the audit of ${last.day}`, owner: false } : null;
 }
 
-// The file an entry of the baseline lies in: a function's own, an import's importing one.
-export function fileOf(id) {
-  const key = id.slice(id.indexOf(": ") + 2);
-  if (id.startsWith("function: ")) return key.slice(0, key.indexOf("#"));
-  if (id.startsWith("clock: ")) return key.slice(0, key.lastIndexOf(": "));
-  const pair = id.startsWith("crossing: ") || id.startsWith("inside: ") ? key.slice(key.indexOf(": ") + 2) : key;
-  return pair.slice(0, pair.indexOf(" -> "));
-}
+// The file an entry of the baseline lies in, as the shape check reads it, which knows every kind of its entries.
+export { fileOf };
 
 // What to clean first: the files the baseline lists entries of, the one where change meets tangle first: its entries
 // times how often the history changed it (once more, so that a file never changed still has its place after those).
@@ -152,7 +146,7 @@ export function auditBody(r, at, home) {
   if (!due) return null;
   return { owner: due.owner, body: [`An audit by a reader is due: ${due.why}.`, "", stateLine(r), "",
     ...(due.owner ? [`**For the owner to see:** the project is in debt and its baseline is no smaller than at the last audit (${auditOf(r.baseline.audited).listed} then). Nothing fails and no work waits: the share the cleaning lane gets is the owner's to change.`, ""] : []),
-    `**How** (\`${home}tasks/cleaning.md\`, "The audit's reader"): a fresh session that built none of what it reads answers the fixed questions, each with its evidence and on the one scale, from \`node ${home}scripts/code-shape.mjs\` and the code itself, and changes nothing; the session that takes this task writes its answers as a report beside the last one's and records the audit with \`node ${home}scripts/dose.mjs --audited\`, in one pull request. Where the project names a *mutation tool*, the same pull request holds the tests' whole run, outside the suite: \`node ${home}scripts/strength.mjs --whole\` writes their strength baseline, whose number the reader reads beside the last one's. The report holds the table of \`node ${home}scripts/test-record.mjs\` (each test's time, failures and what it alone catches), and the reader decides on each test it proposes (\`${home}tasks/tests.md\`). ${home ? `The same pull request writes the project's own rules with what holds each and what each is about (\`node ${home}scripts/holders.mjs --project\`, \`checks/holders.json\`; "A project's own rules name what holds them"), from which the reader answers its eighth question, and the session files each rule about a kind or about every project to the core as an idea where none is filed yet, written for the kind and holding nothing of the project.` : "The reader answers its eighth question from the rules with no holder that \`node scripts/holders.mjs --list\` lists."}`].join("\n") };
+    `**How** (\`${home}tasks/cleaning.md\`, "The audit's reader"): a fresh session that built none of what it reads answers the fixed questions, each with its evidence and on the one scale, from \`node ${home}scripts/code-shape.mjs\` and the code itself, and changes nothing; the session that takes this task writes its answers as a report beside the last one's and records the audit with \`node ${home}scripts/dose.mjs --audited\`, in one pull request. Where the project names a *mutation tool*, the same pull request holds the tests' whole run, outside the suite: \`node ${home}scripts/strength.mjs --whole\` writes their strength baseline, whose number the reader reads beside the last one's. The report holds the table of \`node ${home}scripts/test-record.mjs\` (each test's time, failures and what it alone catches), and the reader decides on each test it proposes (\`${home}tasks/tests.md\`). ${home ? `The same pull request writes the project's own rules with what holds each and what each is about (\`node ${home}scripts/holders.mjs --project\`, \`checks/holders.json\`; "A project's own rules name what holds them"), from which the reader answers its eighth question, and the session files each rule about a kind or about every project to the core as an idea where none is filed yet, written for the kind and holding nothing of the project.` : "The reader answers its eighth question from the rules with no holder that \`node scripts/holders.mjs --list\` lists."} Once the report is written, a second fresh session that wrote no part of it reads it whole for what it missed, its finds go into the report with a line that opens "Challenged" and gives the day (\`${home}tasks/cleaning.md\`, "An inventory or an audit is challenged once for what it missed").`].join("\n") };
 }
 
 // The rules a project's dose is read from, and where its copy of the core lies: its manifest, else the core's own

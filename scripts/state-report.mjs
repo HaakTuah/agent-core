@@ -5,7 +5,7 @@
 // due (pruning.mjs, beside this file; #303), which rules each role cited in
 // the month before (cited.mjs, beside this file), what the look keeps open past a week, and the step that files a check
 // for each rule the reviews found twice and the step that adds the rounds of review the pull requests took (#477), both
-// read by review-record.mjs. In a project it ends with its counts for the core,
+// read by review-record.mjs, and the step that adds the merge line's measure (merge-line.mjs, beside this file; #702). In a project it ends with its counts for the core,
 // counts and conclusions only: the commit its copy holds and how far behind the core's main that is, the steps of a
 // release not done, and of the pull requests merged the month before, how many were the core's upkeep (core-cost.mjs,
 // beside this file, sorts them). In the core it says that a session adds the projects' part, which --projects prints:
@@ -36,7 +36,7 @@ import { said as pruningSaid } from "./pruning.mjs";
 import { isHere, readHere, ruleFiles } from "./rule-files.mjs";
 import { ROOT, rules } from "./rules.mjs";
 import { started } from "./started.mjs";
-import { line as waitLine, measure as measureWait } from "./wait.mjs";
+import { billedLine, line as waitLine, measure as measureWait, selfHosted } from "./wait.mjs";
 
 export const TITLE = "State report";
 export const COUNTS = "Counts for the core";
@@ -71,13 +71,16 @@ function strength(root, config) {
   try { return { at, count: Object.values(JSON.parse(fs.readFileSync(path.join(root, at), "utf8")).listed).reduce((n, e) => n + (e.count ?? 0), 0) }; } catch { return null; }
 }
 
-// What a push waits on (wait.mjs), against the shape check's mark "wait", read through gh: the report's line, which
-// says "not read", and why, where GitHub did not answer.
+// What a push waits on (wait.mjs), against the shape check's mark "wait", and the minutes GitHub bills a pull request,
+// read through gh: the report's two lines, which say "not read", and why, where GitHub did not answer.
 export function pushWait(repo, root, manifest, gh) {
   let mark;
   try { mark = reading(rulesOf(manifest, root).rules, root)?.config.wait; } catch { mark = undefined; }
-  try { return waitLine(measureWait({ repo, mark, ...(gh ? { gh } : {}) })); }
-  catch { return "- what a push waits on: not read (GitHub did not answer for the pull requests' checks: the look's job needs `pull-requests: read` and `checks: read`)."; }
+  try { const m = measureWait({ repo, mark, ...(gh ? { gh } : {}) }); return `${waitLine(m)}\n${billedLine(m, selfHosted(root))}`; }
+  catch {
+    const why = "GitHub did not answer for the pull requests' checks: the look's job needs `pull-requests: read` and `checks: read`";
+    return `- what a push waits on: not read (${why}).\n- billed minutes a pull request: not read (${why}).`;
+  }
 }
 
 // The lines of the measures against their baselines: each with its count at the last report, where that report gave it.
@@ -136,7 +139,9 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
   lines.push("", "**What the reviews found twice**",
     `- Not read by GitHub's job. The session that takes this report runs \`node ${scripts}/review-record.mjs --since ${before(month)}-01\` and, for each rule it lists under "Found twice" that no open issue takes, files an issue as \`${scripts.replace(/scripts$/u, "tasks")}/reviews.md\`, point 8, says.`,
     "", "**The rounds of review**",
-    `- Not read by GitHub's job. The same session adds, as a note, the last two lines that run printed under "Rounds of review": the median over the last 30 merged pull requests beside the last report's, and the five that took the most rounds.`);
+    `- Not read by GitHub's job. The same session adds, as a note, the last two lines that run printed under "Rounds of review": the median over the last 30 merged pull requests beside the last report's, and the five that took the most rounds.`,
+    "", "**The merge line**",
+    `- Not read by GitHub's job, whose token may not read the runs. The same session adds, as a note, the line \`node ${scripts}/merge-line.mjs --repo <this repository> --measure\` prints, the pushes whose checks ran for each merged pull request and the minutes from its turn to its merge, beside the last report's (#702).`);
   if (counts) lines.push("", `**${COUNTS}**`,
     `- copy: ${counts.pin ?? "not read"}${counts.behind === null ? "" : `, ${counts.behind} commits behind the core's main`}.`,
     `- steps not done: ${counts.steps ?? "not read"}.`,
@@ -173,9 +178,22 @@ function heldHere(manifest) {
   } catch { return null; }
 }
 
+// What a push waits on and the minutes GitHub bills a pull request (wait.mjs), from a state report's measures, above its
+// counts: their numbers alone, each read by a whole-line form.
+function waitsFrom(text) {
+  const out = [];
+  for (const line of String(text ?? "").split(/\r?\n/)) {
+    let m;
+    if ((m = /^- what a push waits on: (\d{1,6}\.\d) min, the median of the last (\d{1,3}) merged pull requests' checks[,;]/.exec(line))) out.push(`a push waits ${m[1]} min (median of ${m[2]})`);
+    else if ((m = /^- billed minutes a pull request: (\d{1,9}), the median of the last (\d{1,3}) merged pull requests' last push,/.exec(line))) out.push(`billed minutes a pull request: ${m[1]} (median of ${m[2]})`);
+  }
+  return out;
+}
+
 // A project's counts for the core, from its state report's text, as one line: each count of its own heading read by a
 // whole-line form that holds numbers and fixed words alone, and written anew from what it holds, so no other text of
-// the project's reaches the core's report, and after them the rules its roles cited (cited.mjs's citedFrom, which lets
+// the project's reaches the core's report, then, read so from its measures, what a push waits on and the minutes GitHub
+// bills a pull request (wait.mjs), and after them the rules its roles cited (cited.mjs's citedFrom, which lets
 // through the core's own rule names alone, `known`), and, of a public project (`open`), its outcomes (outcomes.mjs's
 // outcomesFrom, which lets through its own measures' names and words alone); null where none is in its form. The commit its copy holds is kept
 // only where `named` (the owner's public project).
@@ -196,6 +214,7 @@ export function countsFrom(text, named, known = new Set(rules().map(r => r.key))
     const said = COUNT_FORMS.map(([form, write]) => { const m = form.exec(line); return m && write(m, named); }).find(Boolean);
     if (said) out.push(said);
   }
+  out.push(...waitsFrom(text));
   const cited = citedFrom(text, known);
   if (cited) out.push(cited);
   const outcomes = open ? outcomesFrom(text) : null; // (a private project's outcomes are not carried: #450's security review)

@@ -7,8 +7,9 @@
 // and every file the base's config, and the base's SECURITY.md where it is asked, read is read still, as the same kind,
 // one renamed by its new name, or by the file that took in most of its lines (#348, #371, #434); a path may be
 // added; and a config moved, with the call that names it, is held to the one the base called (#370). It also lists the near-copies, the runs of code that match once names and numbers are set aside, and fails
-// none of them. Node's own modules only, so the check needs no install. It runs from the project's root, whatever the
-// directory it is started from.
+// none of them. Node's own modules, and the schemas' checker (schemas.mjs) for its config's shape, which where the core's
+// packages are not installed it leaves unchecked, saying so, so the check needs no install. It runs from the project's
+// root, whatever the directory it is started from.
 // The files an agent tool takes its instructions from are rule files too, read since #405 (rule-files.mjs, `toolFiles`),
 // and a project may hold copies in them from before. Nothing locks a project (AGENTS.md of the core): until the
 // baseline lists it, a copy in one of those files that the pull request's base held, in as many places, is noted and
@@ -36,7 +37,9 @@ import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, unrooted } from "./guards.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { readBlobs } from "./blobs.mjs";
-import { THIRD_PARTY, projectAt } from "./core-path.mjs";
+import { projectAt } from "./core-path.mjs";
+import { keysOf, shapeFaults } from "./schemas.mjs";
+import { unreached } from "./packages.mjs";
 import { uncommented } from "./yaml-keys.mjs";
 // Where the core stands from the root, so a mend names the path a session types: "core/" in a project, nothing in the
 // core's own repository, which runs the check on itself (AGENTS.md of the core, "The core abides by its own rules").
@@ -59,22 +62,23 @@ try { CONFIG_AT = git(["ls-files", "-z", "--full-name", "--error-unmatch", "--",
 let config;
 try { config = JSON.parse(fs.readFileSync(configPath, "utf8")); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
 process.chdir(ROOT);
-// A key it does not know, or one of the wrong shape, would check less without a word, so it fails.
-const KEYS = ["baseline", "code", "prose", "proseFromSecurity"];
-const unknown = Object.keys(config || {}).filter(k => !KEYS.includes(k));
-if (!config || typeof config !== "object" || Array.isArray(config)) fail(`the config is not a JSON object. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`);
-if (unknown.length) fail(`the config holds keys it does not know: ${unknown.join(", ")}. Mend: take them out; it reads "baseline", "code", "prose" and "proseFromSecurity" alone`);
-const list = (v, key) => {
-  if (v === undefined) return [];
-  if (!Array.isArray(v) || v.some(x => typeof x !== "string" || !x)) fail(`the config's "${key}" is not a list of paths. Mend: write it as a list of git pathspecs, each a non-empty string`);
-  return v;
-};
-if (typeof config.baseline !== "string" || !config.baseline) fail(`the config names no "baseline". Mend: name the baseline's path in "baseline", as the starter kit writes it (${TEMPLATE})`);
-if (config.proseFromSecurity !== undefined && typeof config.proseFromSecurity !== "boolean") fail('the config\'s "proseFromSecurity" is not true or false. Mend: set it to true, to read the project\'s rule files, or false');
+// A key it does not know, or one of the wrong shape, would check less without a word, so it fails: its schema holds
+// the config's shape (scripts/schemas/copies.json, schemas.mjs). Where the core's packages are not installed, as in a
+// job of a project's own that ran the check before they came, the shape is not checked, said as a warning, and the
+// check goes on (AGENTS.md of the core, "Nothing locks a project"; steps.mjs asks the install).
+const KEYS = keysOf("copies"), faults = shapeFaults("copies", config, CORE);
+// (a registry that did not answer asks the job again, as install.mjs's warning does)
+if (faults === null) console.log(unreached("ajv") ? "::warning::The config's shape was not checked: the package ajv could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault"
+  : `::warning::The config's shape was not checked: the package ajv is not installed beside the core's copy. Mend: in a pull request of its own, add the step node ${CORE}scripts/install.mjs to this job before the step that runs this check`);
+for (const f of faults ?? []) console.error(`FAIL: ${logged(f)}`);
+if (faults?.length) process.exit(1);
+// (unchecked, what the check itself reads must still be there: an object that names its baseline, lists of paths alone)
+if (faults === null && !(config && typeof config === "object" && !Array.isArray(config) && typeof config.baseline === "string" && config.baseline)) fail(`the config is not a JSON object that names its "baseline". Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`);
+const list = v => (Array.isArray(v) ? v.filter(x => typeof x === "string" && x) : []);
 // (the baseline is read, and written, only inside the project, as a file of its own reached through no link out of it)
 if (!inProject(config.baseline) || leadsOut(ROOT, path.join(ROOT, config.baseline))) fail(`the config's "baseline", ${config.baseline}, lies outside the project. Mend: name the baseline by its path from the project's root, with no ".." that leads above it, as a file of the project's own reached through no link that leads out of it (${TEMPLATE})`);
 const BASELINE = config.baseline;
-const CODE_SPECS = list(config.code, "code"), PROSE_SPECS = list(config.prose, "prose");
+const CODE_SPECS = list(config.code), PROSE_SPECS = list(config.prose);
 let fromSecurity = null;
 // The project's rule files, as `read` and `list` find them (rule-files.mjs): those SECURITY.md lists, each a pathspec as
 // it is written there, and an agent tool's, each a literal path, so that a name of a glob's form names itself alone.
@@ -83,7 +87,7 @@ const withTools = (read, list) => {
   return rules.concat(toolFiles(read, list).filter(f => !named.has(f)).map(f => `:(literal)${f}`));
 };
 const security = () => { if (!fromSecurity) try { fromSecurity = withTools(); } catch (e) { fail(e.message); } return fromSecurity; };
-const proseSpecs = PROSE_SPECS.concat(config.proseFromSecurity ? security() : []);
+const proseSpecs = PROSE_SPECS.concat(config.proseFromSecurity === true ? security() : []);
 const TOOLS = process.argv.includes("--tools"), WRITE = TOOLS || process.argv.includes("--write");
 if (!CODE_SPECS.length && !proseSpecs.length) fail('the config names nothing to check. Mend: list the code in "code" and the prose in "prose", as git pathspecs, or set "proseFromSecurity" to true');
 const LINES = 8, MIN_CHARS = 240, WORDS = 12;
@@ -181,13 +185,10 @@ function find(files, units, size, joiner, minChars, read = f => fs.readFileSync(
   return { copies, dup };
 }
 
-// An empty list checks nothing: git ls-files would list every file. `env` names another index (lsAt, below). The
-// packages the core's copy carries from other publishers are left out, wherever a pattern reaches: they are no code or
-// prose of the project's, nor the core's own (third-party.mjs, beside this file).
-const OTHERS = `:!${CORE}${THIRD_PARTY}`;
+// An empty list checks nothing: git ls-files would list every file. `env` names another index (lsAt, below).
 const ls = (specs, env = process.env) => {
   if (!specs.length) return [];
-  try { return execFileSync("git", ["ls-files", "-z", "--", ...specs, OTHERS], { env, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] }).split("\0").filter(Boolean); }
+  try { return execFileSync("git", ["ls-files", "-z", "--", ...specs], { env, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] }).split("\0").filter(Boolean); }
   catch (e) { return fail(`git cannot read the pathspecs ${specs.join(" ")}: ${unrooted(String(e.stderr || e.message).trim().split(/\r?\n/u)[0], ROOT)}. Mend: write each as a plain git pathspec, a path or a glob, with ":!" before one to leave it out, where it stands: in the config's "code" or "prose", or, for a rule file, on SECURITY.md's "the rule files:" line`); }
 };
 // The files pathspecs read in a commit's tree, as git lists them there: from an index of that tree, written to a

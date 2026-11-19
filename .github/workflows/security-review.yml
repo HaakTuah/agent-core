@@ -6,7 +6,10 @@
 # "Which" and point 2: a review already running is waited for, and one that hangs is taken over, its review posted in a
 # comment that opens "Code review:" naming the commit by its whole SHA, which ends the wait; such a comment starts the
 # job only where the check is not advisory, since an advisory status passes anyway and the next push or Codex's own
-# summary rewrites it, so that no project starts a job for it it did not start before).
+# summary rewrites it, so that no project starts a job for it it did not start before). The same status waits, too,
+# while the newest posted review of a kind from such an account declares no line of its findings or of its score,
+# and, in the core's own repository, while a design-checked pull request has no "Design check:" of its head, which
+# starts the job as "Code review:" does (scripts/review-marks.mjs; tasks/reviews.md, points 3 and 4; #551, #710).
 # Proof is the summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment
 # that opens "Security review:" from the repository's owner, a person the host lets write (in a team's project, each
 # owner: roles/shared/teams.md; the job reads each such commenter's rights from GitHub, #412), or an account the caller
@@ -22,7 +25,7 @@
 # (scripts/security-review.mjs, whose header says what it does not hold). Where the pull request's files show a change
 # to what runs by itself beyond its pins, it asks floor rule 3's two security reviews (the same script says
 # which count, and when one is enough); of a pull request that leaves the check's scripts alone, whose head does
-# not hold them as the default branch does and that the host says was opened before the default branch's copy came,
+# not hold them as the default branch does and that the host says was opened before the script first came to the default branch,
 # which stood before the check came, what the check reads more is said, never waited for. A project
 # calls it (workflow_call) from
 # a workflow of its own of the same name, on pull_request (the types opened, reopened, synchronize and ready_for_review)
@@ -48,9 +51,9 @@
 # What keeps it safe, since a comment starts it and it may write a status (floor rule 2): it checks out the default
 # branch, never the pull request, and runs only that branch's copies of the scripts; a comment's text is read only in
 # the job's condition and as data from GitHub's API, never written into a run line; it runs for a comment only where
-# that is the summary of Codex's app or opens "Security review:" or "Code review:" from the owner, a member or a
-# collaborator; on pull_request it runs only for a branch of the repository itself and not for Dependabot, whose token
-# could not write the status (theirs is written when the first comment that counts arrives: on Dependabot's own, Codex's
+# that is the summary of Codex's app or opens "Security review:", "Code review:" or "Design check:" from the owner, a
+# member or a collaborator; on pull_request it runs only for a branch of the repository itself and not for Dependabot,
+# whose token could not write the status (theirs is written when the first comment that counts arrives: on Dependabot's own, Codex's
 # summary, once the code review that floor rule 17 asks for is asked); and the token can read, and write a commit
 # status, nothing more. The proofs of a pure sync and of the merges from main fetch the head's commits into a clone of
 # their own and check out nothing, so no file of the pull request's is written to disk or run (git's merge of two
@@ -78,7 +81,7 @@ on:
         type: boolean
         default: false
       reviewers:
-        description: The accounts, besides the repository's owner and the people GitHub lets write to it, whose posted "Security review:" counts, by login, separated by spaces. Left out, none.
+        description: The accounts, besides the repository's owner and the people GitHub lets write to it, whose posted "Security review:", "Code review:" or "Design check:" counts, by login, separated by spaces. Left out, none.
         required: false
         type: string
         default: ""
@@ -101,7 +104,9 @@ jobs:
       && (startsWith(github.event.comment.body, 'Security review:')
       || startsWith(github.event.comment.body, '**Security review:')
       || (!inputs.advisory && (startsWith(github.event.comment.body, 'Code review:')
-      || startsWith(github.event.comment.body, '**Code review:')))))))) }}
+      || startsWith(github.event.comment.body, '**Code review:')
+      || startsWith(github.event.comment.body, 'Design check:')
+      || startsWith(github.event.comment.body, '**Design check:')))))))) }}
     # one at a time for a pull request, in the order they came: the last to run has read the newest comments
     concurrency:
       group: security-review-${{ github.event.issue.number || github.event.pull_request.number }}
@@ -134,17 +139,35 @@ jobs:
             exit 0
           fi
           d=$(mktemp -d)
-          gh api "repos/$REPO/pulls/$NUMBER" > "$d/pull.json"
-          gh api --paginate --slurp "repos/$REPO/issues/$NUMBER/comments?per_page=100" > "$d/comments.json"
-          gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/comments?per_page=100" > "$d/findings.json"
-          gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/commits?per_page=100" > "$d/commits.json"
-          gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100" > "$d/files.json"
+          # every read of the host has a deadline, so that both statuses are written within the job's six minutes (#632):
+          # the pull request and what it holds by the step's 60th second, each read in the time the ones before it left;
+          # the clone and its two proofs by the 210th (proof_time); the rights by the 225th, and the head's copies and when
+          # the check's scripts came by the 240th, as each says below; then the two statuses, twenty seconds each. Where
+          # one of the first five is not read in time, nothing is there to write a status from, and the step fails, saying so
+          from_host() {
+            local file=$1 what=$2 left; shift 2
+            left=$((60 - SECONDS))
+            if [ "$left" -gt 0 ] && timeout "$left" gh api "$@" > "$d/$file"; then return 0; fi
+            echo "::error::FAIL the host gave no $what of pull request #$NUMBER by the step's 60th second, so neither the security-review status nor the code-review status was written. Mend: run this job again from the pull request's checks once GitHub answers; where it fails so again, the pull request's lists are too long to read in a minute, so split it."
+            false
+          }
+          # the seconds a proof may take: its own cap, or what is left before the step's 210th second, one at least
+          proof_time() {
+            local left=$((210 - SECONDS))
+            [ "$left" -gt 0 ] || left=1
+            echo "$((left < $1 ? left : $1))"
+          }
+          from_host pull.json "state" "repos/$REPO/pulls/$NUMBER"
+          from_host comments.json "comments" --paginate --slurp "repos/$REPO/issues/$NUMBER/comments?per_page=100"
+          from_host findings.json "review comments" --paginate --slurp "repos/$REPO/pulls/$NUMBER/comments?per_page=100"
+          from_host commits.json "commits" --paginate --slurp "repos/$REPO/pulls/$NUMBER/commits?per_page=100"
+          from_host files.json "list of files" --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100"
           # whether the pull request is held by what a script of the check reads more: not where it leaves the script
           # alone, its head holds it as it stood before this branch's, and the host says it was opened before the
-          # default branch's copy came (it stood before the check came, and is told, never waited for: AGENTS.md,
+          # script first came to the default branch (it stood before the check came, and is told, never waited for: AGENTS.md,
           # "Nothing locks a project"; the script decides that last from came, below); always where it changes the
           # script itself, where its list of files is cut short, or where the head's copy cannot be read for any reason
-          # but its absence
+          # but its absence, or not by the step's 240th second, ten seconds at most (#632)
           head=$(jq -r '.head.sha // empty' "$d/pull.json")
           held() {
             local p="$ROOT/scripts/$1" theirs
@@ -154,25 +177,48 @@ jobs:
               || jq -e --arg p "$p" 'any(.[][]; .filename == $p or .previous_filename == $p)' "$d/files.json" \
                 > /dev/null
             then echo true; return; fi
-            if theirs=$(gh api "repos/$REPO/contents/$p?ref=$head" --jq .sha 2> "$d/error"); then
+            left=$((240 - SECONDS)); [ "$left" -gt 0 ] || { echo true; return; }
+            if theirs=$(timeout "$((left < 10 ? left : 10))" gh api "repos/$REPO/contents/$p?ref=$head" --jq .sha 2> "$d/error"); then
               if [ "$theirs" = "$(git rev-parse "HEAD:$p")" ]; then echo true; else echo false; fi
             elif grep -q "HTTP 404" "$d/error"; then echo false # the head holds no such script: from before it came
             else echo true; fi
           }
-          # when the default branch's copy of a script of the check came, as the host dates it: the merge of the pull
-          # request that brought it; nothing where that cannot be read, or the time set aside for it (came_by, set by
-          # bound) is spent, and the script then holds the pull request (it holds one opened since then whatever its head holds:
+          # when a script of the check first came to the default branch, as the host dates it: the merge of the pull
+          # request that brought its first commit there, read against that branch's own line before it, never a later
+          # one, so no change to the script makes a pull
+          # request opened before it one from before the check; nothing where that cannot be read, where the history is
+          # longer than five pages of a hundred commits, or where the time set aside for it (came_by, set by bound) is
+          # spent, and the script then holds the pull request (it holds one opened since then whatever its head holds:
           # boundOf in security-review.mjs)
           came() {
-            local p="$ROOT/scripts/$1" c at= left
+            local p="$ROOT/scripts/$1" c= page n parent at= merged left
             p="${p#./}"
-            left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
-            c=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits?path=$(jq -rn --arg v "$p" '$v | @uri')&sha=$(jq -rn --arg v "$DEFAULT" '$v | @uri')&per_page=1" 2> /dev/null \
-              | jq -r '.[0].sha // empty' 2> /dev/null) || c=
+            for page in 1 2 3 4 5; do
+              left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
+              n=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits?path=$(jq -rn --arg v "$p" '$v | @uri')&sha=$(jq -rn --arg v "$DEFAULT" '$v | @uri')&per_page=100&page=$page" 2> /dev/null \
+                | jq -r 'if type == "array" then "\(length) \(.[-1].sha // "")" else empty end' 2> /dev/null) || return 0
+              [[ "$n" =~ ^([0-9]+)\ ([0-9a-f]{40})?$ ]] || return 0
+              [ "${BASH_REMATCH[1]}" -gt 0 ] && c=${BASH_REMATCH[2]}
+              [ "${BASH_REMATCH[1]}" -lt 100 ] && break
+              [ "$page" -lt 5 ] || return 0
+            done
             [[ "$c" =~ ^[0-9a-f]{40}$ ]] || return 0
+            # (the host lists a path's commits by the dates their authors set, so the oldest listed is dated by the first
+            # merge of a pull request into the default branch that holds it, and counts only where the default branch's
+            # own line, as it stood just before that merge (the merge's first parent), held no such script, so that the
+            # merge brought it there; else nothing is dated)
             left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
-            at=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits/$c/pulls" 2> /dev/null \
-              | jq -r --arg b "$DEFAULT" '[.[] | select(.merged_at != null and .base.ref == $b) | .merged_at] | min // empty' 2> /dev/null) || at=
+            n=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits/$c/pulls" 2> /dev/null \
+              | jq -r --arg b "$DEFAULT" '[.[] | select(.merged_at != null and .base.ref == $b)] | min_by(.merged_at) // empty | "\(.merged_at) \(.merge_commit_sha)"' 2> /dev/null) || return 0
+            [[ "$n" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)\ ([0-9a-f]{40})$ ]] || return 0
+            at=${BASH_REMATCH[1]} merged=${BASH_REMATCH[2]}
+            left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
+            parent=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits/$merged" 2> /dev/null \
+              | jq -r '.parents[0].sha // empty' 2> /dev/null) || return 0
+            [[ "$parent" =~ ^[0-9a-f]{40}$ ]] || return 0
+            left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
+            if timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/contents/$p?ref=$parent" > /dev/null 2> "$d/error"; then return 0; fi
+            grep -q "HTTP 404" "$d/error" || return 0
             echo "$at"
           }
           # held as the workflow reads it (BOUND), and, where not, when the script came (SINCE), for the script to decide
@@ -210,7 +256,7 @@ jobs:
             auth=("GIT_CONFIG_COUNT=$((n + 1))" "GIT_CONFIG_KEY_$n=http.$SERVER/$REPO.git.extraheader"
               "GIT_CONFIG_VALUE_$n=AUTHORIZATION: basic $key")
             if git init -q -b pr "$d/pr" && git -C "$d/pr" remote add origin "$SERVER/$REPO.git" \
-              && env "${auth[@]}" timeout 90 git -C "$d/pr" fetch -q --no-tags --update-head-ok origin "+$head:refs/heads/pr" \
+              && env "${auth[@]}" timeout "$(proof_time 90)" git -C "$d/pr" fetch -q --no-tags --update-head-ok origin "+$head:refs/heads/pr" \
               && [ "$(git -C "$d/pr" rev-parse refs/heads/pr)" = "$head" ]
             then cloned=1; fi
           fi
@@ -218,7 +264,7 @@ jobs:
           # pure-sync.mjs proves it on the head, in that clone
           if [ -n "$shape" ]; then
             proof="$PWD/$ROOT/scripts/pure-sync.mjs"
-            if [ -n "$cloned" ] && (cd "$d/pr" && env "${auth[@]}" timeout 120 node "$proof" > "$d/pure.txt" 2>&1)
+            if [ -n "$cloned" ] && (cd "$d/pr" && env "${auth[@]}" timeout "$(proof_time 120)" node "$proof" > "$d/pure.txt" 2>&1)
             then pure=$head; echo "A pure sync, as pure-sync.mjs proves: it needs no security review of its own."
             else echo "Not proved a pure sync: it gets its security review as any pull request."; fi
           fi
@@ -231,13 +277,15 @@ jobs:
           if [ -f "$ROOT/scripts/clean-merges.mjs" ]; then echo '[]' > "$d/merges.json"; merges=("$d/merges.json"); fi
           if [ -n "$merge" ]; then
             proof="$PWD/$ROOT/scripts/clean-merges.mjs"
-            if [ -n "$cloned" ] && (cd "$d/pr" && env -u GH_TOKEN timeout 60 node "$proof" "$d/pull.json" "$d/commits.json" > "$d/proved.json") \
+            if [ -n "$cloned" ] && (cd "$d/pr" && env -u GH_TOKEN timeout "$(proof_time 60)" node "$proof" "$d/pull.json" "$d/commits.json" > "$d/proved.json") \
               && jq -e 'type == "array"' "$d/proved.json" > /dev/null
             then mv "$d/proved.json" "$d/merges.json"; echo "Merges from main that are the ones git makes: $(jq -r 'length' "$d/merges.json")."
             else echo "The merges from main could not be proved the ones git makes: a review of the head is asked."; fi
           fi
           # whose posted review counts besides the owner's and the accounts named: a person the host lets write (#412),
-          # read from GitHub's rights for each account, at most twenty, that posted a "Security review:" with a say in the
+          # read from GitHub's rights for each account, at most twenty, that posted a "Security review:", a "Code
+          # review:" or a "Design check:" (for the code-review status's marks, review-marks.mjs), those who posted a
+          # "Security review:" first, with a say in the
           # repository; its login, checked as one, is all that goes into the route, and an answer that cannot be read
           # counts for no one (the script reads each strictly). All of them share 30 seconds, ten at most each, and end
           # by the step's 225th second whatever the proofs above took, and when each of the check's two scripts came seven
@@ -248,9 +296,11 @@ jobs:
           until=$((SECONDS + 30))
           [ "$until" -le 225 ] || until=225
           for login in $(jq -r --arg o "$owner" '[.[][] | select(type == "object" and (.body | type) == "string"
-            and (.body | test("^(\\*\\*)?Security review:")) and (.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
+            and (.body | test("^(\\*\\*)?(Security review|Code review|Design check):")) and (.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
             and .user.type == "User" and (.user.login | type) == "string" and (.user.login | test("^[A-Za-z0-9][A-Za-z0-9-]{0,38}$")))
-            | .user.login | ascii_downcase | select(. != $o)] | unique | .[:20][]' "$d/comments.json"); do
+            | {k: (if (.body | test("^(\\*\\*)?Security review:")) then 0 else 1 end), l: (.user.login | ascii_downcase)}
+            | select(.l != $o)] | sort_by(.k, .l) | reduce .[].l as $l ([]; if index([$l]) then . else . + [$l] end)
+            | .[:20][]' "$d/comments.json"); do
             left=$((until - SECONDS))
             if [ "$left" -le 0 ]; then
               echo "The time for reading the host's rights is spent: a review of $login and those after counts only where the input reviewers names it."
@@ -273,15 +323,18 @@ jobs:
           jq -r '.status | "\(.state): \(.description)"' "$d/out.json"
           # (a summary of Codex's it cannot read: the check's own fixed words, never the comment's)
           if jq -e '.warning' "$d/out.json" > /dev/null; then echo "::warning::$(jq -r '.warning' "$d/out.json")"; fi
-          jq '.status' "$d/out.json" | gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null
+          if ! jq '.status' "$d/out.json" | timeout 20 gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then
+            echo "::error::FAIL the security-review status of $sha could not be posted: the host refused it or gave no answer within 20 seconds (its error, if any, is above), so the code-review status was not posted either. Mend: where no error shows above (the 20 seconds ran out), or it is a lost connection, a 5xx or a rate limit, run this job again from the pull request's checks; otherwise mend what it names, then run it again."
+            false
+          fi
           # the second status, code-review: whether a code review running on that commit has finished (a default branch
           # whose core is older has no such script, and says nothing of it)
           # (a fault in it warns and leaves the job as green as the security-review status left it)
           if [ -f "$ROOT/scripts/code-review-wait.mjs" ]; then
             bound code-review-wait.mjs
-            if node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
+            if RIGHTS="$d/rights.json" node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
               "$d/comments.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/code.json" \
               && jq -r '.status | "\(.state): \(.description)"' "$d/code.json" \
-              && jq '.status' "$d/code.json" | gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then :
+              && jq '.status' "$d/code.json" | timeout 20 gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then :
             else echo "::warning::the code-review status could not be written: scripts/code-review-wait.mjs or its post failed"; fi
           fi
