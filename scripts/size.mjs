@@ -61,14 +61,15 @@ import { started } from "./started.mjs";
 // the role came; the design session's and the orchestrator's not raised for it, two fresh leanness checks having found
 // room enough; the reviewer's, raised one step for it, merged after #777, a third fresh leanness check having found 9
 // bytes of room in the floor's new text, made, for 474 over; and the design session's and the orchestrator's, one step
-// each, merged after #790, a fourth having found 34 and 61 bytes of room, made, for 179 and 322 over. The builder's,
-// raised one step on 19 November 2026 for #829's description rule in roles/shared/work-flow.md, a fifth fresh leanness
-// check having found 38 bytes of room for 546 over, in the stop switch's words, not made, since the staged case that
-// holds that rule would fall due again for them.
+// each, merged after #790, a fourth having found 34 and 61 bytes of room, made, for 179 and 322 over. The builder's, the
+// design session's and the orchestrator's, each raised one step on 19 November 2026 for #829's description rule in
+// roles/shared/work-flow.md: a fifth fresh leanness check found 38 bytes of room in the builder's start for 824 over,
+// and a sixth 45 in roles/design.md for the design session's 122 over and 231 in the orchestrator's start for its
+// 219, all in the wording of rules and lines #829 did not ask for, and so not made.
 export const CAPS = {
   builder: 31 * 1024,
-  design: 32 * 1024,
-  orchestrator: 46 * 1024,
+  design: 33 * 1024,
+  orchestrator: 47 * 1024,
   adviser: 33 * 1024,
   reviewer: 25 * 1024,
   "stand-in": 20 * 1024,
