@@ -1,7 +1,8 @@
 // The total read (tasks/cleaning.md, "A cut or a join lowers the total read"; #469): what the core's tasks read, each
 // file opened a cost of its own. Its readers: each role's start, each kind of task, and the builder and reviewer of each
 // of the last 30 merged pull requests, each reading AGENTS.md, its start with each tool's start part (as size.mjs counts
-// it) and what its kind or changed paths call for (reading.mjs). With --compare, on a cut or a join (CUT, cuts below) it
+// it) and what its kind or changed paths call for (reading.mjs); the starts and kinds are readers beside the tasks so
+// that a cut that helps a kind no recent pull request was of still counts. With --compare, on a cut or a join (CUT, cuts below) it
 // fails unless the sum goes down, no reader reads more, and none loses a file that still stands, save one a line
 // `Never needed:` of the description (PR_BODY) names and says why; a move between two files that both stand is not seen,
 // and stays with the reviews. --candidates lists the files several kinds open, most read first, for the core's audit.
