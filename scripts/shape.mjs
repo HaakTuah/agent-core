@@ -262,11 +262,6 @@ function configuredReach(ctx, from, names) {
 // REACH): each test file is one entry of each kind it reaches, "timed: <test> -> <what>" or "process: <test> ->
 // <what>", its first name in order; found by the readers "clocks" and "processes".
 const KINDS = { clock: "timed", process: "process" }, LISTS = { clock: "clocks", process: "processes" };
-// (what a fake clock replaces, by the call that installs it: Jest's, Vitest's and Sinon's timers, the timers and the
-// time a test reads; freezegun's freeze_time, the time read, never a sleep. One the test hands in, as .NET's
-// FakeTimeProvider, replaces no call of the real clock, so it is none)
-const FAKES = { useFakeTimers: ["setTimeout", "setInterval", "Date.now", "performance.now", "new Date()"], freeze_time: ["time.time", "time.monotonic", "time.perf_counter", "datetime.now", "datetime.utcnow", "datetime.datetime.now", "datetime.datetime.utcnow"] };
-const REAL_AGAIN = ["useRealTimers"];
 const IMPORTS = Object.fromEntries(Object.keys(KINDS).map(kind => [kind, [...new Set(Object.values(REACH).flatMap(l => l[kind].imports))]]));
 function reached(ctx, kind, file, name) {
   const of = ctx.reached.get(file) ?? { clock: new Set(), process: new Set() };
@@ -280,15 +275,8 @@ function runAt(toks, run, k) {
   const next = toks[k + run.length];
   return !isPunct(next, ":") && !(isPunct(next, "=") && !isPunct(toks[k + run.length + 1], "="));
 }
-// The names of the clock a test replaces with a fake one it installs by a call and never goes back from: those it
-// reaches only through the fake.
-function fakedNames(toks) {
-  const called = name => toks.some((t, k) => t.v === name && t.t !== "str" && isPunct(toks[k + 1], "("));
-  return REAL_AGAIN.some(called) ? [] : Object.entries(FAKES).filter(([name]) => called(name)).flatMap(([, names]) => names);
-}
 function testReach(ctx, file, r) {
   if (!ctx.tests.has(file)) return;
-  ctx.faked.set(file, new Set(fakedNames(r.toks)));
   for (const kind of ["clock", "process"]) {
     const own = REACH[r.lang]?.[kind]?.runs ?? [], named = reachRuns(ctx.config[LISTS[kind]]);
     for (const { run, what } of [...own, ...named]) for (let k = 0; k + run.length <= r.toks.length; k++) if (runAt(r.toks, run, k)) { reached(ctx, kind, file, what); break; }
@@ -296,8 +284,7 @@ function testReach(ctx, file, r) {
 }
 function reachEntries(ctx) {
   for (const [file, of] of ctx.reached) for (const kind of ["clock", "process"]) {
-    const faked = kind === "clock" ? ctx.faked.get(file) ?? new Set() : new Set();
-    const what = [...of[kind]].filter(name => !faked.has(name)).sort()[0];
+    const what = [...of[kind]].sort()[0];
     if (what !== undefined) add(ctx, KINDS[kind], `${file} -> ${what}`, file);
   }
 }
@@ -411,7 +398,7 @@ export function survey(texts, config, tests = new Set()) {
   const readings = code.map(file => [file, reading(file, texts[file])]);
   const idx = index(readings, texts), js = manifests(texts);
   const ctx = { config, tests, texts, unsure: new Set(), files: new Set(Object.keys(texts)), idx, packages: js.packages, ships: new Set([...js.ships, ...idx.ships]), declared: new Set([...js.declared, ...idx.declared]),
-    entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map(), reached: new Map(), faked: new Map() };
+    entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map(), reached: new Map() };
   for (const [file, r] of readings) oneFile(ctx, file, r);
   reachEntries(ctx);
   sharedSpace(ctx);
@@ -570,7 +557,7 @@ const SAID = {
   screen: n => [`${plural(n, "test imports", "tests import")} what opens a screen, a window or a device, where no test of ${n === 1 ? "its" : "their"} file did before`,
     "test what it guards beneath the screen, through the system it uses, and take the import out; only where the screen, the window or the device itself is what the test guards, list the entry in the baseline with that reason under \"grown\", by its id, and in the pull request"],
   timed: n => [`${plural(n, "test reaches", "tests reach")} a real clock (a sleep, a timed wait, a read of the time), where no test of ${n === 1 ? "its" : "their"} file did before`,
-    "hand the time in, as the rules take it, and test beneath the clock; only where the clock itself is what the test guards, list the entry in the baseline with that reason under \"grown\", by its id, and in the pull request"],
+    "hand the time in, as the rules take it, and test beneath the clock; only where the clock itself is what the test guards, or the test runs under a fake clock it installs (which the check does not tell apart from the real one), list the entry in the baseline with that reason under \"grown\", by its id, and in the pull request"],
   process: n => [`${plural(n, "test starts", "tests start")} another process, where no test of ${n === 1 ? "its" : "their"} file did before`,
     "call the code the process would run from the test itself, beneath the process; only where starting it is what the test guards (a command's own line, its exit code, what it prints), list the entry in the baseline with that reason under \"grown\", by its id, and in the pull request"],
   clock: n => [`${plural(n, "file", "files")} of the rules ${n === 1 ? "reads" : "read"} the clock or ${n === 1 ? "makes" : "make"} randomness of ${n === 1 ? "its" : "their"} own`, "pass the time and the source of randomness in as arguments, so that the same input gives the same result"],
