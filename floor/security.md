@@ -60,12 +60,13 @@ saved data; a weakened check).
 - A PR that touches one merges only after its security review has run, and none with a blocking security finding open.
   - Dependabot's own: rule 17.
 - One that changes a protected file also gets a code review.
-- A security review that starts by itself when a PR opens or is marked ready is waited for and read on every PR, a pure
-  sync's too (how long: `tasks/reviews.md`, point 3).
-- A pure sync PR needs no review of its own, nor rule 3's two: both passed its code in the core's own PR.
-  - A pure sync: its diff only the core's copy, its pin and the pins of calls to the core's workflows, moved forward to
-    one commit of the core's `main`, as the core's `scripts/pure-sync.mjs`, run from the core's `main`, proves.
-  - Its merger merges only the head it checked.
+- A security review that starts by itself when a PR opens or is marked ready is waited for and read on every PR
+  (how long: `tasks/reviews.md`, point 3).
+- A PR a script of the core's, run from its `main`, proves one of these needs no review of its own, nor rule 3's two:
+  - a pure sync, its code passed both in the core's PR: its diff only the core's copy, its pin and the pins of
+    calls to the core's workflows, moved forward to one commit of the core's `main` (`pure-sync.mjs`), merged only at
+    the head checked;
+  - queue lines alone (`queue-only.mjs`; `tasks/reviews.md`).
 - **Nothing is reviewed twice:** a later commit is reviewed only for what it changes.
 - **Nothing runs on the owner's computer unless the owner starts it:** no poller, scheduled task or service of an
   agent's making.

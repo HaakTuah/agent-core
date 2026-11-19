@@ -196,7 +196,8 @@ export const takesIt = (manifest, prefix, name = "done-when.md") => !prefix || !
 export const PAGES = 3;
 const LIMITED = Symbol("rate limit");
 
-// An item as { labels, body, state }, its body the current text and its state GitHub's ("open" or "closed"): an issue
+// An item as { labels, body, state, author, pull }, its body the current text, its state GitHub's ("open" or "closed"),
+// and, of an issue, the login that opened it and whether it is a pull request: an issue
 // by gh from `repo`, an inbox file, "open" while it stands, as the head's commit holds it in the checkout at `dir` (from
 // git, so that a link is read as its own text and never followed out of the checkout); { limited: true } where
 // GitHub's rate limit refused it; null where it cannot be read.
@@ -220,6 +221,7 @@ export function readItem(repo, item, dir = ".", owner = String(repo).split("/")[
       notes.unshift(...one.map(c => ({ author: String(c.user?.login ?? ""), body: c.body })));
       if (one.some(c => same(c.user?.login, owner) && String(c.body ?? "").includes(CURRENT))) break;
     }
-    return { labels: (got.labels ?? []).map(l => String(l?.name ?? "")), body: currentText(got.body, notes, owner), state: got.state };
+    return { labels: (got.labels ?? []).map(l => String(l?.name ?? "")), body: currentText(got.body, notes, owner), state: got.state,
+      author: String(got.user?.login ?? ""), pull: got.pull_request !== undefined };
   } catch (e) { return e === LIMITED ? { limited: true } : null; }
 }

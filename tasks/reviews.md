@@ -56,6 +56,19 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      one commit stood for later commits no one checked, and any collaborator's comment passed a pull request. Held by
      the `security-review` status, which waits where it is broken, in the core, and holds the merge once a ruleset
      requires it (#320).
+   - **A pull request of queue lines alone needs no review of its own** (#750). By default every pull request gets its
+     reviews. Where `scripts/queue-only.mjs`, run from the default branch on the head, proves that it changes the
+     *progress file* alone, each line it adds naming an open issue the *owner's account* opened, labelled `queued`
+     and not `stand-in-yes` or `on-hold`, that carries the owner's word as "Whose words an issue holds" in the core's
+     `AGENTS.md` reads it (the owner quoted under "The owner's word", or a design under "What it is" the owner agreed
+     to; `by:owner`) or needs none (`bug`, or a task the scheduled look opened), and each line it removes naming a
+     closed issue, it merges on its checks as a pure sync does: the `security-review` and `code-review` statuses pass
+     with no review, a review that starts by itself still waited for, and its builder asks none. It does not mean a
+     line joins without the owner's word where one is needed, that any other file rides along, nor that a line the
+     script cannot read (a test, a check for a rule that stands, an audit's small finding) is refused: that pull
+     request is reviewed as any other. Reason: 4 of 39 merges only added queue lines, each through Codex's two reviews,
+     a fallback's review and the full tests, where what a review would read is exactly what a script can read. Held by
+     `scripts/queue-only.mjs`, which the core's own caller of the `security-review` workflow runs, and its test.
    - **What a posted review declares** (#299): by default a review posted in a comment that opens
      "Security review:", "Code review:" or "Design check:" covers one kind of review, and declares what it found on two
      lines of their own: "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other

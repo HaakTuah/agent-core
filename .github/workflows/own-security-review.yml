@@ -5,6 +5,11 @@
 # safe is in that workflow's header: it reads, and writes one commit status, with no secret. Not advisory here: the
 # status waits until the review has run, so that the core's ruleset can require it, the core first (#99); a project's
 # stays advisory until its owner turns that off and requires it.
+# Before it, a job of its own proves a pull request queue-only (floor rule 8; #750): the default branch's
+# scripts/queue-only.mjs reads the one file it changes and the issues its lines name, with a token that may read issues,
+# which the shared workflow's may not, and hands the head it proved to that workflow (its input "queue"). It checks out
+# the default branch, never the pull request, reads only, and writes nothing; a pull request that changes more than one
+# file ends it at once.
 name: own-security-review
 
 on:
@@ -18,9 +23,58 @@ permissions:
   pull-requests: read
   statuses: write
 
+# (one run at a time for a pull request, in the order they came, the proof with the status it feeds, so that a slow
+# proof of an older head never hands its answer to a run after a newer one)
+concurrency:
+  group: own-security-review-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
+  queue:
+    if: >-
+      ${{ (github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.pull_request.changed_files == 1
+      && github.event.pull_request.head.repo.full_name == github.repository)
+      || (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.issue.state == 'open') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    outputs:
+      head: ${{ steps.prove.outputs.head }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }} # the default branch's script, never the pull request's
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version # the one exact Node ("Node" in tasks/updates.md)
+      - name: Is the pull request queue-only?
+        id: prove
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          set -uo pipefail
+          # (any answer that cannot be read proves nothing: the pull request is reviewed as any other)
+          d=$(mktemp -d)
+          [ -f scripts/queue-only.mjs ] || { echo "The default branch holds no queue-only.mjs yet."; exit 0; }
+          gh api "repos/$REPO/pulls/$NUMBER" > "$d/pull.json" || exit 0
+          [ "$(jq '.changed_files' "$d/pull.json")" = 1 ] || { echo "It changes more than one file: not queue-only."; exit 0; }
+          gh api "repos/$REPO/pulls/$NUMBER/files" > "$d/files.json" || exit 0
+          if head=$(timeout 90 node scripts/queue-only.mjs "$d/pull.json" "$d/files.json") && [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Queue-only, as queue-only.mjs proves: $head"
+            echo "head=$head" >> "$GITHUB_OUTPUT"
+          else echo "$head"; fi
+
   security-review:
+    needs: queue
+    if: ${{ !cancelled() }}
     uses: ./.github/workflows/security-review.yml
     with:
       root: .
       advisory: false
+      queue: ${{ needs.queue.outputs.head }}

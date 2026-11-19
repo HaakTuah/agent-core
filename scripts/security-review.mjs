@@ -37,7 +37,9 @@
 // that kind, which its code reviewer checks (tasks/reviews.md, point 3); the status then says a review is posted, and
 // cannot tell that note from a review. A pure sync needs neither (floor rule 8): where the workflow's run of the
 // default branch's pure-sync.mjs proved the head one (PURE), it passes where no review of Codex's has begun by itself,
-// and one that has is waited for and read as on any pull request, as are floor rule 3's two asked of it never. Nothing
+// and one that has is waited for and read as on any pull request, as are floor rule 3's two asked of it never. So is a
+// pull request its caller proved queue-only with the default branch's queue-only.mjs (QUEUE; floor rule 8, #750), where
+// its files are one Markdown file and nothing that runs by itself. Nothing
 // else on the pull request counts: not its description, not a comment of anyone else, not a review's own text.
 // Where the pull request changes what runs by itself (a file comment-only.mjs reads: under .github/ or .claude/, or an
 // action.yml; the copy under core/ aside, which only a sync changes), it asks floor rule 3's two security reviews:
@@ -68,7 +70,8 @@
 //         ADVISORY=false for a status that waits; BOUND=false for a pull request from before the check, with SINCE
 //         the host's time the default branch's copy of the script came, which it was opened before (boundOf); RUN_URL for
 //         the link the status carries; REVIEWERS for the accounts named; RIGHTS for a file of GitHub's answers on
-//         their rights (collaborators/<login>/permission, as a JSON list); PURE for the head pure-sync.mjs proved.
+//         their rights (collaborators/<login>/permission, as a JSON list); PURE for the head pure-sync.mjs proved;
+//         QUEUE for the head the caller's queue-only.mjs proved (#750).
 import { readFileSync } from "node:fs";
 import { RUNS } from "./comment-only.mjs";
 import { started } from "./started.mjs";
@@ -148,7 +151,7 @@ export const UNREAD = "Codex's summary is on the pull request, but its state can
 // { sha, done, why }, or undefined for a pull request with nothing to mark (closed, a draft, no commit to name). more:
 // { reviewers, the accounts besides the repository's owner whose posted review counts; rights, GitHub's answers on
 // accounts' rights to the repository, whose writers' posted reviews count too; pure, whether pure-sync.mjs
-// proved the head a pure sync; merges, the SHAs of the merges clean-merges.mjs proved the ones git makes, where it ran }
+// proved the head a pure sync; queue, whether the caller's queue-only.mjs proved it queue-only (#750); merges, the SHAs of the merges clean-merges.mjs proved the ones git makes, where it ran }
 export function judge(pull, comments, reviewComments, commits, files, bound = true, more = {}) {
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
@@ -157,9 +160,11 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   const read = codex(list), review = read.review, warning = read.unread ? UNREAD : undefined;
   const { running, posted, changed } = sinceBegun(all, read);
   const { chain, stand, forHead, cut } = forTheHead(pull, commits, sha, more.merges, posted);
-  let verdict = judgeWith({ sha, list, posted, forHead, stand, bind: chain !== undefined, review, pull, reviewComments, commits, changed, bound, pure: more.pure === true, cut, mends: mendsFor(read) });
+  // (a pull request proved queue-only by its caller, #750, counts as one only where its files show the one Markdown file)
+  const queue = more.queue === true && queueOnly(pull, files);
+  let verdict = judgeWith({ sha, list, posted, forHead, stand, bind: chain !== undefined, review, pull, reviewComments, commits, changed, bound, pure: more.pure === true || queue, queue, cut, mends: mendsFor(read) });
   verdict = begunAfter(verdict, { sha, running, all, posted, bound });
-  verdict = floorTwo(verdict, { sha, pull, files, posted, review, bound, pure: more.pure });
+  verdict = floorTwo(verdict, { sha, pull, files, posted, review, bound, pure: more.pure === true || queue });
   if (edited && all.length === 0 && !verdict.done) verdict = { ...verdict, why: EDITED };
   if (unnamed && verdict.done) verdict = { ...verdict, why: `${verdict.why}; a review from an account not named counts, as before this check came` };
   return warning ? { ...verdict, warning } : verdict;
@@ -283,6 +288,9 @@ export function unproved(pull, commits, head, merges) {
   return standsFrom(pull, commits, head).size > chain.size ? [...chain].at(-1) : undefined;
 }
 
+// whether a pull request's files are those of a queue-only one, which its caller proved with queue-only.mjs (#750): the
+// list whole, one file, Markdown, none of what runs by itself; scripts/code-review-wait.mjs reads it too
+export const queueOnly = (pull, files) => files !== undefined && whole(pull, files) && flat(files).length === 1 && /\.md$/iu.test(String(flat(files)[0].filename)) && !runs(flat(files)[0]);
 // whether GitHub gave every file the pull request changes (it gives at most 3000): a list cut short is read as one
 // that changes what runs by itself, never as one that does not
 export const whole = (pull, files) => Number.isInteger(pull.changed_files) && pull.changed_files >= 0 && flat(files).length >= pull.changed_files;
@@ -373,10 +381,10 @@ function codexFound({ sha, short, list, reviewComments, forHead, posted, changed
   return hold(HIDDEN, "Codex's open security finding is not among the comments, nor a review after it");
 }
 // where Codex's security review has not completed: a pure sync, a review posted, Dependabot's own, or none
-function codexNotRun({ sha, short, review, pure, forHead, postedWhy, pull, commits, posted, cut, hold, notGits, mends }) {
+function codexNotRun({ sha, short, review, pure, queue, forHead, postedWhy, pull, commits, posted, cut, hold, notGits, mends }) {
   // a pure sync, as pure-sync.mjs proved it, needs no review where none has begun by itself (floor rule 8): one that
   // has, Codex's running, is waited for as above
-  if (pure && !(review !== null && typeof review === "object" && RUNNING.includes(review.status))) return { sha, done: true, why: "a pure sync, as pure-sync.mjs proves: no review needed, none begun by itself yet (floor rule 8)" };
+  if (pure && !(review !== null && typeof review === "object" && RUNNING.includes(review.status))) return { sha, done: true, why: queue ? "queue-only, as queue-only.mjs proves: no review needed, none begun by itself yet (floor rule 8)" : "a pure sync, as pure-sync.mjs proves: no review needed, none begun by itself yet (floor rule 8)" };
   if (forHead.length > 0) return { sha, done: true, why: postedWhy };
   // Dependabot's own, with no review of Codex's begun on it: the floor holds it another way (rule 17)
   const all = flat(commits);
@@ -418,6 +426,7 @@ if (started(import.meta.url)) {
   const pull = read(pullFile);
   const verdict = judge(pull, read(commentsFile), reviewCommentsFile ? read(reviewCommentsFile) : [], commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, boundOf(process.env.BOUND, pull, process.env.SINCE),
     { reviewers: reviewersOf(process.env.REVIEWERS), rights: process.env.RIGHTS ? read(process.env.RIGHTS) : undefined, pure: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.PURE === pull.head.sha,
+      queue: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.QUEUE === pull.head.sha,
       merges: mergesFile ? read(mergesFile) : undefined });
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }

@@ -19,7 +19,9 @@
 # posted after Codex's summary last changed and, where one is to be found, after its newest finding; nothing else
 # counts. A pure sync needs none where no review starts by itself (floor rule 8): the job runs the default branch's
 # scripts/pure-sync.mjs on the head itself, and one it proves passes with no review and no note
-# (scripts/security-review.mjs, whose header says what it does not hold). Where the pull request's files show a change
+# (scripts/security-review.mjs, whose header says what it does not hold). So does one the caller proved queue-only (the
+# input "queue": the head a job of the caller's proved with the default branch's scripts/queue-only.mjs, whose token may
+# read issues, which this job's may not; #750), where its files are one Markdown file and nothing that runs by itself. Where the pull request's files show a change
 # to what runs by itself beyond its pins, it asks floor rule 3's two security reviews (the same script says
 # which count, and when one is enough); of a pull request that leaves the check's scripts alone, whose head does
 # not hold them as the default branch does and that the host says was opened before the default branch's copy came,
@@ -77,6 +79,11 @@ on:
         required: false
         type: boolean
         default: false
+      queue:
+        description: The head a job of the caller's proved queue-only with the default branch's scripts/queue-only.mjs, which needs no review (floor rule 8). Left out, none.
+        required: false
+        type: string
+        default: ""
       reviewers:
         description: The accounts, besides the repository's owner and the people GitHub lets write to it, whose posted "Security review:" counts, by login, separated by spaces. Left out, none.
         required: false
@@ -124,6 +131,7 @@ jobs:
           ROOT: ${{ inputs.root }}
           ADVISORY: ${{ inputs.advisory }}
           REVIEWERS: ${{ inputs.reviewers }}
+          QUEUE: ${{ inputs.queue }}
           SERVER: ${{ github.server_url }}
           DEFAULT: ${{ github.event.repository.default_branch }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
