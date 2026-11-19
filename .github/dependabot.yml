@@ -13,10 +13,11 @@ updates:
       actions:
         patterns: ["*"]
         update-types: ["minor", "patch"]
-  # The packages of other publishers the core's scripts run, in its package.json and lock file in .packages/ (#654):
-  # each update's licence read from the lock by the core's licence check, its arrival by the lookup.
+  # The packages of other publishers the core's scripts run, in its package.json and lock file in .packages/ (#654), and
+  # the parser's in .packages/parser/ (#719): each update's licence read from the lock by the core's licence check, its
+  # arrival by the lookup.
   - package-ecosystem: "npm"
-    directory: "/.packages"
+    directories: ["/.packages", "/.packages/parser"]
     schedule:
       interval: "weekly"
       day: "monday"

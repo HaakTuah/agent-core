@@ -68,7 +68,12 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    that no workspace pattern of the project's own package list takes the copy's package list in): the sync runs it after
    it writes the copy, a session's start runs npm's own install where what is installed is not what the lock file names
    and the copy's npm files are `main`'s own (the work-saved hook), and each of the core's workflows a project calls
-   runs it before its checks; a check that finds a package missing says it did not run, with that command (#654). Its
+   runs it before its checks; a check that finds a package missing says it did not run, with that command (#654). The
+   parser's packages, whose grammars carry far more than a reader runs, have a lock file of their own in
+   `.packages/parser/`, installed only where a job names it (`install.mjs parser`, or `all`, as the sync runs it and
+   the copies check's job, which runs the shape check; #719): a session's start installs the first alone, and a check
+   that needs the parser says so, with its mend; in a project's own job that installs the first alone, the shape check
+   reads no function of C# and says so as a warning, failing nothing by that. Its
    devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
    copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
@@ -566,9 +571,10 @@ repository, the floor, the modules, the scripts and workflows, the starter kit a
 `words/` and `reports/`: the owner's decisions, own words and records, all rights reserved. Both files travel in each
 project's copy under `core/`, and they license the core alone: a project keeps the terms its own owner gives its own work, and nothing here
 adds or changes them (floor rule 10). Nor do they cover the packages of other publishers the scripts run, each under its
-own licence: none is carried, each an entry of `.packages/package-lock.json`, installed from npm's registry into
-`.packages/node_modules/`, which git does not track (`scripts/install.mjs`; #654), and held to floor rule 10's list by
-the core's own licence check, which reads that lock file. Nothing of the core ships, so no project's audit or notices
+own licence: none is carried, each an entry of `.packages/package-lock.json` or the parser's
+`.packages/parser/package-lock.json`, installed from npm's registry into the `node_modules/` beside it, which git does
+not track (`scripts/install.mjs`; #654, #719), and held to floor rule 10's list by the core's own licence check, which
+reads both lock files. Nothing of the core ships, so no project's audit or notices
 file asks for it.
 `NOTICE` names the work, with its other name, which renames nothing, and as the holder the account in the core's
 address, until the core's owner types another name there by hand (floor rule 11).
