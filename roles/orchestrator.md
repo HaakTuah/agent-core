@@ -28,8 +28,8 @@ nothing yet.
 2. not the orchestrator's provider, while another has allowance left;
 3. among the rest, the project's order (its table's row "Builder", else the record's: `tasks/roles.md`), Codex first
    where neither names one;
-4. the orchestrator's provider last, and never below a reserve that keeps the orchestrator itself waking: by default,
-   no new builder on that provider once its usage window shows its warning level.
+4. the orchestrator's provider last, down to a reserve that keeps the orchestrator itself waking until its usage window
+   opens again, and none where the owner's pace says a second allowance takes over.
 
 - A tool is reached by the first way there is: the
   tool that runs the agents side by side (floor rule 18), else a plug-in in the orchestrator's tool, else a way the
@@ -100,10 +100,21 @@ nothing yet.
 - **The pace is the owner's** (#249). By default no session slows or stops work to save usage by its
   own choice. Where the owner sets a pace, the orchestrator follows it: said to it in person, for now; written under
   "Pace" in the project's manifest, until changed there: how many lanes run at once, which model takes which kind of
-  line, how much of a usage window is left free for the owner's own use.
+  line, how much of a usage window is left free for the owner's own use, whether a second allowance takes over when the
+  first runs out.
   - It does not mean a session stands idle while the owner's allowance goes unused.
   - Reason: no session decides by itself to stand idle, and the pace of the owner's usage is the owner's to set.
   - Held by nothing yet: the usage left is no mark a check reads.
+- **Never held back in silence** (#471). By default, once its provider's usage window shows its warning, the
+  orchestrator opens one issue, "Builders held back for usage", until building goes on: what is left (read, or estimated
+  from the share used at the warning over the time since the window opened, and called so), when the window opens again,
+  which lines wait, and the words that change it. Work goes on down to the reserve ("The builders", point 4), none held
+  back where what is left lasts until the window opens, unless the owner's pace says otherwise; near it, fewer lanes
+  rather than none, only lines that fit what is left by what their kind cost (`scripts/session-cost.mjs`), and a builder
+  that cannot finish ends at a commit with its note. It does not mean the order of "The builders" changes. Reason: on 16
+  November 2026 builders stood still below the warning with days left, unseen. Held, in part, by the scheduled look
+  (`scripts/stalled.mjs`): lines a session could take, no push or merge for a day, no such issue from the owner's
+  account.
 - **It asks the owner nothing** but floor rule 14's yeses and the blind sample; before it reports anything as waiting
   on the owner, it checks GitHub: a yes already in the PR (the owner's or the design session's relay), a branch already
   deleted or a setting already made is never reported again.

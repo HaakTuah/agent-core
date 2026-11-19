@@ -55,6 +55,8 @@ function kit(name, o, { held = true } = {}) {
   // (the copies check's first baseline as the starter kit writes it, its two entry files' shared sentence listed)
   execFileSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: dir, stdio: "ignore" });
   fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), `${JSON.stringify({ reads: Object.keys(READERS), listed: {} }, null, 2)}\n`);
+  // (the first list of what holds the project's own rules, as the starter kit writes it: #662)
+  execFileSync(process.execPath, ["core/scripts/holders.mjs", "--own", "--write"], { cwd: dir, stdio: "ignore" });
   if (held) roundTrip(name, o, dir);
   return dir;
 }
@@ -595,6 +597,20 @@ ok(copiesOf({ "a.yml": stepped("node ../core/scripts/copies.mjs ../config/c.json
   && copiesOf({ "a.yml": stepped("node ../core/scripts/copies.mjs ../config/c.json", {}, { defaults: { run: { "working-directory": "app" } } }) }) === "config/c.json",
   "a step run in a folder of its own reads its paths from there");
 const notRead = (what, ...a) => { const at = configs(inMemory(...a)); return at[what] === null && at.unread.length > 0; };
+// (#821) What a reader's "one pass" means is that its work grows in step with its text, never a time of its own on a real
+// clock, which a busy machine stretches: `read(n, k)` reads a text of size n (its k-th, so that none is read from the
+// reader's memory) and says whether it was read right; the least of a few readings at each of two sizes, taken in turn
+// so that a pause lands on none of them, is compared, and a reader that is linear keeps the larger over the smaller near
+// the sizes' own ratio, where one gone quadratic takes it to its square. The sizes are small, so that the parser's own
+// time (bash-commands.mjs) stays far from its end however busy the machine.
+const linear = (read, small, large, runs = 5) => {
+  read(small, -1); // (the first reading starts the parser)
+  const least = new Map([[small, Infinity], [large, Infinity]]);
+  let right = true;
+  for (let k = 0; k < runs; k++) for (const n of [small, large]) { const at = Date.now(); right = read(n, k) && right; least.set(n, Math.min(least.get(n), Date.now() - at)); }
+  const ratio = least.get(large) / Math.max(1, least.get(small));
+  return { right, linear: ratio < 3 * (large / small), shown: `${small} took ${least.get(small)} ms, ${large} took ${least.get(large)} ms` };
+};
 ok(notRead("copies", { "a.yml": stepped("node ../core/scripts/copies.mjs c.json", { "working-directory": "${{ inputs.at }}" }) })
   && notRead("copies", { "a.yml": stepped("cd app && node ../core/scripts/copies.mjs c.json") })
   && notRead("copies", { "a.yml": stepped('node "$CORE_AT"scripts/copies.mjs c.json') }) && notRead("copies", { "a.yml": stepped("node core/scripts/copies.mjs --first") }),
@@ -623,6 +639,18 @@ ok(sized.sizes === "c/sizes.json" && configs(inMemory({}, {}, "| *size marks* | 
 const signed = configs(inMemory({ "s.yml": coreCall("signatures.yml", { directory: "${{ inputs.at }}" }) }));
 ok(signed.packages === null && signed.unread.some(u => u.startsWith("the signature check's folder not read")) && configs(inMemory({ "s.yml": coreCall("signatures.yml", {}) })).packages === ".",
   "the signature check's folder passed as an expression is not read; none passed is the root");
+// a workflow nested past what the reader of keys given twice reads is told with its own mend, to nest it less, never
+// as a key given twice it may not hold (#610)
+{
+  const keysStep = STEPS.find(s => s.lead === "16 November 2026, no workflow gives a key twice");
+  const deep = keysStep.check(inMemory({}, { ".github/workflows/deep.yml": `on: push\nx: ${"[".repeat(200)}1${"]".repeat(200)}\n` }));
+  const both = keysStep.check(inMemory({}, { ".github/workflows/deep.yml": `on: push\nx: ${"[".repeat(200)}1${"]".repeat(200)}\n`, ".github/workflows/two.yml": "on: push\non: pull_request\n" }));
+  ok(/nest the lists and mappings of these workflows or actions no deeper than a workflow needs, a few levels, since past 128 deep a key given twice in them cannot be read: `\.github\/workflows\/deep\.yml`\./.test(deep ?? "") && !/keep one of the two keys/.test(deep ?? "")
+    && /keep one of the two keys.*`\.github\/workflows\/two\.yml` line 2, "on"/.test(both ?? "") && /no deeper than a workflow needs.*`\.github\/workflows\/deep\.yml`/.test(both ?? "")
+    && keysStep.check(inMemory({}, { ".github/workflows/flat.yml": "on: push\n" })) === null,
+    "a workflow nested past 128 deep is told to nest less, a key given twice to keep one, each with its own mend, and a plain one passes", [deep, both].join("\n"));
+}
+
 const advisory = STEPS.find(s => s.lead === "13 November 2026, the NuGet check fails from the first day");
 let threw = null;
 try { advisory.check(inMemory({ "n.yml": coreCall("nuget.yml", { config: "c.json", advisory: "${{ vars.ADVISORY }}" }) })); } catch (e) { threw = e; }
@@ -670,8 +698,8 @@ ok(copiesOf({ "a.yml": stepped("sudo -E -H node core/scripts/copies.mjs config/c
   && notRead("copies", { "a.yml": stepped("sudo -u bot node core/scripts/copies.mjs config/c.json") }) && copiesOf({ "a.yml": stepped("bash -o pipefail -c 'node core/scripts/copies.mjs config/c.json'") }) === "config/c.json"
   && copiesOf({ "a.yml": stepped("pwsh -ExecutionPolicy Bypass -Command 'node core/scripts/copies.mjs config/c.json'") }) === "config/c.json",
   "every option of a wrapper is passed, a shell's options with their values too, and a run behind a wrapper's option's value is not read");
-const opened = `${"cat <<EOF\n".repeat(20000)}node core/scripts/copies.mjs config/c.json`, started = Date.now();
-ok(copiesOf({ "a.yml": stepped(opened) }) === "config/c.json" && Date.now() - started < 1500, "here-documents with no end leave every line read, in one pass", `${Date.now() - started} ms`);
+const opened = linear((n, k) => copiesOf({ "a.yml": stepped(`${"cat <<EOF\n".repeat(n)}node core/scripts/copies.mjs config/c${k}.json`) }) === `config/c${k}.json`, 500, 8000);
+ok(opened.right && opened.linear, "here-documents with no end leave every line read, in one pass", opened.shown);
 ok(notRead("copies", { "a.yml": stepped("((echo a) ; cat <<EOF)\nnode core/scripts/copies.mjs config/doc.json\nEOF\nnode core/scripts/copies.mjs config/c.json") }), "a \"((\" with no \"))\" hides no here-document after it");
 ok(notRead("copies", { "a.yml": coreCall("copies.yml", { config: "config\\c.json", sizes: "s.json" }) }) && notRead("packages", { "s.yml": coreCall("signatures.yml", { directory: "app\\web" }) })
   && notRead("copies", {}, {}, "| *copies check* | `core/scripts/copies.mjs` with `C:/c.json` |\n"), "a path a call or a slot spells for Windows is not read");
@@ -687,8 +715,8 @@ ok(["sudo chmod +x core/scripts/copies.mjs", "time echo core/scripts/copies.mjs"
   .every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json")
   && notRead("copies", { "a.yml": stepped("sudo -u node node core/scripts/copies.mjs config/c.json") }) && notRead("copies", { "a.yml": stepped("bash -e ci/run.sh core/scripts/copies.mjs") }) && notRead("copies", { "a.yml": stepped("sudo -u bot node tools/scripts/copies.mjs") }),
   "a wrapper's command that runs no node of the copy's script is no run, and one whose node the reader cannot place, or a file given it, is not read");
-const parens = Date.now();
-ok(copiesOf({ "a.yml": stepped(`${"(".repeat(400000)}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json" && Date.now() - parens < 1500, "a long line of \"((\" is read in one pass", `${Date.now() - parens} ms`);
+const parens = linear((n, k) => copiesOf({ "a.yml": stepped(`${"(".repeat(n)}\nnode core/scripts/copies.mjs config/c.json\n# ${k}`) }) === "config/c.json", 3125, 50000);
+ok(parens.right && parens.linear, "a long line of \"((\" is read in one pass", parens.shown);
 // (the review of 2240d78 and 9246a3b: a node run behind a wrapper's option with node's own options, or held in one
 // word, and one after a keyword, said not read; >| and {fd}> are redirections)
 ok(["sudo -u bot node --no-warnings core/scripts/copies.mjs config/c.json", "sudo -u bot node -r x core/scripts/copies.mjs config/c.json", "env -S 'node core/scripts/copies.mjs config/c.json'",
@@ -720,8 +748,8 @@ ok(["bash -e ./run.sh -c 'node core/scripts/copies.mjs other.json'", "bash -x sc
   && ["echo Then run node core/scripts/copies.mjs your.json", "echo env -S 'node core/scripts/copies.mjs x'"]
     .every(line => copiesOf({ "a.yml": stepped(`${line}\nnode core/scripts/copies.mjs config/c.json`) }) === "config/c.json"),
   "a shell's file given arguments that name the script is not read, never read as the file's; a command that runs no script gives no run");
-const longEnv = Date.now();
-ok(notRead("copies", { "a.yml": stepped(`env ${"-S ".repeat(20000)}'node core/scripts/copies.mjs c.json'`) }) && Date.now() - longEnv < 1500, "many of env's options are read in one pass", `${Date.now() - longEnv} ms`);
+const longEnv = linear((n, k) => notRead("copies", { "a.yml": stepped(`env ${"-S ".repeat(n)}'node core/scripts/copies.mjs c.json' # ${k}`) }), 1250, 20000);
+ok(longEnv.right && longEnv.linear, "many of env's options are read in one pass", longEnv.shown);
 const versionsStep = STEPS.find(s => s.lead === "12 November 2026, exact versions");
 ok(versionsStep.check(inMemory({ "a.yml": stepped("cd tools && node scripts/exact-versions.mjs x.json") }, { "package-lock.json": "{}" })) === null, "where the project runs no licence check of its own, a companion run it cannot place asks nothing");
 // (npm known by either lock file it installs from, package-lock.json or npm-shrinkwrap.json: each reads as npm, and the
