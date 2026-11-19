@@ -441,6 +441,7 @@ check a project runs that the list leaves out.
 | `agent-tools.mjs` | left out | It reads the tools' settings at the project's root alone. No tool loads the copy's own. The core's run with `--core` holds those. |
 | `personal-terms.yml` | read | The copy's `LICENSE` and `NOTICE` may hold a copyright holder's name, as the project's own may (floor rule 11). The same workflow runs on the core's pull requests. |
 | `codeql.yml` | read | The whole checkout, in the languages the project names. The core's own code scanning runs on its repository. |
+| `code-scan.mjs` | left out | Where no workflow calls `codeql.yml`, the scan hands the engine the code a pull request adds or alters outside the copy alone. The core's repository is public, and the host's CodeQL scans its code (`codeql.yml`). |
 | `copies.mjs` | left out in part | It reads the copy as the project's config names it: the starter kit's names the copy's rule files' prose. A file of the copy moved, or its text moved into another, counts as gone, never as the config reading less, since a sync alone moves those. The core's own copies check holds them. |
 | `pointers.mjs` | left out | The copy's files are only what a pointer leads to. The core's run with `--core` holds its own pointers. |
 | `reading-size.mjs` | left out in part | Each file of the copy under `"read"` is held to its own mark. The total and the split mark count the project's own files alone. The core's caps hold the copy (`scripts/size.mjs`), and the core has no split mark. |
