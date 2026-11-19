@@ -153,8 +153,9 @@ code is held to: `tasks/code-shape.md`.
   It does not mean reading is cut by keeping a session from what its task calls for, nor anything in a project, whose
   copy of the core changes only by a sync and whose own files "Size asks" holds. Reason: the lowest total has an
   optimum, since each file opened is a call and one more file a session can miss. Held by `read-total.mjs --compare` in
-  the core's size workflow, which fails a cut or a join where a condition fails, and by the state report, which gives
-  the sum beside the last one's.
+  the core's size workflow, which fails a cut or a join where a condition fails, and any pull request whose tree's
+  path patterns run past the total read's budget of steps, and by the state report, which gives the sum beside the
+  last one's.
 - **A role's start holds what any of its tasks can break** (#469). By default a line of a file a role reads at its
   start, as `scripts/reading.mjs` gives it, stays there only where any task of that role can break it, the test the
   floor's own file keeps; a line only some kinds of task can break moves to a module read when a task calls for it.
