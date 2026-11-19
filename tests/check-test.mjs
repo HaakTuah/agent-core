@@ -21,6 +21,15 @@ const { ok, done } = tally();
 const { tmp, git, core, project } = scratch("check-test-");
 // (the core's packages installed by the real npm once, and linked into each job's clone after: npm-once.mjs)
 const env = npmOnce(scratchEnv(core, tmp), tmp);
+// (the licence scan passes npm-once.mjs over, so what it may run is held here: Node's own modules alone, one process
+// started, the real npm's, and nothing fetched by name or address)
+{
+  const text = fs.readFileSync(path.join(root, "scripts", "npm-once.mjs"), "utf8");
+  const loads = [...text.matchAll(/\bfrom\s+["']([^"']+)["']|\b(?:require|import)\(\s*["'`]([^"'`]+)["'`]/gu)].map(m => (m[1] ?? m[2]).replace(/^node:/u, ""));
+  ok(loads.length > 0 && loads.every(m => ["fs", "path", "child_process", "crypto"].includes(m)), "npm-once.mjs, which the licence scan passes over, loads Node's fs, path, child_process and crypto alone", loads.join(", "));
+  ok((text.match(/\b(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|fork)\s*\(/gu) ?? []).length === 1 && /\breal = cwd => spawnSync\(/u.test(text), "and it starts one process, the real npm, with the arguments it was given");
+  ok(!/\bnpx\b|https?:|\bfetch\s*\(|\bcurl\b|\bwget\b/iu.test(text), "and it fetches nothing by name or address");
+}
 const check = (dir, ...args) => { const r = spawnSync(process.execPath, [path.join(dir, "core", "scripts", "check.mjs"), ...args], { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 const commit = (dir, what) => { git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", what); };
 
