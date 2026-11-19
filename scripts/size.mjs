@@ -54,8 +54,8 @@ export const CAPS = {
 // project's size marks give each such file (roles/shared/inbox.md, "The progress file holds order only"; core archive 216):
 // set at its first trim, as each project sets its own, and raised one step on 17 November 2026 for #534's lines (#537),
 // its leanness check having found at most 220 bytes of room for 273 over. A raise of it is read by the reviews, as any
-// mark's is (roles/shared/review-guidelines.md, "A mark on what every session reads"); this script checks only that
-// the queue is under it.
+// mark's is (roles/shared/review-guidelines.md, "A mark on what every session reads"); a pull request that grows the
+// queue past it, or lowers it below the queue, fails, and the default branch past it is a task (#750, point 6).
 export const QUEUE = { file: "QUEUE.md", mark: 5 * 1024 };
 const WRITERS = ["OWNER", "MEMBER", "COLLABORATOR"]; // GitHub's own word for who wrote a comment, not the comment's
 const ANSWER = /^(?:\*\*)?Leanness check:/u;
@@ -84,6 +84,16 @@ export function sizesAt(revision) {
   const sizes = { [QUEUE.file]: size(QUEUE.file) };
   for (const role of Object.values(lib.roles).map(r => r.name)) sizes[role] = (startIn(lib, role) ?? []).reduce((sum, f) => sum + size(f), 0);
   return sizes;
+}
+// The caps the revision `revision` set, { role or QUEUE.file: bytes }, read from its text of this file (capsOf, and
+// the queue's mark as QUEUE spells it); {} where it cannot be read, so no cap reads as lowered.
+const QUEUE_MARK = /^export const QUEUE = \{ file: "QUEUE\.md", mark: ([1-9][0-9]{0,5}) \* 1024 \};\r?$/m;
+export function capsAt(revision) {
+  if (!BASE_FORM.test(String(revision ?? ""))) return {};
+  let text;
+  try { text = execFileSync("git", [...SAFE, "show", `${revision}:scripts/size.mjs`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return {}; }
+  const mark = QUEUE_MARK.exec(text);
+  return { ...capsOf(text), ...(mark ? { [QUEUE.file]: Number(mark[1]) * 1024 } : {}) };
 }
 // The roles the core has a file for, at `dir`.
 export const rolesAt = (dir = ".") => Object.values(library(dir, "").roles).map(r => r.name);
@@ -182,13 +192,15 @@ function measured(roles, wrong) {
 }
 
 // What a pull request or the default branch makes of each start or the queue past its cap: { fail, task }. Against
-// `base` ({ role or QUEUE.file: bytes }), one this change grows past its cap fails; one past it at the base already
-// that the change does not grow, and any where no base is told, is a task (#750, point 6).
-export function judged(over, base = null) {
+// `base` ({ role or QUEUE.file: bytes }) and the caps it set (`caps`, the same form), one this change grows past its
+// cap fails, and so does one past a cap this change lowered; one past it at the base already that the change neither
+// grows nor lowers the cap of, and any where no base is told, is a task (#750, point 6).
+export function judged(over, base = null, caps = {}) {
   const fail = [], task = [];
   for (const m of over) {
-    const was = base?.[m.what] ?? 0, by = m.total - m.cap;
-    if (base && m.total > was) fail.push(`${m.said} is ${by} bytes over its cap${was > m.cap ? `, ${m.total - was} of them this change's own` : ""}. Mend: ${TRIM[m.kind]}`);
+    const was = base?.[m.what] ?? 0, by = m.total - m.cap, had = caps[m.what];
+    if (base && had !== undefined && m.cap < had) fail.push(`${m.said} is ${by} bytes over its cap, which this change lowers from ${had} to ${m.cap}. Mend: lower the cap no further than the ${m.total} bytes that stand, or trim them in the same pull request`);
+    else if (base && m.total > was) fail.push(`${m.said} is ${by} bytes over its cap${was > m.cap ? `, ${m.total - was} of them this change's own` : ""}. Mend: ${TRIM[m.kind]}`);
     else task.push(`${m.said} is ${by} bytes over its cap${base ? ", as it stood before this change, which does not grow it" : ""}`);
   }
   return { fail, task };
@@ -216,7 +228,7 @@ function main([flag, baseFile, commentsFile]) {
   if (flag !== undefined && flag !== "--base") { console.error(`FAIL: ${flag} is no option of this check. Mend: run node scripts/size.mjs, with --base <the pull request's base> on a pull request, or --raise <base> <comments>`); return 1; }
   const base = flag === "--base" ? sizesAt(baseFile) : null;
   if (flag === "--base" && base === null) { console.error(`FAIL: git cannot read the base ${baseFile ?? "(none named)"}. Mend: name a revision git holds here (the workflow fetches the merge commit's parents: HEAD^1)`); return 1; }
-  const wrong = [], { fail, task } = judged(measured(roles, wrong), base);
+  const wrong = [], { fail, task } = judged(measured(roles, wrong), base, base ? capsAt(baseFile) : {});
   for (const t of task) console.log(`::warning::${t}, which fails nothing: a task to trim, which the scheduled look keeps as the issue "${DUE_TITLE}"`);
   for (const w of [...wrong, ...fail]) console.error(`FAIL: ${w}`);
   return wrong.length || fail.length ? 1 : 0;

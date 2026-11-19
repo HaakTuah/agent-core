@@ -133,12 +133,13 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   session reads" in `roles/shared/review-guidelines.md` says of any such mark. Where `main` itself
   stands past a cap, or the queue past its mark, because pull requests that each fitted merged together, it is a task
   to trim, which the scheduled look keeps, never a red that stops merging (#750, point 6): only a pull request whose
-  own change grows a start past its cap fails. It does not mean a rule is moved from where it belongs, cut short or
+  own change takes a start or the queue past its cap, by growing it or lowering the cap, fails. It does not mean a rule is moved from where it belongs, cut short or
   left out to fit, nor another rule's reason, name or example cut to make room, nor that a cap is raised by a task to
   trim. Reason: each start is paid at every task, and a cap that decided where a rule stands would hide it from who
   must keep it; under merge-on-green two rule changes can each fit and together pass a cap. Held by
   `scripts/size.mjs`, against the pull request's base, and `.github/workflows/size.yml`, which fails a raise of more
-  than one step, and one in a PR with no "Leanness check:" comment.
+  than one step, and one in a PR with no "Leanness check:" comment; the task, by the scheduled look's reader of it
+  (`scripts/look.mjs`, from `due` in `scripts/size.mjs`).
 - **A release is cut on the owner's word:** another owner's project takes the core only
   from a release (`README.md`, "How a project takes the core", point 1), so one is cut when the owner says the core as
   it stands may be handed on, never by a session's own choice: the owner's standing word is that it may each time the
