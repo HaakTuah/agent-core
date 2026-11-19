@@ -8,8 +8,9 @@
 // does not read: a list or mapping nested more than DEEPEST deep, far past what a workflow holds, which it reads as an
 // empty value, the rest of the text read still, since Node stops by itself where the package builds one some 800 deep
 // (#610); a text whose lists or mappings nest some thousands deep in block form, past what the package's parser can
-// close, which is read as none of its keys and said so, an entry whose key is null, for the check to fail with its mend,
-// since GitHub refuses such a file all the same; and text that is no YAML past where the package can read it. It holds
+// close, whose keys past that point it reads as none; and text that is no YAML past where the package can read it. A
+// text where either cut was made is said so, an entry whose key is null, for the check to fail with its mend, since a
+// key given twice in the part not read would go unseen. It holds
 // one document's tokens at a time, so a text of many documents takes no more memory than reading them did.
 import { loadSync } from "./packages.mjs";
 
@@ -45,8 +46,9 @@ export function uncommented(line) {
 }
 
 // The keys given twice in one mapping of a YAML text, each as { line, key, first }: the line of the second, the key as
-// YAML reads it and the line of the first, numbered from 1, in the order of the seconds in the text; and, where the
-// text could not be read to its end, { line: 1, key: null, first: null } after them.
+// YAML reads it and the line of the first, numbered from 1, in the order of the seconds in the text; and, where part of
+// the text was not read (nested past DEEPEST, or past what the parser closes), { line: 1, key: null, first: null } after
+// them.
 export function twice(text) {
   // (the package, loaded here alone: a script that imports this file for `uncommented` needs nothing installed)
   const { Composer, LineCounter, Parser, isScalar, visit } = loadSync("yaml");
@@ -72,5 +74,5 @@ export function twice(text) {
     for (const doc of composer.end()) read(doc);
   } catch { whole = false; } // (a text that runs the package's parser out of its stack: what was read before stands)
   const out = found.sort((a, b) => a.at - b.at).map(({ line, key, first }) => ({ line, key, first }));
-  return whole ? out : [...out, { line: 1, key: null, first: null }];
+  return whole && !cut.size ? out : [...out, { line: 1, key: null, first: null }];
 }

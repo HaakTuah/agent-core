@@ -29,7 +29,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
-import { twice } from "./yaml-keys.mjs";
+import { DEEPEST, twice } from "./yaml-keys.mjs";
 import { unreached } from "./packages.mjs";
 import { projectAt } from "./core-path.mjs";
 
@@ -88,7 +88,7 @@ export function repeated(files, before) {
       held.set(key, (held.get(key) ?? 0) - 1);
       const was = old ? (before ? ", as it did on the base" : "") : "";
       (old ? notes : fails).push(key === null
-        ? `${old ? "note" : "FAIL"} ${file}:${line}: the file nests its lists or mappings some thousands deep, past what this check reads, so a key given twice in it is not read, and GitHub refuses such a file all the same${was}. Mend: nest it no deeper than a workflow needs, a few levels`
+        ? `${old ? "note" : "FAIL"} ${file}:${line}: the file nests its lists or mappings more than ${DEEPEST} deep, past what this check reads, so a key given twice in that part would go unseen${was}. Mend: nest it no deeper than a workflow needs, a few levels`
         : `${old ? "note" : "FAIL"} ${file}:${line}: the key ${JSON.stringify(key)} is given twice in one mapping (first on line ${first}), so GitHub refuses the whole file and runs none of its jobs${was}. Mend: keep one of the two keys, with what both said in it (two if: conditions joined by &&, two env: mappings as one)`);
     }
   }
