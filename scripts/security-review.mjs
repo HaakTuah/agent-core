@@ -48,7 +48,7 @@
 // rule 8's one). Given no list of the files (a workflow older than this script), it asks one review, as it did before
 // it read them; a list GitHub cut short (3000 files) is read as one that changes what runs by itself. Of a pull request
 // that leaves this script alone and whose head does not hold it as the default branch does (BOUND=false, which the
-// workflow sets) and that the host says was opened before the default branch's copy came, which stood before the
+// workflow sets) and that the host says was opened before the script first came to the default branch, which stood before the
 // check came, it says the second is missing and never waits for it, and so it
 // says of a review posted before Codex's running one began, or before its summary last changed where it marks a finding
 // open, and of one that names no commit the head stands on, and it counts a review edited since it was posted, from
@@ -66,7 +66,7 @@
 // Usage:  node scripts/security-review.mjs <the pull request, as GitHub's API gives it> <its comments, the same>
 //           [<its review comments, the same> [<its commits, the same> [<its files, the same> [<the merges proved>]]]]
 //         ADVISORY=false for a status that waits; BOUND=false for a pull request from before the check, with SINCE
-//         the host's time the default branch's copy of the script came, which it was opened before (boundOf); RUN_URL for
+//         the host's time the script first came to the default branch, which it was opened before (boundOf); RUN_URL for
 //         the link the status carries; REVIEWERS for the accounts named; RIGHTS for a file of GitHub's answers on
 //         their rights (collaborators/<login>/permission, as a JSON list); PURE for the head pure-sync.mjs proved.
 import { readFileSync } from "node:fs";
@@ -170,7 +170,7 @@ export const asPosted = (comment) => typeof comment.created_at === "string" && c
 export const EDITED = "a \"Security review:\" was edited after it was posted, so counts no longer. Mend: post it again as a new comment";
 // whether a pull request is held by this check: always where the workflow found it held (BOUND, given as text, not
 // "false"); where its head holds an older copy of the script, only where the host says it was opened before the
-// default branch's copy came (SINCE, the host's time for that), never by where its branch began
+// script first came to the default branch (SINCE, the host's time for that), never by where its branch began
 export function boundOf(held, pull, since) {
   if (held !== "false") return true;
   const opened = Date.parse(pull?.created_at), came = Date.parse(since);

@@ -55,8 +55,8 @@ sessions.
   findings, a release's steps not done, a check failed on the default branch, the labels and openers to mend, a run of
   its own missed, the cleaning and each audit the codebase's state makes due (`tasks/cleaning.md`), the pass over the
   choices that are hard to undo and a sign of theirs written in a measure that holds (`tasks/choices.md`), and in the
-  core alone the staged cases due (`core/scripts/staged.mjs`); once a month, the state report
-  (`core/scripts/state-report.mjs`). Its carriers: the project's daily job (`look.yml`, as the starter kit writes it)
+  core alone staged cases due (`core/scripts/staged.mjs`) and caps passed; once a month, the state report
+  (`core/scripts/state-report.mjs`). Its carriers: the project's daily job (the starter kit's `look.yml`)
   and the orchestrator's wake; where issues cannot be reached, its files go to the inbox (`--inbox`).
   - Each issue is a task an orchestrator gives a lane like any other, the report too, so starting an orchestrator is all
     an owner does: only an issue that GitHub's job or the owner's account opened, labelled `by:look`, under a title of
