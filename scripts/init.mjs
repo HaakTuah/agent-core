@@ -298,7 +298,9 @@ function writeKit(o, here, pin, out) {
   // own .gitignore keeps out of the commit; a failure leaves the kit written and says the mend: #654)
   const installer = path.join(here, "core", "scripts", "install.mjs");
   if (fs.existsSync(installer)) {
-    const r = spawnSync(process.execPath, [installer, "all"], { cwd: here, encoding: "utf8" });
+    // (every install, where the copy's installer knows more than one, as its parser's lock file shows; an older pin's
+    // (--at), with no argument: #719)
+    const r = spawnSync(process.execPath, [installer, ...(fs.existsSync(path.join(here, "core", ".packages", "parser", "package.json")) ? ["all"] : [])], { cwd: here, encoding: "utf8" });
     if (r.status !== 0) console.log(`note the core's packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node core/scripts/install.mjs before running a check`);
   }
   const marks = sizes(Object.fromEntries(startOf(Object.fromEntries(out)).map(f => [f, sizeOf(path.join(here, f))])));
