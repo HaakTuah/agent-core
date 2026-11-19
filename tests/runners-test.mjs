@@ -20,7 +20,7 @@ let n = 0;
 const flows = files => { const dir = path.join(scratch, String(n++)); fs.mkdirSync(dir); for (const [f, t] of Object.entries(files)) fs.writeFileSync(path.join(dir, f), t); return dir; };
 const host = priv => () => { if (priv === null) throw new Error("HTTP 403"); return JSON.stringify({ private: priv }); };
 // (a job runs the tests where it starts a suite through the shape check, as every suite is started)
-const suite = "      - run: node core/scripts/shape.mjs checks/shape.json --suite unit -- npm test\n";
+const suite = "      - run: node core/scripts/shape.mjs checks/shape.json --suite unit -- node --test\n";
 const ci = `on:\n  pull_request:\n  push:\n    branches: [main]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n${suite}`;
 const own = `on: [pull_request]\njobs:\n  test:\n    runs-on: [self-hosted, linux]\n    steps:\n${suite}`;
 const nightly = "on:\n  schedule:\n    - cron: '0 3 * * *'\njobs:\n  look:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node look.mjs\n";
@@ -49,7 +49,7 @@ try {
   ok(read({ repo: "o/n", dir: flows({ "g.yml": group }), gh: host(true) }).where === "self-hosted", "a runner group is read as the owner's own");
   r = read({ repo: "o/n", dir: flows({ "l.yml": `on: push\njobs:\n  test:\n    runs-on: big-box\n    steps:\n${suite}` }), gh: host(true) });
   ok(r.where === "self-hosted" && /could not be read, so taken as the owner's own/.test(r.said[0]), "a label of the project's own is not read, taken as the owner's own and said so", r.said[0]);
-  r = read({ repo: "o/n", dir: flows({ "ci.yml": "on: [pull_request]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n" }), gh: host(false) });
+  r = read({ repo: "o/n", dir: flows({ "ci.yml": "on: [pull_request]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node --test\n" }), gh: host(false) });
   ok(r.where === "local", "a job that starts no suite through the shape check runs no tests here, whatever it runs");
   const hostedMatrix = `on: pull_request\njobs:\n  test:\n    strategy:\n      matrix:\n        os: [ubuntu-latest, windows-latest]\n        node: ["20.x"]\n    runs-on: \${{ matrix.os }}\n    steps:\n${suite}`;
   const fromJson = `on: pull_request\njobs:\n  test:\n    strategy:\n      matrix:\n        include: \${{ fromJSON(github.event_name == 'push' && '[{"os":"ubuntu-latest","node":".nv"}]' || '[{"os":"windows-latest","suite":"x"}]') }}\n    runs-on: \${{ matrix.os }}\n    steps:\n${suite}`;
