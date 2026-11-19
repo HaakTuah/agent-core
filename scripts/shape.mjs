@@ -588,19 +588,21 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   const baseline = parseBaseline(baselineText, config.baseline, restore);
   const current = new Map([...found.entries].map(([id, e]) => [id, e.n]));
   if (base) { base.standing = once(base.standing); base.stood = once(() => stoodAt(base, config)); }
-  // (the functions of a reader that read them on the parser and could not run, its packages not installed for the
-  // registry not answering, are read as a reader's the baseline does not name, so that none of them fails; what the
-  // same reader finds without the parser, its imports, cycles and clock, is held as ever: #654, point 4)
+  // (what a reader finds on the parser, where it could not run, its packages not installed for the registry not
+  // answering: its functions are read as a reader's the baseline does not name, so that none fails, and a file its
+  // baseline lists as lost, which only the parser tells, is kept, never gone; what the same reader finds without the
+  // parser, its imports, cycles and clock, and a file new to the baseline, are held as ever: #654, point 4)
   const reads = new Set(baseline.reads), skipped = unreachedReaders();
   const unread = id => { const r = readerOf(id, found.readers); return r !== null && (!reads.has(r) || (skipped.includes(r) && groupOf(id).kind === "function")); };
+  const kept = id => !current.has(id) && skipped.includes(readerOf(id, found.readers)) && ["function", "lost"].includes(groupOf(id).kind);
   const news = unclaimed(current, baseline.listed, config.marks);
   const { fail, later } = fresh({ config, at, self, found, current, base, news, unread });
   // (one that only shrank passes as it is listed: --write lowers its numbers whenever it is run)
-  const stale = [...baseline.listed.keys()].filter(id => !current.has(id) && !unread(id));
+  const stale = [...baseline.listed.keys()].filter(id => !current.has(id) && !unread(id) && !kept(id));
   if (stale.length) fail.push([`FAIL: ${config.baseline} lists ${plural(stale.length, "entry", "entries")} that ${stale.length === 1 ? "is" : "are"} gone or moved now. Mend: run node ${self} ${at} --write and commit the baseline it lowers`, ...some(stale, baseline.listed)]);
   if (base) fail.push(...againstBase({ config, at, self, baseline, base, found }));
-  const reread = [...baseline.listed.keys()].filter(id => !current.has(id) && unread(id)).length;
-  return { fail, notes: [...notesOf(found.read), ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read };
+  const reread = [...baseline.listed.keys()].filter(id => !current.has(id) && unread(id) && !kept(id)).length;
+  return { fail, notes: [...notesOf(found.read), ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read, kept: [...baseline.listed.keys()].filter(kept).length };
 }
 
 // What a baseline written before a reader came does not list yet, said, never failed.
@@ -720,7 +722,7 @@ function check(config, at, self, found, base, named) {
     base: base && { name: base.name, ...baseFiles(base, named), standing: () => standingAt(base.name, config) } });
   for (const note of v.notes) console.log(`note ${logged(note)}`);
   const skipped = unreachedReaders().filter(r => [...found.readers.values()].includes(r));
-  if (skipped.length) console.log(`::warning::The shape check did not read ${skipped.map(r => READERS[r]).join(", ")}: the core's packages could not be installed, the registry not answering, so what it would find there is reported, never failed. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`);
+  if (skipped.length) console.log(`::warning::The shape check did not read ${skipped.map(r => `${READERS[r]} (the reader ${r})`).join(", ")}: the core's packages could not be installed, the registry not answering, so what it would find there on the parser is reported, never failed${v.kept ? `, and the ${plural(v.kept, "entry", "entries")} its baseline lists there (functions, and files the grammar cannot read) ${v.kept === 1 ? "is" : "are"} kept as listed, never failed as gone` : ""}; what it reads without the parser is held as ever. Mend: run this job again before the pull request merges; if it fails again, file it as a fault`);
   if (!base) console.log("note no base to compare with (set SHAPE_BASE to the branch the work started from), so the baseline was not checked for what joined it, and what the config newly reads is not told from what is new");
   for (const line of v.fail.flat()) console.error(logged(line));
   if (v.fail.length) return 1;

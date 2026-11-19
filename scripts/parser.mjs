@@ -54,7 +54,10 @@ export async function load() {
 let bridge = null;
 function start() {
   const { port1, port2 } = new MessageChannel(), signal = new Int32Array(new SharedArrayBuffer(4));
-  const worker = new Worker(new URL("./parser-worker.mjs", import.meta.url), { workerData: { port: port2, signal }, transferList: [port2] });
+  // (the thread takes the process's flags but --input-type, which Node refuses for a module file: a script run with -e and
+  // it would start a thread that dies at once, and every file read wait out WAIT and be lost)
+  const execArgv = process.execArgv.filter(a => !/^--input-type(?:=|$)/u.test(a));
+  const worker = new Worker(new URL("./parser-worker.mjs", import.meta.url), { workerData: { port: port2, signal }, transferList: [port2], execArgv });
   // (neither keeps the process alive once its own work is done)
   worker.unref();
   port1.unref();
