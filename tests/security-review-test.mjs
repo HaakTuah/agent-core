@@ -27,7 +27,7 @@ const summary = (security, at = "2026-11-12T10:00:00Z", who = { login: "chatgpt-
 const done = { commit_sha: SEEN, has_any_findings: null, has_unresolved_findings: null, status: "completed" };
 const running = { ...done, status: "running" };
 const onHead = { ...done, commit_sha: HEAD };
-const said = (body, assoc = "OWNER", at = "2026-11-12T11:00:00Z") => ({ user: { login: "someone", type: "User" }, author_association: assoc, created_at: at, updated_at: at, body });
+const said = (body, assoc = "OWNER", at = "2026-11-12T11:00:00Z") => ({ user: { login: "someone", type: "User" }, author_association: assoc, created_at: at, updated_at: at, last_edited_at: null, body });
 // a finding of Codex's security review, as its app posts one on a line of the change
 const finding = (at, who = { login: "chatgpt-codex-connector[bot]", type: "Bot" }) => ({ user: who, author_association: "NONE", created_at: at, path: "a.js", line: 3, body: "<!-- codex-security-review-finding:v1 -->\n\n### Codex Security Review\n\nA finding." });
 const open = { ...done, has_any_findings: true, has_unresolved_findings: true };
@@ -109,9 +109,19 @@ ok(is(judge(pull, [...live(REAL_RUNNING.replace("🔒 **Security Review** | 🔄
 ok(is(judge(pull, [summary(running), early]), false, BEFORE) && is(judge(pull, [summary({ ...running, status: "in_progress" }, "2026-11-12T12:00:00Z"), said("Security review: x")]), false, BEFORE), "a review posted before Codex's summary last changed, a note that none is needed among them, does not end the wait, and the status says the mend");
 ok(is(judge(pull, [summary(running, "2026-11-12T11:00:00Z"), said("Security review: same second", "OWNER", "2026-11-12T11:00:00Z")]), false, BEFORE) && is(judge(pull, [summary(running, "2026-11-12T10:00:00Z"), early, said("Security review: the fallback reviewer's", "OWNER", "2026-11-12T10:40:00Z")]), true, "is posted"), "one posted in the same second does not; one posted after it does, whatever was posted before");
 ok([undefined, null, "soon"].every((at) => is(judge(pull, [{ ...summary(running), updated_at: at }, said("Security review: x")]), false, BEFORE)) && is(judge(pull, [summary(running), { ...said("Security review: x"), created_at: "soon", updated_at: "soon" }]), false, BEFORE), "a summary, or a review, with no time that can be read: nothing counts as posted after it");
-const retold = { ...said(`Security review: on ${HEAD}`), updated_at: "2026-11-12T12:00:00Z" }, once = said(`Security review: on ${HEAD}`);
+const retold = { ...said(`Security review: on ${HEAD}`), updated_at: "2026-11-12T12:00:00Z", last_edited_at: "2026-11-12T12:00:00Z" }, once = said(`Security review: on ${HEAD}`);
 ok(is(judge(pull, [retold]), false, EDITED) && mended(status(judge(pull, [retold]), false).description) && status(judge(pull, [retold]), false).description.length <= 140 && is(judge(pull, [retold, once]), true, "is posted")
   && is(judge(pull, [retold], [], undefined, undefined, false), true, "is posted"), "a review edited since it was posted counts no longer, its status saying the mend within GitHub's 140 characters; one never edited beside it counts; on a pull request from before the check it counts as it did");
+{
+  // an edit within the second it was posted leaves GitHub's two times the same to the second: the edit record decides,
+  // and with none, only times at full precision can show it unedited
+  const at = "2026-11-12T11:00:00Z", fine = "2026-11-12T11:00:00.250Z", { last_edited_at: _, ...bare } = once;
+  ok(is(judge(pull, [{ ...once, last_edited_at: at }]), false, EDITED) && [undefined, "", 0, false, {}].every((v) => is(judge(pull, [{ ...once, last_edited_at: v }]), false, EDITED)),
+    "a review edited in the second it was posted counts no longer, by its edit record, as does one whose record is no time and no null");
+  ok(is(judge(pull, [bare]), false, EDITED) && is(judge(pull, [{ ...bare, created_at: fine, updated_at: fine }]), true, "is posted")
+    && is(judge(pull, [{ ...bare, created_at: fine, updated_at: "2026-11-12T11:00:00.900Z" }]), false, EDITED),
+    "with no edit record, a review counts only where its times, at full precision, are the same: times to the second alone cannot tell, so it counts as edited");
+}
 ok(is(judge(pull, [summary({ ...done, status: null }), early]), true, "is posted") && is(judge(pull, [early]), true, "is posted") && is(judge(pull, [summary({ ...done, status: "failed" }), early]), true, "is posted") && is(judge(pull, [summary(done, "2026-11-12T12:00:00Z"), early]), true, "has run"), "where no review of Codex's runs (none begun, none at all, a word not known as running, or one finished), a review posted at any time counts as before");
 const old = judge(pull, [summary(running), early], [], [], undefined, false);
 ok(old.done === true && old.why.startsWith("before this check came, so not waited for: Codex's security review began after"), "a pull request from before the check is told of the review posted too early, never held for it");

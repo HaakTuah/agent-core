@@ -95,7 +95,8 @@ export function checkoutStandIn(env, tmp) {
 
 /** The stand-in for GitHub's API, for a test that runs a workflow calling gh
  *  (clean-merges-test.mjs, pure-sync-test.mjs): a `gh` first on the PATH that answers a GET from the JSON file
- *  `ghData` (a route's pattern to its answer; none found: gh's own "Not Found"), and logs each call with -X, its route
+ *  `ghData` (a route's pattern to its answer; none found: gh's own "Not Found"; a GraphQL query for nodes' edit records,
+ *  from its "graphql:edits", a node id to its lastEditedAt, any other id given no node), and logs each call with -X, its route
  *  and what it was sent, to `ghLog`; and the project's address, https://github.com/someone/project, rewritten to the
  *  repository `origin`. It gives `env`, the environment to run the workflow in, with the paths of the two files. */
 export function ghStandIn(env, tmp, origin) {
@@ -105,6 +106,11 @@ export function ghStandIn(env, tmp, origin) {
 const fs = require("fs");
 const a = process.argv.slice(2), data = JSON.parse(fs.readFileSync(process.env.GH_DATA, "utf8"));
 const route = a.find((x, i) => i > 0 && !x.startsWith("-") && !["-X", "--input", "--jq"].includes(a[i - 1]));
+if (route === "graphql") {
+  const ids = JSON.parse(fs.readFileSync(0, "utf8")).variables.ids, edits = data["graphql:edits"] ?? {};
+  console.log(JSON.stringify({ data: { nodes: ids.map((id) => Object.hasOwn(edits, id) ? { id, lastEditedAt: edits[id] } : null) } }));
+  process.exit(0);
+}
 if (a.includes("-X")) { fs.appendFileSync(process.env.GH_LOG, route + " " + fs.readFileSync(0, "utf8") + "\\n"); process.exit(0); }
 const found = Object.entries(data).find(([pattern]) => new RegExp(pattern).test(route));
 if (!found) { console.error("gh: Not Found (HTTP 404)"); process.exit(1); }

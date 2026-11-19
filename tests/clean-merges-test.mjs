@@ -124,7 +124,11 @@ const check = (number, head, posted = [], rights = {}, { names = scripts, opened
   const repoOf = { full_name: "someone/project" };
   const files = names.map((filename) => ({ filename, status: "modified", patch: "@@ -1 +1 @@\n-a\n+b" }));
   const pull = { number, state: "open", draft: false, created_at: opened, changed_files: files.length, commits: 2, head: { sha: head, repo: repoOf }, base: { sha: BASE, repo: { ...repoOf, owner: { login: "someone" } } }, user: { login: "someone" } };
-  fs.writeFileSync(ghData, JSON.stringify({ [`pulls/${number}$`]: pull, [`issues/${number}/comments`]: [summary, ...posted], [`pulls/${number}/comments`]: [], [`pulls/${number}/commits`]: listed(repo, SEEN, head), [`pulls/${number}/files`]: files, ...rights }));
+  // (each posted review's last_edited_at is the host's edit record of it, which the workflow reads from the GraphQL
+  // API; one without it the host gives no record of; rest, what the REST API's copy of it holds besides)
+  const comments = [summary, ...posted].map((c, i) => ({ node_id: `IC_${i}`, ...c }));
+  const edits = Object.fromEntries(comments.filter((c) => Object.hasOwn(c, "last_edited_at")).map((c) => [c.node_id, c.last_edited_at]));
+  fs.writeFileSync(ghData, JSON.stringify({ [`pulls/${number}$`]: pull, [`issues/${number}/comments`]: comments.map(({ last_edited_at: _, rest = {}, ...c }) => ({ ...c, ...rest })), [`pulls/${number}/comments`]: [], [`pulls/${number}/commits`]: listed(repo, SEEN, head), [`pulls/${number}/files`]: files, ...rights, "graphql:edits": edits }));
   fs.writeFileSync(ghLog, "");
   const github = { event_name: "pull_request", repository: "someone/project", actor: "someone", server_url: "https://github.com", run_id: "1", token: "not-a-token",
     event: { action: "synchronize", pull_request: pull, repository: { default_branch: "main", private: false } } };
@@ -145,10 +149,16 @@ ok(own.passed && own.out.includes("Merges from main that are the ones git makes:
   "  and one before a merge with a change of its own waits, both statuses naming that merge and the mend", own.out + JSON.stringify([own.security, own.code]));
 
 // a member's review of the head, which the job reads the member's rights for (#412)
-const member = { user: { login: "a-member", type: "User" }, author_association: "MEMBER", created_at: "2026-11-15T11:00:00Z", updated_at: "2026-11-15T11:00:00Z", body: `Security review: ${OWN}\nNo blocking finding.\nNo other finding.` };
+const member = { user: { login: "a-member", type: "User" }, author_association: "MEMBER", created_at: "2026-11-15T11:00:00Z", updated_at: "2026-11-15T11:00:00Z", last_edited_at: null, body: `Security review: ${OWN}\nNo blocking finding.\nNo other finding.` };
 const rightOf = (role_name, permission) => ({ "collaborators/a-member/permission$": { permission, role_name, user: { login: "a-member", type: "User" } } });
 const writer = check(2, OWN, [member], rightOf("write", "write"));
 ok(writer.passed && writer.security.state === "success" && writer.security.description.includes("a security review is posted"), "the workflow: a member the host lets write counts with nothing named", writer.out + JSON.stringify(writer.security));
+// (an edit made in the second the review was posted leaves the REST API's two times the same: the edit record decides,
+// whatever the REST copy says of it; and a review the host gives no record of counts as edited)
+const sameSecond = check(2, OWN, [{ ...member, last_edited_at: "2026-11-15T11:00:00Z", rest: { last_edited_at: null } }], rightOf("write", "write"));
+const { last_edited_at: _, ...unrecorded } = member, noRecord = check(2, OWN, [unrecorded], rightOf("write", "write"));
+ok([sameSecond, noRecord].every((r) => r.passed && r.security.state === "pending" && r.security.description.includes("was edited after it was posted") && mended(r.security.description)),
+  "  and its review edited in the second it was posted does not, by the host's edit record, nor one the host gives no record of", sameSecond.out + noRecord.out + JSON.stringify([sameSecond.security, noRecord.security]));
 const reader = check(2, OWN, [member], rightOf("triage", "read")), unread = check(2, OWN, [member]);
 ok(reader.passed && reader.security.state === "pending" && unread.passed && unread.security.state === "pending" && unread.out.includes("The host's rights of a-member could not be read"),
   "  and one it lets only triage, or whose rights cannot be read, does not, the run saying the second", reader.out + unread.out + JSON.stringify([reader.security, unread.security]));

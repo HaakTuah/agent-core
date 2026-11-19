@@ -30,7 +30,7 @@ const HEAD = "a".repeat(40), BASE = "d".repeat(40), OTHER = "e".repeat(40);
 const pull = { state: "open", draft: false, head: { sha: HEAD }, base: { repo: { owner: { login: "someone" }, full_name: "someone/project" } }, commits: 1, changed_files: 1 };
 const commits = [{ sha: HEAD, parents: [{ sha: BASE }] }];
 const files = [{ filename: "src/a.js", status: "modified" }];
-const said = (body, more = {}) => ({ user: { login: "someone", type: "User" }, author_association: "OWNER", created_at: "2026-11-12T11:00:00Z", updated_at: "2026-11-12T11:00:00Z", body, ...more });
+const said = (body, more = {}) => ({ user: { login: "someone", type: "User" }, author_association: "OWNER", created_at: "2026-11-12T11:00:00Z", updated_at: "2026-11-12T11:00:00Z", last_edited_at: null, body, ...more });
 const bot = { login: CODEX, type: "Bot" };
 const summary = (security, more = {}) => ({ user: bot, author_association: "NONE", updated_at: "2026-11-12T10:00:00Z", body: `<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 ${JSON.stringify({ code_review: { commit_sha: HEAD, status: "completed" }, security_review: security })} -->\n`, ...more });
 // the verdict on these comments, and whether it waits with its mend said

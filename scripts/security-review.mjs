@@ -163,9 +163,13 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   if (edited && all.length === 0 && !verdict.done) verdict = { ...verdict, why: EDITED };
   return warning ? { ...verdict, warning } : verdict;
 }
-// whether a comment stands as it was first posted: GitHub's two times for it the same, never edited since (a reaction
-// changes neither)
-export const asPosted = (comment) => typeof comment.created_at === "string" && comment.updated_at === comment.created_at;
+// whether a comment stands as it was first posted, never edited since (a reaction changes neither time): its two times
+// the same, and its edit record, last_edited_at (GitHub's lastEditedAt, which the workflow adds), null. Where it has no
+// such record, its two times are read at full precision instead, and times given only to the second cannot tell an edit
+// made within that second, so such a comment counts as edited
+const FINE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d+(?:Z|[+-]\d\d:\d\d)$/u;
+export const asPosted = (comment) => typeof comment.created_at === "string" && comment.updated_at === comment.created_at
+  && (Object.hasOwn(comment, "last_edited_at") ? comment.last_edited_at === null : FINE.test(comment.created_at));
 // what a waiting status says where a review that would count was edited after it was posted
 export const EDITED = "a \"Security review:\" was edited after it was posted, so counts no longer. Mend: post it again as a new comment";
 // whether a pull request is held by this check: always where the workflow found it held (BOUND, given as text, not

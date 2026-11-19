@@ -160,6 +160,29 @@ jobs:
           from_host pull.json "state" "repos/$REPO/pulls/$NUMBER"
           from_host comments.json "comments" --paginate --slurp "repos/$REPO/issues/$NUMBER/comments?per_page=100"
           from_host findings.json "review comments" --paginate --slurp "repos/$REPO/pulls/$NUMBER/comments?per_page=100"
+          # whether each comment that may hold a review was edited since it was posted: the REST API gives its times to the
+          # second alone, so its edit record (lastEditedAt) is read from the GraphQL API, a hundred at a time, and added
+          # to it as last_edited_at; a comment the host gives no record of counts as edited (security-review.mjs, asPosted)
+          jq -c '[.[][] | select(type == "object" and (.body | type) == "string"
+            and (.body | test("(Security review|Code review|Design check):"))
+            and (.node_id | type) == "string" and (.node_id | test("^[A-Za-z0-9_=-]{1,100}$"))) | .node_id] | range(0; length; 100) as $i | .[$i:$i + 100]' \
+            "$d/comments.json" > "$d/ids.jsonl"
+          : > "$d/edits.jsonl"
+          while IFS= read -r ids; do
+            left=$((60 - SECONDS))
+            if [ "$left" -gt 0 ] && jq -n --argjson ids "$ids" \
+              '{query: "query($ids: [ID!]!) { nodes(ids: $ids) { ... on IssueComment { id lastEditedAt } } }", variables: {ids: $ids}}' \
+              | timeout "$left" gh api graphql --input - >> "$d/edits.jsonl"; then continue; fi
+            echo "::error::FAIL the host gave no edit record of pull request #$NUMBER's reviews by the step's 60th second, so neither the security-review status nor the code-review status was written. Mend: run this job again from the pull request's checks once GitHub answers."
+            false
+          done < "$d/ids.jsonl"
+          jq -s '[.[] | .data.nodes[]? | select(type == "object" and (.id | type) == "string"
+            and ((.lastEditedAt | type) == "null" or (.lastEditedAt | type) == "string")) | {key: .id, value: .lastEditedAt}] | from_entries' \
+            "$d/edits.jsonl" > "$d/edits.json"
+          jq --slurpfile e "$d/edits.json" 'map(map(if type != "object" then .
+            elif (.node_id | type) == "string" and (.node_id as $n | $e[0] | has($n)) then . + {last_edited_at: $e[0][.node_id]}
+            else del(.last_edited_at) end))' "$d/comments.json" > "$d/edited.json"
+          mv "$d/edited.json" "$d/comments.json"
           from_host commits.json "commits" --paginate --slurp "repos/$REPO/pulls/$NUMBER/commits?per_page=100"
           from_host files.json "list of files" --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100"
           # whether the pull request is held by what a script of the check reads more: not where it leaves the script

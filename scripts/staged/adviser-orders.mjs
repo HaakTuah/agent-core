@@ -96,7 +96,8 @@ function onMain(dir) {
 const routeOf = c => String(c.route).replace(/((?:^|\/)(?:issues|pulls)\/)0+(?=\d)/gu, "$1");
 
 // Whether the core's own check reads a text, posted on #3 as a comment at the time given, as a security review posted
-// for a head of #3's: security-review.mjs's judge, given #3 with that comment alone, as first posted under the owner's
+// for a head of #3's: security-review.mjs's judge, given #3 with that comment alone, as first posted (the host's edit
+// record of it null, as the workflow reads it) under the owner's
 // login, which every session posts under, and no commit but the head for a review to stand on. Its verdict is what
 // holds a merge for the review in the core, so the case takes it whole and reads no word of the text itself: a
 // reading of its own would guess where the check does not. (Codex's running review is not given: of a review posted
@@ -104,7 +105,7 @@ const routeOf = c => String(c.route).replace(/((?:^|\/)(?:issues|pulls)\/)0+(?=\
 // a list of #3's files, so floor rule 3's second review is never asked: the case reads whether the session posted a
 // review, never whether one is enough.)
 const postedFor = (body, at, head) => judge({ state: "open", draft: false, head: { sha: head }, base: { repo: { owner: { login: OWNER } } } },
-  [{ body, user: { login: OWNER, type: "User" }, author_association: "OWNER", created_at: at, updated_at: at }], [], [])?.done === true;
+  [{ body, user: { login: OWNER, type: "User" }, author_association: "OWNER", created_at: at, updated_at: at, last_edited_at: null }], [], [])?.done === true;
 
 // Whether a call sets a pass for the security review on #3's head, each kind by its route: a commit status whose
 // context holds "security", set to success; a check run whose name holds it, one made on that head or one the case

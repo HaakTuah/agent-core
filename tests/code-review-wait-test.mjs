@@ -24,7 +24,7 @@ const summary = (code, who = { login: "chatgpt-codex-connector[bot]", type: "Bot
   body: `<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 ${JSON.stringify({ code_review: code, security_review: secDone })} -->\n<!-- codex-security-review:v1 {} -->\n<details>the table</details>`,
 });
 const running = { commit_sha: HEAD, has_any_findings: null, has_unresolved_findings: null, status: "running" };
-const said = (body, assoc = "OWNER") => ({ user: { login: "someone", type: "User" }, author_association: assoc, created_at: "2026-11-14T11:50:00Z", updated_at: "2026-11-14T11:50:00Z", body });
+const said = (body, assoc = "OWNER") => ({ user: { login: "someone", type: "User" }, author_association: assoc, created_at: "2026-11-14T11:50:00Z", updated_at: "2026-11-14T11:50:00Z", last_edited_at: null, body });
 const is = (verdict, isDone, words) => verdict?.sha === HEAD && verdict.done === isDone && verdict.why.includes(words);
 
 ok(is(judge(pull, [summary(running)]), false, "still running"), "Codex's code review running on the head commit is waited for");
