@@ -7,8 +7,10 @@ staged cases (`tasks/tools.md`).
 Its reviews by each way:
 - *Side by side:* none, with no command line of its known.
 - *Through a plug-in:* nothing of the kind is documented.
-- *On the host:* none. A project with it alone asks in its editor, a new conversation given the review's brief, as
-  `tasks/tools.md`, "Each tool's part", says of a tool with no review app.
+- *On the host:* none.
+
+With none of these, a project asks in its editor, a new conversation given the review's brief, as `tasks/tools.md`,
+"Each tool's part", says of a tool with no review app.
 
 - **What it reads:** `AGENTS.md`, GEMINI.md and the rules under .agents/rules (or the older .agent/rules), in the
   folder it works in and each folder above it up to the repository's root, never one below. In a rule,

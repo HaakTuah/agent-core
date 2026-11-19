@@ -10,6 +10,8 @@ How a review is asked of Kiro by each way:
 - *Through a plug-in:* no plug-in of Kiro's for another tool is known.
 - *On the host:* none: it has no review app there.
 
+With none of these, a new chat in its editor is handed the brief.
+
 - **What it reads:** an `AGENTS.md` at the root, always, and one in any folder it works in; the steering files under
   .kiro/steering, in which `#[[file:<path from the root>]]` pulls a file in. Its entry file from the starter kit,
   `.kiro/steering/core.md`, holds a line of that kind for each file `AGENTS.md` names, this part and
