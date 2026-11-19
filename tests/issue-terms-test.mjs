@@ -8,7 +8,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { holds, main, MARK, OWED, payloadOf, places, takeOut, termsOf, texts } from "../scripts/issue-terms.mjs";
+import { holds, main, MARK, OWED, payloadOf, places, takeOut, termsOf, texts, versions } from "../scripts/issue-terms.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
@@ -163,6 +163,12 @@ ok(members.asked.filter(a => a.includes("/collaborators/")).length === 4, "the r
 const cleaned = { ...comment, id: 29, html_url: "https://github.com/o/r/issues/1#issuecomment-29", node_id: "C29", body: `A note ${MARK}`, author_association: "COLLABORATOR", user: { login: "writer-b", type: "User" } };
 const history = run(["--private"], { env: { TERMS }, extra: [cleaned], versions: { C29: [`A note ${other}`, `A note ${MARK}`] } });
 ok(history.out.includes(`earlier versions hold a term: ${cleaned.html_url}`), "--private names a collaborator's text the job already cleaned, whose kept version holds a term", history.out);
+
+// a history GitHub gives without its edits, or a node gone since it was listed, is unread, and the run goes on
+{
+  const got = versions(["C1", "C2", "C3"], terms, () => JSON.stringify({ data: { nodes: [{ id: "C1" }, null, { id: "C3", userContentEdits: { pageInfo: { hasNextPage: false }, nodes: [{ diff: `x ${term}` }] } }] } }));
+  ok(got.unread.has("C1") && got.unread.has("C2") && got.held.has("C3") && got.held.size === 1, "a history given without its edits, or a node gone, is unread, and the rest are still read", JSON.stringify({ held: [...got.held], unread: [...got.unread] }));
+}
 
 // GitHub's older node ids, Base64 with padding, are read
 ok(texts(repo, "2026-11-11T12:00:00Z", (...args) => (/[?&]page=1$/.test(args[0]) && args[0].includes("issues/comments?") ? JSON.stringify([{ ...comment, node_id: "MDE3OlB1bGxSZXF1ZXN0UmV2aWV3ODA=" }]) : "[]")).length === 1, "a node id of GitHub's older form, padded, is read");

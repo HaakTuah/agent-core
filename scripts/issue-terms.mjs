@@ -174,9 +174,11 @@ export function versions(nodes, terms, gh = ghApi) {
     try { got = JSON.parse(gh("graphql", "-f", `query=${q}`, ...batch.flatMap(id => ["-f", `ids[]=${id}`]))); } catch {}
     const rows = Array.isArray(got?.data?.nodes) ? got.data.nodes : null;
     if (!rows) { batch.forEach(id => unread.add(id)); continue; }
-    for (const row of rows) {
+    // (a node GitHub gives as null, gone since it was listed, is unread by the id asked)
+    rows.forEach((row, at) => { if (!row?.id && batch[at]) unread.add(batch[at]); });
+    for (const row of rows.filter(r => r?.id)) {
       const edits = row?.userContentEdits?.nodes;
-      if (edits.some?.(e => holds(e?.diff, terms))) held.add(row.id);
+      if (Array.isArray(edits) && edits.some(e => holds(e?.diff, terms))) held.add(row.id);
       // (a history longer than its first page is read as unread, never as clear)
       else if (!Array.isArray(edits) || row?.userContentEdits?.pageInfo?.hasNextPage !== false) { if (row?.id) unread.add(row.id); }
     }
