@@ -12,8 +12,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    most, as its hostile tests time it (`scripts/hostile.mjs`), and each JSON it parses is nested 200 deep at most
    (`scripts/guards.mjs`); its limits name what it reads beyond that.
    - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the line
-     "Read for it:" by `scripts/reading.mjs`); limits: none of its own on the text, which GitHub holds to 65,536
-     characters; 100 commits, one page; 8 s for the reading list's calls; hostile tests: `tests/hostile-pr-text-test.mjs`.
+     "Read for it:" by `scripts/reading.mjs`, and the line "Never needed:" by `scripts/read-total.mjs`, line by line);
+     limits: none of its own on the text, which GitHub holds to 65,536 characters; 100 commits, one page; 8 s for the
+     reading list's calls; hostile tests: `tests/hostile-pr-text-test.mjs`.
    - the comments and reviews on a pull request, their bodies and authors: read by the security-review check and
      the code-review wait (`scripts/security-review.mjs`, `scripts/code-review-wait.mjs`) and the size check's reader
      of a "Leanness check:" answer (`scripts/size.mjs`), with the descriptions of merged pull requests by the tools
@@ -25,11 +26,20 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
-     a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`), and the rule files a
-     checkout holds, the manifest too (`scripts/reading.mjs`); limits: 64 MB of git's answer (256 MB for the
-     comments proof and the selection, 16 MB for the manifest, past which it is reported unread), none in count, since
-     every changed path is read, and of the rule files only a regular file of the checkout's own, a link, pipe or
-     device read as no file; hostile tests: `tests/hostile-pr-changes-test.mjs`.
+     a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`), the rule files a checkout
+     holds, the manifest too (`scripts/reading.mjs`, and `scripts/rules.mjs` for the rules in them, which read only
+     regular files in real folders of the checkout's own, a pipe or device as no file and a link at any depth refused
+     with its mend, and the first tries the changed paths on the path patterns within 16 million steps for each
+     reading, a run of it or a pull request's description, each with a budget of its own, past which every pattern
+     left matches), and the rule
+     files the total read sums and reads for a cut or a join (`scripts/read-total.mjs`, which prints each name with its
+     control characters written out, and reads a link, what is no regular file of the checkout's own, and a name a rule
+     file gives that is absolute or holds a ".." segment as no file); limits: 64 MB of git's answer (256 MB for the
+     comments proof, the selection and the total read, 16 MB for the manifest, past which it is reported unread), and
+     none in count, since every changed path is read, save the total read's 1 MB of a file's text, past which its size
+     alone is counted, and 8 MB of all their text, 200 rule files, 100 kinds of task, 300 names they give and 16
+     million steps of each tree's tries, past which it fails with its mend; hostile tests:
+     `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
      of the work standing still (`scripts/look.mjs`, through `queue.mjs`'s placing and reading), with the open issues
