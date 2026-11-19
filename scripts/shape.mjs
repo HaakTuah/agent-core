@@ -765,8 +765,8 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   // (what a reader finds on the parser, where it could not run, its packages not installed for the registry not
   // answering: its functions are read as a reader's the baseline does not name, so that none fails, and a file its
   // baseline lists as lost, which only the parser tells, is kept, never gone; what the same reader finds without the
-  // parser, the imports, cycles and clock of JavaScript and C#, and a file new to the baseline, are held as ever; of a
-  // file the parser reads whole (Python's), each entry is so: #654, point 4; #530, item 6)
+  // parser, the imports, cycles and clock of JavaScript, and a file new to the baseline, are held as ever; of a file the
+  // parser reads whole (C#'s and Python's), each entry is so: #654, point 4; #530, item 6)
   const reads = new Set(baseline.reads), skipped = unreachedReaders();
   const wholly = id => { const r = found.readers.get(fileOf(id)); return skipped.includes(r) && WHOLE_ON_PARSER.includes(r); };
   const unread = id => { const r = readerOf(id, found.readers); return r !== null && (!reads.has(r) || (skipped.includes(r) && groupOf(id).kind === "function") || wholly(id)); };

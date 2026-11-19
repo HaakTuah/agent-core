@@ -76,10 +76,16 @@ ok(same(csLines.comments.map(c => `${c.line}:${c.text}`), ["5: one", "7: two\r",
   "C#: a # inside a verbatim string is no directive; both sides of an #if are read; a comment's lines are read as the lexer read them; a using of global:: names nothing", JSON.stringify(csLines));
 // (the review's three cases: a hole right after an escaped brace, which the grammar reads as text, is read as code; a
 // global:: in a type argument leaves the target named; a comment of 600,000 lines is read whole, overflowing nothing)
-const escaped = readCsharp("class C { void M() { var s = $\"{{{DateTime.Now}}}\"; var e = $\"{{{{q}}}}\"; var f = $\"{{{Task.Delay(1):N0}}}\"; } }\n");
+const escaped = readCsharp("class C { void M() { var s = $\"{{{DateTime.Now}}}\"; var e = $\"{{{{q}}}}\"; var f = $\"{{{Task.Delay(1):N0}}}\"; var g = $\"{{{1 /* Clock.Now */ + 2}}}\"; } }\n");
 const escapedWords = escaped.toks.map(t => t.v).filter(Boolean).join(" ");
-ok(escapedWords.includes("= DateTime . Now ;") && !escaped.toks.some(t => t.v === "q") && escapedWords.includes("= Task . Delay ( 1 ) ;") && !escaped.toks.some(t => t.v === "N0"),
-  "C#: a hole right after an escaped brace is read as code, to its format; an even run of braces is text", JSON.stringify(escaped.toks.map(t => t.v)));
+ok(escapedWords.includes("= DateTime . Now ;") && !escaped.toks.some(t => t.v === "q") && escapedWords.includes("= Task . Delay ( 1 ) ;") && !escaped.toks.some(t => ["N0", "Clock"].includes(t.v) || /^\/[*/]/u.test(t.v)),
+  "C#: a hole right after an escaped brace is read as code, to its format, its comments no tokens; an even run of braces is text", JSON.stringify(escaped.toks.map(t => t.v)));
+// (the fallback reviewer's cases: a raw interpolated string's code is not read, as the reader's definition says, and no
+// text of one is taken for a hole; the holes after escaped braces are read in time linear in the string, each on its line)
+const rawHoles = readCsharp("class C { void M() { var s = $$\"\"\"{y} {{Clock.Now}}\"\"\"; var t = $\"\"\"a{Task.Delay(1)}\"\"\"; } }\n");
+ok(!rawHoles.toks.some(t => ["y", "Clock", "Task"].includes(t.v)), "C#: a raw interpolated string's code is not read, and none of its text is taken for a hole", JSON.stringify(rawHoles.toks.map(t => t.v).filter(Boolean)));
+const holesStarted = Date.now(), manyHoles = readCsharp(`class C { string s = $@"${"\n{{{x}}}".repeat(40000)}"; }`), holesTook = Date.now() - holesStarted, xs = manyHoles.toks.filter(t => t.v === "x");
+ok(xs.length === 40000 && xs.at(-1).line === 40001 && holesTook < 5000, `C#: 40,000 holes after escaped braces, a line each, are read in time, each on its line (${holesTook} ms)`, JSON.stringify({ n: xs.length, last: xs.at(-1)?.line }));
 const typeArg = readCsharp("using Alias = Game.Rules.Box<global::System.String>;\nusing B = global::M.N;\nclass C {}\n");
 ok(same(typeArg.usings.map(u => u.target), ["Game.Rules.Box"]), "C#: a global:: inside the target's type arguments leaves the target named; one that qualifies the target names nothing", JSON.stringify(typeArg.usings));
 const manyLines = readCsharp(`/*${"\n".repeat(600000)}*/ class C { void M() { } }\n`);

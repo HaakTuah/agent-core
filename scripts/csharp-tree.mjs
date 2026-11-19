@@ -363,7 +363,7 @@ function tokensOf(root, text, comments) {
     if (STRINGS.has(node.type)) { toks.push({ t: "str", v: node.type === "character_literal" ? node.text.slice(1, -1) : "", line }); continue; }
     if (node.type === "interpolated_string_expression") {
       toks.push({ t: "str", v: "", line });
-      const raw = node.children.some(c => c.type === "interpolation_start" && /"""/u.test(c.text));
+      const raw = /^\$+"""/u.test(text.slice(node.startIndex, node.startIndex + 64)); // (the grammar's interpolation_start holds the $ signs alone)
       const holes = raw ? [] : node.namedChildren.filter(c => c.type === "interpolation");
       for (let k = holes.length - 1; k >= 0; k--) for (const c of [...holes[k].children].reverse()) if (!["interpolation_brace", "interpolation_alignment_clause", "interpolation_format_clause"].includes(c.type)) stack.push(c);
       if (!raw) for (const tok of misreadHoles(node, holes, text)) toks.push(tok);
@@ -379,17 +379,18 @@ function tokensOf(root, text, comments) {
 // hole: a run of an odd count of `{` in the text outside the holes the grammar read. Its code, to the `}` that closes it
 // (before an alignment's `,` or a format's `:` at its own depth), is given as tokens after the string's, split as words,
 // numbers, strings and signs, as the lexer gave them, so a run of the clock in it is still read.
-const SPLIT = /@?[A-Za-z_\u0080-\uffff][\w\u0080-\uffff]*|\d[\w.]*|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|=>|\S/gu;
+const SPLIT = /\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*|@?[A-Za-z_\u0080-\uffff][\w\u0080-\uffff]*|\d[\w.]*|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|=>|\S/gu;
 function misreadHoles(node, holes, text) {
-  const out = [], from = node.startIndex;
-  let at = from;
+  const out = [];
+  let at = node.startIndex, row = node.startPosition.row + 1, seen = at; // (lines counted once each, as the holes are passed in order)
   for (const span of [...holes.map(h => [h.startIndex, h.endIndex]), [node.endIndex, node.endIndex]]) {
     const runs = /\{+/gu, piece = text.slice(at, span[0]);
     for (let m; (m = runs.exec(piece));) {
       if (m[0].length % 2 === 0) continue;
       const start = at + m.index + m[0].length, end = holeEnd(text, start, span[0]);
-      const line = node.startPosition.row + 1 + (text.slice(from, start).match(/\n/gu)?.length ?? 0);
-      for (const v of text.slice(start, end).match(SPLIT) ?? []) out.push(tokenOf(v, line));
+      for (; seen < start; seen++) if (text[seen] === "\n") row++;
+      const line = row;
+      for (const v of text.slice(start, end).match(SPLIT) ?? []) if (!v.startsWith("//") && !v.startsWith("/*")) out.push(tokenOf(v, line)); // (a comment is no token)
       runs.lastIndex = Math.max(runs.lastIndex, end - at);
     }
     at = span[1];
