@@ -58,9 +58,9 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      since the host tells it from no owner's. Reason: a review of
      one commit stood for later commits no one checked, and any collaborator's comment passed a pull request; and a
      fresh review was asked of every head, about 150 of Codex's on 39 pull requests, 113 finding nothing (#750). Held by
-     the `security-review` status, which waits where it is broken, in the core, and holds the merge once a ruleset
-     requires it (#320), through `scripts/clean-merges.mjs` and its test, by which the `code-review` status carries a
-     code review over the same way.
+     the `security-review` status through `scripts/clean-merges.mjs` and its test, by which the `code-review` status
+     carries a code review over the same way; the status waits where the rule is broken, in the core, and holds the
+     merge once a ruleset requires it (#320).
    - **What a posted review declares** (#299): by default a review posted in a comment that opens
      "Security review:", "Code review:" or "Design check:" covers one kind of review, and declares what it found on two
      lines of their own: "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other
