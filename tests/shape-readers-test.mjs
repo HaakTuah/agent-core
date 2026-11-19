@@ -469,6 +469,7 @@ ok(deepIfs?.depth === 20000 && deepIfs.branches === 20000 && Date.now() - walked
     const w = new Worker(code, { eval: true, execArgv: ["--input-type=module"] });
     w.once("message", m => { resolve(m); w.terminate(); });
     w.once("error", e => resolve({ error: String(e?.message ?? e) }));
+    w.once("exit", c => resolve({ error: `the thread exited with ${c} and sent nothing` }));
   });
   ok(got.argv?.includes("--input-type=module") && got.functions?.[0]?.name === "M", "code run with --input-type reads C#'s functions on the parser at once", JSON.stringify(got));
 }
