@@ -59,12 +59,12 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   and 4 naming `copies.yml`, the most of any check. **Try** jscpd for the finding, its definition taking the core's
   place by default (#534, point 3); the baseline and the near-copies the audit reads stay the core's glue. This weighs
   again the "Kept" of #486's inventory, whose reason was the core's own definition.
-- `scripts/pointers.mjs`, `scripts/rule-files.mjs`, `scripts/markdown.mjs`: fails a pointer in the rule files, to a file,
-  a section, a numbered point, a floor rule or an archive item, that leads nowhere. *Runs:* any session and the runners. *Else:* lychee
-  (offline, with Markdown's anchors), remark-validate-links, markdown-link-check and linkinator, each kept for
-  Markdown's own links and dropped, on fact, for the rest: none reads a backticked path, a quoted section, a bold lead
-  or "point 6". *Bugs:* 0. **Try** a link checker, run offline, for the form `[text](path)` and a project's own
-  documents (with #486's group 5); **keep** the core's own forms: nothing fits, they are the core's. Its reading of
+- `scripts/pointers.mjs`, `scripts/rule-files.mjs`, `scripts/markdown.mjs`: fails a pointer in the rule files, to a
+  file, a section, a numbered point, a floor rule or an archive item, that leads nowhere. *Runs:* any session and the
+  runners. *Else:* lychee (offline, with Markdown's anchors), remark-validate-links, markdown-link-check and linkinator,
+  each kept for Markdown's own links and dropped, on fact, for the rest: none reads a backticked path, a quoted section,
+  a bold lead or "point 6". *Bugs:* 0. **Try** a link checker, run offline, for the form `[text](path)` and a project's
+  own documents (with #486's group 5); **keep** the core's own forms: nothing fits, they are the core's. Its reading of
   Markdown runs on the package marked (#530, item 7).
 - `scripts/reading-size.mjs`, `scripts/file-size.mjs`: fails a file every session reads that passes its mark. *Runs:*
   any session and the runners. *Else:* size-limit and bundlesize, dropped on fact: they weigh a built bundle, not a file
@@ -89,14 +89,14 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   schemas.
 - `scripts/shape.mjs`, `scripts/code-shape.mjs`, `scripts/shape-readers.mjs`, `scripts/shape-csharp.mjs`,
   `scripts/shape-python.mjs`, `scripts/csharp-functions.mjs`, `scripts/dose.mjs`, `scripts/wait.mjs`,
-  `.github/shape.json`, `.github/shape-baseline.json`, `tests/readers-test.mjs`: fails what is new in how the code is put together: a function
-  past its marks for lines, depth and branching, an import on a cycle, a file in no system. *Runs:* any session and the
-  runners. *Else:* Lizard (MIT, Python, some 30 languages), dropped on fact: its definitions of a branch are fixed in
-  its code (#519's record); ESLint's `complexity` and `max-lines-per-function`, dropped on fact: JavaScript alone;
-  dependency-cruiser (MIT, 18 packages) and madge, for cycles and boundaries, dropped on fact: JavaScript and TypeScript
-  alone, where the check reads C# and Python too. *Bugs:* 3. **Keep:** fitting costs more than keeping, each tool
-  knowing one language or fixing its definitions; its readers go to the parser, as #486's group 3 and #519's path say,
-  C#'s functions the first (`scripts/csharp-functions.mjs`, #529).
+  `.github/shape.json`, `.github/shape-baseline.json`, `tests/readers-test.mjs`: fails what is new in how the code is
+  put together: a function past its marks for lines, depth and branching, an import on a cycle, a file in no system.
+  *Runs:* any session and the runners. *Else:* Lizard (MIT, Python, some 30 languages), dropped on fact: its definitions
+  of a branch are fixed in its code (#519's record); ESLint's `complexity` and `max-lines-per-function`, dropped on
+  fact: JavaScript alone; dependency-cruiser (MIT, 18 packages) and madge, for cycles and boundaries, dropped on fact:
+  JavaScript and TypeScript alone, where the check reads C# and Python too. *Bugs:* 3. **Keep:** fitting costs more than
+  keeping, each tool knowing one language or fixing its definitions; its readers go to the parser, as #486's group 3 and
+  #519's path say, C#'s functions the first (`scripts/csharp-functions.mjs`, #529).
 - `scripts/choices.mjs`: fails a choice record a pull request adds without its lines, says when the pass is due, and
   reads each sign written in a measure. *Runs:* any session and the runners. *Else:* none found; the decision records'
   tools (adr-tools, log4brains) write records and check no form. *Bugs:* 1. **Keep:** nothing fits; the form is the
@@ -106,13 +106,13 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   task runner (npm scripts, just, make), dropped on fact: a project in another stack has none of npm's, and the others
   are installs. *Bugs:* 2. **Keep:** small and stable glue.
 - `scripts/pr-description.mjs`, `.github/workflows/pr-description.yml`, `.github/workflows/own-description.yml`,
-  `scripts/milestones.mjs`, `scripts/done-when.mjs`, `scripts/owner-yes.mjs`: fail a ready pull request whose description lacks a heading the
-  project names, and, here, the lines the core asks. *Runs:* the runners, where the description is; any session given
-  it. *Else:* Danger JS (MIT), its rules written in JavaScript and run with a token, dropped on a measure: 14.1.0
-  installs 86 packages (34 MB), and the check's rules, the headings and lines the core asks, would be written again in
-  its file, Danger giving only the description the workflow already reads; the semantic title actions, dropped on fact:
-  a vendor's wrapper (#534, point 6) reading the title alone. *Bugs:* 2, and 1 naming `pr-description.yml`. **Keep:**
-  nothing fits; the headings are the core's.
+  `scripts/milestones.mjs`, `scripts/done-when.mjs`, `scripts/owner-yes.mjs`: fail a ready pull request whose
+  description lacks a heading the project names, and, here, the lines the core asks. *Runs:* the runners, where the
+  description is; any session given it. *Else:* Danger JS (MIT), its rules written in JavaScript and run with a token,
+  dropped on a measure: 14.1.0 installs 86 packages (34 MB), and the check's rules, the headings and lines the core
+  asks, would be written again in its file, Danger giving only the description the workflow already reads; the semantic
+  title actions, dropped on fact: a vendor's wrapper (#534, point 6) reading the title alone. *Bugs:* 2, and 1 naming
+  `pr-description.yml`. **Keep:** nothing fits; the headings are the core's.
 - `.github/workflows/personal-terms.yml`, `tests/personal-terms-test.mjs`: fails a pull request whose files, commits,
   title, description or branch hold a term of the secret `PERSONAL_TERMS`. *Runs:* the runners, where the secret is.
   *Else:* gitleaks (MIT, Go), kept: its rules may be written when the job runs, from the secret, and it reads text given
