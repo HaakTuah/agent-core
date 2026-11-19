@@ -8,8 +8,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one | |
-| #750 | rule builder; it changes floor rule 8 (point 2) | |
-| #841 | builder; a rework of tests; `scripts/steps-stage.mjs` and `scripts/steps/` | #750's point 1 |
 | #853 | builder; a rework of tests; `scripts/holders.json`, `scripts/holders.mjs` and their readers | #841 |
 | #810 | the orchestrator, for its done-when: reads `main`'s runs, then closes it | a stretch of merges landing faster than a run; at the batch's end, if none came, the orchestrator reads `main`'s runs since #813 and closes #810 on that |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | #715 |
@@ -43,13 +41,11 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #457 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose rule list it reads |
-| #469 | rule builder; it changes what every role reads at its start | |
 | #441, with #484, points 6 and 7 | rule builder; the file stays whole where #469's measure finds no kind of task reads less | #469 |
 | #355 | builder | #530: the readers left go on the parser #529 brings |
 | #542, point 5 | rule builder | #457 |
 | #675 | builder | |
 | #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | |
-| #492 | rule builder; it changes floor rule 4, who may start the orchestrator, and what every role reads at its start | #397 |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 1 | rule builder | |
 | #486, point 5 | builder | the types record reopening |
@@ -69,6 +65,8 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #739 | rule builder; it changes the game module (`tasks/game-design.md`) | |
 | #786 | rule builder; it changes the floor (the threat model) | |
 | #831 | rule builder; a page for owners beside the floor, with the rule and check that keep it in step; the floor's wording unchanged | |
+| #886, point 1 | rule builder; it changes the floor (rule 3) and adds a script beside `scripts/comment-only.mjs` | |
+| #886, point 2 | rule builder; it changes the floor (rules 3 and 14), `AGENTS.md`'s queue gate, the review guidelines and the state report | #886, point 1 |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line

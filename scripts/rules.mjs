@@ -2,7 +2,7 @@
 // part D): each paragraph or item of a list in the floor's files, the roles' and the modules' whose text opens with a bold lead is a rule,
 // named by its file and that lead ("floor/security.md: 1. Nothing secret in the repository"). Its text runs to the next
 // rule at its own depth or above, a heading, or a line that leaves its item, so an item's own items are part of it as
-// well as rules of their own. What holds each is named in holders.json, beside this file (holders.mjs); a staged case
+// well as rules of their own. What holds each is named in scripts/holders/, beside this file (holders.mjs); a staged case
 // names the rules it holds (staged/, staged.mjs). Node's own modules, and reading.mjs beside it for the files.
 //
 //   import { rules, ruleKey } from "./rules.mjs";

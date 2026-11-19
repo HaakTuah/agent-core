@@ -38,7 +38,7 @@ export const LABEL = "correction";
 // The number a rule names (AGENTS.md of the core, "Every rule says what holds it"; #303): the count it is meant to
 // lower, `findings` (the review findings that name it), `check fires` (the pull requests its check failed) or
 // `correction: <kind>`, the one of the five outcomes it stands for, and "; rare harm" where it guards against rare and
-// severe harm; held in holders.json's "numbers" and on a description's line "Number:" (pr-description.mjs), both beside
+// severe harm; held in the "number" of a rule's entry in scripts/holders/ and on a description's line "Number:" (pr-description.mjs), both beside
 // this file, in this one form.
 export const NUMBER = new RegExp(`^(findings|check fires|correction: (?:${KINDS.join("|")})); outcome: (${OUTCOMES.slice(0, 5).map(([k]) => k).join("|")})(; rare harm)?$`, "u");
 export const LEAST = 30, MONTHS = 3, SAMPLE = 60, SPLIT = 20 * 1024, DAYS = 14, HOUR = 3600e3;

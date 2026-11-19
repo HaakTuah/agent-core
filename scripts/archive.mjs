@@ -19,7 +19,7 @@ import path from "node:path";
 
 export const REASONS = "archive/instructions";
 export const WORDS = "words";
-const FILE_LIST = "scripts/holders.json";
+const FILE_LIST = "scripts/holders/ (the entry of each rule it stands behind)";
 // The last item whose words stand in words/: from the next on, the words stay on the issue the item names.
 export const LAST_WORDS = 245;
 // The last item keyed by a running number: from the next on, an item is keyed by its issue (#744).

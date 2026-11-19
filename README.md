@@ -60,7 +60,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   "content put where its readers must read past it" (`roles/shared/review-guidelines.md`). What a cap decides, and when one
   may rise: `AGENTS.md`, "The size caps keep the rules lean and decide nothing else".
 - **What holds each rule:** a check that fails where it is broken, a staged case, or the scheduled audit
-  (`scripts/holders.json`, which names too the archive's items behind each); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
+  (`scripts/holders/`, an entry for each rule, which names too the archive's items behind it); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
   A project's own rules are read the same way, against its list `checks/holders.json`, and those with none listed in
   its own monthly state report, failing nothing (`node core/scripts/holders.mjs --own`; `AGENTS.md`, "A project's own
   rules name what holds them").
@@ -69,7 +69,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   when a rule they hold changes; their record is `reports/staged-cases.json` (`AGENTS.md`, "Staged cases hold what no
   check reads").
 - **The number each rule names, and the pruning:** each rule names the count it is meant to lower and the outcome it
-  stands for (`scripts/holders.json`, "numbers"); every second month, and with a newer generation of model,
+  stands for (`scripts/holders/`, the entry's "number"); every second month, and with a newer generation of model,
   `scripts/pruning.mjs` lists the rules whose number did not move, whose check never fired or whose staged case passed
   without them, for the owner to decide which go; its record is `reports/pruning.json` (`AGENTS.md`, "Rules are pruned
   by their numbers").

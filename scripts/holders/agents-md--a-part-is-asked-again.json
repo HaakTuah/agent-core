@@ -1,0 +1,5 @@
+{
+  "rule": "AGENTS.md: A part is asked again",
+  "behind": ["#534.1"],
+  "number": "correction: does not work; outcome: robust"
+}
