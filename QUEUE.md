@@ -9,13 +9,12 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
-| #783 | builder | |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
 | #704 | builder; `tests.yml` | #715 |
 | #770 | builder; `tests.yml` | #704 |
 | #772 | builder; `tests.yml` | #770 |
 | #530, step 5 | builder; licence readers | |
-| #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md` | |
+| #534, point 12 | rule builder; it changes `tasks/cleaning.md` | |
 | #593, points 8 and 9 | rule builder | |
 | #625 | builder | #624 |
 | #626 | builder | #624 |
@@ -46,7 +45,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #458 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose rule list it reads |
-| #361 | rule builder, points 1 and 2 only | |
 | #469 | rule builder; it changes what every role reads at its start | |
 | #484, points 1 to 5 | rule builder | |
 | #441, with #484, points 6 and 7 | rule builder; the file stays whole where #469's measure finds no kind of task reads less | #469 |

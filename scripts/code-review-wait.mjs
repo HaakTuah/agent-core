@@ -31,7 +31,7 @@
 // does not hold what a review says, that docs another provider built got their code review, nor, given no list of the
 // merges proved (a workflow older than this script), that a merge from `main` brought no change of its own: those stay
 // with the builder and the reviews. Once a review has run, it waits too on the marks reviews leave (review-marks.mjs,
-// beside this file; #551): the newest posted review of each kind declaring its two lines, and, in the core's own
+// beside this file; #551): the newest posted review of each kind declaring its lines and its score (#710), and, in the core's own
 // repository, a design-checked pull request's design check of its head; a review counts for these only as the
 // security-review status counts one (REVIEWERS, RIGHTS). It prints, as JSON, the commit to
 // mark and the status to give it, named "code-review", or {} for a pull request that is closed or a draft. While
@@ -46,10 +46,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
 import { copyOf } from "./core-path.mjs";
-import { marksWait } from "./review-marks.mjs";
+import { formOf, marksWait } from "./review-marks.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
-import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, counted, form, pinsAlone, reviewersOf, standsFrom, status, unproved, whole, writersOf } from "./security-review.mjs";
+import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, counted, pinsAlone, reviewersOf, standsFrom, status, unproved, whole, writersOf } from "./security-review.mjs";
 
 export const CONTEXT = "code-review";
 const SHA = /^[0-9a-f]{40}$/u;
@@ -66,7 +66,7 @@ export function judge(pull, comments, commits, files, rules = [], bound = true, 
   // (a summary whose state cannot be read is no review of Codex's, running or done: the check warns, and goes on)
   return read.unread ? { ...verdict, warning: UNREAD } : verdict;
 }
-// the marks reviews leave (review-marks.mjs; #551), once the review has run: a posted review's two lines, and, in the
+// the marks reviews leave (review-marks.mjs; #551), once the review has run: a posted review's lines and score, and, in the
 // core, a design-checked pull request's design check of the head; a review counts for them only as security-review.mjs
 // counts one (more: the accounts the project names, and the host's rights read for those who posted one), never by
 // GitHub's association alone, since in an organisation a member who may only read has it too
@@ -104,8 +104,8 @@ function reviewRan(sha, posted, review, pull, commits, bound, merges) {
   // (where a merge from main that git would not make stops it, the status names that merge: #323)
   const cut = unproved(pull, flat(commits), sha, merges);
   const why = cut !== undefined && [...standsFrom(pull, flat(commits), sha)].some((at) => seen.has(at))
-    ? `merge ${cut.slice(0, 7)} unproved. Mend: another reviews, posts ${form("Code")}`
-    : `no code review yet. Mend: ask one, or another reviews, posts ${form("Code")}`;
+    ? `merge ${cut.slice(0, 7)} unproved. Mend: another posts ${formOf("Code review")}`
+    : `no code review. Mend: a fresh reviewer posts ${formOf("Code review")}`;
   // a pull request whose head does not hold this check as the default branch does stood before it came: reported only
   return bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
 }

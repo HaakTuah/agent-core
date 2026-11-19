@@ -152,11 +152,16 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   By default what a role reads at its start, as its file under `roles/` names it, stays under that role's cap, so
   whoever adds a rule there replaces text. Where a fresh session has read all the rules for room and found too little,
   whoever makes the change raises the role's cap one step, a whole KB, in the same PR, as "A mark on what every
-  session reads" in `roles/shared/review-guidelines.md` says of any such mark. It does not mean
-  a rule is moved from where it belongs, cut short or left out to fit, nor another rule's reason, name or example cut
-  to make room. Reason: each start is paid at every task, and a cap that decided where a rule stands would hide it
-  from who must keep it. Held by `scripts/size.mjs`, and `.github/workflows/size.yml`, which fails a raise of more
-  than one step, and one in a PR with no "Leanness check:" comment.
+  session reads" in `roles/shared/review-guidelines.md` says of any such mark. Where `main` itself
+  stands past a cap, or the queue past its mark, because pull requests that each fitted merged together, it is a task
+  to trim, which the scheduled look keeps, never a red that stops merging (#750, point 6): only a pull request whose
+  own change takes a start or the queue past its cap, by growing it or lowering the cap, fails. It does not mean a rule is moved from where it belongs, cut short or
+  left out to fit, nor another rule's reason, name or example cut to make room, nor that a cap is raised by a task to
+  trim. Reason: each start is paid at every task, and a cap that decided where a rule stands would hide it from who
+  must keep it; under merge-on-green two rule changes can each fit and together pass a cap. Held by
+  `scripts/size.mjs`, against the pull request's base, and `.github/workflows/size.yml`, which fails a raise of more
+  than one step, and one in a PR with no "Leanness check:" comment; the task, by the scheduled look's reader of it
+  (`scripts/look.mjs`, from `due` in `scripts/size.mjs`).
 - **A release is cut on the owner's word:** another owner's project takes the core only
   from a release (`README.md`, "How a project takes the core", point 1), so one is cut when the owner says the core as
   it stands may be handed on, never by a session's own choice: the owner's standing word is that it may each time the
@@ -244,6 +249,59 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   conclusions are carried, nothing of its code or its discussions. It does not mean a project that is merely public is
   read for the report, though a task may read it (`roles/shared/how-to-work.md`). Reason: the owner wants to see how the
   core works in other projects, and only those that hold use to read.
+- **A part of the core gives way to what is maintained** (#534). By default the core keeps the parts it has. The one
+  condition that changes it: a maintained tool, package or standard, free to use, does a part's job at the same level or
+  better. The trigger is a line of `QUEUE.md` that names the part, as a verdict of the inventory (`INVENTORY.md`) joins
+  it on the owner's word: whoever takes that line replaces the part, and from then on the core follows the tool's
+  releases by `tasks/updates.md` in place of keeping a version of its own. "The same level or better" is shown: the tool
+  and the part run on the same inputs (the core's own repository, the projects the upgrade test writes of each kind, and
+  the part's own fixtures), and the pull request states what each found that the other did not, as `tasks/choices.md`
+  asks of a trial. Where the tool defines the thing otherwise than the core (what a copy is, what counts as a branch),
+  its definition is taken unless the comparison shows it worse for what the rule is for, and the pull request says
+  which; and that pull request adds a sync note whose step has a project's list for that check written anew at the sync
+  that brings the replacement, the pull request's base counting as the list until then. A part rests on one of the
+  exceptions of `tasks/code-shape.md`, "A job a maintained package does is done by it", to stay. The writer of
+  `QUEUE.md` queues the replacements in one order: the inventory, then the tools that only run, which hand over the most
+  upkeep for the least work (secrets and personal terms, then the workflow checks, then mutation testing, then links),
+  then the packages installed from the core's lock file (#654), then the form the rules are delivered in, each
+  replacement a line and a pull request of its own. Whatever gives way, the core keeps: the floor and the policy a check
+  applies (what is allowed, its lists); the content of the rule text, which another's text never replaces, though its
+  form and delivery may change, the text that describes a check that gave way shrinks to a pointer to the tool's own
+  documentation, and what others do may be written anew as the core's own, joining as any rule does; and the glue around
+  every check: a baseline that may only shrink, a failure that says the mend, the word that it could read nothing
+  (#459), and "Nothing locks a project"; the tool finds, and the core decides and words the failure. It does not mean a
+  part is replaced for the sake of it, nor that a sync asks a project to replace anything of its own. Reason: what the
+  core writes itself, the core alone maintains, in every project that takes it; and rule text breaks on no update, holds
+  the owner's decisions with their reasons, would run with the agents' rights where another's (floor rule 4), and cannot
+  be shown "the same level or better" without trials of behaviour. Held by no check: the comparison and the definition
+  taken are stated in each replacement's pull request, which the reviews read, and the inventory is held by its own
+  check (`tests/mend-test.mjs`).
+- **A tool that only runs is fetched at set-up, as its own program** (#534). By default a check of the core is a script
+  of its own. Where a part gives way to a tool that only runs, whoever builds the replacement has the tool fetched at
+  set-up, never while a check runs: one exact version, its digest in a list a test reads (a registry's own lock file
+  first, for a tool a registry carries; #654), an entry for each platform a check runs on, fetched to a place outside
+  the repository when a session is set up and in the set-up step of the job on the host's runners, as `scripts/node.sh`
+  fetches Node. The check then runs wherever the tool is, in a cloud session, on the owner's own computer or on the
+  runners; where the tool is not there and cannot be fetched, the check says that it did not run and why, and decides
+  nothing. The tool runs as its own program, never through a vendor's action for the host, a hosted service or a feature
+  of the host's paid plans, and passes floor rules 7, 10 and 15 and the lookup (`floor/topics/dependencies.md`). It adds
+  no job: what adds minutes, mutation testing above all, stays on the lines a change touches. It does not mean a check
+  that exists on the host's runners alone. Reason: a private repository on the host's free plan stops its jobs once the
+  month's minutes are spent, a project built on its owner's own computer gets least from a check it cannot run there,
+  and a wrapper or a hosted feature brings terms of its own (a licence key for an organisation's repositories, a price
+  for each committer) and may send data out of the repository. Held, for the pin, by the licence scan's check that a
+  program a file downloads is pinned by version and checksum (`scripts/licence-scan.mjs`; #488); that no workflow runs
+  such a tool through another's action, by no check yet (#639).
+- **A part is asked again** (#534). By default the pass twice a year over the choice records (`tasks/choices.md`) asks
+  of each part the inventory marks keep or try whether something maintained now does it, and writes the day on the
+  inventory's line `Weighed whole:`. The trigger that asks sooner: a bug filed that names such a part, or a pull request
+  that widens what such a part reads or checks (a new case, a new format, a new language) and does not only mend it;
+  whoever takes that work puts the question and answers it in that pull request. A tool the core holds is followed by
+  the update rules and looked up again by the scheduled look (#488). It does not mean that an answer replaces a part: a
+  replace joins the queue on the owner's word, as above. Reason: twice a year is slow for a part that has begun to cost,
+  and a bug or a widening is the sign that it has. Held, for the pass, by its issue, which the scheduled look opens and
+  which asks it of the inventory (`scripts/choices.mjs`); the sooner asking, by no check, since none can tell a mend
+  from a widening without guessing.
 - **A rule is for what an agent can do** (#303). By default a rule moves here, into the floor or a module, only where
   it holds in every project, an agent can carry it out, and it makes the product better or sturdier, as the licence
   check does: an agent keeps the project within it, and the project is safer for it. It comes from a standing word of

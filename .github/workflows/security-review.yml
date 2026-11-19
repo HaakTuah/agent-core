@@ -7,9 +7,9 @@
 # comment that opens "Code review:" naming the commit by its whole SHA, which ends the wait; such a comment starts the
 # job only where the check is not advisory, since an advisory status passes anyway and the next push or Codex's own
 # summary rewrites it, so that no project starts a job for it it did not start before). The same status waits, too,
-# while the newest posted review of a kind from such an account declares no line of its findings, and, in the core's
-# own repository, while a design-checked pull request has no "Design check:" of its head, which starts the job as
-# "Code review:" does (scripts/review-marks.mjs; tasks/reviews.md, points 3 and 4; #551).
+# while the newest posted review of a kind from such an account declares no line of its findings or of its score,
+# and, in the core's own repository, while a design-checked pull request has no "Design check:" of its head, which
+# starts the job as "Code review:" does (scripts/review-marks.mjs; tasks/reviews.md, points 3 and 4; #551, #710).
 # Proof is the summary Codex's own app keeps on the pull request, saying its security review is completed, or a comment
 # that opens "Security review:" from the repository's owner, a person the host lets write (in a team's project, each
 # owner: roles/shared/teams.md; the job reads each such commenter's rights from GitHub, #412), or an account the caller

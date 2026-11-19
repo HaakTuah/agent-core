@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { ghStandIn } from "../scripts/scratch-core.mjs";
 import { onPath, parseYaml } from "../scripts/workflow-run.mjs";
-import { CAPS, QUEUE, answered, capsOf, counted, raised as raisedWith, rolesAt, whoseOf } from "../scripts/size.mjs";
+import { CAPS, DUE_TITLE, QUEUE, answered, capsAt, capsOf, counted, due, judged, raised as raisedWith, rolesAt, whoseOf } from "../scripts/size.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -74,6 +74,22 @@ ok(eq(rolesAt(root).sort(), Object.keys(CAPS).sort()) && rolesAt(root).every(r =
 ok(counted("design", root).includes("roles/builder.md") && counted("orchestrator", root).includes("roles/orchestrator.md") && !counted("builder", root).includes("roles/orchestrator.md") && !counted("stand-in", root).includes("roles/shared/git.md"),
   "a role's count holds what its file names, a role's file named there with what that names, and nothing another role alone reads");
 
+// what a pull request or the default branch makes of what stands past a cap (#750, point 6)
+const past = [{ what: "builder", said: "what the role builder reads at its start", total: 110, cap: 100, kind: "role" }];
+ok(eq(judged(past).fail, []) && /is 10 bytes over its cap$/.test(judged(past).task[0]), "with no base, what stands past a cap is a task");
+ok(judged(past, { builder: 90 }).fail.length === 1 && /is 10 bytes over its cap\. Mend:/.test(judged(past, { builder: 90 }).fail[0]) && judged(past, {}).fail.length === 1, "against a base under the cap, or one without the role, it fails");
+ok(judged(past, { builder: 105 }).fail.length === 1 && /5 of them this change's own/.test(judged(past, { builder: 105 }).fail[0]), "against a base past the cap already, a change that grows it fails, saying how much is its own");
+ok(judged(past, { builder: 100 }).fail.length === 1 && !/this change's own/.test(judged(past, { builder: 100 }).fail[0]), "a base exactly at the cap was not past it");
+ok(eq(judged(past, { builder: 110 }).fail, []) && eq(judged(past, { builder: 120 }).fail, []) && /as it stood before this change/.test(judged(past, { builder: 120 }).task[0]), "one that does not grow it is a task");
+ok(judged(past, { builder: 110 }, { builder: 120 }).fail.length === 1 && /which this change lowers from 0\.1171875 KB to 0\.09765625 KB\. Mend: set it back to 0\.1171875 \* 1024, the base's cap/.test(judged(past, { builder: 110 }, { builder: 120 }).fail[0]) && eq(judged(past, { builder: 110 }, { builder: 100 }).fail, []) && eq(judged(past, { builder: 110 }, {}).fail, []), "a change that lowers a cap below what stands fails, where the base set a higher one (the design check of 9bfbe79)");
+{ const lowered = [{ what: QUEUE.file, said: QUEUE.file, total: 6000, cap: 5 * 1024, kind: "queue" }], f = judged(lowered, { [QUEUE.file]: 6000 }, { [QUEUE.file]: 6 * 1024 }).fail[0];
+  ok(mended(`FAIL: ${f}`) && /over its mark, which this change lowers from 6 KB to 5 KB\. Mend: set it back to 6 \* 1024, the base's mark/.test(f) && eq(Object.keys(capsAt("HEAD")).sort(), [...Object.keys(CAPS), QUEUE.file].sort()) && Object.values(capsAt("HEAD")).every(b => b > 0 && b % 1024 === 0) && eq(capsAt("--output=x"), {}), "the queue's mark lowered below what stands fails with its mend, and capsAt reads a cap for each role and the mark a revision sets, in whole KB, whatever the working tree holds, and nothing from a revision it refuses (the fallback reviewer's check of 94d700d)"); }
+ok(due({ manifest: "a project's manifest" }) === null, "the scheduled look keeps no such issue in a project");
+const here = process.cwd(), empty = fs.mkdtempSync(path.join(os.tmpdir(), "size-empty-"));
+try { process.chdir(empty); ok(due({ manifest: null }) === null, "nor where no roles/ or queue stands to count"); } finally { process.chdir(here); fs.rmSync(empty, { recursive: true, force: true }); }
+const kept = due({ manifest: null });
+ok(kept.title === DUE_TITLE && (kept.body === null || /^- what the role \S+ reads at its start is \d+ bytes over its cap\.$/m.test(kept.body) || /^- QUEUE\.md is/m.test(kept.body)), "in the core it keeps the issue while a start or the queue stands past its cap, and closes it once none does", JSON.stringify(kept));
+
 // the script itself
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "size-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
@@ -86,7 +102,9 @@ ok(QUEUE.mark < 20 * 1024 && /^the queue \(QUEUE\.md\): \d+ bytes of its mark, \
 const queueFile = path.join(root, QUEUE.file), queueText = fs.readFileSync(queueFile);
 try {
   fs.writeFileSync(queueFile, Buffer.concat([queueText, Buffer.alloc(QUEUE.mark, "x")]));
-  ok(run().status === 1 && /QUEUE\.md is \d+ bytes past its mark\. Mend: take out each finished line/.test(run().out) && mended(run().out), "a queue past its mark fails, saying the mend", run().out);
+  const based = run("--base", "HEAD");
+  ok(based.status === 1 && /QUEUE\.md is \d+ bytes over its cap\. Mend: take out each finished line/.test(based.out) && mended(based.out), "a queue this change takes past its mark fails, saying the mend", based.out);
+  ok(run().status === 0 && /::warning::QUEUE\.md is \d+ bytes over its cap, which fails nothing: a task to trim/.test(run().out), "with no base, as on the default branch, a queue past its mark is a warning and a task, never a failure", run().out);
 } finally { fs.writeFileSync(queueFile, queueText); }
 ok(run("--raise", same, none).status === 0 && run("--raise", same, none).out.includes("no role's cap is raised") && run("--raise", old, none).status === 0, "against a base with the same caps, or the one cap of before at the builder's, it passes with no comment");
 ok(run("--raise", lower, none).status === 1 && run("--raise", lower, none).out.includes("Leanness check:") && mended(run("--raise", lower, none).out) && run("--raise", lower, one).status === 0 && run("--raise", lower, one).out.includes("holds a leanness check's answer"), "against a base with a lower cap for a role it fails without the answer, saying the mend, and passes with it", run("--raise", lower, none).out);
@@ -99,8 +117,25 @@ for (const part of ["scripts", "roles", "tasks", "floor"]) fs.cpSync(path.join(r
 fs.copyFileSync(queueFile, path.join(tmp, QUEUE.file));
 const copy = path.join(tmp, "scripts", "size.mjs"), at2 = (...args) => { const r = spawnSync(process.execPath, [copy, ...args], { cwd: tmp, encoding: "utf8", env: { ...process.env, OWNER: "someone" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 ok(at2().status === 0, "a copy of the core counts as the core does", at2().out);
+const git = (...args) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: tmp, encoding: "utf8" });
+git("init", "-q"); git("add", "-A"); git("commit", "-qm", "base");
+const standIn = Number(new RegExp(`the role stand-in reads at its start \\(.*\\): (\\d+) bytes of`).exec(at2().out)?.[1]);
+fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), "x".repeat(CAPS["stand-in"] - standIn));
+ok(at2("--base", "HEAD").status === 0 && new RegExp(`stand-in reads at its start \\(.*\\): ${CAPS["stand-in"]} bytes of`).test(at2().out) && !/::warning::/.test(at2().out), "a start exactly at its cap is not past it", at2().out);
+git("checkout", "-q", "--", "roles/stand-in.md");
 fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), `\n${"x".repeat(CAPS["stand-in"])}\n`);
-ok(at2().status === 1 && /what the role stand-in reads at its start is \d+ bytes over its cap\. Mend: say the rules/.test(at2().out) && mended(at2().out) && !/the role builder reads at its start is/.test(at2().out), "a role whose start has outgrown its cap fails, it alone, saying the mend", at2().out);
+let r = at2("--base", "HEAD");
+ok(r.status === 1 && /what the role stand-in reads at its start is \d+ bytes over its cap\. Mend: say the rules/.test(r.out) && mended(r.out) && !/the role builder reads at its start is/.test(r.out), "a role whose start this change takes past its cap fails, it alone, saying the mend", r.out);
+ok(at2().status === 0 && /::warning::what the role stand-in reads at its start is \d+ bytes over its cap, which fails nothing/.test(at2().out), "with no base, as on the default branch, it is a warning and a task (#750, point 6)", at2().out);
+git("commit", "-qam", "past the cap");
+r = at2("--base", "HEAD");
+ok(r.status === 0 && /::warning::what the role stand-in reads at its start is \d+ bytes over its cap, as it stood before this change, which does not grow it/.test(r.out), "past its cap at the base already, a change that does not grow it passes, with the warning", r.out);
+fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), "one line more\n");
+r = at2("--base", "HEAD");
+ok(r.status === 1 && /over its cap, 14 of them this change's own\. Mend:/.test(r.out) && mended(r.out), "one that grows it further fails, saying how much is its own", r.out);
+git("checkout", "-q", "--", "roles/stand-in.md");
+for (const bad of [at2("--base", "no-such-revision"), at2("--base"), at2("--other"), at2("--base", "--output=x"), at2("--base", "HEAD:roles")]) ok(bad.status === 1 && mended(bad.out), "a base git cannot read, or an option it does not know, fails, saying the mend", bad.out);
+fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), `\n${"x".repeat(CAPS["stand-in"])}\n`);
 fs.writeFileSync(path.join(tmp, "roles", "planner.md"), "# The planner\n\nRead at its start by the role `planner`.\n\n**Reads at its start:** `roles/shared/git.md`.\n");
 ok(/the role planner has no cap\. Mend: give it a line in CAPS/.test(at2().out) && mended(at2().out), "a role with a file and no cap fails, saying the line to add", at2().out);
 fs.rmSync(path.join(tmp, "roles", "planner.md")); fs.rmSync(path.join(tmp, "roles", "reviewer.md"));
@@ -111,10 +146,10 @@ ok(hidden.status === 1 && hidden.out.includes("does not set the caps the script 
 // (given the head's file, it reads the head as text alone, its caps those the text sets: what the head's own script
 // would say of the raise or of an answer has no say)
 const raising = own.replace(/^  builder: (\d+) \* 1024,$/m, (line, n) => `  builder: ${Number(n) + 1} * 1024,`), rewritten = put("rewritten.mjs", raising.replace(/^export function answered\(comments, whose = \(\) => false\) \{$/m, m => `${m}\n  return true;`));
-const judged = run("--raise", same, none, put("rights.json", "[]"), rewritten);
-ok(raising !== own && fs.readFileSync(rewritten, "utf8").includes("return true;") && judged.status === 1 && /the role builder rises.*Leanness check:/.test(judged.out) && mended(judged.out)
+const byBase = run("--raise", same, none, put("rights.json", "[]"), rewritten);
+ok(raising !== own && fs.readFileSync(rewritten, "utf8").includes("return true;") && byBase.status === 1 && /the role builder rises.*Leanness check:/.test(byBase.out) && mended(byBase.out)
   && run("--raise", same, one, put("rights.json", "[]"), rewritten).status === 0 && run("--raise", same, none, put("rights.json", "[]"), put("same-head.mjs", own)).out.includes("no role's cap is raised"),
-  "given the head's file, the raise is judged as this script reads the head's text: one without its answer fails whatever the head's own script holds, and passes with it", judged.out);
+  "given the head's file, the raise is judged as this script reads the head's text: one without its answer fails whatever the head's own script holds, and passes with it", byBase.out);
 ok(run("--raise", same, none, put("rights.json", "[]"), path.join(tmp, "missing.mjs")).status === 1 && mended(run("--raise", same, none, put("rights.json", "[]"), path.join(tmp, "missing.mjs")).out)
   && /not the one block the check reads/.test(run("--raise", same, one, put("rights.json", "[]"), put("nocaps.mjs", "const x = 1;\n")).out),
   "  and a head it cannot read, or whose caps cannot be read, fails, saying the mend");
