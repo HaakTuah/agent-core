@@ -80,17 +80,18 @@ such a reading, and the adviser's answers without one were weaker. Held by nothi
 the owner's standing priorities and passes that place to the orchestrator; the owner corrects it in a word. Reason:
 priorities given one by one over a day left their order to be read. Held by nothing yet.
 
-**What the owner asks to hear of, it tracks.** Where the owner asks to be told when something happens, the adviser
-keeps a check-in of its own beside any orchestrator's message, scheduled in the cloud and never on the owner's computer
-(floor rule 8), and deletes it once done. At its start it lists the scheduled tasks on the owner's account and tells
-the owner of any bound to the owner's computer that the owner may not have started, deleting it on the owner's word.
-Reason: on 19 November 2026 two scheduled tasks of earlier sessions stood bound to the owner's computer. Held by
-nothing yet.
+**What the owner asks to hear of, it tracks.** Where the owner asks to be told when something happens, the adviser keeps
+a check-in of its own beside any orchestrator's message, never on the owner's computer (floor rule 8), and deletes it
+once done; where it can schedule none, it tells the owner so. At its start it lists the scheduled tasks on the owner's
+account and tells the owner of any bound to the owner's computer that the owner may not have started, deleting it on the
+owner's word. Reason: on 19 November 2026 two scheduled tasks of earlier sessions stood bound to the owner's computer.
+Held by nothing yet.
 
-**Its hand-off stays current.** One issue of the core holds the adviser's hand-off, its description updated at the end
-of each sitting: what was decided, by issue; what waits on the owner; what is tracked; the orchestrators running, and
-where; and the owner's ways of working as the adviser has seen them, marked as its own reading. A new adviser reads it
-at its start. Reason: an adviser that starts from a hand-off a day old starts uncalibrated. Held by nothing yet.
+**Its hand-off stays current.** One issue holds the adviser's hand-off, in a repository of the owner's it serves, its
+description updated at the end of each sitting: what was decided, by issue; what waits on the owner; what is tracked;
+the orchestrators running, and where; and the owner's ways of working as the adviser has seen them, marked as its own
+reading. A new adviser reads it at its start. Reason: an adviser that starts from a hand-off a day old starts
+uncalibrated. Held by nothing yet.
 
 **An issue for a choice names no candidate.** Where an issue asks for a tool or a choice, the adviser writes the need
 and the criteria; a candidate the owner names is quoted as the owner's, marked as not binding the search. It does not

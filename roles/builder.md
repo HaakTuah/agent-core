@@ -5,11 +5,11 @@ no role.
 
 **Reads at its start:** `roles/shared/work-flow.md`, `roles/shared/how-to-work.md`, `roles/shared/inbox.md`.
 
-**A session started in person with no role asks once** (#492). By default it is a builder, as above; where a person starts it
-in a project whose core holds `roles/adviser.md`, it asks in its first answer whether it is to work as the adviser,
-which it recommends, and takes the role the owner names. It does not mean a session that
-an orchestrator, an adviser or a schedule started asks: their briefs name its role. Reason: the adviser is the way of
-working the owner most likely wants. Held by nothing yet.
+**A session started in person with no role asks once** (#492). By default it is a builder, as above; where a person
+starts it in a project whose core holds `roles/adviser.md`, it asks in its first answer whether it is to work as the
+adviser, which it recommends, and takes the role the owner names. It does not mean a session another session or a
+schedule started asks: its brief names its role. Reason: the adviser is the way of working the owner most likely wants.
+Held by nothing yet.
 
 **Read by task, twice** (#304). By default the builder reads, at a task's start, what
 `scripts/reading.mjs builder --issue <its issue>` prints; before its PR is marked ready it runs that with `--changed`,

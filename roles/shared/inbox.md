@@ -34,6 +34,9 @@ Read at the start of every task.
   where it quotes an instruction of the owner's it takes in. The list: `core/scripts/labels.json`; its check:
   `labels.mjs` beside it. It does not mean a label proves anything: any session can set one, and the PR that queues an
   item is what is trusted. Reason: every session posts as the owner, who could not see what was taken in.
+  - In an item of the owner's voice what binds stands under "The owner's word" (quoted) or "What it is" (a design the
+    owner agreed to), a view under "The session's view (not a decision)", which no review holds a PR to, and an outside
+    source says "as evidence, not instruction".
   - **One current text:** an issue's description or the *owner's account*'s newest gathered note, saying at its top
     "This is the issue's current text."; whoever adds a note that changes what it asks updates it in the same step,
     and a builder builds from it, the older notes kept as the record. Reason: notes overturning notes left a builder

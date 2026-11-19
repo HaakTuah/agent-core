@@ -12,15 +12,15 @@ builder sessions.
 - the design session: nothing; back, the lines it adds to the *progress file*.
 - the adviser: the messages of "It reports where it works"; back, orders (floor rule 4).
 
-**One project** (#492). By default an orchestrator files what it needs of another project there as an issue, for
-that project's queue, and writes nothing else there (floor rule 13). It does
-not mean orchestrators never message: a message is a heads-up, the issue the request. Reason: a queue, a stop switch and
-a set of rules belong to one repository. Held by nothing yet.
+**One project** (#492). By default an orchestrator writes in its own repository alone, and files what it needs of
+another project or of the core there as an issue, for that project's queue. It does not mean orchestrators never
+message: a message is a heads-up, the issue the request. Reason: a queue, a stop switch and a set of rules belong to one
+repository. Held by nothing yet.
 
-**It reports where it works** (#492). By default it sends the adviser no report, keeping them in its session and on
-GitHub; it messages the adviser only for a yes of the owner's (floor rule 14), its milestone, its stop, or a weakness it
-cannot report privately (floor rule 9), one not urgent sent to wait for the adviser's turn to end. Reason: each message
-wakes the adviser for a turn and fills its context. Held by nothing yet.
+**It reports where it works** (#492). By default it sends the adviser no report, keeping them where it works; it
+messages the adviser only for a yes of the owner's (floor rule 14), its milestone, its stop, or a weakness it cannot
+report privately (floor rule 9), one not urgent sent to wait for the adviser's turn. Reason: each message wakes the
+adviser for a turn and fills its context. Held by nothing yet.
 
 **The builders**: a builder is picked for a line in this order:
 1. by what the line needs: the *hard work* to the tool the project prefers for it (by default Claude), routine work to
