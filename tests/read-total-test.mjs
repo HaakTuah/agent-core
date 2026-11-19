@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
-import { FLOOR, START } from "../scripts/reading.mjs";
+import { FLOOR, MAKE, START } from "../scripts/reading.mjs";
 import { OPEN, candidates, conditions, cuts, tasks, total } from "../scripts/read-total.mjs";
 
 let count = 0, failed = 0;
@@ -43,6 +43,13 @@ const after = texts => { const head = total(memory(texts), given, before); retur
 let got = conditions(...after(cut), "Never needed: `tasks/screens.md`, for a polish task, whose part moved to `tasks/polish.md`.");
 ok(got.cut && !got.failures.length, "a cut that lets a polish task read less, no reader reading more, passes the three conditions", got.failures.join("\n"));
 ok(before.readers.get("a builder's task of the kind polish").cost > total(memory(cut), given).readers.get("a builder's task of the kind polish").cost, "the kind that needed only a part reads less after the cut");
+// (a tree's readers try their paths on the path patterns within the steps it is given, its own (#673): past them it
+// fails, saying its mend, since a reading that takes every pattern left as matching weighs nothing; within them it
+// reads as with all of LIMITS.steps)
+let past = null;
+try { total(memory(core), given, null, MAKE); } catch (e) { past = e; }
+ok(past && /take more than the \d+ steps the total read gives one tree\. Mend: /.test(past.message) && said([past.message]) && total(memory(core), given, null, 1 << 20).sum === before.sum,
+  "a tree whose readers' tries of their paths take more steps than it is given fails, saying its mend; within them it reads as with all of them", past?.message);
 
 // (a cut that splits the start file in two: every reader opens both, so each reads more, its extra open counted)
 const startSplit = { ...core, "roles/shared/work.md": text("# W\n\nRead at the start of every task.", "work", 20), "roles/shared/more.md": text("# M\n\nRead at the start of every task.", "work", 20, 20) };

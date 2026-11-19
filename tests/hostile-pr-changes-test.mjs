@@ -339,16 +339,32 @@ ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "co
     paths: { ...plain, "tasks/p.md": `# P\n\nRead when: the paths ${Array.from({ length: k }, (_, i) => `\`src/**/q${i}/*.js\``).join(", ")}.\n` },
     kinds: { ...plain, "tasks/k.md": `# K\n\nRead when: the kinds ${Array.from({ length: k }, () => "`same`").join(", ")}.\n` },
   });
+  // (the paths' patterns, tried 3.5 million times on them, are past the steps a tree's tries take, and refused)
   for (const [what, texts] of Object.entries(giving(n))) {
     slow = Date.now();
-    const a = total(mem(texts), given), c = conditions(a, total(mem(texts), given, a), "");
-    ok(Date.now() - slow < 5000 && !c.cut, `read-total: ${n} names of one rule file (${what}), read by 60 readers of merged pull requests, take ${Date.now() - slow} ms, within 5 s`);
+    thrown = null;
+    let c = null;
+    try { const a = total(mem(texts), given); c = conditions(a, total(mem(texts), given, a), ""); } catch (e) { thrown = e; }
+    const held = what === "paths" ? thrown && /steps the total read gives one tree/.test(thrown.message) && mended(`FAIL: ${thrown.message}`) : c && !c.cut;
+    ok(Date.now() - slow < 5000 && held, `read-total: ${n} names of one rule file (${what}), read by 60 readers of merged pull requests, take ${Date.now() - slow} ms, within 5 s${what === "paths" ? ", refused with its mend past the steps a tree's tries take" : ""}`);
   }
   // (a path pattern of many stars side by side that matches no path, which a backtracking matcher takes minutes over)
   const stars = { ...plain, "tasks/s.md": `# S\n\nRead when: the paths ${["*a".repeat(30) + "b", "**/".repeat(30) + "*z*z*z*z*z*z*q", `src/${"*".repeat(200)}x`].map(x => `\`${x}\``).join(", ")}.\n` };
   slow = Date.now();
   const sa = total(mem(stars), given.map(t => ({ ...t, paths: t.paths.map(p => `${p.replace(/\.js$/u, "")}${"a".repeat(150)}.js`) })));
   ok(Date.now() - slow < 5000 && sa.readers.size > 0, `read-total: path patterns of many stars side by side, matching no path, are read by 60 readers in ${Date.now() - slow} ms, within 5 s`);
+  // (a head's path patterns that pass the one-pass check on the merged pull requests' paths and fail their walk, more
+  // than the steps a tree's tries take (#673): refused with their mend within 5 s, and the base reads the same before
+  // and after them, each tree spending a budget of its own)
+  const walking = { ...plain, "tasks/b.md": "# B\n\nRead when: the paths `src/*/f1*.js` and `.github/workflows/`.\n" };
+  const walked = { ...walking, "tasks/w.md": `# W\n\nRead when: the paths ${Array.from({ length: 280 }, (_, i) => `\`src/*f${i}*.js\``).join(", ")}.\n` };
+  slow = Date.now();
+  const baseBefore = total(mem(walking), given);
+  thrown = null;
+  try { total(mem(walked), given, baseBefore); } catch (e) { thrown = e; }
+  const baseAfter = total(mem(walking), given), read = t => JSON.stringify([t.sum, [...t.readers]]);
+  ok(thrown && /steps the total read gives one tree/.test(thrown.message) && mended(`FAIL: ${thrown.message}`) && Date.now() - slow < 5000, `read-total: a head's path patterns past the steps a tree's tries take are refused with their mend, in ${Date.now() - slow} ms, within 5 s`);
+  ok(read(baseBefore) === read(baseAfter) && baseBefore.readers.get(`the builder of ${given[0].id}`).files.includes("tasks/b.md"), "read-total: the base reads the same before and after a head that ran past its budget");
   for (const [what, texts] of Object.entries(giving(40000))) {
     slow = Date.now();
     thrown = null;
@@ -391,5 +407,21 @@ if (process.platform !== "win32") {
     ok(!raw(out) && !out.includes("The floor") && /tasks\/zero\.md/u.test(out) && /tasks\/out\.md/u.test(out) && mended(out), "reading.mjs --check: each link is named as a file that says no when it is read, with its mend, and none is read as the file it leads to");
   } else console.log("skip reading.mjs: a rule file that is a link to a pipe: no pipe can be made here");
 } else console.log("skip reading.mjs: a rule file that is a link to a pipe: no pipe can be made here (Windows)");
+
+// ---- reading.mjs: path patterns a fork's branch writes, tried on its changed paths (#673) ----
+// (a module of patterns that pass the one-pass check on a long changed path and fail its walk: the reading stops at its
+// budget within 5 s, each module a pattern names called, saying why, so the paths call for more reading, never less)
+{
+  const rp = path.join(tmp, "reading-steps"), put = (f, text) => { fs.mkdirSync(path.dirname(path.join(rp, f)), { recursive: true }); fs.writeFileSync(path.join(rp, f), text); };
+  put("floor/security.md", "# The floor\n");
+  put("roles/builder.md", "# The builder\n\nRead at the start by the role `builder`.\n\n**Reads at its start:** `tasks/start.md`.\n");
+  put("tasks/start.md", "# Start\n\nRead at the start of every task.\n");
+  put("tasks/plain.md", "# Plain\n\nRead when the readme changes: the path `README.md`.\n");
+  put("tasks/walked.md", `# Walked\n\nRead when: the paths ${Array.from({ length: 50 }, () => `\`x/${"*a".repeat(240)}q\``).join(", ")}.\n`);
+  const started = Date.now(), r = spawnSync(process.execPath, [path.join(root, "scripts", "reading.mjs"), "builder", "--path", `x/${"a/".repeat(1000)}aq`, "--path", "README.md"], { cwd: rp, env, encoding: "utf8", timeout: 5000 });
+  const out = `${r.stdout}${r.stderr}`;
+  ok(r.status === 0 && Date.now() - started < 5000 && /tasks\/walked\.md +the changed paths, past the steps a reading tries them for/u.test(out) && /tasks\/plain\.md/u.test(out),
+    `reading.mjs: path patterns past a reading's budget are read in ${Date.now() - started} ms, within 5 s, each module they name called, saying why`);
+}
 
 process.exit(failed ? 1 : 0);

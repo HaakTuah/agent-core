@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { counted } from "./file-size.mjs";
-import { FLOOR, FLOOR_WHEN, gather, kindsOf, reading, shown, textOf } from "./reading.mjs";
+import { FLOOR, FLOOR_WHEN, STEPS, budget, gather, kindsOf, reading, shown, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
 
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -42,11 +42,13 @@ const git = (args, encoding = "utf8") => execFileSync("git", ["--no-optional-loc
 const safe = s => String(s).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
 
 // What the total read reads at most, on either tree: a file of this many bytes (past it, its size alone is counted, and
-// its text is not read), this many bytes of all the files' text together, this many rule files and kinds of task, and
-// this many names they give (a role's start line, a module's kinds, paths and tools);
-// past the last four it fails, saying so. The core's rule files are 44, about 330 KB in all, giving 92 names of which
-// 32 kinds; at these limits the worst case reads in about 2 s, within the 5 s SECURITY.md allows.
-export const LIMITS = { bytes: 1 << 20, all: 8 << 20, files: 200, kinds: 100, names: 300 };
+// its text is not read), this many bytes of all the files' text together, this many rule files and kinds of task, this
+// many names they give (a role's start line, a module's kinds, paths and tools), and this many of the reading script's
+// steps for all its readers' tries of their paths on the path patterns (reading.mjs, STEPS, #673);
+// past the last five it fails, saying so. The core's rule files are 44, about 330 KB in all, giving 92 names of which
+// 32 kinds, and their tries take about a twentieth of the steps; at these limits the worst case reads in about 2 s,
+// within the 5 s SECURITY.md allows.
+export const LIMITS = { bytes: 1 << 20, all: 8 << 20, files: 200, kinds: 100, names: 300, steps: STEPS };
 const TOO_MUCH = `the rule files' text is past the ${LIMITS.all / (1 << 20)} MB the total read reads. Mend: keep the rule files to what the core holds, a module for each subject`;
 // A name the tree is asked for is a path inside it: relative, with no empty, "." or ".." segment, so that no name a rule
 // file gives (a role's line "Reads at its start:") reaches a file outside the tree.
@@ -106,8 +108,10 @@ const filesOf = (lib, r) => (r.error ? [] : [ENTRY, ...r.start, ...Object.entrie
 
 // The total on a tree for the tasks given: { sum, readers: Map(name → { files, bytes, opens, cost }), named: Set, read,
 // roles, kinds }. `like`, a total of the other side, adds its roles and kinds, so that one either side lacks is read
-// on both, as what it reads where its file or its kind's last module is gone.
-export function total(t, given, like = null) {
+// on both, as what it reads where its file or its kind's last module is gone. Its readers' changed paths are tried on
+// the path patterns within `steps`, a budget the tree spends alone, whatever another tree spent; past them it fails,
+// since a reading that takes every pattern left as matching weighs no cut or join.
+export function total(t, given, like = null, steps = LIMITS.steps) {
   const lib = gather(t.read, t.list), readers = new Map();
   // (the names the rule files give, the files a role's start line names and each module's kinds, paths and tools,
   // counted before any is read, since the reading script's work grows with them beyond a straight line)
@@ -119,7 +123,9 @@ export function total(t, given, like = null) {
   const kinds = [...new Set([...kindsOf(lib).keys(), ...(like?.kinds ?? [])])].sort();
   for (const role of roles) readers.set(`the role ${role}, at its start`, cost(t, filesOf(lib, { ...reading(lib, { role }), task: [] })));
   for (const kind of kinds) readers.set(`a builder's task of the kind ${kind}`, cost(t, filesOf(lib, reading(lib, { role: "builder", kinds: [kind] }))));
-  for (const task of given) for (const role of READERS.filter(r => roles.includes(r))) readers.set(`the ${role} of ${task.id}`, cost(t, filesOf(lib, reading(lib, { role, paths: task.paths }))));
+  const within = budget(steps);
+  for (const task of given) for (const role of READERS.filter(r => roles.includes(r))) readers.set(`the ${role} of ${task.id}`, cost(t, filesOf(lib, reading(lib, { role, paths: task.paths, within }))));
+  if (within.over) throw new Error(`the rule files' path patterns, tried on the paths of the ${given.length} merged pull requests read, take more than the ${steps} steps the total read gives one tree. Mend: keep each module's opening to the few path patterns that call it; where the merged pull requests' own paths take the base past them too, raise LIMITS.steps in scripts/read-total.mjs in this pull request`);
   const sum = [...readers.values()].reduce((s, c) => s + c.cost, 0);
   const named = new Set([ENTRY, FLOOR, ...Object.keys(FLOOR_WHEN), ...Object.keys(lib.roles), ...Object.keys(lib.modules)].filter(f => t.size(f) !== null));
   return { sum, readers, named, read: t.read, roles, kinds };

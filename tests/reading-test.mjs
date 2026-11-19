@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { FLOOR, FLOOR_WHEN, KINDS_BY_PATH, READ_LINE, START, asked, calledByPaths, coreAt, faults, gather, hookLine, kindsOf, leftOut, library, lineMend, listed, matches, opening, ownOf, ownPaths, reading, readsOf, taken, whenOf } from "../scripts/reading.mjs";
+import { FLOOR, FLOOR_WHEN, KINDS_BY_PATH, MAKE, PAST, READ_LINE, START, TRY, asked, budget, calledByPaths, coreAt, faults, gather, hookLine, kindsOf, leftOut, library, lineMend, listed, matches, opening, ownOf, ownPaths, reading, readsOf, taken, whenOf } from "../scripts/reading.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -45,8 +45,18 @@ ok(matches("**/x", "x") && matches("**/x", "a/b/x") && matches("a*a", "aa") && !
 const walkAt = Date.now();
 ok(matches("*a".repeat(200), "a".repeat(2000)) && matches(`x/${"*".repeat(100000)}y`, `x/${"z/".repeat(25000)}y`) && !matches("x/a*b", "x/a/zb") && matches("a**b", "a\nb") && !matches("x/a*b", "x/a\n/b") && Date.now() - walkAt < 2000,
   "a pattern that passes the one-pass check is walked in time its parts times the path's length, a run of stars as one part, * never across a folder, and ** across a line's end too (where the old expression did not, so such a path calls for more, never less)");
-ok(matches(`x/${"*a".repeat(600)}q`, `x/${"a/".repeat(1000)}aq`) && !matches(`x/${"*a".repeat(100)}q`, `x/${"a/".repeat(200)}aq`),
-  "a pattern whose walk would pass a million steps matches, calling for more reading, and one within it is walked");
+// (a reading's budget, #673: each try paid from it, a try past it matching, which calls for more reading, never less)
+const deep = `x/${"*a".repeat(100)}q`, near = `x/${"a/".repeat(200)}aq`;
+ok(!matches(deep, near) && matches(deep, near, budget(50000)), "a pattern whose walk would pass what is left of its reading's budget matches, calling for more reading, and one within it is walked");
+let seed = 1;
+const draw = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return Math.floor(seed / 65536) % n; };
+const pick = (from, n) => Array.from({ length: n }, () => from[draw(from.length)]).join("");
+const tries = Array.from({ length: 3000 }, () => [pick(["*", "**/", "/", "a", "b", "./"], 1 + draw(7)), pick(["/", "a", "b", "\\", "./"], draw(9)), MAKE + draw(1400)]);
+const cutShort = tries.filter(([p, f, n]) => matches(p, f, budget(n)) !== matches(p, f));
+ok(cutShort.length > 100 && cutShort.every(([p, f, n]) => matches(p, f, budget(n)) && !matches(p, f)), `whatever is left of its budget, a try answers as with all of it or matches, never less (${cutShort.length} of ${tries.length} tries cut short)`);
+const spent = budget(50000);
+ok(matches(deep, near, spent) && spent.over && spent.left === 0 && matches("a", "b", spent) && matches("x/", "y/z", spent) && !matches("a", "b") && !matches("x/", "y/z"),
+  "once a reading's budget is spent, every try after it in that reading matches, and a try with a budget of its own answers as before");
 
 // a small core
 const texts = {
@@ -92,6 +102,29 @@ ok(eq([...leftOut(listOf)], ["games.md"]) && eq([...leftOut("Floor: whole. Modul
   "a module is left out where the manifest's list does not name it and its \"Not taken:\" does; with \"all\", or a line that cannot be read, none is");
 ok(eq(files(reading(taken(lib, leftOut(listOf)), { role: "builder", kinds: ["polish"] })), ["tasks/screens.md"]) && eq(calledByPaths(taken(lib, leftOut(listOf)), ["a/site.css"], own).map(c => c.file), ["tasks/screens.md"]) && eq(reading(taken(lib, leftOut(listOf)), { role: "builder" }).start, reading(lib, { role: "builder" }).start),
   "so a kind or a path calls only the modules the project takes, and the start is the same");
+// (a reading's budget, #673: past it each kind and module whose patterns are left is called, saying so, never fewer;
+// every kind of try, and making a pattern ready, spends it, so a reading of many stops at it; a reading's own budget is
+// never another's)
+const changes = [".github/workflows/ci.yml", "README.md"], exactly = calledByPaths(lib, changes, own), cutOff = calledByPaths(lib, changes, own, budget(MAKE));
+ok(eq(exactly, [{ file: "floor/topics/workflows.md", why: "the path .github/workflows/ci.yml" }]) && exactly.every(c => cutOff.some(d => d.file === c.file)) && eq(cutOff.map(c => c.file).sort(), ["floor/topics/workflows.md", "tasks/games.md", "tasks/screens.md", "tasks/updates.md"]) && cutOff.every(c => c.why.startsWith(PAST)),
+  "a reading past its budget calls each module a path pattern or its kind names, the files it would call among them, each saying why", JSON.stringify(cutOff));
+const ofOne = paths => ({ roles: {}, modules: { "tasks/one.md": { start: false, kinds: [], paths, tools: [], others: [], roles: [] } } });
+const kindsOfTry = { "a folder": [i => `d${i}/`, j => `e${j}/x.js`], "a name exactly": [i => `n${i}.md`, j => `p/longer${j}.js`], "a pattern's ends": [i => `a${i}*z`, j => `b${j}`],
+  "its runs in order": [i => `*${i}q*z`, j => `b${j}z`], "a walk": [i => `x/*${i}*q`, j => `x/${j}/q`] };
+for (const [what, [pattern, file]] of Object.entries(kindsOfTry)) {
+  const patterns = Array.from({ length: 100 }, (_, i) => pattern(i)), within = budget(patterns.reduce((n, p) => n + MAKE + TRY * p.length, 0) + 100 * 100 * TRY / 2);
+  calledByPaths(ofOne(patterns), Array.from({ length: 100 }, (_, j) => file(j)), [], within);
+  ok(within.over, `ten thousand tries of ${what} run out a budget of half their own steps`);
+}
+const made = budget(5000 * MAKE);
+calledByPaths(ofOne(Array.from({ length: 10000 }, (_, i) => `m${i}.md`)), ["a.md"], [], made);
+ok(made.over, "making ten thousand patterns ready runs out a budget of half the steps they take");
+const hundred = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`tasks/m${i}.md`, { start: false, kinds: [], paths: Array.from({ length: 100 }, (_, j) => `q${i}x${j}/*.css`), tools: [], others: [], roles: [] }]));
+const within = budget(1 << 18), many = calledByPaths({ roles: {}, modules: hundred }, Array.from({ length: 10000 }, (_, j) => `src/p${j}/f.js`), [], within);
+ok(within.over && within.left === 0 && many.length === 100 && many.every(c => c.why === PAST), "a reading of ten thousand patterns on ten thousand paths, a hundred million tries, stops at its budget, each module then called at once");
+const before = calledByPaths(lib, [near, ...changes], own), wasted = budget(1 << 16);
+calledByPaths(ofOne(Array.from({ length: 4000 }, () => `x/${"*a".repeat(600)}q`)), [`x/${"a/".repeat(1000)}aq`], [], wasted);
+ok(wasted.over && eq(calledByPaths(lib, [near, ...changes], own), before) && !before.some(c => c.why.startsWith(PAST)), "a reading answers the same after another ran past its budget: each spends its own");
 ok(eq([...kindsOf(lib).keys()].filter(k => !Object.values(FLOOR_WHEN).some(f => f.kinds.includes(k))), ["polish", "review", "screen", "update", "workflow"]) && eq(kindsOf(lib).get("update"), ["tasks/updates.md", "floor/topics/workflows.md"]), "the kinds are those the modules name, each with its files");
 
 ok(["tasks/updates.md", "floor/topics/dependencies.md", "floor/topics/licences.md", "floor/topics/what-ships.md"].every(f => calledByPaths(library(root, ""), ["app/package-lock.json"]).some(c => c.file === f && c.why === "the path app/package-lock.json")) && calledByPaths(library(root, ""), ["a/clock.json"]).length === 0,
@@ -204,11 +237,6 @@ if (process.platform !== "win32") {
 }
 const imported = spawnSync(process.execPath, ["--input-type=module", "-e", `import ${JSON.stringify(new URL("../scripts/reading.mjs", import.meta.url).href)}; console.log("imported")`, "builder"], { cwd: root, encoding: "utf8" });
 ok(imported.status === 0 && imported.stdout === "imported\n", "imported by a script named on node's command line, it runs nothing of its own", imported.stdout + imported.stderr);
-
-// (last, since it spends the budget of the run's walks, past which every pattern matches)
-const near = `x/${"a/".repeat(1000)}aq`, walked = Array.from({ length: 200 }, () => matches(`x/${"*a".repeat(240)}q`, near));
-ok(!walked[0] && walked[199],
-  "a run's walks together stop at their budget, past which a pattern matches, so many patterns near the cap of one walk add no walk beyond it");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the reading script`);
 process.exit(failed ? 1 : 0);
