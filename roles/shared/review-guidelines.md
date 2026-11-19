@@ -84,7 +84,7 @@ makes a process measure its goal (`tasks/cleaning.md`).
 
 **A rule file changed:**
 - Blocking: a rule that departs from the owner's word behind it: on its issue, in the archive's items it cites, or in
-  the core, those `scripts/holders/` lists for it.
+  the core, those `scripts/holders.json` lists for it.
 - Blocking: a rule of the core (its floor, modules or `AGENTS.md`) written or changed without a part of the pattern in
   the core's `AGENTS.md`, "A rule is written to one pattern", or holding what that pattern keeps out.
 - Blocking: a rule written or changed that fails the core's test for a rule (the core's `AGENTS.md`, "A rule is for

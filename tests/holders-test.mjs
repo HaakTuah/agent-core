@@ -167,6 +167,8 @@ ok([...[0, 1, 2].map(i => `"tasks/x.md: Its own item", item ${i} `), "core archi
   ok(faults.length === 4 && faults.every(f => /Mend: /.test(f)) && faults.some(f => f.includes(`rename the file to ${entryFile("tasks/x.md: Its own item")}`)) && faults.some(f => /no object with a "rule"/.test(f)) && faults.some(f => /has "holders", which an entry does not read/.test(f)) && faults.some(f => f.includes("notes.txt")),
     "an entry in a file not named from its rule, one that is no object with a rule, one with a part it does not read and a file that is no entry each fail, saying the mend", faults.join("\n"));
   ok(holders(dir, []).wrong.length === 4, "and they fail the check once each", holders(dir, []).wrong.join("\n"));
+  const twin = holders(project({}, { "tasks/z.md": "# Z\n\nRead when needed.\n\n**A rule.** a.\n\n**A rule!** b.\n" }), []).wrong;
+  ok(twin.some(w => /would be the entry of "tasks\/z\.md: A rule" and "tasks\/z\.md: A rule!"\. Mend: reword the lead/.test(w)), "two rules whose entries would share a file fail, saying the mend", twin.join("\n"));
   const all = rules(root, { agents: true }), seen = new Map();
   for (const r of all) seen.set(entryFile(r.key), [...(seen.get(entryFile(r.key)) ?? []), r.key]);
   ok([...seen.values()].every(k => k.length === 1), "no two rules of the core share the file name their entry would stand in", [...seen.values()].filter(k => k.length > 1).join("\n"));

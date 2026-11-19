@@ -332,23 +332,23 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `.github/workflows/core.yml`, which fails a copy that holds what `.gitattributes` keeps here; what is quoted, by what
   holds floor rule 4's "The owner's word".
 - **The archive is pointed to from the list,** not from the rule (#252). By default a rule file here (this file, the
-  floor's, the roles' and the modules') holds no "core archive N": the entries of `scripts/holders/` name under "behind"
-  the items behind each rule, and a session that needs a rule's reason looks them up there. Whoever writes or changes a
+  floor's, the roles' and the modules') holds no "core archive N": `scripts/holders/` names under "behind" the
+  items behind each rule, and a session that needs a rule's reason looks them up there. Whoever writes or changes a
   rule adds its items to that list in the same pull request. Nothing changes it. It does not mean a rule loses its
-  one-line reason, which stays in it ("A rule is written to one pattern"), nor that a project's own rule files are asked
-  anything. Reason: about 60 such pointers stood in what every session reads at its start, and a builder on an ordinary
-  task never opens the archive. Held by `scripts/holders.mjs`, which fails a pointer in a rule file and an item the list
-  names that is not in the archive.
+  one-line reason, which stays in it ("A rule is written to one pattern"), nor that a project's own rule files are
+  asked anything. Reason: about 60 such pointers stood in what every session reads at its start, and a builder on an
+  ordinary task never opens the archive. Held by `scripts/holders.mjs`, which fails a pointer in a rule file and an item the list names
+  that is not in the archive.
 - **A new archive item is named by its issue** (#744). By default an item added to the archive is keyed by the issue
-  that carries the owner's word and, where it records one point of several, by that point, as `#733.1`, and stands in a
-  file of its own named by its key (`archive/instructions/issue-733.1.md`; #750, point 1); its entry in
-  `scripts/holders/` names it so under "behind", and a pointer to it gives that key where one to an older item gives its
-  number. Items 1 to 262 keep their numbers, so every "core archive N" that stands still leads where it did. Nothing
-  changes it. It does not mean an item moves or is rewritten. Reason: on 19 November 2026 two pull requests merged in
-  parallel took the same next number, and a running count cannot be claimed without coordinating, where an issue's
-  number is already unique and already named in the item. Held by `scripts/holders.mjs` with `scripts/archive.mjs`,
-  which fail a key used twice, a key that names no issue (an item numbered past 262 among them), an item outside its own
-  file, one of items 1 to 262 taken out, and a key under "behind" that is not in the archive.
+  that carries the owner's word and, where it records one point of several, by that point, as `#733.1`, and stands in
+  a file of its own named by its key (`archive/instructions/issue-733.1.md`; #750, point 1); `scripts/holders/`
+  names it so under "behind", and a pointer to it gives that key where one to an older item gives its number. Items 1
+  to 262 keep their numbers, so every "core archive N" that stands still leads where it did. Nothing changes it. It does not mean an item moves or
+  is rewritten. Reason: on 19 November 2026 two pull requests merged in parallel took the same next number, and a
+  running count cannot be claimed without coordinating, where an issue's number is already unique and already named in
+  the item. Held by `scripts/holders.mjs` with `scripts/archive.mjs`, which fail a key used twice, a key that names no
+  issue (an item numbered past 262 among them), an item outside its own file, one of items 1 to 262 taken out, and a
+  key under "behind" that is not in the archive.
 - **An item that changes an earlier one names it, and the earlier one is marked** (#756). By default an item of the
   archive stands as written. Where a new item changes what an earlier one decided (corrects, narrows, widens, replaces
   or overturns it), whoever writes the new one gives it a line "Changes: N." naming each such item by its key, and
@@ -360,23 +360,24 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   marks' check in `scripts/archive.mjs`, run by `scripts/holders.mjs`: a "Changes:" whose item is not marked back, a
   "Changed by:" with no "Changes:" to match, a key in either that is no item, and a mark out of its form each fail;
   that a new item that changes one says so, by none yet.
-- **Every rule says what holds it.** By default a rule of the floor or the modules is held by a check that fails where
-  it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no check can read its breach
-  exactly, by a staged case, the holder of last resort, or by the scheduled audit; and where none holds it yet, it is
-  listed. Whoever writes or changes a rule names its holder in that PR: in its entry under `scripts/holders/`, a file
-  named from the rule's file and bold lead, or in a staged case's own file; and under the PR's heading "What holds it"
-  (`.github/workflows/own-description.yml` fails one without it), for each rule it adds or widens, what went wrong or
-  would without it (an incident, a review's finding, the owner's reason), its holder, or that it has none yet, and its
-  number (#303): a line "Number:" with the count the rule is meant to lower (`findings`, the review findings that name
-  it; `check fires`; or `correction: <kind>`, #302) and the one of the five outcomes it stands for (`; outcome: asked`,
-  `fast`, `readable`, `usable` or `robust`), then `; rare harm` where it guards against rare and severe harm, as its
-  entry's "number" keeps it; "None" where it adds no rule. The rules that stood before are held the same way:
-  `scripts/holders.mjs` lists each rule with no holder in the core's monthly state report, until it gains one or goes on
-  the owner's word, and a review's finding seen twice moves its rule up (`tasks/reviews.md`, point 8). A line that only
-  points elsewhere or says what is protected, binding no one, is marked "describes" there and is not listed. It does not
-  mean that a rule with no holder fails anything or goes by itself, that a review is a holder, or that a count of a
-  rule's citations is its number: a citation says a rule is applied, never that it helps. Reason: the audit of 13
-  November found 43 of 122 rules held by nothing but a session reading them, and nothing listed them. Held by
+- **Every rule says what holds it.** By default a rule of the floor or the modules is held by
+  a check that fails where it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no
+  check can read its breach exactly, by a staged case, the holder of last resort, or by the scheduled audit; and where
+  none holds it yet, it is listed. Whoever writes or changes a rule names its holder in that PR: in
+  `scripts/holders/`, a file by the rule's file and bold lead, or in a staged case's own file; and under the PR's heading
+  "What holds it" (`.github/workflows/own-description.yml` fails one without it), for each rule it adds or widens, what
+  went wrong or would without it (an incident, a review's finding, the owner's reason), its holder, or that it has
+  none yet, and its number (#303): a line "Number:" with the count the rule is meant to lower (`findings`, the review
+  findings that name it; `check fires`; or `correction: <kind>`, #302) and the one of the five outcomes it stands for
+  (`; outcome: asked`, `fast`, `readable`, `usable` or `robust`), then `; rare harm` where it guards against rare and
+  severe harm, as `scripts/holders/` keeps it under "number";
+  "None" where it adds no rule. The rules that stood before are held the same way: `scripts/holders.mjs` lists each
+  rule with no holder in the core's monthly state report, until it gains one or goes on the owner's word, and a
+  review's finding seen twice moves its rule up (`tasks/reviews.md`, point 8). A line that only points elsewhere or
+  says what is protected, binding no one, is marked "describes" there and is not listed. It does not mean that a rule
+  with no holder fails anything or goes by itself, that a review is a holder, or that a count of a rule's citations is
+  its number: a citation says a rule is applied, never that it helps. Reason: the audit of 13 November found 43 of 122
+  rules held by nothing but a session reading them, and nothing listed them. Held by
   `scripts/holders.mjs`, in `.github/workflows/tests.yml`, which fails where an entry names a rule that no longer
   stands, a check that is not there or a number in no form, and by the heading's check, which asks the line "Number:"
   where the heading holds more than "None".

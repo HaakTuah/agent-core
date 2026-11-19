@@ -82,6 +82,7 @@ export function named(root) {
   try { files = fs.readdirSync(dir).sort(); }
   catch (e) { return { named: {}, behind: {}, numbers: {}, faults, wrong: `${FILE}/ cannot be read (${e.message}). Mend: write one file for each rule in it, as the ones that stand there are written` }; }
   for (const f of files) {
+    if (!f.endsWith(".json")) { faults.push(`${FILE}/${f} is no entry, which is a file of JSON. Mend: move it out of ${FILE}/, or write the rule's entry in a file named ${f.replace(/\.[^.]*$/u, "")}.json`); continue; }
     let e;
     try { e = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")); }
     catch (x) { faults.push(`${FILE}/${f} cannot be read (${String(x.message).split("\n")[0]}). Mend: write it as JSON, an object with the rule's "rule" and its "holder", "behind" and "number"`); continue; }
@@ -151,6 +152,9 @@ export function holders(root = ROOT, cases = CASES) {
     }
   }
   for (const c of cases) for (const key of c.holds) if (by.has(key)) by.get(key).push({ kind: "case", by: c.name, part: c.inPart.includes(key) });
+  const files = new Map();
+  for (const r of all) files.set(entryFile(r.key), [...(files.get(entryFile(r.key)) ?? []), r.key]);
+  for (const [f, ks] of files) if (ks.length > 1) wrong.push(`${FILE}/${f} would be the entry of ${ks.map(k => `"${k}"`).join(" and ")}. Mend: reword the lead of one of them so that their file names differ`);
   if (!read.wrong) wrong.push(...behindWrong(root, read.behind), ...numbersWrong(root, read.numbers));
   return { rules: all, by, wrong };
 }
@@ -214,7 +218,7 @@ export function ownHolders(root = process.cwd()) {
     catch (e) { named = {}; wrong.push(`${OWN} cannot be read (${span(String(e.message).split("\n")[0])}). Mend: write it as JSON, its "holders" an object keyed by each rule's file and lead`); }
   }
   for (const [key, value] of Object.entries(named)) {
-    if (!by.has(key)) { wrong.push(`${OWN} names ${span(key)}, which is no rule of the project's own rule files as they stand. Mend: write the key as the rule's file and bold lead now read, and rename the file to match, or take it out where the rule has gone`); continue; }
+    if (!by.has(key)) { wrong.push(`${OWN} names ${span(key)}, which is no rule of the project's own rule files as they stand. Mend: write the key as the rule's file and bold lead now read, or take it out where the rule has gone`); continue; }
     for (const v of (Array.isArray(value) ? value : [value]).filter(v => v !== "none")) {
       const h = holderOf(key, v, root, OWN, OWN_PATHS, span);
       // (a review reads what a session judged, and fails nothing by itself: it holds no rule)
