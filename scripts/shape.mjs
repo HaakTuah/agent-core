@@ -807,7 +807,7 @@ function main(argv) {
   if (rest.length > 1 || (rest.length && !command)) refuse(`the check does not know ${rest.join(" ")}`, `run node ${self} [<config>] [--first | --write], or --suite <name> with -- <command> or --since <seconds>`);
   const now = standing(config), found = survey(now.texts, config, now.tests);
   // (a baseline is written only where every reader of a file the project holds could run: one that has no file to read
-  // is no reason to refuse, so a project with no C# writes its own with the parser's packages not installed)
+  // is no reason to refuse, so a project of Python alone writes its own with the parser's packages not installed)
   const skipped = unreachedReaders().filter(r => [...found.readers.values()].includes(r));
   if (command && skipped.length) refuse(`the core's packages are not installed, so ${skipped.map(r => READERS[r]).join(", ")} cannot be read and a baseline written now would leave out what stands there`, `run node ${path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)))}${unnamedReaders().length ? " all" : ""} until it installs them, then run this again`);
   if (!command) return check(config, at, self, found, base, named);
