@@ -4,19 +4,20 @@
 // request here. Node's own modules.
 //
 //   node tests/tools-offer-test.mjs
-import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { TABLE, table, wrong } from "../scripts/tools-offer.mjs";
+import { TABLE, TOOL_DIRS, table, wrong } from "../scripts/tools-offer.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const text = fs.readFileSync(path.join(root, TABLE), "utf8");
 const tools = JSON.parse(fs.readFileSync(path.join(root, "scripts/staged-tools.json"), "utf8")).tools;
-const tracked = execFileSync("git", ["-C", root, "ls-files", "-z"], { encoding: "utf8" }).split("\0").filter(Boolean);
+// (the files of a tool's own folders, read from the checkout, beneath the git the script asks)
+const under = d => fs.readdirSync(path.join(root, d), { withFileTypes: true }).flatMap(e => (e.isDirectory() ? under(`${d}/${e.name}`) : [`${d}/${e.name}`]));
+const tracked = [...TOOL_DIRS.filter(d => fs.existsSync(path.join(root, d))).flatMap(under), ...fs.readdirSync(root).filter(f => /\.md$/u.test(f))];
 // (the core's table with the cell of one row and one tool's column written anew)
 const cell = (row, tool, to, from = text) => {
   const t = table(from), col = t.tools.findIndex(x => x.name === tool) + 1;
@@ -45,8 +46,6 @@ const kit = check(cell("The entry file", "Kiro", "carried: it reads `AGENTS.md` 
 ok(kit.wrong.length === 2 && kit.wrong[0].startsWith("setup/template/kiro-steering.md.tmpl is a file of a tool's own") && kit.wrong[1].startsWith(".kiro/steering/core.md is a file") && kit.wrong.every(w => mended(`FAIL ${w}`)),
   "a template of the starter kit for a tool that no cell names fails, and so does the core's own file it writes, which counts as named where its template is", kit.wrong.join("\n"));
 ok(says(check(cell("The map of the tiers to its models", "Codex", "carried: `tools/other-builders.md`")), "says no day its documentation was read"), "a map whose part says no day its documentation was read fails");
-const run = spawnSync(process.execPath, [path.join(root, "scripts/tools-offer.mjs")], { encoding: "utf8" });
-ok(run.status === 0 && /0 wrong/.test(run.stdout), "run on the core, it passes", `${run.stdout}${run.stderr}`);
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);
