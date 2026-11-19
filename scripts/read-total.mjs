@@ -42,10 +42,11 @@ const git = (args, encoding = "utf8") => execFileSync("git", ["--no-optional-loc
 const safe = s => String(s).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
 
 // What the total read reads at most, on either tree: a file of this many bytes (past it, its size alone is counted, and
-// its text is not read), this many bytes of all the files' text together, and this many rule files and kinds of task;
-// past the last three it fails, saying so. The core's rule files are 44, about 330 KB in all, naming 32 kinds; at these
-// limits the worst case reads in about 2 s, within the 5 s SECURITY.md allows.
-export const LIMITS = { bytes: 1 << 20, all: 8 << 20, files: 200, kinds: 100 };
+// its text is not read), this many bytes of all the files' text together, this many rule files and kinds of task, and
+// this many names they give (a role's start line, a module's kinds, paths and tools);
+// past the last four it fails, saying so. The core's rule files are 44, about 330 KB in all, giving 92 names of which
+// 32 kinds; at these limits the worst case reads in about 2 s, within the 5 s SECURITY.md allows.
+export const LIMITS = { bytes: 1 << 20, all: 8 << 20, files: 200, kinds: 100, names: 300 };
 const TOO_MUCH = `the rule files' text is past the ${LIMITS.all / (1 << 20)} MB the total read reads. Mend: keep the rule files to what the core holds, a module for each subject`;
 // A name the tree is asked for is a path inside it: relative, with no empty, "." or ".." segment, so that no name a rule
 // file gives (a role's line "Reads at its start:") reaches a file outside the tree.
@@ -108,6 +109,10 @@ const filesOf = (lib, r) => (r.error ? [] : [ENTRY, ...r.start, ...Object.entrie
 // on both, as what it reads where its file or its kind's last module is gone.
 export function total(t, given, like = null) {
   const lib = gather(t.read, t.list), readers = new Map();
+  // (the names the rule files give, the files a role's start line names and each module's kinds, paths and tools,
+  // counted before any is read, since the reading script's work grows with them beyond a straight line)
+  const names = Object.values(lib.roles).reduce((n, r) => n + (r.start?.length ?? 0), 0) + Object.values(lib.modules).reduce((n, w) => n + (w ? w.kinds.length + w.paths.length + w.tools.length + w.others.length : 0), 0);
+  if (names > LIMITS.names) throw new Error(`the rule files give ${names} names (the files a role reads at its start, and each module's kinds, paths and tools), past the ${LIMITS.names} the total read reads. Mend: keep each rule file's opening to the few kinds, paths and tools that read it, and each role's start line to the files it reads`);
   const files = Object.keys(lib.roles).length + Object.keys(lib.modules).length, many = kindsOf(lib).size;
   if (files > LIMITS.files || many > LIMITS.kinds) throw new Error(`the rule files name ${files} files and ${many} kinds of task, past the ${LIMITS.files} files and ${LIMITS.kinds} kinds the total read reads. Mend: keep the rule files to what the core holds, a module for each subject, each naming the few kinds of task that read it`);
   const roles = [...new Set([...Object.values(lib.roles).map(r => r.name), ...(like?.roles ?? [])])].sort();

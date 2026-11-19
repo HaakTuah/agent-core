@@ -12,23 +12,27 @@
   ],
   "past": {
     ".github/workflows/tests.yml": {
-      "mark": 55215,
+      "mark": 55491,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {
-      "mark": 53480,
+      "mark": 52604,
       "why": "Its rules that only some tasks break move to modules read on need in #845."
     },
     "README.md": {
-      "mark": 73410,
+      "mark": 74465,
       "why": "Past the large file mark, it is read by the section a task needs, found by searching, never whole (roles/shared/how-to-work.md, \"Read little\"), so no split lets a session read less; GitHub shows it whole as the repository's front page, to people."
     },
     "scripts/holders.json": {
-      "mark": 50346,
+      "mark": 51879,
       "why": "A builder who writes a rule writes its line in each of the three lists, holders, behind and numbers, and holders.mjs reads them whole; split by list or by rule file, that builder opens more files, and a session finds one rule's key by searching."
     },
+    "scripts/read-total.mjs": {
+      "mark": 20690,
+      "why": "Whoever changes how the total is counted reads its tree reader, its readers, its cut and its conditions together, each calling the others; split, that session opens more files and reads no less, and no other task reads it."
+    },
     "scripts/reading.mjs": {
-      "mark": 30266,
+      "mark": 30594,
       "why": "The start hook runs it from git with no file beside it, so it stands alone (its opening says so): no part can be moved to a file of its own."
     },
     "scripts/state-report.mjs": {
@@ -40,11 +44,11 @@
       "why": "Split by the reader each case tests in #852."
     },
     "tests/hostile-pr-changes-test.mjs": {
-      "mark": 28642,
+      "mark": 33922,
       "why": "Split by the reader each case tests in #852."
     },
     "tests/init-test.mjs": {
-      "mark": 61094,
+      "mark": 61827,
       "why": "Its cases run on the one scratch project it writes from the starter kit; split, each file would write it again, adding to the suite's time (tasks/tests.md), and every case reads that setup."
     },
     "tests/look-test.mjs": {

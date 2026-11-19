@@ -318,15 +318,37 @@ ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "co
   fs.rmSync(path.join(dir, "roles/reviewer.md"));
   // (the worst case within the limits: as many modules, kinds and bytes as it reads, every module naming every kind and
   // sharing a sentence, read on both trees as --compare reads them, within 5 s)
-  const many = Array.from({ length: LIMITS.kinds - 2 }, (_, i) => `\`w${i}\``).join(", "), rules = (tag, n) => Array.from({ length: n }, (_, i) => `- A rule of ${tag}, number ${i}, which says what it says at some length.`).join("\n");
+  const rules = (tag, n) => Array.from({ length: n }, (_, i) => `- A rule of ${tag}, number ${i}, which says what it says at some length.`).join("\n");
   const worst = {}, worstHead = {};
   for (const t of [worst, worstHead]) Object.assign(t, { "floor/security.md": "# F\n", "roles/builder.md": "# B\n\nRead at the start by the role `builder`.\n\n**Reads at its start:** `roles/shared/w.md`.\n", "roles/shared/w.md": "# W\n\nRead at the start of every task.\n" });
   const per = Math.floor(LIMITS.all / (LIMITS.files / 2) / 80) - 10;
-  for (let i = 0; i < LIMITS.files / 2 - 2; i++) { worst[`tasks/g${i}.md`] = `# G\n\nRead when: the kinds ${many}.\n\n- A sentence every file shares, long enough to be read as moved.\n${rules(i, per)}\n`; worstHead[`tasks/a${i}.md`] = worst[`tasks/g${i}.md`].replace("# G", "# A"); }
+  for (let i = 0; i < LIMITS.files / 2 - 2; i++) { worst[`tasks/g${i}.md`] = `# G\n\nRead when: the kind \`w${i % (LIMITS.kinds - 2)}\`.\n\n- A sentence every file shares, long enough to be read as moved.\n${rules(i, per)}\n`; worstHead[`tasks/a${i}.md`] = worst[`tasks/g${i}.md`].replace("# G", "# A"); }
   const mem = texts => ({ read: f => texts[f] ?? null, list: folder => Object.keys(texts).filter(f => f.startsWith(`${folder}/`) && !f.slice(folder.length + 1).includes("/") && f.endsWith(".md")).sort(), size: f => (f in texts ? Buffer.byteLength(texts[f]) : null) });
   slow = Date.now();
   const w0 = total(mem(worst), []), wh = total(mem(worstHead), [], w0), wb = total(mem(worst), [], wh), wc = conditions(wb, total(mem(worstHead), [], wb), "");
   ok(Date.now() - slow < 5000 && Array.isArray(wc.failures), `read-total: the worst case within the limits (${LIMITS.files} files, ${LIMITS.kinds} kinds, every file sharing a sentence) is read on both trees in ${Date.now() - slow} ms, within 5 s`);
+  // (the names a rule file gives, at their limit, read by the builder and reviewer of 30 merged pull requests of 200
+  // paths each: a role's start line, a module's path patterns, one kind named again and again; past it, refused)
+  const given = Array.from({ length: 30 }, (_, i) => ({ id: `${i}`.padStart(7, "a"), paths: Array.from({ length: 200 }, (_, j) => `src/p${i}/f${j}.js`) }));
+  const n = LIMITS.names - 10, start = "# W\n\nRead at the start of every task.\n";
+  const roleOf = (role, line) => `# ${role}\n\nRead at the start by the role \`${role}\`.\n\n**Reads at its start:** ${line}.\n`;
+  const plain = { "floor/security.md": "# F\n", "roles/shared/w.md": start, "roles/builder.md": roleOf("builder", "`roles/shared/w.md`"), "roles/reviewer.md": roleOf("reviewer", "`roles/shared/w.md`") };
+  const giving = k => ({
+    start: { ...plain, "roles/builder.md": roleOf("builder", Array.from({ length: k }, (_, i) => `\`roles/shared/x${i}.md\``).join(", ")) },
+    paths: { ...plain, "tasks/p.md": `# P\n\nRead when: the paths ${Array.from({ length: k }, (_, i) => `\`src/**/q${i}/*.js\``).join(", ")}.\n` },
+    kinds: { ...plain, "tasks/k.md": `# K\n\nRead when: the kinds ${Array.from({ length: k }, () => "`same`").join(", ")}.\n` },
+  });
+  for (const [what, texts] of Object.entries(giving(n))) {
+    slow = Date.now();
+    const a = total(mem(texts), given), c = conditions(a, total(mem(texts), given, a), "");
+    ok(Date.now() - slow < 5000 && !c.cut, `read-total: ${n} names of one rule file (${what}), read by 60 readers of merged pull requests, take ${Date.now() - slow} ms, within 5 s`);
+  }
+  for (const [what, texts] of Object.entries(giving(40000))) {
+    slow = Date.now();
+    thrown = null;
+    try { total(mem(texts), given); } catch (e) { thrown = e; }
+    ok(thrown && /names/.test(thrown.message) && mended(`FAIL: ${thrown.message}`) && Date.now() - slow < 5000, `read-total: forty thousand names of one rule file (${what}) are refused with their mend, within 5 s`);
+  }
   // (files each within their limit, past the limit of all their text together, are refused with their mend)
   for (let i = 0; i < 10; i++) put(`tasks/full${i}.md`, `# U\n\nRead when a screen changes: the kind \`screen\`.\n\n${"z".repeat(LIMITS.bytes - 100)}\n`);
   slow = Date.now();

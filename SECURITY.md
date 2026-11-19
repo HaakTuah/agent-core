@@ -32,8 +32,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      gives that is absolute or holds a ".." segment as no file); limits:
      64 MB of git's answer (256 MB for the comments proof, the selection and the total read, 16 MB for the manifest,
      past which it is reported unread), and none in count, since every changed path is read, save the total read's 1 MB
-     of a file's text, past which its size alone is counted, and 8 MB of all their text, 200 rule files and 100 kinds of
-     task, past which it fails with its mend; hostile tests: `tests/hostile-pr-changes-test.mjs`.
+     of a file's text, past which its size alone is counted, and 8 MB of all their text, 200 rule files, 100 kinds of
+     task and 300 names they give, past which it fails with its mend; hostile tests: `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
      of the work standing still (`scripts/look.mjs`, through `queue.mjs`'s placing and reading), with the open issues
