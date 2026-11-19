@@ -49,11 +49,11 @@ might attack: `floor/threat-model.md`.
     nor that a session cannot be tricked. Reason: tools bring most outside text to a session.
 - **The owner's word** is their own comment (one from an owner's account without an agent's attribution line) or
   what they say to any session they work with. That session acts on it and passes it on to the sessions it starts. By
-  default a record of it states the decision and its reason in its own words, a yes as "the owner agreed" and to what;
-  where the owner's words carry the reason better, it quotes only those, spelling and grammar corrected, meaning kept:
-  no agreement, praise, chatter, frustration or words to a session, and nothing rule 11 keeps out (a personal example
-  made general, or the reason given instead). It does not mean a quoted decision is reworded, nor a standing record
-  rewritten. Reason: a quote is only there to say why a decision was taken.
+  default whoever records it states the decision and its reason in their own words, a yes as "the owner agreed" and to
+  what; where the owner's words carry the reason better, they quote only those, spelling and grammar mended, meaning
+  kept: no agreement, praise, chatter, frustration or words to a session, and nothing rule 11 keeps out (a personal
+  example made general, failing that the reason given). It does not mean a quoted decision is reworded, nor
+  a standing record rewritten for it. Reason: a quote only shows why a decision was taken.
 - Every agent that posts under an owner's login ends with its tool's attribution line.
 
 **8. Reviews look for breaks of any floor rule** and any new way in (an input, request, dependency, script, sign-in or
