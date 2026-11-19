@@ -186,14 +186,20 @@ try {
   const plain = call("yaml-keys.mjs", `uncommented("a: 1 # b")`);
   ok(plain.status === 0 && plain.stdout.trim() === JSON.stringify("a: 1"), "what needs no package runs with nothing installed, so a project's own workflow that runs the copies check is not stopped", `${plain.stdout}${plain.stderr}`);
   // (a project's Codex config, which the TOML package reads, with nothing installed: the agent-tools check did not run and
-  // says the install, and where the job's install could not reach the registry it says so as a warning: #654, point 4)
+  // says the install, and where the job's install could not reach the registry it says as a warning that it left that
+  // file unread: its entries are not failed as configured nowhere, and every other failure stands (#654, point 4)
   fs.mkdirSync(path.join(project, ".codex"), { recursive: true });
-  fs.writeFileSync(path.join(project, ".codex/config.toml"), "notify = [\"x\"]\n");
-  fs.writeFileSync(path.join(project, "licences.json"), "{}\n");
+  fs.writeFileSync(path.join(project, ".codex/config.toml"), "[mcp_servers.docs]\ncommand = \"docs-server\"\n");
+  const entry = name => ({ kind: "server", name, publisher: "Example Tools", version: "2.0.0" });
+  fs.writeFileSync(path.join(project, "licences.json"), JSON.stringify({ agentTools: [entry("Codex docs")] }));
   const tools = more => spawnSync(process.execPath, [path.join(copy, "scripts/agent-tools.mjs"), "licences.json"], { cwd: project, encoding: "utf8", timeout: 60000, env: { ...env, ...more } });
   const absent = tools({}), skipped = tools({ CORE_PACKAGES_UNREACHED: "1" });
+  fs.writeFileSync(path.join(project, ".mcp.json"), JSON.stringify({ mcpServers: { files: { command: "files-server" } } }));
+  const others = tools({ CORE_PACKAGES_UNREACHED: "1" });
+  fs.rmSync(path.join(project, ".mcp.json"));
   ok(absent.status === 1 && /did not run: the package smol-toml is not installed/u.test(absent.stderr) && mended(absent.stderr), "the agent-tools check with a Codex config and nothing installed did not run, and says the install", `${absent.status} ${absent.stdout}${absent.stderr}`);
-  ok(skipped.status === 0 && /^::warning::The agent-tools check did not run: .*smol-toml.*Mend: run this job again/mu.test(skipped.stdout), "and where the registry did not answer, it says so as a warning and fails nothing", `${skipped.status} ${skipped.stdout}${skipped.stderr}`);
+  ok(skipped.status === 0 && /^::warning::The agent-tools check did not read \.codex\/config\.toml: .*smol-toml.*Mend: run this job again/mu.test(skipped.stdout) && !/docs/u.test(skipped.stderr), "and where the registry did not answer, it says as a warning that it left the Codex config unread, failing none of its entries", `${skipped.status} ${skipped.stdout}${skipped.stderr}`);
+  ok(others.status === 1 && /server "files", configured in \.mcp\.json, is not listed/u.test(others.stderr) && !/docs/u.test(others.stderr), "while every other part of the check runs, and fails what it finds", `${others.status} ${others.stdout}${others.stderr}`);
   fs.rmSync(path.join(project, ".codex"), { recursive: true, force: true });
   fs.rmSync(path.join(project, "licences.json"));
   // (and the install puts each package where the scripts load it from, untracked)

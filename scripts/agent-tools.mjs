@@ -68,7 +68,7 @@ import { fetchedBy } from "./hook-source.mjs";
 import { baseOf, textAt } from "./licences.mjs";
 import { unreached } from "./packages.mjs";
 import { started } from "./started.mjs";
-import { parseToml } from "./toml.mjs";
+import { TomlUnreached, parseToml } from "./toml.mjs";
 
 const KINDS = { plugin: "the plug-in", server: "the tool server", skill: "the skill", hook: "the hook" };
 const PINNED = new Set(["plugin", "server"]); // (the kinds that must give a version: neither is a file of the project's)
@@ -95,10 +95,10 @@ export function configured(read, skills, files = () => [], linked = () => false,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
   // (`texts`: each problem met reading a file, with that file's text, so one the base held as it stands can be told)
   // (`baselined`: those a project may hold, noted where there is no base to read against, as a pin is)
-  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map(), baselined = new Set();
+  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map(), baselined = new Set(), unread = new Set();
   const flag = (problem, file, text = read(file)) => { problems.push(problem); texts.set(problem, `${file}\0${text}`); };
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
-  const state = { tools, problems, texts, baselined, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, linked };
+  const state = { tools, problems, texts, baselined, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, linked, unread };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -136,7 +136,7 @@ export function configured(read, skills, files = () => [], linked = () => false,
   for (const file of markdown()) { readFrontmatter(state, file, read(file)); if (/^\.claude\/commands\//iu.test(file.normalize("NFC"))) readShell(state, file, read(file)); }
   readKiro(state, json, files);
   readCodex(state, json, read);
-  return { tools, ids, problems, texts, baselined, sources, pins: pinsOf(plugins, markets, servers) };
+  return { tools, ids, problems, texts, baselined, sources, unread, pins: pinsOf(plugins, markets, servers) };
 }
 
 const SERVERS = "each tool server's name to its settings";
@@ -194,6 +194,8 @@ function readCodex(state, json, read) {
   if (text === null) return;
   let config;
   try { config = parseToml(text); } catch (e) {
+    // (left unread where the TOML package could not be installed, the registry not answering: never a problem of the file)
+    if (e instanceof TomlUnreached) { state.unread.add(".codex/config.toml"); return; }
     const problem = `.codex/config.toml cannot be read as TOML (${e.message}). Mend: correct it to TOML, as Codex reads it`;
     state.flag(problem, ".codex/config.toml", text);
     return;
@@ -528,7 +530,7 @@ export function check(head, list, kit, file) {
   if (list) {
     for (const k of unlisted) missing.push([k, `${describe(k)}, configured in ${tools.get(k)}, is not listed. Mend: list it under "agentTools" in ${file} with its publisher and, for a plug-in or tool server, one exact version, in this pull request, where its task names it; else take it out`]);
     problems.push(...missing.map(([, problem]) => problem));
-    for (const k of list.keys) if (!tools.has(k)) problems.push(`${file}: "agentTools" lists ${describe(k)}, which nothing configures. Mend: take its entry out of the list, in this pull request`);
+    for (const k of list.keys) if (!tools.has(k) && !codexUnread(head, k)) problems.push(`${file}: "agentTools" lists ${describe(k)}, which nothing configures. Mend: take its entry out of the list, in this pull request`);
   }
   const pins = [];
   for (const [k, p] of head.pins ?? []) {
@@ -539,6 +541,10 @@ export function check(head, list, kit, file) {
   }
   return { problems, unlisted: list ? [] : unlisted, missing, pins, ...sourcesOf(head, list, file, problems) };
 }
+// Whether a listed tool may be one of Codex's config, which was left unread (configured()'s `unread`), so that its
+// entry is not failed as configured nowhere: a hook or tool server Codex's files configure is named "Codex ...".
+const codexUnread = (head, k) => !!head.unread?.has(".codex/config.toml") && /^(?:hook|server) Codex /u.test(k);
+
 // check()'s `sources` and `marked`, and into `problems` each mark on a hook in the starter kit's form.
 function sourcesOf(head, list, file, problems) {
   const sources = [], marked = [];
@@ -1411,13 +1417,13 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
   return { fail, notes };
 }
 
-// Why the check does not run, or null: where the job's install could not reach the registry, in a project's pull
-// request, a project with a Codex config, which the TOML package reads, is not checked, said as a warning, neither
-// failed nor passed (#654, point 4), since a config left unread would fail each tool it configures as listed for nothing.
-function standsDown(root, base = baseOf(root)) {
+// The part of the check that did not run, or null: where the job's install could not reach the registry, in a project's
+// pull request, a project's Codex config, which the TOML package reads, is left unread, at the head and the base alike,
+// and its entries in the list are not failed as configured nowhere; every other failure stands (#654, point 4).
+function partlyUnread(root, base = baseOf(root)) {
   const codex = ".codex/config.toml";
   const held = () => fs.existsSync(path.join(root, codex)) || (!!base && textAt(root, base, codex) !== null);
-  return unreached("smol-toml") && held() ? `The agent-tools check did not run: ${codex} is read by the package smol-toml, which could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault` : null;
+  return unreached("smol-toml") && held() ? `The agent-tools check did not read ${codex}: it is read by the package smol-toml, which could not be installed, the registry not answering; every other part of the check ran. Mend: run this job again before the pull request merges; if it fails again, file it as a fault` : null;
 }
 
 // With no base to read against, as before a commit or on a push, each problem a project may hold, noted as sortSources
@@ -1444,8 +1450,8 @@ function sortUnlisted(unlisted, { head, base, held, file }, fail, notes) {
 if (started(import.meta.url)) {
   const args = process.argv.slice(2), file = args.find(a => !a.startsWith("--"));
   if (!file) { console.error("usage: node core/scripts/agent-tools.mjs <the licence check's config> [--core]"); process.exit(2); }
-  const skipped = standsDown(process.cwd());
-  if (skipped) { console.log(`::warning::${skipped}`); process.exit(0); }
+  const partly = partlyUnread(process.cwd());
+  if (partly) console.log(`::warning::${partly}`);
   const { fail, notes } = run(process.cwd(), file, { core: args.includes("--core") });
   for (const n of notes) console.log(`note ${logged(n)}`);
   for (const f of fail) console.error(`FAIL: ${logged(f)}`);
