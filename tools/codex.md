@@ -3,8 +3,8 @@
 Read by a session of the tool `codex`, and by whoever hands Codex a task or asks it for a review.
 
 Asked for a review, by the first way there is (`tasks/reviews.md`, point 1):
-- *Side by side:* a fresh session of its command line, `codex exec "<the brief>"`, which takes the review's brief; its
-  briefer posts its answer (`tasks/tools.md`, "Each tool's part").
+- *Side by side:* `codex exec "<the brief>"` starts a fresh session, which takes the review's brief; whoever briefed it
+  posts what it answers.
 - *Through a plug-in:* in Claude Code, a brief to the subagent `codex:codex-rescue`, below, that says to change nothing
   and to review the branch against the default branch. Its answer, posted on the PR, is its code review of Claude's
   work, or, focused as `tasks/reviews.md`, point 3, says, its security review.

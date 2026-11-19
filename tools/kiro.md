@@ -4,10 +4,9 @@ Read by a session of the tool `kiro`, and by whoever hands Kiro a task or a revi
 (kiro.dev, its pages on steering, hooks and the command line, read on 15 November 2026), as `tasks/tools.md` asks
 until Kiro has passed the staged cases.
 
-Asked for a review, by the first way there is (`tasks/reviews.md`, point 1):
-- *Side by side:* a fresh session of its command line, handed the review's brief as below, which it takes; its briefer
-  posts the answer (`tasks/tools.md`, "Each tool's part").
-- *Through a plug-in:* none the core knows.
+How a review is asked of Kiro by each way:
+- *Side by side:* from its command line, as below, in a fresh session that takes the review's brief.
+- *Through a plug-in:* no plug-in of Kiro's for another tool is known.
 - *On the host:* none: it has no review app there.
 
 - **What it reads:** an `AGENTS.md` at the root, always, and one in any folder it works in; the steering files under

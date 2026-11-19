@@ -4,9 +4,9 @@ Read by a session of the tool `antigravity`, and by whoever hands it a task or a
 documentation's page on rules (antigravity.google, read on 15 November 2026) and nothing else, until it passes the
 staged cases (`tasks/tools.md`).
 
-Asked for a review, by the first way there is (`tasks/reviews.md`, point 1):
-- *Side by side:* none: the core knows no command line of its.
-- *Through a plug-in:* none the core knows.
+Its reviews by each way:
+- *Side by side:* none, with no command line of its known.
+- *Through a plug-in:* nothing of the kind is documented.
 - *On the host:* none. A project with it alone asks in its editor, a new conversation given the review's brief, as
   `tasks/tools.md`, "Each tool's part", says of a tool with no review app.
 

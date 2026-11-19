@@ -76,7 +76,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that closes its issue.
 - **Queued means wanted: nothing queued waits for a second word.** Where the floor asks the owner's
   yes in a PR (floor rule 3: a change to the floor or the review guidelines), the yes the owner gave when its issue was
-  queued is that yes: the builder relays it into the PR word for word as it was recorded (floor rule 4), and it covers
+  queued is that yes: the builder relays it into the PR word for word as it was recorded (floor rule 3), and it covers
   the change as the issue describes it. A PR that goes beyond its issue is not covered by it, and the design check
   says so.
 - **The file holds no note.** Where a module asks for one in the *progress file* (a lane that waits), it goes in the
@@ -89,8 +89,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   where it quotes the owner's words, and equally where it sets out a design and says the owner agreed to it, since a
   bare yes is never quoted (#252). Such a record sets the design out in full, as what binds, and says plainly that the
   owner agreed to it, as the notes on #244 and #252 do; it covers what it sets out and nothing beyond, and a view of
-  the session's own, marked as not a decision, binds nothing. The builder relays the record word for word (floor rule
-  4), and the review reads the change against the design it sets out. A label or opening on another account's text
+  the session's own, marked as not a decision, binds nothing. The builder relays the record word for word, and the
+  review reads the change against the design it sets out. A label or opening on another account's text
   makes it no more than data. What any other session adds to an issue is that session's word.
 - **Who builds a line, the line says.** A bug, a test and a check for a rule that already stands go to any builder
   session. A new or changed rule goes to the design session or to a builder at the strongest tier (`tasks/roles.md`), as its
@@ -240,13 +240,13 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   of the items written before 16 November 2026 stay in this repository alone (`words/`, which `.gitattributes` keeps
   out of the copy as it keeps `reports/`). Whoever adds an item writes its number, its date, the issue that carries
   the owner's word and one line of the reasoning, and no quotation: the words stay on the issue. Wherever the owner's
-  words are recorded here, a bare yes is never quoted (the record says the owner agreed, and to what), words that
-  carry a decision or a reason stay quoted, and words addressed to a session are left out. Nothing changes it. It does
-  not mean the items that stand are rewritten: they keep the words they hold, in `words/`, beside their reasoning.
+  words are recorded here (#773), they are quoted only as floor rule 4 says: the reason behind a decision, cleaned,
+  and nothing personal. Nothing changes it. It does not mean the items that stand are rewritten: they keep the words
+  they hold, in `words/`, beside their reasoning.
   Reason: a project of another owner imported the owner's dated messages with the rules, and a stand-in needs the
   reasoning, not the wording. Held, in part, by `scripts/holders.mjs`, which fails the two forms out of step
   (`scripts/archive.mjs`), and by `.github/workflows/core.yml`, which fails a copy that holds what `.gitattributes`
-  keeps here; what is quoted, by no check, since none can tell a bare yes from a decision.
+  keeps here; what is quoted, by what holds floor rule 4's "The owner's word".
 - **The archive is pointed to from the list,** not from the rule (#252). By default a rule file here (this file, the
   floor's, the roles' and the modules') holds no "core archive N": `scripts/holders.json` names under "behind" the
   items behind each rule, and a session that needs a rule's reason looks them up there. Whoever writes or changes a
