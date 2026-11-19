@@ -10,13 +10,14 @@ it merges last.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #715 | rule builder; `tests.yml` steps one by one, 2 security reviews | |
+| #715 | rule builder; `tests.yml` steps one by one | |
 | #733 | rule builder; it changes the floor (rule 12); two security reviews | |
 | #744 | rule builder; it changes the archive's key and its check | |
-| #750 | rule builder; it changes floor rule 8 (point 2); two security reviews | |
+| #750 | rule builder; it changes floor rule 8 (point 2) | |
 | #756 | rule builder | |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
-| #704 | builder; `tests.yml`, 2 security reviews | #715, same file |
+| #704 | builder; `tests.yml` | #715, same file |
+| #770 | builder; `tests.yml` | #769 and #704, same file |
 | #530, step 5 | builder; licence readers | |
 | #593, points 1 to 3 | rule builder | |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md` | |
