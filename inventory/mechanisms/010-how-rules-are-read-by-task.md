@@ -4,6 +4,6 @@
   (Claude Code's `.claude/rules/` with `paths`, Copilot's `.github/instructions/` with `applyTo`, Kiro's steering files,
   whose matching by path was not confirmed), which load a file's rules when a session reads a path they name, as
   `reading.mjs` does for a pull request's changed paths, but each in its own form; and `claude plugin eval`, which reads
-  whether Claude Code loads a skill by itself, half of point 8's trial for one tool. Both proposed for the trial.
+  whether Claude Code loads a skill by itself, half of point 8's trial for one tool. Both agreed for the trial.
   *Bugs:* 1. **Try**, as #534's point 8 sets out: one or two task modules laid out as skills, each tool the core
   supports given a task that calls for one.

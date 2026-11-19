@@ -8,6 +8,6 @@
   made for organisations; Terraform or OpenTofu with the host's provider, dropped on fact: an install and a state file
   to keep for a handful of settings; ghset, a young program, dropped on fact: the host's JSON and its CLI do what it
   does. The app, `NOTICE`, the profile and git's name are no setting a file can hold: an install, the holder's own
-  typing, a profile and each machine's config. *Bugs:* 2 naming a ruleset. **Try**, proposed: the rulesets of
+  typing, a profile and each machine's config. *Bugs:* 2 naming a ruleset. **Try**: the rulesets of
   `README.md` kept as the host's JSON, which the owner applies with one command, where the plan has rulesets (a private
   repository on the free plan has none).

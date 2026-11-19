@@ -1,38 +1,39 @@
 # The core's parts, and what else does each
 
-The inventory of #534, point 4: a line for each part of the core (each script a workflow or a hook runs, each workflow,
-each mechanism), saying what it does, where it must run, what else does it, and a verdict. It grows the inventory of
-#486, point 10 (`CHOICES.md`, "Choice: one parser, tree-sitter, carried in the copy, reads every language's structure",
-its list "What is written by hand today"), which weighed the readers inside the checks and stays the word on them: a
-line here points to it where a part holds such a reader, and weighs the whole part. It lists too, under a heading of its
-own, what the core lacks that a maintained tool gives at once, first a general linter for its own scripts. Each part's
-line stands in a file of its own under `inventory/`, in the folder its heading names, so that two pull requests that
-add a part never edit the same lines (#750, point 1); a new one is named to stand between its neighbours
-(`NNN-<name>.md`), and `node scripts/inventory.mjs` reads the inventory whole.
+The inventory of #534, point 4: a line for each part of the core, saying what it does, where it must run, what else does
+it, and a verdict. It grows the inventory of #486, point 10 (`CHOICES.md`, "Choice: one parser, tree-sitter, carried in
+the copy, reads every language's structure", its list "What is written by hand today"), which weighed the readers inside
+the checks and stays the word on them: a line here points to it where a part holds such a reader, and weighs the whole
+part. It lists too, under a heading of its own, what the core lacks that a maintained tool gives at once, first a
+general linter for its own scripts. Each part's line stands in a file of its own under `inventory/`, in the folder its
+heading names, so that two pull requests that add a part never edit the same lines (#750, point 1); a new one is named
+to stand between its neighbours (`NNN-<name>.md`), and `node scripts/inventory.mjs` reads the inventory whole.
 
-It decides nothing by itself. A **replace** or a **try** becomes a line of `QUEUE.md` only on the owner's word, each a
-pull request of its own that shows the comparison, old against new (#534, point 2); no tool or package arrives before
-#488's points 1, 3, 4 and 5 have merged; and the order is #534's, point 7: the tools that only run first, then the
-packages installed from the core's lock file (#654), then the form the rules are delivered in.
+It decides nothing by itself. A **replace** or a **try** becomes a line of `QUEUE.md` only on the owner's word, and is
+built as `AGENTS.md`, "A part of the core gives way to what is maintained", says: its comparison, old against new, in a
+pull request of its own, in that rule's order.
 
 Weighed whole: 2026-11-17
 
 Challenged whole: 2026-11-17, by a session that wrote no part of it ("The challenge", below; #534, point 13)
 
-**How a line reads.** The part's files, then what it does. *Runs:* where it must run: in a session's hook, in any
-session, on the host's runners, on the owner's own computer; a check that may decide a pull request runs in all three
-places that hold a session or a runner (#534, point 5). *Else:* what else does the job, found on the web and in the
-registries on 17 November 2026, each kept or dropped in a few words, a drop marked as a fact, as a measure, or as an
-assumption to measure (`tasks/choices.md`, "a drop says whether it rests on a fact"). A verdict or a candidate the
-challenge changed says "proposed" and waits on the owner's word ("What waits on the owner", below). *Bugs:* the issues
-labelled `bug` that name the part's files, of the 61 so labelled. A trial of a tool in its place run from 18 November
-2026 on is recorded on the line as *Tried:*, with *Replayed:* saying by number which of the part's bugs the tool reads
-and which it does not (`tasks/choices.md`, "A trial of a maintained tool replays the part's past bugs"; #593, point 7);
-the trials of 17 November below came before that rule and replayed none. Then the verdict: **replace** where a
-maintained tool does the job at the same level or better, the comparison to be shown when it is made; **try** where only
-a trial can tell; **keep**, with the exception of #486, point 6, it rests on: small and stable, nothing fits, fitting
-costs more than keeping, or it brings too much. A part that gives way keeps the core's glue (#534, point 10): its lists
-and baseline, the failure that says the mend, the word that it could read nothing, and "Nothing locks a project".
+**How a line reads.** The part's files, then what it does: before its first colon, the files it claims, a folder by its
+path ending in `/`, and a script's line its test (`tests/<its name>-test.mjs`) too. Every file git tracks is claimed by
+a line, or lies under a path "What the inventory leaves out" names with the reason, as its check reads (#593, point 2).
+*Runs:* where it must run: in a session's hook, in any session, on the host's runners, on the owner's own computer;
+where a check that may decide a pull request runs is `AGENTS.md`'s "A tool that only runs is fetched at set-up, as its
+own program". *Else:* what else does the job, found on the web and in the registries on 17 November 2026, each kept or
+dropped in a few words, a drop marked as a fact, as a measure, or as an assumption to measure (`tasks/choices.md`, "a
+drop says whether it rests on a fact"). A verdict or a candidate the challenge changed was agreed by the owner on 18
+November 2026 ("The owner's word on the challenge", below). *Bugs:* the issues labelled `bug` that name the part's
+files, of the 61 so labelled. A trial of a tool in its place run from 18 November 2026 on is recorded on the line as
+*Tried:*, with *Replayed:* saying by number which of the part's bugs the tool reads and which it does not
+(`tasks/choices.md`, "A trial of a maintained tool replays the part's past bugs"; #593, point 7); the trials of 17
+November below came before that rule and replayed none. Then the verdict: **replace** where a maintained tool does the
+job at the same level or better, the comparison to be shown when it is made; **try** where only a trial can tell;
+**keep**, with the exception of #486, point 6, it rests on: small and stable, nothing fits, fitting costs more than
+keeping, or it brings too much. A part that gives way keeps what `AGENTS.md`, "A part of the core gives way to what is
+maintained", keeps the core's own.
 
 **Trials of 17 November 2026,** each in a scratch folder outside the repository, at one exact version, with install
 scripts off, nothing committed, as the owner allowed for #486's trial on 16 November:
@@ -76,6 +77,24 @@ as the trials above were, over the scripts on `main` that day (36,896 lines of J
 
 Its parts stand in `inventory/lacks/`, a file each, read in the order of their names.
 
+## What the inventory leaves out
+
+What is no part of the core, each with why; every other tracked file is claimed by a line above (#593, point 2).
+
+- `floor/`, `roles/`, `tasks/`, `tools/`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `SECURITY.md`, `.agents/rules/core.md`,
+  `.kiro/steering/core.md`: the rule text, and the entry files that pull it into each tool, read as content; weighed as
+  one mechanism above, "The rule text", whose form is #534's.
+- `modules/`: the pointers left at the rules' old paths, each naming where its file now stands, until the second release
+  after 16 November 2026 (`README.md`).
+- `setup/owner-guide.md`, `setup/server.md`, `setup/starter-kit.md`: guides for the owner and for a project's set-up,
+  read as content.
+- `.github/ISSUE_TEMPLATE/`: the core's own issue forms and `config.yml`, the setting with which the host offers them:
+  text a person or a session fills, weighed as the starter kit's forms are, on its line above.
+- `CHOICES.md`, `INVENTORY.md`, `inventory/`, `reports/`: records of work done and choices made, which the parts
+  above read and none of which runs.
+- `archive/`, `words/`: the archive of the owner's decisions and, in this repository alone, the owner's words.
+- `LICENSE`, `NOTICE`: the core's licence and its holder's notice, which the holder alone writes (floor rule 11).
+
 ## The challenge (#534, point 13)
 
 A fresh session that wrote no part of the inventory read it whole on 17 November 2026, searched the web and the
@@ -108,10 +127,15 @@ weeks before or more where one was, with install scripts off and nothing committ
 fake, built when the trial ran. The programs came from the Go and npm registries, since this session's network refused
 the host's release downloads.
 
-### What waits on the owner
+### The owner's word on the challenge
 
-Each is proposed, and none becomes a line, or widens one, before the owner's word; the twelve agreed verdicts do not
-wait on any of them.
+The challenge left seven proposals here. On 18 November 2026 the owner agreed to all seven, and changed the fetcher's
+trial, in words the orchestrator passed on:
+
+> 5. #534: the inventory challenge's seven proposals are all agreed. The fetcher trial changed: a registry's own lock
+> file is the first candidate, which #654 now makes the rule; aqua or mise only for what no registry carries.
+
+Each now stands on its part's line above and in the order below:
 
 1. TruffleHog joins the comparison of the personal-terms check's replacement, beside gitleaks or Betterleaks, run only
    with `--no-verification` and `--no-update`, offline, as the trial ran it.
@@ -119,22 +143,28 @@ wait on any of them.
 3. promptfoo joins the trial of a harness under the staged cases, beside Inspect AI and Harbor.
 4. The trial of the skill format (#534, point 8) weighs each tool's own rule files for paths too, and uses
    `claude plugin eval` for Claude Code's part.
-5. `scripts/node.sh`, where point 5 widens it to the tools that only run: **try** aqua or mise as the fetcher, its file
-   of digests standing as point 5's list, in place of **keep**.
+5. The fetcher of the tools that only run (`scripts/node.sh`, as `AGENTS.md`'s "A tool that only runs is fetched at
+   set-up, as its own program" widens it): **try** a registry's own lock file first, for each tool a registry carries
+   (#654), and aqua or mise only for what no registry carries, mise through only its backends that check a download
+   against its digest (aqua, github and http), never asdf's or vfox's (floor rule 15).
 6. The owner's steps on the host's account: **try** the rulesets of `README.md` kept as the host's own JSON, applied
    with one command, a new line.
 7. What a session runs by hand: **try** ccusage under the cost line (`scripts/session-cost.mjs`), a new line.
 
 ## What the verdicts ask, in #534's order
 
-The owner agreed to all twelve on 17 November 2026, each a line of `QUEUE.md` of its own; none arrives before #488's
-points 1, 3, 4 and 5 have merged. What the challenge proposes is not among them until the owner's word.
+The owner agreed to all twelve on 17 November 2026, and to the challenge's seven on 18 November 2026, each a line of
+`QUEUE.md` of its own or a widening of the line it belongs to.
 
 1. The tools that only run: **replace** the matching of `personal-terms.yml` with gitleaks or Betterleaks; **replace**
    `scripts/workflows.mjs` with zizmor and actionlint; **replace** `scripts/mutate.mjs` with Stryker; **try** a link
    checker, offline, under `scripts/pointers.mjs`; **try** jscpd under `scripts/copies.mjs`; **try** a harness under the
    staged cases; and of what the core lacks, **try** a general linter for its scripts (oxlint, then Biome), ShellCheck
-   with actionlint, and knip after the linter.
+   with actionlint, and knip after the linter. The challenge's seven widen these: TruffleHog beside gitleaks, ghalint
+   and poutine beside zizmor and actionlint, promptfoo in the harness's trial; and they add, ahead of the first such
+   tool, the **try** of its fetcher, a registry's own lock file first (#654), and the **try**s of the rulesets as the
+   host's JSON and of ccusage under the cost line.
 2. The reading under the package checks: **replace** with `npm sbom`; **try** nuget-license and the SDK's own list.
 3. The packages, installed from the core's lock file (#654): as #486's inventory and #519's path have them.
-4. The form the rules are delivered in: **try** the skill format (#534, point 8).
+4. The form the rules are delivered in: **try** the skill format (#534, point 8), weighing each tool's own rule files
+   for paths too, with `claude plugin eval` for Claude Code's part.

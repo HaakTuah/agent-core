@@ -1,7 +1,8 @@
-// Tests of the labels and openers (labels.mjs): the list's shape, an agent's attribution line, a comment's opening line,
-// the "Found while:" line, a view's heading, the labels to make, what the check reports of each kind and of none; and,
-// on Linux and macOS, the script itself where gh gives no answer, which reports that and fails nothing, and the day it
-// reads from in a full clone, a shallow one and where git cannot start. Node's own modules and git.
+// Tests of the labels and openers (labels.mjs): the list's shape, by its schema, an agent's attribution line, a
+// comment's opening line, the "Found while:" line, a view's heading, the labels to make, what the check reports of each
+// kind and of none; and, on Linux and macOS, the script itself where gh gives no answer, which reports that and fails
+// nothing, and the day it reads from in a full clone, a shallow one and where git cannot start. Node's own modules, git,
+// and ajv for the schema (schemas.mjs).
 //
 //   node tests/labels-test.mjs
 import { spawnSync } from "node:child_process";
@@ -11,14 +12,33 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LIST, SENDERS, SEVERAL, SINCE, STATES, byAgent, cameOn, check, found, opens, report, strayViews, toMake } from "../scripts/labels.mjs";
 import { SENDERS as FILE_SENDERS, STATES as FILE_STATES } from "../scripts/inbox.mjs";
+import { shapeFaults } from "../scripts/schemas.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
 
 ok(STATES.join() === "queued,needs-owner,later,on-hold" && SENDERS.length === 8 && SENDERS.every(s => s.startsWith("by:")),
   "the list: four states and eight senders", `${STATES} ${SENDERS}`);
-ok(Object.values({ ...LIST.state, ...LIST.sender, ...LIST.mark }).every(l => /^[0-9a-f]{6}$/.test(l.color) && l.description.length <= 100),
-  "each label has a colour GitHub takes and a description of at most 100 characters");
+// (the list's shape, by its schema: scripts/schemas/labels.json, through schemas.mjs; #530)
+ok(JSON.stringify(shapeFaults("labels", LIST, "core/")) === "[]", "the list holds to its schema: each label a colour and a description GitHub takes, each sender by:, the openers and the headings",
+  JSON.stringify(shapeFaults("labels", LIST, "core/")));
+{
+  const bent = change => { const l = structuredClone(LIST); change(l); return shapeFaults("labels", l, "core/"); };
+  const said = [
+    [l => { l.state.queued.color = "#0e8a16"; }, '"queued", "color"', "six lower-case hex digits"],
+    [l => { l.state.queued.color = "0E8A16"; }, '"queued", "color"', "six lower-case hex digits"],
+    [l => { l.mark.correction.description = "x".repeat(101); }, '"correction", "description"', "1 to 100 characters"],
+    [l => { l.sender.owner = { color: "000000", description: "x" }; }, '("owner")', "by:<who>"],
+    [l => { l.state["x".repeat(51)] = { color: "000000", description: "x" }; }, '"state" names a key', "1 to 50 characters"],
+    [l => { l.mark.x = { color: "000000", description: "x", name: "x" }; }, '("name")', '"color" and "description" alone'],
+    [l => { l.openers.push("Security review:"); }, '"openers", item', "no colon"],
+    [l => { delete l.headings.view; }, "'view'", '"word", "design", "view"'],
+    [l => { l.extra = 1; }, '("extra")', "take it out"],
+    [l => { delete l.mark; }, "'mark'", "core/scripts/labels.json"],
+  ].map(([change, where, mend]) => [bent(change), where, mend]);
+  ok(said.every(([f, where, mend]) => f?.length === 1 && f[0].startsWith("the list") && f[0].includes(where) && f[0].split(" Mend: ")[1]?.includes(mend)),
+    "a list of the wrong shape fails, saying where and its mend", JSON.stringify(said.filter(([f, where, mend]) => !(f?.length === 1 && f[0].includes(where) && f[0].split(" Mend: ")[1]?.includes(mend)))));
+}
 ok(FILE_STATES.join() === STATES.join() && FILE_SENDERS.join() === SENDERS.map(s => s.slice(3)).join(),
   "the inbox's two lines take the same names, a sender without its by:");
 

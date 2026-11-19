@@ -187,14 +187,20 @@ try {
   fs.writeFileSync(path.join(pp, "package.json"), JSON.stringify(parserList, null, 2));
   fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license, dependencies: parserList.dependencies }, "node_modules/is-number": staged } }, null, 2));
   // (each script that loads a package, by the call that loads it; a script that loads one and has no case here fails)
-  const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")`, "workflow-run.mjs": `parseYaml("a: 1\\n")`, "markdown.mjs": "markdownReader()", "toml.mjs": `parseToml("a = 1\\n")` };
+  const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")`, "workflow-run.mjs": `parseYaml("a: 1\\n")`, "markdown.mjs": "markdownReader()", "runners.mjs": `workflowsIn(".github/workflows")`, "toml.mjs": `parseToml("a = 1\\n")`, "schemas.mjs": `shapeFaults("copies", {})`, "workflows.mjs": `draftHoles("on: pull_request\\njobs: {}\\n")` };
+  // (a reader whose caller goes on without the package, saying so as a warning: it answers null, and loads nothing)
+  const ANSWERS_NULL = new Set(["schemas.mjs"]);
   // (parseYaml throws where the package is not installed, and each of its callers says so as a failure or an unread file:
   // here as a check would, so its words are read as one)
-  const callOf = f => (f === "workflow-run.mjs" ? `(() => { try { return m.${CALLS[f]}; } catch (e) { console.error(\`FAIL: \${e.message}\`); process.exit(1); } })()` : `m.${CALLS[f]}`);
+  const callOf = f => (["workflow-run.mjs", "runners.mjs"].includes(f) ? `(() => { try { return m.${CALLS[f]}; } catch (e) { console.error(\`FAIL: \${e.message}\`); process.exit(1); } })()` : `m.${CALLS[f]}`);
   const loads = fs.readdirSync(path.join(root, "scripts")).filter(f => f.endsWith(".mjs") && f !== "packages.mjs" && /\bload(?:Sync)?\("/u.test(fs.readFileSync(path.join(root, "scripts", f), "utf8")));
   ok(loads.length > 0 && loads.every(f => CALLS[f]), "each script that loads a package has its call here", loads.filter(f => !CALLS[f]).join(", "));
   const call = (f, expr) => spawnSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts", f)).href)}); console.log(JSON.stringify(${expr}));`], { cwd: project, encoding: "utf8", timeout: 60000, env });
-  for (const f of loads) {
+  for (const f of loads.filter(x => ANSWERS_NULL.has(x))) {
+    const r = call(f, callOf(f));
+    ok(r.status === 0 && r.stdout.trim() === "null", `${f}, with nothing installed beside the copy, answers null for its caller to say, and does not take the project's own package of the name`, `${r.stdout}${r.stderr}`);
+  }
+  for (const f of loads.filter(x => !ANSWERS_NULL.has(x))) {
     const r = call(f, callOf(f)), out = `${r.stdout}${r.stderr}`;
     ok(r.status === 1 && /did not run: the package \S+ is not installed/u.test(out) && /install\.mjs/u.test(out) && mended(out), `${f}, with nothing installed beside the copy, says it did not run and how to install, and does not take the project's own package of the name`, out);
   }
@@ -245,6 +251,27 @@ try {
     execFileSync("git", ["add", "-A"], { cwd: cs });
     const cycle = shape([], { CORE_PACKAGES_UNREACHED: "1" }), cycleOut = `${cycle.stdout}${cycle.stderr}`;
     ok(cycle.status === 1 && /FAIL: 2 imports lie on a cycle/u.test(cycleOut) && mended(cycleOut), "and what the reader of C# finds without the parser, a cycle of its using directives, fails all the same", cycleOut);
+  }
+  {
+    // (and so of JavaScript's functions, read on the parser too: where the registry did not answer, none is read, a
+    // warning names the reader, and its imports, read without the parser, still fail on a cycle)
+    const js = path.join(tmp, "js");
+    fs.mkdirSync(js);
+    fs.cpSync(copy, path.join(js, "core"), { recursive: true });
+    fs.writeFileSync(path.join(js, "shape.json"), JSON.stringify({ baseline: "shape-baseline.json", code: [".", ":!core/"], tests: [], systems: {} }));
+    fs.writeFileSync(path.join(js, "a.mjs"), `export function f(x) {\n${"  x++;\n".repeat(70)}}\n`);
+    fs.writeFileSync(path.join(js, "shape-baseline.json"), JSON.stringify({ reads: ["javascript", "jsx", "javascript-tree", "csharp", "csharp-tree", "python", "scripts", "screens"], listed: { "function: a.mjs#f": { lines: 72 } } }));
+    execFileSync("git", ["init", "-q"], { cwd: js });
+    execFileSync("git", ["add", "-A"], { cwd: js });
+    const shape = () => spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json"], { cwd: js, encoding: "utf8", timeout: 120000, env: { ...env, SHAPE_BASE: "", CORE_PACKAGES_UNREACHED: "1" } });
+    const skipped = shape(), skippedOut = `${skipped.stdout}${skipped.stderr}`;
+    ok(skipped.status === 0 && /^::warning::The shape check did not read JavaScript and TypeScript, their functions by the parser \(the reader javascript-tree\): the core's packages could not be installed, .*1 entry its baseline lists there \(functions, and files the grammar cannot read\) is kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut),
+      "where the registry did not answer, the check reads no function of JavaScript, says so as a warning naming the reader, and keeps its baseline's function", skippedOut);
+    fs.writeFileSync(path.join(js, "b.mjs"), "import './c.mjs';\n");
+    fs.writeFileSync(path.join(js, "c.mjs"), "import './b.mjs';\n");
+    execFileSync("git", ["add", "-A"], { cwd: js });
+    const cycle = shape(), cycleOut = `${cycle.stdout}${cycle.stderr}`;
+    ok(cycle.status === 1 && /FAIL: 2 imports lie on a cycle/u.test(cycleOut) && mended(cycleOut), "and what the readers of JavaScript find without the parser, a cycle of its imports, fails all the same", cycleOut);
   }
   // (and the install puts each package where the scripts load it from, untracked)
   // (a project whose own .gitignore leaves out an .npmrc, a lock file and every dot folder still tracks the copy's)
