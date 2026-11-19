@@ -275,7 +275,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   linked the earlier one forward, so a session reading it could rely on a reason that no longer stood. Held by the
   marks' check in `scripts/archive.mjs`, run by `scripts/holders.mjs`: a "Changes:" whose item is not marked back, a
   "Changed by:" with no "Changes:" to match, a key in either that is no item, and a mark out of its form each fail;
-  whether a new item that changes one says so, by the design check of its pull request.
+  that a new item that changes one says so, by none yet.
 - **Every rule says what holds it.** By default a rule of the floor or the modules is held by
   a check that fails where it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no
   check can read its breach exactly, by a staged case, the holder of last resort, or by the scheduled audit; and where
