@@ -2,19 +2,23 @@
 
 The first line that waits on nothing is next.
 
-**Who:** *builder*, any builder session; *rule builder*, a builder on Opus; *the owner*, no session takes it up before
-the owner's own word. A line on points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or "Fixes" it if
+**Who:** *builder*, any builder session; *rule builder*, one on Opus; *the owner*, no session takes it up before
+the owner's word. A line on points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or "Fixes" it if
 it merges last.
 
 ## In order
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #715 | rule builder; `tests.yml` steps one by one, 2 security reviews | |
-| #733 | rule builder; it changes the floor (rule 12); two security reviews | |
+| #715 | rule builder; `tests.yml` steps one by one | |
 | #744 | rule builder; it changes the archive's key and its check | |
-| #750 | rule builder; it changes floor rule 8 (point 2); two security reviews | |
+| #750 | rule builder; it changes floor rule 8 (point 2) | |
 | #756 | rule builder | |
+| #767 | rule builder; it changes `tools/claude.md`'s table | |
+| #773 | rule builder; it changes floor rule 4 | |
+| #704 | builder; `tests.yml` | #715 |
+| #770 | builder; `tests.yml` | #769 and #704 |
+| #772 | builder; `tests.yml` | #769 and #770 |
 | #530, step 5 | builder; licence readers | |
 | #593, points 1 to 3 | rule builder | |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md` | |
@@ -49,10 +53,9 @@ it merges last.
 | #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose rule list it reads |
 | #361 | rule builder, points 1 and 2 only | |
-| #467 | rule builder | |
 | #469 | rule builder; it changes what every role reads at its start | |
 | #484, points 1 to 5 | rule builder | |
-| #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged; the file stays whole where #469's measure finds no kind of task reads less | #469 |
+| #441, with #484, points 6 and 7 | rule builder; the file stays whole where #469's measure finds no kind of task reads less | #469 |
 | #471 | rule builder; it changes what the orchestrator reads at its start | |
 | #355 | builder | #530: the readers left go on the parser #529 brings |
 | #542 | rule builder; it changes what the orchestrator reads at its start | #457 |
@@ -82,6 +85,7 @@ it merges last.
 | #707 | rule builder | |
 | #701 | builder | |
 | #716 | builder | |
+| #551 | builder; #710 adds a line to `tasks/reviews.md` | #642 |
 | #739 | rule builder; it changes the game module (`tasks/game-design.md`) | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
@@ -92,7 +96,7 @@ They read and change no rule.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #550 | builder; a case a PR | |
-| #551 | builder | #549 |
+| #765 | builder | #756, whose #763 brings the rule |
 | #552 | builder | #551 |
 | #553 | builder | #552 |
 | #554 | builder | #553 |

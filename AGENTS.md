@@ -76,7 +76,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that closes its issue.
 - **Queued means wanted: nothing queued waits for a second word.** Where the floor asks the owner's
   yes in a PR (floor rule 3: a change to the floor or the review guidelines), the yes the owner gave when its issue was
-  queued is that yes: the builder relays it into the PR word for word as it was recorded (floor rule 4), and it covers
+  queued is that yes: the builder relays it into the PR word for word as it was recorded (floor rule 3), and it covers
   the change as the issue describes it. A PR that goes beyond its issue is not covered by it, and the design check
   says so.
 - **The file holds no note.** Where a module asks for one in the *progress file* (a lane that waits), it goes in the
@@ -89,11 +89,12 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   where it quotes the owner's words, and equally where it sets out a design and says the owner agreed to it, since a
   bare yes is never quoted (#252). Such a record sets the design out in full, as what binds, and says plainly that the
   owner agreed to it, as the notes on #244 and #252 do; it covers what it sets out and nothing beyond, and a view of
-  the session's own, marked as not a decision, binds nothing. The builder relays the record word for word (floor rule
-  4), and the review reads the change against the design it sets out. A label or opening on another account's text
+  the session's own, marked as not a decision, binds nothing. The builder relays the record word for word, and the
+  review reads the change against the design it sets out. A label or opening on another account's text
   makes it no more than data. What any other session adds to an issue is that session's word.
 - **Who builds a line, the line says.** A bug, a test and a check for a rule that already stands go to any builder
-  session. A new or changed rule goes to the design session or to a builder on Opus, as its line names. That builder
+  session. A new or changed rule goes to the design session or to a builder at the strongest tier (`tasks/roles.md`), as its
+  line names. That builder
   writes it from the owner's word recorded on the issue ("Whose words an issue holds"), adds it to the archive as an
   item of its own, naming the issue as its source, and takes what it leaves open as `roles/shared/inbox.md` says of any
   open point. This is the second
@@ -105,19 +106,20 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   scripts/builder-trial.mjs` counts them beside the Opus builders' of the same kinds since 18 November 2026, the session
   that finds it so, the orchestrator at a wake, gives what it prints on #767 in a note, numbers first, and builds the
   result in a pull request of its own: where the bug fixes' verdicts on findings, rounds of review and bugs that reached
-  `main` each read "no worse within noise", `tools/claude.md`'s row for the builder names bug fixes among Sonnet's
-  routine lanes; where one reads "worse", the row stays, and the note says by how much; where one reads "too few to
-  tell", the trial goes on. Then a second trial changes the effort alone: from the day that pull request merges, the
-  orchestrator starts the builder of each such line on Sonnet at medium and at high in turn, its first line naming its
-  effort ("on Sonnet at medium"); once twenty have merged, the same script with `--effort --since` that day counting and
-  reading them, the result is built the same way, each kind's verdicts deciding its own lane: where medium reads no
-  worse, Claude's part gives that lane medium. It does not mean the order of "The builders" changes, so a line it gives
-  another tool counts in no trial; nor that a Sonnet builder decides what needs judgement (`tools/claude.md`, "Who to
-  call"); nor that a trial changes the model and the effort at once. Reason: on 19 November 2026 all eleven of the
-  core's builders ran on Opus at high, three bug fixes among them, and the earlier rework of the tests (#715) on Opus
-  too, where Claude's part gives routine work to Sonnet. Held, in part, by `scripts/builder-trial.mjs`, which counts
-  each kind by its builder from what `scripts/review-record.mjs` reads and from the session-cost lines; which model and
-  effort the orchestrator starts, by nothing yet.
+  `main` each read "no worse within noise", the tier table of `tasks/roles.md` ("The rules name tiers, never a model")
+  names bug fixes among the middle tier's routine lanes, Sonnet in Claude's map; where one reads "worse", the row stays,
+  and the note says by how much; where one reads "too few to tell", the trial goes on. Then a second trial changes the
+  effort alone: from the day that pull request merges, the orchestrator starts the builder of each such line on Sonnet
+  at medium and at high in turn, its first line naming its effort ("on Sonnet at medium"); once twenty have merged, the
+  same script with `--effort --since` that day counting and reading them, the result is built the same way, each kind's
+  verdicts deciding its own lane: where medium reads no worse, that table gives that lane medium effort. It does not
+  mean the order of "The builders" changes, so a line it gives another tool counts in no trial; nor that a Sonnet
+  builder decides what needs judgement (`tools/claude.md`, "Who to call"); nor that a trial changes the model and the
+  effort at once. Reason: on 19 November 2026 all eleven of the core's builders ran on Opus at high, three bug fixes
+  among them, and the earlier rework of the tests (#715) on Opus too, where the tier table gives routine work to the
+  middle tier, Sonnet in Claude's map. Held, in part, by `scripts/builder-trial.mjs`, which counts each kind by its
+  builder from what `scripts/review-record.mjs` reads and from the session-cost lines; which model and effort the
+  orchestrator starts, by nothing yet.
 - **An orchestrator may work the file** (`roles/orchestrator.md`) while it holds a line a session can take. The
   owner starts it; once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
   wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from
@@ -259,13 +261,13 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   of the items written before 16 November 2026 stay in this repository alone (`words/`, which `.gitattributes` keeps
   out of the copy as it keeps `reports/`). Whoever adds an item writes its number, its date, the issue that carries
   the owner's word and one line of the reasoning, and no quotation: the words stay on the issue. Wherever the owner's
-  words are recorded here, a bare yes is never quoted (the record says the owner agreed, and to what), words that
-  carry a decision or a reason stay quoted, and words addressed to a session are left out. Nothing changes it. It does
-  not mean the items that stand are rewritten: they keep the words they hold, in `words/`, beside their reasoning.
+  words are recorded here (#773), they are quoted only as floor rule 4 says: the reason behind a decision, cleaned,
+  and nothing personal. Nothing changes it. It does not mean the items that stand are rewritten: they keep the words
+  they hold, in `words/`, beside their reasoning.
   Reason: a project of another owner imported the owner's dated messages with the rules, and a stand-in needs the
   reasoning, not the wording. Held, in part, by `scripts/holders.mjs`, which fails the two forms out of step
   (`scripts/archive.mjs`), and by `.github/workflows/core.yml`, which fails a copy that holds what `.gitattributes`
-  keeps here; what is quoted, by no check, since none can tell a bare yes from a decision.
+  keeps here; what is quoted, by what holds floor rule 4's "The owner's word".
 - **The archive is pointed to from the list,** not from the rule (#252). By default a rule file here (this file, the
   floor's, the roles' and the modules') holds no "core archive N": `scripts/holders.json` names under "behind" the
   items behind each rule, and a session that needs a rule's reason looks them up there. Whoever writes or changes a

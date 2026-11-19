@@ -1,4 +1,4 @@
-# The reasons behind the core: items 244 onward
+# The reasons behind the core: items 244 to 264
 
 The index, and how an item is written: `archive/instructions.md`.
 
@@ -199,14 +199,3 @@ The index, and how an item is written: `archive/instructions.md`.
      once an hour in the core, and to its being a priority, since it holds up everything else. It stands behind "A time
      mark measures and never fails", "No test run on a draft", "The default branch is tested at its newest commit" and
      "The slow suites run once per batch, wherever they run" in `tasks/tests.md`.
-265. **19 November 2026**, #767. In the core, a bug fix and a rework of tests are built on Sonnet at high effort, and
-     what writes or changes a rule, touches security or reads a format another publisher defines stays on Opus at
-     high; once Sonnet has built twenty or so of those two kinds, their review findings, rounds and bugs that reached
-     the default branch are set beside the Opus builders' of the same kinds, and Claude's table names bug fixes among
-     Sonnet's routine lanes only where Sonnet's come out no worse within noise. A second trial then changes the effort
-     alone, Sonnet at medium against Sonnet at high, measured the same way. All eleven builders the core ran that day
-     were on Opus at high, three stalled bug fixes among them, and the earlier rework of the tests ran on Opus too,
-     where the table gives routine work to Sonnet; a builder's cost is mostly its context read again at each step, so
-     effort moves it less than its context does. The owner agreed to it in a chat session, asked whether every builder
-     met the criteria that warrant Opus, asked that it be a priority, and agreed that the trial of effort be queued
-     after the first. It stands behind "A bug fix and a rework of tests are built on Sonnet" in `AGENTS.md`.
