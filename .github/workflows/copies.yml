@@ -19,8 +19,9 @@
 # in README.md, point 5), or calls core.yml with its inputs copies and sizes, which runs the same in its one job (#376). It runs, through
 # the project's own core/scripts/checks.mjs, which holds their steps, its copies.mjs, pointers.mjs, reading-size.mjs,
 # workflows.mjs, entry-files.mjs, manifest-reads.mjs, shape.mjs and choices.mjs, with the configs the project names (the shape check's by its
-# manifest's row, or where the starter kit writes it), on the core's one exact Node; Node's own modules only, no
-# package installed. Read-only, with no secret.
+# manifest's row, or where the starter kit writes it), on the core's one exact Node, with the core's packages installed
+# from its lock files first (core/scripts/install.mjs, the parser's by `all`): a YAML parser, a Markdown lexer and the
+# parser of other languages. Read-only, with no secret.
 name: copies
 
 on:
@@ -59,6 +60,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
+      - name: The core's packages, installed from its lock files for the copies check, the parser's for the shape check (#654, #719)
+        run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then if [ -f "${CORE_AT}.packages/parser/package.json" ]; then node "${CORE_AT}scripts/install.mjs" all; else node "${CORE_AT}scripts/install.mjs"; fi; fi
       - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks (each its own script's, run through scripts/checks.mjs, which holds their steps)
         env:
           BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}

@@ -84,6 +84,8 @@ if (kit.status === 0) {
   // two clones: as it is stored, and as git for Windows clones it by default
   const clone = (name, autocrlf) => { git(tmp, "clone", "-q", "-c", `core.autocrlf=${autocrlf}`, dir, name); return path.join(tmp, name); };
   const plain = clone("plain", "false"), converted = clone("converted", "true");
+  // (each clone installs the core's packages first, as a session's start or a job does: git holds none of them; #654)
+  for (const at of [plain, converted]) spawnSync(process.execPath, [path.join(at, "core/scripts/install.mjs")], { cwd: at, stdio: "ignore" });
   const text = (root, f) => fs.readFileSync(path.join(root, f), "latin1");
   const kitFiles = ["AGENTS.md", "core-manifest.md", "SECURITY.md", "checks/sizes.json", ".github/workflows/core.yml", ".claude/settings.json"];
   ok(kitFiles.every(f => text(converted, f).includes("\r\n") && !text(plain, f).includes("\r")) && git(converted, "status", "--porcelain") === "" && git(plain, "status", "--porcelain") === "",

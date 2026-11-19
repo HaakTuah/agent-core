@@ -14,7 +14,7 @@ A weakness is never filed here: the Security tab, "Report a vulnerability", whic
 -->
 
 **What it is**
-The idea in a line or two, in plain words.
+The idea in a line or two, in plain words. Where it asks something of every or all of a kind, the source a script counts that kind from, and `sweep` under "What to read" (`tasks/cleaning.md`, "A sweep's scope is read, not listed").
 
 **Why it matters**
 What went wrong or cost time without it, and how often.

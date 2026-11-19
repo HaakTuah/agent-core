@@ -54,20 +54,26 @@ export function selfHosted(root = ".") {
 
 export const median = xs => { const s = [...xs].sort((a, b) => a - b), k = s.length >> 1; return s.length ? (s.length % 2 ? s[k] : Math.round((s[k - 1] + s[k]) / 2)) : null; };
 
-// The median wait of the last `count` merged pull requests of `repo`, read through `gh`, and their median billed
-// minutes: { median, read, mark, billed, billedRead }, mark the config's, or undefined where it gives none.
-export function measure({ repo, count = COUNT, mark, gh = ghApi }) {
-  if (!aRepository(repo)) throw new Refused(`${JSON.stringify(String(repo)).slice(0, 80)} names no repository. Mend: name it as <owner>/<name>`);
+// The last `count` merged pull requests of `repo` that `kept` keeps, newest first, read through `gh`: GitHub's rows.
+// Also read by merge-line.mjs, beside this file, which keeps those into the default branch alone.
+export function lastMerged(repo, count, gh = ghApi, kept = () => true) {
   // (newest updated first: a pull request is updated when it merges, so once a page's last update is older than the
   // count-th newest merge read, no later page holds a newer one)
   const merged = [], kth = () => merged.map(p => p.merged_at).sort().reverse()[count - 1];
   for (let page = 1; page <= 10; page++) {
     const rows = JSON.parse(gh(`repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`) || "[]");
-    merged.push(...rows.filter(p => p.merged_at));
+    merged.push(...rows.filter(p => p.merged_at && kept(p)));
     if (rows.length < 100 || (merged.length >= count && String(rows.at(-1).updated_at) < kth())) break;
   }
+  return merged.sort((a, b) => b.merged_at.localeCompare(a.merged_at)).slice(0, count);
+}
+
+// The median wait of the last `count` merged pull requests of `repo`, read through `gh`, and their median billed
+// minutes: { median, read, mark, billed, billedRead }, mark the config's, or undefined where it gives none.
+export function measure({ repo, count = COUNT, mark, gh = ghApi }) {
+  if (!aRepository(repo)) throw new Refused(`${JSON.stringify(String(repo)).slice(0, 80)} names no repository. Mend: name it as <owner>/<name>`);
   // (a head that is no commit's whole name, as GitHub gives one, is not read: it would name another route than the commit's)
-  const runs = merged.sort((a, b) => b.merged_at.localeCompare(a.merged_at)).slice(0, count).filter(p => aCommit(p.head?.sha))
+  const runs = lastMerged(repo, count, gh).filter(p => aCommit(p.head?.sha))
     .map(p => JSON.parse(gh(`repos/${repo}/commits/${p.head.sha}/check-runs?filter=all&per_page=100`) || "{}").check_runs ?? []);
   const times = runs.map(r => waited(latest(r))).filter(t => t !== null), bills = runs.map(billed).filter(b => b !== null);
   return { median: median(times), read: times.length, mark, billed: median(bills), billedRead: bills.length };
