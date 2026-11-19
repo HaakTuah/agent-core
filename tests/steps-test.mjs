@@ -681,6 +681,10 @@ ok(signed.packages === null && signed.unread.some(u => u.startsWith("the signatu
     && /keep one of the two keys.*`\.github\/workflows\/two\.yml` line 2, "on"/.test(both ?? "") && /no deeper than a workflow needs.*`\.github\/workflows\/deep\.yml`/.test(both ?? "")
     && keysStep.check(inMemory({}, { ".github/workflows/flat.yml": "on: push\n" })) === null,
     "a workflow nested past 128 deep is told to nest less, a key given twice to keep one, each with its own mend, and a plain one passes", [deep, both].join("\n"));
+  // (a workflow longer than the length read is told to be cut, never to nest less: #752)
+  const long = keysStep.check(inMemory({}, { ".github/workflows/long.yml": `on: push\n# ${"x".repeat(262144)}\n` }));
+  ok(/cut these workflows or actions to under 262144 characters.*`\.github\/workflows\/long\.yml`\./.test(long ?? "") && !/nest the lists/.test(long ?? ""),
+    "a workflow longer than the length read is told to be cut, with its own mend", long ?? "");
 }
 
 const advisory = STEPS.find(s => s.lead === "13 November 2026, the NuGet check fails from the first day");

@@ -22,7 +22,7 @@ import { CORE } from "../scripts/core-address.mjs";
 import { NOT_A_FILE, lockPackages, nugetConfig, plainText, projectFilesByContent, readProject as readBuildFile } from "../scripts/nuget.mjs";
 import { ownFiles } from "../scripts/own-files.mjs";
 import { moveCalls } from "../scripts/sync.mjs";
-import { lines, readable, repeated } from "../scripts/workflows.mjs";
+import { draftHoles, lines, readable, repeated } from "../scripts/workflows.mjs";
 import { twice } from "../scripts/yaml-keys.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
 import { read as runnersRead, workflowsIn } from "../scripts/runners.mjs";
@@ -58,7 +58,9 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   ok(quick(() => !licenceOk(`${"MIT AND ".repeat(50000)}Moss-1.0`, ALLOW) && !licenceOk(`${"(".repeat(20000)}MIT${")".repeat(20000)}`, ALLOW)), "a licence of fifty thousand terms, one off the list, or nested twenty thousand deep, is not allowed");
   ok(quick(() => (r = licences(lockProject(each({ version: "1.0.0", license: "Moss-1.0" })))).failures.length === 30000 && said(r.failures)), "the licence check fails thirty thousand packages off its list, each with its mend, in a few seconds");
   ok(quick(() => (r = nuLock({ version: 1, dependencies: { net9: Object.fromEntries(many.map((m) => [m, { type: "Direct", resolved: "1.0.0", requested: "[1.0.0, 2.0.0)", contentHash: "x" }])) } })).failures.length === 30000 && said(r.failures)), "NuGet's lock reader fails thirty thousand packages asked for by a range, each with its mend");
-  ok(quick(() => twice(`on: push\njobs:\n${"  j:\n    runs-on: x\n".repeat(100000)}`).length === 99999 && lines("\\x70".repeat(1_000_000)).length === 0), "a workflow of megabytes is read for keys given twice and for the forbidden trigger in a few seconds");
+  ok(quick(() => twice(`on: push\njobs:\n${"  j:\n    runs-on: x\n".repeat(8000)}`).length === 7999 && JSON.stringify(twice(`on: push\njobs:\n${"  j:\n    runs-on: x\n".repeat(100000)}`)) === '[{"line":1,"key":null,"first":null,"size":true}]' && lines("\\x70".repeat(1_000_000)).length === 0), "a workflow of a few hundred kilobytes is read for keys given twice, one of megabytes is said unread, and the forbidden trigger is searched for in both, in a few seconds");
+  // (a text of three million `[`, about 3 MB, ran Node out of heap in the package's parser: #752; it is not given to it)
+  ok(quick(() => JSON.stringify(twice(`a: ${"[".repeat(3e6)}\n`)) === '[{"line":1,"key":null,"first":null,"size":true}]' && draftHoles(`a: ${"[".repeat(3e6)}\n`).length === 0), "a text of three million opening brackets is said unread at once, by both readers of a workflow, never given to the parser");
   ok(quick(() => twice("]".repeat(100000)).length === 0 && twice(`{${",".repeat(100000)}`).length === 0 && twice("!t ".repeat(50000)).length === 0), "a text of a hundred thousand closing brackets or commas, or of fifty thousand tags, each an error the package reads, is read in a few seconds");
   ok(quick(() => [`a: ${"{b: ".repeat(50000)}`, Array.from({ length: 5000 }, (_, i) => `${" ".repeat(i)}k:`).join("\n")].every(t => JSON.stringify(twice(t).map(k => k.key)) === "[null]")), "a flow value fifty thousand deep, or keys indented five thousand deep, are read without a throw, and said to be read only in part");
   ok(quick(() => settings(JSON.stringify({ hooks: { Stop: [{ hooks: many.map((m) => ({ type: "command", command: `echo ${m}` })) }] } })).tools.size === 30000), "thirty thousand agent hooks are read in a few seconds");

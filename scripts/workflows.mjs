@@ -36,7 +36,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
-import { DEEPEST, twice } from "./yaml-keys.mjs";
+import { DEEPEST, LONGEST, twice } from "./yaml-keys.mjs";
 import { loadSync, unreached } from "./packages.mjs";
 import { projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
@@ -83,6 +83,12 @@ export const reads = files => files.filter(f => !f.startsWith("core/") && !f.spl
 // What may be no link, of those git tracks: what the check reads, and .github itself with everything in it.
 export const unlinked = files => { const read = new Set(reads(files)); return files.filter(f => read.has(f) || /^\.github(\/|$)/iu.test(f)); };
 
+// What a file past the depth or the length read is said to hold unseen, and its mend.
+const NOT_READ = [ // (by `size`: 0 for a part nested too deep, 1 for a text too long)
+  { said: `the file nests its lists or mappings more than ${DEEPEST} deep, past what this check reads, so a key given twice in that part would go unseen`, mend: "nest it no deeper than a workflow needs, a few levels" },
+  { said: `the file is longer than ${LONGEST} characters, past what this check reads, so a key given twice in it would go unseen`, mend: `cut the file to under ${LONGEST} characters, the steps it repeats moved to a script or a workflow of their own` },
+];
+
 // The keys given twice (yaml-keys.mjs) in files, each { file, text }, as { fails, notes }, each a line with its mend.
 // `before` gives a file's text on the base (null where it held none), or is null where there is no base to read
 // against: then each is a note. Of each key in each file, as many as the base held twice are noted, and the rest fail.
@@ -91,12 +97,12 @@ export function repeated(files, before) {
   for (const { file, text } of files) {
     const held = new Map();
     for (const { key } of before ? twice(before(file) ?? "") : []) held.set(key, (held.get(key) ?? 0) + 1);
-    for (const { line, key, first } of twice(text)) {
+    for (const { line, key, first, size } of twice(text)) {
       const old = !before || held.get(key) > 0;
       held.set(key, (held.get(key) ?? 0) - 1);
       const was = old ? (before ? ", as it did on the base" : "") : "";
       (old ? notes : fails).push(key === null
-        ? `${old ? "note" : "FAIL"} ${file}:${line}: the file nests its lists or mappings more than ${DEEPEST} deep, past what this check reads, so a key given twice in that part would go unseen${was}. Mend: nest it no deeper than a workflow needs, a few levels`
+        ? `${old ? "note" : "FAIL"} ${file}:${line}: ${NOT_READ[+Boolean(size)].said}${was}. Mend: ${NOT_READ[+Boolean(size)].mend}`
         : `${old ? "note" : "FAIL"} ${file}:${line}: the key ${JSON.stringify(key)} is given twice in one mapping (first on line ${first}), so GitHub refuses the whole file and runs none of its jobs${was}. Mend: keep one of the two keys, with what both said in it (two if: conditions joined by &&, two env: mappings as one)`);
     }
   }
@@ -123,7 +129,7 @@ function yamlOf(text) {
 // draft while the trigger never starts it once the pull request is marked ready: [] where none, or where the text is
 // no YAML (GitHub's own reader then refuses it).
 export function draftHoles(yaml) {
-  if (typeof yaml === "string") yaml = yamlOf(yaml);
+  if (typeof yaml === "string") yaml = yaml.length > LONGEST ? null : yamlOf(yaml); // (a text past the length read is not given to the parser: #752)
   const types = typesOf(yaml?.on);
   if (types === null || types.includes("ready_for_review")) return [];
   const prefix = `${CORE}/`.toLowerCase();
