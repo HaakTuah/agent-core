@@ -161,11 +161,13 @@ function dataRows(root, lines) {
     if (before?.type === "ERROR" && before.text === "<" && before.endIndex === from.startIndex) opens.push(from.namedChildren.at(-1) ?? from);
   }
   if (!opens.length) return data;
-  const rowsOf = new Map();
-  lines.forEach((line, k) => { const key = line.replace(/^\t+/u, ""); if (!rowsOf.has(key)) rowsOf.set(key, []); rowsOf.get(key).push(k); });
+  // (a delimiter's line with tabs before it ends only a "<<-", as bash reads it; the grammar ends a "<<" there too)
+  const rowsOf = [new Map(), new Map()];
+  lines.forEach((line, k) => [line, line.replace(/^\t+/u, "")].forEach((key, t) => { if (!rowsOf[t].has(key)) rowsOf[t].set(key, []); rowsOf[t].get(key).push(k); }));
   for (const open of opens) {
+    const tabbed = open.previousSibling?.type === "<<-" || open.text.startsWith("-");
     const word = open.text.replace(/^-/u, "").match(/^(?:"[^"]*"|'[^']*'|\\.|[^\s;&|<>()])+/u)?.[0];
-    const row = open.startPosition.row, end = word ? rowsOf.get(word.replace(/["'\\]/gu, ""))?.find(r => r > row) : undefined;
+    const row = open.startPosition.row, end = word ? rowsOf[tabbed ? 1 : 0].get(word.replace(/["'\\]/gu, ""))?.find(r => r > row) : undefined;
     if (end !== undefined) for (let r = row + 1; r <= end; r++) data.add(r);
   }
   return data;
