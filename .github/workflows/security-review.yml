@@ -183,16 +183,24 @@ jobs:
             elif grep -q "HTTP 404" "$d/error"; then echo false # the head holds no such script: from before it came
             else echo true; fi
           }
-          # when the default branch's copy of a script of the check came, as the host dates it: the merge of the pull
-          # request that brought it; nothing where that cannot be read, or the time set aside for it (came_by, set by
-          # bound) is spent, and the script then holds the pull request (it holds one opened since then whatever its head holds:
+          # when a script of the check first came to the default branch, as the host dates it: the merge of the pull
+          # request that brought its first commit there, never a later one, so no change to the script makes a pull
+          # request opened before it one from before the check; nothing where that cannot be read, where the history is
+          # longer than five pages of a hundred commits, or where the time set aside for it (came_by, set by bound) is
+          # spent, and the script then holds the pull request (it holds one opened since then whatever its head holds:
           # boundOf in security-review.mjs)
           came() {
-            local p="$ROOT/scripts/$1" c at= left
+            local p="$ROOT/scripts/$1" c= page n at= left
             p="${p#./}"
-            left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
-            c=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits?path=$(jq -rn --arg v "$p" '$v | @uri')&sha=$(jq -rn --arg v "$DEFAULT" '$v | @uri')&per_page=1" 2> /dev/null \
-              | jq -r '.[0].sha // empty' 2> /dev/null) || c=
+            for page in 1 2 3 4 5; do
+              left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
+              n=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits?path=$(jq -rn --arg v "$p" '$v | @uri')&sha=$(jq -rn --arg v "$DEFAULT" '$v | @uri')&per_page=100&page=$page" 2> /dev/null \
+                | jq -r 'if type == "array" then "\(length) \(.[-1].sha // "")" else empty end' 2> /dev/null) || return 0
+              [[ "$n" =~ ^([0-9]+)\ ([0-9a-f]{40})?$ ]] || return 0
+              [ "${BASH_REMATCH[1]}" -gt 0 ] && c=${BASH_REMATCH[2]}
+              [ "${BASH_REMATCH[1]}" -lt 100 ] && break
+              [ "$page" -lt 5 ] || return 0
+            done
             [[ "$c" =~ ^[0-9a-f]{40}$ ]] || return 0
             left=$((came_by - SECONDS)); [ "$left" -gt 0 ] || return 0
             at=$(timeout "$((left < 5 ? left : 5))" gh api "repos/$REPO/commits/$c/pulls" 2> /dev/null \

@@ -8,22 +8,27 @@
 // cap in the same pull request, saying why, once a fresh session has read all the rules for room and found too little
 // (AGENTS.md, "How changes are made here"; core archive 179 and 181). That session's answer stands in the pull
 // request as a comment that opens "Leanness check:" (roles/shared/review-guidelines.md, "A mark on what every session
-// reads"), and with --raise this script fails a pull request that raises a role's cap and has no such comment from the
-// repository's owner, a member or a collaborator, by GitHub's own word for who wrote it, and one that raises it by more
-// than one step. It holds that the comment is there, not what it says, when it was written or that a fresh session
+// reads"), and with --raise this script fails a pull request that raises a role's cap and has no such comment from an
+// account the security-review check counts (security-review.mjs's counted: the repository's owner, or a person whose
+// rights the host gives as letting them write, read by the size workflow for those who posted one), and one that raises
+// it by more than one step. It holds that the comment is there, not what it says, when it was written or that a fresh session
 // wrote it: whether the session found too little room stays with the reviews, as does any change to this check itself,
 // which a pull request runs in its own version, and the first cap of a role that had none. Run from this repository's
 // root by the size workflow (.github/workflows/size.yml); Node's own modules only.
 //
 //   node scripts/size.mjs                                  what each role reads at its start, against its cap, and
 //                                                          the queue against its own mark
-//   node scripts/size.mjs --raise <base> <comments>        a raise has its leanness check: <base>, this file as the
+//   node scripts/size.mjs --raise <base> <comments> [<rights>]
+//                                                          a raise has its leanness check: <base>, this file as the
 //                                                          pull request's base holds it; <comments>, the pull
-//                                                          request's comments as GitHub's API gives them
+//                                                          request's comments as GitHub's API gives them; <rights>,
+//                                                          the host's answers on the rights of those who posted one;
+//                                                          OWNER, the repository's owner's login
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { sizeOf } from "./file-size.mjs";
 import { library, reading } from "./reading.mjs";
+import { counted as countedBy, writersOf } from "./security-review.mjs";
 import { started } from "./started.mjs";
 
 // Each role's cap, a whole number of KB: one line a role, spelled exactly so. The builder's is the one cap of before,
@@ -87,11 +92,15 @@ export function capsOf(text) {
 }
 
 // Whether the comments of a pull request, as GitHub's API gives them (a list, or a list of pages), hold a leanness
-// check's answer: a comment that opens with it, written by the owner, a member or a collaborator.
-export function answered(comments) {
+// check's answer: a comment that opens with it, from the owner, a member or a collaborator, by GitHub's own word, whose
+// account `whose` counts (a function of a comment's user, as whoseOf gives it; none, where it is not given).
+export function answered(comments, whose = () => false) {
   return (Array.isArray(comments) ? comments.flat() : []).some(c => c !== null && typeof c === "object"
-    && WRITERS.includes(c.author_association) && typeof c.body === "string" && ANSWER.test(c.body));
+    && WRITERS.includes(c.author_association) && typeof c.body === "string" && ANSWER.test(c.body) && whose(c.user) === true);
 }
+// Whose answer counts: the repository's owner (`owner`, a login) and the people the host's answers on rights
+// (`rights`, as security-review.mjs's writersOf reads them) let write.
+export const whoseOf = (owner, rights) => countedBy({ base: { repo: { owner: { login: owner } } } }, [], writersOf(rights));
 
 // What is wrong with a pull request's raise of a cap, as one line; null where nothing is: no cap is raised, or one is
 // raised one step and the raise has its answer. `base` and `head` are this file's text at the pull request's base and
@@ -100,7 +109,7 @@ export function answered(comments) {
 // check fails. A role the base gives no cap is at its first cap: no raise against the one cap of before, which counted
 // no role but the builder; against a base with a cap a role, no raise up to the smallest cap that base holds, and above
 // it a raise that needs its answer, so that a role's file given another name takes no room its old name had not.
-export function raised(base, head, comments, running = capsOf(head)) {
+export function raised(base, head, comments, running = capsOf(head), whose = () => false) {
   const from = capsOf(base), to = capsOf(head);
   const same = (a, b) => a !== null && b !== null && JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
   if (!same(to, running)) return "scripts/size.mjs: its block that sets CAPS is not the one block the check reads, or does not set the caps the script runs with. Mend: write it as export const CAPS = {, then a line a role as   <role>: <KB> * 1024, and }; with nothing else that sets CAPS or CAP";
@@ -108,21 +117,23 @@ export function raised(base, head, comments, running = capsOf(head)) {
   for (const [role, cap] of Object.entries(to)) {
     const was = from[role], least = Math.min(...Object.values(from));
     if (was === undefined) {
-      if (ONE.test(base) || cap <= least || answered(comments)) continue;
-      return `scripts/size.mjs: the role ${role}, new here, takes a first cap of ${cap} bytes, above the smallest the base holds (${least}), and the pull request has no comment that opens "Leanness check:". Mend: have a fresh session read what the role reads at its start for room, post its answer in a comment that opens "Leanness check:", and run this check again; or set its cap at ${least / 1024} * 1024 or under`;
+      if (ONE.test(base) || cap <= least || answered(comments, whose)) continue;
+      return `scripts/size.mjs: the role ${role}, new here, takes a first cap of ${cap} bytes, above the smallest the base holds (${least}), and the pull request has no comment that opens "Leanness check:" from the owner or a person the host lets write. Mend: have a fresh session read what the role reads at its start for room, post its answer from such an account in a comment that opens "Leanness check:", and run this check again; or set its cap at ${least / 1024} * 1024 or under`;
     }
     if (cap <= was) continue;
     if (cap - was !== 1024) return `scripts/size.mjs: the cap of the role ${role} rises from ${was} to ${cap} bytes, more than one step. Mend: set it to ${was / 1024 + 1} * 1024, one step of a whole KB, or leave it and say the rules in fewer words`;
-    if (!answered(comments)) return `scripts/size.mjs: the cap of the role ${role} rises from ${was} to ${cap} bytes, and the pull request has no comment that opens "Leanness check:". Mend: have a fresh session read all the rules for room, post its answer in a comment that opens "Leanness check:", and run this check again; or leave the cap and say the rules in fewer words`;
+    if (!answered(comments, whose)) return `scripts/size.mjs: the cap of the role ${role} rises from ${was} to ${cap} bytes, and the pull request has no comment that opens "Leanness check:" from the owner or a person the host lets write. Mend: have a fresh session read all the rules for room, post its answer from such an account in a comment that opens "Leanness check:", and run this check again; or leave the cap and say the rules in fewer words`;
   }
   return null;
 }
 
-function raise(baseFile, commentsFile) {
-  let base = null, comments = null;
+function raise(baseFile, commentsFile, rightsFile) {
+  let base = null, comments = null, rights = [];
   try { base = fs.readFileSync(baseFile, "utf8"); comments = JSON.parse(fs.readFileSync(commentsFile, "utf8")); } catch { /* (said below) */ }
+  // (rights that cannot be read let no one write: the owner's answer still counts)
+  try { if (rightsFile) rights = JSON.parse(fs.readFileSync(rightsFile, "utf8")); } catch { rights = []; }
   if (comments === null) { console.error("FAIL: the base's size.mjs or the pull request's comments could not be read. Mend: name both, readable: node scripts/size.mjs --raise <base> <comments, as JSON>"); return 1; }
-  const wrong = raised(base, fs.readFileSync(fileURLToPath(import.meta.url), "utf8"), comments, CAPS);
+  const wrong = raised(base, fs.readFileSync(fileURLToPath(import.meta.url), "utf8"), comments, CAPS, whoseOf(process.env.OWNER, rights));
   if (wrong) { console.error(`FAIL: ${wrong}`); return 1; }
   const from = capsOf(base), up = Object.keys(CAPS).filter(r => from[r] !== undefined && from[r] < CAPS[r]);
   console.log(up.length ? `ok   the cap of ${up.join(", ")} rises one step, and the pull request holds a leanness check's answer` : "ok   no role's cap is raised");
@@ -142,8 +153,8 @@ function over(role, roles) {
     + "has read all the rules for room and found too little, its answer posted in a comment that opens \"Leanness check:\".";
 }
 
-function main([flag, baseFile, commentsFile]) {
-  if (flag === "--raise") return raise(baseFile, commentsFile);
+function main([flag, baseFile, commentsFile, rightsFile]) {
+  if (flag === "--raise") return raise(baseFile, commentsFile, rightsFile);
   const roles = rolesAt();
   if (!roles.length || !fs.existsSync(QUEUE.file)) { console.error(`FAIL: what each role reads at its start cannot be counted: ${roles.length ? QUEUE.file : "roles/"} is not here. Mend: run it from the core's root, where roles/ and ${QUEUE.file} stand, or put back what was moved or taken out`); return 1; }
   const wrong = [...new Set([...roles, ...Object.keys(CAPS)])].map(role => over(role, roles)).filter(Boolean);

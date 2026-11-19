@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { CAPS, QUEUE, answered, capsOf, counted, raised, rolesAt } from "../scripts/size.mjs";
+import { CAPS, QUEUE, answered, capsOf, counted, raised as raisedWith, rolesAt, whoseOf } from "../scripts/size.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -28,9 +28,16 @@ ok([at(0), at("052"), at("5e1"), at("-1"), "let CAP = 52 * 1024;\n", "export con
   "a block or line spelled any other way, two of them, a role named twice, or no text at all gives no caps");
 
 // whose comment answers
-const comment = (body, author_association = "OWNER") => ({ body, author_association });
-ok(answered([comment("Leanness check: a fresh session read all the rules and found too little room.")]) && answered([[comment("x")], [comment("**Leanness check:** no room", "COLLABORATOR")]]) && answered([comment("Leanness check: found", "MEMBER")]),
-  "a comment that opens with the leanness check's answer, from the owner, a member or a collaborator, answers, in a list or a list of pages");
+// (the repository's owner, "someone", whose answer counts with no right read: security-review.mjs, counted)
+const comment = (body, author_association = "OWNER", login = "someone") => ({ body, author_association, user: { login, type: "User" } });
+const owner = whoseOf("someone", []), raised = (base, head, comments, running = capsOf(head)) => raisedWith(base, head, comments, running, owner);
+const right = (login, role_name, permission, push) => ({ role_name, permission, user: { login, type: "User", permissions: { push } } });
+ok(answered([comment("Leanness check: a fresh session read all the rules and found too little room.")], owner) && answered([[comment("x")], [comment("**Leanness check:** no room", "COLLABORATOR")]], owner) && answered([comment("Leanness check: found", "MEMBER")], owner),
+  "a comment that opens with the leanness check's answer, from the owner, answers, in a list or a list of pages, whatever association GitHub gives it");
+ok(answered([comment("Leanness check: found", "MEMBER", "writer")], whoseOf("someone", [right("writer", "write", "write", true)])) && answered([comment("Leanness check: found", "COLLABORATOR", "Writer")], whoseOf("someone", [right("writer", "maintain", "write", true)]))
+  && !answered([comment("Leanness check: found", "MEMBER", "reader")], whoseOf("someone", [right("reader", "read", "read", false)])) && !answered([comment("Leanness check: found", "COLLABORATOR", "reader")], owner)
+  && !answered([comment("Leanness check: found")]) && !answered([comment("Leanness check: found", "MEMBER", "writer")], whoseOf("someone", [right("writer", "triage", "read", false)])),
+  "a member's or collaborator's answers only where the host's rights let them write; one who may only read or triage, or whose right was not read, does not, nor does any, with no one counted");
 ok(!answered([]) && !answered([comment("About the Leanness check: none yet")]) && !answered([comment(" Leanness check: x")]) && !answered([comment("leanness check: x")]) && !answered([comment("Leanness check")]),
   "one that only speaks of it, or opens any other way, does not");
 ok(["NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "MANNEQUIN", null, 5].every(who => !answered([comment("Leanness check: x", who)])), "nor does anyone else's, whatever it says");
@@ -69,7 +76,7 @@ ok(counted("design", root).includes("roles/builder.md") && counted("orchestrator
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "size-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const put = (name, text) => { const to = path.join(tmp, name); fs.writeFileSync(to, text); return to; };
-const run = (...args) => { const r = spawnSync(process.execPath, [file, ...args], { cwd: root, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
+const run = (...args) => { const r = spawnSync(process.execPath, [file, ...args], { cwd: root, encoding: "utf8", env: { ...process.env, OWNER: "someone" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 const kb = Object.fromEntries(Object.entries(CAPS).map(([r, n]) => [r, n / 1024]));
 const same = put("same.mjs", own), lower = put("lower.mjs", caps({ ...kb, builder: kb.builder - 1 })), old = put("old.mjs", at(kb.builder)), none = put("none.json", "[[]]"), one = put("one.json", JSON.stringify([yes]));
 ok(run().status === 0 && Object.keys(CAPS).every(r => new RegExp(`^what the role ${r} reads at its start \\(floor/security\\.md, .*\\): \\d+ bytes of ${CAPS[r]}$`, "m").test(run().out)), "with no argument it holds each role's start to its cap", run().out);
@@ -88,7 +95,7 @@ ok(run("--raise", over, one).status === 1 && /more than one step\. Mend: set it 
 // role's start has outgrown)
 for (const part of ["scripts", "roles", "tasks", "floor"]) fs.cpSync(path.join(root, part), path.join(tmp, part), { recursive: true });
 fs.copyFileSync(queueFile, path.join(tmp, QUEUE.file));
-const copy = path.join(tmp, "scripts", "size.mjs"), at2 = (...args) => { const r = spawnSync(process.execPath, [copy, ...args], { cwd: tmp, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
+const copy = path.join(tmp, "scripts", "size.mjs"), at2 = (...args) => { const r = spawnSync(process.execPath, [copy, ...args], { cwd: tmp, encoding: "utf8", env: { ...process.env, OWNER: "someone" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 ok(at2().status === 0, "a copy of the core counts as the core does", at2().out);
 fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), `\n${"x".repeat(CAPS["stand-in"])}\n`);
 ok(at2().status === 1 && /what the role stand-in reads at its start is \d+ bytes over its cap\. Mend: say the rules/.test(at2().out) && mended(at2().out) && !/the role builder reads at its start is/.test(at2().out), "a role whose start has outgrown its cap fails, it alone, saying the mend", at2().out);
