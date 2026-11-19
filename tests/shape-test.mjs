@@ -44,6 +44,8 @@ const BAD = {
   "a system with no paths": config({ systems: { rules: {} } }),
   "uses that are no list": config(two({ uses: "view" }, {})),
   "wraps that are no list": config(two({ wraps: "lodash" }, {})),
+  "wraps that hold an empty name": config(two({ wraps: ["", "lodash"] }, {})),
+  "uses that hold an empty name": config(two({ uses: ["", "view"] }, {})),
   "a use of no system": config(two({ uses: ["sound"] }, {})),
   "a use of itself": config(two({ uses: ["rules"] }, {})),
   "an entrance outside its paths": config(two({ entrance: "src/view/index.js" }, {})),
@@ -488,9 +490,9 @@ ok(["../shape.json", "checks/../../shape.json", "/etc/shape.json", "C:/shape.jso
   fs.cpSync(path.join(path.dirname(script), "."), path.join(bare, "core/scripts"), { recursive: true });
   fs.cpSync(path.join(path.dirname(script), "../setup/template"), path.join(bare, "core/setup/template"), { recursive: true });
   const parse = text => spawnSync(process.execPath, ["--input-type=module", "-e", `import { parseConfig } from "./core/scripts/shape.mjs"; try { console.log(JSON.stringify(parseConfig(process.argv[1], "checks/shape.json"))); } catch (e) { console.log("FAIL: " + e.message); }`, text], { cwd: bare, encoding: "utf8" }).stdout;
-  const odd = parse(config({ marks: { lines: "x", depth: 2 }, tests: "test/", wiat: 3 })), none = parse(JSON.stringify({ baseline: "b.json" }));
-  ok(/"marks":\{"lines":60,"depth":2,"branches":15\}/.test(odd) && /"tests":\[\]/.test(odd) && mended(none) && /names no "baseline" and "code"/.test(none),
-    "with the core's packages not installed, the config's shape goes unchecked: what holds its form is read, the rest takes its default, and a config with no code still fails with its mend", `${odd}\n${none}`);
+  const odd = parse(JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"], marks: JSON.parse('{"lines":"x","depth":2,"constructor":5,"__proto__":7}'), suites: { q: {}, r: 30 }, tests: "test/", wiat: 3 })), none = parse(JSON.stringify({ baseline: "b.json" }));
+  ok(/"marks":\{"lines":60,"depth":2,"branches":15\}/.test(odd) && /"suites":\{"r":30\}/.test(odd) && /"tests":\[\]/.test(odd) && mended(none) && /names no "baseline" and "code"/.test(none),
+    "with the core's packages not installed, the config's shape goes unchecked: what holds its form is read, the rest (a key no mark has, a platform's empty seconds) takes its default, and a config with no code still fails with its mend", `${odd}\n${none}`);
   fs.writeFileSync(path.join(bare, "shape.json"), config({}));
   for (const a of [["init", "-q"], ["add", "shape.json"]]) execFileSync("git", a, { cwd: bare });
   const said = spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json", "--first"], { cwd: bare, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });

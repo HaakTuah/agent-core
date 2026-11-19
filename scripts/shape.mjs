@@ -158,8 +158,8 @@ export function parseConfig(text, at = KIT) {
   const systems = formed(c.systems, isObject, {});
   for (const [name, s] of Object.entries(systems)) readSystem(name, s, systems, at);
   const list = k => formed(c[k], strings, []), select = Object.fromEntries(SELECT_KEYS.map(k => [k, formed(c.select?.[k], strings, [])]));
-  const marks = { ...MARKS, ...Object.fromEntries(Object.entries(formed(c.marks, isObject, {})).filter(([k, n]) => k in MARKS && Number.isInteger(n) && n > 0)) };
-  const suites = Object.fromEntries(Object.entries(formed(c.suites, isObject, {})).filter(([, v]) => aSecond(v) || (isObject(v) && Object.values(v).every(aSecond))));
+  const marks = { ...MARKS, ...Object.fromEntries(Object.entries(formed(c.marks, isObject, {})).filter(([k, n]) => Object.hasOwn(MARKS, k) && Number.isInteger(n) && n > 0)) };
+  const suites = Object.fromEntries(Object.entries(formed(c.suites, isObject, {})).filter(([, v]) => aSecond(v) || (isObject(v) && Object.keys(v).length > 0 && Object.values(v).every(aSecond))));
   return { baseline: c.baseline, code: c.code, tests: list("tests"), systems, platform: list("platform"), screens: list("screens"), clocks: list("clocks"), processes: list("processes"), select, wait: formed(c.wait, aSecond, undefined), long: formed(c.long, aSecond, LONG), marks, aliases: formed(c.aliases, isObject, {}), suites, wrapped: readTogether(systems, at) };
 }
 

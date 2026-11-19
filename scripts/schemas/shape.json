@@ -67,9 +67,9 @@
         "mend": "give it \"paths\", \"uses\", \"entrance\", \"domain\", \"wraps\" alone",
         "mendFor": { "required": "list its folders (each ending in /) or files in \"paths\"" },
         "properties": {
-          "paths": { "type": "array", "minItems": 1, "items": { "type": "string" }, "mend": "list its folders (each ending in /) or files there" },
-          "uses": { "type": "array", "items": { "type": "string" }, "mend": "list there the systems it may import from" },
-          "wraps": { "type": "array", "items": { "type": "string" }, "mend": "list there the packages it alone imports" },
+          "paths": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "mend": "list its folders (each ending in /) or files there" },
+          "uses": { "type": "array", "items": { "type": "string", "minLength": 1 }, "mend": "list there the systems it may import from" },
+          "wraps": { "type": "array", "items": { "type": "string", "minLength": 1 }, "mend": "list there the packages it alone imports" },
           "entrance": { "type": "string", "mend": "name the one file of the system that the others import from" },
           "domain": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "mend": "name one of the domains {core}tasks/code-shape.md lists, or the project's own in the same form: small letters, digits and hyphens, a letter first" }
         }
