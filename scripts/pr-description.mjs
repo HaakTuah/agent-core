@@ -84,7 +84,7 @@ export function differencesAdded(dir) {
   if (git("rev-parse", "--verify", "--quiet", "HEAD^1").status !== 0) return null;
   // (absent: ""; there, but no plain file git can give whole, or git failed: null)
   const read = at => {
-    const entry = git("ls-tree", "-z", at, "--", "core-manifest.md");
+    const entry = git("ls-tree", "-z", "--full-tree", at, "--", "core-manifest.md");
     if (entry.status !== 0 || entry.error) return null;
     if (entry.stdout === "") return "";
     const [, mode, sha] = /^(\d+) blob ([0-9a-f]+)\tcore-manifest\.md\0$/u.exec(entry.stdout) ?? [];
