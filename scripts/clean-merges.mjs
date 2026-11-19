@@ -86,32 +86,39 @@ const MARK = 41;
 // a NUL byte is binary to git, which merges no lines of it)
 const bytes = (args, cwd, input) => spawnSync("git", args, { cwd, encoding: "latin1", input: input === undefined ? undefined : Buffer.from(input, "latin1"), stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"], maxBuffer: 1 << 26 });
 function keptBoth(base, ours, theirs, cwd) {
-  for (const blob of [base, ours, theirs]) {
-    const text = bytes(["cat-file", "blob", blob], cwd);
-    if (text.status !== 0 || text.stdout.includes("\0") || text.stdout.split("\n").some((line) => /^([<|=>])\1{40}/u.test(line))) return null;
-  }
+  if (![base, ours, theirs].every((blob) => plain(blob, cwd))) return null;
   const run = bytes(["merge-file", "-p", "--object-id", "--diff3", `--marker-size=${MARK}`, ours, base, theirs], cwd);
   // (git's count of conflicts, 1 to 127; an error, 255, or none at all, proves nothing)
   if (run.error || !(run.status >= 1 && run.status <= 127) || typeof run.stdout !== "string" || run.stdout === "") return null;
+  const kept = theirsFirst(run.stdout);
+  if (kept === null) return null;
+  const hashed = bytes(["hash-object", "--stdin"], cwd, kept);
+  return hashed.status === 0 ? hashed.stdout.trim() : null;
+}
+
+// whether a blob can be merged by its lines: read, no NUL byte, and no line that begins as a marker of MARK would
+function plain(blob, cwd) {
+  const text = bytes(["cat-file", "blob", blob], cwd);
+  return text.status === 0 && !text.stdout.includes("\0") && !text.stdout.split("\n").some((line) => /^([<|=>])\1{40}/u.test(line));
+}
+
+// git's diff3 form with each conflict settled by theirs' part, then ours', or null where a conflict holds a line of the
+// base's (a side changed or deleted it) or is left open
+function theirsFirst(diff3) {
   const kept = [];
   let part = "out", mine = [], yours = [];
   // (a marker line as git writes it, in a file whose lines end CR LF too)
   const marks = (line, c) => line.startsWith(c.repeat(MARK)) && (c !== "=" || line.replace(/\r$/u, "") === c.repeat(MARK));
-  for (const line of run.stdout.split("\n")) {
-    if (part === "out" && marks(line, "<")) part = "ours";
-    else if (part === "ours" && marks(line, "|")) part = "base";
-    else if (part === "base" && marks(line, "=")) part = "theirs";
-    else if (part === "theirs" && marks(line, ">")) {
-      kept.push(...yours, ...mine);
-      part = "out"; mine = []; yours = [];
-    } else if (part === "out") kept.push(line);
-    else if (part === "ours") mine.push(line);
-    else if (part === "theirs") yours.push(line);
-    else return null; // (a line of the base's: a side changed or deleted it)
+  const next = { out: "<", ours: "|", base: "=", theirs: ">" };
+  const after = { out: "ours", ours: "base", base: "theirs", theirs: "out" };
+  for (const line of diff3.split("\n")) {
+    if (marks(line, next[part])) {
+      if (part === "theirs") { kept.push(...yours, ...mine); mine = []; yours = []; }
+      part = after[part];
+    } else if (part === "base") return null; // (a line of the base's: a side changed or deleted it)
+    else ({ out: kept, ours: mine, theirs: yours })[part].push(line);
   }
-  if (part !== "out") return null;
-  const hashed = bytes(["hash-object", "--stdin"], cwd, kept.join("\n"));
-  return hashed.status === 0 ? hashed.stdout.trim() : null;
+  return part === "out" ? kept.join("\n") : null;
 }
 
 // the merges proved, of those the walk from the head passes: each in turn, from the head, until one is not, since the
