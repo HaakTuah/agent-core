@@ -4,7 +4,9 @@
 // where a job names it (install.mjs parser, or all; packages.mjs; #654, #719). Each
 // file is read from there and handed to the parser as bytes, so nothing is fetched or built while a file is read.
 // A grammar comes only with the reader that needs it: C#'s, for the functions the shape check's reader of C# finds
-// (csharp-functions.mjs); bash's, for the commands of a workflow's step, which the steps read (bash-commands.mjs).
+// (csharp-functions.mjs); bash's, for the commands of a workflow's step, which the steps read (bash-commands.mjs);
+// JavaScript's, TypeScript's and TSX's, for the functions of JavaScript and TypeScript the shape check and the measures
+// find (javascript-functions.mjs).
 //
 // The parser starts only where a file is read with it, so that a script that reads none, as most that load the shape
 // check's readers, pays nothing for it: in a worker thread of its own (parser-worker.mjs), which the reader's call
@@ -16,7 +18,11 @@ import { MessageChannel, Worker, receiveMessageOnPort } from "node:worker_thread
 import { installedFile, unnamed, unreached } from "./packages.mjs";
 
 // Each language read, by the name a reader asks for, and its grammar's package and file.
-const GRAMMARS = { csharp: ["tree-sitter-c-sharp", "tree-sitter-c_sharp.wasm"], bash: ["tree-sitter-bash", "tree-sitter-bash.wasm"] };
+const GRAMMARS = {
+  csharp: ["tree-sitter-c-sharp", "tree-sitter-c_sharp.wasm"], bash: ["tree-sitter-bash", "tree-sitter-bash.wasm"],
+  javascript: ["tree-sitter-javascript", "tree-sitter-javascript.wasm"],
+  typescript: ["tree-sitter-typescript", "tree-sitter-typescript.wasm"], tsx: ["tree-sitter-typescript", "tree-sitter-tsx.wasm"],
+};
 // Whether the parser or the grammar of `language` could not be installed, the registry not answering, in a project's
 // pull request (install.mjs), or was never installed, a project's own job naming only the core's first install
 // (unnamedFor; #719): its reader then reads no file of it, and the check that runs it says so as a warning, failing

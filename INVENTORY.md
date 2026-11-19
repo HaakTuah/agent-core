@@ -96,15 +96,19 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   settings. *Bugs:* 1. **Keep:** nothing fits; the manifest's form is the core's. Its checks of shape go with #486's
   schemas.
 - `scripts/shape.mjs`, `scripts/code-shape.mjs`, `scripts/shape-readers.mjs`, `scripts/shape-csharp.mjs`,
-  `scripts/shape-python.mjs`, `scripts/csharp-functions.mjs`, `scripts/dose.mjs`, `scripts/wait.mjs`,
-  `.github/shape.json`, `.github/shape-baseline.json`, `tests/readers-test.mjs`: fails what is new in how the code is
-  put together: a function past its marks for lines, depth and branching, an import on a cycle, a file in no system.
-  *Runs:* any session and the runners. *Else:* Lizard (MIT, Python, some 30 languages), dropped on fact: its definitions
-  of a branch are fixed in its code (#519's record); ESLint's `complexity` and `max-lines-per-function`, dropped on
-  fact: JavaScript alone; dependency-cruiser (MIT, 18 packages) and madge, for cycles and boundaries, dropped on fact:
-  JavaScript and TypeScript alone, where the check reads C# and Python too. *Bugs:* 3. **Keep:** fitting costs more than
-  keeping, each tool knowing one language or fixing its definitions; its readers go to the parser, as #486's group 3 and
-  #519's path say, C#'s functions the first (`scripts/csharp-functions.mjs`, #529).
+  `scripts/shape-python.mjs`, `scripts/csharp-functions.mjs`, `scripts/javascript-functions.mjs`,
+  `scripts/tree-walk.mjs`, `scripts/dose.mjs`, `scripts/wait.mjs`, `.github/shape.json`, `.github/shape-baseline.json`,
+  `tests/readers-test.mjs`: fails what is new in how the code is put together: a function past its marks for lines,
+  depth and branching, an import on a cycle, a file in no system. *Runs:* any session and the runners. *Else:* Lizard
+  (MIT, Python, some 30 languages), dropped on fact: its definitions of a branch are fixed in its code (#519's record);
+  ESLint's `complexity` and `max-lines-per-function`, dropped on fact: JavaScript alone; dependency-cruiser (MIT, 18
+  packages) and madge, for cycles and boundaries, dropped on fact: JavaScript and TypeScript alone, where the check
+  reads C# and Python too. *Bugs:* 3. **Keep:** fitting costs more than keeping, each tool knowing one language or
+  fixing its definitions; its readers go to the parser, as #486's group 3 and #519's path say, C#'s functions the first
+  (`scripts/csharp-functions.mjs`, #529), then JavaScript's and TypeScript's (`scripts/javascript-functions.mjs`).
+  *Tried:* 19 November 2026 (#723), tree-sitter's JavaScript grammar 0.25.0 and TypeScript's 0.23.2, on the core's 204
+  files of JavaScript and every case of the lexer's tests: the same where the lexer read by its definition, mended where
+  it misread. *Replayed:* none: no bug filed names the reader; the review findings its tests hold all read.
 - `scripts/choices.mjs`: fails a choice record a pull request adds without its lines, says when the pass is due, and
   reads each sign written in a measure. *Runs:* any session and the runners. *Else:* none found; the decision records'
   tools (adr-tools, log4brains) write records and check no form. *Bugs:* 1. **Keep:** nothing fits; the form is the
@@ -310,18 +314,18 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   `scripts/inbox.mjs`, `scripts/state-report.mjs`, `scripts/pruning.mjs`, `scripts/cited.mjs`, `scripts/outcomes.mjs`,
   `scripts/outcomes-read.mjs`, `scripts/stand-in-record.mjs`, `scripts/review-record.mjs`, `scripts/review-rounds.mjs`,
   `scripts/core-cost.mjs`, `scripts/fixes.mjs`, `scripts/test-record.mjs`, `scripts/tools-read.mjs`,
-  `scripts/merge-line.mjs`), a part the
-  inventory did not list, found by the challenge: `scripts/session-cost.mjs` (the cost line a pull request ends with),
-  `scripts/labels.mjs` (the labels and openers), `scripts/state-report.mjs`, `scripts/pruning.mjs`, and the records
-  (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`, `scripts/core-cost.mjs`). *Runs:* any session. *Else:*
-  for the cost line, ccusage (MIT, 20.0.48, 7 packages, 5.6 MB, a program for each system behind a small wrapper, 69
-  releases in the year to 17 November 2026), which reads the same record of Claude Code's and reports each session's
-  tokens, kept, untried: the session's permission check refused running it over this session's own record; for the
-  labels, the host's CLI (`gh label create --force`), which writes a list of labels, dropped on fact: `labels.mjs`
-  writes none and reads the issues' labels and openers, which no tool found does; for the state report, pruning and the
-  records, none found: each reads the core's own forms. *Bugs:* 2, 1, 0, 0, 0, 2 and 2. **Try**, proposed, ccusage under
-  the cost line, the line's form and its tally staying the core's; **keep** the rest: nothing fits. The libraries of the
-  parts above are named on their parts' lines, and weighed with them.
+  `scripts/merge-line.mjs`, `scripts/reasons.mjs`), a part the inventory did not list, found by the challenge:
+  `scripts/session-cost.mjs` (the cost line a pull request ends with), `scripts/labels.mjs` (the labels and openers),
+  `scripts/state-report.mjs`, `scripts/pruning.mjs`, and the records (`scripts/stand-in-record.mjs`,
+  `scripts/review-record.mjs`, `scripts/core-cost.mjs`). *Runs:* any session. *Else:* for the cost line, ccusage (MIT,
+  20.0.48, 7 packages, 5.6 MB, a program for each system behind a small wrapper, 69 releases in the year to 17 November
+  2026), which reads the same record of Claude Code's and reports each session's tokens, kept, untried: the session's
+  permission check refused running it over this session's own record; for the labels, the host's CLI (`gh label create
+  --force`), which writes a list of labels, dropped on fact: `labels.mjs` writes none and reads the issues' labels and
+  openers, which no tool found does; for the state report, pruning and the records, none found: each reads the core's
+  own forms. *Bugs:* 2, 1, 0, 0, 0, 2 and 2. **Try**, proposed, ccusage under the cost line, the line's form and its
+  tally staying the core's; **keep** the rest: nothing fits. The libraries of the parts above are named on their parts'
+  lines, and weighed with them.
 
 ## Hooks and set-up
 

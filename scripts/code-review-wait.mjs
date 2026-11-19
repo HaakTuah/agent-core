@@ -5,7 +5,8 @@
 // copy, on what GitHub's own API gives of the pull request and its comments. It waits only while the summary Codex's
 // own app keeps on the pull request says its code review is running on the pull request's head commit. The wait ends
 // when Codex's code review finishes, or when a comment that opens "Code review:", as first posted and never edited
-// since, from the repository's owner, a member or a collaborator names that commit by its whole SHA, all forty
+// since, from an account the security-review status counts (the repository's owner, an account the project names, or
+// a person the host's rights let write, REVIEWERS and RIGHTS) names that commit by its whole SHA, all forty
 // characters, since a commit can be made to share a short one's first characters: how the next reviewer, or the
 // fallback reviewer, posts the review it took over.
 // Given the pull request's commits and files, it also waits while a pull request that needs a code review
@@ -61,7 +62,7 @@ export function judge(pull, comments, commits, files, rules = [], bound = true, 
   if (pull?.state !== "open" || pull.draft !== false || typeof pull.head?.sha !== "string" || !SHA.test(pull.head.sha)) return undefined;
   const sha = pull.head.sha;
   const read = codexState(flat(comments));
-  const verdict = withMarks(judgeWith(sha, flat(comments), read.state?.code_review, pull, commits, files, rules, bound, merges, copy), pull, flat(comments), commits, files, bound, merges, more);
+  const verdict = withMarks(judgeWith(sha, flat(comments), read.state?.code_review, pull, commits, files, rules, bound, merges, copy, more), pull, flat(comments), commits, files, bound, merges, more);
   // (a summary whose state cannot be read is no review of Codex's, running or done: the check warns, and goes on)
   return read.unread ? { ...verdict, warning: UNREAD } : verdict;
 }
@@ -78,11 +79,13 @@ function withMarks(verdict, pull, list, commits, files, bound, merges, more) {
   if (why === null) return verdict;
   return bound ? { sha: verdict.sha, done: false, why } : { sha: verdict.sha, done: true, why: `before this check came, so not waited for: ${why}` };
 }
-function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges, copy) {
+function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges, copy, more) {
   const short = sha.slice(0, 7);
   // the whole SHAs a posted code review names, never a prefix: an old review naming the first characters of another
-  // commit must not stand for this one; and only as it was first posted, where the pull request is held (bound)
-  const posted = new Set(list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && (!bound || asPosted(comment)))
+  // commit must not stand for this one; and, where the pull request is held (bound), only as it was first posted and
+  // from an account security-review.mjs counts (more: the accounts the project names, and the host's rights read)
+  const whose = counted(pull, more?.reviewers, writersOf(more?.rights));
+  const posted = new Set(list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && (!bound || (asPosted(comment) && whose(comment.user))))
     .flatMap((comment) => (comment.body.match(/(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/giu) ?? []).map((found) => found.toLowerCase())));
   const running = review !== null && typeof review === "object" && review.commit_sha === sha && RUNNING.includes(review.status);
   if (running) {

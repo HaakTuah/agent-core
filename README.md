@@ -204,8 +204,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      description lacks one of the headings `roles/shared/work-flow.md` names (or those the project gives it), the line that says
      what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`), or the cost
      line, or in its place "No cost line: the script printed none.", or, where it asks the part "What holds it", a
-     line there "Number:" in its form; the lines only of a pull request opened since the project's copy held them. A
-     line passes where it begins in its form, whatever follows: it fails what is missing, never phrasing (#750).
+     line there "Number:" in its form, or, where it adds a line under the manifest's "Differences", the line "Reasons
+     read:"; the lines only of a pull request opened since the project's copy held them. A line passes where it begins
+     in its form, whatever follows: it fails what is missing, never phrasing (#750).
    - **The session's cost:** `session-cost.mjs`, which prints the line a description ends with, what the session has
      spent so far, where Claude Code's own record of it can be read, and nothing where it cannot. It keeps a tally of
      its own beside that record (ids, counts and the models' families), so the line does not drop where the record
@@ -320,8 +321,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      who made it, since builder and reviewer may post under one login. Dependabot's own pull request passes it (floor
      rule 17); one that needs no security review and gets none by itself (floor rule 8) says so in such a comment.
      Beside it, in the same job, the status `code-review` waits while Codex's code review runs on the head commit, until
-     it finishes or a comment that opens "Code review:" from the owner, a member or a collaborator names that commit by
-     its whole SHA (`tasks/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
+     it finishes or a comment that opens "Code review:", from an account the security review counts, names that commit
+     by its whole SHA (`tasks/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
      nor a sync's shape) has had none on its head, or on a commit only such updates from `main` follow; while the newest
      "Security review:", "Code review:" or "Design check:" posted from 18 November lacks its lines "Blocking findings:"
      and "Other findings:" (`tasks/reviews.md`, point 3); and, in the core's own repository, while a pull request opened
@@ -380,7 +381,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    for the plain case, while what holds the rule is the reviews every change to the manifest gets, as a protected file.
    The pointer check fails a difference whose rule the core has since renamed or removed, so it is read again at that
    sync. And each is filed with the core as an idea ("Reporting to the core"): a rule a project had to differ from may
-   not be general enough.
+   not be general enough. Before it proposes one, a session reads the reasons behind the rule, which
+   `core/scripts/reasons.mjs` prints in one step, and says which of them does not hold for the project, the pull request
+   on its line "Reasons read:" (`tasks/updates.md`, its rule on a question or difference; #756).
 8. **A project in several repositories** takes the core once (`tasks/repositories.md`): a repository's manifest names
    where its copy stands (`core/` as a rule, and so a project in one repository changes in nothing), and a repository
    that depends on a library of the project's that holds a copy takes the core with it, at the path the library brings
@@ -546,7 +549,8 @@ an issue on one of this repository's three forms (`.github/ISSUE_TEMPLATE/`, whi
 `core/.github/ISSUE_TEMPLATE/`): a bug, an idea or a question (`roles/shared/inbox.md`, "The core itself"). This repository
 is public, and so is every word of an issue, so a report holds only what the light of day can take.
 
-- **It says:** which rule, hook, check or script of the core (its file, and its section or line); the commit of the core
+- **It says:** which rule, hook, check or script of the core (its file, and its section or line), and, of a rule it
+  questions, which of the reasons `core/scripts/reasons.mjs` prints for it does not hold, and why; the commit of the core
   the project holds; what happened; what was expected; and the kind of project, no closer than this: public or private,
   the platform it is built on (Node, .NET on Windows), the cloud or the owner's own computer. A bug names, where it is
   known, the core's merged pull request that brought it in, on the form's last line, "Brought in by: #N".
