@@ -98,6 +98,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   item of its own, naming the issue as its source, and takes what it leaves open as `roles/shared/inbox.md` says of any
   open point. This is the second
   difference from that module, where only the design session writes rules from the owner's words.
+- **A bug fix and a rework of tests are built on Sonnet** (#767). By default the orchestrator starts the builder of a
+  line that fixes a bug or reworks tests on Sonnet at high effort; a line that writes or changes a rule, touches
+  security or reads a format another publisher defines stays on Opus at high. Once Sonnet has built twenty pull
+  requests of those two kinds, as `node scripts/builder-trial.mjs` counts them beside the Opus builders' of the same
+  kinds since 18 November 2026, the session that finds it so, the orchestrator at a wake, gives what it prints on #767
+  in a note, numbers first, and builds the result in a pull request of its own: where Sonnet's blocking points, rounds
+  of review and bugs that reached `main` each read "no worse within noise", `tools/claude.md`'s row for the builder
+  names bug fixes among Sonnet's routine lanes; where one reads "worse", the row stays, and the note says by how much.
+  It does not mean a Sonnet builder decides what needs judgement (`tools/claude.md`, "Who to call"), nor that the effort
+  changes in the same trial: a second trial changes one thing at a time. Reason: on 19 November 2026 all eleven of the
+  core's builders ran on Opus at high, three bug fixes and the rework of the tests among them, where Claude's part gives
+  routine work to Sonnet. Held by `scripts/builder-trial.mjs`, which counts the two kinds by their builder from what
+  `scripts/review-record.mjs` reads and from the session-cost lines.
 - **An orchestrator may work the file** (`roles/orchestrator.md`) while it holds a line a session can take. The
   owner starts it; once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
   wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from

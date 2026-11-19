@@ -275,7 +275,7 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
 - **What a session runs by hand,** a part the inventory did not list, found by the challenge: `scripts/session-cost.mjs`
   (the cost line a pull request ends with), `scripts/labels.mjs` (the labels and openers), `scripts/state-report.mjs`,
   `scripts/pruning.mjs`, and the records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`,
-  `scripts/core-cost.mjs`). *Runs:* any session. *Else:* for the cost line, ccusage (MIT, 20.0.48, 7 packages, 5.6 MB, a
+  `scripts/core-cost.mjs`, and `scripts/builder-trial.mjs`, #767's trial read from them). *Runs:* any session. *Else:* for the cost line, ccusage (MIT, 20.0.48, 7 packages, 5.6 MB, a
   program for each system behind a small wrapper, 69 releases in the year to 17 November 2026), which reads the same
   record of Claude Code's and reports each session's tokens, kept, untried: the session's permission check refused
   running it over this session's own record; for the labels, the host's CLI (`gh label create --force`), which writes a

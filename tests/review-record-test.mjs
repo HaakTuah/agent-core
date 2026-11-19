@@ -1,11 +1,13 @@
 // Tests of the count of what the reviews find (review-record.mjs): which posted review a comment is and what it declares,
 // which inline comments are finds of Codex's and of which review, what each review did on a pull request, the tally by
 // kind, the second security review's finds, which bugs are tied to a pull request, and which rules the findings of two
-// pull requests name (AGENTS.md, "A finding seen twice becomes a check"). Node's own modules only; the
+// pull requests name (AGENTS.md, "A finding seen twice becomes a check"), and the trial of #767 read from them
+// (builder-trial.mjs: a pull request's kind and builder, and whether Sonnet's numbers come out worse). Node's own modules only; the
 // calls to git and gh are the program's own and are not made here.
 //
 //   node tests/review-record-test.mjs
 import { fileURLToPath } from "node:url";
+import { builderOf, changedOf, kindOf, print as trialPrint, verdict } from "../scripts/builder-trial.mjs";
 import { blockingOf, broughtBy, bugs, codexFind, foundTwice, otherOf, perPull, postedKind, print, ruleOf, rulesIn, rulesNamed, secondFound, standing, tally } from "../scripts/review-record.mjs";
 
 let failed = 0, count = 0;
@@ -117,7 +119,7 @@ const got = bugs([
   { issue: 26, at: "2026-11-13T00:00:00Z", login: OWNER, body: "Brought in by: #10" },
   { issue: 24, at: "2026-11-13T00:00:00Z", login: "someone-else", body: "Brought in by: #10" },
 ], merged, OWNER);
-ok(same(got, { filed: 6, tied: 3, byKind: { own: 2, upkeep: 1, sync: 0, update: 0 }, unlined: 1, unmatched: 2, others: 1 }),
+ok(same({ ...got, byPull: [...got.byPull].sort() }, { filed: 6, tied: 3, byKind: { own: 2, upkeep: 1, sync: 0, update: 0 }, byPull: [[10, 2], [11, 1]], unlined: 1, unmatched: 2, others: 1 }),
   "a bug is tied only by the owner's account's line, to a pull request merged before it, the newest line winning; the rest are not read, by why", JSON.stringify(got));
 
 // the printout
@@ -166,6 +168,34 @@ ok(/Named twice but no rule that stands, so no issue is filed for it: 1\n- agent
   "a key that names no rule that stands is listed apart, and where the rules could not be read every key is", listed);
 ok(/\nFound twice, a rule that stands which the findings of two pull requests or more name, one of them merged from 2026-11-01: 1\n- a\.md: one: #5, #9\n/.test(listed) && /Of the 2 pull requests read, 1 have a finding that names one\./.test(listed)
   && /Found twice, [^\n]*: 0 \(none\)/.test(none), "the count lists each rule found twice with its pull requests, and says how many pull requests named a rule", listed);
+
+// the trial of #767 (builder-trial.mjs)
+const cost = families => `Session so far: 9 answers (${families}); tokens in 1, cache written 2, cache read 3, out 4.`;
+ok(builderOf("Fixes #3 (a Sonnet builder session).\n\nWhat.") === "Sonnet" && builderOf("Builds #9 (a rule builder on Opus).") === "Opus"
+  && builderOf(`Fixes #3.\n\n${cost("Sonnet")}`) === "Sonnet" && builderOf(`Fixes #3.\n\n${cost("Haiku, Opus")}`) === "Opus",
+  "the builder is the one model the first line names, else the one the cost line names alone");
+ok(builderOf(`Fixes #3.\n\n${cost("Opus, Sonnet")}`) === null && builderOf("Sonnet built it; Opus judged it.") === null && builderOf("Fixes #3.") === null
+  && builderOf(`Fixes #3.\n\n> ${cost("Sonnet")}`) === null && builderOf("A Sonnets' thing.") === null,
+  "a builder that cannot be told (both named, neither, a quoted cost line) is not read, never guessed");
+const bugSet = new Set([5]), few = { tests: 1, all: 10 }, most = { tests: 6, all: 10 };
+ok(kindOf("What.\nFixes #5", bugSet, most) === "bug fix" && kindOf("closes #5.", bugSet, few) === "bug fix" && kindOf("Fixes #6", bugSet, few) === null
+  && kindOf("Part of #715.", bugSet, most) === "tests" && kindOf("x", bugSet, { tests: 5, all: 10 }) === null && kindOf("x", bugSet, { tests: 0, all: 0 }) === null && kindOf("Fixes #50", bugSet, few) === null,
+  "a bug fix closes an issue labelled bug; a rework of tests changes more than half its lines under tests/; anything else is neither");
+ok(kindOf("x\nTrial kind: tests", bugSet, few) === "tests" && kindOf("Fixes #5\nTrial kind: neither", bugSet, most) === null && kindOf("Trial kind: bug fix", bugSet, few) === "bug fix",
+  "a line \"Trial kind:\" overrides what was read");
+ok(same(changedOf("3\t2\ttests/a-test.mjs\n4\t1\tscripts/a.mjs\n-\t-\ttests/b.png\n1\t0\tdocs/tests/x.md\n"), { tests: 5, all: 11 }),
+  "the lines changed count under tests/ alone, a binary file none");
+ok(verdict([1, 2, 3], [1, 2, 3]) === "no worse within noise" && verdict([9, 10, 11], [1, 2, 3]) === "worse, by 8.00 a pull request" && verdict([2, 3, 4], [1, 2, 3]) === "no worse within noise"
+  && verdict([1], [1, 2]) === "too few to tell" && verdict([2, 2], [1, 1]) === "worse, by 1.00 a pull request" && verdict([1, 1], [2, 2]) === "no worse within noise",
+  "Sonnet is worse only where its mean is above Opus's by more than twice the standard error of the difference");
+const trial = trialPrint("o/r", "2026-11-18", [
+  { number: 1, kind: "bug fix", builder: "Sonnet", blocking: 1, rounds: 2, bugs: 0, answers: 10, out: 5, into: 100 },
+  { number: 2, kind: "bug fix", builder: "Opus", blocking: 3, rounds: null, bugs: 1, answers: null, out: null, into: null },
+  { number: 3, kind: "tests", builder: null, blocking: 0, rounds: 1, bugs: 0, answers: 1, out: 1, into: 1 },
+]);
+ok(/Sonnet built 1 of the 20/.test(trial) && /bug fix, Sonnet\s+1\s+1 \(1\)\s+2 \(1\)/.test(trial) && /bug fix, Opus\s+1\s+3 \(1\)\s+-/.test(trial)
+  && /- rounds: too few to tell/.test(trial) && !/- answers:/.test(trial) && /Builder not read [^\n]*: #3/.test(trial),
+  "the trial's printout gives each kind and builder, what was read of each, the verdicts and the pull requests whose builder was not read", trial);
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);
