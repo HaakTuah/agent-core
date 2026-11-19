@@ -59,7 +59,8 @@ queue's order; the
 *design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
 issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`tasks/roles.md`,
 `roles/orchestrator.md`); the *hard work*: a new or changed rule; the *size marks*: the caps of
-`scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*:
+`scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, and the split mark, 20 KB, with its `"past"`
+list, in `.github/sizes.json`, which `scripts/reading-size.mjs` reads as a project's; the *major version checks*:
 the suites of `.github/workflows/tests.yml`; *planning design*: none; the *quick check*: `node scripts/holders.mjs && node scripts/size.mjs && node scripts/reading.mjs --check && node tests/holders-test.mjs && node tests/manifest-reads-test.mjs && node tests/general-test.mjs`; the *other builders' checks*: those suites, which any tool's
 session here runs before it finishes, every file here being protected (`SECURITY.md`).
 

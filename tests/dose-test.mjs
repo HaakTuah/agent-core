@@ -70,7 +70,7 @@ ok(cleaning.title === TITLES.cleaning && /\*\*in debt\*\*/.test(cleaning.body) &
   && cleaning.body.indexOf("`src/b.js`: 1 listed, changed 4 times") > 0 && cleaning.body.indexOf("`src/b.js`: 1 listed") < cleaning.body.indexOf("`src/a.js`: 2 listed, changed 1 times") && /node core\/scripts\/shape\.mjs --write/.test(cleaning.body),
   "in debt, the cleaning task says the state, the lane's share and what it got, the files worst first, and how", cleaning.body);
 let audit = auditIsDue({ manifest, at: now, root: dir });
-ok(audit.title === TITLES.audit && audit.owner === false && /no audit yet/.test(audit.body) && /core\/tasks\/cleaning\.md/.test(audit.body) && /dose\.mjs --audited/.test(audit.body), "and an audit is due, since none is recorded", audit.body);
+ok(audit.title === TITLES.audit && audit.owner === false && /no audit yet/.test(audit.body) && /core\/tasks\/cleaning\.md/.test(audit.body) && /dose\.mjs --audited/.test(audit.body) && !/read-total/.test(audit.body), "and an audit is due, since none is recorded, its reader given the core's candidates of the total read only in the core's own repository", audit.body);
 r = run(script, ["--audited"]);
 const baseline = () => JSON.parse(fs.readFileSync(path.join(dir, "checks/shape-baseline.json"), "utf8"));
 ok(r.status === 0 && same(baseline().audited, { day: now.slice(0, 10), listed: 3, read: 3 }) && Object.keys(baseline().listed).length === 3 && run(shape).status === 0, "--audited records the day and the counts in the baseline, which the shape check still reads", r.out);
