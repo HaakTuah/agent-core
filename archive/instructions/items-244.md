@@ -188,7 +188,7 @@ The index, and how an item is written: `archive/instructions.md`.
      the carried packages to stand outside the host's alerts. It stands behind "what a standard mechanism gave" in
      `tasks/choices.md`.
 264. **19 November 2026**, #756, points 1 and 2. Before a session questions a rule of the core or proposes a difference
-     from one, at a project's adoption of the core, at a sync or in any task, it reads the archive items behind the
+     from one, at a project's adoption of the core or at a sync, it reads the archive items behind the
      rule and their issues, which one script prints in one step, and says which reason does not hold for its project
      and why; a pull request that adds a difference names what it read. At a project of another owner's first
      adoption, its session questioned some of the core's choices without the reasoning to hand, though it stood in the

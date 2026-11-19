@@ -3,7 +3,8 @@
 // what a branch could hold, as each case's shape allows: too long, the wrong type, markup, a file path, a number out of
 // range, and nothing at all; each refuses, taking nothing of it as a pass. The readers: pure-sync.mjs and
 // comment-only.mjs, run as a merger runs them in a scratch project whose core is reached by a git rewrite (no network);
-// select.mjs, run as the tests workflow runs it there; and copy-tree.mjs, on trees made here. Test data is made up. Run
+// select.mjs, run as the tests workflow runs it there; copy-tree.mjs, on trees made here; and pr-description.mjs's reader of
+// what a pull request adds under its manifest's "Differences" (#756), on commits made here. Test data is made up. Run
 // by the core's tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
 //
 //   node tests/hostile-pr-changes-test.mjs
@@ -12,6 +13,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
 import { coreIsFolder, entries } from "../scripts/copy-tree.mjs";
+import { MANIFEST_MAX, UNREADABLE, differencesAdded, reasonsMend } from "../scripts/pr-description.mjs";
+import { mended } from "../scripts/mend.mjs";
 import { scratchDir, scratchEnv, root } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
@@ -208,5 +211,40 @@ ok(!coreIsFolder(withCore(["100644", "blob", X, "core"]), gitDir), "copy-tree: c
 ok(!coreIsFolder(withCore(["160000", "commit", MAIN, "core"]), gitDir), "copy-tree: core/ as a submodule is no folder");
 ok(!coreIsFolder(commitOf(tree([])), gitDir) && entries(tree([]), gitDir) === "", "copy-tree: an empty tree holds no core/ and no entry");
 ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "copy-tree: a commit named as an option is no folder, and writes nothing");
+
+// ---- pr-description.mjs: what a pull request adds under its manifest's "Differences" (#756) ----
+{
+  const d = path.join(tmp, "differences");
+  fs.mkdirSync(d);
+  const g = (...args) => git(d, ...args);
+  const manifest = (...lines) => `# Core manifest\n\n## Differences\n\n${lines.join("\n")}\n`;
+  const put = text => { fs.rmSync(path.join(d, "core-manifest.md"), { recursive: true, force: true }); if (text !== null) fs.writeFileSync(path.join(d, "core-manifest.md"), text); };
+  const commit = () => { g("add", "-A"); g("commit", "-q", "--allow-empty", "-m", "x"); };
+  g("init", "-q", "-b", "main");
+  put(manifest("None.")); commit();
+  // too long: a new difference, then padding past what git hands over
+  put(`${manifest("- a new difference, with no reasons read")}\n## Slots\n\n${"x".repeat(MANIFEST_MAX + 1024)}\n`); commit();
+  const long = differencesAdded(d);
+  ok(long === UNREADABLE && mended(`FAIL ${reasonsMend("Reasons read: x", long)}`), "pr-description: a manifest past what git hands over is unreadable and fails with its mend, even beside a line \"Reasons read:\", never read as no difference");
+  // the wrong type: a folder, then a submodule, where the manifest stands
+  put(null); fs.mkdirSync(path.join(d, "core-manifest.md")); fs.writeFileSync(path.join(d, "core-manifest.md", "x"), "- a difference\n"); commit();
+  ok(differencesAdded(d) === UNREADABLE, "pr-description: a folder named core-manifest.md is unreadable");
+  fs.rmSync(path.join(d, "core-manifest.md"), { recursive: true, force: true }); g("add", "-A");
+  g("update-index", "--add", "--cacheinfo", `160000,${g("rev-parse", "HEAD")},core-manifest.md`); g("commit", "-q", "-m", "x");
+  ok(differencesAdded(d) === UNREADABLE, "pr-description: a submodule named core-manifest.md is unreadable");
+  // markup: a difference that holds a runner's command and control characters is read as one line added, and quoted
+  // in the mend with none of them able to open a line
+  g("rm", "-q", "--cached", "core-manifest.md"); put(manifest("- ::error::x\u0085\u2028::warning::y\u001b[2J")); commit();
+  const marked = differencesAdded(d), markedMend = reasonsMend("", marked);
+  ok(Array.isArray(marked) && marked.length === 1 && mended(`FAIL ${markedMend}`) && !/[\r\n\u0085\u2028\u001b]/u.test(markedMend), "pr-description: markup in a difference is one line added, quoted with no character that ends a line or drives a terminal");
+  // nothing at all: an empty manifest, then none, adds no difference; a base it cannot read counts every line as added
+  put(""); commit();
+  ok(Array.isArray(differencesAdded(d)) && differencesAdded(d).length === 0, "pr-description: an empty manifest adds no difference");
+  put(null); commit();
+  ok(Array.isArray(differencesAdded(d)) && differencesAdded(d).length === 0, "pr-description: a manifest taken out adds no difference");
+  fs.mkdirSync(path.join(d, "core-manifest.md")); fs.writeFileSync(path.join(d, "core-manifest.md", "x"), "x\n"); commit();
+  put(manifest("- a difference over an unreadable base")); commit();
+  ok(differencesAdded(d).join() === "- a difference over an unreadable base", "pr-description: over a base whose manifest cannot be read, each difference of the head's counts as added");
+}
 
 process.exit(failed ? 1 : 0);

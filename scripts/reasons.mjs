@@ -43,12 +43,11 @@ export function reasonsOf(root, query) {
 export function lines(found, root = ROOT, cwd = process.cwd()) {
   // (relative where it lies under `cwd`, as a project's root holds its copy; whole elsewhere)
   const where = f => { const at = path.join(root, f), rel = path.relative(cwd, at); return (rel.startsWith("..") || path.isAbsolute(rel) ? at : rel).replace(/\\/gu, "/"); };
-  const outcome = found.number ? /outcome: (\w+)/u.exec(found.number)?.[1] : null;
   const each = list => list.map(it => it.missing ? `- Core archive ${it.key}: not in the archive (holders.mjs fails it).` : `- Core archive ${it.key}${it.date ? `, ${it.date}` : ""} (${where(it.file)}): ${it.text}`);
   const issues = [...new Set([...found.items, ...found.fileItems].flatMap(it => it.issues ?? []))].sort((a, b) => a - b);
   return [
     found.rule,
-    found.number ? `Its number: ${found.number}${outcome ? `; the outcome it stands for: ${outcome}` : ""}.` : "Its number: none named in holders.json yet.",
+    found.number ? `Its number: ${found.number}.` : "Its number: none named in holders.json yet.",
     found.items.length ? `Behind it, ${found.items.length} item${found.items.length === 1 ? "" : "s"} of the core's archive:` : "Behind it: no item of the archive is listed yet.",
     ...each(found.items),
     ...(found.fileItems.length ? [`Behind ${found.file}'s text as a whole:`, ...each(found.fileItems)] : []),

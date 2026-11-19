@@ -16,8 +16,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      tools reader (`scripts/tools-read.mjs`); hostile tests: `tests/hostile-pr-comments-test.mjs`.
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
-     the selection of tests (`scripts/select.mjs`) and the tree a copy must be (`scripts/copy-tree.mjs`); hostile
-     tests: `tests/hostile-pr-changes-test.mjs`.
+     the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
+     a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`); hostile tests:
+     `tests/hostile-pr-changes-test.mjs`.
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the
      reviews' records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look
      (`scripts/look.mjs`) and the inbox (`scripts/inbox.mjs`); hostile tests: `tests/hostile-issues-test.mjs`.

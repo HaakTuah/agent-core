@@ -83,9 +83,9 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   put("src/screens/a.js", "2\n"); put("checks/reading.json", "{}\n"); put("core-manifest.md", "# Core manifest\n\nFloor: whole. Modules: `updates.md`.\nNot taken: `game-design.md` (no game), `screens.md` (none).\n"); put("core/CLAUDE.md", "x\n"); put(".github/workflows/caf\u00e9.yml", "on: push\n");
   git("add", "-A"); git("commit", "-q", "-m", "a change that empties its own reading config");
   const called = calledFor(project);
-  ok(JSON.stringify(called.map(c => c.file)) === JSON.stringify(["core/tasks/screens.md", "core/floor/topics/workflows.md"]) && /of the kind polish/.test(called[0].why),
-    "a pull request's changed paths call for their files by the reading config and the manifest its base holds, not those it carries: a module the base's manifest leaves out is not asked, one the change itself leaves out still is; a path of the copy calls for nothing, and one outside ASCII is read as spelled", JSON.stringify(called));
-  ok(/does not list `core\/tasks\/screens\.md`/.test(lineMend("Read for it: `core/floor/topics/workflows.md`", called, "cmd")) && lineMend("Read for it: `core/floor/topics/workflows.md`, `core/tasks/screens.md`", called, "cmd") === null, "and the line is held to them");
+  ok(JSON.stringify(called.map(c => c.file)) === JSON.stringify(["core/tasks/screens.md", "core/tasks/updates.md", "core/floor/topics/workflows.md"]) && /of the kind polish/.test(called[0].why) && /core-manifest\.md/.test(called[1].why),
+    "a pull request's changed paths call for their files by the reading config and the manifest its base holds, not those it carries (a changed manifest calling for tasks/updates.md, #756): a module the base's manifest leaves out is not asked, one the change itself leaves out still is; a path of the copy calls for nothing, and one outside ASCII is read as spelled", JSON.stringify(called));
+  ok(/does not list `core\/tasks\/screens\.md`/.test(lineMend("Read for it: `core/floor/topics/workflows.md`", called, "cmd")) && lineMend("Read for it: `core/floor/topics/workflows.md`, `core/tasks/screens.md`, `core/tasks/updates.md`", called, "cmd") === null, "and the line is held to them");
   git("checkout", "-q", "--orphan", "alone"); git("commit", "-q", "-m", "no parent");
   ok(calledFor(project) === null, "with no base to read against, nothing is asked");
 }
@@ -130,7 +130,7 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   ok(reasonsMend("No line.", []) === null && reasonsMend("No line.", null) === null, "a pull request that adds no difference is asked nothing");
   ok(reasonsMend("x\n Reasons read: core archive 161 and #156; its reason does not hold here, since this project has no players.\n", ["- a"]) === null, "a line \"Reasons read:\" with what was read passes, whatever its words");
   const mend = reasonsMend("x\nReasons read:\n", ["- `core/tasks/x.md`, a difference"]);
-  ok(mend !== null && mend.includes("core/tasks/x.md") && mend.includes("reasons.mjs") && mended(`FAIL ${mend}`) && reasonsMend("x", ["- a"]) !== null && !/[\r\u001b]/u.test(reasonsMend("x", ["- a\r::error::x\u001b[2J"])), "an empty line, or none, fails, naming the difference (with no control character of the project's text) and the script that prints its reasons, with the mend");
+  ok(mend !== null && mend.includes("core/tasks/x.md") && mend.includes("reasons.mjs") && mended(`FAIL ${mend}`) && reasonsMend("x", ["- a"]) !== null && !/[\r\u001b]/u.test(reasonsMend("x", ["- a\r::error::x\u001b[2J"])) && reasonsMend("x", ["- a"], "vendor/core/").includes("`node vendor/core/scripts/reasons.mjs "), "an empty line, or none, fails, naming the difference (with no control character of the project's text) and the script that prints its reasons where the copy stands, with the mend");
 }
 // run, each failure says its mend (no pull request's date given, so the line is not asked of it here)
 const run = body => spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/pr-description.mjs", import.meta.url))], { env: { ...process.env, PR_BODY: body, PR_CREATED: "" }, encoding: "utf8" });

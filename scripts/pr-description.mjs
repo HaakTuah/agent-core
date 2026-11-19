@@ -73,21 +73,35 @@ export const REASONS_SINCE = "2026-11-19T00:00:00Z";
 export const REASONS = "Reasons read:";
 
 // The lines a pull request adds under the manifest's "Differences", in the checkout at `dir`, the merge commit against
-// its first parent, the base (every line where the base holds no manifest: a project's first); [] where the head holds
-// none, null where git cannot read the change.
+// its first parent, the base (every line where the base holds no manifest, as a project's first, or one git cannot give
+// whole): [] where the head holds none, UNREADABLE where it holds one git cannot give whole (a folder, a submodule, past
+// MANIFEST_MAX bytes), which fails rather than passes, and null where there is no base to read against.
+export const UNREADABLE = "unreadable";
+export const MANIFEST_MAX = 1 << 24;
 export function differencesAdded(dir) {
-  const show = at => { const r = spawnSync("git", ["show", `${at}:core-manifest.md`], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 24 }); return r.status === 0 ? r.stdout : null; };
-  if (spawnSync("git", ["rev-parse", "--verify", "--quiet", "HEAD^1"], { cwd: dir }).status !== 0) return null;
-  const was = new Set(differencesOf(show("HEAD^1")).map(l => l.trim()));
-  return differencesOf(show("HEAD")).map(l => l.trim()).filter(l => !was.has(l) && !/^None\.?$/iu.test(l));
+  const git = (...a) => spawnSync("git", a, { cwd: dir, encoding: "utf8", maxBuffer: MANIFEST_MAX });
+  if (git("rev-parse", "--verify", "--quiet", "HEAD^1").status !== 0) return null;
+  // (absent: ""; there, but no file git can give whole: null)
+  const read = at => {
+    const type = git("cat-file", "-t", `${at}:core-manifest.md`);
+    if (type.status !== 0) return "";
+    const r = type.stdout.trim() === "blob" ? git("show", `${at}:core-manifest.md`) : null;
+    return r && r.status === 0 && !r.error ? r.stdout : null;
+  };
+  const head = read("HEAD");
+  if (head === null) return UNREADABLE;
+  const was = new Set(differencesOf(read("HEAD^1") ?? "").map(l => l.trim()));
+  return differencesOf(head).map(l => l.trim()).filter(l => !was.has(l) && !/^None\.?$/iu.test(l));
 }
 
 // The mend where a pull request adds a difference and its description has no line REASONS with something after it;
-// null where it has one, or adds none.
-export function reasonsMend(body, added) {
-  if (!added?.length) return null;
-  if (textOf(body).split(/\r\n|\r|\n/u).some(l => l.trim().startsWith(REASONS) && l.trim().length > REASONS.length)) return null;
-  return `it adds ${added.length === 1 ? "a line" : `${added.length} lines`} under the manifest's "Differences" ("${added[0].replace(/[\u0000-\u001f\u007f]/gu, " ").slice(0, 80)}"), and the description has no line "${REASONS}". Mend: for each rule of the core it departs from, run \`node core/scripts/reasons.mjs "<the rule's file and lead>"\`, read the archive items and the issues it prints, and add a line "${REASONS} <those items and issues>, and which of their reasons does not hold for this project, and why"; where a line departs from no rule of the core (a step of the sync notes, a file the starter kit writes), say so on that line`;
+// null where it has one, or adds none. `at` is where the core's copy stands, as the manifest's "Core:" line puts it.
+export function reasonsMend(body, added, at = "core/") {
+  if (added === UNREADABLE) return `the pull request's core-manifest.md cannot be read whole (a folder, a submodule, or past ${MANIFEST_MAX} bytes), so what it adds under "Differences" cannot be told. Mend: keep core-manifest.md a text file in the manifest's form, far under that size, and push again`;
+  if (!Array.isArray(added) || !added.length) return null;
+  // (blanks and invisible format characters after the label are nothing)
+  if (textOf(body).split(/\r\n|\r|\n/u).some(l => l.trim().startsWith(REASONS) && l.trim().slice(REASONS.length).replace(/[\s\p{Cf}]/gu, ""))) return null;
+  return `it adds ${added.length === 1 ? "a line" : `${added.length} lines`} under the manifest's "Differences" ("${added[0].replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, " ").slice(0, 80)}"), and the description has no line "${REASONS}". Mend: for each rule of the core it departs from, run \`node ${at}scripts/reasons.mjs "<the rule's file and lead>"\`, read the archive items and the issues it prints, and add a line "${REASONS} <those items and issues>, and which of their reasons does not hold for this project, and why"; where a line departs from no rule of the core (a step of the sync notes, a file the starter kit writes), say so on that line`;
 }
 
 // The day from which the owner's yes is asked of a pull request that changes the floor or the review guidelines
@@ -243,7 +257,7 @@ if (started(import.meta.url)) {
     if (parts.includes(HOLDS) && created >= NUMBER_SINCE && then?.includes("export const NUMBER_SINCE")) { const mend = numberMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log(`ok   the part "${HOLDS}" names a rule's number, or "None"`); }
     else if (parts.includes(HOLDS)) console.log(`ok   the number under "${HOLDS}" is not asked here: ${why}`);
     if (created >= REASONS_SINCE && then?.includes("export const REASONS_SINCE")) {
-      const added = differencesAdded(process.cwd()), mend = added === null ? null : reasonsMend(process.env.PR_BODY, added);
+      const added = differencesAdded(process.cwd()), mend = added === null ? null : reasonsMend(process.env.PR_BODY, added, coreAt(process.cwd()) ?? "core/");
       if (mend) mends.push(mend);
       else console.log(added === null ? `ok   the line "${REASONS}" is not asked here: the change could not be read against its base` : added.length ? `ok   the description says the reasons read for the difference it adds` : `ok   the line "${REASONS}" is not asked here: no line is added under the manifest's "Differences"`);
     } else console.log(`ok   the line "${REASONS}" is not asked here: ${why}`);
