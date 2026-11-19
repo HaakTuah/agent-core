@@ -235,8 +235,7 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
   fs.mkdirSync(sealOf(dir), { recursive: true });
   const project = path.join(dir, "project"), origin = path.join(dir, "origin.git"), bin = path.join(dir, "bin");
   repos(dir, project, origin);
-  const kitRun = spawnSync(process.execPath, [path.join(core, "scripts", "init.mjs"), "--owner", OWNER, "--name", REPO, ...(at ? ["--at", at] : []), ...kit], { cwd: project, encoding: "utf8", env: plainEnv() });
-  if (kitRun.status !== 0) throw new Error(`the starter kit failed: ${kitRun.stdout}${kitRun.stderr}`);
+  starterKit(project, core, at, kit);
   fillIn(project, fills);
   writeAll(project, { ...PROGRAM, ...files });
   if (arrange) arrange(project);
@@ -251,6 +250,26 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
   fs.chmodSync(path.join(bin, "gh"), 0o755);
   fs.writeFileSync(path.join(dir, "github.json"), `${JSON.stringify(stateOf(issues, comments, github), null, 2)}\n`);
   return { dir, project, origin, bin };
+}
+
+// The starter kit, run in `project` from the core `core` at `at` with the kit's options `kit`; or, where a caller kept
+// the kits (keepKits) and one ran for the same core, commit and options, what it wrote copied in and staged as it
+// staged it. The kit writes the same files for the same commit and options, and its install of the core's packages is
+// most of what setting a case costs, on Windows above all (#715); a run of one case runs the kit as it always did.
+const KITS = new Map();
+let kitsAt = null;
+export function keepKits(folder) { fs.mkdirSync(folder, { recursive: true }); kitsAt = folder; }
+const copyBut = (from, to, but) => fs.cpSync(from, to, { recursive: true, verbatimSymlinks: true, filter: src => path.resolve(src) !== path.resolve(from, but) });
+function starterKit(project, core, at, kit) {
+  const key = kitsAt && JSON.stringify([path.resolve(core), at ?? git(core, "rev-parse", "HEAD"), kit]);
+  const kept = key && KITS.get(key);
+  if (kept) { copyBut(kept, project, ".git"); git(project, "add", "-A"); return; }
+  const kitRun = spawnSync(process.execPath, [path.join(core, "scripts", "init.mjs"), "--owner", OWNER, "--name", REPO, ...(at ? ["--at", at] : []), ...kit], { cwd: project, encoding: "utf8", env: plainEnv() });
+  if (kitRun.status !== 0) throw new Error(`the starter kit failed: ${kitRun.stdout}${kitRun.stderr}`);
+  if (!key) return;
+  const to = path.join(kitsAt, `kit-${KITS.size + 1}`);
+  copyBut(project, to, ".git");
+  KITS.set(key, to);
 }
 
 // The project and its bare origin, set so that nothing of the machine's own reaches them.
