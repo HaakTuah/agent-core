@@ -191,7 +191,8 @@ ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] =
   ok(release.on.schedule?.length === 1 && /^\d{1,2} \d{1,2} \* \* \*$/.test(release.on.schedule[0].cron) && "workflow_dispatch" in release.on
     && release.jobs.upgrade["runs-on"] === "windows-latest" && upgradeStep
     && release.jobs.upgrade.if === "${{ github.event_name != 'schedule' || needs.main.outputs.public == 'true' }}"
-    && [release.jobs.release.needs].flat().includes("upgrade") && String(testsUpgrade?.if).startsWith("${{ runner.os == 'Linux'"),
+    && [release.jobs.release.needs].flat().includes("upgrade") && !Object.keys(release.on).some(e => e.startsWith("pull_request"))
+    && /^\$\{\{ runner\.os == 'Linux' && (matrix\.part != '[\w ]+' && )?\(env\.RUN == 'all' \|\| contains\(env\.RUN, ' tests\/upgrade-test\.mjs '\)\) \}\}$/.test(String(testsUpgrade?.if)),
     "the upgrade test runs on Windows in the release workflow alone, once a day where minutes are free and before each release, never in a pull request's run (tasks/tests.md, \"A test that guards only what a release brings runs where the release is made\")",
     JSON.stringify({ schedule: release.on.schedule, if: release.jobs.upgrade?.if, tests: testsUpgrade?.if }));
 }
