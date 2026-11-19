@@ -131,9 +131,11 @@ ok(cancelled.length === 0 && /not queued: nothing is cancelled/.test(out[0]), "w
 out = cancel({ repo: "o/n", keep: [1, 2], gh: queue({}) });
 ok(cancelled.join() === "repos/o/n/actions/runs/13/cancel,repos/o/n/actions/runs/22/cancel,repos/o/n/actions/runs/16/cancel", "where it is, only the queued runs of pull requests into main neither the front nor the next are cancelled: never main's, the front's at a newer head, one into another branch or a fork's", cancelled.join());
 cancelled.length = 0;
-for (const [what, rules, why] of [["no up-to-date branch is asked", [], /before it merges: no,/], ["the host's merge queue keeps the line", [{ type: "merge_queue" }], /merge queue keeps it/]]) {
+for (const [what, rules, why, manifest = null] of [["no up-to-date branch is asked", [], /before it merges: no,/], ["the host's merge queue keeps the line", [{ type: "merge_queue" }], /merge queue keeps it/],
+  ["the manifest's row says a queue keeps the line", strict, /merge queue keeps it/, "| *merge queue* | `on` |\n"],
+  ["a queue is on, though the manifest's row says none", [{ type: "merge_queue" }], /merge queue keeps it/, "| *merge queue* | `none` |\n"]]) {
   let said = "";
-  try { cancel({ repo: "o/n", keep: [1], gh: queue({ rules }) }); } catch (e) { said = e.message; }
+  try { cancel({ repo: "o/n", keep: [1], manifest, gh: queue({ rules }) }); } catch (e) { said = e.message; }
   ok(cancelled.length === 0 && mended(`FAIL: ${said}`) && /not kept by hand/.test(said) && why.test(said), `where ${what}, nothing is cancelled and it says why`, said);
 }
 cancelled.length = 0;

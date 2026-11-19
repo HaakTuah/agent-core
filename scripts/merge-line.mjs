@@ -79,7 +79,7 @@ export function facts({ repo, manifest = null, gh = ghApi }) {
   const said = [up.said,
     queueOver ? `its merge queue: ${queueOver}, as the manifest's row *merge queue* says (read: ${q.queue ?? "not read"})` : q.said,
     billedOver ? `its runner minutes billed: ${billedOver}, as the manifest's row *billed minutes* says (read: ${billedRead})` : `its runner minutes billed: ${billedRead}`];
-  return { upToDate: up.upToDate, queue: queueOver ?? q.queue, billed: billedOver ? billedOver === "yes" : r.private === true, branch, said };
+  return { upToDate: up.upToDate, queue: queueOver ?? q.queue, queueRead: q.queue, billed: billedOver ? billedOver === "yes" : r.private === true, branch, said };
 }
 
 // What follows from the facts, as tasks/hosts.md says: who keeps the line, and the one line of advice to the owner.
@@ -163,9 +163,10 @@ function queuedRuns(repo, gh) {
 // default branch other than `keep` (the front, then the next in line) are cancelled, each of which runs again when its
 // pull request is brought up to date in its turn: the lines it prints. Where no up-to-date branch is asked, or the
 // host's merge queue keeps the line, it refuses: no turn would run those checks again.
-export function cancel({ repo, keep, gh = ghApi }) {
-  const f = facts({ repo, gh });
-  if (f.upToDate === false || f.queue === "on") refuse(`the line of ${repo} is not kept by hand (${f.upToDate === false ? f.said[0] : "the host's merge queue keeps it"}), so a run cancelled would not run again in a turn`, "cancel nothing: tasks/hosts.md's point 5 has nothing to act on here");
+export function cancel({ repo, keep, manifest = null, gh = ghApi }) {
+  // (a queue on, as read or as the manifest's row says, stops it either way: a row cannot let it cancel more)
+  const f = facts({ repo, manifest, gh });
+  if (f.upToDate === false || f.queue === "on" || f.queueRead === "on") refuse(`the line of ${repo} is not kept by hand (${f.upToDate === false ? f.said[0] : "the host's merge queue keeps it"}), so a run cancelled would not run again in a turn`, "cancel nothing: tasks/hosts.md's point 5 has nothing to act on here");
   const branch = f.branch, heads = keep.map(n => json(gh(`repos/${repo}/pulls/${n}`)));
   if (heads[0]?.state !== "open") refuse(`#${keep[0]}, named as the front, is no open pull request`, "name the open pull request at the front of the line first");
   const queued = queuedRuns(repo, gh);
@@ -184,15 +185,15 @@ export function main(argv, { gh = ghApi, say = console.log, warn = console.error
   const repo = opt("--repo"), count = Number(opt("--count") ?? COUNT), keep = opt("--cancel");
   const usage = "run node core/scripts/merge-line.mjs --repo <owner>/<name>, with --measure [--count <n>] or --cancel <front>[,<next>]";
   if (!aRepository(repo) || !(Number.isInteger(count) && count > 0)) refuse("no repository was named, or the count is no whole number", usage);
+  const manifest = fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null;
   if (argv.includes("--cancel")) {
     const nums = String(keep ?? "").split(",").map(Number);
     if (nums.length > 2 || !nums.every(n => Number.isSafeInteger(n) && n > 0)) refuse("--cancel names no front, or more than the front and the next", usage);
-    const out = cancel({ repo, keep: nums, gh });
+    const out = cancel({ repo, keep: nums, manifest, gh });
     for (const l of out) (l.startsWith("FAIL") ? warn : say)(l);
     return out.some(l => l.startsWith("FAIL")) ? 1 : 0;
   }
   if (argv.includes("--measure")) { say(line(measure({ repo, count, gh }))); return 0; }
-  const manifest = fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null;
   const f = facts({ repo, manifest, gh });
   say([`What ${repo}'s host says of the merge line:`, ...f.said.map(s => `- ${s}`), follows(f)].join("\n"));
   return 0;
