@@ -21,10 +21,17 @@
 // link. What a change to the config itself makes the check read (a use declared, a folder left out) no rule here
 // judges, since none could without guessing what was meant: the config is a protected file, and the reviews read
 // its change (floor rule 3). An entry that is gone is taken out with --write, which lowers the
-// numbers that fell too, and a pull request that leaves one standing fails, so the baseline lists the debt as it is,
-// and what was mended cannot come back. A baseline names the readers whose finds it lists ("reads"): what a reader it
-// does not name finds is said, never failed, where the base held it already or no base is told, until --write lists
-// it, so that a sync that brings a reader turns nothing red (AGENTS.md, "Nothing locks a project"). It never guesses:
+// numbers that fell too. A pull request that only improves on the baseline passes and says what --write would take
+// out, which the next pull request that changes the baseline, or a cleaning task, writes; one that changes the
+// baseline and leaves such an entry standing fails, so the baseline it writes lists the debt as it is (#750, point
+// 5: improving pull requests had to rewrite this shared file, and collided); until it is written, an entry the base's
+// code no longer holds covers no breach, in its own place or elsewhere, where the base is told (`heldAt`), and with
+// no base told the mended one could come back unseen, the cost the owner accepted. Told the base, the baseline is
+// read as it is told none, less those entries, so what passes there passes on the push to the branch, which is told
+// none (`thenOf`); a breach left where another's entry is listed can leave one without, and fails until --write. A baseline names the readers
+// whose finds it lists ("reads"): what a reader it does not name finds is said, never failed, where the base held it
+// already or no base is told, until --write lists it, so that a sync that brings a reader turns nothing red
+// (AGENTS.md, "Nothing locks a project"). It never guesses:
 // an import that leads nowhere it can tell and a file whose JSX its reader cannot follow to its end are counted and
 // said, never failed. Once the config names a system, a file of code the pull request adds that lies in none fails
 // too, read against the base's files.
@@ -57,10 +64,10 @@
 //                                                     "grown" gives a reason for, what a reader the baseline did
 //                                                     not name finds, and, with SHAPE_BASE set, what that branch
 //                                                     held already, where the config reads more
-//   node core/scripts/shape.mjs <config> --suite <name> -- <command>...   run a suite (with no shell) and hold its
-//                                                     time to its mark
-//   node core/scripts/shape.mjs <config> --suite <name> --since <seconds>  hold the time since a start the workflow
-//                                                     took (date +%s) to the suite's mark
+//   node core/scripts/shape.mjs <config> --suite <name> -- <command>...   run a suite (with no shell) and measure its
+//                                                     time against its mark, a warning past it, never a failure
+//   node core/scripts/shape.mjs <config> --suite <name> --since <seconds>  measure the time since a start the
+//                                                     workflow took (date +%s) against the suite's mark
 // Run from the project's root, by the copies workflow (.github/workflows/copies.yml) on every pull request; in the
 // core by its size workflow. Reads only, but for the baseline it writes when told; git and Node's own modules.
 import { execFileSync, spawnSync } from "node:child_process";
@@ -71,6 +78,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE, append, cycles, lyingUnder, nameTree, resolve } from "./code-shape.mjs";
 import { inProject, logged } from "./guards.mjs";
+import { installed, unreached } from "./packages.mjs";
+import { shapeFaults } from "./schemas.mjs";
 import { FIRST_READS, PACKAGE_FILES, REACH, READERS, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 
@@ -82,11 +91,9 @@ export const MARKS = { lines: 60, depth: 4, branches: 15 };
 export const DOMAINS = ["rules", "saved-data", "computer-players", "display", "input", "network", "storage", "platform", "packages", "tools", "tests"];
 // What the rules never use: nothing outward.
 export const OUTWARD = ["display", "input", "network", "storage", "platform"];
-const KEYS = ["baseline", "code", "tests", "systems", "aliases", "platform", "marks", "suites", "screens", "clocks", "processes", "select", "wait", "long"];
 const SELECT_KEYS = ["proof", "whole", "none"];
 // The seconds from which a measurement runs as a job outside the session, where the config gives none (#321).
 export const LONG = 3600;
-const SYSTEM_KEYS = ["paths", "uses", "entrance", "domain", "wraps"];
 const BUILTIN = new Set(builtinModules.flatMap(m => [m, `node:${m}`]));
 
 class Refused extends Error {}
@@ -94,51 +101,35 @@ const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
 const isObject = v => !!v && typeof v === "object" && !Array.isArray(v);
 const strings = v => Array.isArray(v) && v.every(s => typeof s === "string" && s.length > 0);
 const optional = (v, test) => v === undefined || test(v);
-const isName = v => typeof v === "string" && /^[a-z][a-z0-9-]*$/u.test(v);
 const plainPath = s => typeof s === "string" && /^[\w@.-][\w@. -]*(\/[\w@.-][\w@. -]*)*\/?$/u.test(s) && !s.split("/").includes("..");
-const wholeNumbers = o => Object.values(o).every(n => Number.isInteger(n) && n > 0);
-const aSecond = n => Number.isFinite(n) && n > 0;
-const seconds = v => aSecond(v) || (isObject(v) && Object.keys(v).length > 0 && Object.values(v).every(aSecond));
 const KIT_FORM = "write it as the starter kit does (core/setup/template/shape.json.tmpl): a JSON object with \"baseline\", the baseline's path, and \"code\", git pathspecs of the code to read";
 
 // ---- the config ----
 
-function readLists(c, at) {
-  const unknown = Object.keys(c).filter(k => !KEYS.includes(k));
-  if (unknown.length) refuse(`${at} holds keys the check does not know: ${unknown.join(", ")}`, `take them out; it reads ${KEYS.map(k => `"${k}"`).join(", ")} alone`);
+// The config's shape, held by its schema (scripts/schemas/shape.json, schemas.mjs; #530): a key the check does not know,
+// or one of the wrong shape, would read less without a word, so it is refused, its first fault said with its mend.
+// Where the core's packages are not installed, as in a project's job of tests that selects with the config and installs
+// none, the shape is not checked, and what the check reads is taken where it stands in its form (formed, below); the
+// shape check itself says so as a warning (main). What the schema cannot say stays here: a path outside the project.
+function readShape(c, at) {
+  const faults = shapeFaults("shape", c, "core/", at);
+  if (faults?.length) throw new Refused(faults[0]);
+  if (faults === null && !(typeof c.baseline === "string" && strings(c.code) && c.code.length)) refuse(`${at} names no "baseline" and "code" the check can read`, KIT_FORM);
   if (!plainPath(c.baseline) || c.baseline.endsWith("/")) refuse(`${at} names no "baseline" that is a plain path inside the project`, "name the baseline's path in \"baseline\", as the starter kit writes it (checks/shape-baseline.json)");
-  for (const k of ["code", "tests"]) if (!optional(c[k], strings)) refuse(`"${k}" in ${at} is not a list of words`, "list git pathspecs there (\":!\" leaves a path out)");
-  if (!optional(c.platform, strings)) refuse(`"platform" in ${at} is not a list of words`, "list there each package or module of Node's that binds code to one platform, by the name it is imported under");
-  if (!optional(c.screens, strings)) refuse(`"screens" in ${at} is not a list of words`, "list there each package or module a test imports that opens a screen, a window or a device, by the name it is imported under");
-  for (const [k, what] of [["clocks", "reaches a real clock (sleeps, waits on a timer or reads the time)"], ["processes", "starts another process"]]) {
-    if (!optional(c[k], strings)) refuse(`"${k}" in ${at} is not a list of words`, `list there each name a test calls or imports that ${what}, beside those the check knows for each language: a call by its dotted name (Clock.Wait), a module by the name it is imported under`);
-  }
-  if (!optional(c.select, v => isObject(v) && Object.keys(v).every(k => SELECT_KEYS.includes(k)) && Object.values(v).every(strings))) refuse(`"select" in ${at} is not in the form the check reads`, `give it ${SELECT_KEYS.map(k => `"${k}"`).join(", ")} alone, each a list of git pathspecs`);
-  for (const k of ["wait", "long"]) if (!optional(c[k], aSecond)) refuse(`"${k}" in ${at} is not a number of seconds`, `give it a number of seconds above 0, or take it out`);
-  if (!c.code?.length) refuse(`${at} names no "code" to read`, "list the code's folders in \"code\", as git pathspecs (\":!\" leaves a path out)");
+  const aliases = formed(c.aliases, isObject, {});
+  if (!Object.values(aliases).every(plainPath)) refuse(`"aliases" in ${at} is not in the form the check reads`, "give each prefix an import may start with (\"@/\") the path inside the project it stands for (\"src/\")");
 }
-
-function readMarks(c, at) {
-  const given = c.marks ?? {}, marks = { ...MARKS, ...(isObject(given) ? given : {}) };
-  if (!isObject(given) || Object.keys(marks).length !== 3 || !wholeNumbers(marks))
-    refuse(`"marks" in ${at} is not in the form the check reads`, `give "lines", "depth" and "branches" a whole number each, or leave one out for the core's own (${JSON.stringify(MARKS)})`);
-  const aliases = c.aliases ?? {}, suites = c.suites ?? {};
-  if (!isObject(aliases) || !Object.entries(aliases).every(([k, v]) => k.length > 0 && plainPath(v))) refuse(`"aliases" in ${at} is not in the form the check reads`, "give each prefix an import may start with (\"@/\") the path inside the project it stands for (\"src/\")");
-  if (!isObject(suites) || !Object.values(suites).every(seconds)) refuse(`"suites" in ${at} is not in the form the check reads`, "give each suite's name its time mark in seconds: a number, or one for each of Node's names for a platform ({ \"linux\": 60, \"win32\": 240 })");
-  return { marks, aliases, suites };
-}
+// (a key as given where it holds its form, else its default: what a config unchecked can hold)
+const formed = (v, test, fallback) => (v !== undefined && test(v) ? v : fallback);
+const aSecond = n => Number.isFinite(n) && n > 0;
 
 function readSystem(name, s, systems, at) {
   const here = `the system "${name}" in ${at}`;
-  if (!isName(name)) refuse(`${here} has a name the check does not read`, "name it in small letters, digits and hyphens, a letter first");
-  if (!isObject(s) || Object.keys(s).some(k => !SYSTEM_KEYS.includes(k))) refuse(`${here} holds keys the check does not know`, `give it ${SYSTEM_KEYS.map(k => `"${k}"`).join(", ")} alone`);
-  if (!Array.isArray(s.paths) || !s.paths.length || !s.paths.every(plainPath)) refuse(`${here} names no "paths" inside the project`, "list its folders (each ending in /) or files there");
-  if (!optional(s.uses, strings)) refuse(`"uses" of ${here} is not a list of names`, "list there the systems it may import from");
-  if (!optional(s.wraps, strings)) refuse(`"wraps" of ${here} is not a list of names`, "list there the packages it alone imports");
+  if (!isObject(s) || !Array.isArray(s.paths) || !s.paths.length || !s.paths.every(plainPath)) refuse(`${here} names no "paths" inside the project`, "list its folders (each ending in /) or files there");
+  for (const k of ["uses", "wraps"]) s[k] = formed(s[k], strings, undefined);
   const other = (s.uses ?? []).find(u => !(u in systems) || u === name);
   if (other !== undefined) refuse(`${here} uses "${other}", which is no other system of the config`, "name a system the config holds, or take it out");
-  if (!optional(s.entrance, e => plainPath(e) && s.paths.some(p => e.startsWith(p)))) refuse(`${here} names an "entrance" outside its own paths`, "name the one file of the system that the others import from");
-  if (!optional(s.domain, isName)) refuse(`the "domain" of ${here} is not a name`, `name one of ${DOMAINS.join(", ")}, or the project's own in the same form`);
+  if (s.entrance !== undefined && !(plainPath(s.entrance) && s.paths.some(p => s.entrance.startsWith(p)))) refuse(`${here} names an "entrance" outside its own paths`, "name the one file of the system that the others import from");
 }
 
 // What holds between the systems: the rules use nothing outward, a package is wrapped once, and no circle is declared.
@@ -157,17 +148,26 @@ function readTogether(systems, at) {
   return wrapped;
 }
 
+// Where ajv is not installed the config's shape went unchecked, as readShape says: said as a warning, and the check
+// goes on (the core's AGENTS.md, "Nothing locks a project").
+function unchecked() {
+  if (installed("ajv")) return;
+  console.log(unreached("ajv") ? "::warning::The config's shape was not checked: the package ajv could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault"
+    : `::warning::The config's shape was not checked: the package ajv is not installed beside the core's copy. Mend: in a pull request of its own, add the step node ${path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)))} to this job before the step that runs this check`);
+}
+
 // The config as the check reads it, every key filled; it throws a Refused, with its mend, for one it cannot hold to.
 export function parseConfig(text, at = KIT) {
   let c;
   try { c = JSON.parse(text); } catch { refuse(`${at} could not be read as JSON`, KIT_FORM); }
   if (!isObject(c)) refuse(`${at} is not a JSON object`, KIT_FORM);
-  readLists(c, at);
-  const systems = c.systems ?? {};
-  if (!isObject(systems)) refuse(`"systems" in ${at} is not an object`, "give each system's name its \"paths\", and what else it declares: \"uses\", \"entrance\", \"domain\", \"wraps\"");
+  readShape(c, at);
+  const systems = formed(c.systems, isObject, {});
   for (const [name, s] of Object.entries(systems)) readSystem(name, s, systems, at);
-  const select = Object.fromEntries(SELECT_KEYS.map(k => [k, c.select?.[k] ?? []]));
-  return { baseline: c.baseline, code: c.code, tests: c.tests ?? [], systems, platform: c.platform ?? [], screens: c.screens ?? [], clocks: c.clocks ?? [], processes: c.processes ?? [], select, wait: c.wait, long: c.long ?? LONG, ...readMarks(c, at), wrapped: readTogether(systems, at) };
+  const list = k => formed(c[k], strings, []), select = Object.fromEntries(SELECT_KEYS.map(k => [k, formed(c.select?.[k], strings, [])]));
+  const marks = { ...MARKS, ...Object.fromEntries(Object.entries(formed(c.marks, isObject, {})).filter(([k, n]) => Object.hasOwn(MARKS, k) && Number.isInteger(n) && n > 0)) };
+  const suites = Object.fromEntries(Object.entries(formed(c.suites, isObject, {})).filter(([, v]) => aSecond(v) || (isObject(v) && Object.keys(v).length > 0 && Object.values(v).every(aSecond))));
+  return { baseline: c.baseline, code: c.code, tests: list("tests"), systems, platform: list("platform"), screens: list("screens"), clocks: list("clocks"), processes: list("processes"), select, wait: formed(c.wait, aSecond, undefined), long: formed(c.long, aSecond, LONG), marks, aliases: formed(c.aliases, isObject, {}), suites, wrapped: readTogether(systems, at) };
 }
 
 // ---- what stands ----
@@ -446,22 +446,44 @@ const NUMBERS = ["lines", "depth", "branches", "count"];
 const within = (n, listed, marks) => n === true || listed === true || NUMBERS.every(k => (n[k] ?? 0) <= Math.max(listed[k] ?? 0, marks[k] ?? 0));
 const size = n => (n === true ? 0 : NUMBERS.reduce((s, k) => s + (n[k] ?? 0), 0));
 
-// The entries of `want` that nothing in `pool` covers: each claims one entry of the pool, the one of its own id where
-// its numbers are within that one's, else one of its kind and group that no entry of `want` stands under any more (what
-// was listed moved, under its name), the smallest that covers it. Both are Maps of id to numbers (or true). `groups`
-// gives an id's kind and group: another check that keeps a baseline in this form passes its own (screens.mjs).
-export function unclaimed(want, pool, marks = {}, groups = groupOf) {
-  const free = new Map(pool), later = [], left = [];
-  for (const [id, n] of want) { if (free.has(id) && within(n, free.get(id), marks)) free.delete(id); else later.push([id, n]); }
+// What `want` claims of `pool`: { left, taken }, `left` the entries of `want` that nothing in the pool covers, `taken`
+// each entry of `want` that claimed one to the id of the one it claimed. Each claims one entry of the pool, the one of
+// its own id where its numbers are within that one's, else one of its kind and group that no entry of `want` stands
+// under any more (what was listed moved, under its name): the smallest still free that covers it, in the order of
+// `want`, and where none is free, one an earlier claimant gives up for another that covers that one (`matched`). So
+// none is left wherever each can be given an entry of its own, whatever the order, and one that shrinks, moves to an
+// id the pool lists nothing at, or goes, leaves no other without. Both are Maps of id to numbers (or true). `groups`
+// gives an id's kind and group: another check that keeps a baseline in this form passes its own (screens.mjs, through
+// `unclaimed`).
+function claims(want, pool, marks = {}, groups = groupOf) {
+  const free = new Map(pool), later = new Map(), taken = new Map();
+  for (const [id, n] of want) { if (free.has(id) && within(n, free.get(id), marks)) { free.delete(id); taken.set(id, id); } else later.set(id, n); }
   for (const id of want.keys()) free.delete(id); // one that stands, and grew, lends its place to no other
-  for (const [id, n] of later) {
+  const fits = new Map([...later].map(([id, n]) => {
     const { kind, group } = groups(id);
     const covers = ([other, listed]) => { const o = groups(other); return o.kind === kind && o.group === group && within(n, listed, marks); };
-    const fit = [...free].filter(covers).sort((a, b) => size(a[1]) - size(b[1]) || a[0].localeCompare(b[0]))[0];
-    if (fit) free.delete(fit[0]); else left.push(id);
-  }
-  return left;
+    return [id, [...free].filter(covers).sort((a, b) => size(a[1]) - size(b[1]) || a[0].localeCompare(b[0])).map(([other]) => other)];
+  }));
+  const held = matched(fits);
+  return { left: [...later.keys()].filter(id => !held.has(id)), taken: new Map([...taken, ...held]) };
 }
+// Each id of `fits` (an id to the entries that cover it, the one it would take first leading) to the entry it is given,
+// each entry given once, as many given one as can be: an id takes its first entry not given yet, and where all are
+// given, one whose holder can take another, that holder's own holder moved the same way.
+function matched(fits) {
+  const holder = new Map();
+  const give = (id, seen) => {
+    const open = fits.get(id).find(entry => !holder.has(entry));
+    if (open !== undefined) return holder.set(open, id);
+    return fits.get(id).some(entry => !seen.has(entry) && seen.add(entry) && give(holder.get(entry), seen) && holder.set(entry, id));
+  };
+  for (const id of fits.keys()) give(id, new Set());
+  return new Map([...holder].map(([entry, id]) => [id, entry]));
+}
+export const unclaimed = (want, pool, marks = {}, groups = groupOf) => claims(want, pool, marks, groups).left;
+// The entries of `want` that `pool` leaves unclaimed of those named in `last`, these claiming after every other, so
+// that a breach that stands where it stood claims its own before a new one may take it (#750, point 5).
+const unclaimedOf = (last, want, pool, marks) => { const at = new Set(last); return unclaimed(new Map([...[...want].filter(([id]) => !at.has(id)), ...[...want].filter(([id]) => at.has(id))]), pool, marks).filter(id => at.has(id)); };
 
 const numbersOf = n => (n === true ? true : Object.fromEntries(NUMBERS.filter(k => k in n).map(k => [k, n[k]])));
 const sorted = map => Object.fromEntries([...map].sort(([a], [b]) => a.localeCompare(b)));
@@ -551,8 +573,8 @@ const SAID = {
   cycle: n => [`${plural(n, "import lies", "imports lie")} on a cycle between files that did not stand before`, "turn one import of the cycle round: move what both files need into a file that imports neither, or pass it in"],
   platform: n => [`${plural(n, "import binds", "imports bind")} code to one platform outside the system declared for that`, "move the code that needs it into the system of the domain \"platform\", and have the rest call what that system offers, so that the rest builds and tests wherever the project's checks run"],
   package: n => [`${plural(n, "import takes", "imports take")} a package the project ships with outside the one system that wraps it`, "import it in one system alone, named under that system's \"wraps\" in the config, and have the others use what that system offers"],
-  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (an element of JSX that never closes, a type's parameter in .tsx it takes for one, as in <T>(x: T) => T, code nested more than 200 levels deep, or C# the grammar the core installs cannot read whole, or in two minutes), so ${n === 1 ? "its" : "their"} functions are not held`,
-    "write it so that the reader can follow it: close each element, give a type's parameter in .tsx a comma or a bound (<T,>, <T extends U>), or nest less deep; where it is C# that builds, newer than the grammar reads, list the entry under \"grown\" with that reason, by its id, and tell the core which construct it is, never the project's code (the core's README.md, \"Reporting to the core\"); the check's failure on the file then names what it holds"],
+  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (JavaScript, TypeScript, C# or Python the grammar the core installs cannot read whole, or within its time, a file of them past 2 MB, or C# or Python nested more than 200 levels deep), so ${n === 1 ? "its" : "their"} functions are not held`,
+    "write it so that the reader can follow it: close each element of JSX, write a } or > in JSX's text as {'}'} or {'>'}, and nest less deep; where a script wrote it as data past 2 MB, leave it out of the config's \"code\" (\"!\" before its pathspec); where it is code that builds, newer than the grammar reads, list the entry under \"grown\" with that reason, by its id, and tell the core which construct it is, never the project's code (the core's README.md, \"Reporting to the core\"); the check's failure on the file then names what it holds"],
   global: n => [`${plural(n, "name joins", "names join")} the global space that scripts with no import or export share: a second name of one file there, or a name another such file declares too`,
     "make the file a module that imports what it uses and exports what it offers; where the page cannot load it so, put what it adds under the one name the file declares there already (an object of its functions), and give a name that two files declare one home"],
   screen: n => [`${plural(n, "test imports", "tests import")} what opens a screen, a window or a device, where no test of ${n === 1 ? "its" : "their"} file did before`,
@@ -567,19 +589,21 @@ const SAID = {
 // The breaches no entry of the baseline covers: { fail, later }. One that only moved, under its name, claims its old
 // entry and is none: the old entry is stale, and --write lists it where it stands now. One that the base held already,
 // as this config reads the base's code, is no new breach either: the check reads more than it did (a system named, a
-// mark lowered), or the baseline was lowered in this same change past what stands, and --write, told the base, lists
-// it. Of a reader the baseline does not list (`unread`), one the base held, or any where no base is told, is `later`:
-// reported, never failed, until --write lists it. The rest are new, each kind with its mend.
+// mark lowered), the baseline was lowered in this same change past what stands, or its entry is listed under another
+// id, where a breach stands now that takes it or lends it to no other, and --write, told the base, lists it; a
+// breach that still stands where the base held it claims that one first, so a new one of its name takes no
+// breach's place that covers itself. Of a reader the baseline does not list (`unread`), one the base held, or any where
+// no base is told, is `later`: reported, never failed, until --write lists it. The rest are new, each kind with its mend.
 function fresh({ config, at, self, found, current, base, news, unread }) {
   const later = base ? [] : news.filter(unread);
   if (!base) news = news.filter(id => !unread(id));
   const fail = [];
   if (base && news.length) {
-    const left = new Set(unclaimed(new Map(news.map(id => [id, current.get(id)])), base.stood(), config.marks));
+    const left = new Set(unclaimedOf(news, current, base.stood(), config.marks));
     const readMore = news.filter(id => !left.has(id) && !unread(id));
     later.push(...news.filter(id => !left.has(id) && unread(id)));
     news = news.filter(id => left.has(id));
-    if (readMore.length) fail.push([`FAIL: ${plural(readMore.length, "breach", "breaches")} that ${base.name} held already ${readMore.length === 1 ? "is" : "are"} not in ${config.baseline}: the config reads more than it did, or the baseline was lowered past what stands. Mend: list them with SHAPE_BASE=${base.name} node ${self} ${at} --write, and commit the baseline`, ...some(readMore, current)]);
+    if (readMore.length) fail.push([`FAIL: ${plural(readMore.length, "breach", "breaches")} that ${base.name} held already ${readMore.length === 1 ? "is" : "are"} not in ${config.baseline}: the config reads more than it did, the baseline was lowered past what stands, or the entry is listed under another id, where a breach stands now. Mend: list them where they stand with SHAPE_BASE=${base.name} node ${self} ${at} --write, and commit the baseline`, ...some(readMore, current)]);
   }
   return { fail: [...fail, ...byKind(news, found, current, config)], later };
 }
@@ -604,22 +628,76 @@ function raised(config, old) {
   return out;
 }
 
+const asWritten = text => (typeof text === "string" ? text.replace(/\r\n/gu, "\n").trimEnd() : null); // (a baseline's text, whatever its line endings)
 const tolerant = read => { try { return read(); } catch { return null; } }; // (what the base cannot be read by holds nothing there)
 const once = make => { let made = null; return () => (made ??= make()); };
-// What the base held, as this config reads the base's code: each breach's id to its numbers.
-const stoodAt = (base, config) => { const before = base.standing(); return new Map([...survey(before.texts, config, before.tests).entries].map(([id, e]) => [id, e.n])); };
+// The base (`standing`, its files), read once as this config reads its code: `found`, what the check finds there, and
+// `stood`, each breach's id to its numbers.
+const readAt = (base, config) => {
+  base.standing = once(base.standing);
+  base.found = once(() => { const before = base.standing(); return survey(before.texts, config, before.tests); });
+  base.stood = once(() => new Map([...base.found().entries].map(([id, e]) => [id, e.n])));
+  return base;
+};
+
+// The base's breaches a baseline's entries may stand for: each of a reader the baseline names, and of one it does not
+// (a reader renamed since among them: shape-readers.mjs, READERS), only the one an entry at its own id is listed for
+// (`own`), which `claims` gives that entry before any other claim; so such a breach takes no entry of another's.
+const readUnder = (stood, reads, readers, own) => new Map([...stood].filter(([id, n]) => reads.includes(readerOf(id, readers)) || own(id, n)));
+
+// What the base's own check read under its baseline: each of those breaches of the base's (`readUnder`) to the id of
+// the entry it claims, as a breach claims one now (`claims`), all of them at once. An entry none claims, mended
+// where an earlier pull request left it listed, covers no breach, in its own place or elsewhere, and one that only a
+// group-mate's grown breach stands by covers that one (#750, point 5).
+function heldAt(baseline, base, marks) {
+  if (!baseline.listed.size) return baseline.listed;
+  const { listed, reads } = baseline, own = (id, n) => listed.has(id) && within(n, listed.get(id), marks);
+  return claims(readUnder(base.stood(), reads, base.found().readers, own), listed, marks).taken;
+}
+
+// What a baseline the change wrote covers against the base (`then`, the base's own baseline; `held`, what the base's
+// check read under it): its entries that the base backs, each as listed. An entry "grown" gives a reason for that
+// the base's did not list as high joins in this change, and is kept. Each other claims one breach of the base's,
+// as this config reads its code and the one at a joining entry's id aside, where its numbers are within what that
+// breach stood under there: its entry in the base's baseline, else the breach itself (the check reads more than it
+// did, or the base's baseline did not cover it). So no entry covers more than the base held, and no two one breach.
+function coverAt({ listed, reads, grown }, base, marks, then, held) {
+  if (!listed.size) return listed;
+  const before = then?.listed ?? new Map(), readers = base.found().readers;
+  const joins = new Map([...listed].filter(([id, n]) => said(grown, id) && !(before.has(id) && within(n, before.get(id), {}))));
+  const under = new Map([...readUnder(base.stood(), reads, readers, id => listed.has(id))].filter(([id]) => !joins.has(id)).map(([id, n]) => [id, held.get(id) ?? n]));
+  const backed = claims(new Map([...listed].filter(([id]) => !joins.has(id))), under, marks).taken;
+  return new Map([...listed].filter(([id]) => joins.has(id) || backed.has(id)));
+}
+
+// A baseline against the base: `then`, the base's own baseline as the check reads it, and `old`, its config (each
+// null where the base holds none the check can read); `read`, the ids of the entries the base's own check read a
+// breach under, and `held`, each of those breaches to its entry's numbers, by the base's own config where this one
+// reads the base's code otherwise (`own`: the base's files as a config reads them); `wrote`, whether the change writes the baseline; and `covers`, what of this
+// baseline covers against the base, each entry under its own id, as the check told no base reads it: left as the
+// base holds it, the entries the base's check read a breach under, and written, those the base backs (`coverAt`).
+// Being the baseline less some entries, read by the same matching, it covers nothing the check told no base, as the
+// push to the branch runs it, would not: a pull request that passes leaves that run passing (floor rule 12).
+function thenOf(base, baseline, baselineText, config) {
+  const then = base.baseline === null ? null : tolerant(() => parseBaseline(base.baseline, base.name, ""));
+  const old = base.config === null ? null : tolerant(() => parseConfig(base.config, base.name));
+  const own = old && JSON.stringify(old) !== JSON.stringify(config) ? readAt({ standing: () => (base.own ?? base.standing)(old) }, old) : base;
+  const under = then ? heldAt(then, own, (old ?? config).marks) : new Map(), read = new Set(under.values());
+  const held = new Map([...under].map(([at, id]) => [at, then.listed.get(id)])), wrote = asWritten(base.baseline) !== asWritten(baselineText);
+  return { then, old, held, read, wrote, covers: wrote ? coverAt(baseline, base, config.marks, then, held) : new Map([...baseline.listed].filter(([id]) => read.has(id))) };
+}
 
 // Against the pull request's base: what joined the baseline that the base neither listed nor held, and each mark
 // raised, where "grown" gives no reason.
-function againstBase({ config, at, self, baseline, base, found }) {
+function againstBase({ config, at, self, baseline, base, found, then, old, read }) {
   const fail = [];
-  const was = base.baseline === null ? null : tolerant(() => parseBaseline(base.baseline, base.name, "").listed);
-  const old = base.config === null ? null : tolerant(() => parseConfig(base.config, base.name));
+  // (of what the base lists: each entry its check read a breach under, and each this baseline keeps at its id, which no other claims)
+  const was = then && new Map([...then.listed].filter(([id]) => read.has(id) || baseline.listed.has(id)));
   // (the readers a baseline names only grow: one dropped would let what it lists go unlisted while it stands)
-  const dropped = base.baseline === null ? [] : (tolerant(() => parseBaseline(base.baseline, base.name, "").reads) ?? []).filter(r => !baseline.reads.includes(r));
+  const dropped = (then?.reads ?? []).filter(r => !baseline.reads.includes(r));
   if (dropped.length) fail.push([`FAIL: ${config.baseline} no longer names ${plural(dropped.length, "reader")} that ${base.name}'s names: ${dropped.join(", ")}. Mend: take "reads" back as ${base.name} holds it (git checkout ${base.name} -- ${config.baseline}), then run node ${self} ${at} --write if the baseline must be lowered`]);
   let joined = unclaimed(baseline.listed, was ?? new Map(), config.marks);
-  if (joined.length) joined = unclaimed(new Map(joined.map(id => [id, baseline.listed.get(id)])), base.stood(), config.marks).filter(id => !said(baseline.grown, id));
+  if (joined.length) joined = unclaimedOf(joined, baseline.listed, base.stood(), config.marks).filter(id => !said(baseline.grown, id));
   if (joined.length) fail.push([`FAIL: ${config.baseline} lists ${plural(joined.length, "entry", "entries")} that ${base.name} neither listed nor held, and the baseline only shrinks. Mend: take each out of the baseline and mend the code as the check then says; only where there is no other way, give each its reason under "grown" in the baseline, by its id, and in the pull request, with a fresh session's word there that it found no other way`, ...some(joined, baseline.listed)]);
   // (once a system is named, a file of code the base did not hold lies in one)
   const loose = Object.keys(config.systems).length ? found.unnamed.filter(f => !(f in base.standing().texts)) : [];
@@ -643,12 +721,12 @@ function notesOf(read) {
 
 // The check's verdict on a project: { fail: [[line, ...details]], notes, listed, read }. `base`, where the pull
 // request's base is known: { name, baseline (its text there, or null), config (its text there, or null), standing: ()
-// => the base's files as `config` reads them }.
+// => the base's files as `config` reads them, own: other => those files as another config reads them (where it is
+// left out, the files `standing` gives) }.
 export function verdict({ config, at, self, found, baselineText, base }) {
   const restore = base ? `take it back as ${base.name} holds it (git checkout ${base.name} -- ${config.baseline}), then run node ${self} ${at} --write` : `write it again from what stands (delete it, then node ${self} ${at} --first), in a pull request the reviews read`;
   const baseline = parseBaseline(baselineText, config.baseline, restore);
   const current = new Map([...found.entries].map(([id, e]) => [id, e.n]));
-  if (base) { base.standing = once(base.standing); base.stood = once(() => stoodAt(base, config)); }
   // (what a reader finds on the parser, where it could not run, its packages not installed for the registry not
   // answering: its functions are read as a reader's the baseline does not name, so that none fails, and a file its
   // baseline lists as lost, which only the parser tells, is kept, never gone; what the same reader finds without the
@@ -656,14 +734,28 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   const reads = new Set(baseline.reads), skipped = unreachedReaders();
   const unread = id => { const r = readerOf(id, found.readers); return r !== null && (!reads.has(r) || (skipped.includes(r) && groupOf(id).kind === "function")); };
   const kept = id => !current.has(id) && skipped.includes(readerOf(id, found.readers)) && ["function", "lost"].includes(groupOf(id).kind);
-  const news = unclaimed(current, baseline.listed, config.marks);
+  const gone = id => !current.has(id) && !unread(id) && !kept(id);
+  // (against the base, a listed entry covers what the base's code still holds of it, wherever it stands now: #750, point 5)
+  // (what a reader the baseline does not name finds claims after every other, so that it leaves no other without)
+  const told = base ? thenOf(readAt(base, config), baseline, baselineText, config) : null;
+  const news = unclaimed(new Map([...current].sort(([a], [b]) => unread(a) - unread(b))), told?.covers ?? baseline.listed, config.marks);
   const { fail, later } = fresh({ config, at, self, found, current, base, news, unread });
-  // (one that only shrank passes as it is listed: --write lowers its numbers whenever it is run)
-  const stale = [...baseline.listed.keys()].filter(id => !current.has(id) && !unread(id) && !kept(id));
-  if (stale.length) fail.push([`FAIL: ${config.baseline} lists ${plural(stale.length, "entry", "entries")} that ${stale.length === 1 ? "is" : "are"} gone or moved now. Mend: run node ${self} ${at} --write and commit the baseline it lowers`, ...some(stale, baseline.listed)]);
-  if (base) fail.push(...againstBase({ config, at, self, baseline, base, found }));
+  const lowered = staleOf({ config, at, self, baseline, wrote: told?.wrote, gone });
+  fail.push(...lowered.fail);
+  if (told) fail.push(...againstBase({ config, at, self, baseline, base, found, ...told }));
   const reread = [...baseline.listed.keys()].filter(id => !current.has(id) && unread(id) && !kept(id)).length;
-  return { fail, notes: [...notesOf(found.read), ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read, kept: [...baseline.listed.keys()].filter(kept).length };
+  return { fail, notes: [...notesOf(found.read), ...lowered.notes, ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read, kept: [...baseline.listed.keys()].filter(kept).length };
+}
+
+// The entries a baseline lists that are gone or moved now (`gone`): { fail, notes }. One that only shrank passes as it
+// is listed, since --write lowers its numbers whenever it is run; one gone or moved fails only a change that writes the
+// baseline, which then writes it whole, and is said, never failed, where the change only improves on it (#750, point 5).
+function staleOf({ config, at, self, baseline, wrote, gone }) {
+  const stale = [...baseline.listed.keys()].filter(gone), n = stale.length, they = n === 1 ? ["is", "it"] : ["are", "them"];
+  if (!n) return { fail: [], notes: [] };
+  const what = `${config.baseline} lists ${plural(n, "entry", "entries")} that ${they[0]} gone or moved now`;
+  if (wrote) return { fail: [[`FAIL: ${what}, and this change writes the baseline. Mend: run node ${self} ${at} --write and commit the baseline it lowers`, ...some(stale, baseline.listed)]], notes: [] };
+  return { fail: [], notes: [`${what}, which fails nothing: the code improved on the baseline. The lowered baseline leaves ${they[1]} out; node ${self} ${at} --write writes it, in the next pull request that changes the baseline or a cleaning task: ${some(stale, baseline.listed).map(l => l.trim()).join("; ")}`] };
 }
 
 // What a baseline written before a reader came does not list yet, said, never failed.
@@ -676,7 +768,8 @@ function unlisted({ config, at, self, reads, later, reread }) {
 
 // ---- the commands ----
 
-// A suite held to its time mark: the command after --, run and timed, or the time since a start the workflow took.
+// A suite measured against its time mark: the command after --, run and timed, or the time since a start the workflow
+// took.
 function timed(name, rest, usage) {
   if (rest[0] === "--since" && /^\d+$/u.test(rest[1] ?? "") && rest.length === 2) return { took: Date.now() / 1000 - Number(rest[1]), status: 0 };
   if (rest[0] !== "--" || rest.length < 2) refuse("--suite takes a name, then -- and the suite's command, or --since and the second its run started at", usage);
@@ -692,9 +785,10 @@ function suite(config, at, self, [name, ...rest]) {
   const limit = isObject(mark) ? mark[process.platform] : mark;
   const { took, status } = timed(name, rest, `run node ${self} ${at} --suite ${name} -- <command>`);
   if (status !== 0) return status; // (the suite's own failure, which says its own mend)
+  // (a time mark measures and never fails, tasks/tests.md; #733, point 5: past it, a warning, which the run shows)
   if (limit !== undefined && took > limit) {
-    console.error(`FAIL: the suite ${name} took ${Math.round(took)} s, past its mark of ${limit}. Mend: make it faster (set up only what each test needs, run only what the change can reach), or split it so that each part runs alone under a mark of its own; only where it cannot be, raise its mark in ${at} with the reason under "grown" in ${config.baseline} and in the pull request`);
-    return 1;
+    console.log(`::warning::the suite ${name} took ${Math.round(took)} s, past its mark of ${limit}, which fails nothing. Mend: add it to the open task on the tests' time, or file one where none is open: make it faster (set up only what each test needs, run only what the change can reach), or split it so that each part runs alone under a mark of its own; only where it cannot be, raise its mark in ${at} with the reason under "grown" in ${config.baseline} and in the pull request`);
+    return 0;
   }
   console.log(`ok   the suite ${name} took ${Math.round(took)} s${limit === undefined ? `; ${at} gives it no mark on ${process.platform}` : `, within its mark of ${limit}`}`);
   return 0;
@@ -710,13 +804,17 @@ function first(config, at, self, numbers) {
 
 // The baseline lowered to what still stands: an entry that is gone goes, one that moved is listed where it stands, a
 // number that fell is lowered, and nothing joins but what "grown" gives a reason for and, where the base is told,
-// what the base held already as this config reads its code (the check reads more than it did).
+// what the base held already as this config reads its code (the check reads more than it did); there, what stands is
+// read against what the old baseline covers against the base, as the check reads it (`thenOf`), so a mended entry an
+// earlier pull request left listed lists nothing in its place, and a baseline written twice is the same (#750, point 5).
 // What a reader the old baseline did not list finds joins it too: what stood when the check came to read it.
-function write(config, at, self, numbers, base, found) {
-  const old = parseBaseline(fs.readFileSync(notLinked(config.baseline), "utf8"), config.baseline, `write it again from what stands (delete it, then node ${self} ${at} --first), in a pull request the reviews read`);
+function write(config, at, self, numbers, base, found, named) {
+  const text = fs.readFileSync(notLinked(config.baseline), "utf8");
+  const old = parseBaseline(text, config.baseline, `write it again from what stands (delete it, then node ${self} ${at} --first), in a pull request the reviews read`);
   const reads = new Set(old.reads);
-  let joins = unclaimed(numbers, old.listed, config.marks).filter(id => reads.has(readerOf(id, found.readers)));
-  if (base && joins.length) joins = unclaimed(new Map(joins.map(id => [id, numbers.get(id)])), stoodAt({ standing: () => standingAt(base.name, config) }, config), config.marks);
+  const there = base && readAt(toldOf(base, named, config), config);
+  let joins = unclaimed(numbers, there ? thenOf(there, old, text, config).covers : old.listed, config.marks).filter(id => reads.has(readerOf(id, found.readers)));
+  if (there && joins.length) joins = unclaimedOf(joins, numbers, there.stood(), config.marks);
   joins = new Set(joins);
   const kept = new Map([...numbers].filter(([id]) => !joins.has(id) || said(old.grown, id)));
   const grown = Object.fromEntries(Object.entries(old.grown).filter(([id]) => kept.has(id) || id.startsWith("mark: ")));
@@ -759,7 +857,7 @@ function unwritten(self, base) {
   if (!base) { console.log(`ok   ${yet}, and there is no base to compare with: nothing was held`); return 0; }
   const now = standing(config), found = survey(now.texts, config, now.tests);
   const current = new Map([...found.entries].map(([id, e]) => [id, e.n]));
-  const news = unclaimed(current, stoodAt({ standing: () => standingAt(base.name, config) }, config), config.marks);
+  const news = unclaimed(current, readAt({ standing: () => standingAt(base.name, config) }, config).stood(), config.marks);
   const fail = byKind(news, found, current, config, `; a file of tests is not held to the marks once the project's own config names it under "tests"`);
   for (const line of fail.flat()) console.error(logged(line));
   if (fail.length) return 1;
@@ -777,10 +875,13 @@ function baseFiles(base, named) {
   return { at, config, baseline: baseline === null ? null : base.show(baseline) };
 }
 
+// The base as the verdict reads it: its name, its config and baseline as its own rules place them, and its files as
+// this config reads them, or (`own`) as another does.
+const toldOf = (base, named, config) => base && { name: base.name, ...baseFiles(base, named), standing: () => standingAt(base.name, config), own: other => standingAt(base.name, other) };
+
 function check(config, at, self, found, base, named) {
   if (!fs.existsSync(notLinked(config.baseline))) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} ${at} --first, and commit it`);
-  const v = verdict({ config, at, self, found, baselineText: fs.readFileSync(config.baseline, "utf8"),
-    base: base && { name: base.name, ...baseFiles(base, named), standing: () => standingAt(base.name, config) } });
+  const v = verdict({ config, at, self, found, baselineText: fs.readFileSync(config.baseline, "utf8"), base: toldOf(base, named, config) });
   for (const note of v.notes) console.log(`note ${logged(note)}`);
   const skipped = unreachedReaders().filter(r => [...found.readers.values()].includes(r));
   // (a job of the project's own that names the core's first install alone, written before the parser's came, is told to
@@ -802,17 +903,19 @@ function main(argv) {
   const base = baseOf(), at = configAt(named, self, base);
   if (at === null) return unwritten(self, base);
   const config = parseConfig(fs.readFileSync(at, "utf8"), at);
+  unchecked();
   if (rest[0] === "--suite") return suite(config, at, self, rest.slice(1));
   const command = { "--first": first, "--write": write }[rest[0] ?? ""];
   if (rest.length > 1 || (rest.length && !command)) refuse(`the check does not know ${rest.join(" ")}`, `run node ${self} [<config>] [--first | --write], or --suite <name> with -- <command> or --since <seconds>`);
   const now = standing(config), found = survey(now.texts, config, now.tests);
   // (a baseline is written only where every reader of a file the project holds could run: one that has no file to read
-  // is no reason to refuse, so a project with no C# writes its own with the parser's packages not installed)
+  // is no reason to refuse, so a project with no file a reader on the parser reads writes its own with the parser's
+  // packages not installed)
   const skipped = unreachedReaders().filter(r => [...found.readers.values()].includes(r));
   if (command && skipped.length) refuse(`the core's packages are not installed, so ${skipped.map(r => READERS[r]).join(", ")} cannot be read and a baseline written now would leave out what stands there`, `run node ${path.relative(process.cwd(), fileURLToPath(new URL("./install.mjs", import.meta.url)))}${unnamedReaders().length ? " all" : ""} until it installs them, then run this again`);
   if (!command) return check(config, at, self, found, base, named);
   if (command === write && !fs.existsSync(config.baseline)) refuse(`there is no baseline at ${config.baseline}`, `write the project's first with node ${self} ${at} --first, and commit it`);
-  return command(config, at, self, new Map([...found.entries].map(([id, e]) => [id, numbersOf(e.n)])), base, found);
+  return command(config, at, self, new Map([...found.entries].map(([id, e]) => [id, numbersOf(e.n)])), base, found, named);
 }
 
 if (started(import.meta.url)) {

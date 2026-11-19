@@ -1,8 +1,10 @@
 // The stalled lanes (roles/orchestrator.md, "A stalled lane"; core archive 200): run in a project's clone on every
 // wake of its orchestrator, it reads the repository's open pull requests (gh, page by page) and the time of each one's
 // newest commit, and prints those whose branch has had no push for longer than the given hours (HOURS unless --hours
-// says otherwise), oldest first, so that no session's word that a lane is "running" stands in for the clock. Pull requests
-// from a fork and Dependabot's own are no lanes and are left out. It prints one line when none has stalled, reads
+// says otherwise), oldest first, so that no session's word that a lane is "running" stands in for the clock, each
+// marked where its description holds no hand-off note (tasks/tools.md, "A change of tool loses nothing"; #306), the
+// line "Hand-off:" the fresh builder reads first. Pull requests from a fork and Dependabot's own are no lanes and are
+// left out. It prints one line when none has stalled, reads
 // only, posts nothing and always exits 0 where it could read: what to do with a stalled lane stays the orchestrator's.
 // gh and Node's own modules.
 //
@@ -11,6 +13,10 @@ import { execFileSync } from "node:child_process";
 import { REPO } from "./core-cost.mjs";
 import { timeOf } from "./moment.mjs";
 import { started } from "./started.mjs";
+
+// A description's hand-off note: a line that opens "Hand-off:", bare, bold, a heading or an item of a list.
+export const HAND_OFF = /^(?:[-*] |#{1,6} )?(?:\*\*)?Hand-off:/mu;
+export const handedOff = body => HAND_OFF.test(typeof body === "string" ? body : "");
 
 // How long a lane may go without a push before it counts as stalled, unless --hours says otherwise.
 export const HOURS = 3;
@@ -31,7 +37,7 @@ const plain = text => String(text ?? "").replace(/[\u0000-\u001f\u007f-\u009f]/g
 export function print(lanes, open, hours) {
   if (!lanes.length) return `No lane stalled: ${open} open, none without a push for over ${hours} h.`;
   return [`Stalled, no push for over ${hours} h: ${lanes.length} of ${open} open`,
-    ...lanes.map(l => `  #${l.number} ${plain(l.ref)}: ${l.waited.toFixed(1)} h since ${l.at} (${plain(l.title)})`)].join("\n");
+    ...lanes.map(l => `  #${l.number} ${plain(l.ref)}: ${l.waited.toFixed(1)} h since ${l.at} (${plain(l.title)})${handedOff(l.body) ? "" : "; no hand-off note"}`)].join("\n");
 }
 
 // The open pull requests of `repo`, through `api` (gh api's route and --jq, as main gives it), page by page, since a

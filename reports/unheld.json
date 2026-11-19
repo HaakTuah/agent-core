@@ -1,11 +1,6 @@
 {
   "about": "The rules of the floor and the modules that scripts/holders.mjs counts as having no holder, each with its proposal (AGENTS.md, \"Rules are pruned by their numbers\"; #545), worst first: a rule read at a role's start before one read on need. \"mark\": \"check\" (a check that never guesses could hold it, a maintained linter's rule first where one reads the breach), \"case\" (only a staged case could), \"move\" (to a module read on need), \"goes\" (kept in the archive with its reason, free to return), or \"describes\" (it binds no one, and holders.json should say so). \"by\": the queued issue that builds the check or case, or \"project\" for a check a project of that kind keeps; a check or case with none has no issue filed yet, since its upkeep does not pay yet or the owner's answer comes first; the owner decides moves and removals, a few at a time. A floor rule is never proposed to go. Sorted first on 17 November 2026; each pruning's session brings it up to date.",
   "proposals": {
-    "floor/security.md: The owner's yes in the PR": {
-      "mark": "check",
-      "by": "#549",
-      "why": "the PR's description check fails a PR that changes `floor/` or the review guidelines and quotes under \"The owner's word\" no words found word for word in its issue's text from the owner's account; whether the quote covers the change stays the design check's"
-    },
     "floor/security.md: Nothing is reviewed twice": {
       "mark": "case",
       "by": "#550",
@@ -158,11 +153,6 @@
       "mark": "case",
       "why": "a session misled by a comment that claims the owner's yes shows only in what it does; the case outsider could add such a comment and read that nothing of it is built"
     },
-    "roles/shared/review-guidelines.md: Every reviewer": {
-      "mark": "check",
-      "by": "#551",
-      "why": "a session's posted review is read for its score and its declared lines of blocking and other findings; what a finding says stays the reviewer's, so in part"
-    },
     "roles/shared/review-guidelines.md: A finding names its rule": {
       "mark": "move",
       "why": "no check can tell a finding that breaks a written rule from a plain bug; it binds when a finding is written: with \"A finding seen twice becomes a check\", to `tasks/reviews.md`"
@@ -279,11 +269,6 @@
       "by": "#556",
       "why": "CodeQL's unsafe-deserialization queries read a loader that builds the type a file names; rights and signing stay unread, so in part"
     },
-    "roles/shared/teams.md: The higher right gives the floor's yeses": {
-      "mark": "check",
-      "by": "#549",
-      "why": "the owner's-yes check reads the quoting account's permission from the host (`maintain` or `admin`), in the same step"
-    },
     "roles/shared/teams.md: Owners who disagree": {
       "mark": "goes",
       "why": "no project of the owner's is a team's yet; free to return with the first team"
@@ -294,7 +279,7 @@
     },
     "roles/shared/teams.md: An employer's rules come first": {
       "mark": "goes",
-      "why": "no project of the owner's is held by an employer; \"A project's own rules add to the core's\" covers its rule files"
+      "why": "no project of the owner's is built under an employer's rules yet; \"A project's own rules add to the core's\" covers its rule files"
     },
     "tasks/choices.md: a drop says whether it rests on a fact": {
       "mark": "case",
@@ -366,10 +351,10 @@
       "by": "#558",
       "why": "an audit's pull request that changes more than its report and the baseline's line of the audit is read exactly: the reader changed nothing"
     },
-    "tasks/cleaning.md: Eight questions, the same at every audit": {
+    "tasks/cleaning.md: Nine questions, the same at every audit": {
       "mark": "check",
       "by": "#558",
-      "why": "an audit's report with no answer to one of the eight questions, or an answer off the scale 0 to 3, is read exactly; the evidence stays the reader's"
+      "why": "an audit's report with no answer to one of the nine questions, or an answer off the scale 0 to 3, is read exactly; the evidence stays the reader's"
     },
     "tasks/cleaning.md: A limit on its own proposals": {
       "mark": "goes",
@@ -560,24 +545,9 @@
       "mark": "goes",
       "why": "scripts/code-review-wait.mjs and scripts/wait.mjs carry the waits; the rest is a step of the brief"
     },
-    "tasks/reviews.md: A late review is still read": {
-      "mark": "check",
-      "by": "#551",
-      "why": "a finding posted after its PR merged with no reply is read exactly from the host; the look lists it"
-    },
     "tasks/reviews.md: A reviewer, the security reviewer too, that gave the last three PRs it was asked on no review": {
       "mark": "goes",
       "why": "scripts/review-record.mjs counts answers; the rule only saves waiting"
-    },
-    "tasks/reviews.md: What a posted review declares": {
-      "mark": "check",
-      "by": "#551",
-      "why": "a comment opening \"Security review:\", \"Code review:\" or \"Design check:\" with no declared line of blocking or other findings is read exactly"
-    },
-    "tasks/reviews.md: The design check": {
-      "mark": "check",
-      "by": "#551",
-      "why": "a design-checked PR (one that changes `floor/`, `roles/`, `tasks/` or `tools/`) with no \"Design check:\" comment on its head is read exactly, in part"
     },
     "tasks/reviews.md: It goes down the lines": {
       "mark": "goes",

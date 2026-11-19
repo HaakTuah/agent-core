@@ -59,10 +59,16 @@ r = run(bare);
 ok(r.code === 1 && mended(r.out) && /^FAIL: the project has no SECURITY\.md yet/m.test(r.out) && !/^\s+at /m.test(r.out), "a project with no SECURITY.md yet is told so in a line, with no stack");
 // a floor rule and an archive item, read in the project's copy of the core's floor and archive
 const CORE = { "core/floor/security.md": "# The floor\n\n**1. Nothing secret.** Text.\n\n**8. Reviews.** As rule 1 says.\n", "core/floor/topics.md": "# Topics\n\n**10. Licences.** Text.\n",
-  "core/archive/instructions/items-001.md": "# Items\n\n1. **1 November 2026**. Words.\n\n2. **2 November 2026**. Words.\n" };
+  "core/archive/instructions/items-001.md": "# Items\n\n1. **1 November 2026**. Words.\n\n2. **2 November 2026**. Words.\n",
+  "core/archive/instructions/issue-744.md": "# Item 744\n\n#744. **19 November 2026**. Words.\n",
+  "core/archive/instructions/issue-744.2.md": "# Item 744.2\n\n#744.2. **19 November 2026**. Words.\n" };
 const cites = text => ({ ...FILES, ...CORE, "AGENTS.md": `${FILES["AGENTS.md"]}\n${text}\n` });
 r = run(cites("As floor rules 8 and 10 say, and floor rule 1 (core archive 1 and 2; core archive 1 to 2)."));
 ok(r.code === 0 && !/floor rule|core archive/.test(r.out.split("\n").filter(l => l.startsWith("note")).join("\n")), "a floor rule is read in the floor's files, by its bold number, and an archive item in the archive's item files");
+r = run(cites("As core archive #744 and #744.2 say, beside core archive 1."));
+ok(r.code === 0 && !/core archive/.test(r.out.split("\n").filter(l => l.startsWith("note")).join("\n")), "an archive item keyed by its issue, or a point of it, is read in its own file (#744)", r.out);
+r = run(cites("As core archive #745 says, and core archive 1 to #9999, and core archive 1 to 9999999999."));
+ok(r.code === 0 && ["#745", "1 to #9999", "1 to 9999999999"].every(a => r.out.includes(`core archive ${a}: no such item in the archive`)), "and a keyed item that is not there is listed, named by its key, as are a range with a key in it and one too wide to build, never read as nothing nor crashing", r.out);
 r = run(cites("As floor rule 19 says (core archive 999)."));
 ok(r.code === 0 && /note .*floor rule 19: no such rule in the floor/.test(r.out) && /note .*core archive 999: no such item in the archive/.test(r.out), "in a project, a floor rule or an archive item that is not there is listed, each named, and fails nothing: a sync never fails a project over a citation of its own");
 ok(/read and not found/.test(r.out) && !/\(2 in forms it cannot read/.test(r.out), "and it is listed as read and not found, not as a form it cannot read", r.out);
@@ -163,6 +169,9 @@ try {
   const nineteen = core("floor/security.md", "# The floor\n\n**1. Nothing secret.** As rule 19 says.\n");
   ok(nineteen.status === 1 && mended(nineteen.out) && /FAIL: a broken pointer: floor\/security\.md:3: rule 19: no such rule in the floor\. Mend: point it at/.test(nineteen.out), "and one that no floor file holds fails", nineteen.out);
   put("floor/security.md", "# The floor\n\n**1. Nothing secret.** Text.\n");
+  const manifest = core("tasks/a.md", "# A module\n\nRead when a pull request changes the path `core-manifest.md`, or `core-manifests.md`.\n");
+  ok(manifest.status === 1 && !/`core-manifest\.md`/.test(manifest.out) && /`core-manifests\.md` is no tracked file/.test(manifest.out), "in the core's own run a project's manifest, which only a project has, is not looked for; a name beside it still is", manifest.out);
+  put("tasks/a.md", "# A module\n\nNothing cited.\n");
   // (a file that points from a path the rules left is read too: the path it names and its import line)
   const points = core("modules/a.md", "# Moved: A module\n\n[`tasks/a.md`](../tasks/a.md) holds these rules now: read it whole.\n\n@../tasks/a.md\n");
   ok(points.status === 0, "in the core's own run a file at a path the rules left is read: the path it names and its import line, each leading to a file", points.out);

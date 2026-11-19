@@ -1,5 +1,5 @@
-// Tests the shape check's readers of C# and Python (scripts/shape-csharp.mjs and scripts/shape-python.mjs) on files
-// made for them: the functions each finds, with their lines, depth and branch points; what a brace or a keyword in a
+// Tests the shape check's readers of C# and Python (scripts/shape-csharp.mjs and scripts/shape-python.mjs, their
+// functions on the parser: csharp-functions.mjs and python-functions.mjs) on files made for them: the functions each finds, with their lines, depth and branch points; what a brace or a keyword in a
 // string or a comment is; what each file imports and where it leads; and the packages a project declares. The check's
 // own use of them, and of the readers of JSX and of the shared space: shape-test.mjs. Run by the core's tests workflow
 // (.github/workflows/tests.yml).
@@ -9,6 +9,7 @@ import { Worker } from "node:worker_threads";
 import { csTokens, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "../scripts/shape-csharp.mjs";
 import { STDLIB, logicalLines, pythonPackages, readPython, resolvePython } from "../scripts/shape-python.mjs";
 import { ParserFailed, inParser } from "../scripts/parser.mjs";
+import { LARGEST } from "../scripts/tree-walk.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -114,6 +115,20 @@ ok(same(py.imports.map(i => `${".".repeat(i.level)}${i.module} [${i.names}]${i.d
   "Python: its imports are read, relative ones with their level; one in a def runs when it is called, one under TYPE_CHECKING takes types alone", JSON.stringify(py.imports));
 ok(same(logicalLines("a = (1,\n  2)\nb = 3 \\\n  + 4\n\n# c\n    \n").map(l => `${l.line}-${l.end}`), ["1-2", "3-4"]), "Python: lines in brackets and after a \\ are one logical line; blank and comment lines are none");
 ok(same(shown(readPython("def f():\n\tif a:\n\t\treturn '''x\nif y:\n  z'''\n\treturn 1\n").functions), ["f:1:6:1:1"]), "Python: a tab indents to the next multiple of 8, and a string's lines open no block");
+// Python's functions on the parser (#530, item 6): where the lexer misread, the grammar reads as the definition says.
+const pyMisread = "def a(x):\n    return x is ... or x\n\ndef b(value):\n    case = value[0]\n    if case:\n        return case.upper()\n";
+ok(same(shown(readPython(pyMisread).functions), ["a:1:2:0:1", "b:4:4:1:1"]), "Python: an or after ... is a branch, and case used as a name at a line's start is none", shown(readPython(pyMisread).functions));
+const pyEdges = "@pick(a or b)\ndef f(x=y and z) -> int:\n    if x:\n        return [i for i in x if i]  # c\n    # trailing\n\ndef g(t):\n    return f\"{t:=^80}\" if t else ''\nn = lambda: a if b else c\n";
+ok(same(shown(readPython(pyEdges).functions), ["f:2:3:1:3", "g:7:2:0:1"]),
+  "Python: a decorator's and a default's branches count where the function stands, a comment after the body is none of its lines, and a format's fill of = (which the grammar reads as :=) leaves the functions told", shown(readPython(pyEdges).functions));
+ok(readPython("def f():\n    return f\"{t:=or 80}\"\n").functions === null && readPython("def f(:\n    pass\n").functions === null,
+  "Python: a file the grammar cannot read whole, an error in an f-string's { } that holds a word among them, has no functions told");
+const pySized = n => `${"x = 1\n".repeat(n)}def f():\n    pass\n`, pyUnder = Math.floor(LARGEST / 7);
+ok(same(shown(readPython(pySized(pyUnder)).functions), [`f:${pyUnder + 1}:2:0:0`]) && readPython(pySized(LARGEST / 5)).functions === null,
+  "Python: a file past the largest the grammar is given is lost unread, and one under it is read whole");
+const pyStarted = Date.now();
+const pyHostile = [`def f():\n    x = ${"([{".repeat(280000)}\n`, `def f():\n    ${"['".repeat(300000)}\n`].map(t => readPython(t).functions);
+ok(pyHostile.every(f => f === null) && Date.now() - pyStarted < 10000, `Python: brackets and strings that never close are lost within the grammar's budget (${Date.now() - pyStarted} ms)`);
 const inline = readPython("import a; import b\nif sys.platform == 'win32': import winreg\nif TYPE_CHECKING: from t import T\ndef f(): import lazy\n");
 ok(same(inline.imports.map(i => `${i.module}${i.dynamic ? " dynamic" : ""}${i.types ? " types" : ""}`), ["a", "b", "winreg", "t types", "lazy dynamic"]), "Python: imports after a ; and in a one-line suite are read, with where they stand", JSON.stringify(inline.imports));
 const files = new Set(["pkg/__init__.py", "pkg/a/m.py", "pkg/a/x.py", "pkg/mod.py", "src/lib/util.py", "tools/helpers.py", "app/json.py", "two/dup.py", "three/dup.py"]);
@@ -444,6 +459,10 @@ ok(same(shown(readCsharp(outside).functions), ["(anonymous):2:3:2:2", "C:4:1:0:0
 // review).
 const newer = `class A\n{\n    void Long()\n    {\n${"        x++;\n".repeat(100)}        a?.b += 1;\n    }\n}\n`;
 ok(readCsharp(newer).functions === null, "C#: a file the grammar cannot read whole has no functions told, so that the check counts it and says so");
+// (and one past the largest a reader gives its grammar, lost unread: its tree's memory is what a generated file costs)
+const sized = n => `class A { int[] W = { ${Array.from({ length: n }, (_, k) => k).join(", ")} }; void M() { } }\n`;
+ok(sized(LARGEST / 9).length <= LARGEST && same(shown(readCsharp(sized(LARGEST / 9)).functions), ["M:1:1:0:0"]) && sized(LARGEST / 6).length > LARGEST && readCsharp(sized(LARGEST / 6)).functions === null,
+  "C#: a file past the largest the grammar is given is lost unread, and one under it is read whole");
 // The parser's thread: a call that fails there is told as the file's ("read"), and the next call gets its own answer,
 // never an earlier one's.
 let failedAs = null;
