@@ -181,7 +181,7 @@ ok(ownCall.length === 1 && ownCall[0].uses === "./.github/workflows/security-rev
 
 // ---- when the core's tests run (#733, points 2 to 4 and 6) ----
 // A pull request's run starts once it is ready, never on a draft, on Linux alone; main is tested on Linux at its newest
-// commit, each run giving way to the next merge's; Windows once an hour at main's newest commit where it moved, with the
+// commit, a run that has started finishing and only a waiting one giving way to the next merge's (#810); Windows once an hour at main's newest commit where it moved, with the
 // tests that reach the network on both; both in full on a start by hand, which a release waits on.
 {
   const tests = parseYaml(fs.readFileSync(path.join(wfDir, "tests.yml"), "utf8"));
