@@ -108,6 +108,7 @@
     "tasks/tests.md: A test keeps its place by one of three": "audit",
     "tasks/tests.md: The tests have a time mark, which never gets worse": "check: scripts/shape.mjs",
     "tasks/tests.md: A test that fails for no reason is mended or removed, never retried in silence": "audit",
+    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": "check: scripts/look.mjs, in part",
     "tasks/tests.md: A test opens a screen only where the screen is what it guards": "check: scripts/shape.mjs",
     "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check: scripts/shape.mjs",
     "tasks/tests.md: A test asserts no time measured on a real clock": "audit",
@@ -373,6 +374,7 @@
     "tasks/hosts.md: One layer knows no host": [236],
     "tasks/hosts.md: Proven host by host": [236],
     "tasks/hosts.md: Where users get a release, a pull request merges on its own green checks": [261],
+    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": [262],
     "tasks/hosts.md: The merge line follows the host": [259],
     "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": [259],
     "tasks/planning.md": [243],
@@ -454,6 +456,7 @@
     "tasks/hosts.md: Where users get a release, a pull request merges on its own green checks": "findings; outcome: fast",
     "tasks/hosts.md: The merge line follows the host": "findings; outcome: fast",
     "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": "findings; outcome: fast",
-    "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check fires; outcome: fast"
+    "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check fires; outcome: fast",
+    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": "check fires; outcome: fast"
   }
 }

@@ -91,10 +91,8 @@ sessions.
   own choice. Where the owner sets a pace, the orchestrator follows it: said to it in person, for now; written under
   "Pace" in the project's manifest, until changed there: how many lanes run at once, which model takes which kind of
   line, how much of a usage window is left free for the owner's own use.
-  - The orchestrator's provider keeps the work going: where builders on it empty
-    its allowance, the orchestrator stops too and nothing restarts what stalled, so builders are picked as
-    "The builders", above, says. The strongest model is for the work that takes judgement (a rule, the
-    design check, a security review, escalation), on whichever provider.
+  - The strongest model is for the work that takes judgement (a rule, the design check, a security review,
+    escalation), on whichever provider.
   - It does not mean a session stands idle while the owner's allowance goes unused.
   - Reason: no session decides by itself to stand idle, and the pace of the owner's usage is the owner's to set.
   - Held by nothing yet: the usage left is no mark a check reads.

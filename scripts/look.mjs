@@ -12,6 +12,9 @@
 //     with no push for longer than stalled.mjs's hours: draft or ready, its checks, what its description says it waits
 //     on (pr-description.mjs) and for how long, a draft with green checks first; and one whose line and label
 //     needs-owner disagree.
+//   - Checks failed on the default branch's newest commit, as GitHub lists that commit's latest check runs, so that
+//     a failure no session saw is still shown (#542; tasks/tests.md, "A check that fails on the default branch has an
+//     owner").
 //   - Steps of a release not done (steps.mjs), in a project.
 //   - Labels and openers to mend (labels.mjs).
 //   - The scheduled look missed a run: where its record shows no run for longer than MISSED hours. The look never
@@ -71,6 +74,7 @@ export const TITLES = {
   labels: "Labels and openers to mend",
   missed: "The scheduled look missed a run",
   stale: "Packages gone stale",
+  red: "Checks failed on the default branch",
 };
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
 // issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over
@@ -252,6 +256,34 @@ function idleFinding(repo, add) {
   }
 }
 
+// The conclusions of a check run that count as failed on the default branch. A cancelled run is left out: there a newer
+// merge's run takes its place (tasks/tests.md, "The default branch is tested at its newest commit").
+export const FAILED = ["failure", "timed_out", "startup_failure", "action_required"];
+
+// The red issue's body, from the latest check runs of the default branch's newest commit (GitHub's "latest" filter, so
+// a job run again and passed counts as passed): each that failed, its name as data and its address where it is
+// GitHub's own; null where none failed.
+export function redBody(runs, branch) {
+  const red = runs.filter(r => r?.status === "completed" && FAILED.includes(r.conclusion));
+  if (!red.length) return null;
+  const sha = String(red[0].head_sha ?? "");
+  const at = /^[0-9a-f]{40}$/u.test(sha) ? `, \`${sha.slice(0, 7)}\`` : "";
+  const link = r => (/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(?:actions\/runs\/\d+\/job\/\d+|runs\/\d+)$/u.test(String(r.html_url ?? "")) ? ` (${r.html_url})` : "");
+  return [`Checks failed on the newest commit of \`${plain(branch).replace(/`/g, "'")}\`${at} (\`core/scripts/look.mjs\`). Each has an owner, who reads its mend and runs it again once where the mend says so, as \`core/tasks/tests.md\`, "A check that fails on the default branch has an owner", says. This closes once none of that branch's newest commit has failed.`,
+    "", ...red.map(r => `- \`${plain(r.name).replace(/`/g, "'")}\`: ${r.conclusion}${link(r)}.`)].join("\n");
+}
+
+// The checks failed on the default branch's newest commit, through `add`, or why they could not be read.
+function redFinding(repo, add) {
+  try {
+    const branch = JSON.parse(ghApi(`repos/${repo}`)).default_branch;
+    if (typeof branch !== "string" || !branch) throw new Error("no default branch");
+    add(TITLES.red, redBody(pagesOf(`repos/${repo}/commits/${encodeURIComponent(branch)}/check-runs`, (...a) => JSON.stringify(JSON.parse(ghApi(...a)).check_runs ?? [])), branch));
+  } catch {
+    add(TITLES.red, null, `the default branch's checks could not be read: the token here may not read them. A project's daily job reads them where it calls the core's \`look.yml\` with \`checks: read\`, as \`core/setup/template/workflows/look.yml.tmpl\` has it`);
+  }
+}
+
 // The packages the project holds that have gone stale (held.mjs's --issue): its body, null where none has, or unread
 // where they could not be looked up.
 export function staleFinding(run = () => spawnSync(process.execPath, [fileURLToPath(new URL("./held.mjs", import.meta.url)), "--issue"], { encoding: "utf8", timeout: 180000, maxBuffer: 1 << 24 })) {
@@ -267,6 +299,8 @@ function findingsOf({ repo, manifest, owner, at }, reach, last) {
   const add = (title, what, unread = null) => findings.push({ title, what, unread });
   // pull requests that stand idle
   idleFinding(repo, add);
+  // checks failed on the default branch
+  redFinding(repo, add);
   // steps of a release not done, in a project
   let stepsLeft = null;
   if (manifest !== null) {
