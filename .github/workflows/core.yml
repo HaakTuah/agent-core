@@ -15,8 +15,8 @@
 # A project calls it (workflow_call) on every pull request and push to main, docs-only changes included, pinned to a
 # full commit SHA. Its own check reads only, with no secret: it fetches this public repository at the pin it reads, which
 # must be a full commit SHA before it is used, and runs nothing from either repository. Its own shell is tested in the
-# core before any project runs it: scripts/core-yml-test.mjs runs this job on scratch projects, and
-# scripts/pure-sync-test.mjs on every way a copy can differ.
+# core before any project runs it: tests/core-yml-test.mjs runs this job on scratch projects, and
+# tests/pure-sync-test.mjs on every way a copy can differ.
 # Given its inputs, the same job then runs the core's other checks that need no secret, as steps of its own (#376):
 # copies.yml's (copies, sizes), pr-description.yml's (description, parts), signatures.yml's (signatures) and nuget.yml's
 # (nuget, advisory), each through the copy's scripts/checks.mjs, which holds their steps and says what each holds, as
@@ -218,11 +218,11 @@ jobs:
           # (the copy a folder, and entry by entry as the core's scripts/copy-tree.mjs compares, which says why; each path
           # quoted as git quotes it, so none prints raw or passes for two entries)
           entries() { git -C "$1" -c core.quotePath=true ls-tree -r --full-tree "$2" | sed 's/^100755 blob /100644 blob /'; }
-          # (the pin's tree without each top-level entry its .gitattributes keeps in the core, reports and words, built
-          # as scripts/copy-tree.mjs builds it, so that no name inside such a folder, however git quotes it, is taken for
-          # part of the copy)
+          # (the pin's tree without each top-level entry its .gitattributes keeps in the core, reports, words and tests,
+          # built as scripts/copy-tree.mjs builds it, from the same list, so that no name inside such a folder, however
+          # git quotes it, is taken for part of the copy)
           tree=$PIN
-          for kept in reports words; do
+          for kept in reports words tests; do
             if grep -q -s -x "/$kept export-ignore" .core-at-pin/.gitattributes; then
               # (the whole entry matched, its name after the first tab exactly that folder's; grep's "none left" is no
               # fault, any other failure is)
@@ -320,6 +320,9 @@ jobs:
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' }}
         with:
           node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
+      - name: The core's packages, installed from its lock file for the core's checks (#654)
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' }}
+        run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then node "${CORE_AT}scripts/install.mjs"; fi
       - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.copies != '' }}
         timeout-minutes: 5

@@ -9,6 +9,7 @@
 //       the last n merged pull requests (30 where none is given), through gh. Reads only; gh and Node's own modules.
 import fs from "node:fs";
 import { aCommit, aRepository } from "./guards.mjs";
+import { timeOf } from "./moment.mjs";
 import { ghApi } from "./labels.mjs";
 import { notLinked, parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
@@ -20,9 +21,9 @@ export const COUNT = 30;
 // The seconds the checks of one push took: from the first one's start to the last one's end, of those that ran to an
 // end (one skipped or not started counts nothing); null where none did.
 export function waited(checks) {
-  const ran = checks.filter(c => c.started_at && c.completed_at && c.conclusion !== "skipped");
+  const ran = checks.filter(c => timeOf(c?.started_at) !== null && timeOf(c.completed_at) !== null && c.conclusion !== "skipped");
   if (!ran.length) return null;
-  const from = Math.min(...ran.map(c => Date.parse(c.started_at))), to = Math.max(...ran.map(c => Date.parse(c.completed_at)));
+  const from = Math.min(...ran.map(c => timeOf(c.started_at))), to = Math.max(...ran.map(c => timeOf(c.completed_at)));
   return Math.max(0, Math.round((to - from) / 1000));
 }
 

@@ -15,7 +15,7 @@ runs the change's own code (its copy's scripts, its packages' restore), as its t
 sign-in or key is held but the host's own for that pipeline. It does not mean that a check of the host's own runs there
 (a review app's status, the dependency review, code scanning, a job started by a schedule): it names each and runs none,
 and the host's part says what stands in. Reason: every check was a GitHub workflow, so a project on another host had
-none. Held by `scripts/check-test.mjs`, in `.github/workflows/tests.yml`, which fails where a workflow the starter kit
+none. Held by `tests/check-test.mjs`, in `.github/workflows/tests.yml`, which fails where a workflow the starter kit
 calls is neither run by it nor named the host's own.
 
 **Each host's part:** a thin part for what is the host's own: how a job is started on a schedule, how

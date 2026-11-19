@@ -219,12 +219,13 @@ const RUN = {
   },
 
   // npm's own install from the lock file and its own check of the registry's signatures (.github/workflows/signatures.yml
-  // says what it holds and why), where the change touches what it reads.
+  // says what it holds and why), where the change touches what it reads: never the core's own package list, lock file
+  // and .npmrc in its copy's .packages/, which the core's own repository checks (#654), and which a sync alone changes.
   signatures(o, { coreAt, check }) {
     const dir = o.signatures || ".";
     console.log("== Does the pull request change what this check reads?");
     const look = changes(process.env.BASE_SHA || baseCommit(o.base), [":(glob)**/package.json", ":(glob)**/package-lock.json", ":(glob)**/npm-shrinkwrap.json",
-      ":(glob)**/.npmrc", `${coreAt}.node-version`, ".github/workflows/signatures.yml", ...caller()],
+      ":(glob)**/.npmrc", `${coreAt}.node-version`, ".github/workflows/signatures.yml", ...caller(), ...["package.json", "package-lock.json", ".npmrc"].map(f => `:(exclude)${coreAt}.packages/${f}`)],
     "No package list, lock file, .npmrc, Node version or calling workflow changed: nothing to verify.");
     if (!look) return;
     if (!check("Install from the lock file, from the registry alone, running no package's install script",

@@ -60,8 +60,16 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 
 1. **An exact copy under `core/`** (or the folder the manifest's `Core:` line names, or carried by a library of the
    project's: point 8), pinned to one commit of this repository and never edited by hand: everything but
-   `reports/`, the dated reports of this repository's own changes, and `words/`, the owner's own words behind the
-   archive, which stay here alone (`.gitattributes`; core archive 165; #252). A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
+   `reports/`, the dated reports of this repository's own changes, `words/`, the owner's own words behind the
+   archive, and `tests/`, the tests of the core's own scripts, which stay here alone (`.gitattributes`; core archive
+   165; #252; #527). The packages of other publishers its scripts run are never in the copy: its
+   `.packages/package-lock.json` names each, at one exact version, and `core/scripts/install.mjs` installs them from
+   npm's registry into `core/.packages/node_modules/`, which the copy's `.gitignore` keeps out of git (a dot folder, so
+   that no workspace pattern of the project's own package list takes the copy's package list in): the sync runs it after
+   it writes the copy, a session's start runs npm's own install where what is installed is not what the lock file names
+   and the copy's npm files are `main`'s own (the work-saved hook), and each of the core's workflows a project calls
+   runs it before its checks; a check that finds a package missing says it did not run, with that command (#654). Its
+   devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`. A pure sync (only the
    copy and its pins, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
@@ -102,18 +110,18 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    the project takes changed between the two, the project stays at its pin: `scripts/sync.mjs` says so and changes
    nothing, and `scripts/core-moved.mjs` opens no issue (`staysAt` in `scripts/releases.mjs`). What it takes is every
    file of the core but what never matters to it, a list exact and short: a module its manifest's "Modules:" line does
-   not name and its "Not taken:" line does, the tests of the core's own scripts (`scripts/*-test.mjs`, which nothing a
-   project runs names), the core's own issue forms (`.github/ISSUE_TEMPLATE/`), and the core's own files that no project
+   not name and its "Not taken:" line does, the tests of the core's own scripts (`tests/`, which the copy leaves out,
+   and `scripts/*-test.mjs`, where releases before #527 held them), the core's own issue forms (`.github/ISSUE_TEMPLATE/`), and the core's own files that no project
    reads, each named (#342): its queue, `QUEUE.md`, and the workflows no project can call, `own-description.yml`,
    `own-look.yml`, `own-security-review.yml`, `release.yml`, `size.yml` and `tests.yml` under `.github/workflows/`
    (`OWN_FILES` in `scripts/releases.mjs`). In doubt it syncs: a change that cannot be read is a change, and a module is
    taken where the list forgot it or the line says "all" or cannot be read. One release at most is passed over, since
-   the upgrade test proves a sync from each of the last two (`scripts/upgrade-test.mjs`): at the next release the
+   the upgrade test proves a sync from each of the last two (`tests/upgrade-test.mjs`): at the next release the
    project syncs, whatever that one changes. It does not mean the copy is ever partial (it stays whole and exact at its
    pin, which `core.yml` checks as before), nor that a project following `main` waits, nor that a full SHA is refused.
    Reason: every release moved every pin, and a sync pull request's checks are paid minutes in a private repository, for
-   a release that may bring it nothing. Held by `scripts/releases-test.mjs`, `scripts/core-moved-test.mjs` and
-   `scripts/upgrade-test.mjs`.
+   a release that may bring it nothing. Held by `tests/releases-test.mjs`, `tests/core-moved-test.mjs` and
+   `tests/upgrade-test.mjs`.
 2. **A manifest,** `core-manifest.md` at its root (format below): the pin, the modules it takes, its names for the
    core's words, and a row for each slot it fills otherwise than the core reads it or leaves it ("Slots"). Every
    session reads it at the start. A list of modules does not grow by itself: when the core gains a module, a note says
@@ -145,10 +153,16 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      that ships with its notice; beside it `exact-versions.mjs`, which reads the same config's lockfiles and fails a
      dependency that is not, letter for letter, the one version its lockfile installs: floor rule 7; `lookup.mjs`,
      which asks npm's registry of each package new to the lockfiles, as floor topic 15's "A new one is looked up in
-     its registry" says; and
-     `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents that
-     the config's "agentTools" does not list, with its publisher and version, a plug-in or tool server at the version its
-     configuration pins where it pins one: floor topic 15). A package or
+     its registry" says, and fails a lock entry a pull request brings from anywhere but npm's registry or with no
+     integrity value: floor rule 7; the licence check also holds each `.npmrc` of "ignoreScriptsIn" to the week's wait
+     (`min-release-age=7`), and a program a file downloads by address to a version and a checksum, failing only what
+     a pull request adds and reporting what its base held: floor rule 7; and
+     `agent-tools.mjs`, which fails a plug-in, tool server, skill or hook the project configures for its agents, in
+     Claude Code's, Kiro's or Codex's files, whatever their letter case or git stores at them, that the config's
+     "agentTools" does not list, with its publisher and version, a plug-in or tool server at the version its
+     configuration pins where it pins one: floor topic 15; and a hook, or a command a tool runs by itself from its
+     settings or a skill's, subagent's or command's frontmatter, or a Codex model provider, not in the starter kit's form, which alone shows it runs its copy on `main`, or a variable a tool's settings set but those it keeps, any other of
+     which may change how the programs a hook runs start: floor rule 3). A package or
      an audit entry off its list that the owner wants anyway is named in the config's "accepted" with the owner's
      words (`licence-yes.mjs`; floor rule 10), and passes only as it was accepted: that version, that licence, a
      tool or what ships.
@@ -195,7 +209,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      `codeql.yml`, `delete-merged-branches.yml`, `pr-description.yml` and, if it has versions Dependabot cannot see,
      `versions.yml` keep their triggers and call the core's of the same name
      (`uses: HaakTuah/agent-core/.github/workflows/<name>.yml@<full commit SHA>`), each with the triggers, the
-     permissions and the inputs its template has (`setup/template/workflows/`, which `scripts/init-test.mjs` holds to
+     permissions and the inputs its template has (`setup/template/workflows/`, which `tests/init-test.mjs` holds to
      the core's workflows; `versions.yml` has none yet).
    - **The core's checks without a secret may run as one job** (#376): `core.yml`, given its inputs, runs after its own
      check of the copy the copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records'
@@ -212,7 +226,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      statuses, and write issues), calling the core's `look.yml`: it keeps one issue open for the owner while the core has
      moved past the project's pin (point 1; `core/scripts/core-moved.mjs`), then runs the scheduled look
      (`core/scripts/look.mjs`, `roles/orchestrator.md`), and opens no pull request, since one a workflow opens gets
-     no checks. A project whose daily job still calls the core's `core-moved.yml` runs both there too, the look
+     no checks. Once a month, with the state report, the look asks the registries again of every package the project
+     holds (`core/scripts/held.mjs`) and keeps the issue "Packages gone stale". A project whose daily job still calls the core's `core-moved.yml` runs both there too, the look
      reading no pull request, check or status with that job's token, until it moves to the template's. A builder
      session started with no orchestrator asks the same at its start
      (`core/scripts/core-moved.mjs`, with `--dry`) and syncs first where the core has moved ("Sessions" in
@@ -223,11 +238,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      project of each of the last two releases synced to the change (`AGENTS.md`, "Nothing locks a
      project"): so the project's own suites run on one only for what they take from the copy (all of them where they run
      on its Node version and `core/.node-version` changed; those that read its scripts for a change under
-     `core/scripts/`), never for the rest of the copy, which `core.yml` checks, nor for a workflow in which only such a
-     pin moved (`tasks/tests.md`, "A pull request runs the tests its change can reach"; core archive 167). A path filter
-     sees which files changed, not what changed in them, so a suite filtered by `paths-ignore` names there each file
-     that holds only calls to the core's workflows by its exact path (`core/scripts/steps.mjs` reports one that does
-     not).
+     `core/scripts/` or `core/.packages/package-lock.json`, whose packages those scripts run), never for the rest of the
+     copy, which `core.yml` checks, nor for a workflow in which only such a pin moved (`tasks/tests.md`, "A pull request
+     runs the tests its change can reach"; core archive 167). A path filter sees which files changed, not what changed
+     in them, so a suite filtered by `paths-ignore` names there each file that holds only calls to the core's workflows
+     by its exact path (`core/scripts/steps.mjs` reports one that does not).
    - **Dependabot:** its `.github/dependabot.yml` ignores `HaakTuah/agent-core*`.
    - **Every action a workflow uses,** GitHub's own included, is pinned to a full commit SHA with its version in a
      comment after it, which Dependabot keeps current: a security fix in an action reaches a workflow by that weekly
@@ -548,7 +563,11 @@ changed or not, passes on with it, marking the files they changed (#257; core ar
 repository, the floor, the modules, the scripts and workflows, the starter kit and the rule files, but `archive/`,
 `words/` and `reports/`: the owner's decisions, own words and records, all rights reserved. Both files travel in each
 project's copy under `core/`, and they license the core alone: a project keeps the terms its own owner gives its own work, and nothing here
-adds or changes them (floor rule 10). Nothing of the core ships, so no project's audit or notices file asks for it.
+adds or changes them (floor rule 10). Nor do they cover the packages of other publishers the scripts run, each under its
+own licence: none is carried, each an entry of `.packages/package-lock.json`, installed from npm's registry into
+`.packages/node_modules/`, which git does not track (`scripts/install.mjs`; #654), and held to floor rule 10's list by
+the core's own licence check, which reads that lock file. Nothing of the core ships, so no project's audit or notices
+file asks for it.
 `NOTICE` names the work, with its other name, which renames nothing, and as the holder the account in the core's
 address, until the core's owner types another name there by hand (floor rule 11).
 

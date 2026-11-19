@@ -1,0 +1,133 @@
+// Tests of scripts/checks.mjs, the one script that holds the steps of the core's pull-request checks without a secret
+// (#376), on a scratch project whose copy of the core holds checks.mjs as it stands here and a stand-in for each check
+// it runs, which prints what it was given and fails where the project says: each check runs even after one before it
+// failed, with its base and its file; its failures and its own say their mend; with no part named, it runs what the
+// project's calls to the core's workflows run, folded into core.yml or each in its own; and the package checks look
+// first, running nothing where nothing they read changed. What each check does is its own test's. Git, bash and Node's
+// own modules.
+//
+//   node tests/checks-test.mjs
+import { execFileSync, spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { CORE } from "../scripts/core-address.mjs";
+import { COPIES } from "../scripts/checks.mjs";
+import { mended } from "../scripts/mend.mjs";
+import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+
+const { ok, done } = tally();
+const tmp = scratchDir("checks-test-");
+const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(GIT_|GITHUB_|RUNNER_|PR_|BASE_SHA$|CALLER$)|TOKEN|SECRET/i.test(name)));
+Object.assign(env, { GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" });
+const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+
+// (a stand-in prints its name, its arguments and the base it was given, and fails where the project's fails.txt names it)
+const STAND_IN = name => `import fs from "node:fs";\nconst base = Object.entries(process.env).filter(([k]) => /_BASE$|^BASE_SHA$|^PR_BODY$/.test(k)).map(([k, v]) => \`\${k}=\${v}\`).join(",");\nconsole.log(\`ran ${name} [\${process.argv.slice(2).join(" ")}] \${base}\`);\nconst failing = fs.existsSync("fails.txt") ? fs.readFileSync("fails.txt", "utf8") : "";\nif (failing.includes("${name}")) { console.log("FAIL ${name} failed here. Mend: mend it."); process.exit(1); }\n`;
+const CALLS = with_ => `name: core\non:\n  pull_request:\njobs:\n  core:\n    uses: ${CORE}/.github/workflows/core.yml@${"a".repeat(40)}\n${with_}`;
+let n = 0;
+function project(files = {}) {
+  const dir = path.join(tmp, `p${++n}`);
+  fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
+  for (const f of ["checks.mjs", "core-address.mjs", "core-path.mjs", "mend.mjs", "started.mjs", "workflow-run.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
+  for (const [, script] of COPIES) fs.writeFileSync(path.join(dir, "core/scripts", script), STAND_IN(script));
+  for (const s of ["pr-description.mjs", "licence-installed.mjs", "nuget.mjs", "nuget-fetch.mjs", "lookup.mjs"]) fs.writeFileSync(path.join(dir, "core/scripts", s), STAND_IN(s));
+  fs.writeFileSync(path.join(dir, "core/scripts/nuget-look.sh"), 'echo "ran nuget-look.sh BASE=$BASE CONFIG=$CONFIG"\necho "run=false" >> "$GITHUB_OUTPUT"\n');
+  fs.writeFileSync(path.join(dir, "core/.node-version"), "22\n");
+  git(dir, "init", "-q", "-b", "main");
+  for (const [f, text] of Object.entries({ "README.md": "# p\n", ...files })) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "base");
+  return dir;
+}
+const run = (dir, args, extra = {}) => {
+  const r = spawnSync(process.execPath, ["core/scripts/checks.mjs", ...args], { cwd: dir, env: { ...env, ...extra }, encoding: "utf8" });
+  return { status: r.status, out: `${r.stdout}${r.stderr}` };
+};
+
+// the part copies: each check in turn, a failure not stopping the rest, each given its base and its file
+{
+  const dir = project({ "fails.txt": "pointers.mjs" });
+  const head = git(dir, "rev-parse", "HEAD");
+  const r = run(dir, ["copies", "--copies", "checks/copies.json", "--sizes", "checks/sizes.json", "--base", head]);
+  const ran = [...r.out.matchAll(/^ran (\S+)/gm)].map(m => m[1]);
+  ok(r.status === 1 && ran.join() === COPIES.map(([, s]) => s).join() && /^ran copies\.mjs \[checks\/copies\.json\] COPIES_BASE=[0-9a-f]{40}/m.test(r.out) && /^ran reading-size\.mjs \[checks\/sizes\.json\] SIZES_BASE=/m.test(r.out)
+    && /^ran shape\.mjs \[\] SHAPE_BASE=[0-9a-f]{40}/m.test(r.out) && /^ran choices\.mjs \[\] CHOICES_BASE=[0-9a-f]{40}/m.test(r.out) && /1 of 9 checks failed/.test(r.out) && mended(r.out),
+  "copies: each of its eight checks runs, in order, the one that fails not stopping the rest, each with its base and its file; it fails, and says each failure's mend", r.out);
+  const none = run(dir, ["copies", "--copies", "c.json", "--sizes", "s.json", "--base", ""]);
+  ok(/^ran copies\.mjs \[c\.json\] COPIES_BASE=(,|$)/m.test(none.out), "with the base given empty, as on a push to main, each check is given none", none.out);
+}
+// its own failures say their mend
+{
+  const dir = project();
+  for (const [what, args] of [["a part or option it does not know", ["--fast"]], ["an option with no value", ["copies", "--copies"]], ["copies without its marks", ["copies", "--copies", "c.json"]],
+    ["a description with nothing to read", ["description"]], ["a base that is no commit", ["copies", "--copies", "c", "--sizes", "s", "--base", "nowhere"]],
+    ["no part, and no call to the core's workflows", []]]) {
+    const r = run(dir, args);
+    ok(r.status === 1 && mended(r.out), `${what}: it fails, saying its mend`, r.out);
+  }
+}
+// a base that cannot be had fails as a check of its own, and every check of the part still runs
+{
+  const dir = project();
+  const r = run(dir, ["copies", "--copies", "c.json", "--sizes", "s.json", "--base", "origin/nowhere"]);
+  ok(r.status === 1 && [...r.out.matchAll(/^ran (\S+)/gm)].length === COPIES.length && /^FAIL --base origin\/nowhere is no commit here/m.test(r.out) && mended(r.out),
+    "a base that cannot be fetched fails as a check of its own, saying its mend, and each of the seven checks still runs", r.out);
+}
+// with no part named: what the project's calls run, folded into core.yml, or each in its own
+{
+  const folded = project({ ".github/workflows/core.yml": CALLS("    with:\n      copies: checks/copies.json\n      sizes: checks/sizes.json\n      description: true\n      nuget: checks/licences.json\n") });
+  const r = run(folded, []);
+  ok(r.status === 0 && /^ran copies\.mjs \[checks\/copies\.json\]/m.test(r.out) && /^ran nuget-look\.sh BASE= CONFIG=checks\/licences\.json$/m.test(r.out) && !/^ran pr-description/m.test(r.out) && /description check is not run/.test(r.out),
+    "core.yml's inputs: the copies checks with its files, and the NuGet check's look with its config; the description only where one is given", r.out);
+  fs.writeFileSync(path.join(folded, "body.md"), "the description\n");
+  const d = run(folded, ["--description", "body.md"]);
+  ok(d.status === 0 && /^ran pr-description\.mjs \[\] .*PR_BODY=the description/m.test(d.out), "given a description's file, it runs the description check on it", d.out);
+  const separate = project({ ".github/workflows/copies.yml": `name: copies\non: pull_request\njobs:\n  copies:\n    uses: ${CORE}/.github/workflows/copies.yml@${"a".repeat(40)}\n    with:\n      config: own/copies.json\n      sizes: own/sizes.json\n`,
+    ".github/workflows/signatures.yml": `name: signatures\non: pull_request\njobs:\n  signatures:\n    uses: ${CORE}/.github/workflows/signatures.yml@${"a".repeat(40)}\n    with:\n      directory: web\n` });
+  const s = run(separate, []);
+  ok(/^ran copies\.mjs \[own\/copies\.json\]/m.test(s.out) && /^ran reading-size\.mjs \[own\/sizes\.json\]/m.test(s.out) && /^== Does the pull request change what this check reads\?$/m.test(s.out), "the calls of their own: copies with its config and marks, and the signature check", s.out);
+  // (two calls of the signature check, each for a lock file's folder of its own: each runs, nothing merged into one)
+  const two = project({ "web/package.json": "{}\n", "api/package.json": "{}\n", ".github/workflows/signatures.yml": ["web", "api"].map((d, k) => `${k ? "" : "name: signatures\non: pull_request\njobs:\n"}  s${k}:\n    uses: ${CORE}/.github/workflows/signatures.yml@${"a".repeat(40)}\n    with:\n      directory: ${d}\n`).join("") });
+  const both = run(two, [], { BASE_SHA: git(two, "rev-parse", "HEAD") });
+  ok(both.status === 0 && (both.out.match(/^== Does the pull request change what this check reads\?$/gm) ?? []).length === 2, "two calls of the signature check, for two folders, each run by hand, as their workflows run them", both.out);
+  // (two calls of the NuGet check, each with a config of its own: both lookups run before either look, which may restore)
+  const nugets = project({ ".github/workflows/nuget.yml": ["checks/a.json", "checks/b.json"].map((c, k) => `${k ? "" : "name: nuget\non: pull_request\njobs:\n"}  n${k}:\n    uses: ${CORE}/.github/workflows/nuget.yml@${"a".repeat(40)}\n    with:\n      config: ${c}\n`).join("") });
+  const order = run(nugets, [], { BASE_SHA: git(nugets, "rev-parse", "HEAD") });
+  const at = what => order.out.indexOf(what);
+  ok(at("ran lookup.mjs [checks/a.json") >= 0 && at("ran lookup.mjs [checks/b.json") >= 0 && at("ran lookup.mjs [checks/b.json") < at("ran nuget-look.sh"),
+    "two calls of the NuGet check: every config's lookup runs before any look, which may run the change's build files", order.out);
+}
+// the package checks look first: with nothing they read changed, nothing is installed or restored
+{
+  const dir = project({ "web/package.json": "{}\n" });
+  const base = git(dir, "rev-parse", "HEAD");
+  fs.writeFileSync(path.join(dir, "README.md"), "# p\n\nMore.\n");
+  git(dir, "commit", "-q", "-am", "a doc");
+  const npm = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base });
+  ok(npm.status === 0 && /nothing to verify/.test(npm.out) && !/^== Install/m.test(npm.out), "signatures: a change to a doc alone installs nothing", npm.out);
+  fs.mkdirSync(path.join(dir, "core/.packages"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "core/.packages/package.json"), "{\"private\": true, \"dependencies\": {\"yaml\": \"2.9.1\"}}\n");
+  fs.writeFileSync(path.join(dir, "core/.packages/package-lock.json"), "{\"lockfileVersion\": 3, \"packages\": {}}\n");
+  fs.writeFileSync(path.join(dir, "core/.packages/.npmrc"), "ignore-scripts=true\n");
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "a sync moves the core's lock file");
+  const carried = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base });
+  ok(carried.status === 0 && /nothing to verify/.test(carried.out) && !/^== Install/m.test(carried.out), "and so does the core's own package list, lock file and .npmrc in its copy's .packages/, which the core's own repository checks", carried.out);
+  fs.mkdirSync(path.join(dir, ".github/workflows"), { recursive: true });
+  fs.writeFileSync(path.join(dir, ".github/workflows/core.yml"), "name: core\n");
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "the caller");
+  const called = run(dir, ["signatures", "--signatures", "web"], { BASE_SHA: base, CALLER: "o/p/.github/workflows/core.yml@refs/pull/1/merge", GITHUB_REPOSITORY: "o/p" });
+  ok(/^Changed:\n- \.github\/workflows\/core\.yml$/m.test(called.out) && /^== Install from the lock file/m.test(called.out), "and a change to the workflow that calls it, whatever it is named, is one it reads", called.out);
+  const nuget = run(dir, ["nuget", "--nuget", "checks/licences.json"], { BASE_SHA: base });
+  ok(nuget.status === 0 && new RegExp(`^ran nuget-look\\.sh BASE=${base} CONFIG=checks/licences\\.json$`, "m").test(nuget.out) && !/^== (Every locked|Restore)/m.test(nuget.out), "nuget: where its look says nothing NuGet reads changed, nothing is fetched or restored", nuget.out);
+  ok(new RegExp(`^ran lookup\\.mjs \\[checks/licences\\.json --nuget\\] .*LOOKUP_BASE=${base}`, "m").test(nuget.out) && nuget.out.indexOf("ran lookup.mjs") < nuget.out.indexOf("ran nuget-look.sh"), "nuget: each new package is looked up first, against the base, before the look, which may restore", nuget.out);
+  fs.writeFileSync(path.join(dir, "fails.txt"), "lookup.mjs");
+  const looked = run(dir, ["nuget", "--nuget", "checks/licences.json"], { BASE_SHA: base });
+  ok(looked.status === 1 && /^ran nuget-look\.sh/m.test(looked.out) && /1 of 2 checks failed/.test(looked.out), "and a failed lookup fails the run, the look still running after it", looked.out);
+  const advised = run(dir, ["nuget", "--nuget", "checks/licences.json", "--advisory"], { BASE_SHA: base });
+  ok(advised.status === 0 && /Advisory: nothing fails for it yet/.test(advised.out), "where advisory, it fails nothing", advised.out);
+  fs.rmSync(path.join(dir, "fails.txt"));
+}
+
+done("the one script of the core's checks");
