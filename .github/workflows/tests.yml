@@ -25,7 +25,8 @@
 # among them (#719), from npm's registry, running no install script (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
 # tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
 # Once, on Linux, the core's own lock files are held as a project's are: each package it brings looked up in npm's
-# registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures).
+# registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures); the
+# mutation tool's in tests/mutation/ in the job that installs it, the step after its install.
 # Each job of the suites, three on Linux and eight on Windows on each Node, the network's on both, and the upgrade
 # test, are measured against a time mark (the "suites" of .github/shape.json, by scripts/shape.mjs), which a job past
 # it says as a warning and never fails on (tasks/tests.md, "A time mark measures and never fails"; #733, point 5).
@@ -38,9 +39,10 @@
 # that passed is not run again"; #457); the upgrade test and the staged cases, which read the release tags and the day,
 # never in the tree, run on every push; and the checks of the core itself, each a step of its own after the suites, run
 # every time.
-# After them, on Linux, in the job of the suites projects and sync on the pin, the core's own mutation tool puts faults
-# into the lines a pull request changes and runs the tests that name each file against them (scripts/strength.mjs with scripts/mutate.mjs; tasks/code-shape.md, "How
-# strong the tests are"), in working copies of its own, with no secret.
+# After them, on Linux, in the job of the suites projects and sync on the pin, the core's mutation tool, Stryker, installed
+# there from its own lock file in tests/mutation/, puts faults into the lines a pull request changes and runs the tests
+# that name each file against them (scripts/strength.mjs with scripts/stryker.mjs; tasks/code-shape.md, "How strong the
+# tests are"), in a working copy of its own, with no secret.
 name: tests
 
 on:
@@ -249,6 +251,9 @@ jobs:
       - name: The core's own mutation tool
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/mutate-test.mjs ')) }}
         run: node tests/mutate-test.mjs
+      - name: Stryker's run as a mutation tool, without Stryker itself
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/stryker-test.mjs ')) }}
+        run: node tests/stryker-test.mjs
       - name: The stand-in's record
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/stand-in-record-test.mjs ')) }}
         run: node tests/stand-in-record-test.mjs
@@ -454,6 +459,9 @@ jobs:
       - name: What the core's own workflows and scripts use, each to its list
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
         run: node scripts/licences.mjs .github/licences.json
+      - name: Every package of the core's own lock files at one exact version, from npm's registry (floor rule 7)
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
+        run: node scripts/exact-versions.mjs .github/licences.json
       - name: Each package new to the core's own lock file looked up in its registry (floor rule 15; once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }}
         env:
@@ -490,7 +498,20 @@ jobs:
         run: node scripts/shape.mjs .github/shape.json --suite "$SUITE" --since "$SUITES_START"
       # (after the time mark, which it is no part of: the faults put into the lines a pull request changes, with the
       # base fetched above; the tool stops at its budget and says what it left unrun. In the shortest job, projects and
-      # sync, since in rest and steps it made that job the longest on a large change; #715)
+      # sync, since in rest and steps it made that job the longest on a large change; #715. Stryker,
+      # the core's mutation tool, is installed first from its own lock file at the versions it pins, with no package's
+      # install scripts (floor rules 7 and 15), and its run tested with it)
+      - name: Stryker, from its lock file, with no install scripts (once, on Linux)
+        id: mutation
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
+        run: node scripts/install.mjs mutation # (its lock file, package list and .npmrc refused before npm runs where they could reach past npm's registry, as each install's are)
+      - name: Stryker's packages, the registry's signature on each (once, on Linux)
+        if: ${{ !cancelled() && steps.mutation.outcome == 'success' && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
+        working-directory: tests/mutation
+        run: npm audit signatures --prefix=. # (only where the install passed, as the core's other installs' are checked, floor rule 7)
+      - name: Stryker's run as a mutation tool, with Stryker itself (once, on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' && (env.RUN == 'all' || contains(env.RUN, ' tests/stryker-test.mjs ')) }}
+        run: node tests/stryker-test.mjs --tool tests/mutation
       - name: How strong the tests are, on the lines the pull request changes (once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
         env:

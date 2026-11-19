@@ -25,7 +25,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #579 | builder | |
 | #580 | builder | |
-| #581 | rule builder; it changes `AGENTS.md`'s *mutation tool* | |
 | #582 | builder | |
 | #583 | builder | |
 | #584 | rule builder | |

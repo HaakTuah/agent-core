@@ -1,7 +1,8 @@
 // Tests rules.mjs (what counts as a rule, and its text), holders.mjs (what holds each, the archive's items behind each,
 // and what it fails) and archive.mjs (the archive's two forms in step), on
 // rule files and holders written in a scratch folder, and on the core's own. Its tests workflow runs it on every pull
-// request here. Node's own modules.
+// request here, after the core's install: the file's form is read by ajv (schemas.mjs), and the script as a check is run
+// once on a copy with no packages.
 //
 //   node tests/holders-test.mjs
 import { spawnSync } from "node:child_process";
@@ -9,10 +10,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { inStep as inStepAt, itemsIn } from "../scripts/archive.mjs";
+import { inStep as inStepAt, itemsIn, KEY, LAST_NUMBERED } from "../scripts/archive.mjs";
 import { counts, holders, report } from "../scripts/holders.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { fingerprint, rules, rulesOf } from "../scripts/rules.mjs";
+import { shapeFaults } from "../scripts/schemas.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
@@ -121,7 +123,7 @@ ok(!inStep(marked("", "", "")).length && !inStep(archive({ "items-001.md": "1. *
 const markKeyed = archive({ "items-001.md": "1. **1 Nov**, #1: a.\n   Changed by: #9.1.\n", "issue-9.1.md": "# Issue 9.1\n\n#9.1. **19 Nov**, #9: b.\n     Changes: 1.\n" });
 ok(!inStep(markKeyed).length, "a mark keyed by an issue's point is read as the archive keys it", inStep(markKeyed).join("\n"));
 const behindBad = holders(project({}, { behind: { "tasks/x.md: Gone": [1], "tasks/x.md: Numbered": [7], "tasks/x.md: Its own item": "1", "tasks/x.md": [1] }, "tasks/y.md": "# Y\n\n- **A rule** (core archive 1).\n" }), []);
-ok(["names \"tasks/x.md: Gone\"", "core archive 7 is no item", "is no list of the archive's keys", "tasks/y.md:3 points to the archive"].every(w => behindBad.wrong.some(x => x.includes(w))) && !behindBad.wrong.some(x => x.includes("names \"tasks/x.md\"")) && behindBad.wrong.every(w => /Mend: /.test(w)),
+ok(["names \"tasks/x.md: Gone\"", "core archive 7 is no item", "\"behind\", \"tasks/x.md: Its own item\" must be array. Mend: write it as a list of the keys", "tasks/y.md:3 points to the archive"].every(w => behindBad.wrong.some(x => x.includes(w))) && !behindBad.wrong.some(x => x.includes("names \"tasks/x.md\"")) && behindBad.wrong.every(w => /Mend: /.test(w)),
   "behind: a key that is no rule, an item not in the archive, no list, and a pointer in a rule file each fail, saying the mend; a rule file alone is a key", behindBad.wrong.join("\n"));
 
 // (#744: an item after the last numbered one is keyed by its issue, or one point of it, in a file of its own named by its
@@ -142,8 +144,20 @@ const keysAt = archive({ "items-001.md": r1, "issue-9.md": "#9. **19 Nov**: h.\n
 fs.writeFileSync(path.join(keysAt, "scripts", "holders.json"), JSON.stringify({ holders: {}, behind: { "tasks/x.md: Numbered": [1, "#9", "#9.2"], "tasks/x.md: Its own item": ["9", "#x", 7.5], "tasks/x.md: A last item": ["#10"] } }));
 fs.writeFileSync(path.join(keysAt, "tasks", "y.md"), "# Y\n\n- **A rule** (core archive #9).\n");
 const behindKeys = holders(keysAt, []);
-ok(["\"9\" is a key that names no issue", "\"#x\" is a key that names no issue", "7.5 is a key that names no issue", "core archive #10 is no item", "tasks/y.md:3 points to the archive"].every(w => behindKeys.wrong.some(x => x.includes(w))) && !behindKeys.wrong.some(x => x.includes("\"tasks/x.md: Numbered\"")) && behindKeys.wrong.every(w => /Mend: /.test(w)),
+ok([...[0, 1, 2].map(i => `"tasks/x.md: Its own item", item ${i} `), "core archive #10 is no item", "tasks/y.md:3 points to the archive"].every(w => behindKeys.wrong.some(x => x.includes(w))) && behindKeys.wrong.filter(x => x.includes("Its own item")).every(x => x.includes("Mend: write an item's key as the archive keys it")) && !behindKeys.wrong.some(x => x.includes("\"tasks/x.md: Numbered\"")) && behindKeys.wrong.every(w => /Mend: /.test(w)),
   "behind: a number and keys by an issue that stand pass; a key that names no issue, one not in the archive and a keyed pointer in a rule file each fail, saying the mend", behindKeys.wrong.join("\n"));
+
+// ---- the file's form, its schema's (#530) ----
+const formOf = j => shapeFaults("holders", j, "", "scripts/holders.json");
+const shapes = [null, [], { holders: [] }, { behind: "a" }, { numbers: 3 }, { holders: { a: 5 } }, { holders: { a: "" } }, { holders: { a: ["audit", ""] } }, { holders: { a: [4] } },
+  { behind: { a: [] } }, { behind: { a: [0] } }, { behind: { a: [LAST_NUMBERED + 1] } }, { behind: { a: ["#"] } }, { behind: { a: ["#9.x"] } }, { behind: { a: [null] } }, { numbers: { a: "" } }, { numbers: { a: 3 } }];
+const refused = shapes.map(j => formOf(j));
+ok(refused.every(f => f.length === 1 && /^scripts\/holders\.json.* Mend: \S/u.test(f[0])), "each part in no form the file holds is refused once, said of the file and where in it, with its mend",
+  refused.map((f, i) => `${JSON.stringify(shapes[i])}: ${JSON.stringify(f)}`).join("\n"));
+ok(JSON.stringify(formOf(JSON.parse(fs.readFileSync(path.join(root, "scripts", "holders.json"), "utf8")))) === "[]" && JSON.stringify(formOf({ holders: { a: [] }, behind: { a: [1, LAST_NUMBERED, "#9", "#9.2"] }, numbers: { a: "x" }, other: 1 })) === "[]",
+  "the core's own file holds its form, as do a number up to the last numbered item and keys by an issue or one point of it; a key the file does not name is let be, as the script let it");
+const keyRule = JSON.parse(fs.readFileSync(path.join(root, "scripts", "schemas", "holders.json"), "utf8")).properties.behind.additionalProperties.items;
+ok(keyRule.pattern === KEY.source && keyRule.maximum === LAST_NUMBERED && keyRule.mend.includes(`up to ${LAST_NUMBERED} `), "the schema's form of a key is the archive's own (archive.mjs's KEY and LAST_NUMBERED), its mend naming the last numbered item", JSON.stringify(keyRule));
 
 // ---- the core's own, and the script as a check ----
 const own = spawnSync(process.execPath, [path.join(root, "scripts", "holders.mjs")], { encoding: "utf8" });
@@ -153,11 +167,13 @@ ok(numbersBad.wrong.length === 2 && numbersBad.wrong.some(w => w.includes("\"num
 ok(own.status === 0 && !own.stderr, "the core's own holders.json names only rules that stand, and checks that are there", own.stderr);
 const failing = project({ "tasks/x.md: Gone": "audit" });
 fs.mkdirSync(path.join(failing, "scripts", "staged"));
-for (const f of ["archive.mjs", "holders.mjs", "rules.mjs", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
+fs.mkdirSync(path.join(failing, "scripts", "schemas"));
+for (const f of ["archive.mjs", "holders.mjs", "packages.mjs", "rules.mjs", "schemas.mjs", "schemas/holders.json", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
 fs.writeFileSync(path.join(failing, "scripts", "staged.mjs"), "export const CASES = [];\n");
 fs.writeFileSync(path.join(failing, "scripts", "outcomes.mjs"), "export const NUMBER = /^$/u;\n");
 const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.mjs")], { encoding: "utf8" });
-ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`), "where holders.json is wrong the check fails, each failure saying its mend", `${run.stdout}${run.stderr}`);
+ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`) && /^::warning::The form of scripts\/holders\.json was not checked: the package ajv is not installed\. Mend: run node scripts\/install\.mjs/mu.test(run.stdout),
+  "where holders.json is wrong the check fails, each failure saying its mend; on a copy with no packages its form goes unchecked, said as a warning with its mend, and the rest is read as ever", `${run.stdout}${run.stderr}`);
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);
