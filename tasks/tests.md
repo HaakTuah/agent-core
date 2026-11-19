@@ -41,17 +41,61 @@ reads is the *shape check*'s config.
   is taken out because a script proposed it, nor that a pull request's own work removes tests beyond what its task
   forces. Reason: a study of 5.5 million tests found every failure in about 63 thousand, and judging a test by
   coverage alone loses faults (#275's evidence). Held by the audit.
-- **The tests have a time mark, which never gets worse.** By default each suite a project names in the config's
-  "suites" has a mark in seconds, set with room above what it takes today so that a slow runner fails nothing, and is
-  started through the shape check (`--suite`), which fails one that passes and took longer; each system's tests can
-  be started alone. A mark rises only as a breach joins a baseline (`tasks/code-shape.md`, "Never worse"): with its
-  reason under "grown", in the pull request too. The trigger is a suite past its mark: the builder whose change took
-  it there makes it faster (each test sets up only what it needs, and runs only where the change can reach), or
-  splits the job, its parts side by side and the quick ones first, so a failure shows early; how fast the marks come
-  down is the dose the codebase's state sets (`tasks/cleaning.md`). It does not mean that a long measurement joins a
-  suite, nor that a suite's own failure is the mark's, nor that a suite is dropped to meet it: what guards a promise
-  stays. Reason: every session waits on the tests, and in the core the slowest job set a push's wait. Held by the
-  shape check, and by the audit's fifth question.
+- **A time mark measures and never fails** (#733). By default each suite a project names in the config's "suites" has a
+  mark in seconds, set with room above what it takes today, and is started through the shape check (`--suite`), which
+  measures it against its mark and says a job past it as a warning, never a failure; each system's tests can be started
+  alone. A mark rises only as a breach joins a baseline (`tasks/code-shape.md`, "Never worse"): with its reason under
+  "grown", in the pull request too. The trigger is a job past its mark, which its run's warning shows: the session that
+  reads it, a builder on its pull request's run or the orchestrator on the default branch's, adds it to the open task on
+  the tests' time, or files one where none is open, and that task makes the suite faster (each test sets up only what it
+  needs, and runs only where the change can reach), or splits the job, its parts side by side and the quick ones first,
+  so a failure shows early; how fast the marks come down is the dose the codebase's state sets (`tasks/cleaning.md`). It
+  does not mean the marks go, since the shape check still holds them never worse and the state report gives the trend;
+  nor that a long measurement joins a suite, nor that a suite's own failure is the mark's, nor that a suite is dropped
+  to meet it: what guards a promise stays. Reason: every session waits on the tests, and under floor rule 12 a red
+  default branch stops all merging, where of the core's 8 red runs on it in 24 hours at least 3 were a suite past its
+  mark on a slow runner. Held by the shape check's test (`tests/shape-test.mjs`), which reads the warning and the pass,
+  and by the audit's fifth question.
+- **No test run on a draft** (#733). By default the job that runs a project's tests on its host starts on a pull request
+  once it is marked ready, and again on each push after, and runs nothing on a draft. Nothing changes it. The trigger is
+  a workflow that runs tests on a pull request: whoever writes or changes it gives its trigger the types opened,
+  synchronize, reopened and ready_for_review and skips each of its jobs on a draft; and a builder, before it marks its
+  pull request ready, runs in its own working copy the suites its change reaches (`core/scripts/select.mjs`, with
+  `SELECT_BASE` the default branch). It does not mean a builder pushes less: it pushes after every commit
+  (`roles/shared/work-flow.md`). Reason: in the core 43% of the job-minutes of 24 hours went to runs that a newer push
+  replaced before they finished. Held by `tests/workflows-test.mjs`, for the core's own workflow; in a project, by
+  nothing yet: which of its workflows runs its tests cannot be read without guessing.
+- **The default branch is tested at its newest commit** (#733). By default a run of the tests on the default branch gives
+  way to the run of a newer merge, so that when merges come fast one run covers several: whoever writes the workflow
+  puts its runs there in one concurrency group that cancels the run in progress. Nothing changes it. The trigger is a
+  red run on the default branch: the session that reads it (`core/scripts/merge-line.mjs` says it, where users get a
+  release) narrows it, first by the history of the files its failing test names since the last green run, then by
+  halving the merges since that run, running the failing suite alone at each half's commit in its own working copy, and
+  fixes it before any other merge (`tasks/hosts.md`, "Where users get a release, a pull request merges on its own green
+  checks"). It does not mean a pull request's run, a start by hand or the run before a release is cancelled, nor that a
+  red run is merged past. Reason: a batch tested once costs less than each merge tested alone, and a break between
+  merges is rare and quickly found. Held, in the core, by the concurrency its `tests.yml` gives the runs on main, which
+  the workflows test reads; the narrowing, by nothing yet.
+
+- **The slow suites run once per batch, wherever they run** (#733). By default a pull request's run holds the suites its
+  change reaches on one platform, those of its users first, and the slow and platform suites (those on another platform,
+  and those the time marks give the most seconds) run at the default branch's newest commit, where it moved since their
+  last run, as often as their cost allows: once an hour on the host's free runners, once a night where minutes are
+  billed or the runner is a machine of the owner's, and only before a release where the tests run on a computer alone;
+  in full before each release in every case. Where the tests run and who pays is read, never asked:
+  `core/scripts/runners.mjs --repo <owner>/<name>` prints both and the schedule, and the manifest's rows *test runners*
+  and *billed minutes* only override them. Nothing changes it. The trigger is a workflow that runs the tests on a pull
+  request: whoever writes or changes it moves the slow and platform suites to that schedule. In the core, the Linux
+  suites run after every merge and the Windows suites once an hour (`.github/workflows/tests.yml`). It does not mean a
+  public repository takes a runner on a machine of the owner's, where a stranger's pull request would run its code (the
+  script advises the owner once, by an issue labelled `needs-owner`), nor that a suite runs less than once before each
+  release, nor that a project changes its workflow for this before its builders take it up. Reason: a full run on the
+  default branch after every merge holds most of the host's jobs at once and leaves the pull requests waiting, and a
+  slow suite run once per change costs most where it is paid for, in money or in a machine's hours; in the core Windows
+  took 69% of the pull requests' job-minutes, where about three of its bugs were found by Windows alone. Held by
+  `tests/runners-test.mjs`, for what is read, and in the core by its workflow's schedule and matrix, which the workflows
+  test reads.
+
 - **A test that fails for no reason is mended or removed, never retried in silence.** By default a test passes or
   fails the same way each time it runs on the same commit. The trigger is a test that failed and then passed on the
   same commit in the same job, which the record names: the session that meets it, or the audit's next cleaning task,

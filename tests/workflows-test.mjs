@@ -108,10 +108,11 @@ try {
 // the pull request, cancelled once a newer run starts for it; a run on main, a schedule or a start by hand is a group of
 // its own (its run id), and never cancelled. Left out, each for its reason: the security-review check, whose runs go one
 // at a time in order so the last has read the newest comments, the release, the preview's queue and the deletion of
-// merged branches, which no pull request starts and which never cancel, and the scheduled ones.
+// merged branches, which no pull request starts and which never cancel, the scheduled ones, and the core's tests, read
+// below for their own groups (#733).
 const KEY = "${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}";
 const CANCEL = "${{ github.event_name == 'pull_request' }}";
-const APART = new Set(["security-review.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml"]);
+const APART = new Set(["security-review.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml", "tests.yml"]);
 const wfDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".github", "workflows");
 const loose = [];
 // (a workflow in a form the test's reader does not know, a flow mapping say, is read for its group at the top, by its
@@ -131,5 +132,35 @@ const groups = Object.fromEntries(["codeql.yml", "signatures.yml", "nuget.yml", 
 ok(Object.values(groups["codeql.yml"].jobs)[0].concurrency.group.includes("${{ matrix.language }}") && groups["signatures.yml"].jobs.signatures.concurrency.group.includes("${{ inputs.directory }}") && groups["nuget.yml"].jobs.nuget.concurrency.group.includes("${{ inputs.config }}"),
   "and jobs of one run that differ (a matrix, a call for each lock folder or config) are groups of their own, so none cancels another");
 ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] === false, "while the security-review check's runs go one at a time, never cancelled");
+
+// ---- when the core's tests run (#733, points 2 to 4 and 6) ----
+// A pull request's run starts once it is ready, never on a draft, on Linux alone; main is tested on Linux at its newest
+// commit, each run giving way to the next merge's; Windows once an hour at main's newest commit where it moved; both in
+// full on a start by hand and in the release's call before a cut.
+{
+  const tests = parseYaml(fs.readFileSync(path.join(wfDir, "tests.yml"), "utf8"));
+  const release = parseYaml(fs.readFileSync(path.join(wfDir, "release.yml"), "utf8"));
+  const DRAFT = "!(github.event_name == 'pull_request' && github.event.pull_request.draft)";
+  const MOVED = "(github.event_name != 'schedule' || needs.moved.outputs.run == 'true')";
+  ok(tests.on.pull_request.types.includes("ready_for_review") && !tests.on.pull_request.types.includes("edited") && ["suites", "upgrade", "tests"].every(j => String(tests.jobs[j].if).includes(DRAFT) && String(tests.jobs[j].if).includes(MOVED)),
+    "no run on a draft: a pull request's run starts when it is marked ready, and each job of it skips a draft and an hourly run where main did not move (point 2)");
+  const WINDOWS = ["suites-projects", "suites-sync", "suites-kit", "suites-core", "suites-core-places", "suites-licences", "suites-rest", "suites-tools"];
+  const onWindows = tests.jobs.suites.strategy.matrix.include.filter(x => x.os === "windows-latest").map(x => x.suite);
+  const exclude = String(tests.jobs.suites.strategy.matrix.exclude), upgrade = String(tests.jobs.upgrade.strategy.matrix.include);
+  const prList = /^\$\{\{ \(github\.event_name == 'pull_request' \|\| github\.event_name == 'push'\) && fromJSON\('(\[[^']*\])'\)/.exec(exclude);
+  const prUpgrade = /^\$\{\{ fromJSON\(\(github\.event_name == 'pull_request' \|\| github\.event_name == 'push'\) && '(\[[^']*\])'/.exec(upgrade);
+  ok(prList && JSON.stringify(JSON.parse(prList[1]).map(x => x.suite).sort()) === JSON.stringify([...onWindows].sort()) && JSON.stringify([...onWindows].sort()) === JSON.stringify([...WINDOWS].sort())
+    && prUpgrade && JSON.parse(prUpgrade[1]).every(x => x.os === "ubuntu-latest"),
+    "a pull request's run and a push's are on Linux alone: every suite on Windows is left out of them, and the upgrade job's parts there (points 3 and 4)", exclude.slice(0, 300));
+  ok(/github\.event_name == 'schedule' && fromJSON\('\[\{"suite":"suites-kit-core-licences"\},\{"suite":"suites"\},\{"suite":"suites-rest-steps"\}\]'\)/.test(exclude) && /fromJSON\('\[\]'\) \}\}$/.test(exclude),
+    "the hourly run leaves out the suites on Linux, which ran after the merge, and a start by hand or the release's call leaves out none (point 6)");
+  ok(tests.concurrency.group.includes("format('pr-{0}', github.event.pull_request.number)") && tests.concurrency.group.includes("(github.event_name == 'push' || github.event_name == 'schedule') && format('{0}-main', github.event_name) || github.run_id")
+    && tests.concurrency["cancel-in-progress"] === "${{ github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' }}",
+    "a run on main gives way to the next of its kind, main tested at its newest commit; a start by hand or a call never (point 4)");
+  ok(tests.on.schedule?.length === 1 && /^\d{1,2} \* \* \* \*$/.test(tests.on.schedule[0].cron) && tests.jobs.moved.if === "${{ github.event_name == 'schedule' }}" && /event=schedule/.test(tests.jobs.moved.steps.at(-1).run) && /status=completed/.test(tests.jobs.moved.steps.at(-1).run),
+    "Windows once an hour, at main's newest commit, where no hourly run finished on it yet (point 6)");
+  ok("workflow_call" in tests.on && "workflow_dispatch" in tests.on && release.jobs.tests.uses === "./.github/workflows/tests.yml" && release.jobs.tests.if === "${{ github.event_name == 'workflow_dispatch' }}" && release.jobs.release.needs.includes("tests"),
+    "and both in full before each release, which waits on them (point 6)");
+}
 
 process.exit(failed ? 1 : 0);

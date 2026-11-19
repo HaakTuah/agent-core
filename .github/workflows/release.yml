@@ -6,7 +6,9 @@
 # Linux runs on every pull request and push in tests.yml), since what it guards reaches a project only through a
 # release and on Windows it set the length of every pull request's run (#715); it runs it too once a day on main, where
 # it cuts nothing, so a break is found among a day's merges, and where minutes are billed (a private repository, or
-# one whose visibility could not be read) only before a release. It cuts only where that test passed, every check the push of that commit to main started has
+# one whose visibility could not be read) only before a release. Before a cut it runs the core's tests in full too, on
+# Linux and on Windows (.github/workflows/tests.yml, called), since a pull request's run and a push's are on Linux alone
+# and Windows runs them once an hour (#733, points 3 and 6). It cuts only where those passed, that test passed, every check the push of that commit to main started has
 # finished and passed, and main has not moved on since the run began (scripts/release.mjs, which also numbers the
 # release and never moves a tag that exists); otherwise it fails, says which check holds it, and is started again
 # later. This repository only; no project calls it. The cut may write this repository's contents, which the tag needs,
@@ -83,8 +85,19 @@ jobs:
           PART: ${{ matrix.part }}
         run: node scripts/shape.mjs .github/shape.json --suite upgrade -- node tests/upgrade-test.mjs --part "$PART"
 
+  # (the core's tests in full, on Linux and on Windows, before a cut alone; the called workflow's jobs ask for no more
+  # than this: the contents, the checks the selection reads on a push, and the runs its hourly job reads)
+  tests:
+    needs: main
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    uses: ./.github/workflows/tests.yml
+    permissions:
+      contents: read
+      checks: read
+      actions: read
+
   release:
-    needs: [main, upgrade]
+    needs: [main, upgrade, tests]
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
