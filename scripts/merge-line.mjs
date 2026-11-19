@@ -159,26 +159,27 @@ export function cancel({ repo, keep, gh = ghApi }) {
   return out.length ? out : ["The front's run is queued, but no run of another pull request is queued: nothing is cancelled."];
 }
 
-function main(argv) {
+// The script's run: its exit code, what it prints through `say` (and failures through `warn`), read through `gh`.
+export function main(argv, { gh = ghApi, say = console.log, warn = console.error } = {}) {
   const opt = k => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
   const repo = opt("--repo"), count = Number(opt("--count") ?? COUNT), keep = opt("--cancel");
   const usage = "run node core/scripts/merge-line.mjs --repo <owner>/<name>, with --measure [--count <n>] or --cancel <front>[,<next>]";
   if (!aRepository(repo) || !(Number.isInteger(count) && count > 0)) refuse("no repository was named, or the count is no whole number", usage);
   if (argv.includes("--cancel")) {
     const nums = String(keep ?? "").split(",").map(Number);
-    if (!nums.length || nums.length > 2 || !nums.every(n => Number.isSafeInteger(n) && n > 0)) refuse("--cancel names no front, or more than the front and the next", usage);
-    const out = cancel({ repo, keep: nums });
-    for (const l of out) (l.startsWith("FAIL") ? console.error : console.log)(l);
+    if (nums.length > 2 || !nums.every(n => Number.isSafeInteger(n) && n > 0)) refuse("--cancel names no front, or more than the front and the next", usage);
+    const out = cancel({ repo, keep: nums, gh });
+    for (const l of out) (l.startsWith("FAIL") ? warn : say)(l);
     return out.some(l => l.startsWith("FAIL")) ? 1 : 0;
   }
-  if (argv.includes("--measure")) { console.log(line(measure({ repo, count }))); return 0; }
+  if (argv.includes("--measure")) { say(line(measure({ repo, count, gh }))); return 0; }
   const manifest = fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null;
-  const f = facts({ repo, manifest });
-  console.log([`What ${repo}'s host says of the merge line:`, ...f.said.map(s => `- ${s}`), follows(f)].join("\n"));
+  const f = facts({ repo, manifest, gh });
+  say([`What ${repo}'s host says of the merge line:`, ...f.said.map(s => `- ${s}`), follows(f)].join("\n"));
   return 0;
 }
 
 if (started(import.meta.url)) {
   try { process.exitCode = main(process.argv.slice(2)); }
-  catch (e) { if (!(e instanceof Refused)) { console.error(`FAIL: GitHub did not answer (${oneLine(e.message).slice(0, 200)}). Mend: run it where gh answers for the repository, or say in the report that it was not read`); process.exitCode = 1; } else { console.error(`FAIL: ${e.message}`); process.exitCode = 1; } }
+  catch (e) { console.error(e instanceof Refused ? `FAIL: ${e.message}` : `FAIL: GitHub did not answer (${oneLine(e.message).slice(0, 200)}). Mend: run it where gh answers for the repository, or say in the report that it was not read`); process.exitCode = 1; }
 }

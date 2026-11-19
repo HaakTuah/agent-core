@@ -11,7 +11,7 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { cancel, facts, follows, line, measure, override } from "../scripts/merge-line.mjs";
+import { cancel, facts, follows, line, main, measure, override } from "../scripts/merge-line.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -37,9 +37,11 @@ ok(f.queue === "offered" && f.billed === false && /file one for the owner, label
 f = facts({ repo: "o/n", gh: host({ owner: "Organization", priv: true, rules: strict, plan: "team" }) });
 ok(f.queue === "none" && f.billed === true, "an organisation's private one on a smaller plan: no queue, minutes billed", JSON.stringify(f));
 ok(facts({ repo: "o/n", gh: host({ owner: "Organization", priv: true, rules: strict, plan: "enterprise" }) }).queue === "offered", "and on the largest plan, the queue offered");
-ok(facts({ repo: "o/n", gh: host({ owner: "Organization", priv: true, rules: strict, plan: "a plan to come" }) }).queue === null, "a plan whose name it does not know is not read, never guessed");
+f = facts({ repo: "o/n", gh: host({ owner: "Organization", priv: true, rules: strict, plan: "a plan to come" }) });
+ok(f.queue === null && /"a plan to come", a name this script does not know\), so taken as not offered/.test(f.said[1]), "a plan whose name it does not know is not read, never guessed, and said so", f.said[1]);
+ok(facts({ repo: "o/n", gh: host({ rules: [{ type: "required_status_checks", parameters: { strict_required_status_checks_policy: false } }] }) }).upToDate === false, "required checks that ask no up-to-date branch ask no line");
 f = facts({ repo: "o/n", gh: host({ owner: "Organization", priv: true, rules: strict, plan: null }) });
-ok(f.queue === null && /not read .*taken as not offered/.test(f.said[1]) && !/needs-owner/.test(follows(f)), "a plan that cannot be read is said so, taken as no queue", f.said[1]);
+ok(f.queue === null && /plan did not answer\), so taken as not offered/.test(f.said[1]) && !/needs-owner/.test(follows(f)), "a plan that cannot be read is said so, taken as no queue", f.said[1]);
 f = facts({ repo: "o/n", gh: host({ owner: "Organization", rules: [{ type: "merge_queue" }] }) });
 ok(f.queue === "on" && f.upToDate === true && /merge queue keeps the line/.test(follows(f)), "a queue that is on keeps the line", follows(f));
 f = facts({ repo: "o/n", gh: host({ rules: [] }) });
@@ -55,7 +57,7 @@ ok(f.queue === "on" && f.billed === true && /manifest's row \*merge queue\* says
 ok(override("| *merge queue* | `maybe` |", "merge queue", ["on", "offered", "none"]) === undefined, "a row with no value the slot takes overrides nothing");
 
 // The measure: three merged pull requests, oldest first #1, #2, #3 (and #9 into another branch, left out); #2 was
-// marked ready after #1 merged, so its turn is its marking ready; #3 was ready before #2 merged, so its turn is that merge.
+// marked ready after #1 merged, so its turn is its marking ready, as is #3's, marked ready after #2 merged.
 const pulls = [
   { number: 3, merged_at: at(100), created_at: at(0), base: { ref: "main" }, head: { ref: "c", sha: sha("c") } },
   { number: 9, merged_at: at(95), created_at: at(0), base: { ref: "other" }, head: { ref: "x", sha: sha("e") } },
@@ -63,23 +65,36 @@ const pulls = [
   { number: 1, merged_at: at(20), created_at: at(1), base: { ref: "main" }, head: { ref: "a", sha: sha("a") } },
   { number: 7, merged_at: null, created_at: at(1), base: { ref: "main" }, head: { ref: "z", sha: sha("f") } },
 ];
-const timeline = { 1: [], 2: [{ event: "ready_for_review", created_at: at(10) }, { event: "ready_for_review", created_at: at(30) }], 3: [{ event: "ready_for_review", created_at: at(40) }] };
-const runs = { a: [["1", 2], ["1", 3], ["2", 4]], b: [["3", 31], ["4", 50], ["5", 70]], c: [["6", 50], ["6", 51]] };
+// (#3's timeline runs over two pages, its marking ready on the second, a later event of another kind beside it; #2's
+// runs fall on its opening and on its merge, which count)
+const filler = Array.from({ length: 100 }, () => ({ event: "commented", created_at: at(1) }));
+const timeline = { 1: [[]], 2: [[{ event: "ready_for_review", created_at: at(10) }, { event: "ready_for_review", created_at: at(30) }]], 3: [filler, [{ event: "ready_for_review", created_at: at(70) }, { event: "commented", created_at: at(90) }]] };
+const runFiller = Array.from({ length: 100 }, () => ({ head_sha: "x", created_at: at(500) }));
+const runs = { a: [[["1", 2], ["1", 3], ["2", 4]]], b: [[["3", 5], ["4", 50], ["5", 70]]], c: [runFiller, [["6", 50], ["6", 51], ["7", 100]]] };
 const measured = route => {
   if (route === "repos/o/n") return JSON.stringify({ default_branch: "main" });
   if (route.includes("/pulls?")) return JSON.stringify(pulls);
+  const page = Number(/&page=(\d+)/.exec(route)?.[1] ?? 1) - 1;
   const t = /issues\/(\d+)\/timeline/.exec(route);
-  if (t) return JSON.stringify(timeline[t[1]]);
+  if (t) return JSON.stringify(timeline[t[1]][page] ?? []);
   const r = /actions\/runs\?branch=(\w+)&/.exec(route);
-  if (r) return JSON.stringify({ workflow_runs: runs[r[1]].map(([s, min]) => ({ head_sha: s, created_at: at(min) })) });
+  if (r) return JSON.stringify({ workflow_runs: (runs[r[1]][page] ?? []).map(x => (Array.isArray(x) ? { head_sha: x[0], created_at: at(x[1]) } : x)) });
   throw new Error(`no such route: ${route}`);
 };
 let m = measure({ repo: "o/n", count: 3, gh: measured });
-ok(m.read === 3 && m.minutes.join() === "19,30,40", "each merge's minutes run from its turn, the later of the merge before it and its last marking ready", JSON.stringify(m));
-ok(m.pushes.join() === "2,2,1", "the pushes whose checks ran are counted once each, between its opening and its merge", JSON.stringify(m));
+ok(m.read === 3 && m.minutes.join() === "19,30,30", "each merge's minutes run from its turn, the later of the merge before it and its last marking ready", JSON.stringify(m));
+ok(m.pushes.join() === "2,2,2", "the pushes whose checks ran are counted once each, from its opening to its merge, past a full page", JSON.stringify(m));
+const all = measure({ repo: "o/n", count: 10, gh: measured });
+ok(all.read === 3 && all.minutes.join() === "19,30,30", "with fewer merged than asked, the oldest counts from its own marking ready", JSON.stringify(all));
 m = measure({ repo: "o/n", count: 2, gh: measured });
-ok(m.read === 2 && m.minutes.join() === "30,40", "with one more read than counted, the oldest gives only the merge before the next", JSON.stringify(m));
-ok(/of the last 2 merged pull requests, 3 pushes whose checks ran \(a median of 2 each\), and a median of 35\.0 min/.test(line(m)) && /not read/.test(line({ read: 0 })), "the state report's line, and with nothing read, that", line(m));
+ok(m.read === 2 && m.minutes.join() === "30,30", "the last two into the default branch are counted, one into another left out", JSON.stringify(m));
+// (#3 made ready before #2 merged: its turn is that merge; with one more read than counted, the oldest gives only that)
+timeline[3] = [[{ event: "ready_for_review", created_at: at(40) }]];
+const mainOnly = route => (route.includes("/pulls?") ? JSON.stringify(pulls.filter(p => p.number !== 9)) : measured(route));
+const extra = measure({ repo: "o/n", count: 2, gh: mainOnly });
+ok(extra.read === 2 && extra.minutes.join() === "30,40", "with one more read than counted, the oldest gives only the merge before the next", JSON.stringify(extra));
+timeline[3] = [filler, [{ event: "ready_for_review", created_at: at(70) }, { event: "commented", created_at: at(90) }]];
+ok(/of the last 2 merged pull requests, 4 pushes whose checks ran \(a median of 2 each\), and a median of 30\.0 min/.test(line(m)) && /not read/.test(line({ read: 0 })), "the state report's line, and with nothing read, that", line(m));
 
 // The cancelling: the front #1 (head a) and the next #2 (head b); runs queued of #1, #2, #3 (head c), main's, and a push's.
 const cancelled = [];
@@ -89,7 +104,9 @@ const queue = ({ frontQueued = true, refuse = false }) => (...a) => {
   if (route === "repos/o/n") return JSON.stringify({ default_branch: "main" });
   const p = /pulls\/(\d+)$/.exec(route);
   if (p) return JSON.stringify({ state: p[1] === "8" ? "closed" : "open", head: { sha: sha({ 1: "a", 2: "b" }[p[1]] ?? "d") } });
+  if (route.includes("actions/runs?status=queued&per_page=100&page=2")) return JSON.stringify({ workflow_runs: [{ id: 16, event: "pull_request", head_sha: sha("g"), head_branch: "g", name: "tests" }] });
   if (route.includes("actions/runs?status=queued")) return JSON.stringify({ workflow_runs: [
+    ...Array.from({ length: 95 }, (_, k) => ({ id: 100 + k, event: "schedule", head_sha: sha("m"), head_branch: "main", name: "look" })),
     ...(frontQueued ? [{ id: 11, event: "pull_request", head_sha: sha("a"), head_branch: "a", name: "tests" }] : []),
     { id: 12, event: "pull_request", head_sha: sha("b"), head_branch: "b", name: "tests" },
     { id: 13, event: "pull_request", head_sha: sha("c"), head_branch: "c", name: "tests" },
@@ -101,21 +118,38 @@ const queue = ({ frontQueued = true, refuse = false }) => (...a) => {
 let out = cancel({ repo: "o/n", keep: [1, 2], gh: queue({ frontQueued: false }) });
 ok(cancelled.length === 0 && /not queued: nothing is cancelled/.test(out[0]), "while the front's run is not queued, nothing is cancelled", out.join(" | "));
 out = cancel({ repo: "o/n", keep: [1, 2], gh: queue({}) });
-ok(cancelled.join() === "repos/o/n/actions/runs/13/cancel", "where it is, only the queued run of a pull request neither the front nor the next is cancelled, never main's", cancelled.join());
+ok(cancelled.join() === "repos/o/n/actions/runs/13/cancel,repos/o/n/actions/runs/16/cancel", "where it is, only the queued run of a pull request neither the front nor the next is cancelled, never main's", cancelled.join());
 cancelled.length = 0;
 cancel({ repo: "o/n", keep: [1], gh: queue({}) });
-ok(cancelled.join() === "repos/o/n/actions/runs/12/cancel,repos/o/n/actions/runs/13/cancel", "with the front alone named, the front's run is spared and the rest cancelled", cancelled.join());
+ok(cancelled.join() === "repos/o/n/actions/runs/12/cancel,repos/o/n/actions/runs/13/cancel,repos/o/n/actions/runs/16/cancel", "with the front alone named, the front's run is spared and the rest cancelled", cancelled.join());
 out = cancel({ repo: "o/n", keep: [1], gh: queue({ refuse: true }) });
 ok(mended(out.join("\n")), "a cancel the sign-in is refused fails with its mend", out.join(" | "));
 let thrown = "";
 try { cancel({ repo: "o/n", keep: [8], gh: queue({}) }); } catch (e) { thrown = e.message; }
 ok(mended(`FAIL: ${thrown}`), "a front that is no open pull request is refused, with its mend", thrown);
 
+// (its run, through the stand-in: each mode, its options read, and a cancel refused for its sign-in)
+const run = (argv, gh) => { const out = [], err = []; const code = main(argv, { gh, say: l => out.push(l), warn: l => err.push(l) }); return { code, out: out.join("\n"), err: err.join("\n") }; };
+let r = run(["--repo", "o/n"], host({ rules: strict }));
+ok(r.code === 0 && /^What o\/n's host says of the merge line:\n- a branch must be up to date .*yes/.test(r.out) && /kept by hand/.test(r.out), "by itself it prints what it read and what follows", r.out);
+r = run(["--repo", "o/n", "--measure", "--count", "2"], measured);
+ok(r.code === 0 && /of the last 2 merged pull requests/.test(r.out), "--measure reads the count it is given", r.out);
+cancelled.length = 0;
+r = run(["--repo", "o/n", "--cancel", "1,2"], queue({}));
+ok(r.code === 0 && cancelled.length === 2 && /cancelled: run 13/.test(r.out), "--cancel spares the front and the next it is given", r.out);
+r = run(["--repo", "o/n", "--cancel", "1"], queue({ refuse: true }));
+ok(r.code === 1 && mended(r.err) && r.out === "", "a cancel refused fails the run, its mend said", r.err);
+for (const argv of [["--repo", "o/n", "--count", "0"], ["--repo", "o/n", "--count", "2.5"], ["--repo", "o/n", "--cancel", "0"], ["--repo", "o/n", "--cancel", "1,1.5"], ["--repo", "o/n", "--cancel"]]) {
+  let said = "";
+  try { run(argv, () => { throw new Error("no call is made"); }); } catch (e) { said = e.message; }
+  ok(mended(`FAIL: ${said}`) && !/no call is made/.test(said), `refused before any call, with its mend: ${argv.join(" ")}`, said);
+}
+
 // (the script run by itself, told no repository or a bad front, refuses with its mend)
 const script = fileURLToPath(new URL("../scripts/merge-line.mjs", import.meta.url));
 for (const args of [[], ["--repo", "o/.."], ["--repo", "o/n", "--cancel", "x"], ["--repo", "o/n", "--cancel", "1,2,3"]]) {
-  const r = spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
-  ok(r.status === 1 && mended(r.stdout + r.stderr), `refused, with its mend: ${args.join(" ") || "(nothing)"}`, r.stdout + r.stderr);
+  r = spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
+  ok(r.status === 1 && mended(r.stdout + r.stderr) && !/GitHub did not answer/.test(r.stderr), `refused, with its mend: ${args.join(" ") || "(nothing)"}`, r.stdout + r.stderr);
 }
 
 console.log(`${count - failed} of ${count} passed`);
