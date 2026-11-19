@@ -180,6 +180,8 @@ if ((m = /^pulls\/(\d+)(?:\/(.+))?$/.exec(rest))) {
   if (more === "commits") out(page(String(git("log", "--format=%H", "--end-of-options", `${sha(p.base)}..${sha(p.head) ?? p.headSha}`).stdout).split("\n").filter(Boolean).map(s => ({ sha: s }))));
   if (more === "comments" || more === "reviews" || more === "requested_reviewers") out(method === "GET" ? [] : {});
 }
+// a weakness reported by GitHub's private reporting, which only the owner sees (core/floor/topics/weaknesses.md)
+if (rest === "security-advisories/reports" && method === "POST") { const r = { ghsa_id: `GHSA-${next()}`, summary: String(body.summary ?? ""), description: String(body.description ?? ""), state: "triage", created_at: now() }; (state.reports ??= []).push(r); out(r); }
 if ((m = /^commits\/([^/]+)\/check-runs$/.exec(rest))) out({ total_count: (state.checks ?? []).length, check_runs: state.checks ?? [] });
 if ((m = /^commits\/([^/]+)\/status$/.exec(rest))) out({ state: "pending", total_count: 0, statuses: [] });
 if ((m = /^compare\/(.+)\.\.\.(.+)$/.exec(rest))) {
