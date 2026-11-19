@@ -16,6 +16,7 @@ import { CORE } from "../scripts/core-address.mjs";
 import { coreIsFolder, entries } from "../scripts/copy-tree.mjs";
 import { MANIFEST_MAX, UNREADABLE, differencesAdded, reasonsMend } from "../scripts/pr-description.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { library, regular } from "../scripts/reading.mjs";
 import { rules } from "../scripts/rules.mjs";
 import { scratchDir, scratchEnv, root } from "../scripts/scratch-core.mjs";
 
@@ -287,7 +288,9 @@ if (process.platform !== "win32") {
 } else console.log("skip reading.mjs: a rule file that is a link to a pipe: no pipe can be made here (Windows)");
 
 // ---- reading.mjs and rules.mjs: a rule folder that is a link, and a folder and a file link in a rule folder (#848) ----
-// (each is refused by name with its mend, and nothing it leads to is read, by the reading script or the rules' reader)
+// (each is refused by name with its mend, a name that holds a line's end shown on one line, and nothing it leads to is
+// read, by the reading script's library or the rules' reader; a backslash in a name is a letter here, as the system
+// reads it, so the path checked is the path opened)
 if (process.platform !== "win32") {
   const rf = path.join(tmp, "reading-folders"), away = path.join(tmp, "away-folders");
   for (const d of ["roles", "floor", "tasks"]) fs.mkdirSync(path.join(rf, d), { recursive: true });
@@ -298,9 +301,18 @@ if (process.platform !== "win32") {
   fs.symlinkSync(away, path.join(rf, "floor/topics"));
   fs.symlinkSync(away, path.join(rf, "tasks/more"));
   fs.symlinkSync(path.join(away, "x.md"), path.join(rf, "tasks/link.md"));
+  fs.symlinkSync(path.join(away, "x.md"), path.join(rf, "floor/more.md"));
+  fs.symlinkSync(path.join(away, "x.md"), path.join(rf, "AGENTS.md"));
+  fs.symlinkSync(path.join(away, "x.md"), path.join(rf, "tasks/two\nFAIL: lines.md"));
+  fs.mkdirSync(path.join(rf, "inbox"));
+  fs.writeFileSync(path.join(rf, "inbox/item.md"), "# An item\n");
+  fs.symlinkSync(path.join(away, "x.md"), path.join(rf, "inbox\\item.md"));
   const r = spawnSync(process.execPath, [path.join(root, "scripts", "reading.mjs"), "--check"], { cwd: rf, env, encoding: "utf8", timeout: 5000 });
   const out = `${r.stdout}${r.stderr}`;
-  ok(r.status === 1 && !raw(out) && ["floor/topics", "tasks/more", "tasks/link.md"].every(l => out.includes(`FAIL: ${l} is a symbolic link`)) && mended(out) && !out.includes("elsewhere"), "reading.mjs --check: a rule folder that is a link, and a folder and a file link in a rule folder, are each refused with its mend, and none is read");
+  const lib = library(rf, ""), fails = out.split("\n").filter(l => l.startsWith("FAIL"));
+  ok(r.status === 1 && !raw(out) && ["AGENTS.md", "floor/more.md", "floor/topics", "tasks/more", "tasks/link.md", "tasks/two\\nFAIL: lines.md"].every(l => out.includes(`FAIL: ${l.includes("\\") ? `"${l}"` : l} is a symbolic link`)) && fails.length === 6 && mended(out), "reading.mjs --check: a rule folder that is a link, a folder and a file link in a rule folder, one in the floor's folder and the core's AGENTS.md are each refused once with its mend, a name with a line's end on one line", out);
+  ok(Object.keys(lib.modules).every(f => !/^floor\/topics\/|^tasks\/(?:more|link|two)/u.test(f)) && lib.links.length === 6, "reading.mjs: the library reads no module through a link, and lists each link it met");
+  ok(regular(rf, "inbox/item.md") === "# An item\n" && regular(rf, "inbox\\item.md") === (path.sep === "\\" ? "# An item\n" : null), "reading.mjs: a name with a backslash, a link, is the path checked and the path opened");
   const got = rules(rf, { agents: true });
   ok(!got.some(x => /elsewhere/u.test(`${x.key} ${x.text}`)), "rules.mjs: no rule is read through a folder or a file link in the rule folders");
 } else console.log("skip reading.mjs and rules.mjs: a link in a rule folder: links are not made here (Windows)");

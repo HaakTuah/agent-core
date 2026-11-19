@@ -116,23 +116,25 @@ export function coreAt(dir) {
 // What stands at the path `rel` under `dir`: "file" or "folder" where it and each folder on the way to it is a real one,
 // "link" where any of them is a symbolic link, null where one is missing, a pipe or a device. Each part is read with
 // lstat, so no link is followed at any depth, as a fork's branch may make any of them one (#848); `dir` itself is the
-// caller's. A path that leaves `dir` is null.
-export function real(dir, rel) {
+// caller's. A path that leaves `dir` is null. Its parts are split where the system splits a path, "/" alone where a
+// backslash is a letter of a name, and `at` is the path the walk read, which is the one a reader opens.
+function walk(dir, rel) {
   let at = dir, kind = "folder";
-  for (const part of String(rel).split(/[\\/]+/u).filter(p => p && p !== ".")) {
-    if (kind !== "folder" || part === "..") return null;
+  for (const part of String(rel).split(path.sep === "\\" ? /[\\/]+/u : /\/+/u).filter(p => p && p !== ".")) {
+    if (kind !== "folder" || part === "..") return { kind: null, at };
     at = path.join(at, part);
     let s;
-    try { s = fs.lstatSync(at); } catch { return null; }
-    if (s.isSymbolicLink()) return "link";
+    try { s = fs.lstatSync(at); } catch { return { kind: null, at }; }
+    if (s.isSymbolicLink()) return { kind: "link", at };
     kind = s.isDirectory() ? "folder" : s.isFile() ? "file" : null;
   }
-  return kind;
+  return { kind, at };
 }
+export const real = (dir, rel) => walk(dir, rel).kind;
 // A file's text where it is a regular file of the checkout's own, else null: a link (to a pipe, which never answers, to
 // an endless device or to a file outside the checkout), at its own place or on the way to it, a device, a pipe or a
 // folder reads as no file (#848).
-export const regular = (dir, rel) => { try { return real(dir, rel) === "file" ? fs.readFileSync(path.join(dir, rel), "utf8") : null; } catch { return null; } };
+export const regular = (dir, rel) => { try { const w = walk(dir, rel); return w.kind === "file" ? fs.readFileSync(w.at, "utf8") : null; } catch { return null; } };
 // The Markdown files of a real folder of the checkout, by their paths under `dir`; each link met, in the folder or on the
 // way to it, goes into `links` and is listed as no file.
 export function realFiles(dir, folder, links) {
@@ -140,7 +142,7 @@ export function realFiles(dir, folder, links) {
   if (kind === "link") links.add(folder);
   if (kind !== "folder") return [];
   let entries;
-  try { entries = fs.readdirSync(path.join(dir, folder), { withFileTypes: true }); } catch { return []; }
+  try { entries = fs.readdirSync(walk(dir, folder).at, { withFileTypes: true }); } catch { return []; }
   for (const e of entries) if (e.isSymbolicLink()) links.add(path.posix.join(folder, e.name));
   return entries.filter(e => e.isFile() && e.name.endsWith(".md")).map(e => e.name).sort();
 }
@@ -150,7 +152,11 @@ export function library(dir, prefix) {
   const links = new Set();
   const read = f => regular(dir, `${prefix}${f}`);
   const list = folder => realFiles(dir, `${prefix}${folder}`, links).map(f => `${folder}/${f}`);
-  return { ...gather(read, list), links: [...links].sort() };
+  const lib = gather(read, list);
+  // (the floor's own folder and the core's AGENTS.md hold rules too, which rules.mjs reads: a link there is refused as well)
+  realFiles(dir, `${prefix}floor`, links);
+  if (real(dir, `${prefix}AGENTS.md`) === "link") links.add("AGENTS.md");
+  return { ...lib, links: [...links].sort() };
 }
 
 // The modules a project's manifest leaves out, by their names: its "Modules:" line is a list that does not name the
@@ -392,7 +398,7 @@ function located(dir) {
   if (prefix === null) { console.error("FAIL: the core's roles/ and floor/ are not here as a real folder and file, none of them or the folders above them a link. Mend: run it from the project's root, where core-manifest.md names the core's path, or from the core's own root; where the core's copy is a link, put the copy itself in its place"); return 1; }
   const manifest = prefix ? regular(dir, "core-manifest.md") : null; // (leftOut reads none as no line)
   const all = library(dir, prefix);
-  for (const l of all.links) console.error(`FAIL: ${prefix}${l} is a symbolic link where the core's rules stand, and is read as nothing. Mend: put the file or folder itself in its place, or take the link out`);
+  for (const l of all.links) console.error(`FAIL: ${shown(`${prefix}${l}`)} is a symbolic link where the core's rules stand, and is read as nothing. Mend: put the file or folder itself in its place, or take the link out`);
   if (all.links.length) return 1;
   return { prefix, all, manifest };
 }
