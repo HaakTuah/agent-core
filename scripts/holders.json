@@ -189,7 +189,9 @@
       "check: scripts/security-review.mjs, in part",
       "check: GitHub's ruleset on the default branch, in part"
     ],
-    "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part"
+    "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part",
+    "floor/security.md: The owner's yes in the PR": "check: scripts/pr-description.mjs, in part",
+    "roles/shared/teams.md: The higher right gives the floor's yeses": "check: scripts/pr-description.mjs, in part"
   },
   "behind": {
     "AGENTS.md": [208, 209, 213],
@@ -330,7 +332,7 @@
     "roles/shared/review-guidelines.md: A mechanical move is read by its rule and a sample": [251],
     "tasks/cleaning.md": [226],
     "tasks/cleaning.md: No process number is a builder's goal": [244],
-    "tasks/cleaning.md: The audit's reader has a fixed brief and fixed questions": [257],
+    "tasks/cleaning.md: The audit's reader has a fixed brief and fixed questions": [257, 262],
     "tasks/cleaning.md: The state report leads with the outcomes": [244, 251],
     "tasks/code-shape.md": [226],
     "tasks/code-shape.md: A job a maintained package does is done by it": [255],
@@ -374,7 +376,7 @@
     "tasks/hosts.md: One layer knows no host": [236],
     "tasks/hosts.md: Proven host by host": [236],
     "tasks/hosts.md: Where users get a release, a pull request merges on its own green checks": [261],
-    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": [262],
+    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": [263],
     "tasks/hosts.md: The merge line follows the host": [259],
     "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": [259],
     "tasks/planning.md": [243],
@@ -445,6 +447,7 @@
     "tasks/choices.md: A trial of a maintained tool replays the part's past bugs": "correction: does not work; outcome: robust",
     "roles/shared/review-guidelines.md: A mechanical move is read by its rule and a sample": "findings; outcome: robust",
     "tasks/cleaning.md: The state report leads with the outcomes": "correction: does not work; outcome: robust",
+    "tasks/cleaning.md: The audit's reader has a fixed brief and fixed questions": "correction: looks wrong; outcome: readable",
     "floor/topics/dependencies.md: A new one is looked up in its registry": "check fires; outcome: robust; rare harm",
     "floor/topics/dependencies.md: A new one is taken in an order": "findings; outcome: robust",
     "floor/topics/dependencies.md: Code of another publisher is named in a lock file": "correction: rule missing; outcome: robust; rare harm",
