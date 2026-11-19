@@ -9,14 +9,14 @@ change): the kind `role`.
 the fallback reviewer takes a review no other gives; the design check, the stand-in and planning design judge or plan
 against the design and the owner's words; escalation takes what has beaten a builder twice.
 
-**A file for each role** (#304). By default what a role reads at its start is the floor's
-`security.md`, its own file under `roles/` and the shared files that file names on its line "Reads at its start:". Whoever writes or changes a rule
+**A file for each role** (#304). By default what a role reads at its start is the floor's `security.md`, its own file
+under `roles/` and the shared files that file names on its line "Reads at its start:". Whoever writes or changes a rule
 puts one that a single role needs in that role's file, and one that several roles share in one shared file their files
 name, so that no rule stands in two files; a role's file says in a line each what the role hands each neighbouring role
 and gets back, and nothing of how the neighbour works. It does not mean a module read by task belongs to a role (a
 builder that mends a bug and one that builds a feature have one role and read different modules), nor that a session
-with no file here (a helper, planning design, escalation) reads more than its brief names. Reason: every role read
-every other role's rules at each start. Held by `scripts/size.mjs`, a cap for each role's start, and
+with no file here (a helper, planning design, escalation) reads more than its brief names. Reason: every role read every
+other role's rules at each start. Held by `scripts/size.mjs`, a cap for each role's start, and
 `scripts/reading.mjs --check`, which fails a role's file that names no start; where a rule stands, by nothing yet.
 
 **Tools are preferences** (#249). By default each role goes to the tool this table prefers, and,
@@ -44,10 +44,9 @@ where that tool is not at hand, to the next it names:
   with another tool alone could fill none.
 - Held by nothing yet: which tool took a role leaves no mark a check reads.
 
-**No session reviews its own work:** the session that reviews a change is never the session that
-wrote it. A fresh session of the same tool serves; a different tool is a preference, the table's. It does not mean a
-second tool is needed. Reason: a reviewer that wrote the change reads its own intent instead of the diff. Held by
-nothing yet: builder and reviewer post under one login (#187).
+**No session reviews its own work:** the session that reviews a change is never the session that wrote it. It does not
+mean a second tool is needed: a fresh session of the same tool serves. Reason: a reviewer that wrote the change reads
+its own intent instead of the diff. Held by nothing yet: builder and reviewer post under one login (#187).
 
 **The rules name tiers, never a model** (#467). By default a rule names the tier a job takes, with its effort:
 
@@ -66,8 +65,6 @@ a session picks its own. Reason: a running session can seldom change its model, 
 strongest, which the owner's usage pays for. Held by `scripts/general.mjs` and `scripts/tools-offer.mjs`; what built
 a PR, by nothing yet.
 
-**Planning design** is asked at most once per task (its PR says when it was), with a self-contained brief, when it needs
-a new or better plan.
+**Planning design** is asked at most once per task (its PR says when it was), when it needs a new or better plan.
 
-**Escalation:** what has beaten a builder twice may go to a fresh solver with a self-contained brief;
-the builder applies and checks the answer.
+**Escalation:** what has beaten a builder twice may go to a fresh solver; the builder applies and checks the answer.

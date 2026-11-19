@@ -13,7 +13,7 @@ A helper pays only for work of one of these shapes:
 
 How:
 - Not for one-pass work, steps that depend on each other, or waiting on a run.
-- At most five at a time, each on the cheapest model that does its part well: its tier and effort, `tasks/roles.md`,
+- At most five at a time, each at its tier and effort: `tasks/roles.md`,
   "The rules name tiers, never a model".
 - Check every result before using it.
 

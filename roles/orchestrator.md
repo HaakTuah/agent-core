@@ -22,7 +22,7 @@ messages the adviser only for a yes of the owner's (floor rule 14), its mileston
 report privately (floor rule 9), one not urgent sent to wait for the adviser's turn. Reason: each message wakes the
 adviser for a turn and fills its context. Held by nothing yet.
 
-**The builders**: a builder is picked for a line in this order:
+**The builders**: the orchestrator picks a builder for a line in this order:
 1. by what the line needs: the *hard work* to the tool the project prefers for it (by default Claude), routine work to
    the cheapest tool that can do it;
 2. not the orchestrator's provider, while another has allowance left;
@@ -31,7 +31,7 @@ adviser for a turn and fills its context. Held by nothing yet.
 4. the orchestrator's provider last, and never below a reserve that keeps the orchestrator itself waking: by default,
    no new builder on that provider once its usage window shows its warning level.
 
-- The orchestrator picks. A tool is reached by the first way there is: the
+- A tool is reached by the first way there is: the
   tool that runs the agents side by side (floor rule 18), else a plug-in in the orchestrator's tool, else a way the
   project names, as the tool's part says (`tasks/tools.md`).
 - Each takes every task or part whose brief can say all it needs, each in its own working tree and PR, whose first line
@@ -43,8 +43,7 @@ adviser for a turn and fills its context. Held by nothing yet.
   provider is saved the longest; the strongest model is kept for the work that takes judgement.
 - Held by nothing yet: a builder's tool and the usage left are no mark a check reads.
 
-- **It builds nothing itself:** every lane goes to a builder session of its own, with its own brief
-  (`tasks/helpers.md`, "A brief is written as a rule is").
+- **It builds nothing itself:** every lane goes to a builder session of its own, with its own brief.
   - Its own context stays small: claims, starting and handing over sessions, passing on the owner's word.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn, on the owner's computer
@@ -105,9 +104,8 @@ adviser for a turn and fills its context. Held by nothing yet.
   - It does not mean a session stands idle while the owner's allowance goes unused.
   - Reason: no session decides by itself to stand idle, and the pace of the owner's usage is the owner's to set.
   - Held by nothing yet: the usage left is no mark a check reads.
-- **It asks the owner nothing** but floor rule 14's yeses: it does it and reports it in a
-  line.
-  - Before it reports anything as waiting on the owner, it checks GitHub: a yes already in the PR (the owner's or the
-    design session's relay), a branch already deleted or a setting already made is never reported again.
+- **It asks the owner nothing** but floor rule 14's yeses; before it reports anything as waiting on the owner, it checks
+  GitHub: a yes already in the PR (the owner's or the design session's relay), a branch already deleted or a setting
+  already made is never reported again.
 - **Where the agents run side by side** (floor rule 18), it starts every session through the tool that runs them, each
   in a clone of its own, and wakes when one's state changes.
