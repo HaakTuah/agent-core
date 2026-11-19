@@ -18,9 +18,9 @@
 //                                     cuts it: the tag is pushed to the core's repository, and nothing else is. Only
 //                                     where main's newest commit is <sha>, the checks listed in --runs, GitHub's
 //                                     answer to repos/<core>/actions/runs?head_sha=<sha>&branch=main&event=push, have
-//                                     all passed, and the newest hourly or hand-started run of the tests in --full,
-//                                     its answer to repos/<core>/actions/workflows/tests.yml/runs?head_sha=<sha>, has
-//                                     passed too (fullRun); without the three it cuts nothing
+//                                     all passed, and the tests' hourly or hand-started runs in --full, its answer to
+//                                     repos/<core>/actions/workflows/tests.yml/runs?head_sha=<sha>&branch=main, are none
+//                                     unfinished, the newest passed (fullRun); without the three it cuts nothing
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -85,17 +85,15 @@ function after(flag, argv) {
 // Why the release `name` at `sha` is not cut, or null: the staged cases hold it (`staged`, from atRelease), or a check
 // on that commit has not passed, as the list of the runs there (`runs`, a file) says.
 // The core's tests in full on a commit (#733, points 3 and 6): a pull request's run and a push's are on Linux alone, so
-// a release waits on the newest run of the tests' workflow there that ran once an hour or was started by hand, which
-// holds the Windows suites, to have passed. A reason it holds the release, or null.
+// a release waits on the tests' runs there that ran once an hour or were started by hand, which hold the Windows
+// suites: none unfinished, the newest passed. A reason it holds the release, or null.
 export const TESTS = ".github/workflows/tests.yml";
-// When a run last changed (its finish, for one that completed); never, read as the oldest.
-const finishOf = r => (typeof r?.updated_at === "string" ? Date.parse(r.updated_at) || 0 : 0);
-// The last of runs to finish, the higher id of two that finished together.
-const lastOf = runs => runs.reduce((a, b) => (finishOf(b) > finishOf(a) || (finishOf(b) === finishOf(a) && Number(b?.id ?? 0) > Number(a?.id ?? 0)) ? b : a));
+// The newest of runs, by when each was made: the highest id, as tests.yml's hourly run reads them.
+const lastOf = runs => runs.reduce((a, b) => (Number(b?.id ?? 0) > Number(a?.id ?? 0) ? b : a));
 // The tests' runs in full on a commit: those once an hour or started by hand.
 const inFull = list => (Array.isArray(list?.workflow_runs) ? list.workflow_runs : []).filter(r => r?.path === TESTS && ["schedule", "workflow_dispatch"].includes(r?.event));
-// (it holds while any full run on the commit is unfinished, and reads the last to finish: an hourly run skips only
-// where none other is going and the last to finish passed, so a skipped one never reads a failure away)
+// (it holds while any full run on the commit is unfinished, and reads the newest: an hourly run skips only where none
+// other is going and the newest passed, so a skipped one is the newest only where nothing was made after it)
 export function fullRun(list) {
   const runs = inFull(list);
   if (!runs.length) return "the tests have not run in full on it yet, the Windows suites with them: start the tests workflow on main by hand (its page under Actions), or wait for its hourly run, and start the release again once it has passed";

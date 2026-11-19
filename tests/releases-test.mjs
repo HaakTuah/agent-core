@@ -195,14 +195,14 @@ ok(!staysAt(r4, onlyA, dir), "a release whose notes ask something new asks a syn
 // the checks on the commit a release would stand on
 const run = (name, status, conclusion, path = `.github/workflows/${name}.yml`) => ({ name, path, status, conclusion });
 const list = (...runs) => ({ total_count: runs.length, workflow_runs: runs });
-// the core's tests in full on that commit (#733): the newest run of the tests' workflow there that ran once an hour or
-// was started by hand, which holds the Windows suites, has passed
-const full = (event, conclusion, at, status = "completed") => ({ ...run("tests", status, conclusion), event, updated_at: `2026-11-19T${at}:00Z` });
+// the core's tests in full on that commit (#733): of the tests' runs there once an hour or by hand, which hold the
+// Windows suites, none is unfinished and the newest, by when it was made (its id), passed
+const full = (event, conclusion, id, status = "completed") => ({ ...run("tests", status, conclusion), event, id });
 ok(/have not run in full on it yet/.test(fullRun(list({ ...run("tests", "completed", "success"), event: "push" }))), "a commit whose tests ran only on its push, on Linux, has not had them in full, and the release waits, saying how to start them");
-ok(fullRun(list(full("schedule", "success", "10:00"))) === null && fullRun(list(full("workflow_dispatch", "success", "10:00"))) === null, "an hourly or a hand-started run that passed lets the release stand");
-ok(fullRun(list(full("schedule", "failure", "09:00"), full("workflow_dispatch", "success", "10:00"))) === null && /hourly run\): failure/.test(fullRun(list(full("workflow_dispatch", "success", "09:00"), full("schedule", "failure", "10:00")))), "the last of them to finish decides: a later pass after a failure lets it stand, a later failure holds it");
-ok(/hand-started run\): in_progress/.test(fullRun(list(full("schedule", "success", "11:00"), full("workflow_dispatch", null, "10:30", "in_progress")))), "and a full run still going on the commit holds it, though a skipped hourly run finished after it started");
-ok(/in_progress/.test(fullRun(list(full("schedule", null, "10:00", "in_progress")))) && /not run in full/.test(fullRun(list(full("schedule", "success", "10:00").path && { ...full("schedule", "success", "10:00"), path: ".github/workflows/other.yml" }))), "one still going holds it, and another workflow's run is no run of the tests");
+ok(fullRun(list(full("schedule", "success", 10))) === null && fullRun(list(full("workflow_dispatch", "success", 10))) === null, "an hourly or a hand-started run that passed lets the release stand");
+ok(fullRun(list(full("workflow_dispatch", "success", 10), full("schedule", "failure", 9))) === null && /hourly run\): failure/.test(fullRun(list(full("schedule", "failure", 10), full("workflow_dispatch", "success", 9)))), "the newest of them, by when it was made, decides, in whatever order GitHub lists them: a pass made after a failure lets it stand, a failure made after a pass holds it");
+ok(/hand-started run\): in_progress/.test(fullRun(list(full("schedule", "success", 11), full("workflow_dispatch", null, 10, "in_progress")))), "and a full run still going on the commit holds it, though a skipped hourly run was made after it");
+ok(/in_progress/.test(fullRun(list(full("schedule", null, 10, "in_progress")))) && /not run in full/.test(fullRun(list({ ...full("schedule", "success", 10), path: ".github/workflows/other.yml" }))), "one still going holds it, and another workflow's run is no run of the tests");
 ok(held(list(run("tests", "completed", "success"), run("size", "completed", "success"))).length === 0, "a commit whose every check has passed may carry a release");
 ok(held(list(run("tests", "completed", "success"), run("size", "completed", "skipped"), run("other", "completed", "neutral"))).length === 0, "a check that was skipped holds nothing where another passed");
 ok(held(list(run("tests", "in_progress", null), run("size", "completed", "success"))).join() === "tests: in_progress" && held(list(run("tests", "queued", null))).join() === "tests: queued", "a check still going holds it");
