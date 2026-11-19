@@ -5,8 +5,8 @@
 // the pull request's; read by their parents alone, such a merge could carry a change of its own that no review saw.
 // This proves, of each merge that walk passes (standsFrom), that its tree is git's own merge of its two parents (`git
 // merge-tree --write-tree`, git 2.38 and later, the strategy GitHub's "Update branch" uses too), with each file in
-// conflict, where there are any, settled by keeping both sides' lines whole, one side's after the other's in either
-// order, the same for the whole file (built from `git merge-file --diff3`, git 2.43 and later), where in each conflict
+// conflict, where there are any, settled by keeping both sides' lines whole, main's (the second parent's) first and
+// then the pull request's, one order a merger cannot choose, since the order of lines can change what they do (built from `git merge-file --diff3`, git 2.43 and later), where in each conflict
 // both sides only added lines, none taken from the base: so two pull requests that add to the same place in a file
 // bring in no new content when the second is brought up to date. A merge it cannot prove so (a conflict where either
 // side changed or deleted a line, which keeping both would settle for one side, any conflict settled another way, which
@@ -50,7 +50,7 @@ export function isGits(at, parents, cwd) {
 
 // whether a tree differs from git's merge (made, its files in conflict written with markers) only in those files, each
 // of them, as git's merge left it in conflict (listed: its three stages, as merge-tree's `-z` gives them), both sides'
-// lines whole in either order and the mode both sides give it, where each conflict in it only adds lines on both sides
+// lines whole, main's first, and the mode both sides give it, where each conflict in it only adds lines on both sides
 const STAGE = /^(100644|100755) ([0-9a-f]{40}) ([123])\t(.+)$/su;
 function bothKept(made, tree, listed, cwd) {
   const stages = new Map();
@@ -71,12 +71,12 @@ function bothKept(made, tree, listed, cwd) {
     if (!base || !ours || !theirs || ours.mode !== theirs.mode) return false;
     const kept = entries.get(file);
     const both = keptBoth(base.blob, ours.blob, theirs.blob, cwd);
-    if (both === null || !both.some((blob) => SHA.test(blob) && kept === `${ours.mode} blob ${blob}\t${file}`)) return false;
+    if (both === null || !SHA.test(both) || kept !== `${ours.mode} blob ${both}\t${file}`) return false;
   }
   return true;
 }
 
-// the blobs of the file with both sides kept, ours' part before theirs in every conflict and theirs' before ours', or
+// the blob of the file with both sides kept, theirs' part (main's) before ours' (the pull request's) in every conflict, or
 // null where a conflict's base part is not empty: there a side changed or deleted a line, and keeping both would undo
 // one side's change (#750, point 3). Built from git's diff3 form, which leaves each conflict as git's merge finds it
 // (merge-file's --union joins conflicts a few lines apart, and so would move a side's line past lines both share), with
@@ -93,7 +93,7 @@ function keptBoth(base, ours, theirs, cwd) {
   const run = bytes(["merge-file", "-p", "--object-id", "--diff3", `--marker-size=${MARK}`, ours, base, theirs], cwd);
   // (git's count of conflicts, 1 to 127; an error, 255, or none at all, proves nothing)
   if (run.error || !(run.status >= 1 && run.status <= 127) || typeof run.stdout !== "string" || run.stdout === "") return null;
-  const first = [], second = [];
+  const kept = [];
   let part = "out", mine = [], yours = [];
   // (a marker line as git writes it, in a file whose lines end CR LF too)
   const marks = (line, c) => line.startsWith(c.repeat(MARK)) && (c !== "=" || line.replace(/\r$/u, "") === c.repeat(MARK));
@@ -102,18 +102,16 @@ function keptBoth(base, ours, theirs, cwd) {
     else if (part === "ours" && marks(line, "|")) part = "base";
     else if (part === "base" && marks(line, "=")) part = "theirs";
     else if (part === "theirs" && marks(line, ">")) {
-      first.push(...mine, ...yours); second.push(...yours, ...mine);
+      kept.push(...yours, ...mine);
       part = "out"; mine = []; yours = [];
-    } else if (part === "out") { first.push(line); second.push(line); }
+    } else if (part === "out") kept.push(line);
     else if (part === "ours") mine.push(line);
     else if (part === "theirs") yours.push(line);
     else return null; // (a line of the base's: a side changed or deleted it)
   }
   if (part !== "out") return null;
-  return [first, second].map((lines) => {
-    const hashed = bytes(["hash-object", "--stdin"], cwd, lines.join("\n"));
-    return hashed.status === 0 ? hashed.stdout.trim() : null;
-  });
+  const hashed = bytes(["hash-object", "--stdin"], cwd, kept.join("\n"));
+  return hashed.status === 0 ? hashed.stdout.trim() : null;
 }
 
 // the merges proved, of those the walk from the head passes: each in turn, from the head, until one is not, since the

@@ -83,7 +83,8 @@ const settled = (name, text, extra) => {
 };
 const MAIN_FIRST = settled("main-first", "one\ntwo\nthree\nmain's line\nthe pull request's line\n");
 const OURS_FIRST = settled("ours-first", "one\ntwo\nthree\nthe pull request's line\nmain's line\n");
-ok([MAIN_FIRST, OURS_FIRST].every((at) => proved(pullOf(at, [ADDS, at]), listed(r, ADDS, at), r).join() === at), "a conflict settled by keeping both sides' lines whole, main's first or the pull request's, is proved");
+ok(proved(pullOf(MAIN_FIRST, [ADDS, MAIN_FIRST]), listed(r, ADDS, MAIN_FIRST), r).join() === MAIN_FIRST && proved(pullOf(OURS_FIRST, [ADDS, OURS_FIRST]), listed(r, ADDS, OURS_FIRST), r).length === 0,
+  "a conflict settled by keeping both sides' lines whole, main's first, is proved; the pull request's first, an order a merger chose, is not (Codex's finding on #753)");
 const CHANGED = settled("changed", "one\ntwo\nthree\nmain's line\nthe pull request's line, changed\n");
 const DROPPED = settled("dropped", "one\ntwo\nthree\nthe pull request's line\n");
 const BESIDE = settled("beside", "one\ntwo\nthree\nmain's line\nthe pull request's line\n", () => write(r, "b.txt", "a change of its own\n"));
@@ -121,7 +122,7 @@ const near = (name, between) => {
 };
 for (const [name, between] of [["exit", "exit 0"], ["braces", "}\n\n}"]]) {
   const { ours, theirs } = near(name, between);
-  const inPlace = kept(`${name}-in-place`, ours, theirs, `start\nA pr-line\nverify || exit 1\n${between}\nB pr-line\nD main-line\nend\n`);
+  const inPlace = kept(`${name}-in-place`, ours, theirs, `start\nverify || exit 1\nA pr-line\n${between}\nD main-line\nB pr-line\nend\n`);
   const moved = kept(`${name}-moved`, ours, theirs, `start\nA pr-line\n${between}\nB pr-line\nverify || exit 1\n${between}\nD main-line\nend\n`);
   ok(proved(pullOf(inPlace, [inPlace]), listed(r, inPlace), r).join() === inPlace && proved(pullOf(moved, [moved]), listed(r, moved), r).length === 0,
     `  two conflicts apart by ${name === "exit" ? "a line both share" : "lines with no letter or digit"}: kept in place, proved; the union that moves main's line past it, not`);
@@ -135,8 +136,8 @@ const bytesOf = (name, base, pr, main, settled) => {
 };
 const latin = (text) => Buffer.from(text, "latin1");
 const BINARY = bytesOf("binary", latin("a\0b\n"), latin("a\0b\nours\n"), latin("a\0b\ntheirs\n"), "");
-const REWRITTEN = bytesOf("latin", latin("a\nsecret=\xff\nb\n"), latin("a\nsecret=\xff\nb\nours\n"), latin("a\nsecret=\xff\nb\ntheirs\n"), "a\nsecret=\ufffd\nb\nours\ntheirs\n");
-const LATIN = bytesOf("latin-kept", latin("a\nsecret=\xff\nb\n"), latin("a\nsecret=\xff\nb\nours\n"), latin("a\nsecret=\xff\nb\ntheirs\n"), latin("a\nsecret=\xff\nb\nours\ntheirs\n"));
+const REWRITTEN = bytesOf("latin", latin("a\nsecret=\xff\nb\n"), latin("a\nsecret=\xff\nb\nours\n"), latin("a\nsecret=\xff\nb\ntheirs\n"), "a\nsecret=\ufffd\nb\ntheirs\nours\n");
+const LATIN = bytesOf("latin-kept", latin("a\nsecret=\xff\nb\n"), latin("a\nsecret=\xff\nb\nours\n"), latin("a\nsecret=\xff\nb\ntheirs\n"), latin("a\nsecret=\xff\nb\ntheirs\nours\n"));
 const CRLF = bytesOf("crlf", "a\r\nb\r\n", "a\r\nb\r\nours\r\n", "a\r\nb\r\ntheirs\r\n", "a\r\nb\r\ntheirs\r\nours\r\n");
 const is = (at) => proved(pullOf(at, [at]), listed(r, at), r).join() === at;
 ok(!is(BINARY) && !is(REWRITTEN) && is(LATIN) && is(CRLF),
@@ -156,8 +157,8 @@ const FFFD = Buffer.from("\ufffd", "utf8").toString("latin1");
 const NAME_BASE = commitOf(treeOf({ "\xff": "a\n", [FFFD]: "harmless\n" }));
 const NAME_PR = commitOf(treeOf({ "\xff": "a\nours\n", [FFFD]: "harmless\n" }), NAME_BASE);
 const NAME_MAIN = commitOf(treeOf({ "\xff": "a\ntheirs\n", [FFFD]: "harmless\n" }), NAME_BASE);
-const NAME_EVIL = commitOf(treeOf({ "\xff": "EVIL: never reviewed\n", [FFFD]: "a\nours\ntheirs\n" }), NAME_PR, NAME_MAIN);
-const NAME_KEPT = commitOf(treeOf({ "\xff": "a\nours\ntheirs\n", [FFFD]: "harmless\n" }), NAME_PR, NAME_MAIN);
+const NAME_EVIL = commitOf(treeOf({ "\xff": "EVIL: never reviewed\n", [FFFD]: "a\ntheirs\nours\n" }), NAME_PR, NAME_MAIN);
+const NAME_KEPT = commitOf(treeOf({ "\xff": "a\ntheirs\nours\n", [FFFD]: "harmless\n" }), NAME_PR, NAME_MAIN);
 ok(proved(pullOf(NAME_EVIL, [NAME_EVIL]), listed(r, NAME_EVIL), r).length === 0 && proved(pullOf(NAME_KEPT, [NAME_KEPT]), listed(r, NAME_KEPT), r).join() === NAME_KEPT,
   "  a path that is no UTF-8 is read as its own bytes: content written into it is not proved, both sides kept in it are");
 git(r, "checkout", "-q", "-B", "mode", ADDS);

@@ -59,9 +59,9 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    - **A review carries over to a commit that adds nothing new of the pull request's own** (#750). By default the
      `security-review` and `code-review` statuses read a review of the head. Where `scripts/clean-merges.mjs` proves
      that the commits since the review only bring in `main`, each the merge git makes of its parents, any file in
-     conflict where both sides only added lines, settled by keeping both sides' lines whole, one side's after the
-     other's, the statuses pass on that review with no new one, and the builder asks Codex, or any reviewer, again only
-     for new content. It does not mean a conflict settled by hand goes unreviewed: a merge that changes the pull
+     conflict where both sides only added lines, settled by keeping both sides' lines whole, main's before the pull
+     request's, the statuses pass on that review with no new one, and the builder asks Codex, or any reviewer, again
+     only for new content. It does not mean a conflict settled by hand goes unreviewed: a merge that changes the pull
      request's own lines, or main's, is new content. Reason: floor rule 8 says nothing is reviewed twice, and the check
      asked a fresh review of every head: about 150 requests for Codex's review on 39 pull requests, 113 of them finding
      nothing, and about 140 security-review comments, 17 of them saying only that none was needed. Held by
