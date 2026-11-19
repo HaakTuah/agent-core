@@ -10,7 +10,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { FLOOR, FLOOR_WHEN, KINDS_BY_PATH, MAKE, PAST, READ_LINE, START, TRY, asked, budget, calledByPaths, coreAt, faults, gather, hookLine, kindsOf, leftOut, library, lineMend, listed, matches, opening, ownOf, ownPaths, reading, readsOf, taken, whenOf } from "../scripts/reading.mjs";
+import { FLOOR, FLOOR_WHEN, KINDS_BY_PATH, MAKE, PAST, READ_LINE, START, TRY, asked, budget, calledByPaths, coreAt, faults, gather, hookLine, kindsOf, leftOut, library, lineMend, listed, matches as matchesIn, opening, ownOf, ownPaths, reading, readsOf, taken, whenOf } from "../scripts/reading.mjs";
+// (each case its own reading, with a budget of its own, where it gives none)
+const matches = (pattern, file, within = budget()) => matchesIn(pattern, file, within);
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -237,6 +239,10 @@ if (process.platform !== "win32") {
 }
 const imported = spawnSync(process.execPath, ["--input-type=module", "-e", `import ${JSON.stringify(new URL("../scripts/reading.mjs", import.meta.url).href)}; console.log("imported")`, "builder"], { cwd: root, encoding: "utf8" });
 ok(imported.status === 0 && imported.stdout === "imported\n", "imported by a script named on node's command line, it runs nothing of its own", imported.stdout + imported.stderr);
+
+let unbudgeted = null;
+try { matchesIn("*.md", "a.md"); } catch (e) { unbudgeted = e; }
+ok(unbudgeted instanceof TypeError && /Mend:/u.test(unbudgeted.message), "matches() given no reading's budget is refused, with its mend, so no try runs outside a reading's bound");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the reading script`);
 process.exit(failed ? 1 : 0);

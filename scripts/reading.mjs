@@ -159,9 +159,10 @@ function tried(g, n, within) {
   if (g.parts === null) { if (!paid(within, TRY * g.p.length)) return true; g.parts = partsOf(g.p); }
   return !paid(within, 2 * g.parts.length * (s.length + 1)) || globbed(g.parts, s);
 }
-// Whether a changed path matches a pattern, the steps paid from `within` (a budget of its own where none is given), or
-// true where they cannot be paid.
-export function matches(pattern, file, within = budget()) {
+// Whether a changed path matches a pattern, the steps paid from `within`, the reading's budget, which every caller gives
+// (none given is refused, so no caller tries patterns outside a reading's bound), or true where they cannot be paid.
+export function matches(pattern, file, within) {
+  if (!within || typeof within.left !== "number") throw new TypeError("matches(): no reading's budget given. Mend: pass the reading's budget(), as calledByPaths does");
   const g = patternOf(String(pattern), within), name = String(file);
   return g === null || !paid(within, name.length) || tried(g, pathOf(name), within);
 }
