@@ -259,6 +259,12 @@ ok(improved.every(v => v.fail.length === 0 && /lists 1 entry that is gone or mov
   "an entry that is gone, where the change leaves the baseline as its base holds it or names no base, passes and is said with the --write that takes it out; one that only shrank is not named", improved.map(noted).join("\n"));
 v = judge({ now: { "src/a.js": long("tall", 90) }, baseline: gone.replace("}}", "}, \"grown\": {}}"), base: baseOf(gone, { "src/a.js": long("tall", 100) }) });
 ok(mended(said(v)) && /lists 1 entry that is gone or moved now, and this change writes the baseline/.test(said(v)) && /--write/.test(said(v)) && !/tall/.test(said(v)) && !/gone or moved/.test(noted(v)), "where the change writes the baseline, an entry it leaves that is gone fails until --write lowers it", said(v));
+const cycle = (a, b) => ({ [a]: `import "./${path.basename(b)}";\n`, [b]: `import "./${path.basename(a)}";\n` });
+const loop = JSON.stringify({ reads: Object.keys(READERS), listed: { "cycle: src/x.js -> src/y.js": true, "cycle: src/y.js -> src/x.js": true } });
+v = judge({ now: cycle("src/p.js", "src/q.js"), baseline: loop, base: baseOf(loop, {}) });
+ok(mended(said(v)) && /src\/p\.js/.test(said(v)), "an entry the base's code no longer held, left listed by an earlier pull request, covers no new breach of its kind", said(v));
+v = judge({ now: cycle("src/p.js", "src/q.js"), baseline: loop, base: baseOf(loop, cycle("src/x.js", "src/y.js")) });
+ok(v.fail.length === 0, "one the base held, which this change moves, still covers it", said(v));
 v = judge({ now: { "src/b.js": long("tall", 100) }, baseline: listed([f100]) });
 ok(v.fail.length === 0 && /gone or moved/.test(noted(v)) && !/functions? pass/.test(said(v)), "a listed function that moved is no new breach: its old entry is said, for --write to list where it stands", noted(v));
 ok(mended(`FAIL: ${(() => { try { judge({ now: {}, baseline: "{}" }); return ""; } catch (e) { return e.message; } })()}`), "a baseline that is none is refused, with its mend");

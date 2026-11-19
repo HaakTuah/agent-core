@@ -24,8 +24,8 @@
 // numbers that fell too. A pull request that only improves on the baseline passes and says what --write would take
 // out, which the next pull request that changes the baseline, or a cleaning task, writes; one that changes the
 // baseline and leaves such an entry standing fails, so the baseline it writes lists the debt as it is (#750, point
-// 5: improving pull requests had to rewrite this shared file, and collided; until it is written, a mended entry could
-// come back unseen). A baseline names the readers whose finds it lists ("reads"): what a reader it
+// 5: improving pull requests had to rewrite this shared file, and collided); until it is written, an entry the base's
+// code no longer held covers no new breach. A baseline names the readers whose finds it lists ("reads"): what a reader it
 // does not name finds is said, never failed, where the base held it already or no base is told, until --write lists
 // it, so that a sync that brings a reader turns nothing red (AGENTS.md, "Nothing locks a project"). It never guesses:
 // an import that leads nowhere it can tell and a file whose JSX its reader cannot follow to its end are counted and
@@ -660,13 +660,22 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   const reads = new Set(baseline.reads), skipped = unreachedReaders();
   const unread = id => { const r = readerOf(id, found.readers); return r !== null && (!reads.has(r) || (skipped.includes(r) && groupOf(id).kind === "function")); };
   const kept = id => !current.has(id) && skipped.includes(readerOf(id, found.readers)) && ["function", "lost"].includes(groupOf(id).kind);
-  const news = unclaimed(current, baseline.listed, config.marks);
+  const gone = id => !current.has(id) && !unread(id) && !kept(id);
+  const news = unclaimed(current, base ? heldAt(baseline.listed, gone, base) : baseline.listed, config.marks);
   const { fail, later } = fresh({ config, at, self, found, current, base, news, unread });
-  const lowered = staleOf({ config, at, self, baseline, baselineText, base, gone: id => !current.has(id) && !unread(id) && !kept(id) });
+  const lowered = staleOf({ config, at, self, baseline, baselineText, base, gone });
   fail.push(...lowered.fail);
   if (base) fail.push(...againstBase({ config, at, self, baseline, base, found }));
   const reread = [...baseline.listed.keys()].filter(id => !current.has(id) && unread(id) && !kept(id)).length;
   return { fail, notes: [...notesOf(found.read), ...lowered.notes, ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read, kept: [...baseline.listed.keys()].filter(kept).length };
+}
+
+// The entries of a baseline a new breach may claim, against the pull request's base: each but one gone now that the
+// base's code no longer held either, a mended entry an earlier pull request left listed, which covers nothing new
+// (#750, point 5). The base's code is read only where an entry is gone now.
+function heldAt(listed, gone, base) {
+  const kept = [...listed].filter(([id]) => !gone(id) || base.stood().has(id));
+  return kept.length === listed.size ? listed : new Map(kept);
 }
 
 // The entries a baseline lists that are gone or moved now (`gone`): { fail, notes }. One that only shrank passes as it
