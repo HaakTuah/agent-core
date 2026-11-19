@@ -13,21 +13,28 @@
 // rights the host gives as letting them write, read by the size workflow for those who posted one), and one that raises
 // it by more than one step. It holds that the comment is there, not what it says, when it was written or that a fresh session
 // wrote it: whether the session found too little room stays with the reviews, as does any change to this check itself,
-// which a pull request runs in its own version, and the first cap of a role that had none. Run from this repository's
-// root by the size workflow (.github/workflows/size.yml); Node's own modules only.
+// which a pull request runs in its own version, and the first cap of a role that had none. A start or the queue past
+// its cap fails a pull request only where its own change grows it there, against the base; where the default branch
+// itself stands past one, since pull requests that each fitted merged together, it is a task, never a red: a warning
+// here, and an issue the scheduled look keeps (`due`, which look.mjs reads; #750, point 6). Run from this
+// repository's root by the size workflow (.github/workflows/size.yml); git and Node's own modules only.
 //
-//   node scripts/size.mjs                                  what each role reads at its start, against its cap, and
-//                                                          the queue against its own mark
+//   node scripts/size.mjs [--base <revision>]              what each role reads at its start, against its cap, and
+//                                                          the queue against its own mark; with --base, the pull
+//                                                          request's base, a start or the queue that this change
+//                                                          grows past its cap fails, and one past it there already
+//                                                          that it does not grow is a warning, as with no base
 //   node scripts/size.mjs --raise <base> <comments> [<rights>]
 //                                                          a raise has its leanness check: <base>, this file as the
 //                                                          pull request's base holds it; <comments>, the pull
 //                                                          request's comments as GitHub's API gives them; <rights>,
 //                                                          the host's answers on the rights of those who posted one;
 //                                                          OWNER, the repository's owner's login
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { sizeOf } from "./file-size.mjs";
-import { library, reading } from "./reading.mjs";
+import { counted as bytesOf, sizeOf } from "./file-size.mjs";
+import { gather, library, reading } from "./reading.mjs";
 import { counted as countedBy, writersOf } from "./security-review.mjs";
 import { started } from "./started.mjs";
 
@@ -55,19 +62,46 @@ export const CAPS = {
 // project's size marks give each such file (roles/shared/inbox.md, "The progress file holds order only"; core archive 216):
 // set at its first trim, as each project sets its own, and raised one step on 17 November 2026 for #534's lines (#537),
 // its leanness check having found at most 220 bytes of room for 273 over. A raise of it is read by the reviews, as any
-// mark's is (roles/shared/review-guidelines.md, "A mark on what every session reads"); this script checks only that
-// the queue is under it.
+// mark's is (roles/shared/review-guidelines.md, "A mark on what every session reads"); a pull request that grows the
+// queue past it, or lowers it below the queue, fails, and the default branch past it is a task (#750, point 6).
 export const QUEUE = { file: "QUEUE.md", mark: 5 * 1024 };
 const WRITERS = ["OWNER", "MEMBER", "COLLABORATOR"]; // GitHub's own word for who wrote a comment, not the comment's
 const ANSWER = /^(?:\*\*)?Leanness check:/u;
 
 // The files a role reads at its start, in the core at `dir`, by their paths there: what the reading script gives for
 // the role, and each module a tool's session reads at its start. Null where the role has no file.
-export function counted(role, dir = ".") {
-  const lib = library(dir, ""), got = reading(lib, { role });
+export const counted = (role, dir = ".") => startIn(library(dir, ""), role);
+function startIn(lib, role) {
+  const got = reading(lib, { role });
   if (got.error) return null;
   const parts = Object.entries(lib.modules).filter(([, w]) => w?.start && (w.tools.length || w.others.length)).map(([f]) => f);
   return [...new Set([...got.start, ...parts])];
+}
+
+// What each role reads at its start and the queue come to at a revision of this repository, read from git: { role:
+// bytes }, with the queue under QUEUE.file. Null where the revision is not named as one or git cannot read it, so that
+// the caller fails.
+const SAFE = ["-c", "core.fsmonitor=false"]; // (no command of git's settings runs as it reads)
+const BASE_FORM = /^\w[\w./^~-]*$/u; // (a revision's name, never an option)
+export function sizesAt(revision) {
+  if (!BASE_FORM.test(String(revision ?? ""))) return null;
+  const show = f => { try { return execFileSync("git", [...SAFE, "show", `${revision}:${f}`], { stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 26 }); } catch { return null; } };
+  try { execFileSync("git", [...SAFE, "rev-parse", "--verify", "--quiet", `${revision}^{commit}`], { stdio: "ignore" }); } catch { return null; }
+  const list = folder => { try { return execFileSync("git", [...SAFE, "ls-tree", "--name-only", `${revision}:${folder}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\n").filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`); } catch { return []; } };
+  const lib = gather(f => show(f)?.toString("utf8") ?? null, list), size = f => { const b = show(f); return b === null ? 0 : bytesOf(b); };
+  const sizes = { [QUEUE.file]: size(QUEUE.file) };
+  for (const role of Object.values(lib.roles).map(r => r.name)) sizes[role] = (startIn(lib, role) ?? []).reduce((sum, f) => sum + size(f), 0);
+  return sizes;
+}
+// The caps the revision `revision` set, { role or QUEUE.file: bytes }, read from its text of this file (capsOf, and
+// the queue's mark as QUEUE spells it); {} where it cannot be read, so no cap reads as lowered.
+const QUEUE_MARK = /^export const QUEUE = \{ file: "QUEUE\.md", mark: ([1-9][0-9]{0,5}) \* 1024 \};\r?$/m;
+export function capsAt(revision) {
+  if (!BASE_FORM.test(String(revision ?? ""))) return {};
+  let text;
+  try { text = execFileSync("git", [...SAFE, "show", `${revision}:scripts/size.mjs`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return {}; }
+  const mark = QUEUE_MARK.exec(text);
+  return { ...capsOf(text), ...(mark ? { [QUEUE.file]: Number(mark[1]) * 1024 } : {}) };
 }
 // The roles the core has a file for, at `dir`.
 export const rolesAt = (dir = ".") => Object.values(library(dir, "").roles).map(r => r.name);
@@ -139,31 +173,79 @@ function raise(baseFile, commentsFile, rightsFile) {
   console.log(up.length ? `ok   the cap of ${up.join(", ")} rises one step, and the pull request holds a leanness check's answer` : "ok   no role's cap is raised");
   return 0;
 }
-// What is wrong with one role's start against its cap, as the failure with its mend; null where nothing, its count printed.
-function over(role, roles) {
+// One role's start against its cap: { total, wrong }, wrong the failure with its mend where the start cannot be counted.
+function startOf(role, roles) {
   const files = roles.includes(role) ? counted(role) : null, cap = CAPS[role];
-  if (files === null) return `scripts/size.mjs gives the role ${role} a cap, and roles/ holds no file for it. Mend: take its line out of CAPS, or put its file back`;
-  if (cap === undefined) return `the role ${role} has no cap. Mend: give it a line in CAPS of scripts/size.mjs, the whole KB next above what it reads at its start, and say so in the pull request`;
+  if (files === null) return { wrong: `scripts/size.mjs gives the role ${role} a cap, and roles/ holds no file for it. Mend: take its line out of CAPS, or put its file back` };
+  if (cap === undefined) return { wrong: `the role ${role} has no cap. Mend: give it a line in CAPS of scripts/size.mjs, the whole KB next above what it reads at its start, and say so in the pull request` };
   const missing = files.filter(f => !fs.existsSync(f));
-  if (missing.length) return `what the role ${role} reads at its start cannot be counted: ${missing.join(", ")}. Mend: put back the file moved or taken out, or name it as it now stands in roles/${role}.md`;
+  if (missing.length) return { wrong: `what the role ${role} reads at its start cannot be counted: ${missing.join(", ")}. Mend: put back the file moved or taken out, or name it as it now stands in roles/${role}.md` };
   const total = files.reduce((sum, f) => sum + sizeOf(f), 0);
   console.log(`what the role ${role} reads at its start (${files.join(", ")}): ${total} bytes of ${cap}`);
-  return total <= cap ? null : `what the role ${role} reads at its start is ${total - cap} bytes over its cap. Mend: say the rules this\n`
-    + "pull request changes in fewer words and trim what is said twice; raise the role's cap by one KB only once a fresh session\n"
-    + "has read all the rules for room and found too little, its answer posted in a comment that opens \"Leanness check:\".";
+  return { total };
+}
+
+const TRIM = {
+  role: "say the rules this\npull request changes in fewer words and trim what is said twice; raise the role's cap by one KB only once a fresh session\n"
+    + "has read all the rules for room and found too little, its answer posted in a comment that opens \"Leanness check:\".",
+  queue: "take out each finished line, and any\nnote, which belongs in the description of its line's pull request: the file holds what is next and nothing done.",
+};
+
+// What is past its cap, each { what, total, cap, kind }: kind "role" or "queue". `wrong` gathers what cannot be counted.
+function measured(roles, wrong) {
+  const out = [];
+  for (const role of [...new Set([...roles, ...Object.keys(CAPS)])]) {
+    const got = startOf(role, roles);
+    if (got.wrong) wrong.push(got.wrong);
+    else out.push({ what: role, total: got.total, cap: CAPS[role], kind: "role", said: `what the role ${role} reads at its start` });
+  }
+  const queue = sizeOf(QUEUE.file);
+  console.log(`the queue (${QUEUE.file}): ${queue} bytes of its mark, ${QUEUE.mark}`);
+  out.push({ what: QUEUE.file, total: queue, cap: QUEUE.mark, kind: "queue", said: QUEUE.file });
+  return out.filter(m => m.total > m.cap);
+}
+
+// What a pull request or the default branch makes of each start or the queue past its cap: { fail, task }. Against
+// `base` ({ role or QUEUE.file: bytes }) and the caps it set (`caps`, the same form), one this change grows past its
+// cap fails, and so does one past a cap this change lowered; one past it at the base already that the change neither
+// grows nor lowers the cap of, and any where no base is told, is a task (#750, point 6).
+export function judged(over, base = null, caps = {}) {
+  const fail = [], task = [];
+  for (const m of over) {
+    const was = base?.[m.what] ?? 0, by = m.total - m.cap, had = caps[m.what];
+    if (base && had !== undefined && m.cap < had) fail.push(`${m.said} is ${by} bytes over its ${m.kind === "queue" ? "mark" : "cap"}, which this change lowers from ${had / 1024} KB to ${m.cap / 1024} KB. Mend: set it back to ${had / 1024} * 1024, the base's ${m.kind === "queue" ? "mark" : "cap"}, in scripts/size.mjs, or trim what stands to fit under the lower one in the same pull request`);
+    else if (base && m.total > was) fail.push(`${m.said} is ${by} bytes over its cap${was > m.cap ? `, ${m.total - was} of them this change's own` : ""}. Mend: ${TRIM[m.kind]}`);
+    else task.push(`${m.said} is ${by} bytes over its cap${base ? ", as it stood before this change, which does not grow it" : ""}`);
+  }
+  return { fail, task };
+}
+
+// The issue the scheduled look keeps while what a role reads at its start, or the queue, stands past its cap on the
+// default branch (look.mjs, its readers of what is due): in the core alone, where no manifest stands; a body of null,
+// once nothing stands past one, closes it. Counted at the root it is run from.
+export const DUE_TITLE = "What a role reads at its start passes its cap";
+export function due({ manifest }) {
+  if (manifest !== null || !fs.existsSync("roles") || !fs.existsSync(QUEUE.file)) return null;
+  const log = console.log, wrong = [];
+  console.log = () => {};
+  let over;
+  try { over = measured(rolesAt(), wrong); } finally { console.log = log; }
+  const { task } = judged(over);
+  if (!task.length) return { title: DUE_TITLE, body: null };
+  return { title: DUE_TITLE, body: [`Pull requests that each fitted merged together and took the default branch past a cap (\`node scripts/size.mjs\`; AGENTS.md, "The size caps keep the rules lean and decide nothing else"). A task to trim, which fails no pull request: say the rules in fewer words and trim what is said twice, the role's cap raised one KB only as that rule says.`, "", ...task.map(t => `- ${t}.`)].join("\n") };
 }
 
 function main([flag, baseFile, commentsFile, rightsFile]) {
   if (flag === "--raise") return raise(baseFile, commentsFile, rightsFile);
   const roles = rolesAt();
   if (!roles.length || !fs.existsSync(QUEUE.file)) { console.error(`FAIL: what each role reads at its start cannot be counted: ${roles.length ? QUEUE.file : "roles/"} is not here. Mend: run it from the core's root, where roles/ and ${QUEUE.file} stand, or put back what was moved or taken out`); return 1; }
-  const wrong = [...new Set([...roles, ...Object.keys(CAPS)])].map(role => over(role, roles)).filter(Boolean);
-  const queue = sizeOf(QUEUE.file);
-  console.log(`the queue (${QUEUE.file}): ${queue} bytes of its mark, ${QUEUE.mark}`);
-  if (queue > QUEUE.mark) wrong.push(`${QUEUE.file} is ${queue - QUEUE.mark} bytes past its mark. Mend: take out each finished line, and any\n`
-    + "note, which belongs in the description of its line's pull request: the file holds what is next and nothing done.");
-  for (const w of wrong) console.error(`FAIL: ${w}`);
-  return wrong.length ? 1 : 0;
+  if (flag !== undefined && flag !== "--base") { console.error(`FAIL: ${flag} is no option of this check. Mend: run node scripts/size.mjs, with --base <the pull request's base> on a pull request, or --raise <base> <comments> [<rights>]`); return 1; }
+  const base = flag === "--base" ? sizesAt(baseFile) : null;
+  if (flag === "--base" && base === null) { console.error(`FAIL: git cannot read the base ${baseFile ?? "(none named)"}. Mend: name a revision git holds here (the workflow fetches the merge commit's parents: HEAD^1)`); return 1; }
+  const wrong = [], { fail, task } = judged(measured(roles, wrong), base, base ? capsAt(baseFile) : {});
+  for (const t of task) console.log(`::warning::${t}, which fails nothing: a task to trim, which the scheduled look keeps as the issue "${DUE_TITLE}"`);
+  for (const w of [...wrong, ...fail]) console.error(`FAIL: ${w}`);
+  return wrong.length || fail.length ? 1 : 0;
 }
 
 if (started(import.meta.url)) process.exitCode = main(process.argv.slice(2));

@@ -76,6 +76,7 @@ const CHECKS = {
 const NOT_CHECKS = {
   "scripts/core-moved.mjs": "runs on a schedule, and tells a project the core has moved",
   "scripts/look.mjs": "runs on a schedule, and opens issues",
+  "scripts/issue-terms.mjs": "runs on a schedule, takes the personal terms out of issues and comments, and fails nothing",
   "scripts/versions.mjs": "runs on a schedule, and opens issues",
   "scripts/release.mjs": "cuts a release, started by hand on main",
   "scripts/site-publish.sh": "publishes a preview of a pull request's site",
