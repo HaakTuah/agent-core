@@ -78,17 +78,26 @@ function bothKept(made, tree, listed, cwd) {
 // (merge-file's --union joins conflicts a few lines apart, and so would move a side's line past lines both share), with
 // markers longer than any line of the blobs holds, so that a marker is never a line of the file's own.
 const MARK = 41;
+// (each blob read as bytes, one character a byte, so that nothing is decoded and written back otherwise; a blob holding
+// a NUL byte is binary to git, which merges no lines of it)
+const bytes = (args, cwd, input) => spawnSync("git", args, { cwd, encoding: "latin1", input: input === undefined ? undefined : Buffer.from(input, "latin1"), stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"], maxBuffer: 1 << 26 });
 function keptBoth(base, ours, theirs, cwd) {
-  for (const blob of [base, ours, theirs]) if (git(["cat-file", "blob", blob], cwd).split("\n").some((line) => /^([<|=>])\1{40}/u.test(line))) return null;
-  const run = spawnSync("git", ["merge-file", "-p", "--object-id", "--diff3", `--marker-size=${MARK}`, ours, base, theirs], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
-  if (run.error || !(run.status > 0) || typeof run.stdout !== "string") return null;
+  for (const blob of [base, ours, theirs]) {
+    const text = bytes(["cat-file", "blob", blob], cwd);
+    if (text.status !== 0 || text.stdout.includes("\0") || text.stdout.split("\n").some((line) => /^([<|=>])\1{40}/u.test(line))) return null;
+  }
+  const run = bytes(["merge-file", "-p", "--object-id", "--diff3", `--marker-size=${MARK}`, ours, base, theirs], cwd);
+  // (git's count of conflicts, 1 to 127; an error, 255, or none at all, proves nothing)
+  if (run.error || !(run.status >= 1 && run.status <= 127) || typeof run.stdout !== "string" || run.stdout === "") return null;
   const first = [], second = [];
   let part = "out", mine = [], yours = [];
+  // (a marker line as git writes it, in a file whose lines end CR LF too)
+  const marks = (line, c) => line.startsWith(c.repeat(MARK)) && (c !== "=" || line.replace(/\r$/u, "") === c.repeat(MARK));
   for (const line of run.stdout.split("\n")) {
-    if (part === "out" && line.startsWith("<".repeat(MARK))) part = "ours";
-    else if (part === "ours" && line.startsWith("|".repeat(MARK))) part = "base";
-    else if (part === "base" && line === "=".repeat(MARK)) part = "theirs";
-    else if (part === "theirs" && line.startsWith(">".repeat(MARK))) {
+    if (part === "out" && marks(line, "<")) part = "ours";
+    else if (part === "ours" && marks(line, "|")) part = "base";
+    else if (part === "base" && marks(line, "=")) part = "theirs";
+    else if (part === "theirs" && marks(line, ">")) {
       first.push(...mine, ...yours); second.push(...yours, ...mine);
       part = "out"; mine = []; yours = [];
     } else if (part === "out") { first.push(line); second.push(line); }
@@ -98,7 +107,7 @@ function keptBoth(base, ours, theirs, cwd) {
   }
   if (part !== "out") return null;
   return [first, second].map((lines) => {
-    const hashed = spawnSync("git", ["hash-object", "--stdin"], { cwd, input: lines.join("\n"), encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+    const hashed = bytes(["hash-object", "--stdin"], cwd, lines.join("\n"));
     return hashed.status === 0 ? hashed.stdout.trim() : null;
   });
 }

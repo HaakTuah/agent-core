@@ -126,6 +126,21 @@ for (const [name, between] of [["exit", "exit 0"], ["braces", "}\n\n}"]]) {
   ok(proved(pullOf(inPlace, [inPlace]), listed(r, inPlace), r).join() === inPlace && proved(pullOf(moved, [moved]), listed(r, moved), r).length === 0,
     `  two conflicts apart by ${name === "exit" ? "a line both share" : "lines with no letter or digit"}: kept in place, proved; the union that moves main's line past it, not`);
 }
+// bytes as they are: a binary file both sides changed, emptied by the merge, and one whose byte that is no UTF-8 the
+// merge rewrites, are not proved; that byte kept, and a file whose lines end CR LF, both sides adding, are (the fallback
+// reviewer's third check on #753)
+const bytesOf = (name, base, pr, main, settled) => {
+  const b = branch(`${name}-base`, B0, base), o = branch(`${name}-pr`, b, pr), t = branch(`${name}-main`, b, main);
+  return kept(`${name}-merge`, o, t, settled);
+};
+const latin = (text) => Buffer.from(text, "latin1");
+const BINARY = bytesOf("binary", latin("a\0b\n"), latin("a\0b\nours\n"), latin("a\0b\ntheirs\n"), "");
+const REWRITTEN = bytesOf("latin", latin("a\nsecret=\xff\nb\n"), latin("a\nsecret=\xff\nb\nours\n"), latin("a\nsecret=\xff\nb\ntheirs\n"), "a\nsecret=\ufffd\nb\nours\ntheirs\n");
+const LATIN = bytesOf("latin-kept", latin("a\nsecret=\xff\nb\n"), latin("a\nsecret=\xff\nb\nours\n"), latin("a\nsecret=\xff\nb\ntheirs\n"), latin("a\nsecret=\xff\nb\nours\ntheirs\n"));
+const CRLF = bytesOf("crlf", "a\r\nb\r\n", "a\r\nb\r\nours\r\n", "a\r\nb\r\ntheirs\r\n", "a\r\nb\r\ntheirs\r\nours\r\n");
+const is = (at) => proved(pullOf(at, [at]), listed(r, at), r).join() === at;
+ok(!is(BINARY) && !is(REWRITTEN) && is(LATIN) && is(CRLF),
+  "  bytes as they are: a binary file emptied, or a byte that is no UTF-8 rewritten, is not proved; that byte kept, and a file of CR LF lines, are");
 git(r, "checkout", "-q", "-B", "mode", ADDS);
 const MODE = merge(r, MAIN_ADDS, () => { write(r, "a.txt", "one\ntwo\nthree\nmain's line\nthe pull request's line\n"); fs.chmodSync(path.join(r, "a.txt"), 0o755); git(r, "update-index", "--add", "--chmod=+x", "a.txt"); });
 git(r, "checkout", "-q", "-B", "gone", B0);
