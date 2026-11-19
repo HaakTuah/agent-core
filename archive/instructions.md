@@ -11,7 +11,8 @@ keyed by the issue that carries the owner's word, `#N`, and where it records one
 `#N.P`, never by a running number (`AGENTS.md`, "A new archive item is named by its issue"; #744): it opens with its
 key and a stop (`#744. **19 November 2026**, ...`), with its date and one line of the reasoning, the words themselves
 staying on the issue, and stands in a file of its own named by its key, `archive/instructions/issue-N.md` or
-`issue-N.P.md`, which opens with a heading and holds that item alone (#750, point 1).
+`issue-N.P.md`, which opens with a heading and holds that item alone (#750, point 1). An item that changes an earlier one says so on a line "Changes:", and the earlier one bears a line "Changed by:"
+naming it (`AGENTS.md`, "An item that changes an earlier one names it, and the earlier one is marked").
 
 Item N is in the file below whose first number is the highest at or below N, item #N in
 `archive/instructions/issue-N.md` and item #N.P in `archive/instructions/issue-N.P.md`. Search them rather than read them whole.

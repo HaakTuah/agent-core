@@ -99,6 +99,7 @@ The index, and how an item is written: `archive/instructions.md`.
     whether it abides by personal preference or repository rules; a security policy for both repositories, Codex's
     findings counted by priority and a scored design check on the big items were proposed. Decided: All of it was agreed
     to, with a condition: it is done taking account of all attack vectors and security concerns.
+    Changed by: 155.
 
 22. **1 November 2026** (Amarna Letters, item 131; for both games). Asked: Codex as the gatekeeper for faults and
     security and a short scored design check on the big items, after Codex found every planted fault. Decided: The owner

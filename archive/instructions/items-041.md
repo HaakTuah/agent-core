@@ -168,6 +168,7 @@ The index, and how an item is written: `archive/instructions.md`.
     where the owner believes they can track and start one another directly; the rules are calibrated for that. Right now
     every cloud session wastes time establishing that it can track its usage, and wastes tokens posting about it on
     every PR, possibly more.
+    Changed by: 146.
 
 77. **9 November 2026** (Amarna Letters, item 243; Barkstreet Snakes, 9 November 2026). Asked: the owner's yes was asked
     for on this repository's first pull request and on the personal-terms fix in both games; the design session relayed

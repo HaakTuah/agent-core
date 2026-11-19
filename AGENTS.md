@@ -265,6 +265,17 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   the item. Held by `scripts/holders.mjs` with `scripts/archive.mjs`, which fail a key used twice, a key that names no
   issue (an item numbered past 262 among them), an item outside its own file, one of items 1 to 262 taken out, and a
   key under "behind" that is not in the archive.
+- **An item that changes an earlier one names it, and the earlier one is marked** (#756). By default an item of the
+  archive stands as written. Where a new item changes what an earlier one decided (corrects, narrows, widens, replaces
+  or overturns it), whoever writes the new one gives it a line "Changes: N." naming each such item by its key, and
+  gives each item it names one line "Changed by: M.", the keys joined by ", " where there are more; `scripts/reasons.mjs`
+  prints that line under the item, and the later items after it. Nothing changes it. It does not mean the earlier item
+  is rewritten: its text stays as it stands, the one line added; nor that an item that only cites an earlier one, or
+  leaves it as it was, names it. Reason: some items said in passing that they replaced an earlier one while nothing
+  linked the earlier one forward, so a session reading it could rely on a reason that no longer stood. Held by the
+  marks' check in `scripts/archive.mjs`, run by `scripts/holders.mjs`: a "Changes:" whose item is not marked back, a
+  "Changed by:" with no "Changes:" to match, a key in either that is no item, and a mark out of its form each fail;
+  whether a new item that changes one says so, by the design check of its pull request.
 - **Every rule says what holds it.** By default a rule of the floor or the modules is held by
   a check that fails where it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no
   check can read its breach exactly, by a staged case, the holder of last resort, or by the scheduled audit; and where
