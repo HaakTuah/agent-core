@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { inStep as inStepAt, itemsIn, KEY, LAST_NUMBERED } from "../scripts/archive.mjs";
-import { OWN, counts, holders, ownHolders, ownReport, report } from "../scripts/holders.mjs";
+import { OWN, counts, heldThere, holders, ownHolders, ownReport, report, shareLine } from "../scripts/holders.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { fingerprint, rules, rulesOf } from "../scripts/rules.mjs";
@@ -176,6 +176,14 @@ const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.
 ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`) && /^::warning::The form of scripts\/holders\.json was not checked: the package ajv is not installed\. Mend: run node scripts\/install\.mjs/mu.test(run.stdout),
   "where holders.json is wrong the check fails, each failure saying its mend; on a copy with no packages its form goes unchecked, said as a warning with its mend, and the rest is read as ever", `${run.stdout}${run.stderr}`);
 
+// ---- the share a check holds in a project (#459, point 3) ----
+{
+  const all = heldThere(root, []), shape = heldThere(root, ["core/scripts/shape.mjs"]), floorOnly = heldThere(root, [], new Set(holders(root).rules.map(r => path.posix.basename(r.file)).filter(f => f !== "security.md")));
+  ok(all.held > shape.held && shape.all === all.all && floorOnly.all < all.all && floorOnly.all === holders(root).rules.filter(r => r.file.startsWith("floor/")).length,
+    "the core's rules a check holds in a project leave out those whose every check read nothing there, and count only the modules it takes, the floor's always", JSON.stringify({ all, shape, floorOnly }));
+  ok(shareLine({ all: 7, check: 2 }, { held: 9, all: 40 }) === "- rules held by a check: the project's own 2 of 7, the core's 9 of 40.", "the share's line holds the counts alone");
+}
+
 // ---- a project's own rules (#662) ----
 // (a scratch project: its AGENTS.md with one rule held and one not, the file it pulls in, its SECURITY.md with the rule
 // file it adds, and a copy of the core whose rules are none of its own)
@@ -214,6 +222,9 @@ const held = ownHolders(proj), lines = ownReport(proj);
 ok(counts(held).check === 1 && counts(held).none.length === 5 && held.wrong.length === 3 && held.wrong.some(w => w.includes("a review, which holds no rule")) && held.wrong.every(w => /Mend: /.test(w)),
   "the list names one rule's check, which is there; one that is not there, a review named as a check, and a rule that is gone, are wrong, each with its mend", held.wrong.join("\n"));
 const listed = lines.find(l => l.startsWith("- No holder")) ?? "";
+// (#484, point 9: the report asks of each rule whom it is about, and files the rules of a kind or of every project)
+ok(lines.some(l => l.includes("whether it is about this project, its kind or every project") && l.includes("`core/README.md`, \"Reporting to the core\"")),
+  "a project's report asks of each own rule whether it is about the project, its kind or every project, and where to file the last two", lines.join("\n"));
 ok(/^- Of 6 rules of the project's own .*: 1 held whole by a check, .* 5 have no holder/.test(lines[0]) && listed.indexOf("docs/play.md: A turn ends on a move") < listed.indexOf("docs/design.md: Saves are small") && !listed.includes("Each computer player") && lines.filter(l => /Mend: /.test(l)).length === 3,
   "the report's lines: the counts, the rules with no holder, those read at a session's start first, and each wrong line of the list", lines.join("\n"));
 // (holders that are no text, or empty, as no schema reads a project's list: named wrong once for their key, and the

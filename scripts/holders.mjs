@@ -150,6 +150,20 @@ export function report(root = ROOT) {
   ];
 }
 
+// Of the core's rules a project takes (the floor's always, a module's unless its manifest leaves it out: `out`, by the
+// file's name), how many a check holds whole there: { held, all }, none counted whose every check read nothing there
+// (`nothing`, the checks read-nothing.mjs names, by their path as the project calls them; #459, point 3).
+export function heldThere(root, nothing, out = new Set()) {
+  const h = holders(root), gone = new Set(nothing.map(n => n.replace(/^.*?(?=scripts\/)/u, "")));
+  const taken = h.rules.filter(r => r.file.startsWith("floor/") || !out.has(path.posix.basename(r.file)));
+  const held = taken.filter(r => (h.by.get(r.key) ?? []).some(x => x.kind === "check" && !x.part && !hook(x) && !gone.has(x.by))).length;
+  return { held, all: taken.length };
+}
+
+// The line a project's state report carries (state-report.mjs): its own rules a check holds whole, as counts() gives
+// them of ownHolders(), and the core's, as heldThere() gives them.
+export const shareLine = (own, core) => `- rules held by a check: the project's own ${own.check} of ${own.all}, the core's ${core.held} of ${core.all}.`;
+
 // ---- a project's own rules (#662) ----
 export const OWN = "checks/holders.json";
 // (text from a project's files as the report and the log carry it: on one line, in a code span, so that no line break,
@@ -207,6 +221,8 @@ export function ownReport(root = process.cwd(), scripts = "core/scripts") {
   return [
     `- Of ${c.all} rules of the project's own (${files.map(span).join(", ")}): ${c.check} held whole by a check, ${c.audit} by the audit, ${c.part} in part; ${c.describes} describe and bind no one; ${c.none.length} have no holder (\`node ${scripts}/holders.mjs --own\`, its list \`${OWN}\`${h.list ? "" : ", not written yet"}).`,
     ...(none.length ? [`- No holder, worst first (read at a session's start, then on need): the session that takes this report files each as a task at the project's pace, a check where one can read its breach exactly, named in \`${OWN}\`; a move to where it is read on need; or a proposal that it goes, which is the owner's to decide. Where its file is a copy made from elsewhere, the change goes to whoever writes that source. Nothing fails meanwhile: ${none.map(span).join("; ")}.`] : []),
+    // (#484, point 9, as #459's note adds it)
+    `- Of each rule listed, the session that takes this report asks whether it is about this project, its kind or every project, and files each of the last two to the core as an idea where none is filed yet, written for the kind and holding nothing of the project (\`${scripts.replace(/scripts\/?$/u, "")}README.md\`, "Reporting to the core").`,
     ...h.wrong.map(w => `- ${w}.`),
   ];
 }

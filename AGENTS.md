@@ -387,13 +387,28 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   step asks for (`setup/sync-notes.md`, which gives the files and the list's forms). Each month the session that takes
   the project's state report files, for each rule it lists with no holder, those read at a session's start first, a
   task at the project's pace: a check where one can read the breach exactly, the rule moved to where it is read on
-  need, or a proposal that it goes, which is the owner's to decide. The staged cases and the pruning stay the core's,
+  need, or a proposal that it goes, which is the owner's to decide. As it lists them, it answers
+  of each rule whether it is about this project, its kind or every project, and files each of the last two to the core
+  as an idea where none is filed yet, written for the kind and holding nothing of the project (`README.md`, "Reporting
+  to the core"; #484, point 9). The staged cases and the pruning stay the core's,
   for the whole sessions each costs a month. Nothing changes it. It does not mean that a rule with no holder, or a wrong
   line of the list, fails anything, is removed or stops binding, that a session rewords a project's rule on its own
   reading, nor that a review, or how often a rule is cited, holds one. Reason: a rule file read at every session's
   start with nothing that enforces it is the case the study behind #545 measured, no gain in the work and more cost.
   Held by `tests/holders-test.mjs`, on a scratch project with one rule held and one not, by `tests/look-test.mjs`, for
   the report's list, and by the step `scripts/steps.mjs` reads for the first list.
+- **A check that read nothing says so** (#459, points 2 and 3). By default a check of the core's that reads a project's
+  code passes where it finds nothing wrong. The one condition that changes it: it found no file there it could read,
+  the shape check where its config's "code" names no file of a language its readers know, the tests' strength where the
+  manifest names no *mutation tool* or `none`. Then `scripts/read-nothing.mjs` names it, with the rules of the modules
+  the project takes that it holds, in the report every sync prints (`scripts/steps.mjs`); and a project's state report
+  gives, on its line "rules held by a check", how many of its own rules a check holds whole and how many of the core's
+  it takes, counting none whose every check read nothing there, which the core's report of the projects carries as
+  numbers alone. Whoever adds a check of the core's that reads a project's code adds its case there. It does not mean
+  that it fails anything, nor that the share is a target. Reason: a check that passes on nothing makes its rule look
+  held: in a project of another owner a check held 10 of the 75 of the core's rules that applied there, and nothing
+  told its owner which. Held by `tests/steps-test.mjs`, for the sync's report, and `tests/look-test.mjs` with
+  `tests/holders-test.mjs`, for the share; that a new check adds its case, by none.
 - **Staged cases hold what no check reads** (#235). By default a rule is held by a check; where none
   can read its breach exactly, since the breach lies in what a session does, a staged case holds it: a scratch project
   (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by

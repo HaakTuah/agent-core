@@ -26,6 +26,7 @@ import { progressOf } from "./done-when.mjs";
 import { NOTES } from "./releases.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { OWN as OWN_HOLDERS } from "./holders.mjs";
+import { readNothing, saidOf } from "./read-nothing.mjs";
 import { started } from "./started.mjs";
 import { Unread, call, calls, folded, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml } from "./workflow-run.mjs";
@@ -345,11 +346,17 @@ export function notDone(root, steps = STEPS) {
     if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend });
   }
   out.unread = p.unread;
+  try { out.nothing = readNothing(p.root, p.manifest, p.read); } catch { out.nothing = []; }
   return out;
 }
 
-// The report a sync prints for its pull request's description: the steps not done, and nothing where all are.
+// The report a sync prints for its pull request's description: the steps not done, and nothing where all are; and the
+// checks that read nothing here (read-nothing.mjs; #459, point 2).
 export function report(missed) {
+  const said = saidOf(missed.nothing ?? []);
+  return [steps(missed), ...(said.length ? ["", ...said] : [])].join("\n");
+}
+function steps(missed) {
   const unread = missed.unread?.length ? `\n\nLeft unread, each past ${READ_MOST} bytes, which no file a step reads reaches: ${missed.unread.map(f => `\`${shown(f)}\``).join(", ")}. A step that reads one may have read it as missing: make it smaller, or take it out of git if it is no file of the project's.` : "";
   if (!missed.length) return `Every step a check reads is done (\`core/scripts/steps.mjs\`).${unread}`;
   return [`Steps not done (\`core/scripts/steps.mjs\`; core/${NOTES}): each a task the project's agents take, in a pull request of its own, none waiting on another${missed.some(m => m.owner) ? "; one marked \"the owner's\" waits on the owner and is labelled so" : ""}.`,
