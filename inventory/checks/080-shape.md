@@ -14,7 +14,9 @@
   and TypeScript's 0.23.2, on the core's 204 files of JavaScript and every case of the lexer's tests: the same where the
   lexer read by its definition, mended where it misread; the same day, its Python grammar 0.25.0, on 30,902 files of
   Python, likewise, and on 30,811 files of Python its imports, 180,814, and the runs of its clock the same in every file
-  it read, its tokens mended where the lexer misread (#530, item 6). *Replayed:* none: no bug filed names a reader of
+  it read, its tokens mended where the lexer misread (#530, item 6); and on 6,626 files of C# from ten public
+  repositories its using directives, 18,934, the same in every file, its functions, declarations and tokens mended
+  where the lexer misread, the declarations in the part of a file the grammar could not read lost (7 files). *Replayed:* none: no bug filed names a reader of
   functions, and the hardening of Python's imports (#724), reported privately with no issue, was of leading an import to
   its file, which stays, its cases all read; the review findings its tests hold all read. Its config's shape is held by a schema and ajv
   (`scripts/schemas/shape.json`; #530, item 7).
