@@ -25,6 +25,28 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "steps-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const PIN = "a".repeat(40);
+// What a reader's "one pass" or its bound means is that its work grows in step with its text (or stops at
+// its bound), never a time of its own on a real clock, which a busy machine stretches: `read(n, k)` reads a text of
+// size n (its k-th, so that none is read from the reader's memory) and says whether it was read right, or does what
+// needs building first and returns what then reads it, which alone is timed; the least of a few readings at each of two
+// sizes, taken in turn so that a pause lands on none of them, is compared, the smaller held to at least 10 ms, below
+// which a clock tells nothing; and a reader that is linear keeps the larger over the smaller near the sizes' own ratio,
+// where one gone quadratic takes it to its square. The sizes are small, so that the parser's own time
+// (bash-commands.mjs) stays far from its end however busy the machine. The factor of three and the smaller sizes hold
+// "one pass" as "not quadratic at these sizes", a small term that shows only past them unseen.
+const linear = (read, small, large, runs = 5) => {
+  read(small, -1)?.call?.(); // (the first reading starts the parser)
+  const least = new Map([[small, Infinity], [large, Infinity]]);
+  let right = true;
+  for (let k = 0; k < runs; k++) for (const n of [small, large]) {
+    let at = Date.now(), got = read(n, k);
+    if (typeof got === "function") { at = Date.now(); got = got(); }
+    right = got && right;
+    least.set(n, Math.min(least.get(n), Date.now() - at));
+  }
+  const ratio = least.get(large) / Math.max(10, least.get(small));
+  return { right, linear: ratio < 3 * (large / small), shown: `${small} took ${least.get(small)} ms, ${large} took ${least.get(large)} ms` };
+};
 const modules = ["roles/shared", "tasks", "tools"].flatMap(d => fs.readdirSync(path.join(root, d)).filter(n => n.endsWith(".md")));
 const texts = dir => Object.fromEntries(fs.readdirSync(path.join(root, dir)).filter(n => n.endsWith(".md")).map(n => [n, fs.readFileSync(path.join(root, dir, n), "utf8")]));
 
@@ -255,12 +277,14 @@ ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.y
   && pathsLetThrough(["c]d.yml"], ["c]d.yml"]) && pathsLetThrough(["dir/+e"], ["dir//e"]) && !pathsLetThrough(["a[b.yml"], ["ab.yml"]),
   "a filter's `?` or `+` with nothing before it, and a lone `[` or `]`, is read as itself, and one after a character repeats it, as GitHub reads them");
 {
-  // (patterns that would keep a backtracking expression busy for minutes, each read at once)
-  const began = Date.now(), long = `.github/workflows/${"a".repeat(200)}.yml`;
-  const quick = [["**a+a+a+a+a+a+a+b", long], [`${"*".repeat(30)}z`, ".github/workflows/core.yml"], ["*a+a+a+a+a+a+a+a+a+a+b", "a".repeat(500)], ["**/**/**/**/**/x", `${"a/".repeat(300)}y`], [`${"**/a/".repeat(500)}x`, `${"a/".repeat(2000)}y`]]
-    .every(([pattern, name]) => !pathsLetThrough([pattern], [name]));
+  // (patterns that would keep a backtracking expression busy for minutes: each shape of them grows with its size, and the
+  // time with it must not grow faster)
+  const long = `.github/workflows/${"a".repeat(200)}.yml`;
+  const quick = [[n => [`**a${"+a".repeat(n)}+b`, long], 3, 6], [n => [`${"*".repeat(n)}z`, ".github/workflows/core.yml"], 10, 30], [n => [`*a${"+a".repeat(n)}+b`, "a".repeat(500)], 5, 10],
+    [n => [`${"**/".repeat(n)}x`, `${"a/".repeat(300)}y`], 3, 5], [n => [`${"**/a/".repeat(n)}x`, `${"a/".repeat(2000)}y`], 250, 500]]
+    .map(([make, small, large]) => linear(n => { const [pattern, name] = make(n); return !pathsLetThrough([pattern], [name]); }, small, large));
   const reported = suiteBy("    paths: ['*a+a+a+a+a+a+a+a+a+b', '.github/workflows/**']");
-  ok(quick && reported && Date.now() - began < 3000, "a filter that would keep a backtracking expression busy is read at once, and read right", `${Date.now() - began} ms`);
+  ok(quick.every(q => q.right && q.linear) && reported, "a filter that would keep a backtracking expression busy is read at once, and read right", quick.map(q => q.shown).join("; "));
   fs.rmSync(suiteFile);
 }
 
@@ -469,10 +493,10 @@ ok(found.some(d => d.startsWith("the copies check's baseline not compared: ") &&
     fs.rmSync(agents);
     fs.symlinkSync("/dev/zero", agents);
     const step = STEPS.filter(x => x.lead === "14 November 2026, the size marks' total counts the project's own files");
-    const at = Date.now(), said2 = notDone(kitDir, step);
+    const said2 = notDone(kitDir, step); // (a read that never ended would never return: the suite's own time stops it)
     fs.rmSync(agents);
     fs.writeFileSync(agents, was);
-    ok(said2.length === 1 && /names `AGENTS\.md`, which is no regular file of the project's own/.test(said2[0].mend) && Date.now() - at < 30000, "the size marks' step hands the reading-size check no file the reader would not read, and says which", said2[0]?.mend);
+    ok(said2.length === 1 && /names `AGENTS\.md`, which is no regular file of the project's own/.test(said2[0].mend), "the size marks' step hands the reading-size check no file the reader would not read, and says which", said2[0]?.mend);
   }
 }
 
@@ -570,9 +594,9 @@ ok(["node $GITHUB_WORKSPACE/core/scripts/copies.mjs config/c.json", 'node "${{ g
     && rooted("$GITHUB_WORKSPACE", { shell: "/bin/bash -e {0}" }) === "config/c.json" && rooted("$env:GITHUB_WORKSPACE", { shell: "powershell.exe" }) === "config/c.json"
     && rooted("$github_workspace", { shell: "bash" }) === null && rooted("$env:github_workspace", { shell: "pwsh" }, { "runs-on": "ubuntu-latest" }) === null,
     "a root's name read in any case only where its shell reads it so (cmd's, PowerShell's env: drive, GitHub's expression), and a shell named by its path");
-  const manyLabels = Date.now(), labelled = { jobs: { j: { "runs-on": [...Array.from({ length: 5000 }, (_, k) => `l${k}`), "ubuntu-latest"],
-    steps: [...Array.from({ length: 19000 }, () => ({ run: "echo x" })), { run: "node core/scripts/copies.mjs $GITHUB_WORKSPACE/config/c.json" }] } } };
-  ok(copiesOf({ "a.yml": labelled }) === "config/c.json" && Date.now() - manyLabels < 1500, "a job's many labels, over many steps, are read once", `${Date.now() - manyLabels} ms`);
+  const labelled = linear(n => () => copiesOf({ "a.yml": { jobs: { j: { "runs-on": [...Array.from({ length: n }, (_, k) => `l${k}`), "ubuntu-latest"],
+    steps: [...Array.from({ length: 4 * n }, () => ({ run: "echo x" })), { run: "node core/scripts/copies.mjs $GITHUB_WORKSPACE/config/c.json" }] } } } }) === "config/c.json", 500, 4000);
+  ok(labelled.right && labelled.linear, "a job's many labels, over many steps, are read once", labelled.shown);
   ok(copiesOf({ "a.yml": stepped("node ../core/scripts/copies.mjs config/c.json", { "working-directory": "%GITHUB_WORKSPACE%/app" }, { "runs-on": "ubuntu-latest" }) }) === null, "a folder named by a shell's variable, which no shell fills there, is not read");
   // (a macOS runner's shell is bash; an organisation's runner group may hold Windows machines, so its shell cannot be told)
   ok(["macos-latest", "macos-14"].every(r => rooted("$GITHUB_WORKSPACE", {}, { "runs-on": r }) === "config/c.json" && rooted("$env:GITHUB_WORKSPACE", {}, { "runs-on": r }) === null)
@@ -597,20 +621,6 @@ ok(copiesOf({ "a.yml": stepped("node ../core/scripts/copies.mjs ../config/c.json
   && copiesOf({ "a.yml": stepped("node ../core/scripts/copies.mjs ../config/c.json", {}, { defaults: { run: { "working-directory": "app" } } }) }) === "config/c.json",
   "a step run in a folder of its own reads its paths from there");
 const notRead = (what, ...a) => { const at = configs(inMemory(...a)); return at[what] === null && at.unread.length > 0; };
-// (#821) What a reader's "one pass" means is that its work grows in step with its text, never a time of its own on a real
-// clock, which a busy machine stretches: `read(n, k)` reads a text of size n (its k-th, so that none is read from the
-// reader's memory) and says whether it was read right; the least of a few readings at each of two sizes, taken in turn
-// so that a pause lands on none of them, is compared, and a reader that is linear keeps the larger over the smaller near
-// the sizes' own ratio, where one gone quadratic takes it to its square. The sizes are small, so that the parser's own
-// time (bash-commands.mjs) stays far from its end however busy the machine.
-const linear = (read, small, large, runs = 5) => {
-  read(small, -1); // (the first reading starts the parser)
-  const least = new Map([[small, Infinity], [large, Infinity]]);
-  let right = true;
-  for (let k = 0; k < runs; k++) for (const n of [small, large]) { const at = Date.now(); right = read(n, k) && right; least.set(n, Math.min(least.get(n), Date.now() - at)); }
-  const ratio = least.get(large) / Math.max(1, least.get(small));
-  return { right, linear: ratio < 3 * (large / small), shown: `${small} took ${least.get(small)} ms, ${large} took ${least.get(large)} ms` };
-};
 ok(notRead("copies", { "a.yml": stepped("node ../core/scripts/copies.mjs c.json", { "working-directory": "${{ inputs.at }}" }) })
   && notRead("copies", { "a.yml": stepped("cd app && node ../core/scripts/copies.mjs c.json") })
   && notRead("copies", { "a.yml": stepped('node "$CORE_AT"scripts/copies.mjs c.json') }) && notRead("copies", { "a.yml": stepped("node core/scripts/copies.mjs --first") }),
@@ -778,8 +788,8 @@ ok(notRead("copies", { "a.yml": stepped("source /dev/stdin <<'EOF'\nnode core/sc
 ok([`${NPX} node core/scripts/copies.mjs config/c.json`, "find . -exec node core/scripts/copies.mjs config/c.json ';'", "timeout 60 bash -c 'node $GITHUB_WORKSPACE/core/scripts/copies.mjs config/c.json'",
   "timeout 60 bash -c 'cd app && node ../core/scripts/copies.mjs ../config/c.json'", "pwsh -wd app -c 'node core/scripts/copies.mjs config/c.json'", `${NPX} prettier --check core/scripts/copies.mjs`]
   .every(run => notRead("copies", { "a.yml": stepped(run) })), "a command that may run others, a string the reader cannot place, and PowerShell run elsewhere, are not read");
-const wordy = Date.now();
-ok(notRead("copies", { "a.yml": stepped(`timeout 1 '${"node ".repeat(40000)}x' core/scripts/copies.mjs`) }) && Date.now() - wordy < 1500, "a long word is read in one pass", `${Date.now() - wordy} ms`);
+const wordy = linear((n, k) => notRead("copies", { "a.yml": stepped(`timeout 1 '${"node ".repeat(n)}x' core/scripts/copies.mjs # ${k}`) }), 5000, 40000);
+ok(wordy.right && wordy.linear, "a long word is read in one pass", wordy.shown);
 // (the review of be09443 and 814895c: every naming of the script a step holds is accounted for, or the run is not
 // read: a here-document piped to a shell or written to a file run later, a here-string, PowerShell's -Command given
 // words, a folder changed by Push-Location)
@@ -797,8 +807,8 @@ ok(["awk 'BEGIN{system(\"node core/scripts/copies.mjs bad.json\")}'", "git -c al
   "node core//scripts/copies.mjs good.json\ntimeout 60 node core/scripts/copies.mjs bad.json", "timeout 60 node \"$CORE_AT\"scripts/copies.mjs bad.json",
   "pwsh -c 'Push-Location app; node ../core/scripts/copies.mjs ../config/custom.json'"].every(run => notRead("copies", { "a.yml": stepped(run) })),
   "a command that can run another, a second naming beside a read run, a path joined to a variable and a folder pushed are not read");
-const quotes = Date.now();
-ok(copiesOf({ "a.yml": stepped(`echo core/scripts/copies.mjs ${"\"\\".repeat(80000)}`) }) === "checks/copies.json" && Date.now() - quotes < 1500, "quotes are read in one pass", `${Date.now() - quotes} ms`);
+const quotes = linear((n, k) => copiesOf({ "a.yml": stepped(`echo core/scripts/copies.mjs ${"\"\\".repeat(n)} # ${k}`) }) === "checks/copies.json", 5000, 40000);
+ok(quotes.right && quotes.linear, "quotes are read in one pass", quotes.shown);
 // (the review of 3085de7: a naming of scripts/<name> by any path, in any case or with quotes, ./ or // inside, is
 // counted; commands that can set up a run are no text)
 ok(["node my_scripts/copies.mjs x.json\ntimeout 60 node core/scripts/copies.mjs bad.json", "node ~/work/p/core/scripts/copies.mjs bad.json", "node Core/scripts/copies.mjs bad.json",
@@ -821,10 +831,11 @@ ok(copiesOf(withEnv("node core/scripts/copies.mjs config/c.json", { S: { toStrin
   && notRead("copies", { "a.yml": { jobs: { j: { strategy: { matrix: { script: ["core/scripts/copies.mjs"] } }, steps: [{ run: "node ${{ matrix.script }} bad.json" }] } } } })
   && notRead("copies", { "a.yml": { jobs: { c: { uses: "./.github/workflows/b.yml", with: { script: "core/scripts/copies.mjs" } } } }, "b.yml": stepped("node ${{ inputs.script }} bad.json") }),
   "an env: of any shape is read without a throw; a matrix or a local workflow's call that names the script leaves its run not read");
-const manyEnv = Object.fromEntries(Array.from({ length: 2000 }, (_, k) => [`E${k}`, `v${k}`]));
-const manySteps = Array.from({ length: 2000 }, (_, k) => ({ run: `echo ${k}` }));
-const envStarted = Date.now();
-ok(copiesOf({ "a.yml": { env: manyEnv, jobs: { j: { env: manyEnv, steps: manySteps } } } }) === "checks/copies.json" && Date.now() - envStarted < 3000, "a workflow's and a job's env: are read once, however many steps", `${Date.now() - envStarted} ms`);
+const manyEnvs = linear(n => {
+  const manyEnv = Object.fromEntries(Array.from({ length: n }, (_, k) => [`E${k}`, `v${k}`])), manySteps = Array.from({ length: n }, (_, k) => ({ run: `echo ${k}` }));
+  return () => copiesOf({ "a.yml": { env: manyEnv, jobs: { j: { env: manyEnv, steps: manySteps } } } }) === "checks/copies.json";
+}, 250, 2000);
+ok(manyEnvs.right && manyEnvs.linear, "a workflow's and a job's env: are read once, however many steps", manyEnvs.shown);
 ok(notRead("copies", { "a.yml": stepped('node "$GITHUB_WORKSPACE/core/scripts/copies.mjs" c.json', { "working-directory": "app\\dir" }) }), "a folder with \"\\\" in it is not read as one");
 // (the review of b69d16f: a script given by an expression of GitHub's, or in a mapping too large to read whole, and a
 // key named __proto__, leave the run not read)
@@ -838,12 +849,17 @@ ok(notRead("copies", { "a.yml": { env: { CHECK: "core/scripts/copies.mjs" }, job
   && copiesOf({ "a.yml": stepped("node ${{ github.action_path }}/index.js\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json",
   "a local action is read with what its caller gives it; a file of another plain name past an expression is no run of the script");
 // (the review of 165db25: actions read once, and their steps, calls and depth bounded; a glob or a "/" after the name)
-const fanFiles = { ".github/actions/a/action.yml": `runs:\n  using: composite\n  steps:\n${"    - uses: ./.github/actions/b\n".repeat(1999)}`, ".github/actions/b/action.yml": `runs:\n  using: composite\n  steps:\n${"    - run: echo x\n      shell: bash\n".repeat(2000)}` };
-const fanStarted = Date.now();
-ok(notRead("copies", { "a.yml": { jobs: { j: { steps: [{ uses: "./.github/actions/a" }] } } } }, fanFiles) && Date.now() - fanStarted < 5000, "actions called thousands of times are read once each, and past the bound the run is not read", `${Date.now() - fanStarted} ms`);
-const chainFiles = Object.fromEntries(Array.from({ length: 2000 }, (_, k) => [`.github/actions/c${k}/action.yml`, `runs:\n  using: composite\n  steps:\n${"    - run: echo x\n      shell: bash\n".repeat(50)}    - uses: ./.github/actions/c${k + 1}\n`]));
-const chainStarted = Date.now();
-ok(notRead("copies", { "a.yml": { env: { A: "x" }, jobs: { j: { steps: [{ uses: "./.github/actions/c0" }] } } } }, chainFiles) && Date.now() - chainStarted < 5000, "a long chain of actions is read no deeper than the bound", `${Date.now() - chainStarted} ms`);
+// (past the bound the run is not read, so the work stops there: of the two sizes, each above it, the larger takes no more)
+const fan = linear(n => {
+  const files = { ".github/actions/a/action.yml": `runs:\n  using: composite\n  steps:\n${"    - uses: ./.github/actions/b\n".repeat(n - 1)}`, ".github/actions/b/action.yml": `runs:\n  using: composite\n  steps:\n${"    - run: echo x\n      shell: bash\n".repeat(n)}` };
+  return () => notRead("copies", { "a.yml": { jobs: { j: { steps: [{ uses: "./.github/actions/a" }] } } } }, files);
+}, 200, 1999);
+ok(fan.right && fan.linear, "actions called thousands of times are read once each, and past the bound the run is not read", fan.shown);
+const chain = linear(n => {
+  const files = Object.fromEntries(Array.from({ length: n }, (_, k) => [`.github/actions/c${k}/action.yml`, `runs:\n  using: composite\n  steps:\n${"    - run: echo x\n      shell: bash\n".repeat(n / 40)}    - uses: ./.github/actions/c${k + 1}\n`]));
+  return () => notRead("copies", { "a.yml": { env: { A: "x" }, jobs: { j: { steps: [{ uses: "./.github/actions/c0" }] } } } }, files);
+}, 200, 2000);
+ok(chain.right && chain.linear, "a long chain of actions is read no deeper than the bound", chain.shown);
 ok(['node "$CORE"/scripts/copies.mj? c.json', "node $CORE/scripts/copie[s].mjs c.json", "node $CORE/scripts/copies.* c.json", "node $C/copies.mjs/ c.json", "node ${{ github.action_path }}/copies.mjs/ c.json", "node core/scripts/copies.mj? c.json"]
   .every(run => notRead("copies", { "a.yml": stepped(run) })) && copiesOf({ "a.yml": stepped("node --test tests/*.mjs\nnode core/scripts/copies.mjs config/c.json") }) === "config/c.json",
   "a glob or a \"/\" after the script's name leaves the run not read; a glob in a folder that is no scripts folder is no run of it");
@@ -857,30 +873,31 @@ ok(["node copies.mj? c.json", "node ./copies.* c.json", "node * c.json", "node $
 ok(["cd app && node core/scripts/c*.mjs c.json", "pushd x; node ../core/scripts/copies.mj? c.json", "node core/scripts/{cop*,x}.mjs c.json", "node core/scripts/[[:alpha:]]opies.mjs c.json", "node core/**/s*/c*.mjs c.json"]
   .every(run => notRead("copies", { "a.yml": stepped(run) })) && notRead("copies", { "a.yml": stepped("node s*/c*.mjs c.json", { "working-directory": "${{ inputs.d }}" }) }),
   "a glob after a cd, in a folder named only when it runs, or with braces, a class or ** that may match, is not read");
-const stars = Date.now();
-ok(notRead("copies", { "a.yml": stepped(`node core/scripts/${"*".repeat(40)}x c.json\nnode core/${"*".repeat(40)}/copies.mjs c.json`) }) && Date.now() - stars < 1500, "a glob of many stars is read in one pass", `${Date.now() - stars} ms`);
+const stars = linear((n, k) => notRead("copies", { "a.yml": stepped(`node core/scripts/${"*".repeat(n)}x c.json\nnode core/${"*".repeat(n)}/copies.mjs c.json # ${k}`) }), 10, 40);
+ok(stars.right && stars.linear, "a glob of many stars is read in one pass", stars.shown);
 // (the review of 5f229be: any class may match, read in one pass; a folder's "/" at its end is no other folder)
-const classes = Date.now();
-ok(["core/scripts/copie[]s].mjs", "core/scripts/copie[!]a].mjs", "core/scripts/[a[:alpha:]]opies.mjs", "core/scripts/[^[:digit:]]opies.mjs", `core/scripts/${"[a".repeat(100000)}]x`]
-  .every(f => notRead("copies", { "a.yml": stepped(`node ${f} c.json`) })) && notRead("copies", { "a.yml": stepped("node copies.mj? c.json", { "working-directory": "core/scripts/" }) }) && Date.now() - classes < 3000,
-  "a class in any form may match, read in one pass; a folder named with a \"/\" at its end is that folder", `${Date.now() - classes} ms`);
+const classes = linear((n, k) => ["core/scripts/copie[]s].mjs", "core/scripts/copie[!]a].mjs", "core/scripts/[a[:alpha:]]opies.mjs", "core/scripts/[^[:digit:]]opies.mjs", `core/scripts/${"[a".repeat(n)}]x`]
+  .every(f => notRead("copies", { "a.yml": stepped(`node ${f} c.json # ${k}`) })) && notRead("copies", { "a.yml": stepped("node copies.mj? c.json", { "working-directory": "core/scripts/" }) }), 12500, 100000);
+ok(classes.right && classes.linear,
+  "a class in any form may match, read in one pass; a folder named with a \"/\" at its end is that folder", classes.shown);
 ok(configs(inMemory({ "a.yml": stepped("node core/scripts/reading-size.mjs config/sizes*.json") })).sizes === null && notRead("copies", { "a.yml": stepped("node core/scripts/copies.mjs config/c?.json") })
   && copiesOf({ "a.yml": stepped("node core/scripts/copies.mjs 'config/c*.json'") }) === "config/c*.json", "a config given as an unquoted glob is not read; a quoted one is a file's name");
 // (the review of 3546fd8: an extended glob of bash's may match; a run of "/" is read in one pass)
 ok(["c?(x)opies.mjs", "+(c)opies*.mjs", "!(x)*.mjs", "@(copies|x).mjs", "!(x).mjs", "copies.@(mjs)"].every(f => notRead("copies", { "a.yml": stepped(`shopt -s extglob\nnode core/scripts/${f} c.json`) }))
   && ["core/?(x)scripts/c*.mjs", "core/@(scripts)/c*.mjs"].every(f => notRead("copies", { "a.yml": stepped(`shopt -s extglob\nnode ${f} c.json`) })),
   "an extended glob of bash's, in the script's name or its folder, may match, so the run is not read");
-const slashes = Date.now();
-ok(copiesOf({ "a.yml": stepped(`node core/scripts${"/".repeat(100000)}x*.mjs c.json\nnode core/scripts/copies.mjs c.json`) }) === "c.json" && Date.now() - slashes < 1500, "a run of \"/\" is read in one pass", `${Date.now() - slashes} ms`);
-const globs = Date.now();
+const slashes = linear((n, k) => copiesOf({ "a.yml": stepped(`node core/scripts${"/".repeat(n)}x*.mjs c.json\nnode core/scripts/copies.mjs c.json # ${k}`) }) === "c.json", 12500, 100000);
+ok(slashes.right && slashes.linear, "a run of \"/\" is read in one pass", slashes.shown);
 // (on the parser, #530: a text the grammar cannot read within its time is not read at all, since a line read alone
 // would misread a quote or a continued line over it; the fallback reviewer's review of 4ffb50d)
-ok(notRead("copies", { "a.yml": stepped(`echo ${"a?(b)".repeat(100000)}\nnode core/scripts/copies.mjs c.json`) }) && Date.now() - globs < 1500, "a long line of extended globs leaves its step not read, within the time mark", `${Date.now() - globs} ms`);
-const bigEnv = Object.fromEntries(Array.from({ length: 99000 }, (_, k) => [`E${k}`, `v${k}`]));
+ok(notRead("copies", { "a.yml": stepped(`echo ${"a?(b)".repeat(100000)}\nnode core/scripts/copies.mjs c.json`) }), "a long line of extended globs leaves its step not read, within the time mark");
 const oneRun = { ".github/actions/a/action.yml": "runs:\n  using: composite\n  steps:\n    - run: echo x\n      shell: bash\n" };
-const givenStarted = Date.now();
-ok(copiesOf({ "a.yml": { jobs: { j: { env: bigEnv, steps: Array.from({ length: 200 }, () => ({ uses: "./.github/actions/a" })) } } } }, oneRun) === "checks/copies.json" && Date.now() - givenStarted < 5000,
-  "a large env: given to many calls of an action is read once", `${Date.now() - givenStarted} ms`);
+const givenEnv = linear(n => {
+  const bigEnv = Object.fromEntries(Array.from({ length: n }, (_, k) => [`E${k}`, `v${k}`]));
+  return () => copiesOf({ "a.yml": { jobs: { j: { env: bigEnv, steps: Array.from({ length: n / 450 }, () => ({ uses: "./.github/actions/a" })) } } } }, oneRun) === "checks/copies.json";
+}, 12375, 99000);
+ok(givenEnv.right && givenEnv.linear,
+  "a large env: given to many calls of an action is read once", givenEnv.shown);
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
 ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));
