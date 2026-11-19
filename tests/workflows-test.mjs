@@ -182,6 +182,11 @@ const ownCall = Object.values(ownReview.jobs ?? {});
 const callOf = (name) => ownCall.filter((job) => job.uses === `./.github/workflows/${name}`);
 ok(ownCall.length === 2 && ["security-review.yml", "queue-only.yml"].every((name) => callOf(name).length === 1 && callOf(name)[0].with?.root === ".") && callOf("security-review.yml")[0].with?.advisory === false,
   "and calls the core's workflow, and the queue-only proof before it, with its scripts at the root and advisory turned off");
+// (no group holds a whole run of the check, nor its proof: GitHub cancels a waiting run or job once a newer one of its
+// group queues, so any comment's run would lose the one that records a review; the fallback review of 64361aa)
+const queueProof = parseYaml(fs.readFileSync(path.join(wfDir, "queue-only.yml"), "utf8"));
+ok(ownReview.concurrency === undefined && kitReview.concurrency === undefined && Object.values(queueProof.jobs).every((job) => job.concurrency === undefined),
+  "and neither caller holds its whole run in a group, nor the proof its job, so no comment's run cancels one waiting to record a review");
 
 // ---- when the core's tests run (#733, points 2 to 4 and 6) ----
 // A pull request's run starts once it is ready, never on a draft, on Linux alone; main is tested on Linux at its newest

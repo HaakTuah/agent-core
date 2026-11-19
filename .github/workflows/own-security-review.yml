@@ -21,12 +21,9 @@ permissions:
   pull-requests: read
   statuses: write
 
-# (one run at a time for a pull request, in the order they came, the proof with the status it feeds, so that a slow
-# proof of an older head never hands its answer to a run after a newer one)
-concurrency:
-  group: own-security-review-${{ github.event.issue.number || github.event.pull_request.number }}
-  cancel-in-progress: false
-
+# (no group for the whole run: every comment's run would join it before any job's condition is read, and GitHub
+# cancels a waiting run once a newer one queues, so anyone's comment could lose a run that records a review; each
+# run's proof feeds only its own review job, which honours it only where it names the head that job reads itself)
 jobs:
   queue:
     permissions:

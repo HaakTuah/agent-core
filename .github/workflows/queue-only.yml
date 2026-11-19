@@ -47,10 +47,8 @@ jobs:
       || (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.issue.state == 'open'
       && (github.event.comment.user.login == 'chatgpt-codex-connector[bot]'
       || contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)))) }}
-    # (one at a time for a pull request, in the order they came, as the security-review job its answer feeds)
-    concurrency:
-      group: queue-only-${{ github.event.issue.number || github.event.pull_request.number }}
-      cancel-in-progress: false
+    # (no group: GitHub cancels a waiting job once a newer one of its group queues, which would lose the run of the
+    # review it feeds; each proof feeds only its own run's review job, which honours it only for the head it reads)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
@@ -78,6 +76,8 @@ jobs:
           gh api "repos/$REPO/pulls/$NUMBER" > "$d/pull.json" || exit 0
           [ "$(jq '.changed_files' "$d/pull.json")" = 1 ] || { echo "It changes more than one file: not queue-only."; exit 0; }
           gh api "repos/$REPO/pulls/$NUMBER/files" > "$d/files.json" || exit 0
+          # (the files bound to the head first read: a push between the two reads proves nothing)
+          [ "$(gh api "repos/$REPO/pulls/$NUMBER" --jq '.head.sha')" = "$(jq -r '.head.sha' "$d/pull.json")" ] || { echo "The head moved while it was read: not proved."; exit 0; }
           if head=$(timeout 90 node "$ROOT/scripts/queue-only.mjs" "$d/pull.json" "$d/files.json") && [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
             echo "Queue-only, as queue-only.mjs proves: $head"
             echo "head=$head" >> "$GITHUB_OUTPUT"
