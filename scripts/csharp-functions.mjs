@@ -18,6 +18,7 @@
 // functions told, and the shape check counts it and says so, and fails one a pull request brings (shape.mjs, "lost").
 // Proven old against new by tests/shape-readers-test.mjs, and against counts taken by hand.
 import { inParser } from "./parser.mjs";
+import { walkFunctions } from "./tree-walk.mjs";
 
 /** The functions of `src`: [{ name, line, lines, depth, branches }], in the order their bodies open; null where they
  *  cannot be told. `directives`, the lines (from 1) the preprocessor holds. Read in the parser's thread (read, below). */
@@ -47,7 +48,9 @@ export function read(parse, src, directives) {
   try {
     const headers = /\bextension\s*[<(]/u.test(text) ? extensionHeaders(text, tree.rootNode) : [];
     if (headers.length) { text = asTypes(text, headers); tree.delete(); tree = parse("csharp", text); }
-    return tree.rootNode.hasError ? null : walk(tree.rootNode);
+    if (tree.rootNode.hasError) return null;
+    const before = leafBefore(tree.rootNode);
+    return walkFunctions(tree.rootNode, { functionBody, nameOf: node => nameOf(node, before), branches, isControl });
   } finally { tree.delete(); }
 }
 
@@ -130,35 +133,6 @@ function asTypes(text, headers) {
   return out + text.slice(at);
 }
 
-// The walk, with a stack of its own so that no nesting runs out of the call stack: each item a node, its parent, the
-// function it counts toward (null outside any) and the level of control blocks it stands at. (The parent is carried,
-// not asked of the node: the parser finds it from the file's root, at a cost that grows with how deep it lies.)
-function walk(root) {
-  const found = [], stack = [{ node: root, parent: null, fn: null, level: 0 }], before = leafBefore(root);
-  while (stack.length) {
-    const { node, parent, fn, level } = stack.pop();
-    const body = functionBody(node);
-    if (body) {
-      const own = { name: nameOf(node, before), line: body.startPosition.row + 1, lines: body.endPosition.row - body.startPosition.row + 1, depth: 0, branches: 0 };
-      found.push([body.startIndex, own]);
-      // (what stands outside its body, a lambda passed to : base(...) or a default's choice, counts where the function
-      // itself stands, as the lexer read it)
-      for (const c of [...node.children].reverse()) push(stack, c.id === body.id ? null : c, node, fn, level);
-      push(stack, body, node, own, 0);
-      continue;
-    }
-    if (fn) fn.branches += branches(node);
-    const inner = isControl(node, parent) ? level + 1 : level;
-    if (fn && inner > level) fn.depth = Math.max(fn.depth, inner);
-    // (all of a node's children at once: one by one, each costs as many steps as the children before it)
-    const children = node.children;
-    for (let k = children.length - 1; k >= 0; k--) push(stack, children[k], node, fn, inner);
-  }
-  // (in the order their bodies open, as a baseline numbers functions of one name: a lambda passed to : base(...)
-  // opens before its constructor's body)
-  return found.sort((a, b) => a[0] - b[0]).map(([, fn]) => fn);
-}
-const push = (stack, node, parent, fn, level) => { if (node) stack.push({ node, parent, fn, level }); };
 
 // The body in braces of a node that is a function, else null.
 function functionBody(node) {
