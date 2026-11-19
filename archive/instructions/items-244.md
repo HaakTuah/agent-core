@@ -1,4 +1,4 @@
-# The reasons behind the core: items 244 onward
+# The reasons behind the core: items 244 to 264
 
 The index, and how an item is written: `archive/instructions.md`.
 
@@ -199,12 +199,3 @@ The index, and how an item is written: `archive/instructions.md`.
      once an hour in the core, and to its being a priority, since it holds up everything else. It stands behind "A time
      mark measures and never fails", "No test run on a draft", "The default branch is tested at its newest commit" and
      "The slow suites run once per batch, wherever they run" in `tasks/tests.md`.
-265. **17 November 2026**, #593, points 1 to 3. Where an issue asks something of every or all of a kind, a sweep, its
-     writer names the source a script counts that kind from, and the check that holds the sweep reads its coverage
-     there, each thing it holds having its line or a path left out with the reason, the core's inventory reading every
-     tracked file first; and an inventory or an audit is challenged once, by a fresh session that wrote no part of it,
-     for what it missed: a scope written as a list is as complete as its writer's memory, an inventory of the core's
-     parts had missed what the starter kit holds because the issue's list had, and nothing in the flow read an issue
-     against what stands. It stands behind "A sweep's scope is read, not listed" and "An inventory or an audit is
-     challenged once for what it missed" in `tasks/cleaning.md`, the line of the idea form that asks for the source, and
-     the inventory's check in `tests/mend-test.mjs`.
