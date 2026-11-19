@@ -106,12 +106,13 @@ try {
 // ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
 // Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and
 // the pull request, cancelled once a newer run starts for it; a run on main, a schedule or a start by hand is a group of
-// its own (its run id), and never cancelled. Left out, each for its reason: the security-review check, whose runs go one
+// its own (its run id), and never cancelled. Left out, each for its reason: the security-review check and the queue-only
+// proof that feeds it, whose runs go one
 // at a time in order so the last has read the newest comments, the release, the preview's queue and the deletion of
 // merged branches, which no pull request starts and which never cancel, and the scheduled ones.
 const KEY = "${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}";
 const CANCEL = "${{ github.event_name == 'pull_request' }}";
-const APART = new Set(["security-review.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml"]);
+const APART = new Set(["security-review.yml", "queue-only.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml"]);
 const wfDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".github", "workflows");
 const loose = [];
 // (a workflow in a form the test's reader does not know, a flow mapping say, is read for its group at the top, by its
