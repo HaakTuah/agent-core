@@ -292,7 +292,7 @@ What these are and how they are kept: `words/README.md`.
 
 122. **10 November 2026** (the core), on Codex building. Told that Codex's cloud tasks cannot push, and that a capped
      API key in a cloud environment would let Claude call Codex there, no less safely than elsewhere, the owner asked
-     how that is any safer than running it elsewhere, and declined the key.
+     how running it elsewhere is any safer than that, and declined the key.
 
      The owner's reason: a key billed by use spends money for nothing where the owner can already use the tool
      another way.

@@ -304,4 +304,5 @@ What these are and how they are kept: `words/README.md`.
      > as they should. But anything that stops stuff, because his setup is different: […]. Must absolutely be addressed!
 
      Behind the end of floor rule 10 (the owner's own work carries the terms he gives it, where it said no licence
-     file ever), and the README's lines on a project that is sold, GitHub's free plan, the default branch and Windows.
+     file ever), and the README's lines under "How a project takes the core" for a project set up
+     otherwise, among them the default branch.

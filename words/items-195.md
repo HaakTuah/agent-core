@@ -207,7 +207,7 @@ What these are and how they are kept: `words/README.md`.
      it runs neither by itself nor with credentials; `modules/reviews.md`, point 3, the "Security review:" comment
      giving what it printed and that word, which the code reviewer checks.
 
-204. **14 November 2026** (the core, in the design chat). Told, of a planned project, that it could be played from
+204. **14 November 2026** (the core, in the design chat). Told, of a project, that it could be played from
      its first stage on, unlike Amarna, which was built toward its finished form:
 
      > Yes, unlike amarna, […]. Amarna still doesn't feel like a game. Something I
