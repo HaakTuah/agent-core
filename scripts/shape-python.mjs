@@ -295,11 +295,18 @@ const deepest = files => {
   if (!DEEP.has(files)) { let most = 0; for (const f of files) most = Math.max(most, f.split("/").length); DEEP.set(files, most + 1); }
   return DEEP.get(files);
 };
-// Of a module none of those roots holds, the one file whose path ends in it; null where none does, or more than one.
+// Of a module none of those roots holds, the one file whose path ends in it; null where none does, or more than one;
+// each module's answer made once for each set of files.
+const ENDS = new WeakMap();
 function bySuffix(parts, files) {
-  const p = parts.join("/"), ends = [`${p}.py`, `${p}/__init__.py`];
+  const p = parts.join("/"), key = `${parts.at(-1).length}:${p}`;
+  if (!ENDS.has(files)) ENDS.set(files, new Map());
+  const known = ENDS.get(files);
+  if (known.has(key)) return known.get(key);
+  const ends = [`${p}.py`, `${p}/__init__.py`];
   const found = ends.flatMap(e => (byName(files).get(path.posix.basename(e) === "__init__.py" ? `${parts.at(-1)}/__init__.py` : path.posix.basename(e)) ?? []).filter(f => f === e || f.endsWith(`/${e}`)));
-  return found.length === 1 ? found[0] : null;
+  known.set(key, found.length === 1 ? found[0] : null);
+  return known.get(key);
 }
 
 // The project's Python files by their name (a package's __init__.py by its folder's: "pkg/__init__.py"), made once
