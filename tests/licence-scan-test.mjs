@@ -115,20 +115,20 @@ for (const [what, change, why] of [
   ["an asset that ships, covered only by a tool's entry", json("audit.json", (j) => { j.entries.find((e) => e.name === "Bark sounds").ships = false; }), /reaches users/],
   ["an entry covering a file that is gone", entry({ name: "Old bark", kind: "asset", licence: "CC0-1.0", ships: true, files: ["site/old-bark.m4a"] }), /names no tracked file/],
   ['"files" that is not a list of paths', json("audit.json", (j) => { j.entries.find((e) => e.name === "Bark sounds").files = "site/audio/"; }), /not a list of paths/],
-  ["a scan key it does not know", json("licences.json", (j) => { j.scan.servd = ["site/"]; }), /keys it does not know/],
-  ["a scan that does not say what reaches users", json("licences.json", (j) => { delete j.scan.served; }), /what reaches users/],
+  ["a scan key it does not know", json("licences.json", (j) => { j.scan.servd = ["site/"]; }), /"scan".*servd.*Mend: take them out, or correct their spelling/],
+  ["a scan that does not say what reaches users", json("licences.json", (j) => { delete j.scan.served; }), /"scan".*Mend: add "served", the folders whose files reach users/],
   ["a scan path outside the project", json("licences.json", (j) => { j.scan.skip = ["../elsewhere/"]; }), /not a list of paths in the project/],
-  ["a scan that skips everything", json("licences.json", (j) => { j.scan.skip = [""]; }), /not a list of paths in the project/],
+  ["a scan that skips everything", json("licences.json", (j) => { j.scan.skip = [""]; }), /"scan.*skip.*Mend: list each as a path from the project\'s root/],
   ["a scan path written another way than git lists it", json("licences.json", (j) => { j.scan.served = ["./site/"]; }), /not a list of paths in the project/],
   ['a scan folder without its "/", which names no file', json("licences.json", (j) => { j.scan.served = ["site"]; }), /names no tracked file/],
   ["a scan path that names nothing", json("licences.json", (j) => { j.scan.skip = ["notes/"]; }), /names no tracked file/],
-  ["a scan without an audit", json("licences.json", (j) => { delete j.audit; j.lockfiles = ["package-lock.json"]; }), /needs an "audit"/],
+  ["a scan without an audit", json("licences.json", (j) => { delete j.audit; j.lockfiles = ["package-lock.json"]; }), /scan.*Mend: name the audit's file in "audit"/],
   ...["node_modules//mossgrip-lib", "node_modules/./mossgrip-lib", "node_modules/x/../mossgrip-lib", "node_modules/mossgrip-lib/", "/node_modules/mossgrip-lib"].map((key) => [`a lock file with an entry at ${key}, which is not written as npm writes one`,
     (dir) => { LOCK("MIT")(dir); json("package-lock.json", (j) => { j.packages[key] = j.packages["node_modules/mossgrip-lib"]; delete j.packages["node_modules/mossgrip-lib"]; })(dir); }, /package-lock\.json holds an entry at ".*" that is not written as npm writes one/]),
   ["a lock file with an entry that is no entry", (dir) => { LOCK("MIT")(dir); json("package-lock.json", (j) => { j.packages["node_modules/mossgrip-lib"] = "MIT"; })(dir); }, /that is not written as npm writes one/],
   ["a shrinkwrap file beside the lock file the config names", (dir) => { LOCK("MIT")(dir); write("npm-shrinkwrap.json", "{}")(dir); }, /package-lock\.json: npm-shrinkwrap\.json stands beside it, and an install reads the shrinkwrap file of the two\. Mend: delete one/],
-  ["notices that are no path", json("licences.json", (j) => { j.notices = 7; }), /"notices" is not a path/],
-  ["notices without an audit", (dir) => { LOCK("MIT")(dir); json("licences.json", (j) => { delete j.audit; delete j.scan; j.notices = "site/NOTICES.txt"; })(dir); }, /names no "audit"/],
+  ["notices that are no path", json("licences.json", (j) => { j.notices = 7; }), /"notices".*Mend: name the notices file by its path/],
+  ["notices without an audit", (dir) => { LOCK("MIT")(dir); json("licences.json", (j) => { delete j.audit; delete j.scan; j.notices = "site/NOTICES.txt"; })(dir); }, /notices.*Mend: name the (?:notices file by its path, beside an "audit"|audit's file in "audit", which holds what "notices")/],
   ["notices naming no file", json("licences.json", (j) => { j.notices = "site/NOTICES.txt"; }), /"notices", site\/NOTICES\.txt, names no file/],
   ["notices naming a folder", json("licences.json", (j) => { j.notices = "site/audio"; }), /"notices", site\/audio, names no file/],
 ]) { const f = run(change); ok(f.some((m) => why.test(m)) && mendSaid(f), `fails on ${what}, each failure saying its mend`, f.join("\n") || "(it passed)"); }
@@ -220,6 +220,11 @@ for (const [what, change, why] of [
       ok(linkedFile.some((m) => /^site\/tools\/linked\.js is a link that leads out of the project, so what it holds cannot be read\. Mend: /u.test(m)) && !linkedFile.some((m) => /carrying a licence notice/u.test(m)), "fails a tracked link that leads out of the project, never reading the file it leads to, saying its mend", linkedFile.join("\n"));
       const inside = run((dir) => { write("docs/vendor.txt", "/*! Copyright 2020 Mossgrip | GPL-3.0 */\n")(dir); fs.symlinkSync(path.join("..", "docs", "vendor.txt"), path.join(dir, "site", "vendor.js")); });
       ok(inside.some((m) => /^site\/vendor\.js \(a file carrying a licence notice\) is not in audit\.json/u.test(m)), "reads a tracked link inside the project as the file it leads to, in the link's own place, a skipped file's notice among them", inside.join("\n"));
+      // (a tracked link to a folder inside the project: its files are read in their own place, and the link fails with its
+      // mend, never with the error a read of a folder throws; #447)
+      const folder = run((dir) => { write("docs/vendor.txt", "x\n")(dir); fs.symlinkSync(path.join("..", "docs"), path.join(dir, "site", "docs-link")); });
+      ok(folder.some((m) => /^site\/docs-link is a link to no file of bytes \(a folder, a device or a pipe\)/u.test(m)) && mendSaid(folder.filter((m) => m.startsWith("site/docs-link"))) && !folder.some((m) => /EISDIR/u.test(m)),
+        "fails a tracked link to a folder inside the project with its mend, never with EISDIR", folder.join("\n"));
     }
   } finally { fs.rmSync(elsewhere, { recursive: true, force: true }); }
 }

@@ -1,5 +1,0 @@
-{
-  "description": "Makes Node read the .js files of the packages in this folder as CommonJS, as their publishers built them, whatever the package.json of a project around the core's copy says (scripts/third-party.mjs).",
-  "private": true,
-  "type": "commonjs"
-}

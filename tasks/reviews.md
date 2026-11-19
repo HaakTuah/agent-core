@@ -11,8 +11,28 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
 - The *design-checked PRs* also get the design check, and a PR its users will see the stand-in's notes.
 - A PR that changes a screen also gets the critique (`tasks/screens.md`, point 18).
 
-1. **Ask** the code reviewer (`tasks/roles.md`) as its part (`tools/codex.md`, `tools/copilot.md`) or the project
-   says.
+1. **Ask by the first way there is** (#397). By default the session whose PR it is asks its code reviewer
+   (`tasks/roles.md`), and its security reviewer where one is asked, through the first of these that its project has,
+   as a builder is reached (`roles/orchestrator.md`, "The builders"): the tool that runs the agents side by side, a
+   plug-in in the session's own tool, a way the project names, and the host's app last, each as the reviewer's part
+   says under that way (`tasks/tools.md`, "Each tool's part"). Which ways the project has is read, never asked: from
+   the tools the session can call (a plug-in's agent, a tool that runs the agents side by side), the reviews and checks
+   of the host's apps on recent PRs, and the manifest's "Tools" table for the project's own; where none can be read,
+   the host's app. Nothing changes it. A review that starts by itself is still waited for and read (floor rule 8): the
+   order decides how a session asks, and replaces no review. It does not mean a second review
+   of the same kind by another way. Reason: on 15 November the merge line lost about 20 minutes at each conflict, the
+   sessions asking the host's app and waiting while a faster way stood open (#395). Held, in part, by
+   `core/scripts/tools-offer.mjs`, which fails a tool's part with a way left out or the ways out of order; that the
+   first was taken, by nothing.
+   - **A review's stance follows the kind of change** (#397). By default the code review's brief is regular, a review
+     against the guidelines; where the PR does the *hard work*, its brief says adversarial
+     (`roles/shared/review-guidelines.md`, "Its stance is its brief's"). Only where the code reviewer takes a brief: a
+     tool that runs the agents side by side, a plug-in, or the fallback reviewer; where the only one takes none, as a
+     host's app asked by a bare comment, the hard work gets the regular review and nothing is added. It does not mean a
+     second review is asked to get the stance, nor that another provider's reviewer is swapped for the fallback reviewer
+     to get it. Reason: no review was asked to try to break a change, though the hard work is where that pays. Held by
+     nothing yet: `core/scripts/review-record.mjs` counts the posted code reviews by the stance each declares, so the
+     next pruning sees whether the adversarial find more, and fails nothing.
 2. **No sign in about 5 minutes, no finished review in about 20, or an answer that is not a review:** the next reviewer,
    last the fallback reviewer, takes the PR at once.
    - **A review already running is waited for,** never merged past: the `code-review` status holds a
@@ -43,30 +63,37 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      head so (the code reviewer checks that), in a comment that opens "Security review:", which the `security-review`
      check reads.
    - **What a posted review stands for** (#99): by default the commit it names, and the head only
-     where nothing but updates from `main` follow that commit; after any other commit, where no review of the head has
-     run, the fallback reviewer checks it and posts one naming the head, or the session posts the note that none is
-     needed, naming the head. It counts from the repository's owner (the *owner's account*, where that owns it), from
+     where nothing but merges from `main` follow that commit, each the merge git makes of its parents with no conflict,
+     as `scripts/clean-merges.mjs` proves (#323, #750). The builder asks Codex, or any reviewer, again only for new
+     content. A merge with a conflict is new content however it is settled, since its settling is a choice no review
+     saw (an order of lines can change what they do). After any other commit, where no review of the head has run,
+     the fallback reviewer checks it and posts one naming the head, or the session posts the note that none is needed,
+     naming the head. It counts from the repository's owner (the *owner's account*, where that owns it), from
      a person's account the host lets write, each owner of a team's project (`roles/shared/teams.md`), whose rights
      the check reads from the host each run (#412), and from another account only where the project names it to the
      check (its input `reviewers`). A pure sync needs none: the check proves it with `pure-sync.mjs` and waits only for
-     a review that started by itself. It does not mean an update from `main` is reviewed again (point 6), that a review
+     a review that started by itself. It does not mean a merge git makes from `main` is reviewed again (point 6), that a review
      Codex completed on the head needs a posted one, nor that the status shows who reviewed: builder and reviewer post
      under one login (#187), and an account the agents sign in with that the host lets write counts as a person's,
      since the host tells it from no owner's. Reason: a review of
-     one commit stood for later commits no one checked, and any collaborator's comment passed a pull request. Held by
-     the `security-review` status, which waits where it is broken, in the core, and holds the merge once a ruleset
-     requires it (#320).
-   - **What a posted review declares** (#299): by default a review posted in a comment that opens
-     "Security review:", "Code review:" or "Design check:" covers one kind of review, and declares what it found on two
-     lines of their own: "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other
-     finding.". Whoever posts it, session or reviewer, writes both. The one condition that changes it: a note that no
-     review is needed ("Security review: none needed") declares nothing. It does not mean that the lines change what
+     one commit stood for later commits no one checked, and any collaborator's comment passed a pull request; and a
+     fresh review was asked of every head, about 150 of Codex's on 39 pull requests, 113 finding nothing (#750). Held,
+     in part, by the `security-review` status through `scripts/clean-merges.mjs` and its test, by which the `code-review`
+     status carries a code review over the same way; the status waits where the rule is broken, in the core, and holds
+     the merge once a ruleset requires it (#320).
+   - **What a posted review declares** (#299): by default a review posted in a comment that opens "Security review:",
+     "Code review:" or "Design check:" covers one kind of review, and declares what it found on two lines of their own:
+     "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other finding.", and its score
+     ("Every reviewer" in `roles/shared/review-guidelines.md`) on a third: "Score: S of 10.", S a whole number from 1 to
+     10 (#710). Whoever posts it, session or reviewer, writes all three. The one condition that changes it: a note that
+     no review is needed ("Security review: none needed") declares nothing. It does not mean that the lines change what
      blocks or what a builder mends (point 5; #315), that they stand in for the findings written out, that Codex's own
      reviews, read by their badges, are asked anything, nor that a comment covering two kinds is read as both. Reason:
      run on 10 to 15 November 2026, the count of what the reviews find read 4 of 24 posted security reviews, their
-     wording varying, and the findings that do not block are to be counted before #315 is decided. Held by no check
-     yet: `core/scripts/review-record.mjs` counts a review without its line as "not read", never as none, so the share
-     not read shows where the form is not kept, and no check fails a pull request for it.
+     wording varying, and the findings that do not block are to be counted before #315 is decided; the score was written
+     in as many forms, and no count read it. Held by the `code-review` status, which waits while the newest posted
+     review of a kind declares no line, its score asked from 20 November (`core/scripts/review-marks.mjs`; #551);
+     `core/scripts/review-record.mjs` counts one without its line as "not read".
 4. **The design check:** once before the merge, a fresh reviewer judges the work against the design alone, and its
    "Readings taken" as the stand-in would.
    - **It goes down the lines** (#305). By default, where the pull request's entry has "Done when"
@@ -85,12 +112,13 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    otherwise filed as a follow-up with the reason in the PR, or answered with why it is wrong (a security finding: only
    as floor rule 9 allows). A review from anyone else is advisory.
 6. **Rounds end:** after a fix, one request to its reviewer, and a security check only as point 3 says, and none for an
-   update from `main` without a conflict; a PR is never marked draft and ready again to rerun its reviews.
+   update from `main` that git merges with no conflict (point 3); a PR is never marked draft and ready again to rerun
+   its reviews.
    - After three rounds, what is still open goes to escalation (`tasks/roles.md`); a PR it cannot settle stays
      unmerged.
 7. **The fallback reviewer's brief,** written as `tasks/helpers.md` says, hands it the diff, the task's text, the
-   *review reference*, the review guidelines (the core's and the project's) and the project's `SECURITY.md` and threat
-   model with the floor, and nothing else.
+   *review reference*, the review guidelines (the core's and the project's), the project's `SECURITY.md` and threat
+   model with the floor, and its stance (point 1), and nothing else.
 8. **A finding seen twice becomes a check** (#254). By default a kind of finding stays a point a
    review holds a change to, and needs nothing more. Once the findings of a second pull request name the same rule
    that stands (the core's, or the project's own in its `AGENTS.md` or `SECURITY.md`), which
