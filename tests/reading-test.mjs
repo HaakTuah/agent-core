@@ -241,8 +241,10 @@ const imported = spawnSync(process.execPath, ["--input-type=module", "-e", `impo
 ok(imported.status === 0 && imported.stdout === "imported\n", "imported by a script named on node's command line, it runs nothing of its own", imported.stdout + imported.stderr);
 
 let unbudgeted = null;
+let handMade = null;
 try { matchesIn("*.md", "a.md"); } catch (e) { unbudgeted = e; }
-ok(unbudgeted instanceof TypeError && /Mend:/u.test(unbudgeted.message), "matches() given no reading's budget is refused, with its mend, so no try runs outside a reading's bound");
+try { matchesIn("*.md", "a.md", { left: 5 }); } catch (e) { handMade = e; }
+ok(unbudgeted instanceof TypeError && /Mend:/u.test(unbudgeted.message) && handMade instanceof TypeError && /Mend:/u.test(handMade.message), "matches() given no reading's budget is refused, with its mend, so no try runs outside a reading's bound");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the reading script`);
 process.exit(failed ? 1 : 0);

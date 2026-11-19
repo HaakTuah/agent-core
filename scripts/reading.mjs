@@ -162,7 +162,7 @@ function tried(g, n, within) {
 // Whether a changed path matches a pattern, the steps paid from `within`, the reading's budget, which every caller gives
 // (none given is refused, so no caller tries patterns outside a reading's bound), or true where they cannot be paid.
 export function matches(pattern, file, within) {
-  if (!within || typeof within.left !== "number") throw new TypeError("matches(): no reading's budget given. Mend: pass the reading's budget(), as calledByPaths does");
+  if (!within || typeof within.left !== "number" || !(within.made instanceof Map)) throw new TypeError("matches(): no reading's budget given. Mend: pass the reading's budget(), as calledByPaths does");
   const g = patternOf(String(pattern), within), name = String(file);
   return g === null || !paid(within, name.length) || tried(g, pathOf(name), within);
 }
