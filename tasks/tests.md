@@ -100,8 +100,31 @@ reads is the *shape check*'s config.
   fails the same way each time it runs on the same commit. The trigger is a test that failed and then passed on the
   same commit in the same job, which the record names: the session that meets it, or the audit's next cleaning task,
   mends it or takes it out, saying so under "Readings taken". It does not mean that a job is never run again: a job
-  run again for a cause outside the tests (a runner lost, the network) says so in the pull request. Reason: a test
-  that fails at random teaches every session to run again rather than read. Held by the audit, through the record.
+  run again for a cause outside the tests (a runner lost, the network) says so in the pull request, and one on the
+  default branch is run again and filed as the rule below says. Reason: a test that fails at random teaches every
+  session to run again rather than read. Held by the audit, through the record.
+- **A check that fails on the default branch has an owner, and is run again once** (#542). By default a check that fails
+  on a pull request is its builder's. The one condition that changes it: where a check run on the default branch's
+  newest commit ends in failure, it is owned by the session whose merge it followed, while that session still runs;
+  otherwise by the orchestrator at its next wake; and with no orchestrator, by the next builder session at its start.
+  The trigger is that failure, read before a merge (`tasks/hosts.md`), before a session's last message, at a wake or a
+  start, or in the issue the scheduled look keeps while one stands: its owner reads the failure's mend and, where it
+  says to run the check again or the failure is of a source that could not be reached, runs the failed jobs again, once.
+  Whoever takes it up says so in a comment on the look's issue where it stands, else on the pull request whose merge it
+  followed, and a later session leaves the failure to that comment's writer only where the comment is the *owner's
+  account*'s, opens with a session's line (`roles/shared/inbox.md`), and is under an hour old: past that, what the
+  second run left is taken up as any failure is. A check that then passes on the same commit is unsteady: the owner
+  files a `bug` for the test, naming it and what it could not reach or do, or adds the day to the one that stands, and
+  that bug is mended at its cause as any is. A check that fails again is a bug that waits for no line, naming the merge
+  it followed as "A correction is marked" says (`roles/shared/inbox.md`), narrowed and fixed as "The default branch is
+  tested at its newest commit", above, says. It does not mean a check is run until it passes, nor a second run where the
+  mend names something to change, nor a retry the host's workflows make by themselves, which would hide what a second
+  run counts; nor that other lanes stop while the default branch is red: they go on, and only merges wait
+  (`tasks/hosts.md`). Reason: on 17 November 2026 a suite failed on the core's default branch for a fetch that failed,
+  its mend said to run it again, and no session was left to read it, while a release waits on a green default branch; a
+  second run that hides an unsteady test is only a stopgap, and such a test is mended once it is counted. Held by the
+  scheduled look, which keeps an issue open while a check on the default branch's newest commit has failed
+  (`core/scripts/look.mjs`), and by the staged case `red-main`, for the second run and what is filed.
 - **A new test says what it guards.** By default a test file opens with a line that names the rule it holds or the
   fault it catches (a module's rule, an issue, a bug's number), and sets up only what that needs (`roles/shared/how-to-work.md`,
   "The smallest setup that tests the rule"). The trigger is a test file a pull request adds: its builder writes that

@@ -8,7 +8,8 @@ Read at the start of every task.
    - Once every review asked for has answered on the head commit with no finding open, turn on auto-merge
      (`tasks/github-calls.md`; a sync PR is merged by hand: floor rule 8) and go on: GitHub merges when the checks are
      green and, where asked, the branch is up to date. Where it refuses, the PR already `clean` or `unstable`,
-     merge it yourself as floor rule 12 says.
+     merge it yourself as floor rule 12 says. A check that then fails on `main` is yours while you run
+     (`tasks/tests.md`).
    - A push after that turns auto-merge off first; bringing the branch up to date with `main` keeps it on.
    - **Ready pull requests merge in a line** (#702). By default only the first whose reviews answered with no
      finding open is brought up to date; one in a round of fixes keeps its place and lets the next go first. The
@@ -46,7 +47,7 @@ owner creates from any device to stop its agents and deletes to let them go on.
   up.
 - A builder session that no orchestrator started, and the orchestrator on every wake, first checks whether the core
   has moved (`core/scripts/core-moved.mjs --dry`) and syncs it if so (`core/scripts/sync.mjs`, then each step and
-  difference it reports), between tasks, a floor change at once (`tasks/planning.md`); where checks cost money, not on a day a sync PR was already opened. Then both read what reviews left after a merge (`tasks/reviews.md`, point 2).
+  difference it reports), between tasks, a floor change at once (`tasks/planning.md`); where checks cost money, not on a day a sync PR was already opened. Then both read what reviews left after a merge (`tasks/reviews.md`, point 2), and take up a check failed on `main`'s newest commit that no running session owns (`tasks/tests.md`).
 
 ## Git and GitHub
 

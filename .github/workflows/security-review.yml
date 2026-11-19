@@ -81,7 +81,7 @@ on:
         type: boolean
         default: false
       reviewers:
-        description: The accounts, besides the repository's owner and the people GitHub lets write to it, whose posted "Security review:" counts, by login, separated by spaces. Left out, none.
+        description: The accounts, besides the repository's owner and the people GitHub lets write to it, whose posted "Security review:", "Code review:" or "Design check:" counts, by login, separated by spaces. Left out, none.
         required: false
         type: string
         default: ""
