@@ -63,12 +63,13 @@ started it. It reaches only its own repository, which the owner sets where it st
 own reach, and the orchestrator attaches no other repository save to read one, and runs on the owner's computer only
 where the owner said so. Once it runs, the adviser reads back that it is a session of its own, in its role, reaching
 that repository alone, and tells the owner that it runs, how to stop it, and where any of that is not so. How a session
-is started is each tool's part (`tasks/tools.md`, its table's row); where the tool cannot, the adviser writes the brief
+is started is each tool's part (`tasks/tools.md`, its table); where the tool cannot, the adviser writes the brief
 and the owner starts it. The adviser's own session is not archived while an orchestrator it started runs, until the
 tool's part says, from its documentation, that a session outlives the one that started it. It does not mean the adviser
 uses no helper to read or search, nor that the owner may not start an orchestrator or a builder directly. Reason: a
 helper would end with the adviser, fill it with the queue's reports and inherit all it reaches; in the test of 16
-November 2026 the started session took itself for a builder, and nothing checked what it reached. Held by nothing yet.
+November 2026 the started session took itself for a builder, and nothing checked what it reached. Held in part by
+`adviser-starts`.
 
 **It is not the way between orchestrators.** By default what one orchestrator needs of another project goes there as an
 issue (`roles/orchestrator.md`, "One project"). The adviser carries such a request only where that session cannot file

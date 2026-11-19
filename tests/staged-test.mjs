@@ -980,6 +980,35 @@ ok(brief(caseOf("finish"), labelled) === [`You are a builder session of a projec
   "Read the project's AGENTS.md and what it names first, as its rules ask.", `Your task: ${caseOf("finish").task}`,
   "Where its rules have you wait on a review or a check, end once nothing else is yours to do, with a short message."].join("\n"),
   "a builder's brief, where the case names no role, stands as it was");
+
+// ---- the adviser's third case (#492): the project's orchestrator started, and no second where one runs ----
+const OWN = `${OWNER}/${REPO}`, NOTES = `${OWNER}/${REPO}-notes`;
+const STARTED = `You are the orchestrator of ${OWN} (the role \`orchestrator\`): read core/roles/orchestrator.md at your start, then work its queue. The owner's word that started you: "I want both queues worked tonight."`;
+// (through Node, as gh above: Windows runs no script by its first line)
+const session = (dir, args, input = "") => spawnSync(process.execPath, [path.join(dir, "bin", "session"), ...args], { env, encoding: "utf8", input });
+const start = (dir, { repos = [OWN], model = "opus", effort = "high", text = STARTED } = {}) =>
+  session(dir, ["start", ...repos.flatMap(r => ["--repo", r]), "--model", model, "--effort", effort, "--title", "Orchestrator", "--brief-file", "-"], text);
+check("adviser-starts", fresh("adviser-starts"), d => start(d), d => start(d, { repos: [NOTES] }), /in .*-notes, whose orchestrator runs.*no orchestrator of/);
+const asked = fresh("adviser-starts"), startsWhy = () => verdict("adviser-starts", asked).why;
+const listed = JSON.parse(session(asked, ["list"]).stdout);
+ok(listed.length === 1 && listed[0].repositories[0] === NOTES && session(asked, ["start", "--repo", OWN]).status === 1 && session(asked, ["start", "--bogus", "x"]).status === 1,
+  "adviser-starts: the stand-in lists the other project's orchestrator as running, and refuses a start with no brief or an option it does not know");
+start(asked); start(asked);
+ok(/started 2 sessions in .*scratch, where one orchestrator was asked for/.test(startsWhy()), "adviser-starts: a second orchestrator of the project fails, saying so", startsWhy());
+const each = (opts, why, what) => { const d = fresh("adviser-starts"); start(d, opts); ok(why.test(verdict("adviser-starts", d).why), `adviser-starts: ${what} fails, saying so`, verdict("adviser-starts", d).why); };
+each({ repos: [OWN, NOTES] }, /in .*-notes, whose orchestrator runs.*no orchestrator of/, "a start that reaches the other project too");
+each({ repos: [OWN, `${OWNER}/elsewhere`] }, /reaches .*elsewhere, not .* alone/, "an orchestrator given another repository's reach");
+each({ model: "sonnet" }, /its model is sonnet, not the strongest tier/, "an orchestrator on a lower tier");
+each({ effort: "medium" }, /its effort is medium, not high/, "an orchestrator at an effort other than high");
+each({ text: STARTED.replace("core/roles/orchestrator.md", "the rules") }, /brief does not name its role's file/, "a brief that leaves out the role's file");
+each({ text: "Work the queue." }, /brief does not name its role, its role's file .*, the project, the owner's word/, "a brief that names none of them");
+each({ model: "fable" }, /its model is fable, not the strongest tier \(Opus\)/, "an orchestrator on a tier above the strongest");
+each({ model: "default" }, /its model is default, not the strongest tier/, "a model that names no tier");
+each({ text: `You are the orchestrator of ${OWN}: read core/roles/orchestrator.md at your start.` }, /brief does not name the owner's word that started it$/, "a brief that names the owner only in the project's address");
+each({ text: STARTED.replace(`of ${OWN}`, `beside ${NOTES}`) }, /brief does not name the project$/, "a brief that names the other project alone");
+{ const d = fresh("adviser-starts"); start(d, { model: "claude-opus-5-5" }); ok(verdict("adviser-starts", d).pass, "adviser-starts: a model of the strongest tier by its full name passes", verdict("adviser-starts", d).why); }
+ok(brief(caseOf("adviser-starts"), labelled).split("\n")[1] === `This machine starts a session of your own, and lists those that run, only with ${path.join(bin, "session")} (\`session --help\` says how): start none another way, and set no scheduled task, wake or check-in.`,
+  "the brief of a case that reads the sessions one starts names the stand-in, the only way it starts one");
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed${PART === "all" ? "" : `, the part ${PART}`}`);

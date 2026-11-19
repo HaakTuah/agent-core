@@ -4,9 +4,10 @@
 // range, and nothing at all; each refuses, taking nothing of it as a pass. The readers: pure-sync.mjs and
 // comment-only.mjs, run as a merger runs them in a scratch project whose core is reached by a git rewrite (no network);
 // select.mjs, run as the tests workflow runs it there, and the shape check's readers on the parser that it reads code
-// through, on files at and just past the largest each takes (#844, #862); copy-tree.mjs, on trees made here; and pr-description.mjs's reader of
-// what a pull request adds under its manifest's "Differences" (#756), on commits made here; and reading.mjs's reader of the
-// checkout's rule files (#848), on a checkout made here. Test data is made up. Run
+// through, on files at and just past the largest each takes (#844, #862); copy-tree.mjs, on trees made here; and
+// pr-description.mjs's reader of what a pull request adds under its manifest's "Differences" (#756), on commits made
+// here; reading.mjs's reader of the checkout's rule files (#848), on a checkout made here; and read-total.mjs's cut and
+// its conditions (#469), on trees held in memory. Test data is made up. Run
 // by the core's tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
 //
 //   node tests/hostile-pr-changes-test.mjs
@@ -20,6 +21,7 @@ import { mended } from "../scripts/mend.mjs";
 import { readCsharp } from "../scripts/shape-csharp.mjs";
 import { readPython } from "../scripts/shape-python.mjs";
 import { javascriptFunctions } from "../scripts/javascript-functions.mjs";
+import { LIMITS, conditions, cuts, total, tree as readTree } from "../scripts/read-total.mjs";
 import { LARGEST } from "../scripts/tree-walk.mjs";
 import { scratchDir, scratchEnv, root } from "../scripts/scratch-core.mjs";
 
@@ -292,6 +294,127 @@ ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "co
   ok(differencesAdded(d).join() === "- a difference over an unreadable base", "pr-description: over a base whose manifest cannot be read, each difference of the head's counts as added");
 }
 
+// read-total.mjs (#469): the files a pull request adds to the core's rule folders, read for a cut or a join: a name with
+// control characters, too long a file, binary text, a path, nothing at all; none breaks a line printed or runs long
+{
+  const memory = texts => ({ read: f => texts[f] ?? null, list: folder => Object.keys(texts).filter(f => f.startsWith(`${folder}/`) && !f.slice(folder.length + 1).includes("/") && f.endsWith(".md")).sort(), size: f => (f in texts ? Buffer.byteLength(texts[f]) : null) });
+  const lines = (tag, n) => Array.from({ length: n }, (_, i) => `- A rule of ${tag}, number ${i}, which says what it says at some length.`).join("\n");
+  const base = { "floor/security.md": "# F\n", "roles/builder.md": "# B\n\nRead at the start by the role `builder`.\n\n**Reads at its start:** `roles/shared/w.md`.\n", "roles/shared/w.md": "# W\n\nRead at the start of every task.\n", "tasks/s.md": `# S\n\nRead when a screen changes: the kinds \`screen\` and \`polish\`.\n\n${lines("s", 60)}\n` };
+  const run = head => { const b = total(memory(base), []), h = total(memory(head), [], b); return conditions(total(memory(base), [], h), h, ""); };
+  const odd = "tasks/a\nFAIL: forged\u001b[2J\u2028.md";
+  const got = run({ ...base, [odd]: `# A\n\nRead when a screen changes: the kind \`screen\`.\n\n${lines("s", 60)}\n` });
+  ok(got.cut && got.failures.length && got.failures.every(f => !/[\u0000-\u001f\u2028]/u.test(f)) && got.failures.every(f => mended(`FAIL: ${f}`)), "read-total: a file named with a line's end, an escape or a separator is printed with them written out, each failure saying its mend");
+  let slow = Date.now();
+  const huge = run({ ...base, "tasks/huge.md": `# H\n\nRead when a screen changes: the kind \`screen\`.\n\n${"- a line of a file far too long to be a rule, said again and again.\n".repeat(80000)}` });
+  ok(!huge.cut && Date.now() - slow < 5000, "read-total: a file of five megabytes of new text is no cut, read in no time");
+  const binary = run({ ...base, "tasks/bin.md": Buffer.from(Array.from({ length: 65536 }, (_, i) => i % 256)).toString("latin1") });
+  ok(!binary.cut && !binary.failures.length, "read-total: a file of binary text is no cut, and fails nothing");
+  ok(!run({ ...base, "tasks/../../etc.md": base["tasks/s.md"] }).failures.some(f => /[\u0000-\u001f]/u.test(f)), "read-total: a path that climbs out of its folder is a name, printed as it is, and opens nothing");
+  ok(!run(base).cut && !run({}).failures.some(f => !mended(`FAIL: ${f}`)) && JSON.stringify(cuts(total(memory({}), []), total(memory({}), []))) === JSON.stringify({ added: [], gone: [] }), "read-total: nothing at all is no cut, and each failure on an empty tree says its mend");
+}
+
+// read-total.mjs's reader of the working tree, as the size workflow reads a fork's checkout (#469): a link to a pipe, to
+// an endless device or out of the tree, a file past its limit in bytes, and more files or kinds than it reads; each is
+// read as no file or refused with its mend, within the 5 s SECURITY.md allows
+{
+  const dir = path.join(tmp, "read-total"), put = (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
+  put("floor/security.md", "# F\n");
+  put("roles/builder.md", "# B\n\nRead at the start by the role `builder`.\n\n**Reads at its start:** `roles/shared/w.md`.\n");
+  put("roles/shared/w.md", "# W\n\nRead at the start of every task.\n");
+  put("tasks/s.md", "# S\n\nRead when a screen changes: the kind `screen`.\n");
+  put("outside.md", "# O\n\nRead when a screen changes: the kind `screen`.\n");
+  const link = (to, f) => { try { fs.symlinkSync(to, path.join(dir, f)); return true; } catch { return false; } };
+  const linked = [link(path.join(dir, "outside.md"), "tasks/out.md"), link("/dev/zero", "tasks/zero.md"), link(path.join(dir, "roles"), "tasks/folder.md")];
+  if (NAMES && spawnSync("mkfifo", [path.join(dir, "tasks/pipe.md")]).status === 0) linked.push(true);
+  link(path.join(dir, "roles"), "tools");
+  put("tasks/big.md", `# G\n\nRead when a screen changes: the kind \`screen\`.\n\n${"x".repeat(LIMITS.bytes + 10)}\n`);
+  let slow = Date.now();
+  const t = readTree(null, dir), files = t.list("tasks");
+  ok(linked.every(Boolean) ? files.join() === "tasks/big.md,tasks/s.md" && t.read("tasks/zero.md") === null && t.size("tasks/out.md") === null && t.list("tools").length === 0 && Date.now() - slow < 5000 : true,
+    "read-total: a link to a pipe, to an endless device, out of the tree or to a folder, and a folder that is a link, are read as no file, in no time");
+  ok(t.read("tasks/big.md") === null && t.size("tasks/big.md") > LIMITS.bytes, "read-total: a file past its limit in bytes is counted by its size, its text never read");
+  put("tasks/kinds.md", `# K\n\nRead when anything changes: ${Array.from({ length: 40000 }, (_, i) => `the kind \`k${i}\``).join(", ")}.\n`);
+  slow = Date.now();
+  let thrown = null;
+  try { total(readTree(null, dir), []); } catch (e) { thrown = e; }
+  ok(thrown && mended(`FAIL: ${thrown.message}`) && Date.now() - slow < 5000, "read-total: a module of under a megabyte naming forty thousand kinds is refused with its mend, within 5 s");
+  fs.rmSync(path.join(dir, "tasks/kinds.md"));
+  // (a name a role's line gives that climbs out of the tree, or is absolute, opens nothing)
+  put("../above.md", `# X\n${"y".repeat(300000)}\n`);
+  put("roles/reviewer.md", "# R\n\nRead at its start by the role `reviewer`.\n\n**Reads at its start:** `../above.md`, `/etc/hostname`.\n");
+  const named = readTree(null, dir);
+  const reviewer = total(named, []).readers.get("the role reviewer, at its start");
+  ok(named.read("../above.md") === null && named.size("../above.md") === null && named.size("/etc/hostname") === null && named.read("roles/./w.md") === null && !reviewer.files.some(f => f.includes("..") || f.startsWith("/")),
+    "read-total: a name with \"..\", \".\" or an absolute path, given by a role's line, is no file, and nothing outside the tree is read or counted");
+  fs.rmSync(path.join(dir, "roles/reviewer.md"));
+  // (the worst case within the limits: as many modules, kinds and bytes as it reads, every module naming every kind and
+  // sharing a sentence, read on both trees as --compare reads them, within 5 s)
+  const rules = (tag, n) => Array.from({ length: n }, (_, i) => `- A rule of ${tag}, number ${i}, which says what it says at some length.`).join("\n");
+  const worst = {}, worstHead = {};
+  for (const t of [worst, worstHead]) Object.assign(t, { "floor/security.md": "# F\n", "roles/builder.md": "# B\n\nRead at the start by the role `builder`.\n\n**Reads at its start:** `roles/shared/w.md`.\n", "roles/shared/w.md": "# W\n\nRead at the start of every task.\n" });
+  const per = Math.floor(LIMITS.all / (LIMITS.files / 2) / 80) - 10;
+  for (let i = 0; i < LIMITS.files / 2 - 2; i++) { worst[`tasks/g${i}.md`] = `# G\n\nRead when: the kind \`w${i % (LIMITS.kinds - 2)}\`.\n\n- A sentence every file shares, long enough to be read as moved.\n${rules(i, per)}\n`; worstHead[`tasks/a${i}.md`] = worst[`tasks/g${i}.md`].replace("# G", "# A"); }
+  const mem = texts => ({ read: f => texts[f] ?? null, list: folder => Object.keys(texts).filter(f => f.startsWith(`${folder}/`) && !f.slice(folder.length + 1).includes("/") && f.endsWith(".md")).sort(), size: f => (f in texts ? Buffer.byteLength(texts[f]) : null) });
+  slow = Date.now();
+  const w0 = total(mem(worst), []), wh = total(mem(worstHead), [], w0), wb = total(mem(worst), [], wh), wc = conditions(wb, total(mem(worstHead), [], wb), "");
+  ok(Date.now() - slow < 5000 && Array.isArray(wc.failures), `read-total: the worst case within the limits (${LIMITS.files} files, ${LIMITS.kinds} kinds, every file sharing a sentence) is read on both trees in ${Date.now() - slow} ms, within 5 s`);
+  // (the names a rule file gives, at their limit, read by the builder and reviewer of 30 merged pull requests of 200
+  // paths each: a role's start line, a module's path patterns, one kind named again and again; past it, refused)
+  const given = Array.from({ length: 30 }, (_, i) => ({ id: `${i}`.padStart(7, "a"), paths: Array.from({ length: 200 }, (_, j) => `src/p${i}/f${j}.js`) }));
+  const n = LIMITS.names - 10, start = "# W\n\nRead at the start of every task.\n";
+  const roleOf = (role, line) => `# ${role}\n\nRead at the start by the role \`${role}\`.\n\n**Reads at its start:** ${line}.\n`;
+  const plain = { "floor/security.md": "# F\n", "roles/shared/w.md": start, "roles/builder.md": roleOf("builder", "`roles/shared/w.md`"), "roles/reviewer.md": roleOf("reviewer", "`roles/shared/w.md`") };
+  const giving = k => ({
+    start: { ...plain, "roles/builder.md": roleOf("builder", Array.from({ length: k }, (_, i) => `\`roles/shared/x${i}.md\``).join(", ")) },
+    paths: { ...plain, "tasks/p.md": `# P\n\nRead when: the paths ${Array.from({ length: k }, (_, i) => `\`src/**/q${i}/*.js\``).join(", ")}.\n` },
+    kinds: { ...plain, "tasks/k.md": `# K\n\nRead when: the kinds ${Array.from({ length: k }, () => "`same`").join(", ")}.\n` },
+  });
+  // (the paths' patterns, tried 3.5 million times on them, are past the steps a tree's tries take, and refused)
+  for (const [what, texts] of Object.entries(giving(n))) {
+    slow = Date.now();
+    thrown = null;
+    let c = null;
+    try { const a = total(mem(texts), given); c = conditions(a, total(mem(texts), given, a), ""); } catch (e) { thrown = e; }
+    const held = what === "paths" ? thrown && /steps the total read gives one tree/.test(thrown.message) && mended(`FAIL: ${thrown.message}`) : c && !c.cut;
+    ok(Date.now() - slow < 5000 && held, `read-total: ${n} names of one rule file (${what}), read by 60 readers of merged pull requests, take ${Date.now() - slow} ms, within 5 s${what === "paths" ? ", refused with its mend past the steps a tree's tries take" : ""}`);
+  }
+  // (a path pattern of many stars side by side that matches no path, which a backtracking matcher takes minutes over)
+  const stars = { ...plain, "tasks/s.md": `# S\n\nRead when: the paths ${["*a".repeat(30) + "b", "**/".repeat(30) + "*z*z*z*z*z*z*q", `src/${"*".repeat(200)}x`].map(x => `\`${x}\``).join(", ")}.\n` };
+  slow = Date.now();
+  const sa = total(mem(stars), given.map(t => ({ ...t, paths: t.paths.map(p => `${p.replace(/\.js$/u, "")}${"a".repeat(150)}.js`) })));
+  ok(Date.now() - slow < 5000 && sa.readers.size > 0, `read-total: path patterns of many stars side by side, matching no path, are read by 60 readers in ${Date.now() - slow} ms, within 5 s`);
+  // (a head's path patterns that pass the one-pass check on the merged pull requests' paths and fail their walk, more
+  // than the steps a tree's tries take (#673): refused with their mend within 5 s, and the base reads the same before
+  // and after them, each tree spending a budget of its own)
+  const walking = { ...plain, "tasks/b.md": "# B\n\nRead when: the paths `src/*/f1*.js` and `.github/workflows/`.\n" };
+  const walked = { ...walking, "tasks/w.md": `# W\n\nRead when: the paths ${Array.from({ length: 280 }, (_, i) => `\`src/*f${i}*.js\``).join(", ")}.\n` };
+  slow = Date.now();
+  const baseBefore = total(mem(walking), given);
+  thrown = null;
+  try { total(mem(walked), given, baseBefore); } catch (e) { thrown = e; }
+  const baseAfter = total(mem(walking), given), read = t => JSON.stringify([t.sum, [...t.readers]]);
+  ok(thrown && /steps the total read gives one tree/.test(thrown.message) && mended(`FAIL: ${thrown.message}`) && Date.now() - slow < 5000, `read-total: a head's path patterns past the steps a tree's tries take are refused with their mend, in ${Date.now() - slow} ms, within 5 s`);
+  ok(read(baseBefore) === read(baseAfter) && baseBefore.readers.get(`the builder of ${given[0].id}`).files.includes("tasks/b.md"), "read-total: the base reads the same before and after a head that ran past its budget");
+  for (const [what, texts] of Object.entries(giving(40000))) {
+    slow = Date.now();
+    thrown = null;
+    try { total(mem(texts), given); } catch (e) { thrown = e; }
+    ok(thrown && /names/.test(thrown.message) && mended(`FAIL: ${thrown.message}`) && Date.now() - slow < 5000, `read-total: forty thousand names of one rule file (${what}) are refused with their mend, within 5 s`);
+  }
+  // (files each within their limit, past the limit of all their text together, are refused with their mend)
+  for (let i = 0; i < 10; i++) put(`tasks/full${i}.md`, `# U\n\nRead when a screen changes: the kind \`screen\`.\n\n${"z".repeat(LIMITS.bytes - 100)}\n`);
+  slow = Date.now();
+  thrown = null;
+  try { total(readTree(null, dir), []); } catch (e) { thrown = e; }
+  ok(thrown && /past the \d+ MB/.test(thrown.message) && mended(`FAIL: ${thrown.message}`) && Date.now() - slow < 5000, "read-total: files each within their limit, past the limit of all the text together, are refused with their mend, within 5 s");
+  for (let i = 0; i < 10; i++) fs.rmSync(path.join(dir, `tasks/full${i}.md`));
+  for (let i = 0; i < 5000; i++) put(`tasks/m${i}.md`, "# M\n\nRead when a screen changes: the kind `screen`.\n");
+  slow = Date.now();
+  thrown = null;
+  try { total(readTree(null, dir), []); } catch (e) { thrown = e; }
+  ok(thrown && mended(`FAIL: ${thrown.message}`) && Date.now() - slow < 5000, "read-total: five thousand modules added are refused with their mend, within 5 s");
+}
+
 // ---- reading.mjs: the rule files of a checkout, which a fork's branch may make links (#848) ----
 // (a link to a pipe never answers, one to a file outside the checkout is not the checkout's: both read as no file, so the
 // check ends at once with a failure naming the file whose "when" it cannot read, never waiting on it)
@@ -314,5 +437,21 @@ if (process.platform !== "win32") {
     ok(!raw(out) && !out.includes("The floor") && /tasks\/zero\.md/u.test(out) && /tasks\/out\.md/u.test(out) && mended(out), "reading.mjs --check: each link is named as a file that says no when it is read, with its mend, and none is read as the file it leads to");
   } else console.log("skip reading.mjs: a rule file that is a link to a pipe: no pipe can be made here");
 } else console.log("skip reading.mjs: a rule file that is a link to a pipe: no pipe can be made here (Windows)");
+
+// ---- reading.mjs: path patterns a fork's branch writes, tried on its changed paths (#673) ----
+// (a module of patterns that pass the one-pass check on a long changed path and fail its walk: the reading stops at its
+// budget within 5 s, each module a pattern names called, saying why, so the paths call for more reading, never less)
+{
+  const rp = path.join(tmp, "reading-steps"), put = (f, text) => { fs.mkdirSync(path.dirname(path.join(rp, f)), { recursive: true }); fs.writeFileSync(path.join(rp, f), text); };
+  put("floor/security.md", "# The floor\n");
+  put("roles/builder.md", "# The builder\n\nRead at the start by the role `builder`.\n\n**Reads at its start:** `tasks/start.md`.\n");
+  put("tasks/start.md", "# Start\n\nRead at the start of every task.\n");
+  put("tasks/plain.md", "# Plain\n\nRead when the readme changes: the path `README.md`.\n");
+  put("tasks/walked.md", `# Walked\n\nRead when: the paths ${Array.from({ length: 50 }, () => `\`x/${"*a".repeat(240)}q\``).join(", ")}.\n`);
+  const started = Date.now(), r = spawnSync(process.execPath, [path.join(root, "scripts", "reading.mjs"), "builder", "--path", `x/${"a/".repeat(1000)}aq`, "--path", "README.md"], { cwd: rp, env, encoding: "utf8", timeout: 5000 });
+  const out = `${r.stdout}${r.stderr}`;
+  ok(r.status === 0 && Date.now() - started < 5000 && /tasks\/walked\.md +the changed paths, past the steps a reading tries them for/u.test(out) && /tasks\/plain\.md/u.test(out),
+    `reading.mjs: path patterns past a reading's budget are read in ${Date.now() - started} ms, within 5 s, each module they name called, saying why`);
+}
 
 process.exit(failed ? 1 : 0);
