@@ -87,7 +87,7 @@ export const FAULTS = [
   { kind: "a job a maintained package does written by hand", file: "src/yaml.mjs", words: /package|library|maintained|by hand|hand-written|Looked for/i },
   { kind: "a mark raised without its reason", file: "checks/sizes.json", words: /mark|cap|raised|raise|Leanness/i },
   { kind: "a baseline grown without its reason", file: "checks/shape-baseline.json", words: /baseline|grown|reason/i },
-  { kind: "a quote of the owner's that holds more than a decision and its reason", file: "description", also: ["owner's word", "owner’s word"], words: /quot|praise|thank|typo|misspel|spell|chatter/i },
+  { kind: "a quote of the owner's that holds more than a decision and its reason", file: "description", also: ["owner's word", "owner’s word"], words: /praise|thank|typo|misspel|spell|chatter/i },
   { kind: "a rule with no owner's word behind it", file: "AGENTS.md", words: /owner|issue|asked|beyond|word|scope/i },
 ];
 

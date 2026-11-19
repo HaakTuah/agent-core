@@ -114,7 +114,7 @@ export function testsChanged(dir = ".", base = "HEAD^1") {
 if (started(import.meta.url)) {
   const args = process.argv.slice(2), at = args.indexOf("--base"), eq = args.find(a => a.startsWith("--base="));
   const ref = eq !== undefined ? eq.slice("--base=".length) : at >= 0 ? args[at + 1] : null;
-  const known = args.every((a, i) => a === "--base" || a.startsWith("--base=") || (i === at + 1 && at >= 0));
+  const known = args.filter(a => a === "--base" || a.startsWith("--base=")).length <= 1 && args.every((a, i) => a === "--base" || a.startsWith("--base=") || (i === at + 1 && at >= 0));
   if (!known || ((at >= 0 || eq !== undefined) && (!ref || ref.startsWith("-")))) { console.log("Usage: node core/scripts/weakened.mjs [--base <ref>]"); process.exit(2); }
   const base = baseOf(".", ref), found = testsChanged(".", base);
   if (found === null) console.log(`Not read: ${base ? "the base holds no shape check config naming the tests, or the change could not be read against it" : `no base could be read${ref ? ` from ${plain(ref)}` : ": name it with --base <ref>"}`}.`);
