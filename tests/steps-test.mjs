@@ -341,6 +341,9 @@ ok(missedInputs.length === 1 && /newest version/u.test(missedInputs[0].mend) && 
   "an item that says its input carries a version, and names no version among its limits, is reported; a path in backticks says nothing of one", report(missedInputs));
 ok(!rule5("   - a saved game, its version read first; limits: 1 MB, 5 s, version 3; hostile tests: `tests/hostile/link.test.mjs`.\n").length,
   "an item whose limits name the newest version its reader knows reads done");
+ok(rule5("   - a saved game, its version read first; limits: 1 MB, 5 s, a newer version refused; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1
+  && rule5("   - a saved game, its version read first, `limits: version 3`; limits: 1 MB; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1,
+  "a version named among the limits with no number, or a version only in backticks, does not read done");
 ok(!rule5("   - a peer's message, which carries no version number; limits: 64 KB; hostile tests: `tests/hostile/link.test.mjs`.\n").length,
   "an item that says its input carries no version is not asked to name one");
 missedInputs = rule5("   - a saved game, refused without a version; limits: 1 MB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a save, \u001b[31mred\u0007\u009b\u200f\u2028\u202e\u2066\ufeff; limits: 1 MB; hostile tests: none\n");

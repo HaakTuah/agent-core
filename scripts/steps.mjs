@@ -508,10 +508,10 @@ function namesTests(p, item) {
   return [...(/hostile\s+tests\b([\s\S]*)/i.exec(item)?.[1] ?? "").matchAll(/`([^`]+)`/g)].some(m => there(m[1]));
 }
 const CASES = "too long, the wrong type, markup, a file path, a number out of range, nothing at all";
-// An item's limits, the words after "limits:" up to its hostile tests or its end, what is in backticks taken out; null
-// where it states none: no number and no "none".
+// An item's limits, the words after "limits:" up to its hostile tests or its end, what is in backticks taken out first
+// (a "limits:" there is none); null where it states none: no number and no "none".
 function limitsOf(item) {
-  const said = /\blimits:([\s\S]*?)(?=hostile\s+tests\b|$)/i.exec(item)?.[1].replace(/`[^`]*`/g, "") ?? "";
+  const said = /\blimits:([\s\S]*?)(?=hostile\s+tests\b|$)/i.exec(item.replace(/`[^`]*`/g, ""))?.[1] ?? "";
   return /\d|\bnone\b/i.test(said) ? said : null;
 }
 // Whether an item says its input carries a version, in its own words outside its limits and anything in backticks (a
@@ -534,7 +534,7 @@ function hostileTests(p) {
   const first = l => short(l.split("\n")[0].trim().slice(2).trim());
   const bare = items.filter(l => !namesTests(p, l)).map(first);
   const unlimited = items.filter(l => !limitsOf(l)).map(first);
-  const unversioned = items.filter(l => limitsOf(l) && versioned(l) && !/\bversion/i.test(limitsOf(l))).map(first);
+  const unversioned = items.filter(l => limitsOf(l) && versioned(l) && !/\bversions?\b[^,;]*?\d/i.test(limitsOf(l))).map(first);
   const wrong = [
     bare.length && `each input names, after the words "hostile tests:", in backticks, a file or folder of the project that holds them (${CASES}): write those tests where they are missing, and name them so. Naming none that is there: ${bare.join("; ")}.`,
     unlimited.length && `each input names, after the words "limits:", its limit in size, in count and in time, each as a number where it applies, as its reader holds it (or "limits: none", with why, where its shape has none), and its "too long" test uses that number. Naming none: ${unlimited.join("; ")}.`,
