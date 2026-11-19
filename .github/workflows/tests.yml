@@ -499,12 +499,13 @@ jobs:
       # the core's mutation tool, is installed first from its own lock file at the versions it pins, with no package's
       # install scripts (floor rules 7 and 15), and its run tested with it)
       - name: Stryker, from its lock file, with no install scripts (once, on Linux)
+        id: mutation
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
         run: node scripts/install.mjs mutation # (its lock file, package list and .npmrc refused before npm runs where they could reach past npm's registry, as each install's are)
       - name: Stryker's packages, the registry's signature on each (once, on Linux)
-        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
+        if: ${{ !cancelled() && steps.mutation.outcome == 'success' && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
         working-directory: tests/mutation
-        run: npm audit signatures --prefix=. # (as the core's other installs' are checked, floor rule 7)
+        run: npm audit signatures --prefix=. # (only where the install passed, as the core's other installs' are checked, floor rule 7)
       - name: Stryker's run as a mutation tool, with Stryker itself (once, on Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' && (env.RUN == 'all' || contains(env.RUN, ' tests/stryker-test.mjs ')) }}
         run: node tests/stryker-test.mjs --tool tests/mutation
