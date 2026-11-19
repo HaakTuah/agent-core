@@ -12,7 +12,6 @@ it merges last.
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one, 2 security reviews | |
 | #733 | rule builder; it changes the floor (rule 12), with the owner's yes on the issue; two security reviews | |
-| #744 | rule builder; it changes the archive's key and its check | |
 | #750 | rule builder; it changes floor rule 8 (point 2), with the owner's yes on the issue; two security reviews | |
 | #530, step 5 | builder; licence readers | |
 | #593, points 1 to 3 | rule builder | |
