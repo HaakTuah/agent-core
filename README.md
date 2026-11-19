@@ -97,8 +97,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
    core files the sync moved or removed is reviewed like any PR. Where a change to the core asks something of the
-   project itself (a row of its manifest, a line of a rule file, a workflow), `setup/sync-notes.md` says so, and
-   `scripts/steps.mjs` tells each such step done or not; the sync script prints the entries a sync brings, then every
+   project itself (a row of its manifest, a line of a rule file, a workflow), an entry of the sync notes says so
+   (`setup/sync-notes.md`, each entry a file of `setup/sync-notes/`, read whole by `scripts/sync-notes.mjs`), and its
+   step of the same name in `scripts/steps/` tells it done or not (`scripts/steps.mjs`); the sync script prints the entries a sync brings, then every
    step not done, every difference from what the starter kit writes today (`scripts/fresh.mjs`), where the owner's
    inbox is (`scripts/inbox.mjs`), what its labels and openers lack (`scripts/labels.mjs`) and the line `Read for it:`
    (`scripts/reading.mjs`), for the sync PR's description, and each is done in a PR of its own once the sync is merged, nothing waiting on it (`AGENTS.md`, "A
@@ -314,7 +315,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      its list that the owner wants anyway, stands in "nuget.accepted" as `licence-yes.mjs` says, and there alone. It
      fails from a project's first day ("advisory" is for a fault of the check's own, while it is mended), and a private
      repository calls it too, since it needs nothing of GitHub's paid code security, or its owner declines it where a
-     job of the project's own that already runs holds its packages (`setup/sync-notes.md`, "16 November 2026, the NuGet
+     job of the project's own that already runs holds its packages (`setup/sync-notes/`, "16 November 2026, the NuGet
      check where it can matter"). Like the signature check, it first looks whether the pull request changes anything
      NuGet reads (its workflow's header lists what), and passes without a restore where it changes none; any doubt runs
      it. Before the restore, which runs the pull request's own build files, `nuget-fetch.mjs` fetches every package the
@@ -371,8 +372,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      over them: floor rule 14), so each runs only where a change can affect it and only once a pull request is ready:
      its calls to `core.yml` and `personal-terms.yml`, as the starter kit writes them, also start when a pull request
      is marked ready and skip their job on a draft, so a push to a draft bills none of them and a draft shows no check
-     until it is marked ready (#375; `setup/sync-notes.md`, "16 November 2026, checks once a pull request is ready"),
-     and a pull request then starts two jobs, `core.yml`'s one job and `personal-terms` (`setup/sync-notes.md`,
+     until it is marked ready (#375; `setup/sync-notes/`, "16 November 2026, checks once a pull request is ready"),
+     and a pull request then starts two jobs, `core.yml`'s one job and `personal-terms` (`setup/sync-notes/`,
      "17 November 2026, the checks as one job"); and the core is synced once a day at
      most, a sync PR opened that day being the day's ("Sessions" in `roles/shared/work-flow.md`). On GitHub's free plan it
      has neither rulesets nor auto-merge: there the sessions alone keep floor rule 12 and merge by hand
@@ -498,12 +499,12 @@ for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit
 | *test runners* | `hosted`, `self-hosted` or `local`, in backticks: where the project's tests run, the host's runners, a runner of the owner's own, or a session's or the owner's computer alone (`tasks/tests.md`, "The slow suites run once per batch, wherever they run") | read: from the project's workflows, the jobs on a pull request or a push that start a suite through the shape check, and the runner each takes (`scripts/runners.mjs`) |
 | *billed minutes* | `yes` or `no`, in backticks: whether the host bills the repository's runner minutes (`tasks/hosts.md`, "The merge line follows the host") | read: whether the repository is private (`scripts/merge-line.mjs`) |
 | *other builders*, *code reviewers*, *security reviewer* | rows of the *tools* table, "Builder", "Code reviewer" and "Security reviewer"; one still standing among the slots is read as that row | read: as the *tools* (`scripts/tools-read.mjs`) |
-| *direction* | the file that holds what the project's screens are held to: who uses it, its main size, what each screen is for, its mood, its references, what it uses and never uses, and where its system's values and its reference screen stand (`tasks/screens.md`, points 1 and 2) | choice: left out, `docs/direction.md`, written before its first screen |
-| *screen sizes* | the sizes its screens are used at, in pixels, the smallest first (`tasks/screens.md`) | choice: left out, 360, 768 and 1280 wide |
+| *direction* | the file that holds what the project's screens are held to: who uses it, its main size, what each screen is for, its mood, its references, what it uses and never uses, where its system's values and its reference screen stand, and, for a screen read from across a room, its distance (`tasks/screens.md`, points 1, 2 and 10) | choice: left out, `docs/direction.md`, written before its first screen |
+| *screen sizes* | the sizes its screens are used at, in pixels, the smallest first, a screen read from across a room among them (`tasks/screens.md`, point 10) | choice: left out, 360, 768 and 1280 wide |
 | *accessibility floor* | the numbers of the accessibility floor where the project tightens one (`tasks/screens.md`, point 9) | choice: left out, the module's own |
 | *desktop platforms* | the desktop platforms a program of the project's is made for (`tasks/screens.md`, point 15) | cannot be read: the build files that say it (a .NET project's target frameworks and runtime identifiers, a desktop shell's config) are read once the parser #486's record picked arrives (#501); left out, none |
 | *screen checks* | the config of the screen checks the project has turned on, in backticks, for `scripts/screens.mjs`, with the commands of its own tool that takes the pictures and runs each (`tasks/screens.md`, "What holds it") | choice: left out, `checks/screens.json` where it stands, and otherwise every check off |
-| *game page* | the page that says what a game of the project's is for (`tasks/game-design.md`, "Every game says what it is for, on one page"): one for each game, or one with a section for each | choice: left out, `docs/game.md` |
+| *game page* | the page that says what a game of the project's is for (`tasks/game-design.md`, "Every game says what it is for, on one page"), and, where a game has them, the setting that lets its computer players know who is a person, where its given rules come from and its mode for the show: one for each game, or one with a section for each | choice: left out, `docs/game.md` |
 | *computer players*, *measured players*, *what they are shown*, *use-against-ignore measurement*, *where the numbers go*, *where rules are taught* | a game's names for what `game-design.md` speaks of | cannot be read: they name parts of a game's own code, which no script reads by meaning; left out, the module's own words, each found in the game's code by the session that needs it |
 
 ## The manifest's format
@@ -533,7 +534,7 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
 <one row per role it orders otherwise than the core's default; none: the default>
 
 ## Pace
-<one line each, where the owner sets one: lanes at once, which model takes which kind of line, a share of a usage window left free; none: the default>
+<one line each, where the owner sets one: lanes at once, which model takes which kind of line, a share of a usage window left free, whether a second allowance takes over when the first runs out; none: the default>
 
 ## Differences
 <only where it differs from a module's rule ("How a project takes the core", point 7), one line each>

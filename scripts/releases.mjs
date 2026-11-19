@@ -13,12 +13,13 @@ import { aRepository, logged } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
 import { MODULES } from "./reading.mjs";
+import { entries, notesAt } from "./sync-notes.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
 // a release's name: the word and a whole number above zero, written without leading zeros
 export const RELEASE = /^release-([1-9][0-9]{0,8})$/;
-// the core's sync notes: what a sync asks of a project beyond the copy
-export const NOTES = "setup/sync-notes.md";
+// the core's sync notes: what a sync asks of a project beyond the copy (sync-notes.mjs, beside this file)
+export { NOTES } from "./sync-notes.mjs";
 // Git's own variables that point a command at another repository than the folder it is run in (a hook, or a shell
 // that set them, hands them on): left out of every call here and in release.mjs, so each lands in the folder it names
 // and nowhere else.
@@ -168,12 +169,15 @@ export function held(list, own = OWN) {
 }
 
 
-// What taking the core from `old` to `pin` asks of a project beyond the copy: the entries the sync notes gained between
-// the two (a commit from before the notes gives every entry), or null where they cannot be read: never an all-clear.
+// What taking the core from `old` to `pin` asks of a project beyond the copy: the entries the sync notes hold at `pin`
+// and did not at `old`, each read whole, in a file or in the folder (a commit from before the notes gives every entry),
+// or null where either commit cannot be read: never an all-clear.
 export function asksBetween(old, pin, dir) {
   try {
-    return git(["diff", "--unified=0", "--no-color", "--no-ext-diff", "--no-textconv", old, pin, "--", NOTES], dir)
-      .split("\n").filter(l => l.startsWith("+- ")).map(l => l.slice(1));
+    for (const rev of [old, pin]) git(["rev-parse", "--verify", "--quiet", `${rev}^{commit}`], dir);
+    const at = rev => entries(notesAt(rev, args => inBare(dir, args)));
+    const before = new Set(at(old));
+    return at(pin).filter(l => !before.has(l));
   } catch { return null; }
 }
 
