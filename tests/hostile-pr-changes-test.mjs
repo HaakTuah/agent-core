@@ -232,9 +232,19 @@ ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "co
   fs.rmSync(path.join(d, "core-manifest.md"), { recursive: true, force: true }); g("add", "-A");
   g("update-index", "--add", "--cacheinfo", `160000,${g("rev-parse", "HEAD")},core-manifest.md`); g("commit", "-q", "-m", "x");
   ok(differencesAdded(d) === UNREADABLE, "pr-description: a submodule named core-manifest.md is unreadable");
+  // a link: made one to a file that holds a new difference, then only that file changed; both are unreadable, never
+  // read as the link's target path, which holds no "Differences"
+  g("rm", "-q", "--cached", "core-manifest.md"); put(manifest("None.")); commit();
+  fs.mkdirSync(path.join(d, "docs")); fs.writeFileSync(path.join(d, "docs", "m.md"), manifest("- a difference behind a link"));
+  put(null); fs.symlinkSync("docs/m.md", path.join(d, "core-manifest.md")); commit();
+  const linked = differencesAdded(d);
+  ok(linked === UNREADABLE && mended(`FAIL ${reasonsMend("", linked)}`) && /a link/u.test(reasonsMend("", linked)), "pr-description: core-manifest.md made a link is unreadable and fails with its mend, naming a link");
+  fs.writeFileSync(path.join(d, "docs", "m.md"), manifest("- a difference behind a link", "- another, only the target changed")); commit();
+  ok(differencesAdded(d) === UNREADABLE, "pr-description: a link whose target alone changes is unreadable");
+  fs.rmSync(path.join(d, "core-manifest.md")); fs.rmSync(path.join(d, "docs"), { recursive: true }); put(manifest("None.")); commit();
   // markup: a difference that holds a runner's command and control characters is read as one line added, and quoted
   // in the mend with none of them able to open a line
-  g("rm", "-q", "--cached", "core-manifest.md"); put(manifest("- ::error::x\u0085\u2028::warning::y\u001b[2J")); commit();
+  put(manifest("- ::error::x\u0085\u2028::warning::y\u001b[2J")); commit();
   const marked = differencesAdded(d), markedMend = reasonsMend("", marked);
   ok(Array.isArray(marked) && marked.length === 1 && mended(`FAIL ${markedMend}`) && !/[\r\n\u0085\u2028\u001b]/u.test(markedMend), "pr-description: markup in a difference is one line added, quoted with no character that ends a line or drives a terminal");
   // nothing at all: an empty manifest, then none, adds no difference; a base it cannot read counts every line as added

@@ -74,18 +74,21 @@ export const REASONS = "Reasons read:";
 
 // The lines a pull request adds under the manifest's "Differences", in the checkout at `dir`, the merge commit against
 // its first parent, the base (every line where the base holds no manifest, as a project's first, or one git cannot give
-// whole): [] where the head holds none, UNREADABLE where it holds one git cannot give whole (a folder, a submodule, past
-// MANIFEST_MAX bytes), which fails rather than passes, and null where there is no base to read against.
+// whole): [] where the head holds none, UNREADABLE where it holds one git cannot give whole (a link, a folder, a
+// submodule, past MANIFEST_MAX bytes) or git fails, which fails rather than passes, and null where there is no base to
+// read against.
 export const UNREADABLE = "unreadable";
 export const MANIFEST_MAX = 1 << 24;
 export function differencesAdded(dir) {
   const git = (...a) => spawnSync("git", a, { cwd: dir, encoding: "utf8", maxBuffer: MANIFEST_MAX });
   if (git("rev-parse", "--verify", "--quiet", "HEAD^1").status !== 0) return null;
-  // (absent: ""; there, but no file git can give whole: null)
+  // (absent: ""; there, but no plain file git can give whole, or git failed: null)
   const read = at => {
-    const type = git("cat-file", "-t", `${at}:core-manifest.md`);
-    if (type.status !== 0) return "";
-    const r = type.stdout.trim() === "blob" ? git("show", `${at}:core-manifest.md`) : null;
+    const entry = git("ls-tree", "-z", at, "--", "core-manifest.md");
+    if (entry.status !== 0 || entry.error) return null;
+    if (entry.stdout === "") return "";
+    const [, mode, sha] = /^(\d+) blob ([0-9a-f]+)\tcore-manifest\.md\0$/u.exec(entry.stdout) ?? [];
+    const r = mode === "100644" || mode === "100755" ? git("cat-file", "blob", sha) : null;
     return r && r.status === 0 && !r.error ? r.stdout : null;
   };
   const head = read("HEAD");
@@ -97,7 +100,7 @@ export function differencesAdded(dir) {
 // The mend where a pull request adds a difference and its description has no line REASONS with something after it;
 // null where it has one, or adds none. `at` is where the core's copy stands, as the manifest's "Core:" line puts it.
 export function reasonsMend(body, added, at = "core/") {
-  if (added === UNREADABLE) return `the pull request's core-manifest.md cannot be read whole (a folder, a submodule, or past ${MANIFEST_MAX} bytes), so what it adds under "Differences" cannot be told. Mend: keep core-manifest.md a text file in the manifest's form, far under that size, and push again`;
+  if (added === UNREADABLE) return `the pull request's core-manifest.md cannot be read whole (a link, a folder, a submodule, or past ${MANIFEST_MAX} bytes), so what it adds under "Differences" cannot be told. Mend: keep core-manifest.md a text file in the manifest's form, far under that size, and push again`;
   if (!Array.isArray(added) || !added.length) return null;
   // (blanks and invisible format characters after the label are nothing)
   if (textOf(body).split(/\r\n|\r|\n/u).some(l => l.trim().startsWith(REASONS) && l.trim().slice(REASONS.length).replace(/[\s\p{Cf}]/gu, ""))) return null;
