@@ -20,7 +20,6 @@ name: size
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited] # (edited: a line "Never needed:" added to the description)
   push:
     branches: [main]
 

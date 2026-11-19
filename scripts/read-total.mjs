@@ -1,14 +1,15 @@
 // The total read (tasks/cleaning.md, "A cut or a join lowers the total read"; #469): what the core's tasks read, each
 // file opened counted as a cost of its own, never one file's size. A task is each of the last 30 pull requests merged
 // into the history it is given, read by its builder and by its reviewer: each reads at its start what the reading
-// script gives its role, with each tool's part read at the start (as scripts/size.mjs counts a start), and what the
+// script gives its role, with AGENTS.md and each tool's part read at the start (as scripts/size.mjs counts a start), and what the
 // paths the pull request changed call for (reading.mjs, beside this file). Beside them, each role's start and each kind
 // of task (a builder's start with what the kind calls for) is a reader too, so that a cut that helps a kind no recent
 // pull request was of still counts. The sum is all of these readers' cost.
 // With --compare it reads the base's tree and this one's against the same 30 pull requests, the base's, every role and
 // kind of either side read on both. A cut or a join is a file the reading script names that is added holding text the
-// base's named files held, or taken out with its text standing in the head's (CUT); a file of new text, one taken out
-// whose text stands nowhere, and a rename are none. On a cut or a join it fails unless the sum goes down, no role, kind
+// base's named files (AGENTS.md among them) held, or taken out with its text standing in the head's (CUT), read by
+// its sentences however its lines are wrapped; a file of new text, one taken out whose text stands nowhere, and a
+// rename are none. On a cut or a join it fails unless the sum goes down, no role, kind
 // or task reads more, and none loses a file that still stands and that it read before, save one a line `Never needed:`
 // of the pull request's description (PR_BODY) names and says why. A move between two files that both stand is not seen,
 // and stays with the reviews. --candidates lists the files several kinds of task open (point 10 of #469), ranked by what
@@ -38,10 +39,10 @@ export const OPEN = 1024;
 export const TASKS = 30;
 // The roles a merged pull request is read by: its builder, and its reviewer.
 const READERS = ["builder", "reviewer"];
-// A file added is a cut's part, or one taken out a join's, where at least this many of its lines, and a quarter of
-// them, stand in the other side's named files; a line counts where it holds 40 characters or more, trimmed, so that a
-// heading or a list's lead shared by chance is not taken for moved text. A pair of which nine in ten lines stand in the
-// other, both ways, is a rename. Readings, not measures: the reviews read what the check does not see.
+// A file added is a cut's part, or one taken out a join's, where at least this many of its sentences, and a quarter of
+// them, stand in the other side's named files; a sentence counts where it holds 40 characters or more, so that a
+// heading or a list's lead shared by chance is not taken for moved text. A pair of which nine in ten sentences stand in
+// the other, both ways, is a rename. Readings, not measures: the reviews read what the check does not see.
 export const CUT = { lines: 3, share: 0.25, long: 40, rename: 0.9 };
 
 const QUIET = { GIT_TERMINAL_PROMPT: "0", GIT_NO_LAZY_FETCH: "1", GCM_INTERACTIVE: "never" };
@@ -79,8 +80,12 @@ function cost(t, files) {
   const bytes = there.reduce((sum, f) => sum + t.size(f), 0);
   return { files: there, bytes, opens: there.length, cost: bytes + there.length * OPEN };
 }
-// A reading's files, with the parts each tool reads at the start, every tool's, as scripts/size.mjs counts a start.
-const filesOf = (lib, r) => (r.error ? [] : [...r.start, ...Object.entries(lib.modules).filter(([, w]) => w?.start && (w.tools.length || w.others.length)).map(([f]) => f), ...r.task.map(c => c.file)]);
+// The file every session in the core reads at its start whatever its role, through its tool's entry file (CLAUDE.md
+// imports it, and every other tool's entry names it).
+export const ENTRY = "AGENTS.md";
+// A reading's files: the entry file, the parts each tool reads at the start, every tool's, as scripts/size.mjs counts
+// a start, and what the role and the task call for.
+const filesOf = (lib, r) => (r.error ? [] : [ENTRY, ...r.start, ...Object.entries(lib.modules).filter(([, w]) => w?.start && (w.tools.length || w.others.length)).map(([f]) => f), ...r.task.map(c => c.file)]);
 
 // The total on a tree for the tasks given: { sum, readers: Map(name → { files, bytes, opens, cost }), named: Set, read,
 // roles, kinds }. `like`, a total of the other side, adds its roles and kinds, so that one either side lacks is read
@@ -93,12 +98,14 @@ export function total(t, given, like = null) {
   for (const kind of kinds) readers.set(`a builder's task of the kind ${kind}`, cost(t, filesOf(lib, reading(lib, { role: "builder", kinds: [kind] }))));
   for (const task of given) for (const role of READERS.filter(r => roles.includes(r))) readers.set(`the ${role} of ${task.id}`, cost(t, filesOf(lib, reading(lib, { role, paths: task.paths }))));
   const sum = [...readers.values()].reduce((s, c) => s + c.cost, 0);
-  const named = new Set([FLOOR, ...Object.keys(FLOOR_WHEN), ...Object.keys(lib.roles), ...Object.keys(lib.modules)].filter(f => t.size(f) !== null));
+  const named = new Set([ENTRY, FLOOR, ...Object.keys(FLOOR_WHEN), ...Object.keys(lib.roles), ...Object.keys(lib.modules)].filter(f => t.size(f) !== null));
   return { sum, readers, named, read: t.read, roles, kinds };
 }
 
 const kb = n => `${(n / 1024).toFixed(1)} KB`;
-const linesOf = text => new Set(textOf(text).split(/\r?\n/u).map(l => l.trim()).filter(l => l.length >= CUT.long));
+// A text's sentences, its lines joined and its list marks and spacing set aside, so that a move whose lines are wrapped
+// anew is still seen.
+const linesOf = text => new Set(textOf(text).replace(/^\s*(?:[-*+]|\d+\.)\s+/gmu, "").replace(/\s+/gu, " ").split(/(?<=[.;:!?])\s/u).map(l => l.trim()).filter(l => l.length >= CUT.long));
 // The share of `mine`'s long lines that stand in `others`' texts, and how many.
 function standIn(mine, others) {
   const there = new Set(others.flatMap(t => [...linesOf(t)]));

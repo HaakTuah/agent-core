@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 import { FLOOR, START } from "../scripts/reading.mjs";
-import { OPEN, candidates, conditions, tasks, total } from "../scripts/read-total.mjs";
+import { OPEN, candidates, conditions, cuts, tasks, total } from "../scripts/read-total.mjs";
 
 let count = 0, failed = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -79,6 +79,16 @@ got = conditions(...after({ ...without, "tasks/screen.md": core["tasks/screens.m
 ok(!got.cut && !got.failures.length, "a module renamed, its text as it stood, is no cut or join", got.failures.join("\n"));
 got = conditions(...after({ ...without, "tasks/screens-a.md": text("# A\n\nRead when a screen changes: the kinds `screen` and `polish`.", "screens", 60), "tasks/screens-b.md": text("# B\n\nRead when a screen changes: the kinds `screen` and `polish`.", "screens", 60, 60) }));
 ok(got.cut && got.failures.some(f => /does not go down/.test(f)), "a module cut in two that every reader opens both of is a cut, and fails", got.failures.join("\n"));
+
+// (a cut whose moved text is wrapped anew is still a cut, read by its sentences)
+const wrapped = { ...cut, "tasks/polish.md": `# P\n\nRead before a polish task: the kind \`polish\`.\n\n${rules("screens", 40, 60).replace(/\n- /gu, " ").replace(/, which/gu, ",\n  which")}\n` };
+ok(cuts(before, total(memory(wrapped), given, before)).added.includes("tasks/polish.md"), "a cut whose moved rules are joined and wrapped anew is still a cut");
+// (AGENTS.md, which every reader in the core opens at its start, is read: a rule moved out of it to a module is a cut)
+const withEntry = { ...core, "AGENTS.md": text("# A", "agents", 80) }, entryBefore = total(memory(withEntry), given);
+const movedOut = { ...withEntry, "AGENTS.md": text("# A", "agents", 40), "tasks/agents-more.md": text("# M\n\nRead when a screen changes: the kind `screen`.", "agents", 40, 40) };
+const entryAfter = total(memory(movedOut), given, entryBefore);
+ok(entryBefore.readers.get("the role builder, at its start").files.includes("AGENTS.md") && cuts(entryBefore, entryAfter).added.includes("tasks/agents-more.md") && entryAfter.sum < entryBefore.sum,
+  "AGENTS.md is read by every reader, and a rule moved out of it to a module read on need is a cut that lowers the sum");
 
 const ranked = candidates(memory(core), given);
 ok(ranked.length === 1 && ranked[0][0] === "tasks/screens.md" && JSON.stringify(ranked[0][1]) === JSON.stringify(["polish", "screen"]) && ranked[0][2] === 2 * Buffer.byteLength(core["tasks/screens.md"]),
