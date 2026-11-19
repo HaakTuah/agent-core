@@ -13,7 +13,8 @@
       "tests/licence-scan-test.mjs",
       "tests/licence-fetch-test.mjs",
       "scripts/agent-tools.mjs",
-      "tests/agent-tools-test.mjs"
+      "tests/agent-tools-test.mjs",
+      "scripts/npm-once.mjs"
     ]
   },
   "agentTools": [

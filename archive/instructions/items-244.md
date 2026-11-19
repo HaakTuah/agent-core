@@ -1,4 +1,4 @@
-# The reasons behind the core: items 244 onward
+# The reasons behind the core: items 244 to 262
 
 The index, and how an item is written: `archive/instructions.md`.
 
@@ -48,6 +48,7 @@ The index, and how an item is written: `archive/instructions.md`.
      no "and similar" and no pattern. Behind: the core's own files named in "A release that brings nothing a project
      takes asks no sync of it" in `README.md`, "How a project takes the core", point 1, and `OWN_FILES` in
      `scripts/releases.mjs`.
+     Changes: 224.
 
 246. **14 to 16 November 2026**, #252. A project's copy carries each item's reasoning and not the owner's words, a bare
      yes is never quoted, an order for now is no rule, and rule text points to no item: a stand-in needs the reasoning,
@@ -129,9 +130,9 @@ The index, and how an item is written: `archive/instructions.md`.
 257. **18 November 2026**, #457, points 2, 4 and 5. A test that needs time has it handed in and asserts no duration on
      a real clock, a measure of speed excepted with room above its floor; a push that merges an up-to-date pull request
      whose whole suite passed on the same tree runs no test again; and the audit's seventh question asks where the tests
-     of portable code run and what that costs, since in another owner's suite counted for #426 the one failure at random
-     in 26,518 runs came from a duration asserted on a real clock, and every push to its default branch ran the whole
-     suite again after its pull request had. The owner agreed to the issue's points, and to point 4's skip being built in
+     of portable code run and what that costs, since in a project of another owner (#426) the one failure at random
+     came from a duration asserted on a real clock, and every push to its default branch ran the whole suite again
+     after its pull request had. The owner agreed to the issue's points, and to point 4's skip being built in
      the core's own job of tests and listed for projects as a step with its cost, the starter kit holding none. It stands
      behind "A test asserts no time measured on a real clock" and "A tree that passed is not run again" in
      `tasks/tests.md`, and the seventh question in `tasks/cleaning.md`.
@@ -160,15 +161,15 @@ The index, and how an item is written: `archive/instructions.md`.
      from their turn are cancelled" in `tasks/hosts.md`.
 260. **19 November 2026**, #457, point 1, built as #715 orders it. A test reaches a real clock or another process
      only where the clock or the process is what it guards, counted by the shape check with the share of the tests'
-     time each takes, those that stood listed and a new one failing, since in another owner's suite counted for #426 the
-     6% of tests that started a process took 66% of its time and the 21% that reached a real clock took 89%. The owner
+     time each takes, those that stood listed and a new one failing, since in a project of another owner (#426) the
+     few tests that started a process, and those that reached a real clock, took most of its tests' time. The owner
      agreed to the issue's points, and asked on 19 November that #715's work, the count first, be a priority. It stands
      behind "A test reaches a real clock or another process only where it guards it" in `tasks/tests.md`.
 261. **19 November 2026**, #733, point 1. Where users get a release and not each merge, a pull request merges on its own
      checks and reviews passed on its head, up to date or not; the default branch is tested at its newest commit, a red
      one fixed before any other merge, and a release cut only from a green one; where every merge goes live, a pull
      request is brought up to date first, as before. In 24 hours of the core's tests, 256 runs were started for 27
-     merges, about 70% of what the plan's jobs at once can run in a day, and a merge took 45.8 minutes, 19.7 of them
+     merges, a large share of what the host lets run in a day, and a merge took 45.8 minutes, 19.7 of them
      waiting for a turn, while what users get is built from a release that waits on a green default branch anyway. The
      owner agreed to the point as worded on the issue, and to its being a priority. It stands behind floor rule 12 and
      "Where users get a release, a pull request merges on its own green checks" in `tasks/hosts.md`.
@@ -179,33 +180,3 @@ The index, and how an item is written: `archive/instructions.md`.
      happens to read it. The owner agreed to it in a chat session, as the third of three ways to gain on what the
      core already has. It stands behind "The audit's reader has a fixed brief and fixed questions" in
      `tasks/cleaning.md`.
-263. **18 November 2026**, #652. A choice record whose option does a job in a way of the project's own that an
-     ecosystem's standard mechanism does for most of its users lists what that mechanism gives beside its main job,
-     and for each what does it under the option, or that nothing does; the challenger reads the list for what it
-     lacks. The record that chose to carry packages in the core's copy never listed what a lock file gives beside the
-     install, and the host's alerts, update proposals, the registry's audit and the list of what is inside were each
-     found missing later, one at a time. The owner agreed to it in a chat session, asked what the core had lacked for
-     the carried packages to stand outside the host's alerts. It stands behind "what a standard mechanism gave" in
-     `tasks/choices.md`.
-
-264. **19 November 2026**, #733, points 2 to 6. No test run on a draft; a pull request's run on one platform, the suites
-     its change reaches; the default branch tested at its newest commit, a run giving way to a newer merge's and a red
-     one narrowed by its files' history and then by halving; the slow and platform suites run once per batch at the
-     default branch's newest commit, as often as their cost allows, where the tests run and who pays read and never
-     asked; and a time mark that measures and never fails. In 24 hours of the core's tests, 43% of the job-minutes went
-     to runs a newer push replaced, Windows took 69% of the pull requests' job-minutes while about three bugs in the
-     core's history were found there alone, and at least 3 of 8 red runs on the default branch were a suite past its
-     mark on a slow runner. The owner agreed to the points as worded on the issue, to point 6 with the Windows suites
-     once an hour in the core, and to its being a priority, since it holds up everything else. It stands behind "A time
-     mark measures and never fails", "No test run on a draft", "The default branch is tested at its newest commit" and
-     "The slow suites run once per batch, wherever they run" in `tasks/tests.md`.
-
-265. **19 November 2026**, #750, point 1, its part on the *progress file*. A line of the core's queue, and of a
-     project's progress file, no longer leaves in the pull request that closes its issue: the readers of the file skip
-     the line of a closed issue, and the next pull request that changes the file takes such lines out together. Of the
-     core's 39 pull requests merged between 18 and 19 November, 12 changed `QUEUE.md`; in the owner's two games, 55 of
-     255 commits since 1 November touched one's progress file and 90 of 326 the other's; and under merge-on-green pull
-     requests that change the same file merge side by side and collide. The owner agreed to the issue's seven points,
-     and to point 1's widening to every project, and asked that they be a priority. It stands behind "An idea is built
-     only from a line, and a line joins in a PR of its own" in `AGENTS.md` and "The *progress file* holds order only" in
-     `roles/shared/inbox.md`.

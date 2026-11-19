@@ -9,7 +9,9 @@
 # own scripts (scripts/shape.mjs, with .github/shape.json), which a project runs from the copies workflow. This
 # repository only; no project calls it. Reads only, with no secret: the raise is read from git alone, the merge commit against its
 # first parent, the base, and of the pull request's comments only who wrote each and how it opens is used, in a file
-# the script reads; no text of a comment reaches a command.
+# the script reads, with the host's rights of each who posted a "Leanness check:", at most twenty, their login, checked
+# as one, all that goes into a request's route (an answer counts only from the owner or a person the host lets write);
+# no text of a comment reaches a command.
 name: size
 
 on:
@@ -40,24 +42,44 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
-      - name: The core's packages, installed from its lock file for the size and shape checks (#654)
-        run: node scripts/install.mjs
+      - name: The core's packages and the parser's, installed from their lock files for the size and shape checks (#654, #719)
+        run: node scripts/install.mjs all
       - name: What each role reads at its start stays under its cap
         run: node scripts/size.mjs
       # (two steps, so the token reaches gh alone and never the pull request's own script; a base or a list of
-      # comments that cannot be read fails its step: the check is never waived)
-      - name: The cap at the base, and the pull request's comments
+      # comments that cannot be read fails its step: the check is never waived; a right that cannot be read, within
+      # ten seconds each and thirty in all, lets no one write, and the owner's answer still counts)
+      - name: The cap at the base, the pull request's comments, and the rights of those who answered
         if: ${{ github.event_name == 'pull_request' }}
         env:
           GH_TOKEN: ${{ github.token }}
           NUMBER: ${{ github.event.pull_request.number }}
+          OWNER: ${{ github.repository_owner }}
         run: |
-          mkdir "$RUNNER_TEMP/raise"
-          git show HEAD^1:scripts/size.mjs > "$RUNNER_TEMP/raise/base.mjs"
-          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/issues/$NUMBER/comments?per_page=100" > "$RUNNER_TEMP/raise/comments.json"
+          d="$RUNNER_TEMP/raise"
+          mkdir "$d"
+          git show HEAD^1:scripts/size.mjs > "$d/base.mjs"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/issues/$NUMBER/comments?per_page=100" > "$d/comments.json"
+          : > "$d/rights.txt"
+          until=$((SECONDS + 30))
+          for login in $(jq -r --arg o "$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')" '[.[][] | select(type == "object"
+            and (.body | type) == "string" and (.body | test("^(\\*\\*)?Leanness check:"))
+            and (.author_association | IN("OWNER", "MEMBER", "COLLABORATOR")) and .user.type == "User"
+            and (.user.login | type) == "string" and (.user.login | test("^[A-Za-z0-9][A-Za-z0-9-]{0,38}$")))
+            | .user.login | ascii_downcase | select(. != $o)] | unique | .[:20][]' "$d/comments.json"); do
+            left=$((until - SECONDS))
+            if [ "$left" -le 0 ]; then echo "The time for reading the host's rights is spent: an answer of $login and those after does not count."; break; fi
+            if timeout "$((left < 10 ? left : 10))" gh api "repos/$GITHUB_REPOSITORY/collaborators/$login/permission" > "$d/right.json" 2> /dev/null \
+              && jq -e 'type == "object"' "$d/right.json" > /dev/null 2>&1
+            then cat "$d/right.json" >> "$d/rights.txt"
+            else echo "The host's rights of $login could not be read: an answer of theirs does not count."; fi
+          done
+          jq -s '.' "$d/rights.txt" > "$d/rights.json"
       - name: A raise of a role's cap is one step, and has its leanness check
         if: ${{ github.event_name == 'pull_request' }}
-        run: node scripts/size.mjs --raise "$RUNNER_TEMP/raise/base.mjs" "$RUNNER_TEMP/raise/comments.json"
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: node scripts/size.mjs --raise "$RUNNER_TEMP/raise/base.mjs" "$RUNNER_TEMP/raise/comments.json" "$RUNNER_TEMP/raise/rights.json"
       - name: The floor and the modules fit any project, and a rule written uses no phrase a rule may not use
         run: node scripts/general.mjs scripts/general.json --base HEAD^1
       - name: Nothing new in how the core's own code is put together
