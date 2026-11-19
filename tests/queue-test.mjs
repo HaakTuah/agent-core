@@ -62,6 +62,13 @@ ok(throws(route => (/page=(\d+)/u.exec(route)[1] <= 100 ? page(Array.from({ leng
 const odd = ["| #99999999999 | builder | |", "| #0 | builder | |", "|#7|", "| x #8 | builder | |", "- see #9", "-#10 no space", "| #11 | builder | $(touch x) #12 `rm` |", "| | | |", "|", "#13 alone"].join("\n");
 const seen = linesOf(odd);
 ok(seen.map(l => l.issues.join("+")).join() === "0,7,11" && seen[2].waits.join() === "12" && seen[2].words === "$(touch x) #12 `rm`", "a line is read only where a cell or item names its issue first in at most nine digits, and its words stay text", JSON.stringify(seen));
+const slot = at => `| *progress file* | \`${at}\` |\n`;
+ok(["../../.ssh/authorized_keys", "/etc/passwd", ".git/config", "docs/../../x.md", "core/QUEUE.md", "notes.txt", "C:/x.md"].every(at => fileAt(slot(at)) === null) && fileAt(slot("docs/./PLAN.md")) === "docs/PLAN.md",
+  "a progress file the manifest names outside the project, in .git or core/, or not Markdown, is refused (the fallback reviewer's finding on #757)");
+ok(linesOf("| #50 | builder | agent-core#740 and a/b#7 and x-#8 |\n")[0].waits.length === 0 && linesOf("| other#51 | builder | |\n").length === 0, "a number another repository's name stands before is no issue of this one's");
+ok(command("--clear", { file: "Q.md", read: () => queue, write: () => { throw new Error("written"); }, closed: () => () => true }).status === 1 && mended(command("--check", { file: "Q.md", read: () => queue, closed: () => () => true }).out),
+  "where GitHub's list names none of the file's lines open, as another repository's would, it refuses and writes nothing");
+ok(command(undefined, { file: "Q.md", read: () => "\u20ac".repeat(LARGEST / 2), closed: () => () => false }).status === 1, "the largest is counted in bytes, not characters");
 ok(command(undefined, { file: "Q.md", read: () => "x".repeat(LARGEST + 1), closed: () => () => false }).status === 1 && mended(command(undefined, { file: "Q.md", read: () => "x".repeat(LARGEST + 1), closed: () => () => false }).out), "a progress file past the largest the reader takes is refused, saying the mend");
 
 // the command, in this process, with the file and GitHub standing in

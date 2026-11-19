@@ -17,8 +17,11 @@
 //                                         stands, saying the mend (in the core, own-description.yml runs it)
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
 import { progressOf } from "./done-when.mjs";
+import { leadsOut, inProject } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { started } from "./started.mjs";
 
@@ -26,7 +29,7 @@ export const FILE = "QUEUE.md";
 export const LARGEST = 1 << 20; // (bytes: a progress file past it is refused, never read; SECURITY.md, rule 5)
 const ROW = /^\|([^|]*)\|/u, ITEM = /^\s*[-*]\s+(?:\[[ xX]\]\s+)?#(\d{1,9})\b/u;
 // The numbers a text names, a range "#a to #b" (at most a hundred wide) named whole.
-const numbers = text => [...String(text).matchAll(/#(\d{1,9})\b(?:\s+to\s+#(\d{1,9})\b)?/gu)].flatMap(m => {
+const numbers = text => [...String(text).matchAll(/(?<![\w/-])#(\d{1,9})\b(?:\s+to\s+#(\d{1,9})\b)?/gu)].flatMap(m => {
   const [from, to] = [Number(m[1]), m[2] === undefined ? null : Number(m[2])];
   return to !== null && to > from && to - from <= 100 ? Array.from({ length: to - from + 1 }, (_, i) => from + i) : to === null ? [from] : [from, to];
 });
@@ -97,11 +100,13 @@ export function command(flag, at) {
   const out = [], said = (status, ...lines) => ({ status, out: [...out, ...lines].join("\n") }), FILE = at.file ?? "QUEUE.md";
   if (flag !== undefined && !["--clear", "--check"].includes(flag)) return said(1, `FAIL: ${flag} is no option of this script. Mend: run node scripts/queue.mjs, with --clear or --check, or with nothing`);
   const text = at.read();
-  if (typeof text === "string" && text.length > LARGEST) return said(1, `FAIL: ${FILE} is ${text.length} bytes, past the ${LARGEST} the reader takes. Mend: take out the lines of finished work and any notes, which belong in the pull requests' descriptions`);
+  if (typeof text === "string" && Buffer.byteLength(text) > LARGEST) return said(1, `FAIL: ${FILE} is ${Buffer.byteLength(text)} bytes, past the ${LARGEST} the reader takes. Mend: take out the lines of finished work and any notes, which belong in the pull requests' descriptions`);
   if (text === null) return said(1, `FAIL: ${FILE} is not here. Mend: run it from the repository's root, where the progress file its manifest names stands (in the core, QUEUE.md)`);
   let closed;
   try { closed = at.closed(); } catch (e) { return said(1, `FAIL: the issues the queue names could not be read: ${e.message}. Mend: run it again; where gh is not signed in, sign it in, or set GH_TOKEN`); }
-  const { open, gone, next } = read(text, closed), named = gone.map(l => l.issues.map(n => `#${n}`).join(" and ")).join(", ");
+  const all = read(text, closed);
+  if (all.gone.length && !all.open.length) return said(1, `FAIL: GitHub's list of open issues names none of the ${all.gone.length} lines of ${FILE}, which may be the list of another repository. Mend: run it again from the repository's root, GITHUB_REPOSITORY set to its owner/name; where every line's issue has truly closed, take them out by hand`);
+  const { open, gone, next } = all, named = gone.map(l => l.issues.map(n => `#${n}`).join(" and ")).join(", ");
   if (flag === "--clear") {
     at.write(cleared(text, closed));
     return said(0, gone.length ? `${FILE}: took out the lines of ${named}, closed` : `${FILE}: no line of a closed issue`);
@@ -115,14 +120,26 @@ export function command(flag, at) {
 }
 
 // The progress file where the command runs: a project's, as its manifest names it; the core's own where none stands.
-export const fileAt = manifest => (manifest === null ? FILE : progressOf(manifest));
+// A project's slot is input (SECURITY.md, rule 5): a path taken only where it is a plain Markdown file inside the
+// project, out of .git and core/, and that leads nowhere outside it through a link; else null, which fails.
+export const fileAt = manifest => {
+  if (manifest === null) return FILE;
+  const at = progressOf(manifest), plain = path.posix.normalize(String(at).replace(/\\/gu, "/"));
+  return inProject(at) && /\.md$/iu.test(plain) && !/^(?:\.git|core)(?:\/|$)/iu.test(plain) ? plain : null;
+};
+// Whether this runs from a project's copy of the core (core/scripts/queue.mjs), not from the core itself, read from
+// where this file lies, never from a file a pull request could add.
+const inCopy = () => path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/") === "core/scripts/queue.mjs";
 
 function main([flag]) {
-  const manifest = fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null, file = fileAt(manifest);
+  const copy = inCopy(), manifest = copy && fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null;
+  const file = copy ? fileAt(manifest ?? "") : FILE;
+  if (file === null || (fs.existsSync(file) && leadsOut(process.cwd(), file))) { console.error("FAIL: the progress file core-manifest.md names is no plain Markdown file inside the project (outside .git and core/, reached through no link). Mend: name the progress file in the manifest's row *progress file* as a path such as docs/PROGRESS.md"); return 1; }
+  if (fs.existsSync(file) && fs.statSync(file).size > LARGEST) { console.error(`FAIL: ${file} is ${fs.statSync(file).size} bytes, past the ${LARGEST} the reader takes. Mend: take out the lines of finished work and any notes, which belong in the pull requests' descriptions`); return 1; }
   const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout;
-  const repo = /^[\w.-]+\/[\w.-]+$/u.test(process.env.GITHUB_REPOSITORY ?? "") ? process.env.GITHUB_REPOSITORY : repoOf(origin) ?? (manifest === null ? CORE : null);
+  const repo = /^[\w.-]+\/[\w.-]+$/u.test(process.env.GITHUB_REPOSITORY ?? "") ? process.env.GITHUB_REPOSITORY : repoOf(origin) ?? (copy ? null : CORE);
   if (repo === null) { console.error("FAIL: which repository on GitHub this is cannot be told: its origin is no address on github.com. Mend: set GITHUB_REPOSITORY to its owner/name, and run it again"); return 1; }
-  const { status, out } = command(flag, { file, project: manifest !== null, read: () => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null), write: text => fs.writeFileSync(file, text), closed: () => statesOf(repo) });
+  const { status, out } = command(flag, { file, project: copy, read: () => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null), write: text => fs.writeFileSync(file, text), closed: () => statesOf(repo) });
   (status ? console.error : console.log)(out);
   return status;
 }
