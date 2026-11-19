@@ -63,8 +63,9 @@ import { started } from "./started.mjs";
 // bytes of room in the floor's new text, made, for 474 over; and the design session's and the orchestrator's, one step
 // each, merged after #790, a fourth having found 34 and 61 bytes of room, made, for 179 and 322 over. The orchestrator's,
 // raised one step on 19 November 2026 for #471's "Never held back in silence", merged after #689, a fresh leanness
-// check having found 225 bytes of room in the sections its issue changes, 136 made, for 503 over, and about 207 in
-// rules its issue did not ask for, not made.
+// check having found 225 bytes of room in the sections its issue changes, for 503 over: 24 made, and 201 not, since
+// they would cut the rule's condition, its design's point 5 or another rule's reason; and about 207 in rules its issue
+// did not ask for, not made.
 export const CAPS = {
   builder: 30 * 1024,
   design: 32 * 1024,

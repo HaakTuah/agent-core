@@ -109,10 +109,12 @@ nothing yet.
   orchestrator opens one issue, "Builders held back for usage", until building goes on: what is left (read, or estimated
   from the share used at the warning over the time since the window opened, and called so), when the window opens again,
   which lines wait, and the words that change it. Work goes on down to the reserve ("The builders", point 4), none held
-  back where what is left lasts until the window opens; near it, fewer lanes rather than none, only lines that fit what
-  is left by what their kind cost (`scripts/session-cost.mjs`). It does not mean the order of "The builders" changes.
-  Reason: on 16 November 2026 builders stood still below the warning with days left, unseen. Held, in part, by the
-  scheduled look (`scripts/stalled.mjs`): lines a session could take, no push for a day, no such issue.
+  back where what is left lasts until the window opens, unless the owner's pace says otherwise; near it, fewer lanes
+  rather than none, only lines that fit what is left by what their kind cost (`scripts/session-cost.mjs`), and a builder
+  that cannot finish ends at a commit with its note. It does not mean the order of "The builders" changes. Reason: on 16
+  November 2026 builders stood still below the warning with days left, unseen. Held, in part, by the scheduled look
+  (`scripts/stalled.mjs`): lines a session could take, no push or merge for a day, no such issue from the owner's
+  account.
 - **It asks the owner nothing** but floor rule 14's yeses; before it reports anything as waiting on the owner, it checks
   GitHub: a yes already in the PR (the owner's or the design session's relay), a branch already deleted or a setting
   already made is never reported again.

@@ -486,6 +486,8 @@
   },
   "numbers": {
     "roles/orchestrator.md: Never held back in silence": "correction: does not work; outcome: asked",
+    "roles/orchestrator.md: The builders": "correction: does not work; outcome: asked",
+    "roles/orchestrator.md: The pace is the owner's": "correction: does not work; outcome: asked",
     "AGENTS.md: A bug fix and a rework of tests are built on Sonnet": "findings; outcome: robust",
     "floor/security.md: The owner's word": "findings; outcome: readable; rare harm",
     "tasks/tools.md: What the core offers one tool, it offers each": "check fires; outcome: usable",

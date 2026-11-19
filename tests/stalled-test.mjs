@@ -3,7 +3,7 @@
 // here.
 //
 //   node tests/stalled-test.mjs
-import { handedOff, NOTICE, print, stalled, standingStill } from "../scripts/stalled.mjs";
+import { goesOn, handedOff, NOTICE, print, stalled, standingStill } from "../scripts/stalled.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -39,6 +39,8 @@ ok(standingStill({ queue, closed, pulls: [old, fresh], notices: [], now }) === n
 ok(standingStill({ queue, closed, pulls: [], notices: [`${NOTICE} until the window opens on Friday`], now }) === null, "an open notice of the orchestrator's says why: nothing is reported");
 ok(standingStill({ queue: "| #13 | builder | #12 |\n| #14 | the owner | |\n| #11 | builder | |\n", closed, pulls: [], notices: [], now }) === null, "no line a session could take, a closed issue's among them: nothing is reported");
 ok(JSON.stringify(standingStill({ queue: "| #13 | builder | #11 |\n", closed, pulls: [], notices: [], now })) === "[13]", "a line whose wait has closed can be taken");
+
+ok(standingStill({ queue, closed, pulls: [old], notices: [], now, latest: "2026-11-13T12:00:00Z" }) === null && goesOn({ pulls: [], latest: "2026-11-13T12:00:00Z", now }) && !goesOn({ pulls: [fork], latest: "2026-11-12T08:00:00Z", now }) && !goesOn({ pulls: [{ own: true, at: "not a time" }], now }), "a commit on the default branch in the last day is work going on; a fork's push, an older commit and a time that is no time are not");
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);

@@ -62,10 +62,10 @@ import { pathIn } from "./reading.mjs";
 import { lateBody, lateOf, pullOf, repliersOf } from "./review-marks.mjs";
 import { codexFind } from "./review-record.mjs";
 import { ownerOf } from "./releases.mjs";
-import { progressOf } from "./done-when.mjs";
-import { statesOf } from "./queue.mjs";
+import { copyOf, readCore } from "./core-path.mjs";
+import { fileAt, statesOf, unplaced } from "./queue.mjs";
 import { writersOf } from "./security-review.mjs";
-import { handedOff, HOURS, NOTICE, openPulls, stalled, standingStill } from "./stalled.mjs";
+import { goesOn, handedOff, HOURS, NOTICE, openPulls, stalled, standingStill } from "./stalled.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { started } from "./started.mjs";
 import { timeOf } from "./moment.mjs";
@@ -265,27 +265,38 @@ function reachOf(repo) {
   return got && typeof got === "object" && got.permissions ? asked(repo, got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
 }
 
-// The work standing still (stalled.mjs's standingStill; #471): the *progress file* as the manifest's slot names it (the
-// core's AGENTS.md here), read from the checkout, and the open issues titled as the orchestrator's notice.
-function stillFinding(repo, manifest, pulls, add) {
+// The work standing still (stalled.mjs's standingStill; #471), through `add`. Read cheapest first, each costlier
+// reading only once the one before leaves the question open: the open pull requests' pushes, the default branch's
+// newest commit (a merge is work going on), the progress file the manifest's slot names (the core's QUEUE.md here),
+// placed and read as queue.mjs's own reader takes it, a plain Markdown file inside the project, no larger than it reads
+// (SECURITY.md, rule 5), then the open issues titled as the orchestrator's notice that `owner`'s account opened (anyone
+// may open an issue in a public repository, and only the orchestrator's, posting as the owner, says why work waits),
+// and last which issues are open. `gh` as ghApi gives it; `read` the text of the file placed.
+export function stillFinding({ repo, manifest, owner, pulls, now = Date.now(), gh = ghApi, read = f => (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : "") }, add) {
   try {
-    const slot = manifest ?? fs.readFileSync("AGENTS.md", "utf8"), file = progressOf(slot);
-    const queue = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
-    const notices = ghApi(`search/issues?q=${encodeURIComponent(`repo:${repo} is:issue is:open in:title "${NOTICE}"`)}`, "--jq", ".items[].title").split("\n").filter(Boolean);
-    const free = standingStill({ queue, closed: statesOf(repo, route => ghApi(route)), pulls, notices, now: Date.now() });
-    add(TITLES.still, free ? `The *progress file* (\`${file}\`) holds a line a session could take (${free.map(n => `#${n}`).join(", ")}, the first that waits on nothing open), no pull request of this repository's own was pushed in the last day, and no issue titled "${NOTICE}" is open. Where builders are held back for usage, the orchestrator opens that issue, saying what is left, when the window opens again, which lines wait and the words that change it (\`roles/orchestrator.md\`, "Never held back in silence"); otherwise start a builder on that line. Close this issue once work goes on.` : null);
+    if (goesOn({ pulls, now })) return add(TITLES.still, null);
+    const latest = gh(`repos/${repo}/commits?per_page=1`, "--jq", ".[0].commit.committer.date").trim();
+    if (goesOn({ pulls, latest, now })) return add(TITLES.still, null);
+    const copy = manifest === null ? "" : copyOf(), file = fileAt(manifest, [], manifest === null ? "core/" : readCore(manifest).library ?? copy), wrong = unplaced(copy, file);
+    if (wrong) return add(TITLES.still, null, `the progress file was not read: ${wrong.replace(/^FAIL: /u, "")}`);
+    const queue = read(file);
+    if (!queue.trim()) return add(TITLES.still, null);
+    const asOwner = JSON.parse(gh(`search/issues?q=${encodeURIComponent(`repo:${repo} is:issue is:open in:title "${NOTICE}"`)}`, "--jq", "[.items[] | {title, login: .user.login}]"));
+    const notices = asOwner.filter(i => String(i?.login ?? "").toLowerCase() === String(owner).toLowerCase()).map(i => String(i.title));
+    const free = standingStill({ queue, closed: statesOf(repo, route => gh(route)), pulls, notices, now, latest });
+    add(TITLES.still, free ? `The *progress file* (\`${file}\`) holds a line a session could take (${free.map(n => `#${n}`).join(", ")}, the first that waits on nothing open), no pull request of this repository's own was pushed in the last day, nothing reached the default branch in it, and no issue titled "${NOTICE}" from the owner's account is open. Where builders are held back for usage, the orchestrator opens that issue, saying what is left, when the window opens again, which lines wait and the words that change it (\`roles/orchestrator.md\`, "Never held back in silence"); otherwise start a builder on that line. Close this issue once work goes on.` : null);
   } catch {
-    add(TITLES.still, null, "the progress file or the open issues could not be read");
+    add(TITLES.still, null, "the default branch, the progress file or the open issues could not be read");
   }
 }
 
 // The idle pull requests, through `add`: each lane with its checks, or why the pull requests could not be read; and
 // the work standing still, from the same pull requests.
-function idleFinding(repo, add, manifest = null) {
+function idleFinding(repo, add, manifest = null, owner = "") {
   try {
     const api = (route, jq) => ghApi(route, "--jq", jq);
     const pulls = openPulls(repo, api), lanes = stalled(pulls, Date.now(), HOURS);
-    stillFinding(repo, manifest, pulls, add);
+    stillFinding({ repo, manifest, owner, pulls }, add);
     for (const l of lanes) {
       try { l.checks = checksOf(pagesOf(`repos/${repo}/commits/${l.sha}/check-runs`, (...a) => JSON.stringify(JSON.parse(ghApi(...a)).check_runs ?? [])), JSON.parse(ghApi(`repos/${repo}/commits/${l.sha}/status`))); }
       catch { l.checks = "not read (the token may not read checks and statuses)"; }
@@ -366,7 +377,7 @@ function findingsOf({ repo, manifest, owner, at }, reach, last) {
   const findings = [];
   const add = (title, what, unread = null) => findings.push({ title, what, unread });
   // pull requests that stand idle, the work standing still, and late review findings
-  idleFinding(repo, add, manifest);
+  idleFinding(repo, add, manifest, owner);
   lateFinding(repo, add, at);
   // checks failed on the default branch
   redFinding(repo, add);

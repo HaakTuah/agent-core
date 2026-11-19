@@ -23,8 +23,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`); hostile tests:
      `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
-     GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`); hostile tests:
-     `tests/queue-test.mjs`.
+     GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
+     of the work standing still (`scripts/look.mjs`, through `queue.mjs`'s placing and reading), with the open issues
+     titled as the orchestrator's notice and their authors; hostile tests: `tests/queue-test.mjs`, and for the look
+     `tests/look-test.mjs`.
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the
      reviews' records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look
      (`scripts/look.mjs`), the inbox (`scripts/inbox.mjs`) and the personal terms' take-out (`scripts/issue-terms.mjs`,
