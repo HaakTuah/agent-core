@@ -10,5 +10,5 @@ The index, and how an item is written: `archive/instructions.md`.
      of what was tried and failed, so it is tried again. The owner agreed to it among the additions a session set out
      after checking the core's rules against the field's practice, the owner having asked what mistakes the process
      does not prompt the models to avoid or detect. It stands behind "Sessions" in `roles/shared/work-flow.md`, "A
-     change of tool loses nothing" in `tasks/tools.md`, the *quick check*, the start hook's line and `scripts/stalled.mjs`'s
-     mark.
+     change of tool loses nothing" in `tasks/tools.md`, "A stalled lane" and "A finished session is archived" in
+     `roles/orchestrator.md`, the *quick check*, the start hook's line and `scripts/stalled.mjs`'s mark.

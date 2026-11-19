@@ -44,8 +44,9 @@ session: its branch, pushed after every commit, its pull request's description w
 limit or the stop switch, writes the note (#306): a line "Hand-off:", then what is done, what was tried and failed,
 what is next, and how to check it. Where a builder's tool stops (its usage spent, say), a fresh builder of any tool
 picks up from the branch, reading the note first (`roles/orchestrator.md`, "A stalled lane"). It does not mean that
-the tool that stopped hands over by itself, nor a note where the task ends merged. Reason: a lane handed over from its
-branch alone shows the code and none of what was tried and failed, so the next builder tries it again. Held, in part,
+the tool that stopped hands over by itself, nor a note where the task ends merged. Reason: when one provider's usage ran
+out, everything held only in its sessions stopped with them, and a lane handed over from its branch alone shows the
+code and none of what was tried and failed, so the next builder tries it again. Held, in part,
 by `scripts/stalled.mjs`, which the look and the orchestrator run, and which marks a stalled lane with no note.
 
 **Proven by the staged cases, tool by tool** (`AGENTS.md`, "Staged cases hold what no check
