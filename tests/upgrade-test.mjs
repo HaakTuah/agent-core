@@ -609,6 +609,29 @@ for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newe
   if (tag === starts.at(-1)) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); } // (the kit's calls are the same from either release)
 }
 
+// A project's own workspaces that take in every folder take in none of the copy once synced (#654): the copy's package
+// list stands in the dot folder .packages/, which no pattern of npm's reaches, so the project's own npm ci, from a lock
+// npm wrote with no step taken first, passes, and npm finds no workspace; the same list in core/ itself it would take
+// in, and fail. In a folder of its own beside the synced project, with its copy, since the core's licence check asks a
+// project to name each workspace by its path.
+if (synced) {
+  const probe = path.join(tmp, "workspaces-probe");
+  fs.cpSync(path.join(synced.dir, "core"), path.join(probe, "core"), { recursive: true, filter: src => !slash(src).endsWith("/node_modules") });
+  const own = { name: "a-project", version: "1.0.0", private: true, workspaces: ["*", "**", "core/*"] };
+  write(probe, "package.json", `${JSON.stringify(own, null, 2)}\n`);
+  write(probe, "package-lock.json", `${JSON.stringify({ name: own.name, version: own.version, lockfileVersion: 3, requires: true, packages: { "": { name: own.name, version: own.version, workspaces: own.workspaces } } }, null, 2)}\n`);
+  const said = r => ({ status: r.status, out: `${r.stdout}${r.stderr}` }), at = { cwd: probe, env, encoding: "utf8", shell: process.platform === "win32" };
+  const ci = () => said(spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--offline"], at));
+  const clean = ci(), found = said(spawnSync("npm", ["pkg", "get", "name", "--workspaces"], at));
+  ok(fs.existsSync(path.join(probe, "core/.packages/package.json")) && clean.status === 0 && found.status !== 0 && /No workspaces found/u.test(found.out),
+    `${synced.name}: a project whose own workspaces are "*", "**" and "core/*" takes in nothing of its synced copy, and its own npm ci passes with no step taken`, `${clean.out}\n${found.out}`);
+  fs.copyFileSync(path.join(probe, "core/.packages/package.json"), path.join(probe, "core/package.json"));
+  fs.rmSync(path.join(probe, "node_modules"), { recursive: true, force: true });
+  const taken = ci();
+  ok(taken.status !== 0, "where the copy's package list stood in core/ itself, those workspaces would take it in, and the project's own npm ci would fail", taken.out);
+  fs.rmSync(probe, { recursive: true, force: true });
+}
+
 // A release that brings nothing a project takes asks no sync of it (#242, #342): with the copy it has just taken, the
 // project stays at the release that carries the change while the next one changes only the core's own files, and
 // syncs at the one after, whatever that changes: a jump of two, which this test proves from either of the last two.

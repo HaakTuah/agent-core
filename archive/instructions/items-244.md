@@ -135,3 +135,12 @@ The index, and how an item is written: `archive/instructions.md`.
      the core's own job of tests and listed for projects as a step with its cost, the starter kit holding none. It stands
      behind "A test asserts no time measured on a real clock" and "A tree that passed is not run again" in
      `tasks/tests.md`, and the seventh question in `tasks/cleaning.md`.
+258. **18 November 2026**, #654, the owner's decision. Other publishers' code is registered, never carried: each package
+     the core's scripts run is named in a lock file in its registry's own form, at one exact version, and installed
+     from it by the sync, at a session's start and in each job before a check, into a folder git does not track; the
+     folder the core carried them in goes (#528, #601). In a project too, what it ships or runs of another publisher
+     is named in a lock file, however it is loaded (point 9). The owner decided it, after a session had set out what
+     carrying costs and buys against registering: one standard mechanism, the host's alerts and update proposals
+     reading what is depended on, a replacement a change to a lock file, and a failed fetch run again. It corrects
+     what #601 brought in (Brought in by: #601; Correction: rule missing; #302). It stands behind "Code of another
+     publisher is named in a lock file" in `floor/topics/dependencies.md`, and the dated entries of `CHOICES.md`.
