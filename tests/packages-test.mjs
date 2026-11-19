@@ -48,6 +48,11 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   const acted = { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], optional: true, integrity: "sha512-AAAA" } } };
   ok(lockFaults(list, acted).some(f => /field optional, which npm would act on and the core's lock never writes/u.test(f)), "an entry that holds a field npm would act on that the core's lock never writes is refused before npm runs, whatever else it holds", JSON.stringify(lockFaults(list, acted)));
   const unsorted = { ...list, devDependencies: Object.fromEntries(Object.entries(list.devDependencies).reverse()) };
+  // (an override, as the core's own mutation tool's lock holds one (#581): there alone, at one exact version of npm's
+  // registry, as a package of the list is, and no other spec)
+  const own = { overrides: true };
+  ok(lockFaults({ ...list, overrides: { yaml: "2.9.1" } }, lock, own).length === 0 && ["^2.9.1", "github:a/b", "file:../x"].every(v => lockFaults({ ...list, overrides: { yaml: v } }, lock, own).length > 0) && lockFaults({ ...list, overrides: { yaml: "2.9.1" } }, lock).length > 0,
+    "where the mutation tool's install allows overrides, one passes at one exact version of npm's registry and is refused at a range, a git address or a file; every other install refuses the field", JSON.stringify(lockFaults({ ...list, overrides: { yaml: "^2.9.1" } }, lock, own)));
   ok(Object.keys(unsorted.devDependencies).join() !== Object.keys(lock.packages[""].devDependencies).join() && lockFaults(unsorted, lock).length === 0, "a package list whose packages stand out of order reads as the lock's root entry npm writes, sorted", JSON.stringify(lockFaults(unsorted, lock)));
   // (what npm installed is what the lock file names: its own record of the install, read against the lock entry by
   // entry, whatever field or npm brought another source in; the core's tests' job installs before this runs)
