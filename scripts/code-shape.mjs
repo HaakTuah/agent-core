@@ -1,7 +1,8 @@
 // The measures of how a codebase is put together (#245): the audit's numbers kept as a script, so the next audit is a
 // run and not a study. It reads the JavaScript and TypeScript files git holds and prints a summary; with --json it
 // writes every number. It measures and fails nothing: what is held of it, and how, is the shape check's (shape.mjs,
-// beside this file, which reads with this file's reader; tasks/code-shape.md). Node's own modules and git only.
+// beside this file, which reads with this file's readers; tasks/code-shape.md). Node's own modules, git and the
+// parser's installed packages.
 //
 // What it gives, of the files it reads:
 //   - imports: how many, how many cross a folder, those of code that lead to no file, and the pairs of folders that
@@ -18,11 +19,11 @@
 //   - which files change together in the history (commits that touch more than 30 of them, such as a move, are left
 //     out, and so is every merge);
 //   - with --suite, how long each named suite takes when it runs alone, and whether it passed.
-// Its reader is a lexer, not a parser: it knows comments, strings, template literals, regular expressions and the
-// elements of JSX (in .jsx, .tsx and JavaScript's own files; jsxIn), so a bracket in one of them is not counted; a
-// function or a block it cannot tell from its brackets alone (a body after a return type in TypeScript that holds
-// braces, an if with no braces) is measured as the brackets show it. Files in other languages are counted and named,
-// and not measured here: the shape check reads C# and Python with readers of their own (shape-readers.mjs).
+// Its functions are read on the parser the core installs (javascript-functions.mjs, whose definition they keep): a
+// file whose functions it cannot tell is counted with none. Its imports and a script's names are read by a lexer, not a
+// parser: it knows comments, strings, template literals, regular expressions and the elements of JSX (in .jsx, .tsx
+// and JavaScript's own files; jsxIn), so a bracket in one of them is not counted. Files in other languages are counted
+// and named, and not measured here: the shape check reads C# and Python with readers of their own (shape-readers.mjs).
 //
 //   node core/scripts/code-shape.mjs [<pathspec>...] [--repo <folder>] [--depth <n>] [--history <n>]
 //                                    [--suite "<command>"]... [--json <file>]
@@ -41,23 +42,20 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { started } from "./started.mjs";
 import { projectAt } from "./core-path.mjs";
+import { javascriptFunctions } from "./javascript-functions.mjs";
 
 export const CODE = [".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx"];
 export const OTHER = [".cs", ".fs", ".vb", ".py", ".go", ".rs", ".java", ".kt", ".scala", ".swift", ".dart", ".gd", ".lua", ".c", ".cpp", ".h", ".rb", ".php"];
 const REGEX_AFTER = new Set(["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]);
-const CONTROL = new Set(["if", "for", "while", "switch", "catch", "with"]);
-const CONTROL_BARE = new Set(["else", "try", "finally", "do"]);
-const TYPE_TOKENS = new Set([".", "<", ">", "[", "]", "|", "&", ",", "?"]);
 // git's settings that run a command by themselves, off: a folder measured with --repo may hold a .git it was handed
 const SAFE = ["-c", "core.fsmonitor=false"];
 const BULK = 30; // a commit that touches more of the measured files than this is a move or a sweep, not a sign
-const OPEN = { ")": "(", "]": "[", "}": "{" };
 
 // The tokens of a file's text: { t: "id" | "num" | "str" | "regex" | "punct", v, line, at }, `at` where it starts in the
 // text (for a template's runs, where the run ends). Comments and white space are dropped; a template literal is a
 // "str" token for each run of its text, with the code of each ${ } between them. With
 // `jsx` (jsxIn, below), an element of JSX is a "jsx" token at its <, with the code of each { } in it between ( and );
-// where one never closes, the list's `lost` is true, and its functions cannot be told.
+// where one never closes, the list's `lost` is true, and the file is read again without JSX.
 export function tokens(src, jsx = false) {
   const lex = new Lexer(src, jsx);
   lex.code(false);
@@ -462,37 +460,6 @@ function isExpression(toks, k) {
   return before && !isP(before, ";") && !isP(before, "}") && !isId(before, "export") && !isId(before, "async");
 }
 
-// Whether the token at k is a point where the code branches, by its tokens alone: an if, a loop (for, while; a do's
-// while is its one), a case, a catch; an and (&&), an or (||, ??), each counted at its first sign, with or without the
-// = of an assignment; and a choice (a ? that neither chains, `a?.b`, nor marks a name as optional in TypeScript, which
-// a `:`, `)`, `,`, `;`, `=`, `]` or `}` follows).
-const NOT_A_CHOICE = new Set([":", ")", ",", ";", "=", "]", "}"]);
-const BRANCH_WORD = {
-  if: next => isP(next, "("),
-  while: next => isP(next, "("),
-  for: next => isP(next, "(") || isId(next, "await"),
-  catch: next => isP(next, "(") || isP(next, "{"),
-  case: next => !isP(next, ":"), // (not a key named case)
-};
-function branchSign(tok, prev, next) {
-  if (tok.v === "&" || tok.v === "|") return isP(next, tok.v) && !isP(prev, tok.v);
-  if (tok.v !== "?" || isP(prev, "?")) return false; // (the second sign of ?? is counted at its first)
-  if (isP(next, "?")) return true;
-  if (isP(next, ".")) return false; // a?.b (the . of a number is the number's own token)
-  return !!next && !(next.t === "punct" && NOT_A_CHOICE.has(next.v));
-}
-export function branchesAt(toks, k) {
-  const tok = toks[k];
-  if (tok.t === "punct") return branchSign(tok, toks[k - 1], toks[k + 1]);
-  return tok.t === "id" && Object.hasOwn(BRANCH_WORD, tok.v) && notMember(toks, k) && BRANCH_WORD[tok.v](toks[k + 1]);
-}
-const countBranch = (toks, k, block, stack, lang) => { if (block?.fn && lang.branches(toks, k, stack)) block.fn.branches++; };
-
-// The functions of a file: [{ name, line, lines, depth, branches }], lines from the line of its body's { to that of its
-// }, depth the deepest its control blocks nest inside it, branches how often it branches (branchesAt), a function
-// within it counted on its own. `lang` tells, for a language whose blocks are braces as JavaScript's are (C#,
-// shape-csharp.mjs), what kind of block a { opens ("function", "control" or another), a function's name, and whether
-// a token branches.
 // A tree of dotted names, each by its parts; `lyingUnder` gives the names of it that a dotted name is or lies under,
 // shortest first, and `holdsUnder` whether any name of it lies under a dotted name, each in one walk of the name.
 export function nameTree(names) {
@@ -518,119 +485,6 @@ export function holdsUnder(tree, name) {
 
 // Adds a value to the list a map holds under a key, the list made where there is none yet.
 export const append = (map, key, value) => { const list = map.get(key); if (list) list.push(value); else map.set(key, [value]); };
-
-export function functions(toks, lang = JS) {
-  const found = [], stack = [], opens = { "(": [], "[": [], "{": [] };
-  const openAt = new Map();
-  for (let k = 0; k < toks.length; k++) {
-    const tok = toks[k];
-    countBranch(toks, k, innerBrace(stack, opens), stack, lang);
-    if (tok.t !== "punct") continue;
-    if (tok.v === "(" || tok.v === "[") push(stack, opens, { v: tok.v, k });
-    else if (tok.v === "{") push(stack, opens, openBlock(toks, k, innerBrace(stack, opens), openAt, lang, found));
-    else if (OPEN[tok.v]) closeBracket(toks, k, stack, opens, openAt);
-  }
-  return found;
-}
-
-// The open brackets are kept as a stack, and for each kind the places on it where one of that kind stands, so that
-// the innermost { and the bracket a closing one matches are found at once.
-function push(stack, opens, entry) {
-  opens[entry.v].push(stack.length);
-  stack.push(entry);
-}
-
-// The innermost { still open, null where none is.
-const innerBrace = (stack, opens) => stack[opens["{"].at(-1)] ?? null;
-
-// The entry of the block a { at k opens, a function's added to `found`: its depth of control blocks counts from the
-// function it lies in.
-function openBlock(toks, k, parent, openAt, lang, found) {
-  const kind = lang.kind(toks, k, openAt);
-  const entry = { v: "{", k, kind, fn: parent?.fn ?? null, cd: kind === "function" ? 0 : parent?.cd ?? 0 };
-  if (kind === "function") {
-    entry.fn = { name: lang.name(toks, k, openAt), line: toks[k].line, lines: 1, depth: 0, branches: 0 };
-    found.push(entry.fn);
-  } else if (kind === "control") {
-    entry.cd++;
-    if (entry.fn) entry.fn.depth = Math.max(entry.fn.depth, entry.cd);
-  }
-  return entry;
-}
-
-// A closing bracket at k ends the open one it matches, and every one opened after it (none: it is passed over); a
-// function's lines are told then.
-function closeBracket(toks, k, stack, opens, openAt) {
-  const s = opens[OPEN[toks[k].v]].at(-1);
-  if (s === undefined) return;
-  const entry = stack[s];
-  stack.length = s;
-  for (const at of Object.values(opens)) while (at.length && at.at(-1) >= s) at.pop();
-  openAt.set(k, entry.k);
-  if (entry.kind === "function") entry.fn.lines = toks[k].line - toks[entry.k].line + 1;
-}
-
-// The token a block's header ends on, a return type in TypeScript passed over: the ) of `f(a): T {`.
-function headerEnd(toks, k, openAt) {
-  const prev = toks[k - 1];
-  if (isP(prev, ")") || isP(prev, "=>")) return k - 1;
-  for (let j = k - 1; j > 0 && j > k - 40; j--) {
-    const tok = toks[j];
-    if (isP(tok, ":") && j < k - 1 && isP(toks[j - 1], ")") && openAt.has(j - 1)) return j - 1;
-    if (!(tok.t === "id" || tok.t === "str" || tok.t === "num" || (tok.t === "punct" && TYPE_TOKENS.has(tok.v)))) break;
-  }
-  return k - 1;
-}
-
-function blockKind(toks, k, openAt) {
-  const end = headerEnd(toks, k, openAt), tok = toks[end];
-  if (isP(tok, "=>")) return "function";
-  if (tok?.t === "id") return CONTROL_BARE.has(tok.v) || tok.v === "catch" ? "control" : "other";
-  if (!isP(tok, ")") || !openAt.has(end)) return "other";
-  const at = typeParameters(toks, openAt.get(end)), before = toks[at - 1];
-  if (before?.t !== "id") return "other";
-  return CONTROL.has(before.v) || (before.v === "await" && isId(toks[at - 2], "for")) ? "control" : "function";
-}
-
-// Where a function's header starts before its parameters' (, its type parameters passed over: the < of `f<T>(a)`.
-export function typeParameters(toks, open) {
-  if (!isP(toks[open - 1], ">")) return open;
-  let depth = 0;
-  for (let j = open - 1; j > 0 && j > open - 40; j--) {
-    if (isP(toks[j], ">")) depth++;
-    else if (isP(toks[j], "<") && --depth === 0) return toks[j - 1]?.t === "id" ? j : open;
-    else if (!(toks[j].t === "id" || (toks[j].t === "punct" && TYPE_TOKENS.has(toks[j].v)))) return open;
-  }
-  return open;
-}
-
-function functionName(toks, k, openAt) {
-  const end = headerEnd(toks, k, openAt), arrow = isP(toks[end], "=>");
-  let j = parametersStart(toks, end, openAt) - 1;
-  if (isId(toks[j], "async")) j--;
-  const tok = toks[j];
-  if (tok?.t === "id" && tok.v !== "function" && !arrow) return tok.v;
-  if (isId(tok, "function") || arrow) return boundName(toks, j) ?? "(anonymous)";
-  return "(anonymous)";
-}
-
-// The first token of the header's parameters, the header ending on `end`.
-function parametersStart(toks, end, openAt) {
-  if (isP(toks[end], "=>")) return isP(toks[end - 1], ")") && openAt.has(end - 1) ? openAt.get(end - 1) : end - 1;
-  return openAt.has(end) ? typeParameters(toks, openAt.get(end)) : end;
-}
-
-// The name a function is given by `name = function`, `name: () =>` and the like, the word before its keyword or
-// parameters at j; undefined where none is.
-function boundName(toks, j) {
-  let b = isId(toks[j], "function") ? j - 1 : j;
-  if (isId(toks[b], "async")) b--;
-  if ((isP(toks[b], "=") || isP(toks[b], ":")) && (toks[b - 1]?.t === "id" || toks[b - 1]?.t === "str")) return toks[b - 1].v;
-  return undefined;
-}
-
-// JavaScript's and TypeScript's blocks and branches, as functions() reads them.
-const JS = { kind: blockKind, name: functionName, branches: branchesAt };
 
 // Where an import leads in the repository: the file it names, with its extension or index added as Node and the
 // bundlers add them, or the file of a package the repository holds itself; null for a package from outside.
@@ -679,8 +533,6 @@ export function cycles(graph) {
   return parts.sort((a, b) => b.length - a.length || a[0].localeCompare(b[0]));
 }
 
-// (the functions of a file whose JSX the reader cannot follow to its end cannot be told)
-const told = toks => (toks.lost ? [] : functions(toks));
 const folderOf = (file, depth) => { const parts = path.posix.dirname(file).split("/"); return (depth ? parts.slice(0, depth) : parts).join("/") || "."; };
 const quantile = (sorted, q) => sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : 0;
 const addEdge = (graph, a, b) => { if (!graph.has(a)) graph.set(a, new Set()); graph.get(a).add(b); };
@@ -709,7 +561,7 @@ export function measure(texts, { depth = 0, commits = [], suites = [], other = {
   const fns = [], scripts = [];
   for (const file of code) {
     const toks = tokens(texts[file], jsxIn(file));
-    for (const fn of told(toks)) fns.push({ file, ...fn });
+    for (const fn of javascriptFunctions(file, texts[file]) ?? []) fns.push({ file, ...fn });
     if (!isModule(toks)) scripts.push({ file, names: globals(toks) });
     for (const imp of imports(toks)) noteImport(book, file, imp);
   }

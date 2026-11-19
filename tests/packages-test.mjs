@@ -252,6 +252,27 @@ try {
     const cycle = shape([], { CORE_PACKAGES_UNREACHED: "1" }), cycleOut = `${cycle.stdout}${cycle.stderr}`;
     ok(cycle.status === 1 && /FAIL: 2 imports lie on a cycle/u.test(cycleOut) && mended(cycleOut), "and what the reader of C# finds without the parser, a cycle of its using directives, fails all the same", cycleOut);
   }
+  {
+    // (and so of JavaScript's functions, read on the parser too: where the registry did not answer, none is read, a
+    // warning names the reader, and its imports, read without the parser, still fail on a cycle)
+    const js = path.join(tmp, "js");
+    fs.mkdirSync(js);
+    fs.cpSync(copy, path.join(js, "core"), { recursive: true });
+    fs.writeFileSync(path.join(js, "shape.json"), JSON.stringify({ baseline: "shape-baseline.json", code: [".", ":!core/"], tests: [], systems: {} }));
+    fs.writeFileSync(path.join(js, "a.mjs"), `export function f(x) {\n${"  x++;\n".repeat(70)}}\n`);
+    fs.writeFileSync(path.join(js, "shape-baseline.json"), JSON.stringify({ reads: ["javascript", "jsx", "javascript-tree", "csharp", "csharp-tree", "python", "scripts", "screens"], listed: { "function: a.mjs#f": { lines: 72 } } }));
+    execFileSync("git", ["init", "-q"], { cwd: js });
+    execFileSync("git", ["add", "-A"], { cwd: js });
+    const shape = () => spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json"], { cwd: js, encoding: "utf8", timeout: 120000, env: { ...env, SHAPE_BASE: "", CORE_PACKAGES_UNREACHED: "1" } });
+    const skipped = shape(), skippedOut = `${skipped.stdout}${skipped.stderr}`;
+    ok(skipped.status === 0 && /^::warning::The shape check did not read JavaScript and TypeScript, their functions by the parser \(the reader javascript-tree\): the core's packages could not be installed, .*1 entry its baseline lists there \(functions, and files the grammar cannot read\) is kept as listed, never failed as gone.*Mend: run this job again/mu.test(skippedOut),
+      "where the registry did not answer, the check reads no function of JavaScript, says so as a warning naming the reader, and keeps its baseline's function", skippedOut);
+    fs.writeFileSync(path.join(js, "b.mjs"), "import './c.mjs';\n");
+    fs.writeFileSync(path.join(js, "c.mjs"), "import './b.mjs';\n");
+    execFileSync("git", ["add", "-A"], { cwd: js });
+    const cycle = shape(), cycleOut = `${cycle.stdout}${cycle.stderr}`;
+    ok(cycle.status === 1 && /FAIL: 2 imports lie on a cycle/u.test(cycleOut) && mended(cycleOut), "and what the readers of JavaScript find without the parser, a cycle of its imports, fails all the same", cycleOut);
+  }
   // (and the install puts each package where the scripts load it from, untracked)
   // (a project whose own .gitignore leaves out an .npmrc, a lock file and every dot folder still tracks the copy's)
   fs.writeFileSync(path.join(project, ".gitignore"), ".*\n!.gitignore\n.npmrc\npackage-lock.json\npackage.json\n");
