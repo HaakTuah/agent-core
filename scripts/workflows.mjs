@@ -89,6 +89,10 @@ const NOT_READ = [ // (by `size`: 0 for a part nested too deep, 1 for a text too
   { said: `the file is longer than ${LONGEST} characters, past what this check reads, so a key given twice in it would go unseen`, mend: `cut the file to under ${LONGEST} characters, the steps it repeats moved to a script or a workflow of their own` },
 ];
 
+// What the base's own entry is counted as: a key by its name, a part not read by its reason, so that a file nested too
+// deep on the base does not hold the entry of one that has grown too long (#752).
+const heldAs = ({ key, size }) => key ?? (size ? "\0long" : "\0deep");
+
 // The keys given twice (yaml-keys.mjs) in files, each { file, text }, as { fails, notes }, each a line with its mend.
 // `before` gives a file's text on the base (null where it held none), or is null where there is no base to read
 // against: then each is a note. Of each key in each file, as many as the base held twice are noted, and the rest fail.
@@ -96,10 +100,10 @@ export function repeated(files, before) {
   const fails = [], notes = [];
   for (const { file, text } of files) {
     const held = new Map();
-    for (const { key } of before ? twice(before(file) ?? "") : []) held.set(key, (held.get(key) ?? 0) + 1);
+    for (const found of before ? twice(before(file) ?? "") : []) held.set(heldAs(found), (held.get(heldAs(found)) ?? 0) + 1);
     for (const { line, key, first, size } of twice(text)) {
-      const old = !before || held.get(key) > 0;
-      held.set(key, (held.get(key) ?? 0) - 1);
+      const old = !before || held.get(heldAs({ key, size })) > 0;
+      held.set(heldAs({ key, size }), (held.get(heldAs({ key, size })) ?? 0) - 1);
       const was = old ? (before ? ", as it did on the base" : "") : "";
       (old ? notes : fails).push(key === null
         ? `${old ? "note" : "FAIL"} ${file}:${line}: ${NOT_READ[+Boolean(size)].said}${was}. Mend: ${NOT_READ[+Boolean(size)].mend}`
