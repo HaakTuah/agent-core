@@ -8,7 +8,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one | |
-| #744 | rule builder; it changes the archive's key and its check | |
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
 | #778, point 2 | rule builder | #774 |
 | #782 | rule builder | |
