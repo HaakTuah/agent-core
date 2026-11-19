@@ -20,6 +20,7 @@ import { parseConfig, where, KIT } from "../scripts/shape.mjs";
 import { answered, capsOf } from "../scripts/size.mjs";
 import { STEPS, notDone } from "../scripts/steps.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
+import { shapeFaults } from "../scripts/schemas.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -54,6 +55,15 @@ for (const [text, what] of [["null", "null"], ["[]", "a list"], ["5", "a number"
   ['{"baseline":"b.json","code":"a.md"}', "a code that is no list"], ['{"baseline":"b.json","prose":["a.md"],"proseFromSecurity":"yes"}', "proseFromSecurity that is no boolean"],
   ['{"baseline":"b.json","prose":[1e309]}', "a path that is a number out of range"]]) ok(fails(copies(text)), `${MEND} a config of the wrong type: ${what}`);
 ok(fails(copies("")), `${MEND} an empty config`);
+// (its shape, by its schema: scripts/schemas/copies.json, through schemas.mjs; #530)
+{
+  const kit = JSON.parse(fs.readFileSync(path.join(root, "setup/template/copies.json.tmpl"), "utf8"));
+  const said = [null, [], { baseline: 5 }, { baseline: "b.json", code: "a.md" }, { baseline: "b.json", prose: [""] }, { baseline: "b.json", extra: true }, { baseline: "b.json", proseFromSecurity: "yes" }].map(c => shapeFaults("copies", c, "core/"));
+  const many = shapeFaults("copies", { baseline: "b.json", code: Array(5000).fill("") }, "core/");
+  ok(many.length === 21 && /holds 4980 more faults than those said\. Mend: \S/u.test(many[20]), `${MEND} its schema: a config of many bad items says the first 20 and a count of the rest`);
+  ok(JSON.stringify(shapeFaults("copies", kit, "core/")) === "[]" && said.every(f => f.length && f.every(l => /^the config(?:'s "[^"]+")?\b.* Mend: \S/u.test(l))) && said[5][0].includes('"extra"') && said[0][0].includes("core/setup/template/copies.json.tmpl"),
+    `${MEND} its schema: the starter kit's config holds, and each config of the wrong shape fails, naming where, with its mend`);
+}
 ok(fails(copies('{"baseline":"b.json"}')), `${MEND} a config that names nothing to check`);
 ok(fails(run("copies.mjs", "checks/none.json")) && fails(run("copies.mjs")), `${MEND} a config that is not there, or none named`);
 for (const spec of ["../outside", "/etc"]) ok(fails(copies(JSON.stringify({ baseline: "b.json", code: [spec] }))), `${MEND} a pathspec ${spec}, which leaves the project, and lists nothing there`);

@@ -135,8 +135,8 @@ ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] =
 
 // ---- when the core's tests run (#733, points 2 to 4 and 6) ----
 // A pull request's run starts once it is ready, never on a draft, on Linux alone; main is tested on Linux at its newest
-// commit, each run giving way to the next merge's; Windows once an hour at main's newest commit where it moved; both in
-// full on a start by hand, which a release waits on.
+// commit, each run giving way to the next merge's; Windows once an hour at main's newest commit where it moved, with the
+// tests that reach the network on both; both in full on a start by hand, which a release waits on.
 {
   const tests = parseYaml(fs.readFileSync(path.join(wfDir, "tests.yml"), "utf8"));
   const release = parseYaml(fs.readFileSync(path.join(wfDir, "release.yml"), "utf8"));
@@ -161,13 +161,21 @@ ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] =
   const lists = expr => { const m = /^\$\{\{ fromJSON\(\(github\.event_name == 'pull_request' \|\| github\.event_name == 'push'\) && '(\[[^']*\])' \|\| github\.event_name == 'schedule' && '(\[[^']*\])' \|\| '(\[[^']*\])'\) \}\}$/.exec(String(expr)); return m ? m.slice(1).map(x => JSON.parse(x)) : null; };
   const suites = lists(tests.jobs.suites.strategy.matrix.include), upgrades = lists(tests.jobs.upgrade.strategy.matrix.include);
   const only = (l, os) => l.length > 0 && l.every(x => x.os === os);
+  const NETWORK = "suites-network";
   const WINDOWS = ["suites-projects", "suites-sync", "suites-kit", "suites-core", "suites-core-places", "suites-licences", "suites-rest", "suites-tools"];
   const named = l => [...new Set(l.map(x => x.suite))].sort().join();
   ok(suites && Object.keys(tests.jobs.suites.strategy.matrix).join() === "include" && suites.every(l => l.every(x => x.node && x.suite && x.os && x.parts))
-    && only(suites[0], "ubuntu-latest") && only(suites[1], "windows-latest") && named(suites[1]) === [...WINDOWS].sort().join()
+    && only(suites[0], "ubuntu-latest") && only(suites[1].filter(x => x.suite !== NETWORK), "windows-latest") && named(suites[1].filter(x => x.suite !== NETWORK)) === [...WINDOWS].sort().join()
     && suites[2].length === suites[0].length + suites[1].length && [".node-version", ".node-least"].every(n => suites[2].filter(x => x.node === n).length === suites[2].length / 2)
     && upgrades && only(upgrades[0], "ubuntu-latest") && only(upgrades[1], "windows-latest") && upgrades[2].length === upgrades[0].length + upgrades[1].length,
-    "a pull request's run and a push's are on Linux alone, the hourly run on Windows alone, every job named whole, and a start by hand runs them all, on both Nodes (points 3, 4 and 6)", String(tests.jobs.suites.strategy.matrix.include).slice(0, 300));
+    "a pull request's run and a push's are on Linux alone, the hourly run on Windows but for the network's jobs, every job named whole, and a start by hand runs them all, on both Nodes (points 3, 4 and 6)", String(tests.jobs.suites.strategy.matrix.include).slice(0, 300));
+  // (the tests that reach the network, in the part of that name: in no pull request's run nor a push's, and once an hour
+  // and by hand on both systems and both Nodes; #733, point 9)
+  const steps = tests.jobs.suites.steps.filter(s => /contains\(matrix\.parts, 'network'\)/.test(String(s.if))).map(s => s.run).sort();
+  const nets = l => l.filter(x => x.parts.split(" ").includes("network"));
+  ok(suites && nets(suites[0]).length === 0 && nets(suites[1]).length === 4 && nets(suites[1]).every(x => x.suite === NETWORK && x.parts === "network") && ["ubuntu-latest", "windows-latest"].every(os => [".node-version", ".node-least"].every(n => nets(suites[1]).some(x => x.os === os && x.node === n))) && nets(suites[2]).length === 4
+    && steps.join() === ["node tests/init-dotnet-test.mjs", "node tests/nuget-fetch-test.mjs"].join(),
+    "the tests that reach the network run in no pull request's run nor a push's, and once an hour and by hand in a job of their own on each system and Node (point 9)", steps.join(", "));
   ok(tests.concurrency.group.includes("format('pr-{0}', github.event.pull_request.number)") && tests.concurrency.group.includes("(github.event_name == 'push' || github.event_name == 'schedule') && format('{0}-main', github.event_name) || github.run_id")
     && tests.concurrency["cancel-in-progress"] === "${{ github.event_name == 'pull_request' || github.event_name == 'push' }}",
     "a run on main after a merge gives way to the next merge's, main tested at its newest commit; the hourly runs wait their turn; a start by hand or a call is never cancelled (point 4)");

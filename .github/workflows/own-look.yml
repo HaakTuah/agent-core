@@ -32,8 +32,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
-      - name: The core's packages, installed from its lock file for the core's daily look (#654)
-        run: node scripts/install.mjs
+      - name: The core's packages and the parser's, installed from their lock files for the core's daily look, whose dose reads the code (#654, #719)
+        run: node scripts/install.mjs all
       - name: The scheduled look
         env:
           GH_TOKEN: ${{ github.token }}
