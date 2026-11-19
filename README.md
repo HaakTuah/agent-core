@@ -39,7 +39,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   (`how-to-work.md`, `inbox.md`, `work-flow.md`, which holds the rules on git since the two were always read together,
   `review-guidelines.md` and, read in a team's project, `teams.md`); `tools/` each agent tool's part, read when that
   tool is asked (`claude.md`, `codex.md`, `copilot.md`, `kiro.md`, `antigravity.md`, and `other-builders.md` for every
-  tool but Claude); `tasks/` what a task calls for (`roles.md`, `helpers.md`, `reviews.md`, `tools.md`,
+  tool but Claude); `tasks/` what a task calls for (`roles.md`, `helpers.md`, `reviews.md`, `tools.md`, `ways.md`,
   `github-calls.md`, `hosts.md`, `repositories.md`, `updates.md`, `choices.md`, `code-shape.md`, `tests.md`,
   `cleaning.md`; for a queue planned, `planning.md`; for a change its users will notice, `done-when.md`; for a project
   people use through a screen, `screens.md`; and, for games only, `game-design.md`). A manifest takes or leaves out a
@@ -598,7 +598,9 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   yeses (`roles/shared/teams.md`); nothing is kept in a list.
 - The stop switch, in each project: create the branch `agents-stop` (on GitHub, from any device) to stop its agents,
   and delete it to let them go on (`roles/shared/work-flow.md`). It stops only that repository's agents.
-- The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up.
+- The machine where agents run side by side (floor rule 18): `setup/server.md`, read only when setting it up. How a
+  session is handed work, read and reviewed in each way of running sessions, side by side, the cloud or a plain
+  terminal: `tasks/ways.md`.
 - Any other machine the sessions run on is the owner's to set up (floor rule 18), who chooses knowing what a setup like
   `setup/server.md`'s buys: an account of the agents' own and a throwaway box for the project's code mean that
   an agent fooled by planted text (in a dependency, a web page, an issue) reaches only what that account holds and runs

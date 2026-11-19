@@ -3,7 +3,8 @@
 Read when a project sets up an agent tool, hands a role to one or changes its tool mid-task, and when a tool's staged
 run is due: the kind `tool`; by a session that stops a task before its end, for its hand-off note: the kind
 `hand-off`; the paths `CLAUDE.md`, `.claude/`, `.kiro/`, `.agents/` and `.codex/`. Which tool takes
-which role: `tasks/roles.md`, "Tools are preferences".
+which role: `tasks/roles.md`, "Tools are preferences". What lies around a tool's session, the cloud, a tool that runs
+the agents side by side or a plain terminal, is a way, no tool, with no column below: `tasks/ways.md`.
 
 **One door in: `AGENTS.md`** (#249). By default every rule a session must know is reachable from the
 project's `AGENTS.md` in plain sentences, its `@` lines naming the files a builder reads at the start of every task. A

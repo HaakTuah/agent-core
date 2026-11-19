@@ -1,7 +1,7 @@
 // Tests the check of what the core offers each agent tool (scripts/tools-offer.mjs; tasks/tools.md, "What the core
 // offers one tool, it offers each"; #467): the core's own table passes, and each kind of wrong cell, a tool with no
 // column, a file no cell names, a map with no day and a part that leaves out a way a review is asked, or names the ways
-// out of order (#397), fails, saying its mend. Its tests workflow runs it on every pull
+// out of order (#397), fails, saying its mend; and so does a part of tasks/ways.md out of its form (#397). Its tests workflow runs it on every pull
 // request here. Node's own modules.
 //
 //   node tests/tools-offer-test.mjs
@@ -57,6 +57,15 @@ const swapped = kiro.replace("*Side by side:*", "\u0000").replace("*On the host:
 ok(says(withKiro(swapped), "out of order"), "a part that names the ways out of order fails, saying its mend");
 const heading = to => text.replace("Kiro (`tools/kiro.md`)", `Kiro (\`${to}\`)`);
 ok(says(check(heading("tools")), "which is no file in the repository") && says(check(heading("../outside.md")), "which is no file in the repository"), "a heading that names a folder, or a file outside the repository, as a part fails, saying its mend");
+// (tasks/ways.md as it stands, read through `read`, with a part written anew: tasks/ways.md, "A way of running sessions
+// has a part of its own")
+const waysText = fs.readFileSync(path.join(root, "tasks/ways.md"), "utf8");
+const withWays = to => check(text, { read: f => (f === "tasks/ways.md" ? to : fs.readFileSync(path.join(root, f), "utf8")) });
+ok(withWays(waysText).wrong.length === 0 && (waysText.match(/^## /gmu) ?? []).length === 3, "each way's part holds its labels in order, and passes");
+ok(says(withWays(waysText.replace("- *Floor:* each session it starts is one the owner's", "- each session it starts is one the owner's")), "the part `cloud` holds *Task:*, *State:*, *Review:*, *Installs:*, where each part holds"), "a part that leaves out a label fails, naming it and saying its mend");
+ok(says(withWays(waysText.replace("- *Task:* the owner starts", "- *Statex:* x\n- *Task:* the owner starts").replace("- *State:* none given", "- *Task:* none given")), "the part `terminal` holds"), "a part with a label twice or out of order fails");
+ok(says(withWays(waysText.replace("## A plain terminal: `terminal`", "## A plain terminal")), "names no way") && says(withWays(waysText.replace("`terminal`", "`cloud`")), "has two parts"), "a heading that names no way, or a way named twice, fails");
+ok(says(withWays(waysText.replace("- *Installs:* none: a terminal", "- *Installs:* a terminal")), "line *Installs:* is in no form read here"), "a line *Installs:* in no form read fails");
 
 console.log(failed ? `${failed} of ${count} failed` : `all ${count} passed`);
 process.exit(failed ? 1 : 0);

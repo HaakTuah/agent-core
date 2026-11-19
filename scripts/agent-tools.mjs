@@ -4,7 +4,9 @@
 // publisher named; a version that is one exact version (as SemVer writes one) or a full 40-character commit, which a
 // plug-in and a tool server must give and a skill or hook may (each is a file of the project's, pinned by its commit).
 // The hooks the starter kit writes for Claude Code, Kiro and Codex (setup/template/claude-settings.json.tmpl,
-// kiro-hook.json.tmpl and codex-hooks.json.tmpl, beside this copy) are the core's, listed by it at the core's pin. An
+// kiro-hook.json.tmpl and codex-hooks.json.tmpl, beside this copy) are the core's, listed by it at the core's pin; so
+// is each hook or setting a way of running sessions writes, as its part's line "*Installs:*" names it (tasks/ways.md,
+// beside this copy, read by ways.mjs; #397), printed as installed by that way, and a line in no form read fails. An
 // entry nothing configures fails too, so the list stays true.
 //
 // What it reads as configured, in the files at the project's root that git does not ignore: `.claude/settings.json`
@@ -74,6 +76,7 @@ import { baseOf, textAt } from "./licences.mjs";
 import { unreached } from "./packages.mjs";
 import { started } from "./started.mjs";
 import { TomlUnreached, parseToml } from "./toml.mjs";
+import { waysOf } from "./ways.mjs";
 
 const KINDS = { plugin: "the plug-in", server: "the tool server", skill: "the skill", hook: "the hook" };
 const PINNED = new Set(["plugin", "server"]); // (the kinds that must give a version: neither is a file of the project's)
@@ -526,11 +529,14 @@ const describe = key => { const at = key.indexOf(" "); return `${KINDS[key.slice
 // otherwise than its entry, or fetches it at no fixed version, as [key, problem], the fourth, as [key, problem], each
 // hook that takes a file of the project from the working tree and whose entry does not say so, and the fifth those
 // whose entry says so ("from": "the working tree"), as [key, what is said of it], the baseline, which the caller holds
-// to what its base held. `head` is configured()'s answer, `list` listed()'s or null, `kit` kitHooks()'s.
-export function check(head, list, kit, file) {
+// to what its base held. `head` is configured()'s answer, `list` listed()'s or null, `kit` kitHooks()'s, `installs`
+// each key a way's part names on its line "*Installs:*" to that way's name (installedBy()): such a tool is no
+// project's own, so it is never unlisted, and `installed` names each configured one, as [key, way], to be printed.
+export function check(head, list, kit, file, installs = new Map()) {
   const { tools, ids } = head;
   const problems = [...(list?.problems ?? [])];
-  const unlisted = [...tools.keys()].filter(k => ![...ids.get(k)].every(id => kit.includes(id)) && !list?.keys.has(k));
+  const installed = [...tools.keys()].filter(k => installs.has(k)).map(k => [k, installs.get(k)]);
+  const unlisted = [...tools.keys()].filter(k => ![...ids.get(k)].every(id => kit.includes(id)) && !list?.keys.has(k) && !installs.has(k));
   const missing = [], unconfigured = [];
   if (list) {
     for (const k of unlisted) missing.push([k, `${describe(k)}, configured in ${tools.get(k)}, is not listed. Mend: list it under "agentTools" in ${file} with its publisher and, for a plug-in or tool server, one exact version, in this pull request, where its task names it; else take it out`]);
@@ -545,7 +551,17 @@ export function check(head, list, kit, file) {
     if (p.loose) pins.push([k, `${describe(k)} is fetched at no fixed version: ${p.where} ${p.loose}. Mend: ${p.mend}, and list that same version under "agentTools" in ${file}, in this pull request`]);
     else if (p.pin !== v) pins.push([k, `${describe(k)} is listed at ${show(v)} in ${file}, but ${p.where} pins it at ${show(p.pin)}. Mend: make the two the same, the list's version or the pin, whichever is the one meant, in this pull request`]);
   }
-  return { problems, unlisted: list ? [] : unlisted, missing, unconfigured, pins, ...sourcesOf(head, list, file, problems) };
+  return { problems, unlisted: list ? [] : unlisted, missing, unconfigured, pins, installed, ...sourcesOf(head, list, file, problems) };
+}
+
+// What the ways of running sessions install (tasks/ways.md, "What a way installs is listed"; #397), as `ways`
+// (ways.mjs's answer) names it: { installs, fail, notes }, `installs` each key to its way's name, `fail` each line
+// "*Installs:*" in no form read, and `notes` that the module could not be read, which fails nothing.
+export function installedBy(ways = waysOf()) {
+  const installs = new Map();
+  for (const w of ways.ways) for (const k of w.installs ?? []) installs.set(k, w.name);
+  const unread = ways.ways.length ? [] : ways.problems;
+  return { installs, fail: ways.ways.filter(w => w.problem).map(w => w.problem), notes: unread.map(p => `what the ways install is not read: ${p.replace(". Mend: ", ". To mend: ")}`) };
 }
 // Whether a listed tool may be one of Codex's config, which was left unread (configured()'s `unread`), so that its
 // entry is not failed as configured nowhere: a hook or tool server Codex's files configure is named "Codex ...".
@@ -1002,7 +1018,7 @@ function heldBy(head, baseProject, mended) {
 }
 
 // The whole check, from the project's root: { fail, notes }.
-export function run(root, file, { core = false, base = baseOf(root) } = {}) {
+export function run(root, file, { core = false, base = baseOf(root), ways = installedBy() } = {}) {
   // (each run reads the commits as they stand when it starts: what an earlier run in the same process listed of "HEAD"
   // may be another commit's)
   listings.clear();
@@ -1023,13 +1039,14 @@ export function run(root, file, { core = false, base = baseOf(root) } = {}) {
     }
   }
   if (!list && core) list = { keys: new Set(), versions: new Map(), from: new Set(), problems: [] };
-  const checked = check(head, list, kit, file), { problems, unlisted, pins } = checked;
+  const checked = check(head, list, kit, file, ways.installs), { problems, unlisted, pins } = checked;
   const baseProject = base ? readProject(root, base) : null, baseList = base ? listed(baseConfig, file) : null;
   const mended = mendedBase(root, base), held = heldBy(head, baseProject, mended);
   const stood = heldBefore(checked, { head, baseProject, baseList, held, core, mended });
   const unread = unreadOf(head, baseProject, core);
-  const fail = [...head.problems, ...problems].filter(p => !stood.has(p) && !unread.has(p));
-  const notes = [...[...stood].map(p => `as the base held it, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`), ...[...unread].map(p => `with no base to read against, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`)];
+  const fail = [...head.problems, ...problems].filter(p => !stood.has(p) && !unread.has(p)).concat(ways.fail);
+  const notes = [...[...stood].map(p => `as the base held it, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`), ...[...unread].map(p => `with no base to read against, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`),
+    ...ways.notes, ...checked.installed.map(([k, way]) => `installed by the way \`${way}\` (tasks/ways.md), so listed by it: ${describe(k)}, configured in ${head.tools.get(k)}`)];
   sortPins(pins, { head, list, baseProject, baseList, core, mended }, fail, notes);
   sortSources(checked, { head, baseProject, baseList, core, file, mended }, fail, notes);
   if (base && !core) sortBehind(root, base, fail, notes);
