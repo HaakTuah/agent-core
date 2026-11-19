@@ -173,8 +173,8 @@ const FILLS = [
   [/^FILL IN: the commands that set the project up.*$/m, "`npm test` runs the tests (`test/sum.test.mjs`) and prints \"ok sum\"; nothing to build."],
   [/^1\. FILL IN: the first task.*$/m, "1. #1, builder: sum() leaves out the last number."],
   [/^( *)FILL IN: who may change the protected files.*$/m, "$1as the floor has it."],
-  [/^( *)FILL IN: each input anyone but the user at hand can shape.*$/m, "$1None: it reads only its own command line."],
-  [/^( *)FILL IN: what reaches its users' machines.*$/m, "$1Nothing but its own source; it has no dependencies."],
+  [/^( *)FILL IN: each input anyone but the user at hand can shape[\s\S]*?project takes none\.$/m, "$1None: it reads only its own command line."],
+  [/^( *)FILL IN: what reaches its users' machines[\s\S]*?need behind it \(topic 7\)\.$/m, "$1Nothing but its own source; it has no dependencies."],
   [/^( *)FILL IN: what ships.*$/m, "$1Nothing ships yet."],
   [/^( *)FILL IN: who can reach the project beyond.*$/m, "$1No one: it has no service."],
   [/^( *)FILL IN: what its users would lose.*$/m, "$1A wrong sum; the owner, the repository's good name."],
@@ -347,7 +347,7 @@ export const seal = dir => {
   memo(dir, "objects", objectsOf(dir));
   memo(dir, "reflog", [...new Set(Object.entries(refsIn(path.join(dir, "project", ".git"), { reflog: true })).filter(([r]) => r.startsWith("refs/reflog/")).map(([, sha]) => sha))]);
 };
-const sealed = dir => memoOf(dir, "refs");
+export const sealed = dir => memoOf(dir, "refs");
 
 // A case's folder, as the brief names it: its real path, strictly under the system's temporary folder, so no home
 // folder's name reaches a brief (floor rule 11; where the temporary folder itself lies in the home folder, as on
@@ -490,14 +490,18 @@ export function testPasses(dir, ref) {
 }
 
 // What the program prints at a ref of the origin, given `args`; null where it cannot run.
-export function runAt(dir, ref, args) {
+export const runAt = (dir, ref, args) => printed(dir, ref, args)?.out ?? null;
+
+// What the program prints at a ref of the origin, given `args`, to its output and to its errors: { out, err }, each
+// trimmed; null where it cannot run.
+export function printed(dir, ref, args) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "staged-run-"));
   try {
     if (!writeSrc(dir, ref, tmp, "src/cli.mjs")) return null;
     fs.writeFileSync(path.join(tmp, "package.json"), '{"type":"module"}');
     // (killed outright at the time limit: code of the session's could keep a gentler signal from ending it)
     const r = spawnSync(process.execPath, ["src/cli.mjs", ...args], { cwd: tmp, encoding: "utf8", env: BARE, timeout: LIMITS.run, killSignal: "SIGKILL" });
-    return r.status === 0 ? r.stdout.trim() : null;
+    return r.status === 0 ? { out: r.stdout.trim(), err: String(r.stderr ?? "").trim() } : null;
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); afresh(); }
 }
 
@@ -522,7 +526,9 @@ export function touched(dir) {
   // (a submodule's pointer is no file of the folder: its folder stands empty, as a submodule not checked out does)
   const want = new Map(String(originGit(dir, "ls-tree", "-r", "--end-of-options", base(dir)) ?? "").split("\n").filter(l => l && !l.startsWith("160000 ")).map(l => { const [meta, f] = l.split("\t"); return [f, meta.split(" ")[2]]; }));
   const have = [];
-  const walk = (folder, rel) => { for (const e of fs.readdirSync(folder)) { if (!rel && e === ".git") continue; const p = path.join(folder, e), r = rel ? `${rel}/${e}` : e, st = fs.lstatSync(p); if (st.isSymbolicLink()) { have.push([r, null]); continue; } if (st.isDirectory()) walk(p, r); else have.push([r, p]); } };
+  // (the core's packages, installed into the copy's .packages/node_modules/ by the kit and a session's start, are no file of the
+  // project's: the copy's .gitignore keeps them out of git, and they are not read; #654)
+  const walk = (folder, rel) => { for (const e of fs.readdirSync(folder)) { if (!rel && e === ".git") continue; const p = path.join(folder, e), r = rel ? `${rel}/${e}` : e, st = fs.lstatSync(p); if (r === "core/.packages/node_modules") continue; if (st.isSymbolicLink()) { have.push([r, null]); continue; } if (st.isDirectory()) walk(p, r); else have.push([r, p]); } };
   walk(project, "");
   if (have.length !== want.size || have.some(([r, p]) => !p || !want.has(r))) return true;
   const r = spawnSync("git", [...SAFE_(), `--git-dir=${view(dir, "origin")}`, "hash-object", "--no-filters", "--stdin-paths"], { env: QUIET_(), encoding: "utf8", input: have.map(([, p]) => p).join("\n"), timeout: LIMITS.run, maxBuffer: 1 << 26 });

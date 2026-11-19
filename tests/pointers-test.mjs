@@ -8,17 +8,18 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readMarkdown } from "../scripts/markdown.mjs";
+import { markdownReader } from "../scripts/markdown.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
 const here = fileURLToPath(new URL("../scripts/", import.meta.url));
-// (the check's scripts, and the package its Markdown is read with, as a copy of the core holds them: third-party/)
+// (the check's scripts, and the package its Markdown is read with as the core's install leaves it: the lock file, npm's
+// record of the install and the package itself, from the core's own install, which its tests' job runs)
 const carry = core => {
   fs.mkdirSync(path.join(core, "scripts"), { recursive: true });
-  for (const f of ["pointers.mjs", "markdown.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(core, "scripts", f));
-  fs.cpSync(path.join(here, "../third-party"), path.join(core, "third-party"), { recursive: true });
+  for (const f of ["pointers.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) fs.copyFileSync(path.join(here, f), path.join(core, "scripts", f));
+  for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/marked"]) fs.cpSync(path.join(here, "../.packages", f), path.join(core, ".packages", f), { recursive: true });
 };
 const FILES = {
   "AGENTS.md": "# A project\n\n## Where things are\n\nIts rules: `SECURITY.md`, rule 3, and \"Running it\" in `docs/developing.md`.\n",
@@ -170,12 +171,23 @@ try {
   const steering = core(".agents/rules/core.md", "# The core, for a tool\n\nAs \"Running it\" in `tasks/a.md` says.\n");
   ok(steering.status === 1 && mended(steering.out) && /FAIL: a broken pointer: \.agents\/rules\/core\.md:3: "running it" is no heading/.test(steering.out), "in the core's own run an agent tool's file is read, and a broken pointer in it fails", steering.out);
 } finally { fs.rmSync(coreDir, { recursive: true, force: true }); }
-// ---- what the check reads of Markdown (markdown.mjs, on the carried package; #530's held-out cases) ----
+// ---- what the check reads of Markdown (markdown.mjs, on the installed package; #530's held-out cases) ----
 {
+  const readMarkdown = await markdownReader();
   const md = readMarkdown("---\nname: x\n# not a heading\n---\n# Real\n\n```\n# in code, `x.md`\n```\n\nText #123 goes on\nand on, rule 3 <!-- rule 4 -->.\n\n| **a** | b |\n| --- | --- |\n| c | **d** |\n");
   ok(JSON.stringify(md.heads.map(h => [h.level, h.i, h.text])) === JSON.stringify([[1, 4, "Real"]]), "a heading is read where Markdown has one: none in front matter or code");
-  ok(!md.blocks.some(b => b.text.includes("x.md") || b.text.includes("rule 4")) && md.blocks.some(b => b.i === 1 && b.text.includes("name: x")), "nothing in a code block or an HTML comment is read, and front matter is text");
-  ok(md.blocks.some(b => b.i === 10 && b.text === " Text #123 goes on and on, rule 3 ."), "a line led by #123 goes on its paragraph, which is one block by its first line");
+  ok(!md.blocks.some(b => b.text.includes("x.md")) && md.blocks.some(b => b.i === 1 && b.text.includes("name: x")), "nothing in a code block is read, and front matter is text");
+  ok(md.blocks.some(b => b.i === 10 && b.text === " Text #123 goes on and on, rule 3 <!-- rule 4 -->."), "a line led by #123 goes on its paragraph, which is one block by its first line, and an HTML comment in it is read as written, as an agent reads the file");
   ok(JSON.stringify(md.bolds.map(b => [b.i, b.text])) === JSON.stringify([[13, "a"], [15, "d"]]), "a bold lead-in in a table's row is read on that row's line");
+  // (what the search for differences found on the first build: HTML read as plain lines, a heading underlined over two
+  // lines whole, a lone carriage return a line's end, a bold lead-in only by two asterisks)
+  const html = readMarkdown("Before.\n<details>\n**Lead.** See `a.md`.\n</details>\n- after, rule 2\n\n<!-- `b.md`\n\nstill a comment, `c.md` -->\n\nLast.\n");
+  ok(["a.md", "b.md", "c.md"].every(f => html.blocks.some(b => b.text.includes(f))) && html.bolds.some(b => b.i === 2 && b.text === "Lead.") && html.blocks.some(b => b.i === 4 && b.text === " - after, rule 2") && html.blocks.some(b => b.i === 10 && b.text === " Last."), "what HTML holds, a comment over blank lines among it, is read as plain lines: its blocks, its bold lead-ins, and a list item after it a block of its own", JSON.stringify(html));
+  const setext = readMarkdown("A heading\nover two lines\n---\n\nText.\n");
+  ok(setext.heads.length === 1 && setext.heads[0].i === 0 && setext.blocks[0].text === "A heading over two lines" && setext.blocks.some(b => b.i === 4), "a heading underlined on the line after it is one block of all its lines, its underline left out", JSON.stringify(setext));
+  const cr = readMarkdown("# One\rText.\r\r# Two\r");
+  ok(JSON.stringify(cr.heads.map(h => [h.i, h.text])) === JSON.stringify([[0, "One"], [3, "Two"]]), "a lone carriage return ends a line, as the pointer check splits the file's lines", JSON.stringify(cr));
+  const under = readMarkdown("__Not a lead__ and **a lead** and ***both***.\n");
+  ok(JSON.stringify(under.bolds.map(b => b.text)) === JSON.stringify(["a lead", "both"]), "a bold lead-in is one written with two asterisks", JSON.stringify(under.bolds));
 }
 process.exit(failed ? 1 : 0);

@@ -1,9 +1,9 @@
 // The pointer check ("One fact, one place" in roles/shared/how-to-work.md), for every project that takes the core: every
 // pointer in the project's rule files (rule-files.mjs, beside this file) to a file, a section or a numbered point must
 // lead to one that exists, or it fails, saying which. A pointer is read from the forms below; a form it cannot read is
-// listed, never guessed. It reads Markdown with the package carried in third-party/ (markdown.mjs), and Node's own
-// modules besides. It checks the project it lies in (core/scripts/ there), whatever the
-// directory it is started from; the copies workflow (.github/workflows/copies.yml) runs it on every PR.
+// listed, never guessed. It reads Markdown with the package marked, which the core installs from its lock file
+// (markdown.mjs, install.mjs), and Node's own modules besides. It checks the project it lies in (core/scripts/ there),
+// whatever the directory it is started from; the copies workflow (.github/workflows/copies.yml) runs it on every PR.
 //
 //   `path`                     a tracked file or folder (a bare name, such as `net.js`, if exactly one file has it)
 //   [text](path)               a tracked file or folder, relative to the file it is in (a web address is not checked)
@@ -37,12 +37,17 @@ import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { corePath, projectAt } from "./core-path.mjs";
 import { logged } from "./guards.mjs";
-import { readMarkdown } from "./markdown.mjs";
+import { markdownReader } from "./markdown.mjs";
+import { unreached } from "./packages.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 
 const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
+// (where the job's install could not reach the registry, in a project's pull request, the check did not run, said as a
+// warning that fails nothing (#654, point 4); anywhere else a package not installed fails, saying the mend: packages.mjs)
+if (unreached("marked")) { console.log("::warning::The pointer check did not run: the package marked could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault"); process.exit(0); }
+const readMarkdown = await markdownReader();
 // (`--tools-at <commit>`, which this script gives itself alone: it reads that commit's tree, as git holds it, and prints
 // the broken pointers in its agent tools' files, each by its file and its words, as one JSON list; #405)
 const AT = process.argv.includes("--tools-at") ? process.argv[process.argv.indexOf("--tools-at") + 1] : null;
@@ -80,7 +85,7 @@ const ITEMS = tracked.filter(f => new RegExp(`^${HOME}archive/instructions/items
 const parsed = new Map();
 function parse(file) {
   if (parsed.has(file)) return parsed.get(file);
-  const lines = text(file).split(/\r?\n/), md = readMarkdown(text(file)); // (a Windows checkout's line endings too)
+  const lines = text(file).split(/\r\n?|\n/u), md = readMarkdown(text(file)); // (lines end as the lexer ends them, a Windows checkout's too)
   const heads = md.heads.map(h => ({ level: h.level, i: h.i }));
   const anchors = [...md.heads.map(h => ({ title: plain(h.text), level: h.level, from: h.i })), ...md.bolds.map(b => ({ title: plain(b.text.replace(/[.:,]$/u, "")), level: 9, from: b.i }))]
     .sort((a, b) => a.from - b.from || a.level - b.level);
