@@ -9,14 +9,12 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
-| #778, point 2 | rule builder | |
 | #783 | builder | |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
 | #704 | builder; `tests.yml` | #715 |
 | #770 | builder; `tests.yml` | #704 |
 | #772 | builder; `tests.yml` | #770 |
 | #530, step 5 | builder; licence readers | |
-| #593, points 1 to 3 | rule builder | |
 | #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md` | |
 | #593, points 8 and 9 | rule builder | |
 | #625 | builder | #624 |
