@@ -48,6 +48,8 @@
     "roles/shared/work-flow.md: Push after every commit": "check: scripts/work-saved.sh, in part",
     "roles/shared/work-flow.md: Updates, Dependabot and CodeQL": "describes",
     "tasks/hosts.md: One layer knows no host": "check: .github/workflows/tests.yml, in part",
+    "tasks/hosts.md: The merge line follows the host": "check: .github/workflows/tests.yml, in part",
+    "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": "check: .github/workflows/tests.yml, in part",
     "tasks/repositories.md: The manifest says where the core's copy is": ["check: scripts/core-path.mjs", "check: .github/workflows/core.yml"],
     "tasks/repositories.md: A repository may take the core through a dependency that carries it": "check: .github/workflows/core.yml, in part",
     "tasks/repositories.md: Before a split, one repository": "check: scripts/shape.mjs, in part",
@@ -246,7 +248,7 @@
     "floor/topics/what-ships.md: A program installed on a user's machine": [227],
     "roles/builder.md: Read by task, twice": [234],
     "roles/orchestrator.md: A finished session is archived": [185],
-    "roles/orchestrator.md: A lane for every independent entry": [11],
+    "roles/orchestrator.md: A new lane only where it merges sooner": [11, 259],
     "roles/orchestrator.md: A stalled lane": [133, 200],
     "roles/orchestrator.md: Hand over at once": [10],
     "roles/orchestrator.md: It asks the owner nothing": [133, 134, 137],
@@ -301,6 +303,7 @@
     "roles/shared/work-flow.md: Lanes beside the main lane": [11],
     "roles/shared/work-flow.md: Nothing waits silently": [218],
     "roles/shared/work-flow.md: Push after every commit": [6, 15],
+    "roles/shared/work-flow.md: Ready pull requests merge in a line": [259],
     "roles/shared/work-flow.md: Review in the background": [135],
     "roles/shared/work-flow.md: Sessions": [143, 178, 187],
     "roles/shared/work-flow.md: The owner's stop switch": [201],
@@ -367,6 +370,8 @@
     "tasks/hosts.md: Each host's part": [236],
     "tasks/hosts.md: One layer knows no host": [236],
     "tasks/hosts.md: Proven host by host": [236],
+    "tasks/hosts.md: The merge line follows the host": [259],
+    "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": [259],
     "tasks/planning.md": [243],
     "tasks/repositories.md: A repository may take the core through a dependency that carries it": [241],
     "tasks/repositories.md: A session that cannot read its floor does nothing else": [241],
@@ -439,6 +444,10 @@
     "floor/topics/dependencies.md: Code of another publisher is named in a lock file": "correction: rule missing; outcome: robust; rare harm",
     "floor/topics/what-ships.md: A package found bad goes at once": "correction: rule missing; outcome: robust; rare harm",
     "tasks/tests.md: A test asserts no time measured on a real clock": "findings; outcome: robust",
-    "tasks/tests.md: A tree that passed is not run again": "check fires; outcome: fast"
+    "tasks/tests.md: A tree that passed is not run again": "check fires; outcome: fast",
+    "roles/shared/work-flow.md: Ready pull requests merge in a line": "findings; outcome: fast",
+    "roles/orchestrator.md: A new lane only where it merges sooner": "findings; outcome: fast",
+    "tasks/hosts.md: The merge line follows the host": "findings; outcome: fast",
+    "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": "findings; outcome: fast"
   }
 }

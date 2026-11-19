@@ -199,6 +199,9 @@ jobs:
       - name: What a push waits on, against its mark
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/wait-test.mjs ')) }}
         run: node tests/wait-test.mjs
+      - name: The merge line read from the host, its measure and the runs it cancels
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/merge-line-test.mjs ')) }}
+        run: node tests/merge-line-test.mjs
       - name: The strength check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/strength-test.mjs ')) }}
         run: node tests/strength-test.mjs
