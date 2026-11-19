@@ -13,6 +13,9 @@
 // the copies workflow sets it), a key twice that the base already held in the same file is noted and fails nothing;
 // with no base, as on a push to main, each is noted; and the sync's step "16 November 2026, no workflow gives a key
 // twice" (steps.mjs) names each old one at every sync until it is gone. In the core's own repository (`--core`) each fails.
+// A text longer than LONGEST (yaml-keys.mjs) is never given to the parser, so a base that long lists nothing it held:
+// such a file unchanged is noted, and one a pull request changes is judged as new, failing where it is still that long
+// and for each breach it shows once cut under it (baseOf() below; #752).
 // It fails, too, a call to one of the core's pull-request checks that is skipped on a draft while its pull_request
 // trigger leaves out ready_for_review (floor rule 8, a weakened check; #375, #502): its job's if: names the draft, or the
 // check skips a draft by itself (the description check, called on its own or by core.yml's `description:`). Once such a
@@ -93,13 +96,17 @@ const NOT_READ = [ // (by `size`: 0 for a part nested too deep, 1 for a text too
 // deep on the base does not hold the entry of one that has grown too long (#752).
 const heldAs = ({ key, size }) => (key === null ? (size ? 1 : 0) : `k:${key}`);
 
-// A file's text on the base, for what the base held: `read` where there is a text the readers can take; `unread` where it
-// is past the length read, whose own breaches cannot be listed, so those the file has now count as held (nothing locks a
-// project, and cutting the file under the length is the mend its failure words).
-const baseOf = (before, file) => { const text = before ? before(file) ?? "" : ""; return { text, read: Boolean(before) && text.length <= LONGEST, unread: Boolean(before) && text.length > LONGEST }; };
-
-// How many times a text names ready_for_review: what a file too long to read is judged by, being no more than it was.
-const marks = text => text.split("ready_for_review").length - 1;
+// A file's text on the base, for what the base held (#752): `read`, the text the readers take, where the base's text is
+// within the length read ("" where the base holds no such file); `same` where the base's text is past the length read
+// and the file's is that text unchanged. A text past the length read is never given to the parser, and no count of its
+// words can show that a change to it made nothing worse, so its breaches cannot be listed: a file unchanged from such a
+// base is only noted, and a file changed from it is judged as one the base did not hold, each breach it shows failing,
+// and the file itself where it is still past the length, the mend being to cut it under the length and mend what it
+// then shows, in that pull request.
+const baseOf = (before, file, text) => {
+  const was = before ? before(file) ?? "" : null, long = was !== null && was.length > LONGEST;
+  return { read: was === null || long ? null : was, same: long && was === text };
+};
 
 // The keys given twice (yaml-keys.mjs) in files, each { file, text }, as { fails, notes }, each a line with its mend.
 // `before` gives a file's text on the base (null where it held none), or is null where there is no base to read
@@ -107,10 +114,10 @@ const marks = text => text.split("ready_for_review").length - 1;
 export function repeated(files, before) {
   const fails = [], notes = [];
   for (const { file, text } of files) {
-    const held = new Map(), base = baseOf(before, file);
-    for (const found of base.read ? twice(base.text) : []) held.set(heldAs(found), (held.get(heldAs(found)) ?? 0) + 1);
+    const held = new Map(), base = baseOf(before, file, text);
+    for (const found of base.read === null ? [] : twice(base.read)) held.set(heldAs(found), (held.get(heldAs(found)) ?? 0) + 1);
     for (const { line, key, first, size } of twice(text)) {
-      const id = heldAs({ key, size }), old = !before || base.unread || held.get(id) > 0;
+      const id = heldAs({ key, size }), old = !before || base.same || held.get(id) > 0;
       held.set(id, (held.get(id) ?? 0) - 1);
       const was = old ? (before ? ", as it did on the base" : "") : "";
       (old ? notes : fails).push(key === null
@@ -170,17 +177,16 @@ export function draftHoles(yaml) {
 export function unreadied(files, before) {
   const fails = [], notes = [];
   for (const { file, text } of files) {
-    // (a text past the length read cannot be read for this: where the base was read, or the file is new, it fails, since a
-    // call may have lost ready_for_review behind the length; where the base was too long as well, only a file that grew or
-    // names ready_for_review less often fails, so cutting the debt down goes on a little at a time: #752)
+    // (a text past the length read cannot be read for this: one that differs from the base fails, since a call may have
+    // lost ready_for_review behind the length; one unchanged, or read with no base, is noted by repeated(): #752)
+    const base = baseOf(before, file, text);
     if (text.length > LONGEST) {
-      const base = baseOf(before, file);
-      if (before && !(base.unread && text.length <= base.text.length && marks(text) >= marks(base.text))) fails.push(`FAIL ${file}: the file is longer than ${LONGEST} characters${base.unread ? " and grew, or names ready_for_review less often than on the base" : ""}, so this check cannot tell whether a call of one of the core's checks that is skipped on a draft has ready_for_review among its types. Mend: cut the file to under ${LONGEST} characters, the steps it repeats moved to a script or a workflow of their own`);
+      if (before && !base.same) fails.push(`FAIL ${file}: the file is longer than ${LONGEST} characters and differs from the base, so this check cannot tell whether a call of one of the core's checks that is skipped on a draft has ready_for_review among its types. Mend: cut the file to under ${LONGEST} characters, the steps it repeats moved to a script or a workflow of their own, and mend what this check then says of it`);
       continue;
     }
-    const base = baseOf(before, file), held = new Set(base.read ? draftHoles(base.text) : []);
+    const held = new Set(base.read === null ? [] : draftHoles(base.read));
     for (const job of draftHoles(text)) {
-      const old = !before || base.unread || held.has(job);
+      const old = !before || held.has(job);
       (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}: its job ${JSON.stringify(job)} calls one of the core's checks that is skipped on a draft, and its pull_request trigger leaves out ready_for_review, so once a pull request is marked ready the check runs on no head and the draft's skip reads as passed${old && before ? ", as on the base" : ""}. Mend: add ready_for_review to the types: under pull_request: (where it lists none, types: [opened, reopened, synchronize, ready_for_review])`);
     }
   }

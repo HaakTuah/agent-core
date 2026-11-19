@@ -81,20 +81,28 @@ ok(grown.fails.length === 1 && grown.notes.length === 0 && /grown\.yml:1: the fi
 // (nor does a key spelt like a reason, which a base may give twice, hold the entry of one grown too long)
 const spelt = repeated([{ file: "spelt.yml", text: `a: ${"x".repeat(LONGEST)}\n` }], () => 'on: push\n"\\0long": 1\n"\\0long": 2\n');
 ok(spelt.fails.length === 1 && spelt.notes.length === 0, "a key spelt like a reason, given twice on the base, holds no part not read of the head", spelt.fails.join("\n"));
-// (a file past the length read that a pull request changes fails, so a call left without ready_for_review is not let through
-// by its length; one unchanged on the base, and one with no base, are only noted by repeated(): #752)
+// (a text past the length read is never given to the parser, and no count of its words shows a change to it made nothing
+// worse, so a file past it that a pull request changes fails, with its mend; one unchanged on the base, and one with no
+// base, are only noted: #752)
 const longText = changed => `on: pull_request\n# ${"x".repeat(LONGEST)}${changed}\n`, longFiles = text => [{ file: "long.yml", text }];
-const longChanged = unreadied(longFiles(longText("a")), () => longText("b")), longSame = unreadied(longFiles(longText("a")), () => longText("a")), longAdded = unreadied(longFiles(longText("a")), () => null);
-const longCut = unreadied(longFiles(longText("a")), () => longText("abcd")), longMore = unreadied(longFiles(longText("abcd")), () => longText("a")), longLost = unreadied(longFiles(longText("a")), () => longText("ready_for_review"));
-const longShort = unreadied(longFiles(longText("a")), () => "on: push\n");
-ok(longChanged.fails.length === 0 && longSame.fails.length === 0 && longCut.fails.length === 0 && longMore.fails.length === 1 && mended(longMore.fails[0]) && longLost.fails.length === 1 && longShort.fails.length === 1 && longAdded.fails.length === 1 && unreadied(longFiles(longText("a")), null).fails.length === 0,
-  "a file past the length read that a pull request adds, or grows, or makes name ready_for_review less often, fails with its mend; one cut a little, or unchanged, or read with no base, does not", [...longMore.fails, ...longLost.fails, ...longShort.fails, ...longAdded.fails].join("\n"));
-// (a base past the length read has no listed breaches: the file cut under the length, as its failure asks, holds its old ones as
-// held, never as new, and a pull request that adds one to a base that was read still fails)
+const longSame = unreadied(longFiles(longText("a")), () => longText("a")), longKeys = repeated(longFiles(longText("a")), () => longText("a"));
+const longFails = [["b", "a"], ["abcd", "a"], ["a", "abcd"], ["ready_for_review", "a"], [null, "a"], ["on: push\n", "a"]].map(([was, now]) => unreadied(longFiles(longText(now)), () => (was === null || was.startsWith("on:") ? was : longText(was))).fails);
+ok(longSame.fails.length === 0 && longKeys.fails.length === 0 && longKeys.notes.length === 1 && /as it did on the base\. Mend: cut the file/u.test(longKeys.notes[0]) && unreadied(longFiles(longText("a")), null).fails.length === 0
+  && longFails.every(f => f.length === 1 && /^FAIL long\.yml: the file is longer than 262144 characters and differs from the base/u.test(f[0]) && mended(f[0])) && repeated(longFiles(longText("a")), () => longText("b")).fails.length === 1,
+  "a file past the length read that a pull request changes in any way, cut a little, grown, or added, fails with its mend; one unchanged, or read with no base, is only noted", longFails.flat().join("\n"));
+// (Codex's case: a call of a check skipped on a draft whose ready_for_review a same-length edit moves into a comment, in a
+// file past the length read, its words counted as often as before, fails)
+const commented = types => `on:\n  pull_request:\n    types: ${types}\njobs:\n  check:\n    uses: ${CORE}/.github/workflows/copies.yml@${"a".repeat(40)}\n    if: \${{ !github.event.pull_request.draft }}\n# ${"x".repeat(LONGEST)}\n`;
+const hidden = unreadied(longFiles(commented("[opened] #ready_for_review")), () => commented("[opened, ready_for_review]"));
+ok(commented("[opened] #ready_for_review").length === commented("[opened, ready_for_review]").length && hidden.fails.length === 1 && mended(hidden.fails[0]),
+  "a file past the length read whose ready_for_review a pull request moves into a comment, its length and its count of the word kept, fails", hidden.fails.join("\n"));
+// (a base past the length read lists none of its breaches: a file cut under the length is read as one the base did not
+// hold, so a key given twice or a call left without ready_for_review in it fails, each with its mend, and one cut clean passes)
 const shrunk = { dupes: "on: pull_request\nx: 1\nx: 2\njobs:\n  c:\n    uses: someone/else/.github/workflows/copies.yml@" + "a".repeat(40) + "\n", base: `on: push\nx: 1\nx: 2\n# ${"x".repeat(LONGEST)}\n` };
-const cut = repeated([{ file: "shrunk.yml", text: shrunk.dupes }], () => shrunk.base);
-ok(cut.fails.length === 0 && cut.notes.length === 1 && /as it did on the base/u.test(cut.notes[0]) && repeated([{ file: "shrunk.yml", text: shrunk.dupes }], () => "on: push\n").fails.length === 1,
-  "a file cut under the length read keeps the duplicate keys it held when it was too long as held, and one a base that was read lacked still fails", [...cut.fails, ...cut.notes].join("\n"));
+const cut = repeated([{ file: "shrunk.yml", text: shrunk.dupes }], () => shrunk.base), clean = "on: pull_request\nx: 1\n";
+ok(cut.fails.length === 1 && cut.notes.length === 0 && /^FAIL shrunk\.yml:3: the key "x" is given twice/u.test(cut.fails[0]) && mended(cut.fails[0])
+  && repeated([{ file: "shrunk.yml", text: clean }], () => shrunk.base).fails.length === 0 && unreadied([{ file: "shrunk.yml", text: clean }], () => shrunk.base).fails.length === 0,
+  "a file cut under the length read from a base past it fails for a key it gives twice, and passes cut clean", [...cut.fails, ...cut.notes].join("\n"));
 const lower = `on: push\n${Array.from({ length: 37 }, (_, i) => `k${i}: 1\n`).join("")}z: ${"[".repeat(200)}${"]".repeat(200)}\n`;
 const lowerFails = repeated([{ file: "lower.yml", text: lower }], () => null).fails;
 ok(dup(lower) === "null@39<null" && lowerFails.length === 1 && lowerFails[0].startsWith("FAIL lower.yml:39: the file nests") && mended(lowerFails[0]),
@@ -128,7 +136,8 @@ ok(holes.notes.length === 1 && /^note a\.yml: .*as on the base\. Mend: add ready
   && unreadied([{ file: "b.yml", text: call(TYPES, "pr-description.yml") }], null).fails.length === 0,
   "a call the base already held so is noted, a new one fails with its mend, and with no base each is noted", JSON.stringify(holes));
 const holeOver = unreadied([{ file: "a.yml", text: call(TYPES, "copies.yml", NOT_DRAFT) }], () => shrunk.base);
-ok(holeOver.fails.length === 0 && holeOver.notes.length === 1, "a call left without ready_for_review in a file cut under the length read is held, as the base's breaches could not be listed", [...holeOver.fails, ...holeOver.notes].join("\n"));
+ok(holeOver.fails.length === 1 && holeOver.notes.length === 0 && /^FAIL a\.yml: its job "check"/u.test(holeOver.fails[0]) && mended(holeOver.fails[0]),
+  "a call left without ready_for_review in a file cut under the length read from a base past it fails, as the base's breaches could not be listed", [...holeOver.fails, ...holeOver.notes].join("\n"));
 
 const core = fileURLToPath(new URL("..", import.meta.url));
 const own = fs.readdirSync(`${core}.github/workflows`).filter(f => /\.ya?ml$/u.test(f));

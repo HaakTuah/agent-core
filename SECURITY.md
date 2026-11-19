@@ -69,7 +69,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      `scripts/nuget.mjs`, `scripts/workflows.mjs`, `scripts/agent-tools.mjs`, `scripts/runners.mjs`) and the sync's move
      of the pins (`scripts/sync.mjs`); limits: 64 MB of a file for the licence check (256 MB for NuGet's), 1 MB of an
      action and 5,000 steps of a workflow, 256 K characters of a workflow for the readers of its YAML (past it, said unread
-     with its mend, never given to the parser), 60 s for git's filters, 64 MB of a workflow for the move of the pins,
+     with its mend, never given to the parser; such a file unchanged from the base is only noted, its own keys given
+     twice and calls left without ready_for_review unread, and one a pull request changes fails, and is read as new once
+     cut under it), 60 s for git's filters, 64 MB of a workflow for the move of the pins,
      past which it is reported unread, and none on a file for the reader of where the tests run, a project's own, read
      whole, whose walk of a job's labels stops at 500 and 8 deep, lists and mappings nested 128 deep at most for the
      workflow check's two readers of a workflow (what is nested past it is said with its mend, and no list or mapping
