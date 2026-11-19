@@ -1,0 +1,83 @@
+{
+  "_": "The core's own size marks for scripts/reading-size.mjs, as a project's checks/sizes.json (tasks/cleaning.md, \"Size asks; a reader who reads less answers\"; #469). Only \"split\" and \"past\" bind here: what each role reads at its start is held by scripts/size.mjs's caps, so \"read\" is empty. The dated records are skipped, cut by month where at all.",
+  "each": 1024,
+  "read": {},
+  "total": 1024,
+  "split": 20480,
+  "skip": [
+    "archive/",
+    "reports/",
+    "words/",
+    "tests/mutation/package-lock.json"
+  ],
+  "past": {
+    ".github/workflows/tests.yml": {
+      "mark": 55491,
+      "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
+    },
+    "AGENTS.md": {
+      "mark": 52604,
+      "why": "Its rules that only some tasks break move to modules read on need in #845."
+    },
+    "README.md": {
+      "mark": 74465,
+      "why": "Past the large file mark, it is read by the section a task needs, found by searching, never whole (roles/shared/how-to-work.md, \"Read little\"), so no split lets a session read less; GitHub shows it whole as the repository's front page, to people."
+    },
+    "scripts/csharp-tree.mjs": {
+      "mark": 25832,
+      "why": "#884: the text the parser reads (the preprocessor, C# 14's extension headers) apart from the reading of the tree."
+    },
+    "scripts/read-total.mjs": {
+      "mark": 20690,
+      "why": "Whoever changes how the total is counted reads its tree reader, its readers, its cut and its conditions together, each calling the others; split, that session opens more files and reads no less, and no other task reads it."
+    },
+    "scripts/reading.mjs": {
+      "mark": 32082,
+      "why": "The start hook runs it from git with no file beside it, so it stands alone (its opening says so): no part can be moved to a file of its own."
+    },
+    "scripts/shape.mjs": {
+      "mark": 84826,
+      "why": "#884: along its sections, the survey apart from the baseline and the verdict."
+    },
+    "scripts/state-report.mjs": {
+      "mark": 22381,
+      "why": "Its sections are other scripts' already (holders, pruning, cited, read-total, merge-line); what stands is the one body that sets them in order, which whoever changes a section reads."
+    },
+    "tests/code-shape-test.mjs": {
+      "mark": 23288,
+      "why": "#884: the measures of code-shape.mjs apart from the JavaScript functions read on the parser."
+    },
+    "tests/holders-test.mjs": {
+      "mark": 30947,
+      "why": "Split by the reader each case tests in #852: its archive cases apart from the rest."
+    },
+    "tests/hostile-configs-test.mjs": {
+      "mark": 24643,
+      "why": "Split by the reader each case tests in #852."
+    },
+    "tests/hostile-pr-changes-test.mjs": {
+      "mark": 44725,
+      "why": "Split by the reader each case tests in #852."
+    },
+    "tests/init-test.mjs": {
+      "mark": 61827,
+      "why": "Its cases run on the one scratch project it writes from the starter kit; split, each file would write it again, adding to the suite's time (tasks/tests.md), and every case reads that setup."
+    },
+    "tests/look-test.mjs": {
+      "mark": 37770,
+      "why": "Split into the look's tests and the state report's in #852."
+    },
+    "tests/reading-test.mjs": {
+      "mark": 31106,
+      "why": "Split by the part of reading.mjs each case tests in #852."
+    },
+    "tests/shape-readers-test.mjs": {
+      "mark": 41453,
+      "why": "#884: by language, each reader's cases apart."
+    },
+    "tests/shape-test.mjs": {
+      "mark": 91943,
+      "why": "#884: along its sections, in step with scripts/shape.mjs."
+    }
+  }
+}

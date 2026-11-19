@@ -337,7 +337,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      where updates from `main` alone follow it, each the merge git makes of its parents (the check running
      `clean-merges.mjs` on the head's commits, #323), and the status says so, any other later commit needing such a
      comment naming the head, or the merge where that stops, by its whole SHA; a pure sync passes with none where no review starts by itself, the check running
-     `pure-sync.mjs` on its head; where the pull request changes what runs by itself beyond its pins, both, or two such
+     `pure-sync.mjs` on its head, and so does a pull request of the *progress file* alone that a job of the caller's proves with
+     `queue-only.mjs`, whose token may read issues, handing the head to the input `queue` (the core's own caller does;
+     #750); where the pull request changes what runs by itself beyond its pins, both, or two such
      comments (floor rule 3), or one holding what `comment-only.mjs` printed on the head. Where a summary of Codex's is
      there but its state cannot be read, a form nobody documents having changed, the status says so, the run warns, and
      the check waits or passes as it would with no summary (a summary whose first line itself changed is not known as
@@ -449,7 +451,7 @@ check a project runs that the list leaves out.
 | `code-scan.mjs` | left out | Where no workflow calls `codeql.yml`, the scan hands the engine the code a pull request adds or alters outside the copy alone. The core's repository is public, and the host's CodeQL scans its code (`codeql.yml`). |
 | `copies.mjs` | left out in part | It reads the copy as the project's config names it: the starter kit's names the copy's rule files' prose. A file of the copy moved, or its text moved into another, counts as gone, never as the config reading less, since a sync alone moves those. The core's own copies check holds them. |
 | `pointers.mjs` | left out | The copy's files are only what a pointer leads to. The core's run with `--core` holds its own pointers. |
-| `reading-size.mjs` | left out in part | Each file of the copy under `"read"` is held to its own mark. The total and the split mark count the project's own files alone. The core's caps hold the copy (`scripts/size.mjs`), and the core has no split mark. |
+| `reading-size.mjs` | left out in part | Each file of the copy under `"read"` is held to its own mark. The total and the split mark count the project's own files alone. The core's caps hold the copy (`scripts/size.mjs`). The core's own split mark is in `.github/sizes.json`, which the size workflow reads with this script. |
 | `workflows.mjs` | left out | The core's run with `--core` holds the copy's workflows and actions (floor rule 2). |
 | `entry-files.mjs` | left out | It reads the entry files at the project's root alone. The core's run with `--core` holds its own. |
 | `shape.mjs` | left out | The starter kit's config leaves the copy out (`setup/template/shape.json.tmpl`). The core holds its scripts to its own `.github/shape.json`. |

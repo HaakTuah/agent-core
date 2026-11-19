@@ -193,7 +193,7 @@ const RUN_IN_RUN = /\$\{?RUN\}?(?![\w])/u, RUN_IN_IF = /\benv\.RUN\b/u;
 const SAFE_TERM = /^(env\.RUN\s*==\s*'all'|contains\(\s*env\.RUN\s*,\s*' [^' ]+ '\s*\))$/u;
 const RUN_LINE = /^if \[ "\$RUN" = all \]; then [^;\n]+; elif \[ "\$RUN" != none \]; then [^;\n]+ \$RUN; fi$/u;
 // (an expression split at its top level by `op`, its parentheses kept whole; null where they do not pair)
-function topLevel(text, op) {
+export function topLevel(text, op) {
   const parts = [];
   let depth = 0, from = 0, quoted = false;
   for (let i = 0; i < text.length; i++) {
@@ -205,7 +205,7 @@ function topLevel(text, op) {
   }
   return depth === 0 && !quoted ? [...parts, text.slice(from).trim()] : null;
 }
-const unwrapped = t => { let x = t.trim(); while (x.startsWith("(") && x.endsWith(")") && topLevel(x.slice(1, -1), "&&")) x = x.slice(1, -1).trim(); return x; };
+export const unwrapped = t => { let x = t.trim(); while (x.startsWith("(") && x.endsWith(")") && topLevel(x.slice(1, -1), "&&")) x = x.slice(1, -1).trim(); return x; };
 function ifKeepsNone(expression) {
   const body = expression.trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1");
   const ands = topLevel(unwrapped(body), "&&");

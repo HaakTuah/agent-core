@@ -19,6 +19,7 @@
     "changes"
   ],
   "grown": {
+    "process: tests/read-total-test.mjs -> node:child_process": "Its last tests run the total read as a command, as the size workflow and the state report run it: its exit code, the line it prints, the failure with its mend for a call it does not know, and that from a project's copy it says it did not run and fails nothing, which is what they guard (#469).",
     "timed: tests/code-scan-test.mjs -> Date.now": "The clock is what it guards: a description far past any real one is read in under 2 s, so the scan's reading of \"Scan false alarm:\" and \"Scan unread:\" lines cannot hang on a hostile description (#612).",
     "process: tests/code-scan-test.mjs -> node:child_process": "Starting the programs is what it guards: the scan reads a pull request's diff through git, its own step installs the real engine with pip and runs it, and the test reads the scan's command line, exit code and printed mend on repositories it builds with git (#612).",
     "timed: tests/stryker-test.mjs -> Date.now": "It holds Stryker's run to its budget and a test to its limit with a fault in, both measured on the clock the run itself reads, which is what the test guards (#581).",
@@ -27,7 +28,8 @@
     "process: tests/mend-test.mjs -> node:child_process": "The inventory's check reads its coverage from the files git tracks (#593, point 2: a sweep reads its scope from a source a script counts it from), so what `git ls-files` prints is what the test guards; no code of the core's stands beneath that process to call instead.",
     "process: tests/reasons-test.mjs -> node:child_process": "Its last three tests run the script as a command, since what they guard is the command itself: its exit code and the failure line with its mend that a session reads (#756).",
     "process: tests/copy-left-out-test.mjs -> node:child_process": "It runs each check from a staged project's copy as the project's workflow runs it, and reads whether that run fails: the command's exit code, with the copy and git as they stand, is what the README's list says and the test guards (#661).",
-    "process: tests/weakened-test.mjs -> node:child_process": "Its cases of testsChanged build git repositories and read what git gives for a merge commit against its first parent (a rename, a deletion, a file the base does not hold), which is what the description check reads (#307); git's own output is what the test guards, and no code of the core's stands beneath that process to call instead."
+    "process: tests/weakened-test.mjs -> node:child_process": "Its cases of testsChanged build git repositories and read what git gives for a merge commit against its first parent (a rename, a deletion, a file the base does not hold), which is what the description check reads (#307); git's own output is what the test guards, and no code of the core's stands beneath that process to call instead.",
+    "process: tests/queue-only-test.mjs -> node:child_process": "The test guards the command's own exit code and usage line (no files named: status 2, \"usage:\" on stderr), which only starting scripts/queue-only.mjs as a process shows."
   },
   "listed": {
     "function: scripts/licence-commands.mjs#atCommand": {
@@ -122,6 +124,8 @@
     "process: tests/pr-description-test.mjs -> node:child_process": true,
     "process: tests/pruning-test.mjs -> node:child_process": true,
     "process: tests/pure-sync-test.mjs -> node:child_process": true,
+    "process: tests/queue-only-test.mjs -> node:child_process": true,
+    "process: tests/read-total-test.mjs -> node:child_process": true,
     "process: tests/reading-test.mjs -> node:child_process": true,
     "process: tests/reasons-test.mjs -> node:child_process": true,
     "process: tests/releases-test.mjs -> node:child_process": true,

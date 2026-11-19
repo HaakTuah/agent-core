@@ -38,6 +38,7 @@ const CHECKS = {
   "scripts/pointers.mjs": "tests/pointers-test.mjs",
   "scripts/install.mjs": "tests/packages-test.mjs",
   "scripts/reading-size.mjs": "tests/init-test.mjs",
+  "scripts/read-total.mjs": "tests/read-total-test.mjs",
   "scripts/workflows.mjs": "tests/workflows-test.mjs",
   "scripts/licences.mjs": "tests/licence-scan-test.mjs",
   "scripts/exact-versions.mjs": "tests/exact-versions-test.mjs",
@@ -90,6 +91,7 @@ const NOT_CHECKS = {
   "scripts/sync.mjs": "named in core.yml's mends, as what a session runs to mend the copy",
   "scripts/pure-sync.mjs": "run by security-review.yml as a proof alone: where it fails, the sync is not proved pure and the status says its own mend",
   "scripts/clean-merges.mjs": "run by security-review.yml as a proof alone: a merge it does not prove stops a review of an earlier commit, and the status says its own mend",
+  "scripts/queue-only.mjs": "run by own-security-review.yml as a proof alone: a pull request it does not prove gets its reviews as any other, the job passing and the status saying its own mend",
   ".github/workflows/preview.yml": "publishes a preview of a pull request's site",
   ".github/workflows/release.yml": "cuts a release, started by hand on main, and runs the upgrade test on Windows on main once a day: no pull request runs it",
 };

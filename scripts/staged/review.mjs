@@ -13,7 +13,7 @@ export const holds = ["roles/shared/review-guidelines.md: For every reviewer", "
 export const inPart = ["roles/shared/review-guidelines.md: For every reviewer", "roles/shared/review-guidelines.md: Every reviewer", "roles/shared/review-guidelines.md: A rule file changed", "tasks/reviews.md: The reviewers are tested"];
 // (any change to the guidelines makes the case due, not only to the rules it holds: point 9 asks it so)
 export const dueOn = ["roles/shared/review-guidelines.md"];
-export const role = "reviewer";
+export const role = "a reviewer session (the role `reviewer`: core/roles/reviewer.md)";
 export const task = "Review pull request #2 of the project's repository on GitHub as its code and security reviewer, and post your review on it.";
 
 const at0 = "2026-11-01T09:00:00Z", user = { login: OWNER, type: "User" };

@@ -59,7 +59,8 @@ queue's order; the
 *design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's
 issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`tasks/roles.md`,
 `roles/orchestrator.md`); the *hard work*: a new or changed rule; the *size marks*: the caps of
-`scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*:
+`scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, and the split mark, 20 KB, with its `"past"`
+list, in `.github/sizes.json`, which `scripts/reading-size.mjs` reads as a project's; the *major version checks*:
 the suites of `.github/workflows/tests.yml`; *planning design*: none; the *quick check*: `node scripts/holders.mjs && node scripts/size.mjs && node scripts/reading.mjs --check && node tests/holders-test.mjs && node tests/manifest-reads-test.mjs && node tests/general-test.mjs`; the *other builders' checks*: those suites, which any tool's
 session here runs before it finishes, every file here being protected (`SECURITY.md`).
 
@@ -150,7 +151,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **Whoever builds a change finishes it,** the design session and a builder alike: the branch, the draft PR and the
   push after every commit, then ready, its reviews, their findings fixed and the merge, as `roles/shared/work-flow.md`
   says ("Git and GitHub", and point 1). A PR that changes a rule says what it changes in every project.
-- **Every PR gets Codex's code and security reviews;** one that changes the floor or the review guidelines needs the
+- **Every PR gets Codex's code and security reviews,** save one of queue lines alone that `scripts/queue-only.mjs`
+  proves (floor rule 8; `tasks/reviews.md`, point 3); one that changes the floor or the review guidelines needs the
   owner's yes in it: that of its queued issue ("Queued means wanted"), or, for one that goes beyond it, a new yes, for
   which it waits unmerged while its builder takes the next line.
 - **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`).

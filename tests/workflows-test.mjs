@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TEMPLATES } from "../scripts/init.mjs";
 import { holds, parseYaml } from "../scripts/workflow-run.mjs";
-import { draftHoles, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
+import { draftHoles, foreignBreaks, foreignBroken, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { LONGEST, twice, uncommented } from "../scripts/yaml-keys.mjs";
 
@@ -90,6 +90,15 @@ const longFails = [["b", "a"], ["abcd", "a"], ["a", "abcd"], ["ready_for_review"
 ok(longSame.fails.length === 0 && longKeys.fails.length === 0 && longKeys.notes.length === 1 && /as it did on the base\. Mend: cut the file/u.test(longKeys.notes[0]) && unreadied(longFiles(longText("a")), null).fails.length === 0
   && longFails.every(f => f.length === 1 && /^FAIL long\.yml: the file is longer than 262144 characters and differs from the base/u.test(f[0]) && mended(f[0])) && repeated(longFiles(longText("a")), () => longText("b")).fails.length === 1,
   "a file past the length read that a pull request changes in any way, cut a little, grown, or added, fails with its mend; one unchanged, or read with no base, is only noted", longFails.flat().join("\n"));
+// (a line break of YAML 1.1 the package does not read hides a key given twice and a call left without ready_for_review from
+// its reader, #872: the check fails a file that is new or changed with such a break and notes one unchanged or with no base)
+const hiding = br => `on: push${br}x: 1${br}x: 2\n`;
+const brks = ["\u0085", "\u2028", "\u2029"].map(br => ({ br, found: foreignBreaks(`a\nb\n${hiding(br)}`) })), one = text => [{ file: "w.yml", text }];
+const brokenNew = foreignBroken(one(hiding("\u2028")), () => null), brokenSame = foreignBroken(one(hiding("\u2028")), () => hiding("\u2028")), brokenChanged = foreignBroken(one(hiding("\u2028")), () => `${hiding("\u2028")}# a\n`);
+ok(twice(hiding("\u2028")).length === 0 && brks.every(({ br, found }) => found.line === 3 && found.count === 2 && found.code === `U+${br.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}`) && foreignBreaks("a\r\nb\rc\n") === null && foreignBreaks("") === null
+  && brokenNew.fails.length === 1 && mended(brokenNew.fails[0]) && /^FAIL w\.yml:1: the file holds the line break U\+2028 and 1 more/u.test(brokenNew.fails[0]) && brokenChanged.fails.length === 1
+  && brokenSame.fails.length === 0 && brokenSame.notes.length === 1 && /as on the base\. Mend:/u.test(brokenSame.notes[0]) && foreignBroken(one(hiding("\u2028")), null).fails.length === 0 && foreignBroken(one(hiding("\u2028")), null).notes.length === 1 && foreignBroken(one("on: push\nx: 1\n"), () => null).fails.length === 0,
+  "a line break the package does not read hides a key given twice from its reader, and the check fails a file with one that is new or changed, with its mend, and notes one unchanged or read with no base", [brokenNew, brokenSame].flatMap(r => [...r.fails, ...r.notes]).join("\n"));
 // (Codex's case: a call of a check skipped on a draft whose ready_for_review a same-length edit moves into a comment, in a
 // file past the length read, its words counted as often as before, fails)
 const commented = types => `on:\n  pull_request:\n    types: ${types}\njobs:\n  check:\n    uses: ${CORE}/.github/workflows/copies.yml@${"a".repeat(40)}\n    if: \${{ !github.event.pull_request.draft }}\n# ${"x".repeat(LONGEST)}\n`;
@@ -183,13 +192,14 @@ try {
 // ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
 // Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and
 // the pull request, cancelled once a newer run starts for it; a run on main, a schedule or a start by hand is a group of
-// its own (its run id), and never cancelled. Left out, each for its reason: the security-review check, whose runs go one
-// at a time in order so the last has read the newest comments, the release, the preview's queue and the deletion of
+// its own (its run id), and never cancelled. Left out, each for its reason: the security-review check, whose runs go
+// one at a time in order so the last has read the newest comments, and the queue-only proof that feeds it, which keeps
+// no group, so that no comment's run cancels one waiting to record a review (read below), the release, the preview's queue and the deletion of
 // merged branches, which no pull request starts and which never cancel, the scheduled ones, and the core's tests, read
 // below for their own groups (#733).
 const KEY = "${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}";
 const CANCEL = "${{ github.event_name == 'pull_request' }}";
-const APART = new Set(["security-review.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml", "tests.yml"]);
+const APART = new Set(["security-review.yml", "queue-only.yml", "own-security-review.yml", "release.yml", "preview.yml", "delete-merged-branches.yml", "look.yml", "own-look.yml", "core-moved.yml", "versions.yml", "tests.yml"]);
 const wfDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".github", "workflows");
 const loose = [];
 // (a workflow in a form the test's reader does not know, a flow mapping say, is read for its group at the top, by its
@@ -231,8 +241,22 @@ const ownReview = parseYaml(fs.readFileSync(path.join(wfDir, "own-security-revie
 // (the template's own {{core}} and {{pin}} filled in, which init.mjs writes when it makes the project)
 const kitReview = parseYaml(fs.readFileSync(path.join(core, TEMPLATES, "workflows/security-review.yml.tmpl"), "utf8").replace(/\{\{\w+\}\}/g, "x"));
 ok(JSON.stringify(ownReview.on) === JSON.stringify(kitReview.on), `the core's own security-review check is started by what the template's is, and nothing more${JSON.stringify(ownReview.on) === JSON.stringify(kitReview.on) ? "" : `: ${JSON.stringify(ownReview.on)}`}`);
+// (its two calls: the review's, and the queue-only proof's that feeds it, #750)
 const ownCall = Object.values(ownReview.jobs ?? {});
-ok(ownCall.length === 1 && ownCall[0].uses === "./.github/workflows/security-review.yml" && ownCall[0].with?.root === "." && ownCall[0].with?.advisory === false, "and calls the core's workflow with its scripts at the root and advisory turned off");
+const callOf = (name) => ownCall.filter((job) => job.uses === `./.github/workflows/${name}`);
+ok(ownCall.length === 2 && ["security-review.yml", "queue-only.yml"].every((name) => callOf(name).length === 1 && callOf(name)[0].with?.root === ".") && callOf("security-review.yml")[0].with?.advisory === false,
+  "and calls the core's workflow, and the queue-only proof before it, with its scripts at the root and advisory turned off");
+// (no group holds a whole run of the check, nor its proof: GitHub cancels a waiting run or job once a newer one of its
+// group queues, so any comment's run would lose the one that records a review)
+const queueProof = parseYaml(fs.readFileSync(path.join(wfDir, "queue-only.yml"), "utf8"));
+ok(ownReview.concurrency === undefined && kitReview.concurrency === undefined && Object.values(queueProof.jobs).every((job) => job.concurrency === undefined),
+  "and neither caller holds its whole run in a group, nor the proof its job, so no comment's run cancels one waiting to record a review");
+// (the proof compares from the default branch's commit it checked out, whose progress file gives the form, and proves
+// only files that are those GitHub lists for the pull request, which the review job reads: the answer's base.sha can
+// stand behind where the head leaves that branch)
+const proveRun = String(queueProof.jobs.prove.steps.find((step) => step.id === "prove")?.run);
+ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.sha") && /compare\/\$base\.\.\.\$tip/u.test(proveRun) && /pulls\/\$NUMBER\/files/u.test(proveRun),
+  "and the proof compares the head from the default branch's commit it checked out, its files held to those GitHub lists for the pull request");
 
 // ---- when the core's tests run (#733, points 2 to 4 and 6) ----
 // A pull request's run starts once it is ready, never on a draft, on Linux alone; main is tested on Linux at its newest

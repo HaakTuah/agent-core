@@ -422,6 +422,16 @@ declare(lockProject, '"12 November 2026, the security review shown on every pull
 ok(!notDone(lockProject).length, "until its manifest's \"Differences\" quotes the step's lead, on the owner's word");
 sec.mend(lockProject);
 
+// ---- the proof that a pull request is queue-only (#750): read whole, at the review's pin, its job kept running ----
+{
+  const QUEUE_LEAD = "19 November 2026, a pull request of the progress file alone proved by a script", flow = path.join(lockProject, ".github/workflows/security-review.yml"), was = fs.readFileSync(flow, "utf8");
+  const queueAsked = change => { fs.writeFileSync(flow, change(was)); const said = notDone(lockProject).some(m => m.lead === QUEUE_LEAD); fs.writeFileSync(flow, was); return said; };
+  ok(!queueAsked(t => t) && queueAsked(t => t.replace(/(queue-only\.yml@)\w+/, "$1main")) && queueAsked(t => t.replace("      issues: read\n", ""))
+    && queueAsked(t => t.replace("    if: ${{ !cancelled() }}\n", "")) && queueAsked(t => t.replace("    needs: queue\n", "")) && queueAsked(t => t.replace("needs.queue.outputs.head", "needs.queue.outputs.other"))
+    && !queueAsked(t => t.replace("if: ${{ !cancelled() }}", "if: ${{ always() && github.event_name != 'push' }}")),
+    "a caller of the security review is asked the queue job unless it calls queue-only.yml at the review's pin, may read issues, and the review's job needs it, takes its head and runs where it is skipped");
+}
+
 // ---- a check that cannot read the project is reported, never read as done ----
 const throwing = [{ lead: "a step", cost: COST.check, check: () => { throw new Error("cannot read it"); } }];
 ok(notDone(lockProject, throwing)[0]?.mend.includes("could not read the project"), "a check that throws is reported as not read, never as done");

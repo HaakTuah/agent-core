@@ -308,6 +308,9 @@ jobs:
       - name: The proof that an update from main is the merge git makes, and the review statuses' run on one
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/clean-merges-test.mjs ')) }}
         run: node tests/clean-merges-test.mjs
+      - name: The proof that a pull request changes only the progress file's lines, each for an issue it may name
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-only-test.mjs ')) }}
+        run: node tests/queue-only-test.mjs
       - name: The workflow check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/workflows-test.mjs ')) }}
         run: node tests/workflows-test.mjs
@@ -462,6 +465,9 @@ jobs:
       - name: The reading script, by role and by task
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/reading-test.mjs ')) }}
         run: node tests/reading-test.mjs
+      - name: The total read
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/read-total-test.mjs ')) }}
+        run: node tests/read-total-test.mjs
       - name: Every module and role of the core says when it is read, in words the reading script matches
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/reading.mjs --check
