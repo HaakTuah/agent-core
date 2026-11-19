@@ -16,8 +16,9 @@
 # runs in two jobs of its own, a part of it each, beside the suites, here on Linux alone; on Windows, where it set the
 # length of every run, the release workflow runs it once a day and before each release (#715), since what it guards
 # reaches a project only through a release. The staged cases' test, which writes a scratch project with the starter kit
-# for each case it reads, runs in thirds: on Linux the first after the older release's part of the upgrade test and the
-# other two after the newer's, and on Windows in three jobs of the same name with nothing before them (#508, #715).
+# for each case it reads, runs in thirds: on Linux the first after the newer release's part of the upgrade test and the
+# other two in a job of their own, the older release's part alone in its job, and on Windows in three jobs of the same
+# name with nothing before them (#508, #715).
 # A third runs the reference parsers the hand-written readers are held to, tools that only run, the devDependencies of
 # the core's lock file, which its own jobs install and a copy does not (tests/readers-test.mjs, on Linux).
 # Each job first installs the core's own packages from its lock files in .packages/, the parser's in .packages/parser/
@@ -37,9 +38,10 @@
 # that passed is not run again"; #457); the upgrade test and the staged cases, which read the release tags and the day,
 # never in the tree, run on every push; and the checks of the core itself, each a step of its own after the suites, run
 # every time.
-# After them, on Linux, the core's own mutation tool puts faults into the lines a pull request changes and runs the
-# tests that name each file against them (scripts/strength.mjs with scripts/mutate.mjs; tasks/code-shape.md, "How
-# strong the tests are"), in working copies of its own, with no secret.
+# On a pull request, on Linux, after the staged cases' second and third parts in their job, the core's own mutation
+# tool puts faults into the lines a pull request changes and runs the tests that name each file against them
+# (scripts/strength.mjs with scripts/mutate.mjs; tasks/code-shape.md, "How strong the tests are"), in working copies of
+# its own, with no secret.
 name: tests
 
 on:
@@ -471,31 +473,25 @@ jobs:
         env:
           SUITE: ${{ matrix.suite }}
         run: node scripts/shape.mjs .github/shape.json --suite "$SUITE" --since "$SUITES_START"
-      # (after the time mark, which it is no part of: the faults put into the lines a pull request changes, with the
-      # base the copies baseline fetched; the tool stops at its budget and says what it left unrun)
-      - name: How strong the tests are, on the lines the pull request changes (once, on Linux)
-        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'rest') && github.event_name == 'pull_request' }}
-        env:
-          STRENGTH_BASE: origin/${{ github.base_ref }}
-          MUTATE_BUDGET: "240"
-        run: node scripts/strength.mjs
 
   # (on Linux the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the older
   # of the two releases with the copy older than the first, and the newer release; on Windows it runs in the release
   # workflow alone, daily and before each release, and three jobs there run the staged cases' test alone (#715). It
   # runs in thirds, each under the suite's own mark: on Windows a job each, since in halves the longer took 805 s of
-  # its 900 and set the pull request's time; on Linux its first in the older's job and the other two in the newer's,
-  # since whole it took up to 264 s of its 240 there; #304, #508, #515, #715)
+  # its 900 and set the pull request's time; on Linux its first in the newer's job and the other two in a job of their
+  # own, with the strength check after them on a pull request, since whole it took up to 264 s of its 240 there, and
+  # beside the upgrade test's parts its second and third set the longest job, as the strength check set the rest's on a
+  # large change; #304, #508, #515, #715)
   upgrade:
-    name: ${{ matrix.os == 'windows-latest' && 'staged' || 'upgrade' }} (${{ matrix.os }}, ${{ matrix.part }})
+    name: ${{ (matrix.os == 'windows-latest' || matrix.part == 'second and third') && 'staged' || 'upgrade' }} (${{ matrix.os }}, ${{ matrix.part }})
     needs: moved
     if: ${{ !cancelled() && !(github.event_name == 'pull_request' && github.event.pull_request.draft) && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}
     strategy:
       fail-fast: false
-      # (as the suites: on a pull request and a push the two on Linux, on the hourly run the three on Windows, on a start
-      # by hand all five; #733, points 3 and 6)
+      # (as the suites: on a pull request and a push the three on Linux, on the hourly run the three on Windows, on a
+      # start by hand all six; #733, points 3 and 6)
       matrix:
-        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"os":"ubuntu-latest","part":"older"},{"os":"ubuntu-latest","part":"newer"}]' || github.event_name == 'schedule' && '[{"os":"windows-latest","part":"older"},{"os":"windows-latest","part":"newer"},{"os":"windows-latest","part":"third"}]' || '[{"os":"ubuntu-latest","part":"older"},{"os":"ubuntu-latest","part":"newer"},{"os":"windows-latest","part":"older"},{"os":"windows-latest","part":"newer"},{"os":"windows-latest","part":"third"}]') }}
+        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"os":"ubuntu-latest","part":"older"},{"os":"ubuntu-latest","part":"newer"},{"os":"ubuntu-latest","part":"second and third"}]' || github.event_name == 'schedule' && '[{"os":"windows-latest","part":"older"},{"os":"windows-latest","part":"newer"},{"os":"windows-latest","part":"third"}]' || '[{"os":"ubuntu-latest","part":"older"},{"os":"ubuntu-latest","part":"newer"},{"os":"ubuntu-latest","part":"second and third"},{"os":"windows-latest","part":"older"},{"os":"windows-latest","part":"newer"},{"os":"windows-latest","part":"third"}]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     defaults:
@@ -516,17 +512,27 @@ jobs:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
         run: node scripts/select.mjs .github/shape.json --env RUN
       - name: A project of each of the last two releases, or of the one this job's part names, synced to this commit, passes every check unchanged (on Linux; on Windows, the release workflow)
-        if: ${{ runner.os == 'Linux' && (env.RUN == 'all' || contains(env.RUN, ' tests/upgrade-test.mjs ')) }}
+        if: ${{ runner.os == 'Linux' && matrix.part != 'second and third' && (env.RUN == 'all' || contains(env.RUN, ' tests/upgrade-test.mjs ')) }}
         env:
           PART: ${{ matrix.part }}
         run: node scripts/shape.mjs .github/shape.json --suite upgrade -- node tests/upgrade-test.mjs --part "$PART"
       # (here, not in the suites: a scratch project each, which on Windows would run the suites past their time; a third
-      # each, a job of its own on Windows, the second and third after the newer release's upgrade test on Linux; #715)
+      # each, a job of its own on Windows; on Linux the first after the newer release's upgrade test and the second and
+      # third in their own job, none after the older's; #715)
       - name: The staged cases, each read as set, kept and broken; what is due, and when they hold a release
-        if: ${{ !cancelled() && (env.RUN == 'all' || contains(env.RUN, ' tests/staged-test.mjs ')) }}
+        if: ${{ !cancelled() && !(runner.os == 'Linux' && matrix.part == 'older') && (env.RUN == 'all' || contains(env.RUN, ' tests/staged-test.mjs ')) }}
         env:
-          STAGED: ${{ matrix.part == 'older' && 'first' || matrix.part == 'third' && 'third' || matrix.part == 'newer' && runner.os == 'Linux' && 'second,third' || matrix.part == 'newer' && 'second' || 'all' }}
+          STAGED: ${{ matrix.part == 'second and third' && 'second,third' || matrix.part == 'newer' && runner.os == 'Linux' && 'first' || matrix.part == 'older' && 'first' || matrix.part == 'newer' && 'second' || matrix.part == 'third' && 'third' || 'all' }}
         run: node scripts/shape.mjs .github/shape.json --suite staged -- node tests/staged-test.mjs --part "$STAGED"
+      # (after the staged cases' time mark, which it is no part of: the faults put into the lines a pull request changes,
+      # against its base, which this job's checkout of the whole history holds; the tool stops at its budget and says what
+      # it left unrun)
+      - name: How strong the tests are, on the lines the pull request changes (once, on Linux)
+        if: ${{ !cancelled() && matrix.part == 'second and third' && github.event_name == 'pull_request' }}
+        env:
+          STRENGTH_BASE: origin/${{ github.base_ref }}
+          MUTATE_BUDGET: "240"
+        run: node scripts/strength.mjs
 
   # (the one check the ruleset asks for by name: it passes only where the suites, the staged cases and the upgrade test
   # on Linux passed that the run started, on Windows too where it started them; a job that ran out of its time is
@@ -558,7 +564,7 @@ jobs:
             exit 1
           fi
           if [ "$SUITES" != success ] || [ "$UPGRADE" != success ]; then
-            echo "::error::a suite, the upgrade test or a staged case failed. Mend: read the failing job above, whose" \
+            echo "::error::a suite, the upgrade test, a staged case or the strength check failed. Mend: read the failing job above, whose" \
               "failing line says its own mend, and fix that in this pull request"
             exit 1
           fi

@@ -7,7 +7,7 @@
 //
 //   node tests/staged-test.mjs [--part all | first | second | third | parts joined by commas, as second,third]
 // (each part about a third of the whole and under the suite's own mark: on Windows each runs alone in a job of its own,
-// on Linux after a part of the upgrade test in its job, first in one and second,third in the other. First, the rules
+// on Linux first after the newer release's part of the upgrade test and second,third in a job of their own. First, the rules
 // the cases name, the cases up to order-for-now, and the steps case; second, stack-choice, carried, weakness and
 // no-floor; third, the rest; #508, #715)
 import { execFileSync, spawnSync } from "node:child_process";
