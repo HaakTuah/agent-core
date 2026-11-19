@@ -93,30 +93,36 @@ export function statesOf(repo, gh = route => {
   return n => !open.has(n);
 }
 
-// The command, given its option and what it reads and writes: { status, out }, `out` what it prints. `at`: { file,
-// project (whether it runs in a project, from its copy of the core), read() the progress file's text or null, write(text), closed() a reader of whether a number has closed, which
-// throws where GitHub cannot answer }.
-export function command(flag, at) {
-  const out = [], said = (status, ...lines) => ({ status, out: [...out, ...lines].join("\n") }), FILE = at.file ?? "QUEUE.md";
-  if (flag !== undefined && !["--clear", "--check"].includes(flag)) return said(1, `FAIL: ${flag} is no option of this script. Mend: run node scripts/queue.mjs, with --clear or --check, or with nothing`);
+// What the command reads, or why it cannot: { text, closed } or { fail }, the failure with its mend.
+function readIn(flag, at, FILE) {
+  if (flag !== undefined && !["--clear", "--check"].includes(flag)) return { fail: `FAIL: ${flag} is no option of this script. Mend: run node scripts/queue.mjs, with --clear or --check, or with nothing` };
   const text = at.read();
-  if (typeof text === "string" && Buffer.byteLength(text) > LARGEST) return said(1, `FAIL: ${FILE} is ${Buffer.byteLength(text)} bytes, past the ${LARGEST} the reader takes. Mend: take out the lines of finished work and any notes, which belong in the pull requests' descriptions`);
-  if (text === null) return said(1, `FAIL: ${FILE} is not here. Mend: run it from the repository's root, where the progress file its manifest names stands (in the core, QUEUE.md)`);
+  if (text === null) return { fail: `FAIL: ${FILE} is not here. Mend: run it from the repository's root, where the progress file its manifest names stands (in the core, QUEUE.md)` };
+  if (Buffer.byteLength(text) > LARGEST) return { fail: `FAIL: ${FILE} is ${Buffer.byteLength(text)} bytes, past the ${LARGEST} the reader takes. Mend: take out the lines of finished work and any notes, which belong in the pull requests' descriptions` };
   let closed;
-  try { closed = at.closed(); } catch (e) { return said(1, `FAIL: the issues the queue names could not be read: ${e.message}. Mend: run it again; where gh is not signed in, sign it in, or set GH_TOKEN`); }
+  try { closed = at.closed(); } catch (e) { return { fail: `FAIL: the issues the queue names could not be read: ${e.message}. Mend: run it again; where gh is not signed in, sign it in, or set GH_TOKEN` }; }
   const all = read(text, closed);
-  if (all.gone.length && !all.open.length) return said(1, `FAIL: GitHub's list of open issues names none of the ${all.gone.length} lines of ${FILE}, which may be the list of another repository. Mend: run it again from the repository's root, GITHUB_REPOSITORY set to its owner/name; where every line's issue has truly closed, take them out by hand`);
-  const { open, gone, next } = all, named = gone.map(l => l.issues.map(n => `#${n}`).join(" and ")).join(", ");
+  if (all.gone.length && !all.open.length) return { fail: `FAIL: GitHub's list of open issues names none of the ${all.gone.length} lines of ${FILE}, which may be the list of another repository. Mend: run it again from the repository's root, GITHUB_REPOSITORY set to its owner/name; where every line's issue has truly closed, take them out by hand` };
+  return { text, closed, all };
+}
+
+// The command, given its option and what it reads and writes: { status, out }, `out` what it prints. `at`: { file,
+// project (whether it runs in a project, from its copy of the core), read() the progress file's text or null,
+// write(text), closed() a reader of whether a number has closed, which throws where GitHub cannot answer }.
+export function command(flag, at) {
+  const FILE = at.file ?? "QUEUE.md", got = readIn(flag, at, FILE);
+  if (got.fail) return { status: 1, out: got.fail };
+  const { open, gone, next } = got.all, named = gone.map(l => l.issues.map(n => `#${n}`).join(" and ")).join(", ");
   if (flag === "--clear") {
-    at.write(cleared(text, closed));
-    return said(0, gone.length ? `${FILE}: took out the lines of ${named}, closed` : `${FILE}: no line of a closed issue`);
+    at.write(cleared(got.text, got.closed));
+    return { status: 0, out: gone.length ? `${FILE}: took out the lines of ${named}, closed` : `${FILE}: no line of a closed issue` };
   }
   if (flag === "--check") {
-    if (gone.length) return said(1, `FAIL: ${FILE} holds the line of ${gone.length === 1 ? "an issue" : "issues"} closed: ${named}, and this pull request changes the queue. Mend: run node ${at.project ? "core/" : ""}scripts/queue.mjs --clear and commit ${FILE}`);
-    return said(0, `ok   ${FILE} holds no line of a closed issue`);
+    if (gone.length) return { status: 1, out: `FAIL: ${FILE} holds the line of ${gone.length === 1 ? "an issue" : "issues"} closed: ${named}, and this pull request changes the queue. Mend: run node ${at.project ? "core/" : ""}scripts/queue.mjs --clear and commit ${FILE}` };
+    return { status: 0, out: `ok   ${FILE} holds no line of a closed issue` };
   }
-  out.push(...open.map(l => l.text));
-  return said(0, `${open.length} open lines${gone.length ? `, ${gone.length} of closed issues skipped (${named}), which the next pull request that changes the queue takes out` : ""}`, next ? `next: ${next.issues.map(n => `#${n}`).join(" and ")}` : "next: none that a session takes waits on nothing open");
+  const last = [`${open.length} open lines${gone.length ? `, ${gone.length} of closed issues skipped (${named}), which the next pull request that changes the queue takes out` : ""}`, next ? `next: ${next.issues.map(n => `#${n}`).join(" and ")}` : "next: none that a session takes waits on nothing open"];
+  return { status: 0, out: [...open.map(l => l.text), ...last].join("\n") };
 }
 
 // The progress file where the command runs: a project's, as its manifest names it; the core's own where none stands.
