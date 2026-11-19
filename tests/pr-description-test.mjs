@@ -128,6 +128,9 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   git("mv", "scripts/new.mjs", "scripts/newer.mjs"); write("scripts/path-only.mjs", "changed\n"); write("floor/security.md", "Read `scripts/newer.mjs` and scripts/tools/ first.\n");
   git("add", "-A"); git("commit", "-qm", "the proof changed");
   ok(proven(tmp, "HEAD^1", "HEAD", asked).length === 0, "where the pull request changes the proof, nothing is proven, however its paths follow");
+  git("rm", "-q", "scripts/path-only.mjs"); git("commit", "-qm", "the proof as it was"); git("mv", "scripts/tools", "scripts/box"); write("scripts/box/extra.mjs", "more\n"); write("floor/security.md", "Read `scripts/newer.mjs` and scripts/box/ first.\n");
+  git("add", "-A"); git("commit", "-qm", "a folder moved with a file added");
+  ok(proven(tmp, "HEAD^1", "HEAD", asked).length === 0, "a folder that gains a file in its move holds more than it held, and its pointer is not proven");
 }
 // the line "Reasons read:", asked of a pull request that adds a line under the manifest's "Differences" (#756)
 {

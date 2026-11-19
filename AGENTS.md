@@ -153,8 +153,9 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   says ("Git and GitHub", and point 1). A PR that changes a rule says what it changes in every project.
 - **Every PR gets Codex's code and security reviews,** save one of queue lines alone that `scripts/queue-only.mjs`
   proves (floor rule 8; `tasks/reviews.md`, point 3); one that changes the floor or the review guidelines needs the
-  owner's yes in it: that of its queued issue ("Queued means wanted"), or, for one that goes beyond it, a new yes, for
-  which it waits unmerged while its builder takes the next line.
+  owner's yes in it, save a path that follows a moved file as floor rule 3 says: that of its queued issue ("Queued
+  means wanted"), or, for one that goes beyond it, a new yes, for which it waits unmerged while its builder takes the
+  next line.
 - **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`).
   By default what a role reads at its start, as its file under `roles/` names it, stays under that role's cap, so
   whoever adds a rule there replaces text. Where a fresh session has read all the rules for room and found too little,

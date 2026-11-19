@@ -41,6 +41,8 @@ const graph = { "scripts/pr-description.mjs": 'import { a } from "./owner-yes.mj
 const own = ownFiles(p => graph[p] ?? null);
 ok(ROOTS.every(r => own.has(r)) && own.has(WORKFLOW) && ["scripts/owner-yes.mjs", "scripts/reading.mjs", "scripts/whole-output.mjs"].every(f => own.has(f)) && own.size === 6, "the code that decides the proof is the check, its workflow, the proof and all they import, at any depth");
 ok(refused(verdicts({ changed: [{ path: FLOOR, status: "M", modes: ["100644", "100644"], before, after: before.replace("old", "new") }, { path: "scripts/reading.mjs", status: "M" }], moves, self: true }), /not main.s/u), "where the pull request changes a file the check imports, nothing is proven");
+const named = [{ from: "scripts/a.mjs", to: "scripts/b.mjs", unique: true }, { from: "scripts/c.mjs", to: "scripts/d.mjs" }];
+ok(follows("see `a.mjs`", "see `b.mjs`", spellings(named)) === null && follows("see `c.mjs`", "see `d.mjs`", spellings(named)) !== null && follows("see a.mjs", "see b.mjs", spellings(named)) !== null, "a file's name alone follows its move between backticks, and only where no other file bears that name");
 ok(mended(failure({ path: FLOOR, why: "it changes words" })), "a refusal says its mend");
 
 console.log(`${failed ? "FAIL" : "ok  "} ${count - failed} of ${count} passed`);

@@ -52,16 +52,19 @@ const escape = s => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 // The spellings of each move, old to new. A path is read bare where it has a "/" and names a file by its extension or a
 // folder by its closing "/"; otherwise only between backticks, so that no word of prose ("tests", "and/or") is read as
 // one. A move is left out where either path holds anything but ASCII letters, digits, ".", "_", "-" and "/", or asks
-// the yes: such a move is refused, and justifies no pointer.
+// the yes: such a move is refused, and justifies no pointer. A file's name alone, between backticks, follows its move
+// where the base holds no other file of that name (`unique`).
 const SAFE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const bare = p => p.includes("/") && (p.endsWith("/") || /\.[A-Za-z0-9]+$/u.test(p.split("/").at(-1)));
 export function spellings(moves) {
   const pairs = new Map();
   const add = (a, b) => { pairs.set(`\`${a}\``, `\`${b}\``); if (bare(a) && bare(b)) pairs.set(a, b); };
-  for (const { from, to, folder } of moves) {
+  for (const { from, to, folder, unique } of moves) {
     if (asks(from) || asks(to) || from === to || !SAFE.test(from) || !SAFE.test(to)) continue;
     add(from, to);
     if (folder) add(`${from}/`, `${to}/`);
+    const [a, b] = [from, to].map(p => p.split("/").at(-1));
+    if (unique && a !== b) pairs.set(`\`${a}\``, `\`${b}\``);
   }
   return pairs;
 }
@@ -130,12 +133,18 @@ function movesOf(cwd, base, head) {
   for (let i = 0; i + 2 < r.length; i += 3) if (r[i] === "R100") moves.push({ from: r[i + 1], to: r[i + 2] });
   const files = new Set(moves.map(m => `${m.from}\0${m.to}`)), seen = new Set();
   const stands = (at, p) => run(cwd, ["cat-file", "-e", `${at}:${p}`]) !== null;
-  const whole = d => { const listed = run(cwd, ["ls-tree", "-r", "--name-only", "-z", base, "--", `${d.from}/`]); return listed !== null && fields(listed).every(f => files.has(`${f}\0${d.to}${f.slice(d.from.length)}`)); };
+  // (both ways: each file of the old folder moved to the new, and each file of the new came from the old, none added)
+  const under = (at, dir) => { const listed = run(cwd, ["ls-tree", "-r", "--name-only", "-z", at, "--", `${dir}/`]); return listed === null ? null : fields(listed); };
+  const whole = d => { const was = under(base, d.from), is = under(head, d.to); return was !== null && is !== null && was.length === is.length && was.every(f => files.has(`${f}\0${d.to}${f.slice(d.from.length)}`)); };
   for (const d of moves.flatMap(m => foldersOf(m.from, m.to))) {
     if (seen.has(`${d.from}\0${d.to}`)) continue;
     seen.add(`${d.from}\0${d.to}`);
     if (!stands(head, d.from) && !stands(base, d.to) && whole(d)) moves.push({ ...d, folder: true });
   }
+  // (a file's name alone follows it only where no other file of the base bears that name, nor the new one)
+  const names = new Map();
+  for (const f of fields(run(cwd, ["ls-tree", "-r", "--name-only", "-z", base]) ?? "")) { const n = f.split("/").at(-1); names.set(n, (names.get(n) ?? 0) + 1); }
+  for (const m of moves) if (!m.folder && names.get(m.from.split("/").at(-1)) === 1 && !names.has(m.to.split("/").at(-1))) m.unique = true;
   return moves;
 }
 
