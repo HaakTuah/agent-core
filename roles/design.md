@@ -1,7 +1,6 @@
 # The design session
 
-Read at its start by the role `design`: the design session (`roles/shared/records.md`, "The owner's words are kept
-once").
+Read at its start by the role `design`: the design session.
 
 **Reads at its start:** `roles/builder.md` and what that names, since it builds what it designs, and
 `roles/shared/records.md`.
