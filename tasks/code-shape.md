@@ -131,13 +131,13 @@ one declared entrance.
   the part's job covers, from the source that defines them (the project's kinds and its manifest's slots, the platforms
   it builds and tests on, a format a standard or the host defines), and gives each a test, in that pull request or,
   where that is large, as a task it files, the pull request holding the list. Where an authority says the whole set (a
-  build tool for what a build brings in, git for a rename, the host for a pull request's reviews), in the core that
-  builder, or whoever writes such a part anew, has the part's test run the part and the authority on the same inputs,
-  the projects its upgrade test builds, and fail on any difference, and whether the part gives way to it is weighed as
-  for a maintained package. Three is a first guess. It does not mean a bug waits for the list, that a part with three
-  bugs is replaced, that a kind no source names is guessed, nor a comparison where nothing defines the whole set or on
-  another owner's project. Reason: mended one case at a time, four of the core's parts took 22 bugs of the same kind by
-  17 November 2026, and kinds listed by hand are as complete as their writer's memory.
+  build tool for what a build brings in, git for a rename, the host for a pull request's reviews), in the core, that
+  builder or whoever writes such a part anew has the part's test run the part and the authority on the same inputs, the
+  projects its upgrade test builds, and fail on any difference, and whether the part gives way to it is weighed as for a
+  maintained package. Three is a first guess. It does not mean a bug waits for the list, that a part with three bugs is
+  replaced, that a kind no source names is guessed, nor a comparison where nothing defines the whole set or on another
+  owner's project. Reason: mended one case at a time, four of the core's parts took 22 bugs of the same kind by 17
+  November 2026, and kinds listed by hand are as complete as their writer's memory.
 
 **What has no mark here.** A hub, a file most others import: one that holds one small fact is as it should be, and
 the audit's reader judges the others. The time a user waits on gets its own measure as its rule comes (#318).
