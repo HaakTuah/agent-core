@@ -511,7 +511,15 @@ counter and its commands are in the pull request that adds this record (#487).
   parser's own lock file (`.packages/parser/`, #719) at one exact version, installed from the registry into
   `.packages/parser/node_modules/`, only where a job names it, with no script run, the runtime's CommonJS build and WebAssembly (378 KB) and the grammar's WebAssembly (5.4 MB) read from there;
   the grammar's package brings two more, `node-addon-api` and `node-gyp-build` (MIT), which only its native build,
-  never run, uses. Nothing of them is in the repository's history.
+  never run, uses. Nothing of them is in the repository's history. The using directives, namespaces, types, tokens
+  and comments of C# moved onto it on 19 November 2026 (#530's item 6), and the lexer of C# went: on 6,626 files of C#
+  from ten public repositories, every file read the same 18,934 using directives, and what differs elsewhere is the
+  lexer's misreads mended (a verbatim string that opens with escaped quotes, `@"""x"""`, taken for a raw string and
+  swallowing the code after it, in 10 files' functions; `where T : class` before an `in` read as a type named `in`).
+  Where the grammar cannot read a file whole, the declarations in the part it lost go unread, as its functions do (7 of
+  the 6,626 files, which lose types, 1 a namespace too), where the lexer misread 17 others; keeping a walk of tokens
+  for such files alone was weighed and dropped. Where the parser is not installed, nothing of a file of C# is read, as
+  of Python below.
 - **JavaScript's and TypeScript's grammars arrived** on 19 November 2026 (#530's item 6, #723), with the port of the
   shape check's functions of JavaScript and TypeScript, JSX among them, onto them (`scripts/javascript-functions.mjs`),
   its definition kept: `tree-sitter-javascript` 0.25.0 and `tree-sitter-typescript` 0.23.2 (TypeScript's grammar and
