@@ -238,8 +238,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   stands in the core's own words (`archive/instructions/`: its date and source, what was asked, what was decided and
   what it stands behind), and that is what a project's copy carries and "core archive N" leads to; the owner's words
   of the items written before 16 November 2026 stay in this repository alone (`words/`, which `.gitattributes` keeps
-  out of the copy as it keeps `reports/`). Whoever adds an item writes its number, its date, the issue that carries
-  the owner's word and one line of the reasoning, and no quotation: the words stay on the issue. Wherever the owner's
+  out of the copy as it keeps `reports/`). Whoever adds an item writes its key ("A new archive item is named by its
+  issue"), its date and one line of the reasoning, and no quotation: the words stay on the issue. Wherever the owner's
   words are recorded here (#773), they are quoted only as floor rule 4 says: the reason behind a decision, cleaned,
   and nothing personal. Nothing changes it. It does not mean the items that stand are rewritten: they keep their
   reasoning, and in `words/` the record of the owner's word, cut to reasoning (#778).
@@ -255,6 +255,16 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   asked anything. Reason: about 60 such pointers stood in what every session reads at its start, and a builder on an
   ordinary task never opens the archive. Held by `scripts/holders.mjs`, which fails a pointer in a rule file and an item the list names
   that is not in the archive.
+- **A new archive item is named by its issue** (#744). By default an item added to the archive is keyed by the issue
+  that carries the owner's word and, where it records one point of several, by that point, as `#733.1`, and stands in
+  a file of its own named by its key (`archive/instructions/issue-733.1.md`; #750, point 1); `scripts/holders.json`
+  names it so under "behind", and a pointer to it gives that key where one to an older item gives its number. Items 1
+  to 262 keep their numbers, so every "core archive N" that stands still leads where it did. Nothing changes it. It does not mean an item moves or
+  is rewritten. Reason: on 19 November 2026 two pull requests merged in parallel took the same next number, and a
+  running count cannot be claimed without coordinating, where an issue's number is already unique and already named in
+  the item. Held by `scripts/holders.mjs` with `scripts/archive.mjs`, which fail a key used twice, a key that names no
+  issue (an item numbered past 262 among them), an item outside its own file, one of items 1 to 262 taken out, and a
+  key under "behind" that is not in the archive.
 - **Every rule says what holds it.** By default a rule of the floor or the modules is held by
   a check that fails where it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no
   check can read its breach exactly, by a staged case, the holder of last resort, or by the scheduled audit; and where
