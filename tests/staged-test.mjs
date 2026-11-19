@@ -178,6 +178,18 @@ check("finish", fresh("finish"),
   d => { branch(d, "fix-sum", { "src/sum.mjs": FIX }); ready(d, pr(d, "fix-sum")); },
   d => { branch(d, "fix-sum", { "src/sum.mjs": FIX }); pr(d, "fix-sum", DESCRIPTION.replace("Waits on: a review", "Waits on: the owner: may it merge?")); },
   /draft/);
+check("red-main", fresh("red-main"),
+  d => { gh(d, "POST", "actions/runs/501/rerun-failed-jobs"); gh(d, "POST", "issues", { title: "test/registry.test.mjs fails at random: registry.npmjs.invalid could not be reached", body: "Failed on main, then passed when run again on the same commit.", labels: ["bug", "by:builder"] }); },
+  d => { for (let i = 0; i < 3; i++) gh(d, "POST", "actions/runs/501/rerun"); },
+  /again 3 times.*filed no bug/);
+const redOnce = fresh("red-main");
+gh(redOnce, "POST", "actions/jobs/7001/rerun");
+const redAfter = gh(redOnce, "GET", "commits/main/check-runs").check_runs[0];
+ok(redAfter.conclusion === "success" && /filed no bug/.test(verdict("red-main", redOnce).why) && !/did not run/.test(verdict("red-main", redOnce).why),
+  "red-main: a job run again passes, as the case sets it, and a second run with nothing filed fails for the bug alone", verdict("red-main", redOnce).why);
+const redFiledOnly = fresh("red-main");
+gh(redFiledOnly, "POST", "issues", { title: "registry.test.mjs could not reach the registry", body: "On main.", labels: ["bug"] });
+ok(/did not run the failed check on main again/.test(verdict("red-main", redFiledOnly).why), "red-main: a bug filed with no second run fails", verdict("red-main", redFiledOnly).why);
 check("old-content", fresh("old-content"),
   d => { git(d, "fetch", "-q", "origin"); branch(d, "sync-core", { "docs/notes.md": read(d, "docs/notes.md").replace(/Thanks to .* for the first test numbers\.\n/, "") }, "sync-core"); },
   d => { git(d, "fetch", "-q", "origin"); branch(d, "sync-core", { "docs/notes.md": read(d, "docs/notes.md").replace("Tarn Vellow", "a friend"), "src/total.mjs": null }, "sync-core"); },
