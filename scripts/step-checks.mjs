@@ -398,16 +398,17 @@ export function installsFirst(p) {
 }
 
 // Where a job of the project's own workflows runs the shape check (its script, or the copies check's steps through
-// checks.mjs) before the parser's packages are installed from their own lock file (#719): each such workflow, with the
-// mend; null where each names that install first. Read as installsFirst reads an install, and naming `parser` or `all`.
+// checks.mjs) or the selection of tests, which reads through the shape check's readers (select.mjs; #530, item 6),
+// before the parser's packages are installed from their own lock file (#719): each such workflow, with the mend; null
+// where each names that install first. Read as installsFirst reads an install, and naming `parser` or `all`.
 export function parserFirst(p) {
   const { script, install, bare, installs } = installReading(p);
-  const shapes = st => st.cmds.some(c => { const w = c.map(x => bare(x.text)); return w.includes(`${script}shape.mjs`) || (w.includes(`${script}checks.mjs`) && w.includes("copies")); });
+  const shapes = st => st.cmds.some(c => { const w = c.map(x => bare(x.text)); return w.includes(`${script}shape.mjs`) || w.includes(`${script}select.mjs`) || (w.includes(`${script}checks.mjs`) && w.includes("copies")); });
   const wrong = Object.entries(p.workflows).filter(([, w]) => jobsOf(w).some(job => {
     const at = job.steps.findIndex(shapes);
     return at >= 0 && !job.steps.slice(0, at).some(st => installs(st, ["parser", "all"]));
   })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
-  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check install the parser's too, \`node ${install} all\`, before the shape check runs: it reads the functions of JavaScript, TypeScript, C# and Python on the parser, whose packages stand in a lock file of their own, and without them, after an install of the core's first lock alone, the check reads none of them, saying so as a warning, and with no install of the core's at all it fails, saying so.` : null;
+  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check or the selection of tests install the parser's too, \`node ${install} all\`, before either runs: they read the functions of JavaScript, TypeScript, C# and Python, and all of Python, on the parser, whose packages stand in a lock file of their own, and without them, after an install of the core's first lock alone, the shape check reads none of that, saying so as a warning, the selection runs each test of Python as one that reaches every file, and with no install of the core's at all either fails, saying so.` : null;
 }
 
 // Where the project's call to the NuGet check starts only on the paths it names, each build file a build reads by

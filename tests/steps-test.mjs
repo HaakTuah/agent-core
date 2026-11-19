@@ -151,6 +151,16 @@ for (const step of STEPS.filter(s => s.check)) {
   ok(!notDone(dir).length, `and its mend as written makes it done`, report(notDone(dir)));
   STAGES[step.lead].after?.(dir);
 }
+// (the parser's packages installed where the selection of tests runs too, which reads through the shape check's
+// readers, all of Python on the parser: a job that selects after the first install alone reads not done; #530, item 6)
+{
+  const PARSER_LEAD = "19 November 2026, the parser's packages installed where the shape check runs", file = path.join(dir, ".github/workflows/select-staged.yml");
+  const flow = named => `name: select-staged\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/install.mjs${named}\n      - run: node core/scripts/select.mjs --env RUN\n`;
+  const said = named => { fs.writeFileSync(file, flow(named)); execFileSync("git", ["add", "-A"], { cwd: dir }); const m = notDone(dir).find(x => x.lead === PARSER_LEAD); fs.rmSync(file); execFileSync("git", ["add", "-A"], { cwd: dir }); return m; };
+  const first = said("");
+  ok(first && /`\.github\/workflows\/select-staged\.yml` that runs the shape check or the selection of tests/u.test(first.mend) && !said(" all") && !said(" parser"),
+    "a job that selects the tests after the core's first install alone reads not done, its mend naming the workflow; one that installs the parser's too reads done", JSON.stringify(first));
+}
 // (the project's tests at the pace of a release, read exactly: all four types, and a condition that skips a draft;
 // #733, point 7)
 {
@@ -299,7 +309,7 @@ ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.y
 const shapeBaseline = path.join(lockProject, "checks/shape-baseline.json"), shapeAsKit = fs.readFileSync(shapeBaseline, "utf8");
 fs.writeFileSync(shapeBaseline, "{\n  \"listed\": {}\n}\n");
 let shapeMissed = notDone(lockProject);
-ok(shapeMissed.length === 4 && shapeMissed[3].lead === "19 November 2026, the shape check reads the functions of Python on the parser" && /written before the check read Python, its functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[3].mend) && shapeMissed[2].lead === "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser" && /written before the check read JavaScript and TypeScript, their functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[2].mend) && shapeMissed[1].lead === "18 November 2026, the shape check reads C#'s functions on the parser" && /written before the check read C#, its functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[1].mend) && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, its functions by the lexer, Python, its functions by the lexer, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process, the comments that mark a change:/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
+ok(shapeMissed.length === 4 && shapeMissed[3].lead === "19 November 2026, the shape check reads the functions of Python on the parser" && /written before the check read Python, by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[3].mend) && shapeMissed[2].lead === "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser" && /written before the check read JavaScript and TypeScript, their functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[2].mend) && shapeMissed[1].lead === "18 November 2026, the shape check reads C#'s functions on the parser" && /written before the check read C#, its functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[1].mend) && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, its functions by the lexer, Python, its functions by the lexer, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process, the comments that mark a change:/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
   "a shape baseline that names no reader is reported by each of its steps, each mend to write it with every reader", report(shapeMissed));
 execFileSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: lockProject, env: { ...process.env, SHAPE_BASE: "" } });
 shapeMissed = notDone(lockProject);

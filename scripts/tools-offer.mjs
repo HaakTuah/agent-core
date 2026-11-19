@@ -8,7 +8,8 @@
 // template of the starter kit (init.mjs, beside this file) written into a tool's folder or as a tool's entry file, each
 // hook script (holders.mjs's HOOKS), and each file the core holds in a tool's folder, named by itself or by the template
 // that writes it; and a part a column's heading names that does not say how the tool is asked for a review by each way,
-// in the order of tasks/reviews.md, point 1 (WAYS; #397). With --open it asks gh, as the account it answers for,
+// in the order of tasks/reviews.md, point 1 (WAYS; #397); and a part of tasks/ways.md, a way of running sessions, out
+// of the form ways.mjs reads (tasks/ways.md, "A way of running sessions has a part of its own"). With --open it asks gh, as the account it answers for,
 // whether each issue a "not yet" names is open, and fails one that is not; where gh cannot answer, it says so and fails nothing for it. The core's own repository
 // alone, run by its tests workflow. Git, gh and Node's own modules.
 //
@@ -21,6 +22,7 @@ import { HOOKS } from "./holders.mjs";
 import { FILES, TEMPLATES } from "./init.mjs";
 import { ENTRY_FILES } from "./rule-files.mjs";
 import { started } from "./started.mjs";
+import { MODULE as WAYS_MODULE, readWays } from "./ways.mjs";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const TABLE = "tasks/tools.md";
@@ -103,6 +105,9 @@ export function wrong({ root = ROOT, text = fs.readFileSync(path.join(root, TABL
     }
     if (n) { const open = isOpen(Number(n)); if (open === false) out.push(`${where} names #${n}, which is not open. Mend: carry it or write the tool cannot, or name the open issue that takes it, filing one where none does`); else if (open === null) unread.push(n); }
   });
+  let waysText = null;
+  try { waysText = read(WAYS_MODULE); } catch { out.push(`${WAYS_MODULE} cannot be read. Mend: put back the module of the ways of running sessions, a part for each way`); }
+  if (waysText !== null) out.push(...readWays(waysText).problems);
   for (const f of toolFiles(root, tracked).filter(f => !f.by.some(b => named.has(b)))) out.push(`${f.file} is a file of a tool's own that no cell of the table in ${TABLE} names. Mend: name it in the cell of the row it carries, or add the row for what it offers and fill that row for each tool`);
   return { wrong: out, unread: [...new Set(unread)] };
 }
