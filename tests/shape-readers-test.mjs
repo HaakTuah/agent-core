@@ -134,6 +134,9 @@ const pyBlocks = readPython(["try:\n    import a\nexcept E:\n    import b\nexcep
   "while p:\n    import q\nelse:\n    import r", "match s:\n    case 1:\n        import t", "@deco\nclass U:\n    import v", "if w:\n    pass\nelif x:\n    import y\nelse:\n    import z"].join("\n") + "\n");
 ok(same(pyBlocks.imports.map(i => `${i.module}${i.dynamic ? "!" : ""}`).join(" "), "a b c d e f h! k! n o q r t v y z"),
   "Python: an import is read under each kind of block, a def's as dynamic", JSON.stringify(pyBlocks.imports));
+const pyInError = readPython("if TYPE_CHECKING:\nimport y1\nelse:\n    import y2\n");
+ok(pyInError.functions === null && same(pyInError.imports.map(i => i.module), ["y1", "y2"]),
+  "Python: an import the grammar read whole inside a part it could not read is read all the same", JSON.stringify(pyInError.imports));
 const pyBroken = readPython("import first\ndef f(:\n    import inside\nfrom later import (x,\n");
 ok(pyBroken.functions === null && same(pyBroken.imports.map(i => `${i.module}${i.dynamic ? " dynamic" : ""}`), ["first", "inside dynamic"]),
   "Python: a file the grammar cannot read whole has its imports read where it read them whole, and none from what it could not", JSON.stringify(pyBroken.imports));
