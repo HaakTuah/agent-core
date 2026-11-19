@@ -1,7 +1,7 @@
 # The orchestrator asks less
 
 Both games' orchestrators asked the owner questions whose answer was plainly yes: whether to take over two PRs whose
-sessions, started elsewhere, they could not reach, and whether a PR still waited on an answer he had already
+sessions, started elsewhere, they could not reach, and whether a PR still waited on an answer the owner had already
 given (core archive 133).
 
 - **`modules/orchestrating.md`, a lane whose session is gone:** a lane whose session the orchestrator cannot reach,

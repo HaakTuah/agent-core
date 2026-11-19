@@ -98,8 +98,9 @@ What these are and how they are kept: `words/README.md`.
     latest version as a rule, I think, unless there is a good reason not to: breaks something, worse performance, change
     in license, etc. Your take?" Then the owner agreed.
 
-66. **5 November 2026** (Amarna Letters, item 221; for both games): "I notice that […]." To moving the design check to Opus at high effort, the owner agreed, with a correction: "Though the
-    problem is it can't be on high, it inherits."
+66. **5 November 2026** (Amarna Letters, item 221; for both games): "I notice that [Fable is used up much
+    faster than Opus]." To moving the design check to Opus at high effort, the owner agreed, with a correction: "Though
+    the problem is it can't be on high, it inherits."
 
 67. **5 November 2026** (Amarna Letters, item 222; for both games), to the rule-file audit also cutting and simplifying,
     the owner agreed.
@@ -134,8 +135,8 @@ What these are and how they are kept: `words/README.md`.
     off as described. Get my meaning?"
 
 72. **6 November 2026** (Amarna Letters, item 229; for both games), on a canary in which Codex missed two planted
-    faults: "(…) don't stop using Codex. […] it is better than the
-    alternative still. But I agree with the rule addition and new test."
+    faults: "(…) don't stop using Codex. [Claude is not always
+    available], and it is better than the alternative still. But I agree with the rule addition and new test."
 
 73. **9 November 2026** (Amarna Letters, item 238; Barkstreet Snakes, 9 November 2026), to routine lanes built by
     Sonnet, the owner agreed, with conditions: "But make sure its work is checked where needed, and that we have Opus to
@@ -158,10 +159,12 @@ What these are and how they are kept: `words/README.md`.
     safety rules only one game had join the floor; where the games differ in substance, each keeps its own; the floor in
     two files, the rules any task can break read at every start and the rest before a task touches them), to setting
     Dependabot here to the workflow's actions, and to a last code review before the merge; the owner added: "Only thing
-    i want to add is that only Claude has to stop around 90%, […]. […] Ideally they time so that 90% is never spent up
-    before 100% of them are spent, but that depends on them being in an environment where they can track it, […]. So
-    calibrate for that. Right now every cloud session wastes time establishing that they can track their usage, and wastes tokens
-    posting about it every PR, possibly more. Sounds good to you?"
+    i want to add is that only Claude has to stop around 90%, [the rest is kept for the owner's own use]. So codex or
+    whatveer else I add will only be for project work. Ideally they time so that 90% is never spent up before 100% of
+    them are spent, but that depends on them being in an environment where they can track it, [such as a set-up where
+    they can track and start one another directly]. So calibrate for that. Right now every cloud session wastes time
+    establishing that they can track their usage, and wastes tokens posting about it every PR, possibly more. Sounds
+    good to you?"
 
 77. **9 November 2026** (Amarna Letters, item 243; Barkstreet Snakes, 9 November 2026), asked for his yes on this
     repository's first pull request and on the personal-terms fix in both games; the design session relayed it, signed:

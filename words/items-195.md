@@ -52,7 +52,7 @@ What these are and how they are kept: `words/README.md`.
 
      The owner agreed to add all of them (the licences).
 
-     > What steps do I need to do, I don't find them on agent-core github? […]
+     > What steps do I need to do, I don't find them on agent-core github? [The profile will keep its name.]
 
      Behind the six licences added to floor rule 10's list; the NuGet check built in the core, not in a project
      first; floor rule 11's exception for the name and address GitHub writes into a merge; and "the owner, or a
@@ -124,8 +124,9 @@ What these are and how they are kept: `words/README.md`.
      On section 2, that the personal-terms check reads every commit, the owner asking whether a private repository pays
      for it:
 
-     The owner's reason: the check must add little overhead, and must use no billed minutes where a repository is
-     private.
+     The owner's reason: the owner agreed if the check is quick, not wanting it to add much overhead, and asked
+     whether a private repository pays for such checks in Actions minutes; if so, the check was to be an opt-in, so
+     that a private project pays nothing for it.
 
      Answered that the scan adds seconds inside the job that already runs and no billed minute, so it is on for every
      project; and on failing where the secret `PERSONAL_TERMS` is missing:
@@ -206,10 +207,10 @@ What these are and how they are kept: `words/README.md`.
      it runs neither by itself nor with credentials; `modules/reviews.md`, point 3, the "Security review:" comment
      giving what it printed and that word, which the code reviewer checks.
 
-204. **14 November 2026** (the core, in the design chat). Told, of a planned project that is only ever added
-     to, that it could be played from its first stage on, unlike Amarna, which was built toward its finished form:
+204. **14 November 2026** (the core, in the design chat). Told, of a planned project, that it could be played from
+     its first stage on, unlike Amarna, which was built toward its finished form:
 
-     > Yes, unlike amarna, this is […] that you only add to. Amarna still doesn't feel like a game. Something I
+     > Yes, unlike amarna, […]. Amarna still doesn't feel like a game. Something I
      > should get better at. Mvps and stages that feel playable. With amarna, I am trying to get to the end station,
      > and that was a mistake. But I still want to see it through. […]
 
@@ -243,7 +244,7 @@ What these are and how they are kept: `words/README.md`.
      merged a pull request past a code review it had asked for that was still running:
 
      > Ideally it would block merging before reviews are finished. But then you would have to make sure it doesn't
-     > Bottleneck if a reviewer goes wrong or […].
+     > Bottleneck if a reviewer goes wrong or [becomes unavailable].
 
      Told that the security review already had such a check, `security-review`, advisory for its first week and with
      the fallback reviewer taking over a review not begun in about 5 minutes or finished in about 30, and that a code

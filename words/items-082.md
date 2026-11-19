@@ -290,12 +290,17 @@ What these are and how they are kept: `words/README.md`.
 
      > Renamed the repo to [agent-core](https://github.com/HaakTuah/agent-core).
 
-122. **10 November 2026** (the core), on Codex building. Told that Codex's cloud tasks cannot push, that a capped API key in a
-     cloud environment would let Claude call Codex there, and that a sign-in is kept where no agent that reads
-     outsiders' text can read it, and that a cloud session's machine is reclaimed too often to keep a sign-in it was
-     given, the owner agreed that nothing changes for now.
+122. **10 November 2026** (the core), on Codex building. Told that Codex's cloud tasks cannot push, and that a capped
+     API key in a cloud environment would let Claude call Codex there, no less safely than elsewhere, the owner asked
+     how that is any safer than running it elsewhere, and declined the key.
 
-     The owner's reason: Codex stays the reviewer until a safe way to run it as a builder is set up.
+     The owner's reason: a key billed by use spends money for nothing where the owner can already use the tool
+     another way.
+
+     Told that a sign-in is kept where no agent that reads outsiders' text can read it, and that a cloud session's
+     machine is reclaimed too often to keep a sign-in it was given, the owner asked whether nothing needs changing for
+     now, Codex staying the reviewer until a set-up for it to build is chosen, and asked the session to check whether
+     anything must be updated.
 
 123. **10 November 2026** (the core), on the stand-in's sources:
 

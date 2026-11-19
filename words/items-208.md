@@ -139,8 +139,8 @@ What these are and how they are kept: `words/README.md`.
 
      > (1) Queue lines to add: #277 (how a rule is written) as the first line, before #247, a rule builder's; every
      > rule line after it is written in its pattern. #275 (the test audit) after #253, a rule builder's. #278
-     > (dependency checks for another installer) under "Not taken up", a builder's, waiting on a project's choice
-     > record first naming such a dependency that ships.
+     > (dependency checks for Cargo) under "Not taken up", a builder's, waiting on a project's choice record first
+     > naming a Cargo dependency that ships.
 
      Behind "A rule is written to one pattern" in `AGENTS.md`, its point under "A rule file changed" in
      `modules/review-guidelines.md`, and the list "phrases" of `scripts/general.json`, which `scripts/general.mjs` reads.

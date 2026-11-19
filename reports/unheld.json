@@ -284,7 +284,7 @@
     },
     "roles/shared/teams.md: An employer's rules come first": {
       "mark": "goes",
-      "why": "no project is built under an employer's rules yet; \"A project's own rules add to the core's\" covers its rule files"
+      "why": "no project of the owner's is built under an employer's rules yet; \"A project's own rules add to the core's\" covers its rule files"
     },
     "tasks/choices.md: a drop says whether it rests on a fact": {
       "mark": "case",

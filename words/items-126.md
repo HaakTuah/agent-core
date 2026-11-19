@@ -234,8 +234,8 @@ What these are and how they are kept: `words/README.md`.
 
      The owner agreed with everything, and added:
 
-     > […] and that should be allowed. Should we have a verified by trustable
-     > source, like […] itself, criteria or ideal, or something like that?
+     > Nuget and that should be allowed. Should we have a verified by trustable
+     > source, like nugget itself, criteria or ideal, or something like that?
 
 152. **11 November 2026** (the core, in the design chat), told that a check of the core's own for actions
      not pinned had drawn a new way past it in each of five review rounds, since it read YAML by lines, and that
@@ -304,4 +304,4 @@ What these are and how they are kept: `words/README.md`.
      > as they should. But anything that stops stuff, because his setup is different: […]. Must absolutely be addressed!
 
      Behind the end of floor rule 10 (the owner's own work carries the terms he gives it, where it said no licence
-     file ever), and the README's lines on GitHub's free plan and the default branch.
+     file ever), and the README's lines on a project that is sold, GitHub's free plan, the default branch and Windows.

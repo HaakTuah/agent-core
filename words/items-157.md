@@ -3,11 +3,11 @@
 What these are and how they are kept: `words/README.md`.
 
 157. **12 November 2026** (the core, in the design chat), of a project of another owner:
-     told that a product needs a name somewhere, that the floor let no name into a repository
+     told that a product needs its seller's name somewhere, that the floor let no name into a repository
      but the GitHub account in its address, so that the build would have to take the name from outside, and that a
      company's name could instead be allowed there:
 
-     The owner's reason: a company's name, naming no person, may stand where a project's name is needed.
+     The owner's reason: the seller's name a product needs can be a company's, which names no person.
 
      Behind the second exception of floor rule 11: the company name a project is sold under, naming no person.
 
@@ -74,8 +74,9 @@ What these are and how they are kept: `words/README.md`.
      the core gave another provider's builder first what a check proves right without judgement, and left the rest
      with Claude's:
 
-     The owner's reason: the other provider's sessions had been used for little beyond reviews, and the owner asked
-     whether the rule would use them more fully.
+     The owner's reason: the owner had noticed that another provider was used mostly through sub-sessions, and asked
+     whether it would now be used more fully, whether those sub-sessions had been reviews only, and what the
+     session's take was.
 
      > It was supposed to save on Claude usage by pushing all work suited to any other provider first…
 
@@ -186,8 +187,8 @@ What these are and how they are kept: `words/README.md`.
      > security review is avaliable via github. Seems to me a more generalized rule to just handoff what you can, is
      > the best way? Shouldn't that produce what we do now, when we only have github? And then use plug-in if it is
      > there? But prefer […] even more if you set it up with it? What is your take? This is the kind of
-     > stuff agent-core should solve for […], since he isn't familiar with the options. Are there more holes like
-     > this, that leaves things open for him, without good cause?
+     > stuff agent-core should solve for [an owner who does not know the options]. Are there more holes like
+     > this, that leaves things open for [such an owner], without good cause?
 
      Shown that rule as a table (the tool that runs agents side by side, else the plug-in, else Claude's build) and six
      more places the core left to a project of another owner; offered his rule and four of them as one change (how a
@@ -300,8 +301,8 @@ What these are and how they are kept: `words/README.md`.
 
      > Okay, back to just team prs and on open prs. The rules stay that for github triggers it waits for what is
      > triggered, while manually triggered tests it only does it where it adds something worthwhile, or? What is your
-     > take? [...] setup with the codex plug-in should utilize reveiws and security reviews optimally, not
-     > limited to what my github triggers can acheive, no?
+     > take? [A set-up whose sessions call another tool themselves] should utilize reveiws and security reviews
+     > optimally, not limited to what my github triggers can acheive, no?
 
      Offered that as the floor's line and the review rule, with a few plain lines for an owner on what setting a
      machine up for agents buys him (item 149 left the setup to him), and asked whether Copilot's agent should be

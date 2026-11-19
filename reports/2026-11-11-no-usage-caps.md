@@ -6,7 +6,7 @@ first stays.
 
 What changes in every project:
 
-- **Floor rule 16** (the usage share and its 90% stop) is removed, on his yes (core archive 146, relayed in
+- **Floor rule 16** (the usage share and its 90% stop) is removed, on the owner's yes (core archive 146, relayed in
   this PR). Rule 3 lists "the cloud setup script" among what runs by itself, the status line script being gone.
 - **`modules/claude.md`:** the brake (no new side lane from about 85%, only small things from about 90%) and its
   measuring after every commit are gone. In their place, "Work continuously, other providers first": Codex, and any
@@ -26,7 +26,7 @@ Readings taken:
 - The Fable rule in `modules/claude.md` stays: it sends the scarcest model only to planning design, the last escalation
   step and work the owner names, which no one measures; it routes, it caps nothing.
 - Amarna Letters' model-game kit keeps its own stop points (the simulation and play prompts): those games are dormant
-  until the build order is done and the owner starts one himself, and one run can use a great deal. Told to him, to
+  until the build order is done and the owner starts one, and one run can use a great deal. Told to the owner, to
   remove on his word.
 
 Questions for the owner: none.
