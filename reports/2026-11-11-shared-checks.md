@@ -1,6 +1,6 @@
 # The pointer and reading-size checks, shared
 
-Tonight's audit of both games against the core (the owner: "Are you absolutely sure there are no other overlaps,
+The audit of both games against the core (the owner: "Are you absolutely sure there are no other overlaps,
 discrepancies, or fat that should be cut or shared, between amarna and snakes? Is the implementation of
 agent-core in both, fully perfect?", then "Everything must be fixed!") found that only Snakes had a
 pointer check and a reading-size check, while Amarna's lane was building its own (Amarna #721). Both checks serve the

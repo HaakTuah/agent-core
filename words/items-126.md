@@ -13,9 +13,9 @@ What these are and how they are kept: `words/README.md`.
      agents run side by side, the tests run the game's packages under the account that holds the GitHub token, so a
      bad package could take it; and that the fix is to run project code where no sign-in can be read:
 
-     > And how do we do that? We might either use Claude Code with Codex plugin, or Herdr.
+     > And how do we do that? We might either use Claude Code with Codex plugin, or […].
 
-     Told that the separation sits below either tool (a throwaway box for the tests, given a copy of the clone):
+     Told that the separation sits below any tool (a throwaway box for the tests, given a copy of the clone):
 
      > But I want them to have internet access? Otherwise they can't search for anything?
 
@@ -51,8 +51,8 @@ What these are and how they are kept: `words/README.md`.
      > Why not require quality and scanning checks, and such?
 
      Told that code scanning results are worth requiring (a false alarm then waits for him to dismiss it), that code
-     quality results would block every merge, as no Code Quality check runs, and that Copilot's code review spends his
-     Copilot credits on every PR and is no review the rules count; shown his choice (code scanning blocking on security
+     quality results would block every merge, as no Code Quality check runs, and that Copilot's code review is no
+     review the rules count; shown his choice (code scanning blocking on security
      alerts High or higher and alerts Errors, status checks with branches up to date, Copilot's review on):
 
      > I think I'll set it like this then.
@@ -83,28 +83,27 @@ What these are and how they are kept: `words/README.md`.
      from Codex's account), and asked whether to fix them in the core before the game merges, the owner agreed.
 
 133. **10 November 2026** (the core). A game's orchestrator asked whether to start fresh builders for two PRs whose
-     sessions, started on another account, it could not reach, and another held a PR for an answer the owner had already
-     given:
+     sessions it could not reach, and another held a PR for an answer the owner had already given:
 
-     > Why are they still asking about the other account... have you put anything into the rules about watching out
+     > Why are they still asking about […]... have you put anything into the rules about watching out
      > for it...
 
      Told that no rule did, and asked whether to add one (a lane whose session cannot be reached, with no push for a few
      hours, goes to a fresh builder from its branch):
 
-     > Enough. They are asking nonsense. I don't want another question where the answer is obviously yes. Handle it.
+     > […] I don't want another question where the answer is obviously yes. Handle it.
 
 134. **10 November 2026** (the core). After a day of orchestrators asking him what the rules already settled:
 
      > What rules have you added that make them ask this much nonsense? We need removal of unnecessary rules that I
      > don't care about. I care about my work loop and pillars of good program and game design, I don't care about
-     > these stuff you keep adding, and I have humored it for long enough. How will you handle it. Lay it out
+     > these stuff you keep adding, and […]. How will you handle it. Lay it out
      > for me, and what guarantees can you give me?
 
      Shown the plan (the rules that made agents ask; what to keep: his safety words, his work loop and the pillars; what
      to cut; one pass; a size cap in CI; what can and cannot be guaranteed):
 
-     > Yes to everything, and make it good! My sanity depends on it!
+     > Yes to everything, and make it good! […]
      >
      > "Readings go to you as question issues. The stand-in (the helper that predicts your answer from your past
      > words) answers, but anything it’s less than highly sure of, or that’s a matter of taste, still lands in your
@@ -132,7 +131,7 @@ What these are and how they are kept: `words/README.md`.
 137. **10 November 2026** (the core). Shown two orchestrators' reports asking him for yeses he had already given and
      settings he had already made:
 
-     > Fix everything, I am too tired for this. Make them stop asking these headache inducing questions.
+     > Fix everything, […]. Make them stop asking these […] questions.
 
 138. **10 November 2026** (the core). Told that a Playwright update in a game touched nothing of his, and that his yes
      on the cloud setup script and on workflows protected nothing he could judge better than the reviews, with the
@@ -170,7 +169,7 @@ What these are and how they are kept: `words/README.md`.
      optimization changes nothing a player would notice; a feature too rare to change whole games judged per use and
      against its counter; no refuges; a long task may end its session at a passed gate), the owner agreed to all of it.
 
-144. **28 October 2026** (Amarna Letters, in the design chat, 07:33), the words behind a reading listed with what it
+144. **28 October 2026** (Amarna Letters, in the design chat), the words behind a reading listed with what it
      rests on, which that game's design document had written as part of its "Reason from the pillars"; moved here when
      he asked on 11 November 2026, of the core and both games, "Is everything perfectly cohesive, shared, no
      duplication, and perfect now? Be thorough in your checks!":
@@ -178,23 +177,17 @@ What these are and how they are kept: `words/README.md`.
      > Code's should probably note where it has made an assumption, like it does now with questions, so we can check it
      > afterwards.
 
-145. **31 October 2026** (Amarna Letters, its archive item 73, for both games, in the design chat, 11:31 to 11:39 UTC),
+145. **31 October 2026** (Amarna Letters, its archive item 73, for both games, in the design chat),
      behind the polish lane, which each game then wrote for itself and which moved here on 11 November 2026, when the
      audit he asked for ("Is everything perfect now? Be thorough!") found the two copies drifting apart, and
-     the last lines both games still shared (what it looks for, and when it runs) the same day. On a second account he
-     had freed for the week:
-
-     > They can spend 100% on this account i have used it for what I need.
-
-     Then:
-
-     > Should we add a polish point to each that it can spend the last credits on also?
+     the last lines both games still shared (what it looks for, and when it runs) the same day.
+     The owner's reason for it: what capacity is left over goes to polish work.
 
      And, to the design session's shape of the polish lane:
 
      > Yes, and make things as refined as possible!
 
-146. **11 November 2026** (both games, in the design chat, 16:41 UTC), after the final audit's report, behind
+146. **11 November 2026** (both games, in the design chat), after the final audit's report, behind
      the usage brake's removal from the core and both games (floor rule 16 among it, his yes as he asked), and the
      return of "other providers first", which core archive 76 gave and the cut-down of 10 November had dropped:
 
@@ -202,40 +195,39 @@ What these are and how they are kept: `words/README.md`.
      > it up, and can't track it in the cloud regardless. Just keep the rules about spending other providers first e.g.
      > codex. Does that sound sensible to you?
 
-147. **11 November 2026** (both games, in the design chat, 17:44 UTC), told that one shared workflow for the games'
+147. **11 November 2026** (both games, in the design chat), told that one shared workflow for the games'
      pull-request previews (an idea filed in the core) waited on his yes, since it changes what runs with the token that
      publishes the site:
 
      > Why not use one shared workflow? Obvious improvements gets implemented automatically.
 
-148. **11 November 2026** (the core, in the design chat, 21:18 UTC), asked whether the core should be opened to […]'s
-     project, so a project of another owner takes it whole, its updates through sync PRs, once the owner's GitHub
+148. **11 November 2026** (the core, in the design chat), asked whether the core should be opened to a
+     project of another owner, so that it takes the core whole, its updates through sync PRs, once the owner's GitHub
      account, written into five places (floor rule 4 among them), became a slot each project fills; he chose the answer
      offered as:
 
      > Open the core to him (Recommended)
 
-149. **11 November 2026** (the core, in the design chat, 21:37 UTC), asked whether floor rule 18 should gain an
-     exception for an owner's own computer, since as written it forbade a setup another owner already runs (one tool
-     calling another's under his own account); behind rule 18 cut down to what agents do, the setup itself left to
+149. **11 November 2026** (the core, in the design chat), asked whether floor rule 18 should gain an
+     exception for an owner's own computer, since as written it forbade a setup an owner already runs; behind rule 18 cut down to what agents do, the setup itself left to
      the owner and `setup/server.md`:
 
      > Really, the setup is something the owner does, so why even have rules for what kind of set-up is allowed? Seems
      > like overreach, all it acheives is the system refusing to work, it doesn't help it make it right, like our build
      > rules does, right?
 
-     And, at 21:43 UTC, to the design session's answer (rule 18 keeps only what agents do; and the phrases of the core
+     And, to the design session's answer (rule 18 keeps only what agents do; and the phrases of the core
      that assume a game or a live site, one of them in floor rule 12, are made to fit any project), the owner agreed to
      all.
 
-150. **11 November 2026** (the core, in the design chat, 21:56 UTC), once a project of another owner, not a game, could
+150. **11 November 2026** (the core, in the design chat), once a project of another owner, not a game, could
      take the core; behind "Rules are written for any project" and the words check:
 
      > Yes, and we have to make sure rule changes made to agent-core from now on, is general enough, and accounts for
      > this? How do we ensure it? I want my rules to be general, but implementers are so easily biased in
      > phrasing by the only 2 projects in front of them.
 
-151. **11 November 2026** (the core, in the design chat, 22:14 UTC), asked for his yes to five places where the floor
+151. **11 November 2026** (the core, in the design chat), asked for his yes to five places where the floor
      assumed a public web project on npm (everything public; npm's signature check alone, with "a check that cannot
      run holds the release back"; `npm ci`; text reaching "the page"; a session on his computer holding "no key beyond
      its own sign-in"), after a sample project that was none of those took the core from nothing:
@@ -245,7 +237,7 @@ What these are and how they are kept: `words/README.md`.
      > Nuget and that should be allowed. Should we have a verified by trustable
      > source, like nugget itself, criteria or ideal, or something like that?
 
-152. **11 November 2026** (the core, in the design chat, 23:34 UTC), told that a check of the core's own for actions
+152. **11 November 2026** (the core, in the design chat), told that a check of the core's own for actions
      not pinned had drawn a new way past it in each of five review rounds, since it read YAML by lines, and that
      GitHub's own setting "Require actions to be pinned to a full-length commit SHA" reads a workflow as GitHub runs
      it, but asks the same of GitHub's own actions, which floor rule 2 lets stand at a tag; the advice given: pin
@@ -271,12 +263,11 @@ What these are and how they are kept: `words/README.md`.
 
      > Why should we leave out 6? Did you advice only 1-5, why?
 
-154. **12 November 2026** (the core, in the design chat), of a project of another owner that hands work to Codex
-     through a plug-in in Claude Code and keeps Copilot, about to take the core; told that the core gave Codex the
-     reviews alone, named Codex and Claude's reviewer where it meant a provider and its reviewer, and counted no review
-     of Copilot's, and asked whether who reviews what should be a blank each project fills in:
+154. **12 November 2026** (the core, in the design chat), of a project of another owner, about to take the core;
+     told that the core gave Codex the reviews alone, named Codex and Claude's reviewer where it meant a provider and
+     its reviewer, and asked whether who reviews what should be a blank each project fills in:
 
-     > I am concerned that agent-rules is actively going to fight his setup now. So what do we do?
+     > I am concerned that agent-rules is actively going to fight […] now. So what do we do?
 
      To point 1, the owner agreed, and added:
 
@@ -306,15 +297,12 @@ What these are and how they are kept: `words/README.md`.
      all, so that one score for all cannot be had: every finding is blocking or not, the score stays with every
      reviewer that can give one, and a tool's own grades are read as one or the other.
 
-156. **12 November 2026** (the core, in the design chat), once the project of another owner had taken the core: a
-     product he means to sell, in a private repository, not built on Node, reviewed by Copilot and Codex, built on his
-     own computer:
+156. **12 November 2026** (the core, in the design chat), once a project of another owner had taken the core:
 
      > Investigate: make sure not hook, check, or rule, will interfere in a negative way with […] setup and work, now
      > that he has agent-core. Rules which enforces compliance with best practices are good, and makes his agents work
-     > as they should. But anything that stops stuff, because his setup is different: planning to commercialize his
-     > product, private repo, .net stack, uses both github copilot and codex like he likes, runs locally on his own
-     > machine, etc, etc. Must absolutely be addressed!
+     > as they should. But anything that stops stuff, because his setup is different: […]. Must absolutely be addressed!
 
      Behind the end of floor rule 10 (the owner's own work carries the terms he gives it, where it said no licence
-     file ever), and the README's lines on a project that is sold, GitHub's free plan, the default branch and Windows.
+     file ever), and the README's lines under "How a project takes the core" for a project set up
+     otherwise, among them the default branch.

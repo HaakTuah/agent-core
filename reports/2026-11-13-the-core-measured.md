@@ -1,7 +1,7 @@
 # The core, measured for the first time (13 November 2026)
 
 The owner agreed to have the core measured as it has a game's features measured (core archive 195). This is the first
-run of `scripts/core-cost.mjs`, in both games, on the morning of 13 November 2026, four and a half days after the first
+run of `scripts/core-cost.mjs`, in both games, on 13 November 2026, four and a half days after the first
 game took the core. What the script counts and how is in its header.
 
 ## What merged, before the core and since

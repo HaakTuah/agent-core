@@ -10,11 +10,11 @@ The index, and how an item is written: `archive/instructions.md`.
 
 127. **10 November 2026** (the core). Asked: A security review of a game's step 3 found that, on a machine where agents
      run side by side, the tests run the game's packages under the account that holds the GitHub token, so a bad package
-     could take it. The fix is to run project code where no sign-in can be read, and the owner asked how, suggesting
-     Claude Code with the Codex plug-in or Herdr. Decided: Told that the separation sits below either tool (a throwaway
-     box for the tests, given a copy of the clone), the owner asked that the agents still have internet access, since
-     otherwise they cannot search for anything. Told that the agents keep full internet and only the box holding project
-     code has no sign-ins, with network only where its run needs it, the owner agreed.
+     could take it. The fix is to run project code where no sign-in can be read, and the owner asked how, suggesting one
+     tool or another that runs agents side by side. Decided: Told that the separation sits below either tool (a
+     throwaway box for the tests, given a copy of the clone), the owner asked that the agents still have internet
+     access, since otherwise they cannot search for anything. Told that the agents keep full internet and only the box
+     holding project code has no sign-ins, with network only where its run needs it, the owner agreed.
 
 128. **10 November 2026** (the core). Asked: A game's orchestrator started a builder on Opus without passing an effort,
      as no rule named one, and the builder ran at extra effort, the app's default for a new Opus session. The
@@ -36,15 +36,15 @@ The index, and how an item is written: `archive/instructions.md`.
 130. **10 November 2026** (the core). Asked: On a game's ruleset page, which required neither code scanning nor code
      quality results, the owner asked why quality and scanning checks were not required. Decided: Told that code
      scanning results are worth requiring (a false alarm then waits for the owner to dismiss it), that code quality
-     results would block every merge, as no Code Quality check runs, and that Copilot's code review spends the owner's
-     Copilot credits on every PR and is no review the rules count, the owner chose to set the ruleset as shown: code
-     scanning blocking on security alerts High or higher and alerts Errors, status checks with branches up to date,
-     Copilot's review on. Told to leave code quality off, and asked whether the floor's false-alarm line should say the
-     PR waits for the owner's dismissal where the ruleset blocks on the alert, with the same setting in every project,
-     and whether Copilot's review should be advisory in the rules, the owner agreed to all. On the report's line that
-     code quality results are not required, since no project runs GitHub's Code Quality check and GitHub warns that
-     requiring them without it can block every merge, the owner answered that the setting had been made required, and
-     that without the check present it surely would not trigger.
+     results would block every merge, as no Code Quality check runs, and that Copilot's code review has a cost on every
+     PR and is no review the rules count, the owner chose to set the ruleset as shown: code scanning blocking on
+     security alerts High or higher and alerts Errors, status checks with branches up to date, Copilot's review on. Told
+     to leave code quality off, and asked whether the floor's false-alarm line should say the PR waits for the owner's
+     dismissal where the ruleset blocks on the alert, with the same setting in every project, and whether Copilot's
+     review should be advisory in the rules, the owner agreed to all. On the report's line that code quality results are
+     not required, since no project runs GitHub's Code Quality check and GitHub warns that requiring them without it can
+     block every merge, the owner answered that the setting had been made required, and that without the check present
+     it surely would not trigger.
 
 131. **10 November 2026** (the core). Asked: A game's builder had skipped the design session's comments on its PR,
      taking every comment from the owner's account with Claude Code's attribution line for its own. The owner was asked
@@ -59,24 +59,23 @@ The index, and how an item is written: `archive/instructions.md`.
      agreed to fix them.
 
 133. **10 November 2026** (the core). Asked: A game's orchestrator asked whether to start fresh builders for two PRs
-     whose sessions, started on another account, it could not reach, and another held a PR for an answer the owner had
-     already given. The owner asked why they were still asking about the other account and whether anything in the rules
-     covered watching out for it. Decided: Told that no rule did, and asked whether to add one (a lane whose session
-     cannot be reached, with no push for a few hours, goes to a fresh builder from its branch), the owner said enough:
-     the agents were asking nonsense, and the owner wanted no further question where the answer is obviously yes. The
-     session is to handle it.
+     whose sessions it could not reach, and another held a PR for an answer the owner had already given. The owner asked
+     why they were still asking about those sessions and whether anything in the rules covered watching out for it.
+     Decided: Told that no rule did, and asked whether to add one (a lane whose session cannot be reached, with no push
+     for a few hours, goes to a fresh builder from its branch), the owner said enough: the agents were asking nonsense,
+     and the owner wanted no further question where the answer is obviously yes. The session is to handle it.
 
 134. **10 November 2026** (the core). Asked: After a day of orchestrators asking the owner what the rules already
      settled, the owner asked which rules were added that made them ask so much nonsense, and said unnecessary rules the
      owner does not care about must be removed. The owner cares about the work loop and the pillars of good program and
-     game design, not the rest that kept being added, and had humored that long enough. The owner asked how the session
-     would handle it, to lay it out, and what guarantees it could give. Decided: Shown the plan (the rules that made
-     agents ask; what to keep: the owner's safety words, the work loop and the pillars; what to cut; one pass; a size
-     cap in CI; what can and cannot be guaranteed), the owner agreed to everything and asked that it be made good, since
-     the owner's sanity depended on it. The owner then objected to the rule that readings go to the owner as question
-     issues, with the stand-in (the helper that predicts the owner's answer from past words) answering but anything it
-     is less than highly sure of, or that is a matter of taste, still landing in the owner's inbox: the agents were
-     supposed not to stop, and the owner had emphasized over and over that the machinery keeps churning.
+     game design, not the rest that kept being added. The owner asked how the session would handle it, to lay it out,
+     and what guarantees it could give. Decided: Shown the plan (the rules that made agents ask; what to keep: the
+     owner's safety words, the work loop and the pillars; what to cut; one pass; a size cap in CI; what can and cannot
+     be guaranteed), the owner agreed to everything and asked that it be made good, since it mattered greatly. The owner
+     then objected to the rule that readings go to the owner as question issues, with the stand-in (the helper that
+     predicts the owner's answer from past words) answering but anything it is less than highly sure of, or that is a
+     matter of taste, still landing in the owner's inbox: the agents were supposed not to stop, and the owner had
+     emphasized over and over that the machinery keeps churning.
 
 135. **10 November 2026** (the core). Asked: The owner, having turned on auto-merge as an option in every repository,
      the owner asked whether to use it as a rule. Decided: Told yes, once Codex's reviews are clean on the head commit,
@@ -90,8 +89,8 @@ The index, and how an item is written: `archive/instructions.md`.
      only where judgement decides the cost.
 
 137. **10 November 2026** (the core). Asked: The owner was shown two orchestrators' reports asking the owner for yeses
-     already given and settings already made, the owner said, being too tired for this, that everything must be fixed.
-     Decided: The orchestrators are to stop asking those headache-inducing questions.
+     already given and settings already made, the owner said that everything must be fixed. Decided: The orchestrators
+     are to stop asking those needless questions.
 
 138. **10 November 2026** (the core). Asked: The owner was told that a Playwright update in a game touched nothing of
      the owner's, and that the owner's yes on the cloud setup script and on workflows protected nothing the owner could
@@ -131,61 +130,59 @@ The index, and how an item is written: `archive/instructions.md`.
      against its counter; no refuges; a long task may end its session at a passed gate). Decided: The owner agreed to
      all of it.
 
-144. **28 October 2026** (Amarna Letters, in the design chat, 07:33). Asked: The words behind a reading listed with what
+144. **28 October 2026** (Amarna Letters, in the design chat). Asked: The words behind a reading listed with what
      it rests on, which that game's design document had written as part of its "Reason from the pillars"; moved here
      when the owner asked on 11 November 2026, of the core and both games, whether everything was perfectly cohesive,
      shared, with no duplication, and perfect now, and to be thorough in the checks. Decided: Code should probably note
      where it has made an assumption, as it now does with questions, so that the owner can check it afterwards.
 
-145. **31 October 2026** (Amarna Letters, its archive item 73, for both games, in the design chat, 11:31 to 11:39 UTC).
-     Asked: The words behind the polish lane, which each game then wrote for itself and which moved here on 11 November
-     2026, when the audit the owner asked for (is everything perfect now, thorough) found the two copies drifting apart,
-     and the last lines both games still shared (what it looks for, and when it runs) the same day. On a second account
-     the owner had freed for the week, the owner said the polish lane could spend all of it, since the owner had used
-     the account for what was needed, and asked whether each game should add a polish point that it can spend the last
-     credits on. Decided: To the design session's shape of the polish lane, the owner agreed and asked that things be
-     made as refined as possible.
+145. **31 October 2026** (Amarna Letters, its archive item 73, for both games, in the design chat). Asked: The words
+     behind the polish lane, which each game then wrote for itself and which moved here on 11 November 2026, when the
+     audit the owner asked for (is everything perfect now, thorough) found the two copies drifting apart, and the last
+     lines both games still shared (what it looks for, and when it runs) the same day. The owner said the polish lane
+     could spend usage left over at the end of a week, and asked whether each game should add a polish point that it can
+     spend what is left on. Decided: To the design session's shape of the polish lane, the owner agreed and asked that
+     things be made as refined as possible.
 
-146. **11 November 2026** (both games, in the design chat, 16:41 UTC). Asked: After the final audit's report, the owner
+146. **11 November 2026** (both games, in the design chat). Asked: After the final audit's report, the owner
      remarked that it had taken a couple of hours, and proposed removing all reference to usage caps, since the session
      and the orchestrators all got it wrong and it cannot be tracked in the cloud regardless, while keeping the rules
      about spending other providers first, such as Codex. The owner asked whether that sounded sensible. Decided: The
      usage brake is removed from the core and both games (floor rule 16 among it, with the owner's yes as asked), and
      "other providers first", which core archive 76 gave and the cut-down of 10 November had dropped, returns.
 
-147. **11 November 2026** (both games, in the design chat, 17:44 UTC). Asked: The owner was told that one shared
+147. **11 November 2026** (both games, in the design chat). Asked: The owner was told that one shared
      workflow for the games' pull-request previews (an idea filed in the core) waited on the owner's yes, since it
      changes what runs with the token that publishes the site, the owner asked why one shared workflow was not used.
      Decided: Obvious improvements are implemented automatically.
 
-148. **11 November 2026** (the core, in the design chat, 21:18 UTC). Asked: The owner was asked whether the core should
+148. **11 November 2026** (the core, in the design chat). Asked: The owner was asked whether the core should
      be opened to a project of another owner, so that it takes the core whole, its updates through sync PRs, once the
      owner's GitHub account, written into five places (floor rule 4 among them), became a slot each project fills.
      Decided: The owner chose the answer offered as recommended: open the core to the other owner.
 
-149. **11 November 2026** (the core, in the design chat, 21:37 UTC). Asked: The owner was asked whether floor rule 18
-     should gain an exception for an owner's own computer, since as written it forbade a setup another owner already
-     runs (one tool calling another's under that owner's own account). Decided: The owner answered that the setup is
-     something the owner does, so rules on what kind of set-up is allowed seem like overreach: all they achieve is the
-     system refusing to work, and they do not help it work right, as the build rules do. Rule 18 was cut down to what
-     agents do, the setup itself left to the owner and `setup/server.md`. At 21:43 UTC, to the design session's answer
-     (rule 18 keeps only what agents do; and the phrases of the core that assume a game or a live site, one of them in
-     floor rule 12, are made to fit any project), the owner agreed to all.
+149. **11 November 2026** (the core, in the design chat). Asked: The owner was asked whether floor rule 18 should gain
+     an exception for an owner's own computer, since as written it forbade a setup another owner already runs. Decided:
+     The owner answered that the setup is something the owner does, so rules on what kind of set-up is allowed seem like
+     overreach: all they achieve is the system refusing to work, and they do not help it work right, as the build rules
+     do. Rule 18 was cut down to what agents do, the setup itself left to the owner and `setup/server.md`. Then, to the
+     design session's answer (rule 18 keeps only what agents do; and the phrases of the core that assume a game or a
+     live site, one of them in floor rule 12, are made to fit any project), the owner agreed to all.
 
-150. **11 November 2026** (the core, in the design chat, 21:56 UTC). Asked: Once a project of another owner, not a game,
+150. **11 November 2026** (the core, in the design chat). Asked: Once a project of another owner, not a game,
      could take the core, the owner was asked about making sure the rules stay general. Decided: The owner agreed, and
      said that rule changes made to the core from now on must be general enough and account for this. The owner wanted
      the rules general, but implementers are easily biased in phrasing by the only two projects in front of them, and
      asked how to ensure it. Behind: "Rules are written for any project" and the words check.
 
-151. **11 November 2026** (the core, in the design chat, 22:14 UTC). Asked: The owner was asked for a yes to five places
+151. **11 November 2026** (the core, in the design chat). Asked: The owner was asked for a yes to five places
      where the floor assumed a public web project on npm (everything public; npm's signature check alone, with "a check
      that cannot run holds the release back"; `npm ci`; text reaching "the page"; a session on the owner's computer
      holding "no key beyond its own sign-in"), after a sample project that was none of those took the core from nothing.
      Decided: The owner agreed with everything, said that NuGet and the like should be allowed, and asked whether there
      should be a criterion or ideal of being verified by a trustable source, like NuGet itself, or something like that.
 
-152. **11 November 2026** (the core, in the design chat, 23:34 UTC). Asked: The owner was told that a check of the
+152. **11 November 2026** (the core, in the design chat). Asked: The owner was told that a check of the
      core's own for actions not pinned had drawn a new way past it in each of five review rounds, since it read YAML by
      lines, and that GitHub's own setting "Require actions to be pinned to a full-length commit SHA" reads a workflow as
      GitHub runs it, but asks the same of GitHub's own actions, which floor rule 2 lets stand at a tag. The advice
@@ -201,15 +198,15 @@ The index, and how an item is written: `archive/instructions.md`.
      nothing not allowed goes in. The owner asked whether all six were now added, and why the sixth had been left out
      and why the advice covered only one to five.
 
-154. **12 November 2026** (the core, in the design chat). Asked: Of a project of another owner that hands work to Codex
-     through a plug-in in Claude Code and keeps Copilot, about to take the core: told that the core gave Codex the
-     reviews alone, named Codex and Claude's reviewer where it meant a provider and its reviewer, and counted no review
-     of Copilot's, the owner was asked whether who reviews what should be a blank each project fills in. The owner was
-     concerned that the core would actively fight the other owner's setup and asked what to do. Decided: The owner
-     agreed to point 1 and held that overrides are good. The owner asked whether the rules were a bit rigid on these
-     points, and whether it would be better to have general rules under which Claude hands out the work it can outsource
-     by the best criteria for that (asking whether the criteria in place are the best or too strict), with different
-     providers reviewing each other where possible and a single reviewer kept.
+154. **12 November 2026** (the core, in the design chat). Asked: Of a project of another owner whose tools differ from
+     the games', about to take the core: told that the core gave Codex the reviews alone, named Codex and Claude's
+     reviewer where it meant a provider and its reviewer, and counted no review of other tools', the owner was asked
+     whether who reviews what should be a blank each project fills in. The owner was concerned that the core would
+     actively fight the other owner's setup and asked what to do. Decided: The owner agreed to point 1 and held that
+     overrides are good. The owner asked whether the rules were a bit rigid on these points, and whether it would be
+     better to have general rules under which Claude hands out the work it can outsource by the best criteria for that
+     (asking whether the criteria in place are the best or too strict), with different providers reviewing each other
+     where possible and a single reviewer kept.
 
 155. **12 November 2026** (the core, in the design chat). Asked: The owner was asked whether more rules named one
      provider where they meant any, the owner was shown five: who gives the security reviews (a floor rule among them),
@@ -224,13 +221,10 @@ The index, and how an item is written: `archive/instructions.md`.
      outcome was: every finding is blocking or not, the score stays with every reviewer that can give one, and a tool's
      own grades are read as one or the other.
 
-156. **12 November 2026** (the core, in the design chat). Asked: Once the project of another owner had taken the core: a
-     product the other owner means to sell, in a private repository, not built on Node, reviewed by Copilot and Codex,
-     built on the other owner's own computer. Decided: The session was to investigate and make sure that no hook, check
-     or rule interferes negatively with the other owner's setup and work now that the project has the core. Rules that
-     enforce compliance with best practices are good and make the agents work as they should, but anything that stops
-     work because the setup is different (planning to commercialize the product, private repository, .NET stack, both
-     GitHub Copilot and Codex, running locally on the owner's own machine, and so on) must absolutely be addressed.
-     Behind: the end of floor rule 10 (the owner's own work carries the terms the owner gives it, where it said no
-     licence file ever), and the README's lines on a project that is sold, GitHub's free plan, the default branch and
-     Windows.
+156. **12 November 2026** (the core, in the design chat). Asked: Once a project of another owner had taken the core, set
+     up otherwise than the games. Decided: The session was to investigate and make sure that no hook, check or rule
+     interferes negatively with the other owner's setup and work now that the project has the core. Rules that enforce
+     compliance with best practices are good and make the agents work as they should, but anything that stops work
+     because the setup is different must absolutely be addressed. Behind: the end of floor rule 10 (the owner's own work
+     carries the terms the owner gives it, where it said no licence file ever), and the README's lines under "How a
+     project takes the core" for a project set up otherwise, among them "The default branch is `main`".
