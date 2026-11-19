@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TEMPLATES } from "../scripts/init.mjs";
 import { holds, parseYaml } from "../scripts/workflow-run.mjs";
-import { draftHoles, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
+import { draftHoles, foreignBreaks, foreignBroken, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { LONGEST, twice, uncommented } from "../scripts/yaml-keys.mjs";
 
@@ -90,6 +90,15 @@ const longFails = [["b", "a"], ["abcd", "a"], ["a", "abcd"], ["ready_for_review"
 ok(longSame.fails.length === 0 && longKeys.fails.length === 0 && longKeys.notes.length === 1 && /as it did on the base\. Mend: cut the file/u.test(longKeys.notes[0]) && unreadied(longFiles(longText("a")), null).fails.length === 0
   && longFails.every(f => f.length === 1 && /^FAIL long\.yml: the file is longer than 262144 characters and differs from the base/u.test(f[0]) && mended(f[0])) && repeated(longFiles(longText("a")), () => longText("b")).fails.length === 1,
   "a file past the length read that a pull request changes in any way, cut a little, grown, or added, fails with its mend; one unchanged, or read with no base, is only noted", longFails.flat().join("\n"));
+// (a line break of YAML 1.1 the package does not read hides a key given twice and a call left without ready_for_review from
+// its reader, #872: the check fails a file that is new or changed with such a break and notes one unchanged or with no base)
+const hiding = br => `on: push${br}x: 1${br}x: 2\n`;
+const brks = ["\u0085", "\u2028", "\u2029"].map(br => ({ br, found: foreignBreaks(`a\nb\n${hiding(br)}`) })), one = text => [{ file: "w.yml", text }];
+const brokenNew = foreignBroken(one(hiding("\u2028")), () => null), brokenSame = foreignBroken(one(hiding("\u2028")), () => hiding("\u2028")), brokenChanged = foreignBroken(one(hiding("\u2028")), () => `${hiding("\u2028")}# a\n`);
+ok(twice(hiding("\u2028")).length === 0 && brks.every(({ br, found }) => found.line === 3 && found.count === 2 && found.code === `U+${br.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}`) && foreignBreaks("a\r\nb\rc\n") === null && foreignBreaks("") === null
+  && brokenNew.fails.length === 1 && mended(brokenNew.fails[0]) && /^FAIL w\.yml:1: the file holds the line break U\+2028 and 1 more/u.test(brokenNew.fails[0]) && brokenChanged.fails.length === 1
+  && brokenSame.fails.length === 0 && brokenSame.notes.length === 1 && /as on the base\. Mend:/u.test(brokenSame.notes[0]) && foreignBroken(one(hiding("\u2028")), null).fails.length === 0 && foreignBroken(one(hiding("\u2028")), null).notes.length === 1 && foreignBroken(one("on: push\nx: 1\n"), () => null).fails.length === 0,
+  "a line break the package does not read hides a key given twice from its reader, and the check fails a file with one that is new or changed, with its mend, and notes one unchanged or read with no base", [brokenNew, brokenSame].flatMap(r => [...r.fails, ...r.notes]).join("\n"));
 // (Codex's case: a call of a check skipped on a draft whose ready_for_review a same-length edit moves into a comment, in a
 // file past the length read, its words counted as often as before, fails)
 const commented = types => `on:\n  pull_request:\n    types: ${types}\njobs:\n  check:\n    uses: ${CORE}/.github/workflows/copies.yml@${"a".repeat(40)}\n    if: \${{ !github.event.pull_request.draft }}\n# ${"x".repeat(LONGEST)}\n`;

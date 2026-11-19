@@ -142,6 +142,23 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   fs.rmSync(path.join(crlfRoot, ".github/workflows/big.yml")); gitAt("checkout", "-q", "--", ".github/workflows/big.yml");
   const crlf = spawnSync(process.execPath, ["core/scripts/workflows.mjs"], { cwd: crlfRoot, env: { ...process.env, WORKFLOWS_BASE: "HEAD" }, encoding: "utf8", timeout: 5000 });
   ok(fs.readFileSync(path.join(crlfRoot, ".github/workflows/big.yml"), "utf8").includes("\r\n") && crlf.status === 0 && /big\.yml:1: the file is longer.*as it did on the base/u.test(crlf.stdout) && !/FAIL/u.test(crlf.stdout), "an oversized workflow left as it was, checked out with CRLF line ends, is only noted as on the base, never failed", crlf.stdout);
+  // a line break of YAML 1.1 that the package does not read (U+0085, U+2028, U+2029), hiding a key given twice or a call left
+  // without ready_for_review, in a file a pull request adds: each fails with its mend, a file of three million of them too,
+  // and the same files unchanged from the base are only noted (#872)
+  const brk = path.join(fresh({ "in/.github/workflows/b.yml": "on: push\n" }), "in");
+  fs.cpSync(path.join(root, "core"), path.join(brk, "core"), { recursive: true });
+  const gitBrk = (...a) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...a], { cwd: brk, encoding: "utf8" });
+  gitBrk("init", "-q"); gitBrk("add", "-A"); gitBrk("commit", "-q", "-m", "base");
+  const breaks = { "nel.yml": "\u0085", "ls.yml": "\u2028", "ps.yml": "\u2029" };
+  for (const [name, br] of Object.entries(breaks)) fs.writeFileSync(path.join(brk, ".github/workflows", name), `on: push\nx: 1${br}x: 2\n`);
+  fs.writeFileSync(path.join(brk, ".github/workflows/many.yml"), `on: push\n${"\u2028".repeat(3e6)}\n`);
+  gitBrk("add", "-A");
+  const brkRun = (base) => spawnSync(process.execPath, ["core/scripts/workflows.mjs"], { cwd: brk, env: { ...process.env, WORKFLOWS_BASE: base }, encoding: "utf8", timeout: 10000 });
+  const brkNew = brkRun("HEAD");
+  ok(brkNew.status === 1 && Object.entries(breaks).every(([name, br]) => new RegExp(`FAIL \\.github/workflows/${name}:2: the file holds the line break U\\+${br.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}.*Mend: replace each`, "u").test(brkNew.stdout)) && /many\.yml:2: the file holds the line break U\+2028 and 2999999 more/u.test(brkNew.stdout) && mended(brkNew.stdout) && !/\n\s+at /u.test(brkNew.stderr), "the workflow check fails a file a pull request adds that holds U+0085, U+2028 or U+2029, one of three million of them too, each with its mend");
+  gitBrk("commit", "-q", "-m", "held");
+  const brkOld = brkRun("HEAD");
+  ok(brkOld.status === 0 && !/FAIL/u.test(brkOld.stdout) && /note \.github\/workflows\/nel\.yml:2: .*as on the base/u.test(brkOld.stdout), "the same files unchanged from the base are only noted");
   // the sync's move of the pins, and NuGet's readers, on a workflow and a build file that are links out (#446)
   const call = `jobs:\n  a:\n    uses: ${CORE}/.github/workflows/x.yml@${"a".repeat(40)}\n`;
   const away = path.join(fresh({ "outside.yml": call, "outside.props": "<Project></Project>\n", "in/.github/workflows/b.yml": "on: push\n" }), "in");
