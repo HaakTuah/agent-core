@@ -69,7 +69,7 @@ import { builtinModules } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { CODE, cycles, resolve } from "./code-shape.mjs";
+import { CODE, append, cycles, lyingUnder, nameTree, resolve } from "./code-shape.mjs";
 import { inProject, logged } from "./guards.mjs";
 import { FIRST_READS, PACKAGE_FILES, REACH, READERS, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
@@ -235,7 +235,7 @@ function outside(ctx, from, spec, aliased) {
   if (BUILTIN.has(spec)) return;
   const known = !aliased && !isRelative(spec) && !ctx.packages.has(name) && ctx.declared.has(name);
   if (!known) ctx.unsure.add(from.file); // (it leads to a file the readers do not read, or nowhere they can tell)
-  if (known && ctx.ships.has(name)) ctx.usedBy.set(name, [...(ctx.usedBy.get(name) ?? []), from]);
+  if (known && ctx.ships.has(name)) append(ctx.usedBy, name, from);
   else if (!known && (toCode(spec) || !isRelative(spec))) ctx.read.nowhere++;
 }
 
@@ -325,9 +325,10 @@ function foreign(ctx, from, imp, r) {
   }
   if (l.to) return;
   opensScreen(ctx, from, l.names);
-  const bound = l.names.find(n => ctx.config.platform.includes(n));
+  // (the shortest name of the config's "platform" that the import is or lies under)
+  const bound = lyingUnder(ctx.platformTree ??= nameTree(ctx.config.platform), l.outside)[0];
   if (bound) { if (from.domain !== "platform") add(ctx, "platform", `${from.file} -> ${bound}`, bound); return; }
-  if (l.known && l.known !== "builtin" && ctx.ships.has(l.known)) ctx.usedBy.set(l.known, [...(ctx.usedBy.get(l.known) ?? []), from]);
+  if (l.known && l.known !== "builtin" && ctx.ships.has(l.known)) append(ctx.usedBy, l.known, from);
   else if (!l.known) { ctx.read.nowhere++; ctx.unsure.add(from.file); }
 }
 
@@ -364,7 +365,7 @@ function oneFile(ctx, file, r) {
 // than one such file declares.
 function sharedSpace(ctx) {
   const by = new Map();
-  for (const [file, names] of ctx.scripts) for (const n of names) by.set(n, [...(by.get(n) ?? []), file]);
+  for (const [file, names] of ctx.scripts) for (const n of names) append(by, n, file);
   for (const [file, names] of ctx.scripts) for (const n of names) if (names.length > 1 || by.get(n).length > 1) add(ctx, "global", `${file}: ${n}`, n);
 }
 
@@ -586,7 +587,7 @@ function fresh({ config, at, self, found, current, base, news, unread }) {
 // The failures of new breaches, one for each kind, with its mend and the breaches under it.
 function byKind(news, found, current, config, also = "") {
   const kinds = new Map();
-  for (const id of news) { const k = found.entries.get(id).kind; kinds.set(k, [...(kinds.get(k) ?? []), id]); }
+  for (const id of news) append(kinds, found.entries.get(id).kind, id);
   return [...kinds].map(([kind, ids]) => { const [what, mend] = SAID[kind](ids.length, config); return [`FAIL: ${what}. Mend: ${mend}${also}`, ...some(ids, current)]; });
 }
 
