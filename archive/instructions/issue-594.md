@@ -9,4 +9,5 @@ The index, and how an item is written: `archive/instructions.md`.
      counts, advisory and waiting on nothing. The owner agreed to the section and the sample, after saying the idea is
      the core of agent-core and asking whether it has a place in the repository. It stands behind the README's "What
      the core is for", `scripts/blind-sample.mjs`, the outcomes' line of the share approved, and the sample's place
-     in "Nothing goes to the owner to be answered" in `roles/shared/inbox.md`.
+     in "Nothing goes to the owner to be answered" in `roles/shared/inbox.md` and in "It asks the owner nothing" and
+     "The scheduled look" in `roles/orchestrator.md`.
