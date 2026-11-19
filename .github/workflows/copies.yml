@@ -19,8 +19,9 @@
 # in README.md, point 5), or calls core.yml with its inputs copies and sizes, which runs the same in its one job (#376). It runs, through
 # the project's own core/scripts/checks.mjs, which holds their steps, its copies.mjs, pointers.mjs, reading-size.mjs,
 # workflows.mjs, entry-files.mjs, manifest-reads.mjs, shape.mjs and choices.mjs, with the configs the project names (the shape check's by its
-# manifest's row, or where the starter kit writes it), on the core's one exact Node; Node's own modules only, no
-# package installed. Read-only, with no secret.
+# manifest's row, or where the starter kit writes it), on the core's one exact Node, with the core's packages installed
+# from its lock file first (core/scripts/install.mjs): a YAML parser, a Markdown lexer and the parser of other
+# languages. Read-only, with no secret.
 name: copies
 
 on:
