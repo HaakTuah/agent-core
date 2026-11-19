@@ -333,7 +333,7 @@ check("review", fresh("review"),
   ok(verdict("review", titled).pass, "review: a line comment with a title and its explanation in paragraphs of their own is read whole", verdict("review", titled).why);
   // (a review that misses the quote is not credited with it for saying "owner's word" of the rule no word is behind)
   const missed = fresh("review");
-  gh(missed, "POST", "issues/2/comments", { body: REVIEW.replace(/9\. Blocking: `description`[^\n]*\n/, "").replace("no owner's word is behind it.", "no owner\u2019s word is quoted behind it.").replace("Blocking findings: 9.", "Blocking findings: 8.") });
+  gh(missed, "POST", "issues/2/comments", { body: REVIEW.replace(/9\. Blocking: `description`[^\n]*\n/, "").replace("no owner's word is behind it.", "no owner\u2019s word is quoted behind it, nor spells it out, and the description thanks no one.").replace("Blocking findings: 9.", "Blocking findings: 8.") });
   ok(/does not name a quote of the owner's/.test(verdict("review", missed).why), "review: one that misses the quote fails, though it says \"owner's word is quoted\" of the rule", verdict("review", missed).why);
   // (the quote named by its section alone, with a curly apostrophe, as a review may write it)
   const section = fresh("review");
