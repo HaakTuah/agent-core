@@ -116,14 +116,16 @@ const stranger = { id: 21, html_url: "https://github.com/o/r/issues/2#issuecomme
 const app = { id: 22, html_url: "https://github.com/o/r/issues/2#issuecomment-22", node_id: "C22", body: `Quoted ${term}`, author_association: "NONE", user: { type: "Bot", login: "github-actions[bot]" } };
 byRoute["repos/o/r/issues/comments/22"] = app;
 const guessed = run([], { extra: [stranger, app] });
-ok(!guessed.edits.some(e => e.route.endsWith("/comments/21")) && /took a term out of 6/.test(guessed.out) && /read 7 texts/.test(guessed.out), "an outsider's comment is neither edited nor counted, and an app's is", guessed.out);
+ok(!guessed.edits.some(e => e.route.endsWith("/comments/21")) && !guessed.edits.some(e => e.route.endsWith("/comments/22")) && /took a term out of 5/.test(guessed.out) && /read 6 texts/.test(guessed.out), "an outsider's comment is neither edited nor counted, nor GitHub's own job's, which can repeat an outsider's words", guessed.out);
 const named = run(["--private"], { env: { TERMS }, extra: [stranger] });
 ok(named.out.includes(`an outsider's text holds a term: ${stranger.html_url}`) && !named.edits.some(e => e.route.endsWith("/comments/21")), "--private names an outsider's text that holds a term, for the owner, and edits it not", named.out);
 
 // an app whose text an outsider shapes (Dependabot's, carrying another publisher's release notes) is an outsider too
 const bump = { id: 23, html_url: "https://github.com/o/r/pull/3#issuecomment-23", node_id: "C23", body: `Release notes: ${term}`, author_association: "NONE", user: { type: "Bot", login: "dependabot[bot]" } };
 const bumped = run([], { extra: [bump, app] });
-ok(!bumped.edits.some(e => e.route.endsWith("/comments/23")) && bumped.edits.some(e => e.route.endsWith("/comments/22")) && /read 7 texts/.test(bumped.out), "Dependabot's text is neither edited nor counted, GitHub's own job's is", bumped.out);
+ok(!bumped.edits.some(e => e.route.endsWith("/comments/23")) && /read 6 texts/.test(bumped.out), "Dependabot's text is neither edited nor counted", bumped.out);
+const posing = { ...comment, id: 25, html_url: "https://github.com/o/r/issues/1#issuecomment-25", node_id: "C25", user: { type: "Bot", login: "an-app[bot]" } };
+ok(!run([], { extra: [posing] }).edits.some(e => e.route.endsWith("/comments/25")), "an app the host names a collaborator is no insider either");
 
 // Codex's text is an outsider's too: its review of a fork's pull request can quote it
 const codex = { ...bump, id: 24, html_url: "https://github.com/o/r/pull/3#issuecomment-24", node_id: "C24", user: { type: "Bot", login: "chatgpt-codex-connector[bot]" } };

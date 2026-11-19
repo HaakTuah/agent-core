@@ -10,8 +10,8 @@
 // stood, since a job's log is as public as its repository: only counts, and the mend. Without TERMS it reads nothing
 // and says so. It fails nothing (exit 0), save a wrong option or no repository to read.
 //
-// It reads only the texts of those the host lets write and of apps it installed (`author_association` OWNER, MEMBER or
-// COLLABORATOR, or an account of type Bot): an outsider's text is data (floor rule 4), and were it edited or counted, a
+// It reads only the texts of those the host lets write (`author_association` OWNER, MEMBER or COLLABORATOR, and no
+// app): an outsider's text is data (floor rule 4), and were it edited or counted, a
 // comment listing guesses would learn the list a day later. Such a text it neither edits nor counts; --private names
 // one that holds a term, for the owner to hide or delete by hand. Each row of GitHub's answers is read only where its
 // numbers, addresses and texts are of their shape (floor topic 5); any other is left out.
@@ -82,11 +82,10 @@ const whole = n => Number.isSafeInteger(n) && n > 0;
 const anAddress = (v, repo) => typeof v === "string" && v.length <= 500 && v.startsWith(`https://github.com/${repo}/`) && !/[\s\u0000-\u001f\u007f]/u.test(v);
 const aNode = v => typeof v === "string" && /^[\w-]{1,100}$/u.test(v);
 const aText = v => v === null || (typeof v === "string" && v.length <= 1 << 20);
-// (those the host lets write, and GitHub's own job, whose text no outsider shapes, since a fork's pull request gets no
-// write token; anyone else is an outsider, Dependabot among them, whose descriptions carry another publisher's release
-// notes, and Codex, whose review of a fork's pull request can quote it)
-const APPS = new Set(["github-actions[bot]"]);
-export const insider = row => ["OWNER", "MEMBER", "COLLABORATOR"].includes(row?.author_association) || (row?.user?.type === "Bot" && APPS.has(row?.user?.login));
+// (those the host lets write, and no one else: every app is an outsider, since what an app writes can carry an
+// outsider's words, Dependabot's the release notes of another publisher, Codex's a fork's pull request it reviews, and
+// GitHub's own job those of an issue or comment that started a project's workflow)
+export const insider = row => ["OWNER", "MEMBER", "COLLABORATOR"].includes(row?.author_association) && row?.user?.type !== "Bot";
 
 // What is read, from GitHub's answers through `gh` (ghApi's form): each text as { kind, url, node, fields, route, method,
 // outsider }, where `fields` are its texts by the name GitHub's edit takes, `route` where it is read again and edited,
