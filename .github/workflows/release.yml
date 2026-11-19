@@ -109,8 +109,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # (the runs the push of that commit started, and, apart, the tests' runs on it newest first, of which the newest
-          # hourly or hand-started one decides, however many stand there)
+          # (the runs the push of that commit started, and, apart, the tests' runs on it, of whose hourly or hand-started
+          # ones none may be unfinished and the newest, by when it was made, decides, however many stand there)
           runs=$(mktemp) full=$(mktemp)
           gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs" -f head_sha="$GITHUB_SHA" -f branch=main -f event=push -F per_page=100 > "$runs"
           gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$GITHUB_SHA" -f branch=main -F per_page=100 > "$full"
