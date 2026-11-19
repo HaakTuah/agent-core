@@ -252,6 +252,12 @@ export async function passedWhole({ check, selects, asked = askHost }) {
   return { none: true, why: `the merged head ${head.slice(0, 12)} held this tree, ran the whole suite and passed ${check} on it: a tree that passed is not run again` };
 }
 
+// The newest of a check's runs on one head, which decides, as it does for a ruleset: a draft's gate fails by design and
+// the run started when the pull request was marked ready, on the same head, is the newer (#733). A run with no start
+// time reads as the oldest; of two that started together, the higher id.
+const startOf = run => (typeof run?.started_at === "string" ? Date.parse(run.started_at) || 0 : 0);
+const newestOf = runs => runs.reduce((a, b) => (startOf(b) > startOf(a) || (startOf(b) === startOf(a) && Number(b?.id ?? 0) > Number(a?.id ?? 0)) ? b : a));
+
 // Whether the check `check` passed on the commit `sha`, as the host says: true; else what kept it from saying so.
 async function askHost(sha, check) {
   const api = process.env.GITHUB_API_URL || "https://api.github.com", repo = process.env.GITHUB_REPOSITORY || "", token = process.env.GH_TOKEN || "";
@@ -265,7 +271,8 @@ async function askHost(sha, check) {
     // (only GitHub Actions' own runs: an app of another's, or a check of that name it posts, says nothing of the suite)
     const ours = runs.filter(run => run?.app?.slug === "github-actions");
     if (!ours.length) return "no run of it by GitHub Actions";
-    return ours.every(run => run?.name === check && run?.status === "completed" && run?.conclusion === "success") || "a run of it did not pass";
+    const newest = newestOf(ours);
+    return (newest?.name === check && newest?.status === "completed" && newest?.conclusion === "success") || "its newest run did not pass";
   } catch (e) { return `the host could not be asked: ${String(e?.message ?? e).slice(0, 80)}`; }
 }
 
