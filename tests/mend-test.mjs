@@ -51,6 +51,7 @@ const CHECKS = {
   "scripts/manifest-reads.mjs": "tests/manifest-reads-test.mjs",
   "scripts/holders.mjs": "tests/holders-test.mjs",
   "scripts/entry-files.mjs": "tests/entry-files-test.mjs",
+  "scripts/tools-offer.mjs": "tests/tools-offer-test.mjs",
   "scripts/reading.mjs": "tests/reading-test.mjs",
   "scripts/select.mjs": "tests/select-test.mjs",
   "scripts/shape.mjs": "tests/shape-test.mjs",
@@ -67,6 +68,8 @@ const CHECKS = {
   ".github/workflows/versions.yml": "tests/core-path-test.mjs",
   ".github/workflows/nuget.yml": "tests/nuget-gate-test.mjs",
   ".github/workflows/personal-terms.yml": "tests/personal-terms-test.mjs",
+  // (its gate fails on a draft, saying the mend, since a required check whose job is skipped passes; #733)
+  ".github/workflows/tests.yml": "tests/workflows-test.mjs",
 };
 // what a workflow names that fails no pull request, each with why
 const NOT_CHECKS = {

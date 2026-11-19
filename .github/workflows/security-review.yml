@@ -139,17 +139,35 @@ jobs:
             exit 0
           fi
           d=$(mktemp -d)
-          gh api "repos/$REPO/pulls/$NUMBER" > "$d/pull.json"
-          gh api --paginate --slurp "repos/$REPO/issues/$NUMBER/comments?per_page=100" > "$d/comments.json"
-          gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/comments?per_page=100" > "$d/findings.json"
-          gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/commits?per_page=100" > "$d/commits.json"
-          gh api --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100" > "$d/files.json"
+          # every read of the host has a deadline, so that both statuses are written within the job's six minutes (#632):
+          # the pull request and what it holds by the step's 60th second, each read in the time the ones before it left;
+          # the clone and its two proofs by the 210th (proof_time); the rights by the 225th, and the head's copies and when
+          # the check's scripts came by the 240th, as each says below; then the two statuses, twenty seconds each. Where
+          # one of the first five is not read in time, nothing is there to write a status from, and the step fails, saying so
+          from_host() {
+            local file=$1 what=$2 left; shift 2
+            left=$((60 - SECONDS))
+            if [ "$left" -gt 0 ] && timeout "$left" gh api "$@" > "$d/$file"; then return 0; fi
+            echo "::error::FAIL the host gave no $what of pull request #$NUMBER by the step's 60th second, so neither the security-review status nor the code-review status was written. Mend: run this job again from the pull request's checks once GitHub answers; where it fails so again, the pull request's lists are too long to read in a minute, so split it."
+            false
+          }
+          # the seconds a proof may take: its own cap, or what is left before the step's 210th second, one at least
+          proof_time() {
+            local left=$((210 - SECONDS))
+            [ "$left" -gt 0 ] || left=1
+            echo "$((left < $1 ? left : $1))"
+          }
+          from_host pull.json "state" "repos/$REPO/pulls/$NUMBER"
+          from_host comments.json "comments" --paginate --slurp "repos/$REPO/issues/$NUMBER/comments?per_page=100"
+          from_host findings.json "review comments" --paginate --slurp "repos/$REPO/pulls/$NUMBER/comments?per_page=100"
+          from_host commits.json "commits" --paginate --slurp "repos/$REPO/pulls/$NUMBER/commits?per_page=100"
+          from_host files.json "list of files" --paginate --slurp "repos/$REPO/pulls/$NUMBER/files?per_page=100"
           # whether the pull request is held by what a script of the check reads more: not where it leaves the script
           # alone, its head holds it as it stood before this branch's, and the host says it was opened before the
           # default branch's copy came (it stood before the check came, and is told, never waited for: AGENTS.md,
           # "Nothing locks a project"; the script decides that last from came, below); always where it changes the
           # script itself, where its list of files is cut short, or where the head's copy cannot be read for any reason
-          # but its absence
+          # but its absence, or not by the step's 240th second, ten seconds at most (#632)
           head=$(jq -r '.head.sha // empty' "$d/pull.json")
           held() {
             local p="$ROOT/scripts/$1" theirs
@@ -159,7 +177,8 @@ jobs:
               || jq -e --arg p "$p" 'any(.[][]; .filename == $p or .previous_filename == $p)' "$d/files.json" \
                 > /dev/null
             then echo true; return; fi
-            if theirs=$(gh api "repos/$REPO/contents/$p?ref=$head" --jq .sha 2> "$d/error"); then
+            left=$((240 - SECONDS)); [ "$left" -gt 0 ] || { echo true; return; }
+            if theirs=$(timeout "$((left < 10 ? left : 10))" gh api "repos/$REPO/contents/$p?ref=$head" --jq .sha 2> "$d/error"); then
               if [ "$theirs" = "$(git rev-parse "HEAD:$p")" ]; then echo true; else echo false; fi
             elif grep -q "HTTP 404" "$d/error"; then echo false # the head holds no such script: from before it came
             else echo true; fi
@@ -215,7 +234,7 @@ jobs:
             auth=("GIT_CONFIG_COUNT=$((n + 1))" "GIT_CONFIG_KEY_$n=http.$SERVER/$REPO.git.extraheader"
               "GIT_CONFIG_VALUE_$n=AUTHORIZATION: basic $key")
             if git init -q -b pr "$d/pr" && git -C "$d/pr" remote add origin "$SERVER/$REPO.git" \
-              && env "${auth[@]}" timeout 90 git -C "$d/pr" fetch -q --no-tags --update-head-ok origin "+$head:refs/heads/pr" \
+              && env "${auth[@]}" timeout "$(proof_time 90)" git -C "$d/pr" fetch -q --no-tags --update-head-ok origin "+$head:refs/heads/pr" \
               && [ "$(git -C "$d/pr" rev-parse refs/heads/pr)" = "$head" ]
             then cloned=1; fi
           fi
@@ -223,7 +242,7 @@ jobs:
           # pure-sync.mjs proves it on the head, in that clone
           if [ -n "$shape" ]; then
             proof="$PWD/$ROOT/scripts/pure-sync.mjs"
-            if [ -n "$cloned" ] && (cd "$d/pr" && env "${auth[@]}" timeout 120 node "$proof" > "$d/pure.txt" 2>&1)
+            if [ -n "$cloned" ] && (cd "$d/pr" && env "${auth[@]}" timeout "$(proof_time 120)" node "$proof" > "$d/pure.txt" 2>&1)
             then pure=$head; echo "A pure sync, as pure-sync.mjs proves: it needs no security review of its own."
             else echo "Not proved a pure sync: it gets its security review as any pull request."; fi
           fi
@@ -236,7 +255,7 @@ jobs:
           if [ -f "$ROOT/scripts/clean-merges.mjs" ]; then echo '[]' > "$d/merges.json"; merges=("$d/merges.json"); fi
           if [ -n "$merge" ]; then
             proof="$PWD/$ROOT/scripts/clean-merges.mjs"
-            if [ -n "$cloned" ] && (cd "$d/pr" && env -u GH_TOKEN timeout 60 node "$proof" "$d/pull.json" "$d/commits.json" > "$d/proved.json") \
+            if [ -n "$cloned" ] && (cd "$d/pr" && env -u GH_TOKEN timeout "$(proof_time 60)" node "$proof" "$d/pull.json" "$d/commits.json" > "$d/proved.json") \
               && jq -e 'type == "array"' "$d/proved.json" > /dev/null
             then mv "$d/proved.json" "$d/merges.json"; echo "Merges from main that are the ones git makes: $(jq -r 'length' "$d/merges.json")."
             else echo "The merges from main could not be proved the ones git makes: a review of the head is asked."; fi
@@ -282,7 +301,10 @@ jobs:
           jq -r '.status | "\(.state): \(.description)"' "$d/out.json"
           # (a summary of Codex's it cannot read: the check's own fixed words, never the comment's)
           if jq -e '.warning' "$d/out.json" > /dev/null; then echo "::warning::$(jq -r '.warning' "$d/out.json")"; fi
-          jq '.status' "$d/out.json" | gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null
+          if ! jq '.status' "$d/out.json" | timeout 20 gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then
+            echo "::error::FAIL the security-review status of $sha could not be posted: the host refused it or gave no answer within 20 seconds (its error, if any, is above), so the code-review status was not posted either. Mend: where no error shows above (the 20 seconds ran out), or it is a lost connection, a 5xx or a rate limit, run this job again from the pull request's checks; otherwise mend what it names, then run it again."
+            false
+          fi
           # the second status, code-review: whether a code review running on that commit has finished (a default branch
           # whose core is older has no such script, and says nothing of it)
           # (a fault in it warns and leaves the job as green as the security-review status left it)
@@ -291,6 +313,6 @@ jobs:
             if RIGHTS="$d/rights.json" node "$ROOT/scripts/code-review-wait.mjs" "$d/pull.json" \
               "$d/comments.json" "$d/commits.json" "$d/files.json" "${merges[@]}" > "$d/code.json" \
               && jq -r '.status | "\(.state): \(.description)"' "$d/code.json" \
-              && jq '.status' "$d/code.json" | gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then :
+              && jq '.status' "$d/code.json" | timeout 20 gh api -X POST "repos/$REPO/statuses/$sha" --input - > /dev/null; then :
             else echo "::warning::the code-review status could not be written: scripts/code-review-wait.mjs or its post failed"; fi
           fi
