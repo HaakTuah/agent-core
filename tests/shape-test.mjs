@@ -250,12 +250,18 @@ let v = judge({ now: { "src/a.js": long("tall", 100) }, baseline: listed([f100])
 ok(v.fail.length === 0 && v.listed === 1, "what the baseline lists passes");
 v = judge({ now: { "src/a.js": long("tall", 101) + long("other", 61) }, baseline: listed([f100]) });
 ok(mended(said(v)) && v.fail.length === 1 && /2 functions pass/.test(said(v)) && /src\/a\.js#other \(line 102\): 61 lines/.test(said(v)), "a listed function that grew and a new one past a mark fail, each named with its line and its numbers", said(v));
-v = judge({ now: { "src/a.js": long("tall", 90) }, baseline: listed([f100, ["cycle: x.js -> y.js", true]]) });
-ok(mended(said(v)) && /lists 1 entry that is gone or moved/.test(said(v)) && /--write/.test(said(v)) && !/tall/.test(said(v)), "an entry that is gone fails until the baseline is lowered; one that only shrank passes", said(v));
-v = judge({ now: { "src/b.js": long("tall", 100) }, baseline: listed([f100]) });
-ok(v.fail.length === 1 && /gone or moved/.test(said(v)) && !/functions? pass/.test(said(v)), "a listed function that moved is no new breach: its old entry is lowered", said(v));
-ok(mended(`FAIL: ${(() => { try { judge({ now: {}, baseline: "{}" }); return ""; } catch (e) { return e.message; } })()}`), "a baseline that is none is refused, with its mend");
 const baseOf = (baseline, texts, conf = config({})) => ({ name: "origin/main", baseline, config: conf, standing: () => ({ texts, tests: new Set() }) });
+// (#750, point 5: a change that only improves on the baseline passes and says what --write takes out; one that writes
+// the baseline writes it whole)
+const gone = listed([f100, ["cycle: x.js -> y.js", true]]), noted = v => v.notes.join("\n");
+const improved = [{}, { base: baseOf(gone, { "src/a.js": long("tall", 100) }) }, { base: baseOf(gone.replace(/\n?$/u, "\r\n"), { "src/a.js": long("tall", 100) }) }].map(b => judge({ now: { "src/a.js": long("tall", 90) }, baseline: gone, ...b }));
+ok(improved.every(v => v.fail.length === 0 && /lists 1 entry that is gone or moved now, which fails nothing/.test(noted(v)) && /--write writes it/.test(noted(v)) && /: x\.js -> y\.js$/m.test(noted(v)) && !/tall/.test(noted(v))),
+  "an entry that is gone, where the change leaves the baseline as its base holds it or names no base, passes and is said with the --write that takes it out; one that only shrank is not named", improved.map(noted).join("\n"));
+v = judge({ now: { "src/a.js": long("tall", 90) }, baseline: gone.replace("}}", "}, \"grown\": {}}"), base: baseOf(gone, { "src/a.js": long("tall", 100) }) });
+ok(mended(said(v)) && /lists 1 entry that is gone or moved now, and this change writes the baseline/.test(said(v)) && /--write/.test(said(v)) && !/tall/.test(said(v)) && !/gone or moved/.test(noted(v)), "where the change writes the baseline, an entry it leaves that is gone fails until --write lowers it", said(v));
+v = judge({ now: { "src/b.js": long("tall", 100) }, baseline: listed([f100]) });
+ok(v.fail.length === 0 && /gone or moved/.test(noted(v)) && !/functions? pass/.test(said(v)), "a listed function that moved is no new breach: its old entry is said, for --write to list where it stands", noted(v));
+ok(mended(`FAIL: ${(() => { try { judge({ now: {}, baseline: "{}" }); return ""; } catch (e) { return e.message; } })()}`), "a baseline that is none is refused, with its mend");
 v = judge({ now: { "src/a.js": long("tall", 100) + long("mid", 50) + long("fresh", 45) }, conf: cfg({ marks: { lines: 40 } }), baseline: listed([f100]), base: baseOf(listed([f100]), { "src/a.js": long("tall", 100) + long("mid", 50) }) });
 ok(mended(said(v)) && v.fail.length === 2 && /1 breach that origin\/main held already is not in/.test(v.fail[0][0]) && /SHAPE_BASE=origin\/main node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(v.fail[0][0]) && /#mid/.test(v.fail[0][1]) && /1 function passes/.test(v.fail[1][0]) && /#fresh/.test(v.fail[1][1]),
   "where the config reads more than it did, what the base held already is told from what is new, and its mend is to list it", said(v));

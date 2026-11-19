@@ -21,8 +21,11 @@
 // link. What a change to the config itself makes the check read (a use declared, a folder left out) no rule here
 // judges, since none could without guessing what was meant: the config is a protected file, and the reviews read
 // its change (floor rule 3). An entry that is gone is taken out with --write, which lowers the
-// numbers that fell too, and a pull request that leaves one standing fails, so the baseline lists the debt as it is,
-// and what was mended cannot come back. A baseline names the readers whose finds it lists ("reads"): what a reader it
+// numbers that fell too. A pull request that only improves on the baseline passes and says what --write would take
+// out, which the next pull request that changes the baseline, or a cleaning task, writes; one that changes the
+// baseline and leaves such an entry standing fails, so the baseline it writes lists the debt as it is (#750, point
+// 5: improving pull requests had to rewrite this shared file, and collided; until it is written, a mended entry could
+// come back unseen). A baseline names the readers whose finds it lists ("reads"): what a reader it
 // does not name finds is said, never failed, where the base held it already or no base is told, until --write lists
 // it, so that a sync that brings a reader turns nothing red (AGENTS.md, "Nothing locks a project"). It never guesses:
 // an import that leads nowhere it can tell and a file whose JSX its reader cannot follow to its end are counted and
@@ -604,6 +607,7 @@ function raised(config, old) {
   return out;
 }
 
+const asWritten = text => (typeof text === "string" ? text.replace(/\r\n/gu, "\n").trimEnd() : null); // (a baseline's text, whatever its line endings)
 const tolerant = read => { try { return read(); } catch { return null; } }; // (what the base cannot be read by holds nothing there)
 const once = make => { let made = null; return () => (made ??= make()); };
 // What the base held, as this config reads the base's code: each breach's id to its numbers.
@@ -658,12 +662,22 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   const kept = id => !current.has(id) && skipped.includes(readerOf(id, found.readers)) && ["function", "lost"].includes(groupOf(id).kind);
   const news = unclaimed(current, baseline.listed, config.marks);
   const { fail, later } = fresh({ config, at, self, found, current, base, news, unread });
-  // (one that only shrank passes as it is listed: --write lowers its numbers whenever it is run)
-  const stale = [...baseline.listed.keys()].filter(id => !current.has(id) && !unread(id) && !kept(id));
-  if (stale.length) fail.push([`FAIL: ${config.baseline} lists ${plural(stale.length, "entry", "entries")} that ${stale.length === 1 ? "is" : "are"} gone or moved now. Mend: run node ${self} ${at} --write and commit the baseline it lowers`, ...some(stale, baseline.listed)]);
+  const lowered = staleOf({ config, at, self, baseline, baselineText, base, gone: id => !current.has(id) && !unread(id) && !kept(id) });
+  fail.push(...lowered.fail);
   if (base) fail.push(...againstBase({ config, at, self, baseline, base, found }));
   const reread = [...baseline.listed.keys()].filter(id => !current.has(id) && unread(id) && !kept(id)).length;
-  return { fail, notes: [...notesOf(found.read), ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read, kept: [...baseline.listed.keys()].filter(kept).length };
+  return { fail, notes: [...notesOf(found.read), ...lowered.notes, ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read, kept: [...baseline.listed.keys()].filter(kept).length };
+}
+
+// The entries a baseline lists that are gone or moved now (`gone`): { fail, notes }. One that only shrank passes as it
+// is listed, since --write lowers its numbers whenever it is run; one gone or moved fails only a change that writes the
+// baseline, which then writes it whole, and is said, never failed, where the change only improves on it (#750, point 5).
+function staleOf({ config, at, self, baseline, baselineText, base, gone }) {
+  const stale = [...baseline.listed.keys()].filter(gone), n = stale.length, they = n === 1 ? ["is", "it"] : ["are", "them"];
+  if (!n) return { fail: [], notes: [] };
+  const what = `${config.baseline} lists ${plural(n, "entry", "entries")} that ${they[0]} gone or moved now`;
+  if (base && asWritten(base.baseline) !== asWritten(baselineText)) return { fail: [[`FAIL: ${what}, and this change writes the baseline. Mend: run node ${self} ${at} --write and commit the baseline it lowers`, ...some(stale, baseline.listed)]], notes: [] };
+  return { fail: [], notes: [`${what}, which fails nothing: the code improved on the baseline. The lowered baseline leaves ${they[1]} out; node ${self} ${at} --write writes it, in the next pull request that changes the baseline or a cleaning task: ${some(stale, baseline.listed).map(l => l.trim()).join("; ")}`] };
 }
 
 // What a baseline written before a reader came does not list yet, said, never failed.

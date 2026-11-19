@@ -13,8 +13,11 @@ one declared entrance.
 
 - **Never worse.** By default a pull request that adds a breach of a rule below fails, in every project, and its
   session mends it there. What stood before the check read it is listed in the check's baseline and never fails: a
-  listed function may shrink and may not grow, and a listed import may go. The baseline shrinks freely (`--write`). An
-  entry joins it in two cases only: the check reads more than it did (a system named, a mark lowered, the first
+  listed function may shrink and may not grow, and a listed import may go. The baseline shrinks freely (`--write`): a
+  pull request that only improves on it passes, the check printing what the lowered baseline leaves out, which the
+  next pull request that changes the baseline, or a cleaning task, writes (#750, point 5), since improving pull
+  requests that each rewrote the one baseline collided, at the cost that a mended entry could come back unseen until
+  then; one that changes the baseline writes it whole. An entry joins it in two cases only: the check reads more than it did (a system named, a mark lowered, the first
   baseline), where the base branch held the breach already; or there was no other way, where the baseline gives the
   entry's reason under "grown", the pull request gives it too, and a fresh session says there that it found no other
   way. A mark rises the same way. It does not mean that code which stands is rewritten on demand: the baseline is a
