@@ -1,8 +1,6 @@
 // Tests of the proof that an update from main is the merge git makes (clean-merges.mjs, #323), on merges git really
 // makes in a scratch repository: one as git makes it, one with a change of its own, one whose conflict was resolved by
-// hand, one whose conflict, both sides adding lines, keeps both whole, in either order, ones whose sides changed or
-// deleted a line, and one that does so and changes a line besides (#750, point 3), two in a row, and a list whose
-// parents are not git's; and, end to end, the core's security-review.yml run as
+// hand, two in a row, and a list whose parents are not git's; and, end to end, the core's security-review.yml run as
 // GitHub runs it (workflow-run.mjs) on a pull request whose head is such a merge, GitHub's API a stand-in that gives the
 // pull request and logs the statuses it is given: the review of the commit before a merge git makes stands for the
 // head, and one before a merge with a change of its own waits, both statuses naming that merge and the mend; and a
@@ -70,105 +68,6 @@ const Y2 = commit(r, "main changes the same line");
 git(r, "checkout", "-q", "-B", "conflict", X);
 const RESOLVED = merge(r, Y2, () => write(r, "a.txt", "ONE\ntwo\nthree\n"));
 ok(proved(pullOf(RESOLVED, [X, RESOLVED]), listed(r, X, RESOLVED), r).length === 0, "nor one whose conflict was resolved by hand, even to one side's text");
-// two pull requests that add to the same place: the conflict settled by keeping both sides' lines, in either order
-git(r, "checkout", "-q", "-B", "adds", B0);
-write(r, "a.txt", "one\ntwo\nthree\nthe pull request's line\n");
-const ADDS = commit(r, "the pull request adds a line");
-git(r, "checkout", "-q", "-B", "main-adds", B0);
-write(r, "a.txt", "one\ntwo\nthree\nmain's line\n");
-const MAIN_ADDS = commit(r, "main adds a line at the same place");
-const settled = (name, text, extra) => {
-  git(r, "checkout", "-q", "-B", name, ADDS);
-  return merge(r, MAIN_ADDS, () => { write(r, "a.txt", text); if (extra) extra(); });
-};
-const MAIN_FIRST = settled("main-first", "one\ntwo\nthree\nmain's line\nthe pull request's line\n");
-const OURS_FIRST = settled("ours-first", "one\ntwo\nthree\nthe pull request's line\nmain's line\n");
-ok(proved(pullOf(MAIN_FIRST, [ADDS, MAIN_FIRST]), listed(r, ADDS, MAIN_FIRST), r).join() === MAIN_FIRST && proved(pullOf(OURS_FIRST, [ADDS, OURS_FIRST]), listed(r, ADDS, OURS_FIRST), r).length === 0,
-  "a conflict settled by keeping both sides' lines whole, main's first, is proved; the pull request's first, an order a merger chose, is not (Codex's finding on #753)");
-const CHANGED = settled("changed", "one\ntwo\nthree\nmain's line\nthe pull request's line, changed\n");
-const DROPPED = settled("dropped", "one\ntwo\nthree\nthe pull request's line\n");
-const BESIDE = settled("beside", "one\ntwo\nthree\nmain's line\nthe pull request's line\n", () => write(r, "b.txt", "a change of its own\n"));
-git(r, "checkout", "-q", "-B", "markers", ADDS);
-const MARKERS = merge(r, MAIN_ADDS); // (committed as git's merge left it, its markers in a.txt)
-ok([CHANGED, DROPPED, BESIDE, MARKERS].every((at) => proved(pullOf(at, [ADDS, at]), listed(r, ADDS, at), r).length === 0),
-  "  but not one that changes the pull request's line, drops main's, changes another file besides, or keeps git's conflict markers");
-// a conflict where either side changed or deleted a line: a union keeps one side's change and undoes the other's, so
-// no such merge is proved, however it is settled (the fallback reviewer's finding on #753)
-const branch = (name, from, text) => { git(r, "checkout", "-q", "-B", name, from); write(r, "e.txt", text); return commit(r, name); };
-git(r, "checkout", "-q", "-B", "e-base", B0);
-write(r, "e.txt", "a\nrun dangerous\nb\n");
-const E0 = commit(r, "a file both sides change");
-const E_PR = branch("e-pr", E0, "a\nrun dangerous --verbose\nb\n"), E_DEL = branch("e-del", E0, "a\nb\n"), E_MAIN = branch("e-main", E0, "a\nrun safely\nb\n");
-const E_ADD = branch("e-add", E0, "a\nrun dangerous\nadded\nb\n");
-const kept = (name, ours, theirs, text) => { git(r, "checkout", "-q", "-B", name, ours); return merge(r, theirs, () => write(r, "e.txt", text)); };
-const undone = [
-  kept("pr-over-delete", E_PR, E_DEL, "a\nrun dangerous --verbose\nb\n"),
-  kept("delete-over-pr", E_DEL, E_PR, "a\nrun dangerous --verbose\nb\n"),
-  kept("both-changed", E_PR, E_MAIN, "a\nrun dangerous --verbose\nrun safely\nb\n"),
-  kept("both-changed-other", E_PR, E_MAIN, "a\nrun safely\nrun dangerous --verbose\nb\n"),
-  kept("delete-beside-add", E_ADD, E_DEL, "a\nadded\nb\n"),
-];
-ok(undone.every((at) => proved(pullOf(at, [at]), listed(r, at), r).length === 0),
-  "  nor one whose conflict a union settles where a side changed or deleted a line: modify against delete either way, the same line changed on both sides in either order, a delete beside an add");
-// two conflicts a few lines apart, or apart only by lines with no letter or digit, which merge-file's --union joins
-// into one: both kept in place, each conflict's own, is proved; the union that moves a side's line past the line both
-// share is not (the fallback reviewer's second finding on #753)
-const near = (name, between) => {
-  const at = (text) => text.replace("%", between);
-  const base = branch(`${name}-base`, B0, at("start\n%\nend\n"));
-  const ours = branch(`${name}-pr`, base, at("start\nA pr-line\n%\nB pr-line\nend\n"));
-  const theirs = branch(`${name}-main`, base, at("start\nverify || exit 1\n%\nD main-line\nend\n"));
-  return { ours, theirs };
-};
-for (const [name, between] of [["exit", "exit 0"], ["braces", "}\n\n}"]]) {
-  const { ours, theirs } = near(name, between);
-  const inPlace = kept(`${name}-in-place`, ours, theirs, `start\nverify || exit 1\nA pr-line\n${between}\nD main-line\nB pr-line\nend\n`);
-  const moved = kept(`${name}-moved`, ours, theirs, `start\nA pr-line\n${between}\nB pr-line\nverify || exit 1\n${between}\nD main-line\nend\n`);
-  ok(proved(pullOf(inPlace, [inPlace]), listed(r, inPlace), r).join() === inPlace && proved(pullOf(moved, [moved]), listed(r, moved), r).length === 0,
-    `  two conflicts apart by ${name === "exit" ? "a line both share" : "lines with no letter or digit"}: kept in place, proved; the union that moves main's line past it, not`);
-}
-// bytes as they are: a binary file both sides changed, emptied by the merge, and one whose byte that is no UTF-8 the
-// merge rewrites, are not proved; that byte kept, and a file whose lines end CR LF, both sides adding, are (the fallback
-// reviewer's third check on #753)
-const bytesOf = (name, base, pr, main, settled) => {
-  const b = branch(`${name}-base`, B0, base), o = branch(`${name}-pr`, b, pr), t = branch(`${name}-main`, b, main);
-  return kept(`${name}-merge`, o, t, settled);
-};
-const latin = (text) => Buffer.from(text, "latin1");
-const BINARY = bytesOf("binary", latin("a\0b\n"), latin("a\0b\nours\n"), latin("a\0b\ntheirs\n"), "");
-const REWRITTEN = bytesOf("latin", latin("a\nsecret=\xff\nb\n"), latin("a\nsecret=\xff\nb\nours\n"), latin("a\nsecret=\xff\nb\ntheirs\n"), "a\nsecret=\ufffd\nb\ntheirs\nours\n");
-const LATIN = bytesOf("latin-kept", latin("a\nsecret=\xff\nb\n"), latin("a\nsecret=\xff\nb\nours\n"), latin("a\nsecret=\xff\nb\ntheirs\n"), latin("a\nsecret=\xff\nb\ntheirs\nours\n"));
-const CRLF = bytesOf("crlf", "a\r\nb\r\n", "a\r\nb\r\nours\r\n", "a\r\nb\r\ntheirs\r\n", "a\r\nb\r\ntheirs\r\nours\r\n");
-const is = (at) => proved(pullOf(at, [at]), listed(r, at), r).join() === at;
-ok(!is(BINARY) && !is(REWRITTEN) && is(LATIN) && is(CRLF),
-  "  bytes as they are: a binary file emptied, or a byte that is no UTF-8 rewritten, is not proved; that byte kept, and a file of CR LF lines, are");
-// a path that is no UTF-8 names its own file: built with git's plumbing alone, so no such name is written to disk, a
-// merge that writes into the path \xff what no review saw, and the kept-both blob into the path U+FFFD, is not proved
-// (the fallback reviewer's fourth check on #753)
-const plumb = (args, input) => execFileSync("git", args, { cwd: r, env: { ...env, GIT_INDEX_FILE: path.join(tmp, "byte-index") }, input, encoding: "latin1", stdio: ["pipe", "pipe", "pipe"] }).trim();
-const blobOf = (text) => plumb(["hash-object", "-w", "--stdin"], Buffer.from(text, "latin1"));
-const treeOf = (files) => {
-  plumb(["read-tree", "--empty"]);
-  plumb(["update-index", "-z", "--index-info"], Buffer.concat(Object.entries(files).map(([name, text]) => Buffer.from(`100644 ${blobOf(text)}\t${name}\0`, "latin1"))));
-  return plumb(["write-tree"]);
-};
-const commitOf = (tree, ...parents) => plumb(["commit-tree", tree, ...parents.flatMap((p) => ["-p", p]), "-m", "bytes"]);
-const FFFD = Buffer.from("\ufffd", "utf8").toString("latin1");
-const NAME_BASE = commitOf(treeOf({ "\xff": "a\n", [FFFD]: "harmless\n" }));
-const NAME_PR = commitOf(treeOf({ "\xff": "a\nours\n", [FFFD]: "harmless\n" }), NAME_BASE);
-const NAME_MAIN = commitOf(treeOf({ "\xff": "a\ntheirs\n", [FFFD]: "harmless\n" }), NAME_BASE);
-const NAME_EVIL = commitOf(treeOf({ "\xff": "EVIL: never reviewed\n", [FFFD]: "a\ntheirs\nours\n" }), NAME_PR, NAME_MAIN);
-const NAME_KEPT = commitOf(treeOf({ "\xff": "a\ntheirs\nours\n", [FFFD]: "harmless\n" }), NAME_PR, NAME_MAIN);
-ok(proved(pullOf(NAME_EVIL, [NAME_EVIL]), listed(r, NAME_EVIL), r).length === 0 && proved(pullOf(NAME_KEPT, [NAME_KEPT]), listed(r, NAME_KEPT), r).join() === NAME_KEPT,
-  "  a path that is no UTF-8 is read as its own bytes: content written into it is not proved, both sides kept in it are");
-git(r, "checkout", "-q", "-B", "mode", ADDS);
-const MODE = merge(r, MAIN_ADDS, () => { write(r, "a.txt", "one\ntwo\nthree\nmain's line\nthe pull request's line\n"); fs.chmodSync(path.join(r, "a.txt"), 0o755); git(r, "update-index", "--add", "--chmod=+x", "a.txt"); });
-git(r, "checkout", "-q", "-B", "gone", B0);
-git(r, "rm", "-q", "a.txt");
-const GONE = commit(r, "main deletes the file the pull request changes");
-git(r, "checkout", "-q", "-B", "deleted", ADDS);
-const DELETED = merge(r, GONE, () => write(r, "a.txt", "one\ntwo\nthree\nthe pull request's line\n"));
-ok(git(r, "ls-tree", MODE, "a.txt").startsWith("100755") && [MODE, DELETED].every((at) => proved(pullOf(at, [ADDS, at]), listed(r, ADDS, at), r).length === 0), "  nor one that changes the file's mode, nor a file one side deleted");
 git(r, "checkout", "-q", "main");
 write(r, "d.txt", "z\n");
 const Y3 = commit(r, "main moves again");
@@ -236,10 +135,10 @@ const check = (number, head, posted = [], rights = {}) => {
   return { passed: job.passed, out: job.steps.map((x) => x.out).join(""), security: of("security-review"), code: of("code-review") };
 };
 const gits = check(1, GITS);
-ok(gits.passed && gits.out.includes("Merges from main that bring in main alone: 1.") && gits.security.state === "success" && gits.security.description.includes("only updates from main since")
+ok(gits.passed && gits.out.includes("Merges from main that are the ones git makes: 1.") && gits.security.state === "success" && gits.security.description.includes("only updates from main since")
   && gits.code.state === "success" && gits.code.description.includes("nothing but updates from main since"), "the workflow: a review of the commit before a merge git makes stands for the head, in both statuses", gits.out + JSON.stringify([gits.security, gits.code]));
 const own = check(2, OWN);
-ok(own.passed && own.out.includes("Merges from main that bring in main alone: 0.") && own.security.state === "pending" && own.code.state === "pending"
+ok(own.passed && own.out.includes("Merges from main that are the ones git makes: 0.") && own.security.state === "pending" && own.code.state === "pending"
   && own.security.description.includes(`merge ${OWN.slice(0, 7)} unproved`) && own.code.description.includes(`merge ${OWN.slice(0, 7)} unproved`) && [own.security, own.code].every((s) => mended(s.description)),
   "  and one before a merge with a change of its own waits, both statuses naming that merge and the mend", own.out + JSON.stringify([own.security, own.code]));
 

@@ -303,9 +303,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      input `reviewers`), the second alone where Codex
      marks a finding of its review open, posted after it, and, while Codex's review runs, one posted after it began,
      never a note posted before it; a review of an earlier commit than the head stands only
-     where updates from `main` alone follow it, each the merge git makes of its parents, any file in conflict settled by
-     keeping both sides' added lines whole, main's first (the check running `clean-merges.mjs` on the head's commits, #323, #750), and
-     the status says so, any other later commit needing such a
+     where updates from `main` alone follow it, each the merge git makes of its parents (the check running
+     `clean-merges.mjs` on the head's commits, #323), and the status says so, any other later commit needing such a
      comment naming the head, or the merge where that stops, by its whole SHA; a pure sync passes with none where no review starts by itself, the check running
      `pure-sync.mjs` on its head; where the pull request changes what runs by itself beyond its pins, both, or two such
      comments (floor rule 3), or one holding what `comment-only.mjs` printed on the head. Where a summary of Codex's is

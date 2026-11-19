@@ -69,7 +69,7 @@ ok(is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but 
 // stops it, with its mend
 const proved = (comments, merges, commits = updated) => judge({ commits: commits.length, changed_files: 1, ...pull }, comments, commits, code, [], true, merges);
 const stopped = proved([summary({ ...done, commit_sha: OLD })], [HEAD]);
-ok(is(proved([summary({ ...done, commit_sha: OLD })], [HEAD, M]), true, "nothing but updates from main") && is(proved([said(`Code review: of ${M}`)], [HEAD]), true, "nothing but updates"), "a review stands across the merges proved the ones that bring in main alone, and a review of the merge where they stop stands too");
+ok(is(proved([summary({ ...done, commit_sha: OLD })], [HEAD, M]), true, "nothing but updates from main") && is(proved([said(`Code review: of ${M}`)], [HEAD]), true, "nothing but updates"), "a review stands across the merges proved the ones git makes, and a review of the merge where they stop stands too");
 ok(is(stopped, false, "merge eeeeeee unproved. Mend: another reviews") && is(proved([said(`Code review: of ${OLD}`)], []), false, "merge ccccccc unproved") && is(proved([summary({ ...done, commit_sha: OLD })], {}), false, "merge ccccccc unproved")
   && mended(`Waiting: ${stopped.why}`) && `Waiting: ${stopped.why}`.length <= 140, "one of an earlier commit with a merge not proved after it waits, naming that merge and the mend, within GitHub's 140 characters (a list that is no list proves none)");
 // (each mend names what the posted review carries: its kind and whole SHA, and its two lines of counts; #403)

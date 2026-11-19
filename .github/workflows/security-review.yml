@@ -12,11 +12,9 @@
 # owner: roles/shared/teams.md; the job reads each such commenter's rights from GitHub, #412), or an account the caller
 # names (the input "reviewers"), which is how the fallback reviewer's or another reviewer's is posted
 # (tasks/reviews.md, point 3); a review of an
-# earlier commit than the head only where updates from main alone follow it, each the merge git makes of its parents,
-# any file in conflict where both sides only added lines, settled by keeping both sides' lines whole, main's first
-# (scripts/clean-merges.mjs proves which, #323, #750), so that any other later commit needs such a comment naming the
-# head, or the merge where that stops, by its whole SHA; while Codex's own is running, only such a comment posted after
-# it began,
+# earlier commit than the head only where updates from main alone follow it, each the merge git makes of its parents
+# (scripts/clean-merges.mjs proves which, #323), so that any other later commit needs such a comment naming the head,
+# or the merge where that stops, by its whole SHA; while Codex's own is running, only such a comment posted after it began,
 # as Codex's summary shows; where Codex marks a finding of its security review open, only such a comment settles it,
 # posted after Codex's summary last changed and, where one is to be found, after its newest finding; nothing else
 # counts. A pure sync needs none where no review starts by itself (floor rule 8): the job runs the default branch's
@@ -224,9 +222,8 @@ jobs:
             then pure=$head; echo "A pure sync, as pure-sync.mjs proves: it needs no security review of its own."
             else echo "Not proved a pure sync: it gets its security review as any pull request."; fi
           fi
-          # an update from main stands for nothing reviewed before it unless it is the merge git makes of its parents,
-          # any file in conflict where both sides only added lines, settled by keeping both sides' lines whole, main's first (#323,
-          # #750): the default branch's clean-merges.mjs proves which are, in that clone, with no token (the step's
+          # an update from main stands for nothing reviewed before it unless it is the merge git makes of its parents
+          # (#323): the default branch's clean-merges.mjs proves which are, in that clone, with no token (the step's
           # GH_TOKEN taken from its environment too); where it
           # cannot, none is, and a review of the head is asked (a default branch whose core is older has no such
           # script, and its scripts read the parents alone, as before)
@@ -236,8 +233,8 @@ jobs:
             proof="$PWD/$ROOT/scripts/clean-merges.mjs"
             if [ -n "$cloned" ] && (cd "$d/pr" && env -u GH_TOKEN timeout 60 node "$proof" "$d/pull.json" "$d/commits.json" > "$d/proved.json") \
               && jq -e 'type == "array"' "$d/proved.json" > /dev/null
-            then mv "$d/proved.json" "$d/merges.json"; echo "Merges from main that bring in main alone: $(jq -r 'length' "$d/merges.json")."
-            else echo "The merges from main could not be proved to bring in main alone: a review of the head is asked."; fi
+            then mv "$d/proved.json" "$d/merges.json"; echo "Merges from main that are the ones git makes: $(jq -r 'length' "$d/merges.json")."
+            else echo "The merges from main could not be proved the ones git makes: a review of the head is asked."; fi
           fi
           # whose posted review counts besides the owner's and the accounts named: a person the host lets write (#412),
           # read from GitHub's rights for each account, at most twenty, that posted a "Security review:" with a say in the
