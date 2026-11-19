@@ -1,7 +1,7 @@
 // The shape check's readers (shape.mjs, beside this file; tasks/code-shape.md, "What the check reads"; #354): which
 // files it reads, and each file as its reader reads it, in one form whatever its language. JavaScript and TypeScript,
-// JSX among them, by the reader of the measures (code-shape.mjs); C# by shape-csharp.mjs, its functions on the parser
-// the core installs (csharp-functions.mjs); Python by shape-python.mjs; and the scripts that share one global space,
+// JSX among them, by the readers of the measures (code-shape.mjs), their functions on the parser the core installs
+// (javascript-functions.mjs); C# by shape-csharp.mjs, its functions on the parser too (csharp-functions.mjs); Python by shape-python.mjs; and the scripts that share one global space,
 // those of JavaScript or TypeScript with no import or export, by the names their top level declares. None runs the code
 // it reads. Node's own modules, and the parser's installed packages.
 //
@@ -9,15 +9,19 @@
 // before a reader came lists none of it, and what the pull request's base held of it is reported, never failed, until
 // --write lists it (AGENTS.md, "Nothing locks a project").
 import path from "node:path";
-import { CODE, functions, globals, imports, isModule, isP, jsxIn, lyingUnder, nameTree, tokens } from "./code-shape.mjs";
+import { CODE, globals, imports, isModule, isP, jsxIn, lyingUnder, nameTree, tokens } from "./code-shape.mjs";
+import { javascriptFunctions } from "./javascript-functions.mjs";
 import { OWN as CS_OWN, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "./shape-csharp.mjs";
 import { unnamedFor, unreachedFor } from "./parser.mjs";
 import { OWN as PY_OWN, STDLIB, normal, pythonPackages, readPython, resolvePython } from "./shape-python.mjs";
 
 // Each reader by its name, with what it reads, as a note says it.
 export const READERS = {
+  // (JavaScript and TypeScript as their functions were read by a lexer written here, until #530's item 6, and the files
+  // that hold JSX apart: no file is read so now, and a baseline that names them stays one the check reads)
   javascript: "JavaScript and TypeScript",
   jsx: "files that hold JSX",
+  "javascript-tree": "JavaScript and TypeScript, their functions by the parser",
   // (C# as its functions were read by a lexer written here, until #529: no file is read so now, and a baseline that
   // names it stays one the check reads)
   csharp: "C#, its functions by the lexer",
@@ -32,8 +36,11 @@ export const READERS = {
 // a project's pull request, or for a project's own job naming the core's first install alone (parser.mjs, unreachedFor,
 // unnamedFor): the check reads their finds as a reader's the baseline does not name, reported and never failed, and
 // says so (#654, point 4; #719).
-export const unreachedReaders = () => (unreachedFor("csharp") ? ["csharp-tree"] : []);
-export const unnamedReaders = () => (unnamedFor("csharp") ? ["csharp-tree"] : []);
+// (each reader on the parser, by the grammars it reads with)
+const ON_PARSER = { "javascript-tree": ["javascript", "typescript", "tsx"], "csharp-tree": ["csharp"] };
+const readersWhere = gone => Object.keys(ON_PARSER).filter(r => ON_PARSER[r].some(gone));
+export const unreachedReaders = () => readersWhere(unreachedFor);
+export const unnamedReaders = () => readersWhere(unnamedFor);
 // What a baseline that names no reader was written with: the check as #246 built it.
 export const FIRST_READS = ["javascript"];
 
@@ -69,17 +76,16 @@ export const REACH = {
 };
 export const reachRuns = runsOf;
 
-const JSX_FILES = [".jsx", ".tsx"];
 // (files that are modules by their extension, whatever they hold; and types alone, which no page loads)
 const NEVER_SCRIPTS = [".mjs", ".cjs", ".mts", ".cts"];
 
-// A file of JavaScript or TypeScript: its tokens, read with JSX where it may hold it. One whose JSX the reader cannot
-// follow to its end is read without it for its imports, and its functions cannot be told.
+// A file of JavaScript or TypeScript: its functions on the parser (none where its packages are not installed), and its
+// tokens, read with JSX where it may hold it, for its imports and names; one whose JSX the lexer cannot follow to its end
+// is read without it.
 function javascript(file, text) {
-  const jsx = jsxIn(file), toks = tokens(text, jsx);
-  const held = JSX_FILES.includes(path.posix.extname(file)) || toks.some(t => t.t === "jsx");
-  const read = toks.lost ? tokens(text) : toks;
-  return { reader: held ? "jsx" : "javascript", toks: read, functions: toks.lost ? null : functions(toks), imports: imports(read), own: JS_OWN, lang: "javascript" };
+  const toks = tokens(text, jsxIn(file)), read = toks.lost ? tokens(text) : toks;
+  const functions = unreachedReaders().includes("javascript-tree") ? [] : javascriptFunctions(file, text);
+  return { reader: "javascript-tree", toks: read, functions, imports: imports(read), own: JS_OWN, lang: "javascript" };
 }
 
 // Each file of code as its reader reads it: { reader, toks, functions (null where they cannot be told), imports, own,
