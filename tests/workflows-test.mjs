@@ -85,8 +85,10 @@ ok(spelt.fails.length === 1 && spelt.notes.length === 0, "a key spelt like a rea
 // by its length; one unchanged on the base, and one with no base, are only noted by repeated(): #752)
 const longText = changed => `on: pull_request\n# ${"x".repeat(LONGEST)}${changed}\n`, longFiles = text => [{ file: "long.yml", text }];
 const longChanged = unreadied(longFiles(longText("a")), () => longText("b")), longSame = unreadied(longFiles(longText("a")), () => longText("a")), longAdded = unreadied(longFiles(longText("a")), () => null);
-ok(longChanged.fails.length === 1 && mended(longChanged.fails[0]) && longSame.fails.length === 0 && longAdded.fails.length === 1 && unreadied(longFiles(longText("a")), null).fails.length === 0,
-  "a file past the length read that a pull request changes or adds fails with its mend; one unchanged, or read with no base, does not", [...longChanged.fails, ...longAdded.fails].join("\n"));
+const longCut = unreadied(longFiles(longText("a")), () => longText("abcd")), longMore = unreadied(longFiles(longText("abcd")), () => longText("a")), longLost = unreadied(longFiles(longText("a")), () => longText("ready_for_review"));
+const longShort = unreadied(longFiles(longText("a")), () => "on: push\n");
+ok(longChanged.fails.length === 0 && longSame.fails.length === 0 && longCut.fails.length === 0 && longMore.fails.length === 1 && mended(longMore.fails[0]) && longLost.fails.length === 1 && longShort.fails.length === 1 && longAdded.fails.length === 1 && unreadied(longFiles(longText("a")), null).fails.length === 0,
+  "a file past the length read that a pull request adds, or grows, or makes name ready_for_review less often, fails with its mend; one cut a little, or unchanged, or read with no base, does not", [...longMore.fails, ...longLost.fails, ...longShort.fails, ...longAdded.fails].join("\n"));
 // (a base past the length read has no listed breaches: the file cut under the length, as its failure asks, holds its old ones as
 // held, never as new, and a pull request that adds one to a base that was read still fails)
 const shrunk = { dupes: "on: pull_request\nx: 1\nx: 2\njobs:\n  c:\n    uses: someone/else/.github/workflows/copies.yml@" + "a".repeat(40) + "\n", base: `on: push\nx: 1\nx: 2\n# ${"x".repeat(LONGEST)}\n` };
