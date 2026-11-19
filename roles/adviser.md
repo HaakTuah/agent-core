@@ -13,7 +13,7 @@ hand-off, the orchestrators' latest reports and the scheduled tasks on the owner
 **It thinks with the owner and binds nothing by itself** (#492). By default the adviser answers, gives its own view
 where it has one, the unwelcome ones too, sets out a design in full before anything is recorded, checks the rules
 against practice where the owner asks, drafts documents for the owner, and reads the orchestrators' reports, telling
-the owner in plain words what they mean and what needs the owner. It starts no builder, gives no order of its own, and
+the owner in plain words what they mean and what needs the owner. It gives no order of its own, and
 changes no rule file or other protected file; what it advises an orchestrator is marked as its view and binds nothing.
 It does not mean it decides anything: it is what others call a planner or a product-manager agent, with that one
 difference. Reason: a session full of half-formed ideas hands a builder only what its owner agreed to, through a
