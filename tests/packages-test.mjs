@@ -151,7 +151,7 @@ if (failed) { console.log(`FAIL ${failed} of the lock file's checks above failed
 // ---- nothing of another publisher's tracked: no node_modules/, no carried folder ----
 {
   const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" }).split("\0").filter(Boolean);
-  const theirs = f => /(?:^|\/)node_modules(?:\/|$)/u.test(f) || f.startsWith("third-party/");
+  const theirs = f => /(?:^|\/)node_modules(?:\/|$)/u.test(f) || /^\.packages\/pypi(?:\/|$)/u.test(f) || f.startsWith("third-party/");
   ok(!tracked.some(theirs), "no file of another publisher's is tracked in the core, nor a link in its install's place: its packages are installed, never carried", tracked.filter(theirs).slice(0, 5).join(", "));
   const ignore = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
   ok(/^\/\.packages\/node_modules$/mu.test(ignore) && /^\/\.packages\/pypi$/mu.test(ignore) && ["/.packages/", "/.packages/.npmrc", "/.packages/package.json", "/.packages/package-lock.json", "/.packages/requirements.txt"].every(f => ignore.split("\n").includes(`!${f}`)), "the core's .gitignore, which travels to the copy's root, keeps the install out of git, a link in its place too, and the copy's package list, lock file and .npmrc in it");
@@ -259,6 +259,16 @@ try {
   fs.writeFileSync(jobEnv, "");
   const pipWarned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "pypi"], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...inPr, [["PIP_INDEX", "_URL"].join("")]: "http://127.0.0.1:9/simple", PIP_TIMEOUT: "2", PIP_RETRIES: "1", PIP_NO_CACHE_DIR: "1" } });
   ok(pipWarned.status === 0 && /^::warning::The core's packages could not be installed from \.packages\/requirements\.txt, twice/mu.test(pipWarned.stdout) && /^CORE_PACKAGES_UNREACHED=1$/mu.test(fs.readFileSync(jobEnv, "utf8")), "and so is PyPI's, for the code scan's engine", `${pipWarned.status} ${pipWarned.stdout}${pipWarned.stderr}`);
+  // (but not where pip, once a retry got through, refused a wheel for its hash: a python3 that prints both, on a system
+  // that runs a shell script by its name)
+  if (process.platform !== "win32") {
+    const bin = path.join(tmp, "fake-bin");
+    fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(bin, "python3"), "#!/bin/sh\necho \"WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ProtocolError('Connection aborted.')': /x\" >&2\necho 'ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE.' >&2\nexit 1\n", { mode: 0o755 });
+    fs.writeFileSync(jobEnv, "");
+    const refusedHash = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "pypi"], { cwd: project, encoding: "utf8", timeout: 60000, env: { ...inPr, PATH: `${bin}${path.delimiter}${process.env.PATH}` } });
+    ok(refusedHash.status === 1 && !fs.readFileSync(jobEnv, "utf8"), "and a wheel pip refused for its hash after a retry fails, the job told nothing, though a connection broke on the way", `${refusedHash.status} ${refusedHash.stdout}${refusedHash.stderr}`);
+  }
   // (what would reach past the core's own files: a shrinkwrap npm reads first, another registry, a link in the install's place)
   const refuses = (what, plant, unplant, said) => {
     plant();

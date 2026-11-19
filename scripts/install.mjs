@@ -52,6 +52,10 @@ function refusal(lock, into) {
   const folder = path.join(root, into.replace(/\/$/u, "")); // (no "/" after it, which would read the link's target)
   // (a link first, before anything is read through it, for each registry's install)
   for (const f of [packages, folder]) if (fs.lstatSync(f, { throwIfNoEntry: false })?.isSymbolicLink()) return `${f} is a link, which the install would write through, or empty. Mend: remove the link, then run this again`;
+  // (and files git tracks in the install's folder, which it would replace, for each registry's install too)
+  let tracked = "";
+  try { tracked = spawnSync("git", ["ls-files", "--", into], { cwd: root, encoding: "utf8" }).stdout ?? ""; } catch { /* (no git: nothing tracked) */ }
+  if (tracked.trim()) return `${folder} holds files git tracks, which the install would replace. Mend: take them out of git (git rm -r --cached ${into}), then run this again`;
   if (lock !== REGISTRIES.npm.lock) return null;
   // (what the package list and lock file hold, read before npm runs: the npm that comes with the least Node fetches
   // whatever source a spec names, and runs its prepare script, whatever setting says otherwise)
@@ -65,9 +69,6 @@ function refusal(lock, into) {
   try { npmrc = fs.readFileSync(at(".npmrc"), "utf8"); } catch { /* (none: npm's own registry) */ }
   const others = npmrcOthers(npmrc);
   if (others.length) return `${at(".npmrc")} holds ${others.length === 1 ? "a line" : `${others.length} lines`} beside the core's own two settings (the first: ${JSON.stringify(others[0].slice(0, 80))}), which npm would read: a registry, a host's token, a proxy or a certificate would send the install elsewhere. Mend: take ${others.length === 1 ? "that line" : "those lines"} out; the core's .npmrc holds ignore-scripts=true and min-release-age alone`;
-  let tracked = "";
-  try { tracked = spawnSync("git", ["ls-files", "--", into], { cwd: root, encoding: "utf8" }).stdout ?? ""; } catch { /* (no git: nothing tracked) */ }
-  if (tracked.trim()) return `${folder} holds files git tracks, which the install would replace. Mend: take them out of git (git rm -r --cached ${into}), then run this again`;
   return null;
 }
 
@@ -75,10 +76,12 @@ function refusal(lock, into) {
 // (a lock file npm cannot read, an integrity that does not match), which a pull request could bring about. Read from
 // the program's own line alone, never from a message that echoes what the lock file holds (a version, an integrity),
 // which could name such an error (#714): npm's line "npm error code <code>" ("npm ERR!" before npm 10), and pip's
-// retry, in Python's words, of a connection it could not make or a read that timed out.
+// retry, in Python's words, of a connection it could not make or a read that timed out, where pip refused no wheel for
+// its hash, since a retry that later got through ends in another failure.
 const NPM_UNANSWERED = /^npm (?:ERR!|error) code (?:ETIMEDOUT|ESOCKETTIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|E5\d\d)$/mu;
 const PIP_UNANSWERED = /^WARNING: Retrying \(Retry\([^)]*\)\) after connection broken by '(?:NewConnectionError|ConnectTimeoutError|ReadTimeoutError|ProtocolError)\(/mu;
-const unanswered = text => NPM_UNANSWERED.test(String(text ?? "")) || PIP_UNANSWERED.test(String(text ?? ""));
+const PIP_REFUSED = /^ERROR: THESE PACKAGES DO NOT MATCH THE HASHES/mu;
+const unanswered = text => NPM_UNANSWERED.test(String(text ?? "")) || (PIP_UNANSWERED.test(String(text ?? "")) && !PIP_REFUSED.test(String(text ?? "")));
 
 const named = process.argv.slice(2);
 const unknown = named.filter(n => !Object.hasOwn(REGISTRIES, n));
