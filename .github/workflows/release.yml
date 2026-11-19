@@ -5,15 +5,16 @@
 # anything is read. Before the cut it runs the upgrade test on Windows on that commit (tests/upgrade-test.mjs, which on
 # Linux runs on every pull request and push in tests.yml), since what it guards reaches a project only through a
 # release and on Windows it set the length of every pull request's run (#715); it runs it too once a day on main, where
-# it cuts nothing, so a break is found among a day's merges, and where minutes are billed (a private repository) only
-# before a release. It cuts only where that test passed, every check the push of that commit to main started has
+# it cuts nothing, so a break is found among a day's merges, and where minutes are billed (a private repository, or
+# one whose visibility could not be read) only before a release. It cuts only where that test passed, every check the push of that commit to main started has
 # finished and passed, and main has not moved on since the run began (scripts/release.mjs, which also numbers the
 # release and never moves a tag that exists); otherwise it fails, says which check holds it, and is started again
 # later. This repository only; no project calls it. The cut may write this repository's contents, which the tag needs,
-# and read its Actions runs; the token reaches the one step that cuts, through git's own credential helper, and is
-# never written into a command or a file; the upgrade test reads only. It takes no input: a run's inputs are shown to
-# anyone who can read the repository before any step could check them, so the owner's word for a release is not
-# written here (floor rule 11), and no text of anyone's reaches a step.
+# and read its Actions runs; that token reaches the one step that cuts, through git's own credential helper, and is
+# never written into a command or a file. The first job's token, which reads only, asks whether the repository is
+# public; the upgrade test has none. It takes no input: a run's inputs are shown to anyone who can read the repository
+# before any step could check them, so the owner's word for a release is not written here (floor rule 11), and no text
+# of anyone's reaches a step.
 name: release
 run-name: ${{ github.event_name == 'schedule' && 'the upgrade test on Windows, daily (no release)' || 'release' }}
 
@@ -34,18 +35,29 @@ jobs:
   main:
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    outputs:
+      public: ${{ steps.visibility.outputs.public }}
     steps:
       - name: Only on main
         run: |
           [ "$GITHUB_REF" = refs/heads/main ] || { echo "::error::a release is cut on main alone, and this run was started on another branch or a tag. Mend: start the release workflow again on main"; exit 1; }
+      # (read from GitHub, since a scheduled run's event may not say it: only "false" read makes the daily run go on,
+      # so where nothing is read the Windows jobs start on a release alone, and in a private repository, where minutes
+      # are billed, the daily run is this one job)
+      - name: Whether the repository is public, its minutes free, for the daily run
+        id: visibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          private=$(gh api "repos/$GITHUB_REPOSITORY" --jq .private || true)
+          echo "private: ${private:-not read}"
+          echo "public=$([ "$private" = false ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
   # (the upgrade test on Windows in two jobs side by side, each a part of it under the test's time mark: the older of
   # the two releases with the copy older than the first, and the newer release; #304, #515, #715)
   upgrade:
     needs: main
-    # (the daily run only where the repository is known to be public, its minutes free: one whose event does not say
-    # so pays nothing)
-    if: ${{ github.event_name != 'schedule' || github.event.repository.private == false }}
+    if: ${{ github.event_name != 'schedule' || needs.main.outputs.public == 'true' }}
     name: upgrade (windows-latest, ${{ matrix.part }})
     strategy:
       fail-fast: false
