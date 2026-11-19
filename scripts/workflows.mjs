@@ -25,8 +25,9 @@
 // The rest of rule 2 is held elsewhere: that every action is pinned to a full commit SHA by GitHub's own setting, which
 // reads a workflow as GitHub runs it (README.md, "Setting up"); workflow_run, the fewest permissions and untrusted text
 // in a script by the reviews, and by CodeQL where the repository has it. The copy of the core (core/) is checked in the
-// core, which runs this on itself. Reads only; git and Node's own modules. It checks the project it lies in, whatever the
-// directory it is started from. Run by the copies workflow (.github/workflows/copies.yml).
+// core, which runs this on itself. Reads only; git, Node's own modules and the YAML package the core installs
+// (packages.mjs). It checks the project it lies in, whatever the directory it is started from. Run by the copies workflow
+// (.github/workflows/copies.yml).
 //
 //   node core/scripts/workflows.mjs           from a project's root, as the copies workflow runs it
 //   node scripts/workflows.mjs --core         in the core's own repository
