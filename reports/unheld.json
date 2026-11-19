@@ -269,16 +269,6 @@
       "by": "#556",
       "why": "a maintained linter's rules read its second half exactly, ESLint's no-eval, no-implied-eval and no-new-func; CodeQL's XSS and code-injection queries read markup built from untrusted data: name both, in part"
     },
-    "floor/topics/weaknesses.md: 9. Security alerts and reported weaknesses": {
-      "mark": "case",
-      "by": "#550",
-      "why": "a case shows a session a weakness in merged code and reads that nothing of it lands in a file, PR, issue or comment"
-    },
-    "floor/topics/weaknesses.md: In merged code, if it reaches what the threat model protects": {
-      "mark": "case",
-      "by": "#550",
-      "why": "the same case as rule 9's: nothing public is written of the weakness"
-    },
     "floor/topics/weaknesses.md: Any other weakness in merged code": {
       "mark": "case",
       "by": "#550",

@@ -107,7 +107,7 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   const root = path.join(fresh({ "outside.yml": "on: push\n", "in/.github/workflows/b.yml": "on: push\n" }), "in");
   // (the whole of scripts/, as a project's copy holds it, so whatever the check imports is there)
   fs.cpSync(fileURLToPath(new URL("../scripts", import.meta.url)), path.join(root, "core/scripts"), { recursive: true });
-  fs.cpSync(fileURLToPath(new URL("../third-party", import.meta.url)), path.join(root, "core/third-party"), { recursive: true });
+  fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(root, "core/.packages"), { recursive: true });
   fs.symlinkSync(path.join(root, "../outside.yml"), path.join(root, ".github/workflows/a.yml"));
   fs.writeFileSync(path.join(root, ".github/workflows/c.yml"), Buffer.from("\ufeffon: push\n", "utf16le"));
   for (const a of [["init", "-q"], ["add", "-A"]]) spawnSync("git", a, { cwd: root });

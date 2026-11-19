@@ -40,7 +40,7 @@ const TWICE = "name: twice-staged\n\non:\n  push:\n\npermissions:\n  contents: r
 // A job of the tests on a pull request and on a push, which selects them; PASSED is where --passed stands (#457). It
 // names no SELECT_BASE, which the step of the tests a change can reach reads, so that staging this one leaves that
 // one's reading as it was.
-const PUSHED = "name: tests-pushed\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      checks: read\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/select.mjs --env RUNPASSED\n        env:\n          SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}\n          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}\n      - run: if [ \"$RUN\" = all ]; then node --test; elif [ \"$RUN\" != none ]; then node --test $RUN; fi\n";
+const PUSHED = "name: tests-pushed\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      checks: read\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/install.mjs\n      - run: node core/scripts/select.mjs --env RUNPASSED\n        env:\n          SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}\n          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}\n      - run: if [ \"$RUN\" = all ]; then node --test; elif [ \"$RUN\" != none ]; then node --test $RUN; fi\n";
 
 export const STAGES = {
   "16 November 2026, hostile tests for every named input": {
@@ -83,7 +83,7 @@ export const STAGES = {
       if (!fs.existsSync(at(dir, "package-lock.json"))) write(dir, "stage-npm/package-lock.json", "{}\n");
       const core = at(dir, ".github/workflows/licences.yml");
       if (fs.existsSync(core)) { write(dir, ".stage-licences/licences.yml", fs.readFileSync(core, "utf8")); fs.rmSync(core); }
-      write(dir, ".github/workflows/licences-own.yml", "name: licences-own\n\non:\n  pull_request:\n\njobs:\n  licences:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/licences.mjs checks/licences.json\n      - run: node core/scripts/agent-tools.mjs checks/licences.json\n      - run: node core/scripts/lookup.mjs checks/licences.json\n");
+      write(dir, ".github/workflows/licences-own.yml", "name: licences-own\n\non:\n  pull_request:\n\njobs:\n  licences:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/install.mjs\n      - run: node core/scripts/licences.mjs checks/licences.json\n      - run: node core/scripts/agent-tools.mjs checks/licences.json\n      - run: node core/scripts/lookup.mjs checks/licences.json\n");
     },
     mend: dir => {
       write(dir, ".github/workflows/licences-own.yml", `${read(dir, ".github/workflows/licences-own.yml")}      - run: node core/scripts/exact-versions.mjs checks/licences.json\n`);
@@ -169,7 +169,7 @@ export const STAGES = {
       write(dir, "core-manifest.md", read(dir, "core-manifest.md").replace(/^(\| \*mutation tool\* \| `none`): no tests yet[^|\n]*\|/m, "$1: no mutation tool is named for this project's language yet |"));
     },
     // (as the step words it: a step that selects, with its base, before the tests, which run what it names)
-    mend: dir => write(dir, ".github/workflows/tests-selected.yml", "name: tests-selected\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/select.mjs --env RUN\n        env:\n          SELECT_BASE: HEAD^1\n      - run: if [ \"$RUN\" = all ]; then node --test; else node --test $RUN; fi\n"),
+    mend: dir => write(dir, ".github/workflows/tests-selected.yml", "name: tests-selected\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/install.mjs\n      - run: node core/scripts/select.mjs --env RUN\n        env:\n          SELECT_BASE: HEAD^1\n      - run: if [ \"$RUN\" = all ]; then node --test; else node --test $RUN; fi\n"),
   },
   "18 November 2026, a tree that passed is not run again": {
     // (a job of the tests that selects on a pull request and on a push alike, with nothing for the push)
@@ -285,8 +285,8 @@ export const STAGES = {
   "16 November 2026, a new package looked up": {
     // (a project that runs the exact-versions and NuGet checks from a workflow of its own, without either lookup; its
     // workflow runs no licence or agent-tools script, whose own steps a workflow running them beside these would answer)
-    stage: dir => write(dir, ".github/workflows/packages-own.yml", "name: packages-own\n\non:\n  pull_request:\n\njobs:\n  packages:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/exact-versions.mjs checks/licences.json\n      - run: node core/scripts/nuget.mjs checks/licences.json --packages packages\n"),
-    mend: dir => write(dir, ".github/workflows/packages-own.yml", read(dir, ".github/workflows/packages-own.yml").replace("    steps:\n", "    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/lookup.mjs checks/licences.json --nuget\n      - run: node core/scripts/lookup.mjs checks/licences.json\n")),
+    stage: dir => write(dir, ".github/workflows/packages-own.yml", "name: packages-own\n\non:\n  pull_request:\n\njobs:\n  packages:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/install.mjs\n      - run: node core/scripts/exact-versions.mjs checks/licences.json\n      - run: node core/scripts/nuget.mjs checks/licences.json --packages packages\n"),
+    mend: dir => write(dir, ".github/workflows/packages-own.yml", read(dir, ".github/workflows/packages-own.yml").replace("    steps:\n      - run: node core/scripts/install.mjs\n", "    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/install.mjs\n      - run: node core/scripts/lookup.mjs checks/licences.json --nuget\n      - run: node core/scripts/lookup.mjs checks/licences.json\n")),
   },
   "17 November 2026, the checks as one job": {
     // (the call to core.yml folds the description check and leaves the copies checks out, their own call taken out too;
@@ -330,11 +330,11 @@ export const STAGES = {
       write(dir, file, `${(fs.existsSync(at(dir, file)) ? read(dir, file) : "# Choices\n").replace(/\n*$/, "\n")}\n## Choice: the project's foundations, judged again as if written today\n\n- Looked for: none the list lacked, in the registry and on the web.\n- The blind pick: the same stack.\n- The judgment: it stands; staying is the answer.\n- The suggestion: #1\n- Reopens it: a need in numbers the stack misses.\n`);
     },
   },
-  "17 November 2026, the packages the copy carries": {
-    // (a suite of the project's own that runs on a change to its code or to the core's scripts, and not on one to the
-    // packages they run; the mend adds that folder to its filter)
-    stage: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS),
+  "18 November 2026, the core's packages installed from its lock file": {
+    // (a job of the project's own that runs a script of the copy with nothing installed, before it only a step that names
+    // the install and one that never runs; the mend installs first, guarded, as it can go in ahead of the sync)
+    stage: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: echo core/scripts/install.mjs\n      - if: false\n        run: node core/scripts/install.mjs\n      - run: node core/scripts/steps.mjs\n")),
     after: dir => fs.rmSync(at(dir, ".github/workflows/scripts-staged.yml"), { force: true }),
-    mend: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - 'core/scripts/**'\n", "      - 'core/scripts/**'\n      - 'core/third-party/**'\n")),
+    mend: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\n      - run: node core/scripts/steps.mjs\n")),
   },
 };

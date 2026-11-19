@@ -23,7 +23,8 @@ import { fileURLToPath } from "node:url";
 import { kitHooks, listed, readProject, check as toolsCheck } from "./agent-tools.mjs";
 import { parse as parseChoices, where as choicesAt } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
-import { THIRD_PARTY, corePath } from "./core-path.mjs";
+import { corePath } from "./core-path.mjs";
+import { installed } from "./packages.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
 import { progressOf } from "./done-when.mjs";
 import { leadsOut } from "./guards.mjs";
@@ -153,6 +154,9 @@ function strengthNamed(p) {
 // them (workflows.mjs and yaml-keys.mjs, beside this file), which GitHub refuses, running none of the file's jobs: the
 // old ones, which the check notes and passes, listed here at every sync until they are gone (#393). Null where none is.
 function keysOnce(p) {
+  // (with the core's packages not installed, as after a sync made by a copy from before #654, this step cannot be read:
+  // it says so, with the install, and every other step is still told)
+  if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`node ${corePath(p.root) || "core/"}scripts/install.mjs\`, then \`node ${corePath(p.root) || "core/"}scripts/steps.mjs\` again.`;
   const found = reads(p.files).flatMap(f => twice(p.read(f) ?? "").map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
   return found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : null;
 }
@@ -319,18 +323,25 @@ function suitesOnPins(p) {
   return started.length ? `A sync that only moves the pin of a call to the core's workflows starts no suite of the project's own: each workflow named lists in its \`paths-ignore\`, beside \`core/**\` and \`core-manifest.md\`, each file that holds only such calls by its exact path, or, where it filters with \`paths\`, takes each out with \`!<its path>\` after its patterns (\`core.yml\` checks those pins on every pull request). Started by such a file alone: ${started.join("; ")}.` : null;
 }
 
-// Where a workflow of the project's filters its pull requests by their paths and runs on a change to a script of the
-// copy, each file of the packages the copy carries for them (its own files, as the project holds them), a change to it
-// let through alike; null where each workflow does.
-function scriptsWithPackages(p) {
-  const copy = corePath(p.root) || "core/", scripts = p.files.filter(f => f.startsWith(`${copy}scripts/`)), packages = p.files.filter(f => f.startsWith(`${copy}${THIRD_PARTY}`));
-  readable(p, text => /paths(-ignore)?\s*:/.test(text));
-  const wrong = Object.entries(p.workflows).filter(([, w]) => {
-    const on = w.yaml?.on?.pull_request, only = on?.paths, ignore = on?.["paths-ignore"];
-    const through = f => (Array.isArray(only) ? pathsLetThrough(only, [f]) : Array.isArray(ignore) ? !pathsLetThrough(ignore, [f]) : true);
-    return scripts.some(through) && packages.some(f => !through(f));
-  }).map(([f]) => `\`.github/workflows/${shown(f)}\``);
-  return wrong.length ? `In one small pull request, let a change under \`${copy}${THIRD_PARTY}\` through wherever a change to a script under \`${copy}scripts/\` is, in the \`paths:\` (add \`'${copy}${THIRD_PARTY}**'\`) or \`paths-ignore:\` of ${wrong.join(", ")}: those scripts run the packages the copy carries in that folder.` : null;
+// Where a job of the project's own workflows runs a script of the copy before the core's packages are installed from its
+// lock file (#654): each such workflow, with the mend; null where each installs first. A call to the core's own
+// workflows installs by itself, and holds no step to read. The install counts only as a step that runs it, node and the
+// copy's install.mjs as a command's first words (after a shell's then, else or do), with no `if:` or
+// continue-on-error of its own; a command that only names the path, as echo does, installs nothing.
+function installsFirst(p) {
+  const copy = corePath(p.root) || "core/", script = `${copy}scripts/`, install = `${copy}scripts/install.mjs`;
+  const bare = t => t.replace(/^\.\//u, "");
+  // (a command, as check-configs.mjs reads it: its words; one runs a script of the copy where a word is one's path)
+  const runs = (st, file) => st.cmds.some(c => c.some(w => file(bare(w.text))));
+  const installs = st => st.unconditioned && st.cmds.some(c => {
+    const w = c.map(x => x.text); while (["then", "else", "do"].includes(w[0])) w.shift();
+    return /(?:^|[\\/])node(?:\.exe)?$/u.test(w[0] ?? "") && bare(w[1] ?? "") === install;
+  });
+  const wrong = Object.entries(p.workflows).filter(([, w]) => jobsOf(w).some(job => {
+    const at = job.steps.findIndex(st => runs(st, t => t.startsWith(script) && t.endsWith(".mjs") && t !== install));
+    return at >= 0 && !job.steps.slice(0, at).some(installs);
+  })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
+  return wrong.length ? `In one small pull request, add a step \`node ${install}\` before the first step that runs a .mjs script under \`${script}\` in each such job of ${wrong.join(", ")}: the core's scripts load the packages it installs from its lock file, and without them a check says it did not run.` : null;
 }
 
 // Where the project's call to the NuGet check starts only on the paths it names, each build file a build reads by
@@ -584,6 +595,8 @@ const plainAction = (st, job, w) => Object.keys(st.env).length === 0 && visible(
 // Whether a job runs in a container of its own, or beside service containers, which may mount its folder: it runs as
 // they are given, their env and options too, so nothing counts there.
 const boxedJob = job => job?.container !== undefined || job?.services !== undefined;
+// Whether a step runs whenever its job reaches it: no `if:` and no continue-on-error of its own.
+const unconditioned = st => st?.if === undefined && !st?.["continue-on-error"];
 // A step of a job as the step reads it: its commands, whether its one lookup counts, its action and its env.
 function stepOf(st, job, w, started) {
   const cmds = typeof st?.run === "string" ? commands(st.run) : [];
@@ -593,7 +606,7 @@ function stepOf(st, job, w, started) {
   const counts = started && cmds.length === 1 && alone && stops && st.if === undefined && job?.if === undefined && !st["continue-on-error"] && !job?.["continue-on-error"];
   const env = st?.env && typeof st.env === "object" ? st.env : {};
   const boxed = boxedJob(job);
-  return { cmds, counts, hidden: boxed || hides(st, env, job, w), plain: !boxed && typeof st?.uses === "string" && plainAction({ ...st, env }, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
+  return { cmds, counts, unconditioned: unconditioned(st), hidden: boxed || hides(st, env, job, w), plain: !boxed && typeof st?.uses === "string" && plainAction({ ...st, env }, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
 }
 
 // Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads
@@ -632,13 +645,14 @@ const lookupOf = (st, flag, copy, at, job) => {
   return !name || st.env[name[1] ?? name[2]] === at.step.env[name[1] ?? name[2]];
 };
 // Where a lookup stands, as the step's mend says it (beforeLookup).
-const FIRST = copy => `with nothing before it in its job but the checkout, \`setup-\` actions and the core's lookup, exact-versions, licence and agent-tools scripts, each run as \`node ${copy}scripts/<name>.mjs\` from the project's root under bash (named, or on GitHub's own Linux or macOS runner) in a job with no container or services, with no env but a variable its config is named by, each setup action given only its version, its cache, if named, turned off (\`package-manager-cache: false\`, or in \`setup-dotnet\` \`cache: false\`), so that nothing of the pull request's (\`npm\`, \`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`) has run before it`;
+const FIRST = copy => `with nothing before it in its job but the checkout, \`setup-\` actions and the core's lookup, exact-versions, licence, agent-tools and install scripts, each run as \`node ${copy}scripts/<name>.mjs\` from the project's root under bash (named, or on GitHub's own Linux or macOS runner) in a job with no container or services, with no env but a variable its config is named by, each setup action given only its version, its cache, if named, turned off (\`package-manager-cache: false\`, or in \`setup-dotnet\` \`cache: false\`), so that nothing of the pull request's (\`npm\`, \`dotnet\`, a build script, a local action, \`${copy}scripts/nuget.mjs\`) has run before it`;
 // Whether a step may stand before a lookup: checkout or a setup action, or a run, by the runner's own `node`, from the
 // project's root, of one of the core's scripts that only read (BEFORE_LOOKUP), named by the copy's own path, with nothing
 // hidden (hides). Anything else (dotnet under any spelling, npm, a build script, make, a local action, a script of the
 // core's that restores or runs the project's tests) may run the pull request's own files, which could change what the
 // lookup reads or the lookup itself: an allow-list, not a search for a build.
-const BEFORE_LOOKUP = ["lookup.mjs", "exact-versions.mjs", "licences.mjs", "agent-tools.mjs"];
+// (and the install of the core's own packages from its lock file, which runs none of their code: #654)
+const BEFORE_LOOKUP = ["lookup.mjs", "exact-versions.mjs", "licences.mjs", "agent-tools.mjs", "install.mjs"];
 const beforeLookup = (st, copy) => (st.uses ? st.plain && /^actions\/(?:checkout|setup-[\w-]+)@/u.test(st.uses)
   : !st.hidden && (st.dir === undefined || st.dir === ".") && st.cmds.length > 0 && st.cmds.every(c => c.length > 1
     && /^node(?:\.exe)?$/iu.test(c[0].text) && BEFORE_LOOKUP.some(n => c[1].text === `${copy}scripts/${n}` || c[1].text === `./${copy}scripts/${n}`)));
@@ -926,8 +940,9 @@ export const STEPS = [
     } },
   { lead: "17 November 2026, packages from the registry, the week's wait and pinned downloads", cost: COST.check, check: packagesHeld },
   { lead: "17 November 2026, held packages looked up again", cost: COST.read, unread: "whether a package has gone stale is its registry's answer on the day, and GitHub's, not a file's: the session that syncs runs `node core/scripts/held.mjs` once and puts what it prints in the sync pull request's description, each package gone stale a task; the scheduled look runs it again each month" },
-  { lead: "17 November 2026, the packages the copy carries", cost: COST.workflow, check: scriptsWithPackages,
-    partly: "which suites read the core's scripts is the project's own logic, read by the review" },
+  { lead: "18 November 2026, the core's packages installed from its lock file", cost: COST.workflow, check: installsFirst,
+    partly: "that a job reaching a script of the copy through the project's own npm or shell script installs first is read by the review" },
+  { lead: "18 November 2026, another publisher's code named in a lock file", cost: COST.line, unread: "how a project loads another publisher's code (a content network's script, a file copied in) is no file's to say exactly: the session that syncs reads the project's pages and folders for it" },
   { lead: "18 November 2026, a tree that passed is not run again", cost: COST.workflow, check: passedRuns,
     partly: "which check gates a project's tests is the project's own, as its ruleset names it, and which entries of a job's matrix a pull request leaves out is a reading of its expressions" },
 ];

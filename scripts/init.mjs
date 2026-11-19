@@ -23,7 +23,7 @@
 //              steps of core.yml's one job (oneJob), and each pull-request check started only once a pull request is
 //              no draft (READY_ONLY)
 //   --game     a game: the module game-design.md with the others
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -294,6 +294,13 @@ function writeKit(o, here, pin, out) {
   fs.mkdirSync(path.join(here, "core"));
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
   execFileSync("tar", ["-x", "-f", "-", "-C", "core"], { cwd: here, input: execFileSync("git", ["archive", pin], { cwd: ROOT, env: plainEnv(), maxBuffer: 1 << 28 }) });
+  // (and its packages, installed from its lock file as the sync installs them, into core/.packages/node_modules/, which the copy's
+  // own .gitignore keeps out of the commit; a failure leaves the kit written and says the mend: #654)
+  const installer = path.join(here, "core", "scripts", "install.mjs");
+  if (fs.existsSync(installer)) {
+    const r = spawnSync(process.execPath, [installer], { cwd: here, encoding: "utf8" });
+    if (r.status !== 0) console.log(`note the core's packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node core/scripts/install.mjs before running a check`);
+  }
   const marks = sizes(Object.fromEntries(startOf(Object.fromEntries(out)).map(f => [f, sizeOf(path.join(here, f))])));
   write("checks/sizes.json", `${JSON.stringify(marks, null, 2)}\n`);
   write("checks/licences.json", `${JSON.stringify(licences(o, f => fs.existsSync(path.join(here, f))), null, 2)}\n`);

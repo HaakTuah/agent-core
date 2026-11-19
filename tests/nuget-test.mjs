@@ -322,7 +322,7 @@ Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid"
 const here = fileURLToPath(new URL("../scripts", import.meta.url)); // (the scripts this tests, beside the folder tests/)
 fs.mkdirSync(path.join(repo, "core"), { recursive: true });
 fs.cpSync(here, path.join(repo, "core", "scripts"), { recursive: true });
-fs.cpSync(path.join(here, "..", "third-party"), path.join(repo, "core", "third-party"), { recursive: true });
+fs.cpSync(path.join(here, "..", ".packages"), path.join(repo, "core", ".packages"), { recursive: true });
 fs.cpSync(path.join(here, "..", "floor"), path.join(repo, "core", "floor"), { recursive: true });
 // where each package was taken from, as NuGet records it beside the package
 const APP = "src/App/App.csproj", only = [APP, L];
