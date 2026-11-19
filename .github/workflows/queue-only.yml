@@ -5,8 +5,9 @@
 # output "head" is the head it proved, or empty, which the caller hands to security-review.yml (its input "queue"); that
 # workflow honours it only where the pull request's files are one Markdown file and nothing that runs by itself, so a
 # caller changed in the pull request itself waves through nothing more. It runs where the security-review job runs, and
-# on a pull request only where it changes one file, so a project starts no job for it where it started none before. It
-# checks out the default branch, never the pull request, reads only, and writes nothing. No secret: untrusted text (the
+# on a pull request only where it changes one file; in a private repository, where each run is a billed job, only where
+# the caller passes "private", the owner's choice, so it adds no billed job to a project that changes nothing (AGENTS.md,
+# "Nothing locks a project"), whose queue-only pull requests are then reviewed as before. It checks out the default branch, never the pull request, reads only, and writes nothing. No secret: untrusted text (the
 # pull request's, its issues') reaches the script only as files and env, never a run line (floor rule 2).
 name: queue-only
 
@@ -24,7 +25,7 @@ on:
         type: boolean
         default: true
       private:
-        description: As security-review.yml's. Left out, false.
+        description: Whether it runs in a private repository, where each run is a billed job. Left out, it does not, and such a pull request is reviewed as any other.
         required: false
         type: boolean
         default: false
@@ -40,9 +41,10 @@ permissions:
 
 jobs:
   prove:
-    # (where security-review.yml's job runs, and of a pull request's events only one that changes one file)
+    # (where security-review.yml's job runs, in a private repository only where the caller passes "private", and of a
+    # pull request's events only one that changes one file)
     if: >-
-      ${{ (!github.event.repository.private || inputs.private || !inputs.advisory)
+      ${{ (!github.event.repository.private || inputs.private)
       && ((github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.pull_request.changed_files == 1
       && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')
       || (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.issue.state == 'open'
