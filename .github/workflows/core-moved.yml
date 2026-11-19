@@ -45,7 +45,7 @@ jobs:
         with:
           node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: The core's packages, installed from its lock files for the daily look at the core (#654; the parser's too, since the dose reads C#'s functions on it, #719)
-        run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then node "${CORE_AT}scripts/install.mjs" all; fi
+        run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then if [ -f "${CORE_AT}.packages/parser/package.json" ]; then node "${CORE_AT}scripts/install.mjs" all; else node "${CORE_AT}scripts/install.mjs"; fi; fi
       - name: One issue while the core is ahead of the project's copy
         env:
           GH_TOKEN: ${{ github.token }}

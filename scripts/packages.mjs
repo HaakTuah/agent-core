@@ -197,9 +197,10 @@ export function unreached(name) {
   return !installed(name) && (process.env.CORE_PACKAGES_UNREACHED === "1" || unnamed(name));
 }
 // Whether, in a copy, the job installed the core's first install but never the one whose list names the package (npm's
-// record of it absent): a job of the project's own written before that install came, which no change of the pull
-// request's made so, said as a warning with the mend, never failed (#719; "Nothing locks a project"). In the core, which
-// holds its tests, every job names what it runs, and a package not there fails.
+// record of it absent): as a job of the project's own written before that install came stands, said as a warning with
+// the mend, never failed (#719; "Nothing locks a project"). It is not compared with the base: a pull request that takes
+// `all` out of such a job is warned the same, the workflow being a protected file and the sync's step reporting the job.
+// In the core, which holds its tests, every job names what it runs, and a package not there fails.
 const own = fs.existsSync(path.join(root, "tests"));
 export function unnamed(name) {
   const install = installOf(name);

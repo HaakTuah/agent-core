@@ -324,7 +324,7 @@ jobs:
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' }}
         env:
           COPIES: ${{ inputs.copies }}
-        run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then if [ -n "$COPIES" ]; then node "${CORE_AT}scripts/install.mjs" all; else node "${CORE_AT}scripts/install.mjs"; fi; fi
+        run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then if [ -n "$COPIES" ] && [ -f "${CORE_AT}.packages/parser/package.json" ]; then node "${CORE_AT}scripts/install.mjs" all; else node "${CORE_AT}scripts/install.mjs"; fi; fi
       - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.copies != '' }}
         timeout-minutes: 5
