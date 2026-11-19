@@ -74,6 +74,16 @@ ok(same(csMisread.types, ["N.A"]) && csMisread.toks.some(t => t.v === "1e-9") &&
 const csLines = readCsharp("var s = @\"\n#not a directive\n\";\n#if A\nint x = 1; // one\n#else\nint x = 2; /* two\r\n   lines */\n#endif\nusing global::G.H;\n");
 ok(same(csLines.comments.map(c => `${c.line}:${c.text}`), ["5: one", "7: two\r", "8:   lines "]) && csLines.usings.length === 0 && csLines.toks.filter(t => t.v === "x").length === 2,
   "C#: a # inside a verbatim string is no directive; both sides of an #if are read; a comment's lines are read as the lexer read them; a using of global:: names nothing", JSON.stringify(csLines));
+// (the review's three cases: a hole right after an escaped brace, which the grammar reads as text, is read as code; a
+// global:: in a type argument leaves the target named; a comment of 600,000 lines is read whole, overflowing nothing)
+const escaped = readCsharp("class C { void M() { var s = $\"{{{DateTime.Now}}}\"; var e = $\"{{{{q}}}}\"; var f = $\"{{{Task.Delay(1):N0}}}\"; } }\n");
+const escapedWords = escaped.toks.map(t => t.v).filter(Boolean).join(" ");
+ok(escapedWords.includes("= DateTime . Now ;") && !escaped.toks.some(t => t.v === "q") && escapedWords.includes("= Task . Delay ( 1 ) ;") && !escaped.toks.some(t => t.v === "N0"),
+  "C#: a hole right after an escaped brace is read as code, to its format; an even run of braces is text", JSON.stringify(escaped.toks.map(t => t.v)));
+const typeArg = readCsharp("using Alias = Game.Rules.Box<global::System.String>;\nusing B = global::M.N;\nclass C {}\n");
+ok(same(typeArg.usings.map(u => u.target), ["Game.Rules.Box"]), "C#: a global:: inside the target's type arguments leaves the target named; one that qualifies the target names nothing", JSON.stringify(typeArg.usings));
+const manyLines = readCsharp(`/*${"\n".repeat(600000)}*/ class C { void M() { } }\n`);
+ok(manyLines.functions?.length === 1 && manyLines.comments.length === 600001, "C#: a comment of 600,000 short lines is read whole, its lines passed one at a time", JSON.stringify({ functions: manyLines.functions?.length, comments: manyLines.comments.length }));
 const csBroken = readCsharp("using A.B;\nnamespace N;\nclass Kept { }\nclass Lost { void M() { return x is [.., 1]; } }\n");
 ok(csBroken.functions === null && same(csBroken.usings.map(u => u.target), ["A.B"]) && same(csBroken.namespaces, ["N"]) && csBroken.types.includes("N.Kept"),
   "C#: a file the grammar cannot read whole has no functions told, and its usings and declarations are those the grammar read whole", JSON.stringify(csBroken));

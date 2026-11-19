@@ -311,8 +311,9 @@ function declarations(root, injected) {
 const join = (a, b) => (a && b ? `${a}.${b}` : a || b);
 
 // A using directive's target: { target, static, alias }; null where it names no dotted name: `using global::N;`, as the
-// lexer read it.
-const GLOBAL = node => { const stack = [node]; while (stack.length) { const n = stack.pop(); if (n.type === "alias_qualified_name") return true; stack.push(...n.namedChildren); } return false; };
+// lexer read it. A `global::` inside the target's type arguments (`using A = N.Box<global::S>;`) is no qualifier of the
+// target, which the lexer kept.
+const GLOBAL = node => { const stack = [node]; while (stack.length) { const n = stack.pop(); if (n.type === "alias_qualified_name") return true; stack.push(...n.namedChildren.filter(c => c.type !== "type_argument_list")); } return false; };
 function usingOf(node) {
   if (node.hasError || GLOBAL(node)) return null;
   const isStatic = node.children.some(c => c.type === "static"), alias = node.children.some(c => c.type === "=");
@@ -335,13 +336,14 @@ function tokensOf(root, text, comments) {
   const toks = [], stack = [root];
   while (stack.length) {
     const node = stack.pop(), line = node.startPosition.row + 1;
-    if (node.type === "comment") { comments.push(...commentOf(node, text, line)); continue; }
+    if (node.type === "comment") { for (const c of commentOf(node, text, line)) comments.push(c); continue; } // (one at a time: a comment of many lines would pass the limit of a call's arguments)
     if (STRINGS.has(node.type)) { toks.push({ t: "str", v: node.type === "character_literal" ? node.text.slice(1, -1) : "", line }); continue; }
     if (node.type === "interpolated_string_expression") {
       toks.push({ t: "str", v: "", line });
       const raw = node.children.some(c => c.type === "interpolation_start" && /"""/u.test(c.text));
       const holes = raw ? [] : node.namedChildren.filter(c => c.type === "interpolation");
       for (let k = holes.length - 1; k >= 0; k--) for (const c of [...holes[k].children].reverse()) if (!["interpolation_brace", "interpolation_alignment_clause", "interpolation_format_clause"].includes(c.type)) stack.push(c);
+      if (!raw) for (const tok of misreadHoles(node, holes, text)) toks.push(tok);
       continue;
     }
     if (node.childCount === 0) { leaf(toks, node, line); continue; }
@@ -350,6 +352,40 @@ function tokensOf(root, text, comments) {
   }
   return toks;
 }
+// The grammar reads a hole right after an escaped brace (`$"{{{x}}}"`) as the string's text, where C# reads `{{` then a
+// hole: a run of an odd count of `{` in the text outside the holes the grammar read. Its code, to the `}` that closes it
+// (before an alignment's `,` or a format's `:` at its own depth), is given as tokens after the string's, split as words,
+// numbers, strings and signs, as the lexer gave them, so a run of the clock in it is still read.
+const SPLIT = /@?[A-Za-z_\u0080-\uffff][\w\u0080-\uffff]*|\d[\w.]*|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|=>|\S/gu;
+function misreadHoles(node, holes, text) {
+  const out = [], from = node.startIndex;
+  let at = from;
+  for (const span of [...holes.map(h => [h.startIndex, h.endIndex]), [node.endIndex, node.endIndex]]) {
+    const runs = /\{+/gu, piece = text.slice(at, span[0]);
+    for (let m; (m = runs.exec(piece));) {
+      if (m[0].length % 2 === 0) continue;
+      const start = at + m.index + m[0].length, end = holeEnd(text, start, span[0]);
+      const line = node.startPosition.row + 1 + (text.slice(from, start).match(/\n/gu)?.length ?? 0);
+      for (const v of text.slice(start, end).match(SPLIT) ?? []) out.push(tokenOf(v, line));
+      runs.lastIndex = Math.max(runs.lastIndex, end - at);
+    }
+    at = span[1];
+  }
+  return out;
+}
+// Where a hole's code ends: at the `}` that closes it, or an alignment's `,` or a format's `:` at its own depth.
+function holeEnd(text, start, limit) {
+  let depth = 0, end = start;
+  for (; end < limit; end++) {
+    const c = text[end];
+    if ("([{".includes(c)) depth++;
+    else if (")]".includes(c) || (c === "}" && depth > 0)) depth--;
+    else if (c === "}" || (depth === 0 && (c === "," || c === ":"))) break;
+  }
+  return end;
+}
+const tokenOf = (v, line) => (/^["']/u.test(v) ? { t: "str", v: "", line } : /^\d/u.test(v) ? { t: "num", v, line } : WORDLIKE.test(v) ? { t: "id", v: v.replace(/^@/u, ""), line } : { t: "punct", v, line });
+
 // The lines of a comment, as the lexer read them: of a // comment its text to the line's end (a \r before it kept), and
 // of a /* */ one each line from after its /* to before its */.
 function commentOf(node, text, line) {
