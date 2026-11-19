@@ -146,8 +146,8 @@ export function realFiles(dir, folder, links) {
   for (const e of entries) if (e.isSymbolicLink()) links.add(path.posix.join(folder, e.name));
   return entries.filter(e => e.isFile() && e.name.endsWith(".md")).map(e => e.name).sort();
 }
-// The core's roles and modules under `dir` and `prefix`, and `links`: each symbolic link met where they stand, read as
-// nothing and refused by the reader (main, below).
+// The core's roles and modules under `dir` and `prefix`, and `links`: each symbolic link met where they stand, by its
+// path under `dir`, read as nothing and refused by the reader (main, below).
 export function library(dir, prefix) {
   const links = new Set();
   const read = f => regular(dir, `${prefix}${f}`);
@@ -155,7 +155,7 @@ export function library(dir, prefix) {
   const lib = gather(read, list);
   // (the floor's own folder and the core's AGENTS.md hold rules too, which rules.mjs reads: a link there is refused as well)
   realFiles(dir, `${prefix}floor`, links);
-  if (real(dir, `${prefix}AGENTS.md`) === "link") links.add("AGENTS.md");
+  if (real(dir, `${prefix}AGENTS.md`) === "link") links.add(`${prefix}AGENTS.md`);
   return { ...lib, links: [...links].sort() };
 }
 
@@ -398,7 +398,7 @@ function located(dir) {
   if (prefix === null) { console.error("FAIL: the core's roles/ and floor/ are not here as a real folder and file, none of them or the folders above them a link. Mend: run it from the project's root, where core-manifest.md names the core's path, or from the core's own root; where the core's copy is a link, put the copy itself in its place"); return 1; }
   const manifest = prefix ? regular(dir, "core-manifest.md") : null; // (leftOut reads none as no line)
   const all = library(dir, prefix);
-  for (const l of all.links) console.error(`FAIL: ${shown(`${prefix}${l}`)} is a symbolic link where the core's rules stand, and is read as nothing. Mend: put the file or folder itself in its place, or take the link out`);
+  for (const l of all.links) console.error(`FAIL: ${shown(l)} is a symbolic link where the core's rules stand, and is read as nothing. Mend: put the file or folder itself in its place, or take the link out`);
   if (all.links.length) return 1;
   return { prefix, all, manifest };
 }

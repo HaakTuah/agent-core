@@ -315,6 +315,17 @@ if (process.platform !== "win32") {
   ok(regular(rf, "inbox/item.md") === "# An item\n" && regular(rf, "inbox\\item.md") === (path.sep === "\\" ? "# An item\n" : null), "reading.mjs: a name with a backslash, a link, is the path checked and the path opened");
   const got = rules(rf, { agents: true });
   ok(!got.some(x => /elsewhere/u.test(`${x.key} ${x.text}`)), "rules.mjs: no rule is read through a folder or a file link in the rule folders");
+  // (in a project, the core under core/, a link is named by its path from the project's root, the core's folder once)
+  const pj = path.join(tmp, "reading-project");
+  for (const d of ["core/roles", "core/floor"]) fs.mkdirSync(path.join(pj, d), { recursive: true });
+  fs.writeFileSync(path.join(pj, "core-manifest.md"), "# The core's manifest\n");
+  fs.writeFileSync(path.join(pj, "core/floor/security.md"), "# The floor\n");
+  fs.writeFileSync(path.join(pj, "core/roles/builder.md"), "# The builder\n\nRead at the start of every task by the role `builder`.\n");
+  fs.symlinkSync(path.join(away, "x.md"), path.join(pj, "core/floor/more.md"));
+  fs.symlinkSync(path.join(away, "x.md"), path.join(pj, "core/AGENTS.md"));
+  const rp = spawnSync(process.execPath, [path.join(root, "scripts", "reading.mjs"), "--check"], { cwd: pj, env, encoding: "utf8", timeout: 5000 });
+  const outp = `${rp.stdout}${rp.stderr}`;
+  ok(rp.status === 1 && outp.includes("FAIL: core/floor/more.md is a symbolic link") && outp.includes("FAIL: core/AGENTS.md is a symbolic link") && !outp.includes("core/core/") && mended(outp), "reading.mjs --check in a project: each link is named by its path from the project's root, with its mend", outp);
 } else console.log("skip reading.mjs and rules.mjs: a link in a rule folder: links are not made here (Windows)");
 
 process.exit(failed ? 1 : 0);
