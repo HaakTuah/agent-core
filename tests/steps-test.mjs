@@ -888,6 +888,13 @@ ok(["check() { node core/scripts/lookup.mjs c.json; }", "for f in; do node core/
   "while false; do node core/scripts/lookup.mjs c.json; done", "{ node core/scripts/lookup.mjs c.json; }"].every(run => { const c = shown(run); return c.length > 1 && c.includes("node core/scripts/lookup.mjs c.json"); })
   && JSON.stringify(shown("until x; do y; done")) === JSON.stringify(["until", "x", "y"]),
   "a command inside a function, a loop, a case or a group is read with its keyword as a command before it, so no such step reads as one command run once");
+// (the fallback reviewer's check of ccee6c9: a here-document opened in a subshell is data to its delimiter's line, as
+// bash reads it; a subshell at a step's start is no extended glob)
+ok(copiesOf({ "a.yml": stepped("(cat <<E)\nnode core/scripts/copies.mjs config/fake.json\nE\nnode core/scripts/copies.mjs config/c.json") }) !== "config/fake.json"
+  && JSON.stringify(shown("(cat <<\"E\")\nnode fake.mjs\nE\nnode real.mjs")) === JSON.stringify(["cat", "node real.mjs"])
+  && JSON.stringify(shown("cat <<A <<-B\nnode x.mjs\nA\nnode y.mjs\n\tB\nnode z.mjs")) === JSON.stringify(["cat", "node z.mjs"])
+  && JSON.stringify(shown("( node core/scripts/lookup.mjs c.json )")) === JSON.stringify(["node core/scripts/lookup.mjs c.json"]),
+  "a here-document opened in a subshell, or second on its line, holds its lines as data to its delimiter's line, and a subshell at a step's start is read as one");
 // (the fallback reviewer's check of d32e5f0: a folder changed behind "!" is changed, and a pipeline under it is led by
 // it in each of its commands)
 ok(["! cd app; node core/scripts/copies.mjs config/c.json", "! pushd app\nnode core/scripts/copies.mjs config/c.json", "! echo x | node core/scripts/copies.mjs config/c.json",

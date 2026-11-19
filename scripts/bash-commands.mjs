@@ -83,7 +83,7 @@ function readable(parse, text, filled, until) {
     if (!tree) return null;
     const globs = [];
     try {
-      const seek = n => { if (n.type === "subshell" && "?*+@!".includes(text[n.startIndex - 1] ?? "")) globs.push([n.startIndex, n.endIndex]); else for (const c of n.namedChildren) seek(c); };
+      const seek = n => { if (n.type === "subshell" && n.startIndex > 0 && "?*+@!".includes(text[n.startIndex - 1])) globs.push([n.startIndex, n.endIndex]); else for (const c of n.namedChildren) seek(c); };
       seek(tree.rootNode);
     } finally { tree.delete(); }
     if (!globs.length) return text;
@@ -102,18 +102,19 @@ function commandsIn(parse, text, offset, ctx) {
   const tree = parse("bash", text, left(ctx.time.until));
   if (!tree) { ctx.time.late = true; return; }
   try {
-    const found = [], local = { ...ctx, out: found, offset, parse };
+    const lines = text.split("\n"), starts = [];
+    for (let k = 0, at = 0; k < lines.length; at += lines[k].length + 1, k++) starts.push(at);
+    const rowOf = at => { let low = 0, high = starts.length - 1; while (low < high) { const mid = (low + high + 1) >> 1; if (starts[mid] <= at - offset) low = mid; else high = mid - 1; } return low; };
+    const data = dataRows(tree.rootNode, lines), found = [], local = { ...ctx, out: found, offset, parse, data };
     walk(tree.rootNode, local);
     if (tree.rootNode.hasError && text.includes("\n")) { // (a line alone is read once: what it gives is all)
       const errors = [], seek = n => { if (n.type === "ERROR" || n.isMissing) errors.push([n.startPosition.row, n.endPosition.row]); else if (n.hasError) for (const c of n.children) seek(c); };
       seek(tree.rootNode);
-      const lines = text.split("\n"), starts = [];
-      for (let k = 0, at = 0; k < lines.length; at += lines[k].length + 1, k++) starts.push(at);
-      const rowOf = at => { let low = 0, high = starts.length - 1; while (low < high) { const mid = (low + high + 1) >> 1; if (starts[mid] <= at - offset) low = mid; else high = mid - 1; } return low; };
       const covered = new Set(found.map(c => rowOf(c.at)));
       const rows = new Set(errors.flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, k) => a + k)));
-      for (const r of rows) if (!covered.has(r) && lines[r]?.trim()) commandsIn(parse, lines[r], offset + starts[r], { ...ctx, out: found });
+      for (const r of rows) if (!covered.has(r) && !data.has(r) && lines[r]?.trim()) commandsIn(parse, lines[r], offset + starts[r], { ...ctx, out: found });
     }
+    if (data.size) found.splice(0, found.length, ...found.filter(c => !data.has(rowOf(c.at))));
     ctx.out.push(...found);
   } finally { tree.delete(); }
 }
@@ -139,11 +140,35 @@ function walk(node, ctx) {
 const STRUCTURE = new Set(["function_definition", "for_statement", "c_style_for_statement", "while_statement", "if_statement", "case_statement", "compound_statement"]);
 const keywordOf = node => (node.type === "function_definition" ? "function" : node.type === "compound_statement" ? "{" : node.children[0]?.text ?? node.type);
 // A here-document with no line that ends it: its lines read as commands, each alone, so that one inside another's is
-// read once, never again with each that holds it.
+// read once, never again with each that holds it; but not a line held as data (`dataRows`).
 function unended(node, ctx) {
   if (node.parent?.children.some(c => c.type === "heredoc_end")) return;
   let at = node.startIndex;
-  for (const line of node.text.split("\n")) { if (line.trim()) commandsIn(ctx.parse, line, ctx.offset + at, ctx); at += line.length + 1; }
+  node.text.split("\n").forEach((line, k) => {
+    if (line.trim() && !ctx.data.has(node.startPosition.row + k)) commandsIn(ctx.parse, line, ctx.offset + at, ctx);
+    at += line.length + 1;
+  });
+}
+// The rows that a here-document holds as data: from the line after its opening word to the first line that is its
+// delimiter, as bash reads them, wherever the grammar set its body, or lost it, as it does for one opened inside a
+// subshell, taking a ")" after the word into it (the fallback reviewer's check of ccee6c9), or as it reads a second
+// one on a line, as an error "<" and a redirection from a file. With no such line, none: its lines are read as
+// commands, so that no run is missed.
+function dataRows(root, lines) {
+  const data = new Set(), opens = root.descendantsOfType("heredoc_start");
+  for (const from of root.descendantsOfType("file_redirect")) {
+    const before = from.previousSibling;
+    if (before?.type === "ERROR" && before.text === "<" && before.endIndex === from.startIndex) opens.push(from.namedChildren.at(-1) ?? from);
+  }
+  if (!opens.length) return data;
+  const rowsOf = new Map();
+  lines.forEach((line, k) => { const key = line.replace(/^\t+/u, ""); if (!rowsOf.has(key)) rowsOf.set(key, []); rowsOf.get(key).push(k); });
+  for (const open of opens) {
+    const word = open.text.replace(/^-/u, "").match(/^(?:"[^"]*"|'[^']*'|\\.|[^\s;&|<>()])+/u)?.[0];
+    const row = open.startPosition.row, end = word ? rowsOf.get(word.replace(/["'\\]/gu, ""))?.find(r => r > row) : undefined;
+    if (end !== undefined) for (let r = row + 1; r <= end; r++) data.add(r);
+  }
+  return data;
 }
 // A command that stands in a redirection: its words with the redirection's, then what both hold. (A node is a new
 // object at each call: told apart by its id.)
