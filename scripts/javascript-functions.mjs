@@ -125,6 +125,8 @@ function givenName(node, parent) {
   if (t === "variable_declarator") return parent.childForFieldName("value")?.id === node.id ? parent.childForFieldName("name") : null;
   if (t === "pair") return parent.childForFieldName("value")?.id === node.id ? parent.childForFieldName("key") : null;
   if (t === "public_field_definition" || t === "field_definition") return parent.childForFieldName("value")?.id === node.id ? parent.childForFieldName("name") ?? parent.childForFieldName("property") : null;
+  // (a parameter's default in TypeScript's grammar, which writes it so where JavaScript's writes an assignment pattern)
+  if (t === "required_parameter" || t === "optional_parameter") return parent.childForFieldName("value")?.id === node.id ? parent.childForFieldName("pattern") : null;
   if (t !== "assignment_expression" && t !== "assignment_pattern" && t !== "object_assignment_pattern") return null;
   if (parent.childForFieldName("right")?.id !== node.id) return null;
   const left = parent.childForFieldName("left");

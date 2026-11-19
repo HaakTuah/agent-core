@@ -88,6 +88,11 @@ const forms = [
   "label: { const inner = 1; }",
 ].join("\n");
 ok(same(fn(forms, "a.ts"), ["method:2:1:0", "size:3:1:0", "key:5:1:0", "arrow:5:1:0", "typed:6:3:0", "f:9:3:0", "(anonymous):12:1:0"]), `every form of a function is found, and no other block (${fn(forms, "a.ts")})`);
+// (a parameter's default is named by its parameter, in each grammar: TypeScript's writes it as a parameter with a value,
+// JavaScript's as an assignment pattern)
+const defaults = "function outer(cb = () => { return 1; }, h: H = function () { }) {}\n";
+ok(["a.ts", "a.tsx"].every(f => same(fn(defaults, f), ["cb:1:1:0", "h:1:1:0", "outer:1:1:0"])) && same(fn(defaults.replace(": H", ""), "a.js"), ["cb:1:1:0", "h:1:1:0", "outer:1:1:0"]),
+  `a function given as a parameter's default is named by its parameter (${fn(defaults, "a.ts")})`);
 
 // What the lexer before the parser misread, read as the definition says (#530, item 6; #723): a regular expression in a
 // template literal's code, which ran the lexer to the file's end and lost every function after it; a choice's : taken
