@@ -3,8 +3,10 @@
 // a line whose issue has closed skipped, since a line no longer leaves in the pull request that closes its issue,
 // where pull requests merging side by side collided on the one file, and the next pull request that changes the file
 // clears such lines together (#750, point 1). A line is a row of a table or an item of a list that names its issue
-// first ("#n"); what it waits on is a row's last cell, or what an item names after "waits on", and an issue or pull
-// request named there that has closed is waited on no more. Reads the issues through gh (GITHUB_REPOSITORY and
+// first ("#n"), and goes once every issue it names first has closed; what it waits on is a row's last cell, or what an
+// item names after "waits on", and an issue or pull request named there that has closed is waited on no more. Its
+// text and GitHub's answers are untrusted (SECURITY.md, rule 5): each is checked against its form, and only the
+// repository's name reaches gh's route. Reads the issues through gh (GITHUB_REPOSITORY and
 // GH_TOKEN where GitHub's job sets them; else the repository origin names, or, in the core, its own address, and gh's
 // sign-in); writes the progress file with --clear alone.
 //
@@ -21,58 +23,78 @@ import { repoOf } from "./inbox.mjs";
 import { started } from "./started.mjs";
 
 export const FILE = "QUEUE.md";
-const ROW = /^\|\s*#(\d+)\b[^|]*\|/u, ITEM = /^\s*[-*]\s+(?:\[[ xX]\]\s+)?#(\d+)\b/u;
+export const LARGEST = 1 << 20; // (bytes: a progress file past it is refused, never read; SECURITY.md, rule 5)
+const ROW = /^\|([^|]*)\|/u, ITEM = /^\s*[-*]\s+(?:\[[ xX]\]\s+)?#(\d{1,9})\b/u, NUMBER = /#(\d{1,9})\b/gu;
+const numbers = text => [...String(text).matchAll(NUMBER)].map(w => Number(w[1]));
 
-// The lines of a queue's text, in order: { at, text, issue, waits }, `at` its index among the text's lines, `waits`
-// the numbers its last cell names.
+// The lines of a progress file's text, in order: { at, text, issues, waits, words, owner }: `at` its index among the
+// text's lines; `issues` the issues it names first (a row's first cell, all it names there; an item's first);
+// `waits` the numbers what it waits on names (a row's last cell, or what an item names after "waits on"), `words`
+// that text; `owner` whether a row's second cell holds it for the owner ("the owner", AGENTS.md, "The queue").
 export function linesOf(text) {
   return String(text ?? "").split("\n").map((line, at) => {
-    const row = ROW.exec(line), item = row ? null : ITEM.exec(line);
-    if (!row && !item) return null;
-    const plain = line.replace(/\r$/u, ""), words = (row ? plain.split("|").slice(1, -1).at(-1) ?? "" : /\bwaits on\b(.*)$/iu.exec(plain)?.[1] ?? "").trim();
-    const waits = [...words.matchAll(/#(\d+)\b/gu)].map(w => Number(w[1]));
-    return { at, text: line, issue: Number((row ?? item)[1]), waits, words };
+    const plain = line.replace(/\r$/u, ""), row = ROW.exec(plain), item = row ? null : ITEM.exec(plain);
+    const issues = row ? (/^\s*#\d/u.test(row[1]) ? numbers(row[1]) : []) : item ? [Number(item[1])] : [];
+    if (!issues.length) return null;
+    const cells = row ? plain.split("|").slice(1, -1) : [];
+    const words = (row ? cells.at(-1) ?? "" : /\bwaits on\b(.*)$/iu.exec(plain)?.[1] ?? "").trim();
+    return { at, text: line, issues, waits: numbers(words), words, owner: row !== null && /^\s*the owner\b/iu.test(cells[1] ?? "") };
   }).filter(Boolean);
 }
 
-// The queue as its readers take it, given `closed` (a number => whether that issue or pull request has closed):
-// { open, gone, next }, `gone` the lines of closed issues, `next` the first open line that waits on nothing open (a
-// last cell empty, or naming only what has closed), or null.
+// The progress file as its readers take it, given `closed` (a number => whether that issue or pull request has
+// closed): { open, gone, next }, `gone` the lines all of whose issues have closed, `next` the first open line that no
+// one holds for the owner and that waits on nothing open (what it waits on empty, or naming only what has closed),
+// or null.
 export function read(text, closed) {
-  const lines = linesOf(text), gone = lines.filter(l => closed(l.issue)), open = lines.filter(l => !closed(l.issue));
-  const free = l => (l.waits.length ? l.waits.every(closed) : l.words === "");
+  const lines = linesOf(text), done = l => l.issues.every(closed);
+  const gone = lines.filter(done), open = lines.filter(l => !done(l));
+  const free = l => !l.owner && (l.waits.length ? l.waits.every(closed) : l.words === "");
   return { open, gone, next: open.find(free) ?? null };
 }
 
-// The text with the line of each closed issue taken out, and nothing else changed.
+// The text with each line all of whose issues have closed taken out, and nothing else changed.
 export function cleared(text, closed) {
-  const out = new Set(linesOf(text).filter(l => closed(l.issue)).map(l => l.at));
+  const out = new Set(linesOf(text).filter(l => l.issues.every(closed)).map(l => l.at));
   return String(text).split("\n").filter((_, at) => !out.has(at)).join("\n");
 }
 
-// Whether each number names a closed issue or pull request, asked of GitHub once each; throws where gh cannot answer.
-export function statesOf(numbers, repo, gh = route => {
-  const r = spawnSync("gh", ["api", route, "--jq", ".state"], { encoding: "utf8" });
-  if (r.status !== 0) throw new Error(`gh could not read ${route}: ${String(r.stderr ?? r.error).trim()}`);
-  return r.stdout.trim();
+// Which numbers name an open issue or pull request, read from GitHub's list of the open ones (a page at a time,
+// through `gh`): a number => whether it has closed, every number not open counted closed, so that a line naming one
+// that does not exist goes, never stays. Each row is checked against its form; a page that is not a list, or a row
+// that is no open item with a whole number, throws, as does gh failing: the reading never guesses.
+export function statesOf(repo, gh = route => {
+  const r = spawnSync("gh", ["api", route], { encoding: "utf8", maxBuffer: 1 << 26 });
+  if (r.status !== 0) throw new Error(`gh could not read ${route.split("?")[0]}: ${String(r.stderr ?? r.error).trim().slice(0, 200)}`);
+  return r.stdout;
 }) {
-  const closed = new Map();
-  for (const n of new Set(numbers)) closed.set(n, gh(`repos/${repo}/issues/${n}`) === "closed");
-  return n => closed.get(n) === true;
+  const open = new Set();
+  for (let page = 1; ; page++) {
+    let rows;
+    try { rows = JSON.parse(gh(`repos/${repo}/issues?state=open&per_page=100&page=${page}`)); } catch (e) { throw new Error(e instanceof SyntaxError ? "GitHub's list of open issues is no JSON" : e.message); }
+    if (!Array.isArray(rows)) throw new Error("GitHub's list of open issues is no list");
+    for (const row of rows) {
+      if (row === null || typeof row !== "object" || !Number.isSafeInteger(row.number) || row.number < 1 || row.state !== "open") throw new Error("GitHub's list of open issues holds a row that is no open issue with its number");
+      open.add(row.number);
+    }
+    if (rows.length < 100) break;
+    if (page >= 100) throw new Error("GitHub's list of open issues runs past 100 pages");
+  }
+  return n => !open.has(n);
 }
 
-// The command, given its option and what it reads and writes: { status, out }, `out` what it prints. `at`: { read()
-// the queue's text or null, write(text), closed(numbers) a reader of each one's state, which throws where GitHub
-// cannot answer }.
+// The command, given its option and what it reads and writes: { status, out }, `out` what it prints. `at`: { file,
+// read() the progress file's text or null, write(text), closed() a reader of whether a number has closed, which
+// throws where GitHub cannot answer }.
 export function command(flag, at) {
   const out = [], said = (status, ...lines) => ({ status, out: [...out, ...lines].join("\n") }), FILE = at.file ?? "QUEUE.md";
   if (flag !== undefined && !["--clear", "--check"].includes(flag)) return said(1, `FAIL: ${flag} is no option of this script. Mend: run node scripts/queue.mjs, with --clear or --check, or with nothing`);
   const text = at.read();
+  if (typeof text === "string" && text.length > LARGEST) return said(1, `FAIL: ${FILE} is ${text.length} bytes, past the ${LARGEST} the reader takes. Mend: take out the lines of finished work and any notes, which belong in the pull requests' descriptions`);
   if (text === null) return said(1, `FAIL: ${FILE} is not here. Mend: run it from the repository's root, where the progress file its manifest names stands (in the core, QUEUE.md)`);
-  const lines = linesOf(text);
   let closed;
-  try { closed = at.closed(lines.flatMap(l => [l.issue, ...l.waits])); } catch (e) { return said(1, `FAIL: the issues the queue names could not be read: ${e.message}. Mend: run it again; where gh is not signed in, sign it in, or set GH_TOKEN`); }
-  const { open, gone, next } = read(text, closed), named = gone.map(l => `#${l.issue}`).join(", ");
+  try { closed = at.closed(); } catch (e) { return said(1, `FAIL: the issues the queue names could not be read: ${e.message}. Mend: run it again; where gh is not signed in, sign it in, or set GH_TOKEN`); }
+  const { open, gone, next } = read(text, closed), named = gone.map(l => l.issues.map(n => `#${n}`).join(" and ")).join(", ");
   if (flag === "--clear") {
     at.write(cleared(text, closed));
     return said(0, gone.length ? `${FILE}: took out the lines of ${named}, closed` : `${FILE}: no line of a closed issue`);
@@ -82,7 +104,7 @@ export function command(flag, at) {
     return said(0, `ok   ${FILE} holds no line of a closed issue`);
   }
   out.push(...open.map(l => l.text));
-  return said(0, `${open.length} open lines${gone.length ? `, ${gone.length} of closed issues skipped (${named}), which the next pull request that changes the queue takes out` : ""}`, next ? `next: #${next.issue}` : "next: none waits on nothing open");
+  return said(0, `${open.length} open lines${gone.length ? `, ${gone.length} of closed issues skipped (${named}), which the next pull request that changes the queue takes out` : ""}`, next ? `next: ${next.issues.map(n => `#${n}`).join(" and ")}` : "next: none that a session takes waits on nothing open");
 }
 
 // The progress file where the command runs: a project's, as its manifest names it; the core's own where none stands.
@@ -93,7 +115,7 @@ function main([flag]) {
   const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout;
   const repo = /^[\w.-]+\/[\w.-]+$/u.test(process.env.GITHUB_REPOSITORY ?? "") ? process.env.GITHUB_REPOSITORY : repoOf(origin) ?? (manifest === null ? CORE : null);
   if (repo === null) { console.error("FAIL: which repository on GitHub this is cannot be told: its origin is no address on github.com. Mend: set GITHUB_REPOSITORY to its owner/name, and run it again"); return 1; }
-  const { status, out } = command(flag, { file, read: () => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null), write: text => fs.writeFileSync(file, text), closed: numbers => statesOf(numbers, repo) });
+  const { status, out } = command(flag, { file, read: () => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null), write: text => fs.writeFileSync(file, text), closed: () => statesOf(repo) });
   (status ? console.error : console.log)(out);
   return status;
 }

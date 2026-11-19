@@ -18,6 +18,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`) and the tree a copy must be (`scripts/copy-tree.mjs`); hostile
      tests: `tests/hostile-pr-changes-test.mjs`.
+   - a *progress file* as a pull request changes it, a fork's among them, and GitHub's list of open issues: read by the
+     queue's reader (`scripts/queue.mjs`); hostile tests: `tests/queue-test.mjs`.
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the
      reviews' records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look
      (`scripts/look.mjs`) and the inbox (`scripts/inbox.mjs`); hostile tests: `tests/hostile-issues-test.mjs`.
