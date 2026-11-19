@@ -7,6 +7,8 @@
 //
 //   node tests/licences-test.mjs
 import { readable } from "../scripts/licence-yes.mjs";
+import { installed } from "../scripts/packages.mjs";
+import { keysOf } from "../scripts/schemas.mjs";
 import { actionLists, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -177,13 +179,17 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
     audit: "audit.json", notices: "NOTICES.txt", scan: { served: ["site/"], tools: ["scripts/"], skip: ["x.mjs"] }, nuget: { any: 1 }, accepted: [], agentTools: [] };
   const set = (o, k, v) => { const x = structuredClone(o); if (v === undefined) delete x[k]; else x[k] = v; return x; };
   const configs = [base, {}, { ships: [] }, { ships: [], lockfiles: [] }, { ships: [], audit: "a.json" }, { ...base, extra: 1 }, { ...base, Ships: [] }];
-  for (const k of ["lockfiles", "ships", "data", "fonts", "ignoreScriptsIn", "audit", "notices"]) {
+  // (every key the schema gives, but "scan", varied below, and those the other checks read: so a key added to both
+  // readings is compared too)
+  for (const k of keysOf("licences").filter((k) => !["scan", "nuget", "accepted", "agentTools"].includes(k))) {
     for (const v of [undefined, [], [""], ["a"], "a", "", 5, null, [5], {}, ["a", ""]]) configs.push(set(base, k, v), set(set(base, "audit", undefined), k, v), set(set(base, "lockfiles", undefined), k, v));
   }
   for (const v of [undefined, null, [], {}, "x", { served: [] }, { served: [""] }, { served: ["./x"] }, { served: ["/x"] }, { served: ["."] }, { served: [""], skip: [""] }, { served: [], tools: [5] },
-    { served: "x" }, { servd: [] }, { tools: [] }, { served: ["../x"] }, { served: ["a//b"] }]) configs.push(set(base, "scan", v), set(set(base, "audit", undefined), "scan", v));
+    { served: "x" }, { servd: [] }, { served: [], servd: [] }, { tools: [] }, { served: ["../x"] }, { served: ["a//b"] }]) configs.push(set(base, "scan", v), set(set(base, "audit", undefined), "scan", v));
   const dir = mkdtempSync(join(tmpdir(), "licence-config-")), bare = join(dir, "bare"), file = join(dir, "c.json");
   try {
+    // (with no packages here, both readings would be the fallback and agree with themselves)
+    ok(installed("ajv"), "the core's packages are installed, so the schema is read against the fallback", "Mend: run node scripts/install.mjs, then this test again");
     cpSync(new URL("../scripts/", import.meta.url), join(bare, "scripts"), { recursive: true });
     cpSync(new URL("../floor/", import.meta.url), join(bare, "floor"), { recursive: true });
     const [withAjv, without] = await Promise.all([import("../scripts/licences.mjs"), import(pathToFileURL(join(bare, "scripts", "licences.mjs")).href)]);
