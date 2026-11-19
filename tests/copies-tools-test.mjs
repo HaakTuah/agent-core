@@ -165,7 +165,7 @@ try {
     ok(r.status === 0 && !/EISDIR/.test(r.out) && /not yet in the baseline: .*through\.md.*the pull request's base held it/.test(r.out), "a link to a folder in a tool's folder is passed over, and a file reached through a linked folder is read through it at the base too", r.out);
   }
   // (with the core's packages not installed, its shape is left unchecked, said as a warning, and a config the check
-  // cannot read still fails with its mend: Codex's review of 95abcdb)
+  // cannot read still fails with its mend: Codex's and the fallback reviewer's reviews of 95abcdb)
   {
     const packages = path.join(dir, "core/.packages/node_modules"), aside = `${packages}-aside`;
     fs.renameSync(packages, aside);
