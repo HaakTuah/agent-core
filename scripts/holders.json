@@ -138,7 +138,10 @@
       "check: scripts/node.sh, in part",
       "check: .github/workflows/tests.yml, in part"
     ],
-    "tasks/updates.md: CodeQL": "check: .github/workflows/codeql.yml",
+    "tasks/updates.md: CodeQL": [
+      "check: .github/workflows/codeql.yml",
+      "check: scripts/code-scan.mjs"
+    ],
     "tasks/updates.md: A question or difference about a rule of the core starts from its reasons": "check: scripts/pr-description.mjs, in part",
     "roles/shared/work-flow.md: Review in the background": "check: GitHub's ruleset on the default branch, in part",
     "roles/shared/work-flow.md: Sessions": "check: scripts/work-saved.sh, in part",
@@ -480,6 +483,7 @@
     "tasks/tools.md: Proven by the staged cases, tool by tool": [232],
     "tasks/tools.md: What the core offers one tool, it offers each": ["#467"],
     "tasks/roles.md: The rules name tiers, never a model": ["#467"],
+    "tasks/updates.md: CodeQL": ["#546"],
     "tasks/updates.md: Node": [39, 253],
     "tasks/updates.md: The newest stable version, unless there is a reason": [37, 65],
     "tasks/updates.md: A question or difference about a rule of the core starts from its reasons": ["#756.1"],
@@ -540,6 +544,7 @@
     "AGENTS.md: A record pull requests add to is a folder of one file per entry": "check fires; outcome: fast",
     "tasks/updates.md: Node": "correction: does not work; outcome: robust",
     "tasks/updates.md: A question or difference about a rule of the core starts from its reasons": "findings; outcome: asked",
+    "tasks/updates.md: CodeQL": "check fires; outcome: robust; rare harm",
     "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",
     "AGENTS.md: A part of the core gives way to what is maintained": "correction: does not work; outcome: robust",
     "AGENTS.md: A tool that only runs is fetched at set-up, as its own program": "findings; outcome: robust",
