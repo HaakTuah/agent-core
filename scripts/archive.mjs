@@ -3,12 +3,12 @@
 // owner's words, in words/, which stays in the core's own repository (its .gitattributes line). An item is a line that
 // opens with its key and a stop, at the start of a line: items 1 to LAST_NUMBERED by their number, in a file named
 // items-NNN.md; every later one by the issue that carries the owner's word, and where it records one point of several by
-// that point, as "#733.1" (#744), in the file issue-N.md of that issue, so that pull requests merged side by side never
-// claim one key. The two are in step where every item of the words has its reasoning under the same number, none past
+// that point, as "#733.1" (#744), in a file of its own named by its key, issue-733.1.md (#750, point 1), so that pull
+// requests merged side by side never claim one key nor edit one line. The two are in step where every item of the words has its reasoning under the same number, none past
 // LAST_WORDS and none keyed by an issue stands in the words, each form keys each item once and in the file its key puts
 // it in (#394), no item past LAST_NUMBERED is numbered, no reasoning item quotes (a line opening with ">"), each that has
 // words says what was decided ("Decided:"), and each written since (point 6 of #252) names the issue that holds the
-// owner's word ("#N"). Numbers need not run without gaps (#744). holders.mjs, beside this file, reads it for the items
+// owner's word ("#N"). Items 1 to LAST_NUMBERED stand with none taken out; no number is added past it (#744). holders.mjs, beside this file, reads it for the items
 // its list names and fails what inStep() finds. Node's own modules.
 //
 //   import { items, inStep, KEY } from "./archive.mjs";
@@ -22,9 +22,9 @@ const FILE_LIST = "scripts/holders.json";
 export const LAST_WORDS = 245;
 // The last item keyed by a running number: from the next on, an item is keyed by its issue (#744).
 export const LAST_NUMBERED = 262;
-// A key by an issue, "#744", or by one point of it, "#733.1"; the file it stands in is issue-<the issue>.md.
-export const KEY = /^#(\d+)(?:\.\d+)?$/u;
-const FILE = /^(?:items|issue)-\d+\.md$/u;
+// A key by an issue, "#744", or by one point of it, "#733.1"; the file it stands in alone is issue-<the key>.md.
+export const KEY = /^#(\d+(?:\.\d+)?)$/u;
+const FILE = /^(?:items-\d+|issue-\d+(?:\.\d+)?)\.md$/u;
 const OPENS = /^(\d+|#\d+(?:\.\d+)?)\. /u;
 const keyOf = s => /^\d+$/u.test(s) ? Number(s) : s;
 
@@ -51,7 +51,7 @@ export function itemsIn(root, folder) {
 }
 
 // The file an item's key puts it in: for a number, the items-NNN.md whose first number is the highest at or below it;
-// for a key by an issue, that issue's issue-N.md (`archive/instructions.md`).
+// for a key by an issue, its own issue-<the key>.md (`archive/instructions.md`).
 function fileOf(root, folder, n) {
   if (typeof n === "string") return `${folder}/issue-${KEY.exec(n)[1]}.md`;
   const dir = path.join(root, folder);
@@ -76,7 +76,7 @@ function outOfPlace(root, r, w) {
     const astray = at.filter(x => x.file !== fileOf(root, folder, n)), moves = astray.length && astray.length < at.length ? astray[0] : at.at(-1);
     const rekey = () => folder !== REASONS ? `the number its reasoning has in ${REASONS}/`
       : typeof n === "string" ? `a key of its own, "${n.split(".")[0]}.P" by the one point P of the issue it records, or join the two into one item`
-        : `a key by the issue that carries its owner's word, "#N", in ${REASONS}/issue-N.md, and change each "core archive ${n}" that means it, in ${FILE_LIST} too`;
+        : `a key by the issue that carries its owner's word, "#N", in a file of its own, ${REASONS}/issue-N.md, and change each "core archive ${n}" that means it, in ${FILE_LIST} too`;
     if (at.length > 1) wrong.push(`${folder}: item ${n} stands ${at.length === 2 ? "twice" : `${at.length} times`}, at ${at.map(x => x.at).join(" and ")}. Mend: give the one at ${moves.at} ${rekey()}`);
     else if (astray.length) wrong.push(`${at[0].at}: item ${n} stands outside ${file(folder, n)}, the file its key puts it in. Mend: move it there${folder === REASONS && typeof n === "number" ? `, or give it ${rekey()}` : ""}`);
   }
@@ -89,8 +89,10 @@ export function inStep(root) {
   wrong.push(...outOfPlace(root, r, w));
   for (const [n, it] of w.items) if (typeof n === "string" || n > LAST_WORDS) wrong.push(`${it.file}: item ${n} adds the owner's words here, where nothing is added after item ${LAST_WORDS}. Mend: take it out of ${WORDS}/ and write it in ${REASONS}/ alone, naming the issue that holds the words`);
   for (const [n, it] of w.items) if (!r.items.has(n)) wrong.push(`${it.file}: item ${n} has no reasoning under its number in ${REASONS}/. Mend: write it there, in the core's words, with what was asked, what was decided and what it stands behind (\`archive/instructions.md\`)`);
+  const last = Math.min(LAST_NUMBERED, Math.max(0, ...[...r.items.keys()].filter(n => typeof n === "number")));
+  for (let n = 1; n <= last; n++) if (!r.items.has(n)) wrong.push(`${REASONS}: item ${n} is missing, though items 1 to ${LAST_NUMBERED} keep their numbers. Mend: put it back where it stood (git log -p -- ${REASONS}/ shows it); an item is never taken out`);
   for (const [n, it] of r.items) {
-    if (typeof n === "number" && n > LAST_NUMBERED) wrong.push(`${it.file}: item ${n} is keyed by a running number, a key that names no issue, where items after ${LAST_NUMBERED} are keyed by their issue (#744). Mend: key it "#N" by the issue that carries the owner's word, or "#N.P" by the one point of it the item records, move it to ${REASONS}/issue-N.md, and write that key for ${n} under "behind" in ${FILE_LIST}`);
+    if (typeof n === "number" && n > LAST_NUMBERED) wrong.push(`${it.file}: item ${n} is keyed by a running number, a key that names no issue, where items after ${LAST_NUMBERED} are keyed by their issue (#744). Mend: key it "#N" by the issue that carries the owner's word, or "#N.P" by the one point of it the item records, move it to a file of its own, ${REASONS}/issue-N.md or issue-N.P.md, and write that key for ${n} under "behind" in ${FILE_LIST}`);
     if (/^\s*>/mu.test(it.text)) wrong.push(`${it.file}: item ${n} quotes (a line opening with ">"). Mend: say in the core's own words what was decided; the owner's words stay on the issue, or in ${WORDS}/`);
     if (w.items.has(n) && !/\bDecided:/u.test(it.text)) wrong.push(`${it.file}: item ${n} does not say what was decided. Mend: add "Decided:" and what the owner decided, in plain words`);
     if (!w.items.has(n) && !/#\d+/u.test(it.text)) wrong.push(`${it.file}: item ${n} names no issue. Mend: name the issue that holds the owner's word ("#N"), as \`archive/instructions.md\` says a new item does`);

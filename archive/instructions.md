@@ -10,11 +10,11 @@ copy leaves out; `scripts/holders.mjs` holds the two forms in step. Items 1 to 2
 keyed by the issue that carries the owner's word, `#N`, and where it records one point of several by that point,
 `#N.P`, never by a running number (`AGENTS.md`, "A new archive item is named by its issue"; #744): it opens with its
 key and a stop (`#744. **19 November 2026**, ...`), with its date and one line of the reasoning, the words themselves
-staying on the issue, and stands in that issue's own file, `archive/instructions/issue-N.md`, which opens with a
-heading and holds that issue's items alone.
+staying on the issue, and stands in a file of its own named by its key, `archive/instructions/issue-N.md` or
+`issue-N.P.md`, which opens with a heading and holds that item alone (#750, point 1).
 
-Item N is in the file below whose first number is the highest at or below N, and item #N or #N.P in
-`archive/instructions/issue-N.md`. Search them rather than read them whole.
+Item N is in the file below whose first number is the highest at or below N, item #N in
+`archive/instructions/issue-N.md` and item #N.P in `archive/instructions/issue-N.P.md`. Search them rather than read them whole.
 
 - `archive/instructions/items-001.md`: items 1 to 40
 - `archive/instructions/items-041.md`: items 41 to 81

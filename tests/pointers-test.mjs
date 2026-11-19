@@ -60,14 +60,15 @@ ok(r.code === 1 && mended(r.out) && /^FAIL: the project has no SECURITY\.md yet/
 // a floor rule and an archive item, read in the project's copy of the core's floor and archive
 const CORE = { "core/floor/security.md": "# The floor\n\n**1. Nothing secret.** Text.\n\n**8. Reviews.** As rule 1 says.\n", "core/floor/topics.md": "# Topics\n\n**10. Licences.** Text.\n",
   "core/archive/instructions/items-001.md": "# Items\n\n1. **1 November 2026**. Words.\n\n2. **2 November 2026**. Words.\n",
-  "core/archive/instructions/issue-744.md": "# Item 744\n\n#744. **19 November 2026**. Words.\n\n#744.2. **19 November 2026**. Words.\n" };
+  "core/archive/instructions/issue-744.md": "# Item 744\n\n#744. **19 November 2026**. Words.\n",
+  "core/archive/instructions/issue-744.2.md": "# Item 744.2\n\n#744.2. **19 November 2026**. Words.\n" };
 const cites = text => ({ ...FILES, ...CORE, "AGENTS.md": `${FILES["AGENTS.md"]}\n${text}\n` });
 r = run(cites("As floor rules 8 and 10 say, and floor rule 1 (core archive 1 and 2; core archive 1 to 2)."));
 ok(r.code === 0 && !/floor rule|core archive/.test(r.out.split("\n").filter(l => l.startsWith("note")).join("\n")), "a floor rule is read in the floor's files, by its bold number, and an archive item in the archive's item files");
 r = run(cites("As core archive #744 and #744.2 say, beside core archive 1."));
-ok(r.code === 0 && !/core archive/.test(r.out.split("\n").filter(l => l.startsWith("note")).join("\n")), "an archive item keyed by its issue, or a point of it, is read in that issue's own file (#744)", r.out);
-r = run(cites("As core archive #745 says."));
-ok(r.code === 0 && /note .*core archive #745: no such item in the archive/.test(r.out), "and a keyed item that is not there is listed, named by its key", r.out);
+ok(r.code === 0 && !/core archive/.test(r.out.split("\n").filter(l => l.startsWith("note")).join("\n")), "an archive item keyed by its issue, or a point of it, is read in its own file (#744)", r.out);
+r = run(cites("As core archive #745 says, and core archive 1 to #9999, and core archive 1 to 9999999999."));
+ok(r.code === 0 && ["#745", "1 to #9999", "1 to 9999999999"].every(a => r.out.includes(`core archive ${a}: no such item in the archive`)), "and a keyed item that is not there is listed, named by its key, as are a range with a key in it and one too wide to build, never read as nothing nor crashing", r.out);
 r = run(cites("As floor rule 19 says (core archive 999)."));
 ok(r.code === 0 && /note .*floor rule 19: no such rule in the floor/.test(r.out) && /note .*core archive 999: no such item in the archive/.test(r.out), "in a project, a floor rule or an archive item that is not there is listed, each named, and fails nothing: a sync never fails a project over a citation of its own");
 ok(/read and not found/.test(r.out) && !/\(2 in forms it cannot read/.test(r.out), "and it is listed as read and not found, not as a form it cannot read", r.out);
