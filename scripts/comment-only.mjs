@@ -1,7 +1,7 @@
 // Is this pull request's change to what runs by itself only comments and steps' names (floor rule 3)? Such a change
 // passes one security review, floor rule 8's, instead of rule 3's two. Its builder runs it from a checkout of the
 // core's `main`, never from the pull request's own copy, which the pull request could change, in the pull request's
-// clone with the head that merges checked out, up to date with `main` (floor rule 12):
+// clone with the head that merges checked out, brought up to date with `main` for it:
 //
 //   node <the core's main>/scripts/comment-only.mjs [<a commit already reviewed>]
 //

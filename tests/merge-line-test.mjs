@@ -1,7 +1,8 @@
 // Tests the merge line's reader (scripts/merge-line.mjs; #702) through a stand-in for gh: the three facts read from
 // the host for each kind of repository (a person's public one, an organisation's public one, an organisation's private
 // one on each plan, one whose queue is on, one that asks no up-to-date branch, one whose rules cannot be read), a row
-// of the manifest overriding a reading, the one line of advice where a queue is offered and off; the measure, each
+// of the manifest overriding a reading, the one line of advice where a queue is offered and off, and where users get a
+// release and the host still asks an up-to-date branch (#733); the measure, each
 // pull request's turn the later of the merge before it and its last marking ready, and the pushes whose checks ran
 // counted once each; the cancelling, which cancels nothing while the front's run is not queued and never a run of the
 // front's, the next's or the default branch's; and a run told no repository refused with its mend (mend.mjs). Run by
@@ -55,6 +56,19 @@ const manifest = "| *merge queue* | `on` |\n| *billed minutes* | `yes` |\n";
 f = facts({ repo: "o/n", manifest, gh: host({ rules: strict }) });
 ok(f.queue === "on" && f.billed === true && /manifest's row \*merge queue\* says \(read: none\)/.test(f.said[1]) && /\*billed minutes\* says \(read: no,/.test(f.said[2]), "a row of the manifest overrides a reading, and what was read is still printed", f.said.join(" | "));
 ok(override("| *merge queue* | `maybe` |", "merge queue", ["on", "offered", "none"]) === undefined, "a row with no value the slot takes overrides nothing");
+
+// Where users get a release (floor rule 12; #733): no row says each merge; a row *users get* says a release, and the
+// advice to switch the up-to-date setting off is given only where the host asks it.
+f = facts({ repo: "o/n", gh: host({ rules: strict }) });
+ok(f.users === "merges" && /its users get: each merge, as no row/.test(f.said[3]) && !/a release/.test(follows(f)), "with no row, users get each merge and the line is as before", f.said[3]);
+const releases = "| *users get* | `releases` |\n";
+f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: strict }) });
+ok(f.users === "releases" && /merges on its own green checks/.test(follows(f)) && /to switch it off/.test(follows(f)) && /needs-owner/.test(follows(f)) && /kept by hand/.test(follows(f)), "users get a release and the host still asks an up-to-date branch: the owner is advised once, and the line kept meanwhile", follows(f));
+f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: [] }) });
+ok(/merges on its own green checks/.test(follows(f)) && /nothing to act on/.test(follows(f)) && !/needs-owner/.test(follows(f)), "users get a release and no up-to-date branch is asked: no advice, no line", follows(f));
+f = facts({ repo: "o/n", manifest: releases, gh: host({ rules: null, classic: null }) });
+ok(/was not read, so the line is kept/.test(follows(f)) && !/needs-owner/.test(follows(f)), "users get a release, and the host's rules cannot be read: the line is kept, no advice", follows(f));
+ok(facts({ repo: "o/n", manifest: "| *users get* | `sometimes` |\n", gh: host({ rules: strict }) }).users === "merges", "a row *users get* with no value it takes is read as each merge");
 
 // The measure: three merged pull requests, oldest first #1, #2, #3 (and #9 into another branch, left out); #2 was
 // marked ready after #1 merged, so its turn is its marking ready, as is #3's, marked ready after #2 merged.

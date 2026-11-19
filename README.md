@@ -415,6 +415,7 @@ for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit
 | *other builders' checks* | what a session of another tool than Claude Code runs before it finishes (`tools/other-builders.md`); a row still named *Codex's checks* is this one, renamed at the project's next sync | choice: left out, the project's own tests |
 | *tools* | the manifest's table under "Tools": for each role it orders otherwise, the tool preferred and what takes the role when that tool is not at hand, with how each tool the core has no part for is handed a task or asked for a review, and which of a reviewer's findings block where it marks none so (`tasks/roles.md`, "Tools are preferences") | read: from the last merged pull requests, as `tasks/roles.md` says ("Tools are preferences") (`scripts/tools-read.mjs`) |
 | *pace* | the manifest's lines under "Pace", each a pace the owner sets, of the kinds `roles/orchestrator.md`, "The pace is the owner's", names | choice: left out, no pace but the default |
+| *users get* | `merges` or `releases`, in backticks: whether the project's users get each merge to its default branch (a site deployed on each push) or a release cut from it (floor rule 12; `tasks/hosts.md`) | cannot be read: a deploy on each push and a release workflow each say it only in part; left out, `merges`, under which a pull request is brought up to date first |
 | *merge queue* | `on`, `offered` or `none`, in backticks: whether the host offers the repository a merge queue and whether it is on (`tasks/hosts.md`, "The merge line follows the host") | read: from who holds the repository, whether it is private and its rules on the default branch (`scripts/merge-line.mjs`) |
 | *billed minutes* | `yes` or `no`, in backticks: whether the host bills the repository's runner minutes (`tasks/hosts.md`, "The merge line follows the host") | read: whether the repository is private (`scripts/merge-line.mjs`) |
 | *other builders*, *code reviewers*, *security reviewer* | rows of the *tools* table, "Builder", "Code reviewer" and "Security reviewer"; one still standing among the slots is read as that row | read: as the *tools* (`scripts/tools-read.mjs`) |
@@ -470,9 +471,10 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   the commit it was cut on (core archive 195).
 - This repository's own `main`: a ruleset as each project's has, deletions restricted, force pushes blocked, a pull
   request required, and the checks `tests`, `size`, `own-description` and the Personal terms workflow's `check`
-  required, branches up to date (core archive 201).
+  required, branches up to date (core archive 201) until the owner switches that off, as floor rule 12 lets where users
+  get a release (#733).
 - Each project's ruleset on its default branch: deletions restricted, force pushes blocked; a pull request required, no
-  approvals (a team's project may ask some: `roles/shared/teams.md`); status checks required (the project's CI and `core / core`), branches up to date; where the repository has
+  approvals (a team's project may ask some: `roles/shared/teams.md`); status checks required (the project's CI and `core / core`), branches up to date where every merge goes live (floor rule 12); where the repository has
   them, code scanning results required from CodeQL, blocking on security alerts High or higher and alerts Errors, code
   quality results required at Errors, and Copilot's review requested automatically, advisory (core archive 130).
 - Each repository's Actions settings (Settings, Actions, General): "Require actions to be pinned to a full-length commit

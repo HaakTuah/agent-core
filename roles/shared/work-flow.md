@@ -7,7 +7,7 @@ Read at the start of every task.
    - Mark the draft PR ready and ask for its reviews (`tasks/reviews.md`). Fix every review's findings together.
    - Once every review asked for has answered on the head commit with no finding open, turn on auto-merge
      (`tasks/github-calls.md`; a sync PR is merged by hand: floor rule 8) and go on: GitHub merges when the checks are
-     green and the branch is up to date. Where it refuses, the PR already `clean` or `unstable`,
+     green and, where it asks it, the branch is up to date. Where it refuses, the PR already `clean` or `unstable`,
      merge it yourself as floor rule 12 says.
    - A push after that turns auto-merge off first; bringing the branch up to date with `main` keeps it on.
    - **Ready pull requests merge in a line** (#702). By default only the first whose reviews answered with no

@@ -14,6 +14,7 @@ gh api -X PUT repos/<owner>/<repo>/pulls/<n>/update-branch # bring it up to date
 gh api -X PUT repos/<owner>/<repo>/pulls/<n>/ccr/auto_merge # auto-merge on (DELETE: off)
 gh api repos/<owner>/<repo>/compare/main...<branch> --jq '.files[].filename' # the files a branch changes
 gh api repos/<owner>/<repo>/pulls/<n> --jq '{state, merged}' # was it merged?
+gh api 'repos/<owner>/<repo>/commits/main/check-runs?per_page=100' --jq '.check_runs[] | {name, status, conclusion}' # is main red?
 gh api repos/<owner>/<repo>/collaborators/<login>/permission --jq '{role: .role_name, type: .user.type}' # an
   # account's right: an owner where the role is write, maintain or admin and the type User; the higher right, maintain
   # or admin
