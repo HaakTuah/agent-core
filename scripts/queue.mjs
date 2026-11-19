@@ -20,6 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
+import { copyOf } from "./core-path.mjs";
 import { progressOf } from "./done-when.mjs";
 import { aRepository, inProject } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
@@ -186,8 +187,8 @@ function clearing(FILE, got, at) {
 
 // --check: fails where a line of a closed issue stands, one --clear takes out, or one kept that only a hand does.
 function checking(FILE, gone, stale, at) {
-  if (gone.length) return { status: 1, out: `FAIL: ${FILE} holds the line of ${gone.length === 1 ? "an issue" : "issues"} closed: ${namesOf(gone)}, and this pull request changes the queue. Mend: run node ${at.project ? "core/" : ""}scripts/queue.mjs --clear and commit ${FILE}` };
-  if (stale.length) return { status: 1, out: `FAIL: ${FILE} holds a line whose issues read have all closed, though the reader cannot read them whole: ${stale.map(l => l.text.trim()).join("; ")}. Mend: take the line out of ${FILE} by hand, or name its issues as "#n", "#a to #b" or "#n, points ..." and run node ${at.project ? "core/" : ""}scripts/queue.mjs --clear` };
+  if (gone.length) return { status: 1, out: `FAIL: ${FILE} holds the line of ${gone.length === 1 ? "an issue" : "issues"} closed: ${namesOf(gone)}, and this pull request changes the queue. Mend: run node ${at.project || ""}scripts/queue.mjs --clear and commit ${FILE}` };
+  if (stale.length) return { status: 1, out: `FAIL: ${FILE} holds a line whose issues read have all closed, though the reader cannot read them whole: ${stale.map(l => l.text.trim()).join("; ")}. Mend: take the line out of ${FILE} by hand, or name its issues as "#n", "#a to #b" or "#n, points ..." and run node ${at.project || ""}scripts/queue.mjs --clear` };
   return { status: 0, out: `ok   ${FILE} holds no line of a closed issue` };
 }
 
@@ -196,25 +197,26 @@ function checking(FILE, gone, stale, at) {
 // out of .git, and no protected file (floor rule 3: RULES, an agent tool's folder, and `rules`, the files its
 // SECURITY.md adds); else null, which fails.
 const TOOLS = /^\.git(?:\/|$)|(?:^|\/)\.(?:codex|kiro|agents?)(?:\/|$)/iu;
-export const fileAt = (manifest, rules = []) => {
+export const fileAt = (manifest, rules = [], core = "core/") => {
   if (manifest === null) return FILE;
   const at = progressOf(manifest), plain = path.posix.normalize(String(at).replace(/\\/gu, "/"));
-  return inProject(at) && /\.md$/iu.test(plain) && !RULES.test(plain) && !TOOLS.test(plain) && !rules.some(r => r.toLowerCase() === plain.toLowerCase()) ? plain : null;
+  return inProject(at) && /\.md$/iu.test(plain) && !RULES.test(plain) && !TOOLS.test(plain) && !plain.toLowerCase().startsWith(core.toLowerCase()) && !rules.some(r => r.toLowerCase() === plain.toLowerCase()) ? plain : null;
 };
 // Whether any part of a path inside the project is a link, which --clear's write would follow, to a protected file
 // inside the project as readily as to one outside it.
 const linked = file => file.split("/").some((_, i, parts) => { try { return fs.lstatSync(parts.slice(0, i + 1).join("/")).isSymbolicLink(); } catch { return false; } });
 // The rule files the project's SECURITY.md adds, and its tools' own; none where it names none.
 const ownRules = () => { try { return ruleFiles(undefined, undefined, { tools: true }); } catch { return []; } };
-// Whether this runs from a project's copy of the core (core/scripts/queue.mjs), not from the core itself, read from
-// where this file lies, never from a file a pull request could add.
-const inCopy = () => path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/") === "core/scripts/queue.mjs";
+// The path of the project's copy of the core this runs from (core/, or the folder the manifest's `Core:` line names,
+// as core-path.mjs reads it), or "" where it runs from the core itself: this file must lie at <that path>scripts/, and
+// the core's own scripts/ is no folder a `Core:` line can name.
+const inCopy = () => { const core = copyOf(); return path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/") === `${core}scripts/queue.mjs` ? core : ""; };
 
 // Why the progress file where the command runs cannot be read, with its mend, or null.
 export function unplaced(copy, file) {
   const out = file !== null && linked(file);
   if (!copy && out) return `FAIL: ${FILE} is reached through a link. Mend: make ${FILE} a plain file at the repository's root, the queue's lines in it`;
-  if (file === null || out) return "FAIL: the progress file core-manifest.md names is no plain Markdown file inside the project (outside .git and core/, no protected file, reached through no link). Mend: name the progress file in the manifest's row *progress file* as a path such as docs/PROGRESS.md";
+  if (file === null || out) return "FAIL: the progress file core-manifest.md names is no plain Markdown file inside the project (outside .git and the core's copy, no protected file, reached through no link). Mend: name the progress file in the manifest's row *progress file* as a path such as docs/PROGRESS.md";
   if (fs.existsSync(file) && fs.statSync(file).size > LARGEST) return `FAIL: ${file} is ${fs.statSync(file).size} bytes, past the ${LARGEST} the reader takes. Mend: take out the lines of finished work and any notes, which belong in the pull requests' descriptions`;
   return null;
 }
@@ -222,7 +224,7 @@ export function unplaced(copy, file) {
 // Where the command runs: { copy, file, repo } or { fail }, the failure with its mend.
 function placed() {
   const copy = inCopy(), manifest = copy && fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null;
-  const file = copy ? fileAt(manifest ?? "", ownRules()) : FILE, fail = unplaced(copy, file);
+  const file = copy ? fileAt(manifest ?? "", ownRules(), copy) : FILE, fail = unplaced(copy, file);
   if (fail) return { fail };
   const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout;
   const repo = aRepository(process.env.GITHUB_REPOSITORY) ? process.env.GITHUB_REPOSITORY : repoOf(origin) ?? (copy ? null : CORE);
