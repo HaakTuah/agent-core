@@ -19,8 +19,10 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "runners-test-"));
 let n = 0;
 const flows = files => { const dir = path.join(scratch, String(n++)); fs.mkdirSync(dir); for (const [f, t] of Object.entries(files)) fs.writeFileSync(path.join(dir, f), t); return dir; };
 const host = priv => () => { if (priv === null) throw new Error("HTTP 403"); return JSON.stringify({ private: priv }); };
-const ci = "on:\n  pull_request:\n  push:\n    branches: [main]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n";
-const own = "on: [pull_request]\njobs:\n  test:\n    runs-on: [self-hosted, linux]\n    steps:\n      - run: npm test\n";
+// (a job runs the tests where it starts a suite through the shape check, as every suite is started)
+const suite = "      - run: node core/scripts/shape.mjs checks/shape.json --suite unit -- npm test\n";
+const ci = `on:\n  pull_request:\n  push:\n    branches: [main]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n${suite}`;
+const own = `on: [pull_request]\njobs:\n  test:\n    runs-on: [self-hosted, linux]\n    steps:\n${suite}`;
 const nightly = "on:\n  schedule:\n    - cron: '0 3 * * *'\njobs:\n  look:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node look.mjs\n";
 
 try {
@@ -38,8 +40,16 @@ try {
   ok(r.where === "local", "no workflows at all: a computer alone");
   r = read({ repo: "o/n", dir: flows({ "ci.yml": ci }), gh: host(null) });
   ok(r.billed && r.cadence === "nightly" && /was not read, so taken as billed/.test(r.said[1]), "a host that does not say whether the repository is private: taken as billed, and said so", r.said[1]);
-  const matrix = "on: push\njobs:\n  test:\n    strategy:\n      matrix:\n        os: [ubuntu-latest, self-hosted]\n    runs-on: ${{ matrix.os }}\n    steps:\n      - run: npm test\n";
-  ok(workflowsIn(flows({ "m.yml": matrix })).selfHosted && !workflowsIn(flows({ "c.yml": ci })).selfHosted, "a runner of its own named in the matrix that runs-on takes is read too, and none where no label says it");
+  const matrix = `on: push\njobs:\n  test:\n    strategy:\n      matrix:\n        os: [ubuntu-latest, self-hosted]\n    runs-on: \${{ matrix.os }}\n    steps:\n${suite}`;
+  ok(workflowsIn(flows({ "m.yml": matrix })).testRunners.join() === "own" && workflowsIn(flows({ "c.yml": ci })).testRunners.join() === "hosted", "a runner of its own named in the matrix that runs-on takes is read too, and the host's where only its labels name it");
+  const group = `on: push\njobs:\n  test:\n    runs-on:\n      group: ours\n    steps:\n${suite}`;
+  ok(read({ repo: "o/n", dir: flows({ "g.yml": group }), gh: host(true) }).where === "self-hosted", "a runner group is read as the owner's own");
+  r = read({ repo: "o/n", dir: flows({ "l.yml": `on: push\njobs:\n  test:\n    runs-on: big-box\n    steps:\n${suite}` }), gh: host(true) });
+  ok(r.where === "self-hosted" && /could not be read, so taken as the owner's own/.test(r.said[0]), "a label of the project's own is not read, taken as the owner's own and said so", r.said[0]);
+  r = read({ repo: "o/n", dir: flows({ "ci.yml": "on: [pull_request]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n" }), gh: host(false) });
+  ok(r.where === "local", "a job that starts no suite through the shape check runs no tests here, whatever it runs");
+  r = read({ repo: "o/n", dir: flows({ "ci.yml": ci, "deploy.yml": "on: push\njobs:\n  deploy:\n    runs-on: self-hosted\n    steps:\n      - run: ./deploy\n" }), gh: host(false) });
+  ok(r.where === "hosted" && r.cadence === "hourly" && /forks off that job/.test(r.advice ?? ""), "a deploy job on the owner's machine is not where the tests run, but in a public repository it is advised on all the same", r.advice);
   const bad = workflowsIn(flows({ "ci.yml": ci, "broken.yml": "on: [\n" }));
   ok(bad.onHost && bad.unread.includes("broken.yml"), "a workflow that cannot be read is named, and the rest still read");
   // A row of the manifest overrides each reading, and what was read is still said.

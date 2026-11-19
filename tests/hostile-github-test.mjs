@@ -17,6 +17,7 @@ import { CORE } from "../scripts/core-address.mjs";
 import { TITLE, openIssue } from "../scripts/core-moved.mjs";
 import { RELEASE, elsewhere, fetchCore, hostAccount, ownerOf, releasesIn } from "../scripts/releases.mjs";
 import { OWN, held } from "../scripts/release.mjs";
+import { read as runnersRead } from "../scripts/runners.mjs";
 import { line, measure, median, waited } from "../scripts/wait.mjs";
 import { openPulls, print, stalled } from "../scripts/stalled.mjs";
 import { priced, reading, readings, sessionOf } from "../scripts/core-cost.mjs";
@@ -162,6 +163,17 @@ if (process.platform !== "win32") {
   const hostile = [...[[Number.MAX_SAFE_INTEGER + 2, BOT, TITLE], [-1, BOT, TITLE], ["../../etc/passwd", BOT, TITLE], [7, "a-stranger", TITLE], [8, BOT, `${TITLE}<script>`], [9, BOT, TITLE, "x"]].map(a => issueLine(...a)), "not json", ""].join("\n");
   const r = program(`${B}${HEADS}`, hostile);
   ok(r.status === 0 && /^gh issue create /m.test(r.calls) && !/issue (?:edit|close)/.test(r.calls) && !["etc/passwd", "<script>"].some(w => r.calls.includes(w)), "hostile issue lines name no issue to edit or close, and nothing of them is used: a new one opens");
+}
+
+// ---- runners.mjs: whether the repository is private, as the host answers (#733) ----
+{
+  const none = fs.mkdtempSync(path.join(scratch, "runners-"));
+  for (const [answer, what] of [[JSON.stringify({ private: "yes" }), "a text"], [JSON.stringify({ private: { a: 1 } }), "an object"], ["not json", "no JSON"], ["null", "null"], ["", "nothing"], [JSON.stringify([{ private: false }]), "a list"]]) {
+    const r = runnersRead({ repo: "o/n", dir: none, gh: () => answer });
+    ok(r.billed && /was not read, so taken as billed/.test(r.said[1]), `runners.mjs: a repository whose privacy the host gives as ${what} is not read, taken as billed, and said so`);
+  }
+  const r = runnersRead({ repo: "o/n", dir: none, gh: () => { throw new Error("HTTP 403"); } });
+  ok(r.billed && r.where === "local", "runners.mjs: a host that refuses is taken as billed, nothing thrown");
 }
 
 // ---- nothing at all ----

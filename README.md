@@ -349,7 +349,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      missing, the hook stops nothing, and where Node is missing the work-saved hook says so in a line at the start,
      where it also names what the paths changed on the branch call for (`reading.mjs`, from the copy merged into `main`,
      by `main`'s own roles and modules). The
-     core's own tests run the scripts and both hooks there on every change (`.github/workflows/tests.yml`).
+     core's own tests run the scripts and both hooks there once an hour where `main` moved, and in full before each
+     release (`.github/workflows/tests.yml`; #733).
    - **Another tool's session** reads what `AGENTS.md` names through its own entry file, and runs the work-saved
      hook where its tool has the event (Kiro and Codex at a session's start and stop, from the hook files the starter
      kit writes); no rule rests on a hook alone (`tasks/tools.md`).

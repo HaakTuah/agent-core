@@ -142,21 +142,27 @@ ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] =
   const release = parseYaml(fs.readFileSync(path.join(wfDir, "release.yml"), "utf8"));
   const DRAFT = "!(github.event_name == 'pull_request' && github.event.pull_request.draft)";
   const MOVED = "(github.event_name != 'schedule' || needs.moved.outputs.run == 'true')";
-  ok(tests.on.pull_request.types.includes("ready_for_review") && !tests.on.pull_request.types.includes("edited") && ["suites", "upgrade", "tests"].every(j => String(tests.jobs[j].if).includes(DRAFT) && String(tests.jobs[j].if).includes(MOVED)),
-    "no run on a draft: a pull request's run starts when it is marked ready, and each job of it skips a draft and an hourly run where main did not move (point 2)");
+  const gate = tests.jobs.tests, gateStep = gate.steps.at(-1);
+  ok(tests.on.pull_request.types.includes("ready_for_review") && !tests.on.pull_request.types.includes("edited") && ["suites", "upgrade"].every(j => String(tests.jobs[j].if).includes(DRAFT) && String(tests.jobs[j].if).includes(MOVED)),
+    "no run on a draft: a pull request's run starts when it is marked ready, and each job of tests skips a draft and an hourly run where main did not move (point 2)");
+  ok(!String(gate.if).includes("draft") && String(gate.if).startsWith("${{ always()") && String(gate.if).includes(MOVED) && /github\.event\.pull_request\.draft/.test(gateStep.env.DRAFT) && /if \[ -n "\$DRAFT" \]; then[\s\S]*Mend:[\s\S]*exit 1/.test(gateStep.run),
+    "but the gate the ruleset requires runs on a draft and fails there, saying its mend, since a required check whose job is skipped passes");
+  // (each matrix is set whole for each event: GitHub adds back an entry of `include` that no combination left after
+  // `exclude` matches, so the jobs are read from the lists the expression holds: a pull request's and a push's, the
+  // hourly run's, and all the others')
+  const lists = expr => { const m = /^\$\{\{ fromJSON\(\(github\.event_name == 'pull_request' \|\| github\.event_name == 'push'\) && '(\[[^']*\])' \|\| github\.event_name == 'schedule' && '(\[[^']*\])' \|\| '(\[[^']*\])'\) \}\}$/.exec(String(expr)); return m ? m.slice(1).map(x => JSON.parse(x)) : null; };
+  const suites = lists(tests.jobs.suites.strategy.matrix.include), upgrades = lists(tests.jobs.upgrade.strategy.matrix.include);
+  const only = (l, os) => l.length > 0 && l.every(x => x.os === os);
   const WINDOWS = ["suites-projects", "suites-sync", "suites-kit", "suites-core", "suites-core-places", "suites-licences", "suites-rest", "suites-tools"];
-  const onWindows = tests.jobs.suites.strategy.matrix.include.filter(x => x.os === "windows-latest").map(x => x.suite);
-  const exclude = String(tests.jobs.suites.strategy.matrix.exclude), upgrade = String(tests.jobs.upgrade.strategy.matrix.include);
-  const prList = /^\$\{\{ \(github\.event_name == 'pull_request' \|\| github\.event_name == 'push'\) && fromJSON\('(\[[^']*\])'\)/.exec(exclude);
-  const prUpgrade = /^\$\{\{ fromJSON\(\(github\.event_name == 'pull_request' \|\| github\.event_name == 'push'\) && '(\[[^']*\])'/.exec(upgrade);
-  ok(prList && JSON.stringify(JSON.parse(prList[1]).map(x => x.suite).sort()) === JSON.stringify([...onWindows].sort()) && JSON.stringify([...onWindows].sort()) === JSON.stringify([...WINDOWS].sort())
-    && prUpgrade && JSON.parse(prUpgrade[1]).every(x => x.os === "ubuntu-latest"),
-    "a pull request's run and a push's are on Linux alone: every suite on Windows is left out of them, and the upgrade job's parts there (points 3 and 4)", exclude.slice(0, 300));
-  ok(/github\.event_name == 'schedule' && fromJSON\('\[\{"suite":"suites-kit-core-licences"\},\{"suite":"suites"\},\{"suite":"suites-rest-steps"\}\]'\)/.test(exclude) && /fromJSON\('\[\]'\) \}\}$/.test(exclude),
-    "the hourly run leaves out the suites on Linux, which ran after the merge, and a start by hand or the release's call leaves out none (point 6)");
+  const named = l => [...new Set(l.map(x => x.suite))].sort().join();
+  ok(suites && Object.keys(tests.jobs.suites.strategy.matrix).join() === "include" && suites.every(l => l.every(x => x.node && x.suite && x.os && x.parts))
+    && only(suites[0], "ubuntu-latest") && only(suites[1], "windows-latest") && named(suites[1]) === [...WINDOWS].sort().join()
+    && suites[2].length === suites[0].length + suites[1].length && [".node-version", ".node-least"].every(n => suites[2].filter(x => x.node === n).length === suites[2].length / 2)
+    && upgrades && only(upgrades[0], "ubuntu-latest") && only(upgrades[1], "windows-latest") && upgrades[2].length === upgrades[0].length + upgrades[1].length,
+    "a pull request's run and a push's are on Linux alone, the hourly run on Windows alone, every job named whole, and a start by hand or the release's call runs them all, on both Nodes (points 3, 4 and 6)", String(tests.jobs.suites.strategy.matrix.include).slice(0, 300));
   ok(tests.concurrency.group.includes("format('pr-{0}', github.event.pull_request.number)") && tests.concurrency.group.includes("(github.event_name == 'push' || github.event_name == 'schedule') && format('{0}-main', github.event_name) || github.run_id")
-    && tests.concurrency["cancel-in-progress"] === "${{ github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' }}",
-    "a run on main gives way to the next of its kind, main tested at its newest commit; a start by hand or a call never (point 4)");
+    && tests.concurrency["cancel-in-progress"] === "${{ github.event_name == 'pull_request' || github.event_name == 'push' }}",
+    "a run on main after a merge gives way to the next merge's, main tested at its newest commit; the hourly runs wait their turn; a start by hand or a call is never cancelled (point 4)");
   ok(tests.on.schedule?.length === 1 && /^\d{1,2} \* \* \* \*$/.test(tests.on.schedule[0].cron) && tests.jobs.moved.if === "${{ github.event_name == 'schedule' }}" && /event=schedule/.test(tests.jobs.moved.steps.at(-1).run) && /status=completed/.test(tests.jobs.moved.steps.at(-1).run),
     "Windows once an hour, at main's newest commit, where no hourly run finished on it yet (point 6)");
   ok("workflow_call" in tests.on && "workflow_dispatch" in tests.on && release.jobs.tests.uses === "./.github/workflows/tests.yml" && release.jobs.tests.if === "${{ github.event_name == 'workflow_dispatch' }}" && release.jobs.release.needs.includes("tests"),

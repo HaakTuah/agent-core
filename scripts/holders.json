@@ -454,7 +454,7 @@
     "floor/topics/what-ships.md: A package found bad goes at once": "correction: rule missing; outcome: robust; rare harm",
     "tasks/tests.md: A test asserts no time measured on a real clock": "findings; outcome: robust",
     "tasks/tests.md: A tree that passed is not run again": "check fires; outcome: fast",
-    "tasks/tests.md: A time mark measures and never fails": "check fires; outcome: fast",
+    "tasks/tests.md: A time mark measures and never fails": "findings; outcome: fast",
     "tasks/tests.md: No test run on a draft": "findings; outcome: fast",
     "tasks/tests.md: The default branch is tested at its newest commit": "findings; outcome: fast",
     "tasks/tests.md: The slow suites run once per batch, wherever they run": "findings; outcome: fast",

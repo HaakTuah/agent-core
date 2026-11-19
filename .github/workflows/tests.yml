@@ -55,11 +55,12 @@ permissions:
   contents: read
 
 # (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is, #388; a run on
-# main, after a merge or the hourly one, gives way to the next of its kind, main being tested at its newest commit only,
-# #733, point 4; a start by hand, or the release's call, is a group of its own and never cancelled)
+# main after a merge gives way to the next merge's, main being tested at its newest commit only, #733, point 4; the
+# hourly runs are one group that waits rather than cancels, so a long one finishes and the next, on the same commit,
+# skips itself; a start by hand, or the release's call, is a group of its own and never cancelled)
 concurrency:
   group: tests-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.event_name == 'push' || github.event_name == 'schedule') && format('{0}-main', github.event_name) || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 jobs:
   # (the hourly run tests main's newest commit on Windows only where main moved: where an hourly run already finished on
@@ -110,22 +111,10 @@ jobs:
       # (each job on the pin and on the least long-term Node, the file setup-node reads, #526; on a pull request and a
       # push to main the three on Linux alone, on the hourly run the eight on Windows alone, and on a start by hand or
       # the release's call all eleven; #733, points 3 and 6)
+      # (set whole for each event, since GitHub adds back an entry of `include` that matches no combination left after
+      # `exclude`: each job named with its Node, its suite, its runner and its parts)
       matrix:
-        node: [.node-version, .node-least]
-        suite: [suites-kit-core-licences, suites, suites-rest-steps, suites-projects, suites-sync, suites-kit, suites-core, suites-core-places, suites-licences, suites-rest, suites-tools]
-        include:
-          - { suite: suites-kit-core-licences, os: ubuntu-latest, parts: kit core licences terms tools }
-          - { suite: suites, os: ubuntu-latest, parts: projects sync }
-          - { suite: suites-rest-steps, os: ubuntu-latest, parts: rest steps }
-          - { suite: suites-projects, os: windows-latest, parts: projects }
-          - { suite: suites-sync, os: windows-latest, parts: sync }
-          - { suite: suites-kit, os: windows-latest, parts: kit steps }
-          - { suite: suites-core, os: windows-latest, parts: core faults }
-          - { suite: suites-core-places, os: windows-latest, parts: core places terms }
-          - { suite: suites-licences, os: windows-latest, parts: licences }
-          - { suite: suites-rest, os: windows-latest, parts: rest }
-          - { suite: suites-tools, os: windows-latest, parts: tools }
-        exclude: ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && fromJSON('[{"suite":"suites-projects"},{"suite":"suites-sync"},{"suite":"suites-kit"},{"suite":"suites-core"},{"suite":"suites-core-places"},{"suite":"suites-licences"},{"suite":"suites-rest"},{"suite":"suites-tools"}]') || github.event_name == 'schedule' && fromJSON('[{"suite":"suites-kit-core-licences"},{"suite":"suites"},{"suite":"suites-rest-steps"}]') || fromJSON('[]') }}
+        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"}]' || github.event_name == 'schedule' && '[{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"}]' || '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"}]') }}
     # (the run's token reads the checks too: the selection asks whether "tests" passed on the merged head, on a push)
     permissions:
       contents: read
@@ -532,11 +521,12 @@ jobs:
 
   # (the one check the ruleset asks for by name: it passes only where the suites, the staged cases and the upgrade test
   # on Linux passed that the run started, on Windows too where it started them; a job that ran out of its time is
-  # cancelled, which no failing test is, so the gate says which it was; no gate on a draft, nor on an hourly run where
-  # main did not move)
+  # cancelled, which no failing test is, so the gate says which it was. On a draft it runs and fails, since a check the
+  # ruleset requires passes where its job is skipped, and a draft's head is tested only once it is marked ready; on an
+  # hourly run where main did not move it is skipped, which no pull request or release reads)
   tests:
     needs: [moved, suites, upgrade]
-    if: ${{ always() && !(github.event_name == 'pull_request' && github.event.pull_request.draft) && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}
+    if: ${{ always() && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -544,7 +534,13 @@ jobs:
         env:
           SUITES: ${{ needs.suites.result }}
           UPGRADE: ${{ needs.upgrade.result }}
+          DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && 'yes' || '' }}
         run: |
+          if [ -n "$DRAFT" ]; then
+            echo "::error::a draft is not tested here (#733, point 2), so this check stands failed on its head. Mend: run the" \
+              "suites the change reaches in your own working copy, then mark the pull request ready, which starts this run again"
+            exit 1
+          fi
           echo "the suites: $SUITES; the upgrade test and the staged cases: $UPGRADE"
           if [ "$SUITES" = cancelled ] || [ "$UPGRADE" = cancelled ]; then
             echo "::error::a job was cancelled: it ran out of its time (timeout-minutes) or was stopped, which is no" \

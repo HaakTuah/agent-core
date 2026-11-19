@@ -3,7 +3,7 @@
 // "nuget" and "agentTools", .github/workflows/*.yml, an agent tool's settings), which anyone who opens a pull request
 // writes. Read by licences.mjs (its lock and config readers), exact-versions.mjs, nuget.mjs (its lock and config
 // readers; its build files' XML has its own hostile block in nuget-test.mjs, "const hostile", near line 223, not
-// repeated here), workflows.mjs with yaml-keys.mjs, and agent-tools.mjs (its links out of the checkout: agent-tools-test.mjs,
+// repeated here), workflows.mjs with yaml-keys.mjs, runners.mjs (#733), and agent-tools.mjs (its links out of the checkout: agent-tools-test.mjs,
 // near line 119). Each case is refused: nothing of it is taken as a pass or a value, and a failure says its mend. Run
 // by the core's tests workflow (.github/workflows/tests.yml).
 //
@@ -21,6 +21,8 @@ import { lockPackages, nugetConfig, plainText } from "../scripts/nuget.mjs";
 import { lines, readable, repeated } from "../scripts/workflows.mjs";
 import { twice } from "../scripts/yaml-keys.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
+import { read as runnersRead, workflowsIn } from "../scripts/runners.mjs";
+import os from "node:os";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -145,6 +147,27 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   const keyTwice = repeated([{ file: "a.yml", text: "on: push\non: pull_request\n" }], () => null);
   ok(keyTwice.fails.length === 1 && mended(keyTwice.fails.join("\n")), "a key given twice fails with its mend where the base held none");
   ok(said(settings("").problems) && settings("{}").tools.size === 0 && listed({}, "c.json") === null && said(listed({ agentTools: [{}] }, "c.json").problems), "empty agent settings fail with their mend, an empty object configures nothing, and an empty entry is refused");
+}
+
+// ---- the reader of where the tests run (runners.mjs; #733): a workflow file that anyone's pull request writes ----
+{
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hostile-runners-"));
+  const one = (name, body) => { for (const f of fs.readdirSync(dir)) fs.rmSync(path.join(dir, f)); fs.writeFileSync(path.join(dir, name), body); return workflowsIn(dir); };
+  try {
+    let w = one("loop.yml", "on: push\njobs:\n  t: &a\n    runs-on: [ubuntu-latest, *a]\n    steps: *a\n");
+    ok(!w.selfHosted && !w.onHost, "runners.mjs: a job whose anchors refer to themselves is read as far as it goes, each object once, and nothing overflows");
+    w = one("deep.yml", `on: push\njobs:\n  t:\n    runs-on: ${"[".repeat(5000)}x${"]".repeat(5000)}\n`);
+    ok(w.unread.includes("deep.yml") || w.unknown, "runners.mjs: a runner nested thousands deep is not read, and the file is named or its runner said unread");
+    w = one("types.yml", "on: 5\njobs: x\n");
+    ok(!w.onHost && !w.selfHosted && !w.unknown && !w.unread.length, "runners.mjs: a trigger and jobs of the wrong type say nothing runs here");
+    w = one("list.yml", "- a\n- b\n");
+    ok(!w.onHost && !w.unread.length, "runners.mjs: a file that is a list holds no workflow");
+    w = one("markup.yml", "on: pull_request\njobs:\n  t:\n    runs-on: \"<script>alert(1)</script>\"\n    steps:\n      - run: node core/scripts/shape.mjs c.json --suite u -- x\n");
+    const r = runnersRead({ repo: "o/n", dir, gh: () => JSON.stringify({ private: false }) });
+    ok(w.unknown && r.where === "self-hosted" && !r.said.join(" ").includes("<script>") && /could not be read/.test(r.advice ?? ""), "runners.mjs: a runner named in markup is not read, taken as the owner's own and advised on, and its name never printed");
+    w = one("empty.yml", "");
+    ok(!w.onHost && !w.unread.length, "runners.mjs: an empty file holds no workflow");
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
 console.log(failed ? `${failed} failing` : "ok   every hostile build, package and workflow file is refused");
