@@ -7,11 +7,13 @@
 // `by:chat` or `by:design`, with its current text quoting the owner under "The owner's word", or setting out "What it
 // is" and saying the owner agreed to it), or needs none (labelled `bug`, or opened by the scheduled look, `by:look`);
 // and each line it removes names an issue that is closed, or one a line it adds names again (a line edited or moved in
-// place). A line that names no issue, an inbox file, more than a dozen issues (MOST), or an issue that cannot be read,
-// proves nothing, and the pull request gets its reviews as any other. What needs no word but cannot be read exactly (a
-// test, a check for a rule that stands, an audit's small finding) is left to the reviews too. It reads the labels and
-// the text a review would read, so a label set wrongly is caught by neither; that the line joins in the order the
-// owner wants stays with whoever writes the file (roles/shared/inbox.md).
+// place). A line is read as the progress file's readers read it (queue.mjs's linesOf: a row or an item that names its
+// issues first), each issue it names first counted. A line that names no issue so, an inbox file, issues that cannot
+// be read whole, more than a dozen issues (MOST), or an issue that cannot be read, proves nothing, and the pull
+// request gets its reviews as any other. What needs no word but cannot be read exactly (a test, a check for a rule
+// that stands, an audit's small finding) is left to the reviews too. It reads the labels and the text a review would
+// read, so a label set wrongly is caught by neither; that the line joins in the order the owner wants stays with
+// whoever writes the file (roles/shared/inbox.md).
 // Run by the core's own security-review caller (.github/workflows/own-security-review.yml) from the default branch's
 // copy, in a job of its own whose token may read issues, which the core's shared workflow's may not (a project's caller
 // grants it no such right), never from the pull request's: it hands the head it proved to that workflow, whose scripts
@@ -22,7 +24,8 @@
 //         REPO (or GITHUB_REPOSITORY) the repository; GH_TOKEN for gh. Prints the head's SHA and exits 0 where it
 //         proves it; otherwise prints why not and exits 1 (no check: a pull request it does not prove is reviewed).
 import { existsSync, readFileSync } from "node:fs";
-import { ITEM, MOST, ownerAt, progressOf, readItem } from "./done-when.mjs";
+import { MOST, ownerAt, progressOf, readItem } from "./done-when.mjs";
+import { linesOf } from "./queue.mjs";
 import { started } from "./started.mjs";
 
 const SHA = /^[0-9a-f]{40}$/u;
@@ -42,8 +45,12 @@ export function changed(patch) {
   return { added, removed };
 }
 
-// the item a line names, its first "#n", or an inbox file; null where it names none
-export const itemOf = (line) => String(line).match(ITEM)?.[0] ?? null;
+// the issues a line names first, as "#n", as the progress file's readers read it (queue.mjs); null where it names
+// none, or none that can be read whole
+function itemsOf(line) {
+  const [read] = linesOf(line);
+  return read && !read.kept ? read.issues.map((n) => `#${n}`) : null;
+}
 
 // the lines under a heading of a text (a Markdown heading, or a line wholly in bold), to the next heading
 const headingOf = (line) => /^ {0,3}#{1,6}[ \t]+(.*?)[ \t#]*$/u.exec(line)?.[1] ?? /^\*\*([^*].*?)\*\*:?[ \t]*$/u.exec(line.trim())?.[1] ?? null;
@@ -107,13 +114,14 @@ export function judge(pull, files, { progress, owner, read }) {
   if (bad) return { head: null, why: bad };
   const lines = changed(list[0].patch);
   if (lines === null) return { head: null, why: "GitHub gives no patch of its lines" };
-  const adds = lines.added.map(itemOf), removes = lines.removed.map(itemOf);
-  if ([...adds, ...removes].some((item) => item === null || !item.startsWith("#"))) return { head: null, why: "a line it changes names no issue" };
+  const added = lines.added.map(itemsOf), removed = lines.removed.map(itemsOf);
+  if ([...added, ...removed].some((items) => items === null)) return { head: null, why: "a line it changes names no issue" };
+  const adds = added.flat(), removes = removed.flat();
   const items = [...new Set([...adds, ...removes])];
   if (items.length > MOST) return { head: null, why: `it names more than ${MOST} issues` };
   const fault = itemFault(adds, removes, read, owner);
   if (fault) return { head: null, why: fault };
-  return { head, why: `queue-only: ${adds.length} line${adds.length === 1 ? "" : "s"} added, ${removes.length} removed, each issue as floor rule 8 asks` };
+  return { head, why: `queue-only: ${added.length} line${added.length === 1 ? "" : "s"} added, ${removed.length} removed, each issue as floor rule 8 asks` };
 }
 
 if (started(import.meta.url)) {
