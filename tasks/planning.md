@@ -43,7 +43,7 @@ file*, changes their order or names a milestone, as the orchestrator and the des
   all open hours in two projects, each with the measuring and the building in one. Held by no check: the design check
   asks of a pull request that does the *hard work* whether its approach was known before it was built
   (`tasks/reviews.md`, point 4).
-- **A record pull requests keep adding to is a folder of one file per entry** (#750, point 1). By default each record
+- **Each entry of a busy record stands in a file of its own** (#750, point 1). By default each record
   of a project's that its pull requests add to entry by entry (a line, a row or an item each), such as a running table
   in its *progress file* or its own archive, stands as a folder of one file per entry, each file named to stand between
   its neighbours and read in the order of the names by whatever reads the record. The one condition that changes it:
@@ -53,8 +53,8 @@ file*, changes their order or names a milestone, as the orchestrator and the des
   (`setup/sync-notes/740-a-project-s-records-one-file-per-entry.md`), splits it in a pull request of its own, its
   readers following. It does not mean that what a record holds, or the order it is read in, changes, that a record read
   outside the repository as one file (a changelog its users get with a package) is split, nor that anything fails or
-  waits while a record stands whole. Reason: pull requests that add to one file merge side by side and collide, as 10
-  of the core's 39 merged between 18 and 19 November 2026 did on its sync notes. Held by no check, since which records
+  waits while a record stands whole. Reason: two pull requests that each add an entry to one file conflict once the first
+  merges, as 10 of the core's 39 merged between 18 and 19 November 2026 did on its sync notes. Held by no check, since which records
   these are is a reading of a project's history that no file states; the sync's step asks it once, its reason with the
   staged case `steps`.
 - **A task finishes under the copy of the core it began with.** By default a session syncs the core only between its
