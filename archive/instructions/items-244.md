@@ -183,7 +183,8 @@ The index, and how an item is written: `archive/instructions.md`.
      check printing what the lowered baseline leaves out, which the next pull request that changes the baseline, or a
      cleaning task, writes; one that changes the baseline writes it whole. Under merge-on-green, pull requests that
      made the code better failed until they also rewrote the one shared baseline, and collided; until the lower
-     baseline is written, an entry the base's code no longer held covers no breach elsewhere, though the mended one
-     could come back unseen in its own place, the cost the owner accepted. The owner agreed to the issue's seven
+     baseline is written, an entry the base's code no longer held covers no breach against the base, in its own place
+     or elsewhere, and only a check told no base could let a mended breach come back unseen, the cost the owner
+     accepted. The owner agreed to the issue's seven
      points, found by an audit of 39 merged pull requests, and asked that they be a priority. It stands behind "Never
      worse" in `tasks/code-shape.md`.

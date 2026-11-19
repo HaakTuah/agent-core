@@ -278,6 +278,24 @@ ok(mended(said(v)) && !/writes the baseline/.test(said(v)), "a breach new at a m
 const py = n => `def tall(a):\n${"    a += 1\n".repeat(n - 1)}`, jsOnly = JSON.stringify({ reads: ["javascript"], listed: Object.fromEntries([fn("src/a.js#tall", 100)]) });
 v = judge({ now: { "src/b.js": long("tall", 100), "src/z.py": py(100) }, baseline: jsOnly, base: baseOf(jsOnly, { "src/z.py": py(100) }) });
 ok(mended(said(v)) && /src\/b\.js#tall/.test(said(v)), "a breach the base holds of a reader the baseline does not name moves no entry of another's", said(v));
+// (what the base's code covers is matched as a breach claims an entry, all the base's breaches at once: #751's fifth round)
+const grew = listed([fn("src/b.js#tall", 100), fn("src/c.js#tall", 300)]);
+v = judge({ now: { "src/b.js": long("tall", 250) }, baseline: grew, base: baseOf(grew, { "src/b.js": long("tall", 250) }) });
+ok(v.fail.length === 0 && /gone or moved/.test(noted(v)), "an entry a group-mate's grown breach stands by at the base still covers it: a change that changes no code passes", said(v));
+v = judge({ now: { "src/a.js": long("tall", 100), "src/x.js": long("tall", 100) }, baseline: even, base: baseOf(even, { "src/a.js": long("tall", 100) }) });
+ok(mended(said(v)) && /1 function passes/.test(said(v)) && /src\/x\.js#tall/.test(said(v)), "a mended entry an earlier pull request left listed covers no breach in its own place either, though no other entry is gone", said(v));
+const wide = listed([fn("src/y.js#tall", 300)]), both = listed([fn("src/y.js#tall", 300), fn("src/z.js#tall", 300)]);
+v = judge({ now: { "src/y.js": long("tall", 300), "src/z.js": long("tall", 300) }, baseline: wide, base: baseOf(wide, { "src/y.js": long("tall", 300) }) });
+ok(mended(said(v)) && /1 function passes/.test(said(v)) && /src\/z\.js#tall/.test(said(v)) && !/held already/.test(said(v)), "a new breach takes no base breach's place that still stands and covers itself: it fails as new", said(v));
+v = judge({ now: { "src/y.js": long("tall", 300), "src/z.js": long("tall", 300) }, baseline: both, base: baseOf(wide, { "src/y.js": long("tall", 300) }) });
+ok(mended(said(v)) && /src\/z\.js#tall/.test(said(v)) && /neither listed nor held/.test(said(v)), "nor does an entry listed for it, as --write once wrote it", said(v));
+v = judge({ now: { "src/b.js": long("tall", 100) }, baseline: jsOnly, base: baseOf(jsOnly, { "src/z.py": py(100) }) });
+ok(mended(said(v)) && /src\/b\.js#tall/.test(said(v)), "nor where the change takes that breach out: the entry it would have claimed is mended", said(v));
+v = judge({ now: { "src/b.js": long("tall", 250), "src/z.js": long("tall", 100) }, baseline: grew, base: baseOf(grew, { "src/b.js": long("tall", 250), "src/q.js": long("tall", 400) }) });
+ok(mended(said(v)) && /src\/z\.js#tall/.test(said(v)), "the entry of a breach that grew at the base, which it lends to no other there, covers no other breach of the base's either", said(v));
+const lowered = listed([fn("src/b.js#tall", 80)]);
+v = judge({ now: { "src/b.js": long("tall", 80) }, baseline: lowered, base: baseOf(listed([f100]), { "src/a.js": long("tall", 100) }) });
+ok(v.fail.length === 0, "a baseline this change lowered, of a breach it moved and shrank, still covers it", said(v));
 v = judge({ now: { "src/b.js": long("tall", 100) }, baseline: listed([f100]) });
 ok(v.fail.length === 0 && /gone or moved/.test(noted(v)) && !/functions? pass/.test(said(v)), "a listed function that moved is no new breach: its old entry is said, for --write to list where it stands", noted(v));
 ok(mended(`FAIL: ${(() => { try { judge({ now: {}, baseline: "{}" }); return ""; } catch (e) { return e.message; } })()}`), "a baseline that is none is refused, with its mend");
@@ -485,6 +503,43 @@ if (process.platform !== "win32") { // (a link is made without a privilege only 
     "a baseline that is a link is neither read nor written through", run([]).out);
   fs.rmSync(path.join(dir, "checks/shape-baseline.json"));
   fs.renameSync(path.join(dir, "elsewhere.json"), path.join(dir, "checks/shape-baseline.json"));
+}
+
+// (an entry an earlier pull request mended and left listed lists nothing in its place, --write told the base: #751's
+// fifth round)
+{
+  const at = fs.mkdtempSync(path.join(os.tmpdir(), "shape-test-"));
+  process.on("exit", () => { try { fs.rmSync(at, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+  const there = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", ...args], { cwd: at, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const write = (file, text) => { fs.mkdirSync(path.dirname(path.join(at, file)), { recursive: true }); fs.writeFileSync(path.join(at, file), text); };
+  const check = (args, base) => { const x = spawnSync(process.execPath, [script, "checks/shape.json", ...args], { cwd: at, encoding: "utf8", env: { ...process.env, SHAPE_BASE: base } }); return { status: x.status, out: `${x.stdout}${x.stderr}` }; };
+  const step = what => { there("add", "-A"); there("commit", "-q", "-m", what); };
+  there("init", "-q", "-b", "main");
+  write("checks/shape.json", config({}));
+  write("src/a.js", long("tall", 100));
+  write("src/x.js", long("tall", 300));
+  check(["--first"], "");
+  step("c0");
+  there("mv", "src/a.js", "src/y.js");
+  there("rm", "-q", "src/x.js");
+  step("c1, its baseline left as it was");
+  write("src/z.js", long("tall", 300));
+  const before = check([], "HEAD");
+  const wrote = check(["--write"], "HEAD"), after = check([], "HEAD");
+  ok(before.status === 1 && mended(before.out) && wrote.status === 0 && after.status === 1 && mended(after.out) && /src\/z\.js#tall/.test(after.out) && !("function: src/z.js#tall" in JSON.parse(fs.readFileSync(path.join(at, "checks/shape-baseline.json"), "utf8")).listed),
+    "a new breach no mended entry covers fails, and --write told the base lists it in no mended one's place", `${before.out}\n${wrote.out}\n${after.out}`);
+  there("checkout", "-q", "--", "checks/shape-baseline.json");
+  const blind = check(["--write"], ""), held = check([], "HEAD");
+  ok(blind.status === 0 && held.status === 1 && mended(held.out) && /src\/z\.js#tall/.test(held.out) && /neither listed nor held/.test(held.out), "and where --write was not told the base, the check against it fails what it listed", held.out);
+  there("checkout", "-q", "--", ".");
+  fs.rmSync(path.join(at, "src/z.js"));
+  write("src/y.js", long("tall", 300));
+  write("checks/shape-baseline.json", JSON.stringify({ listed: Object.fromEntries([fn("src/y.js#tall", 300)]) }));
+  step("c2, y.js listed as it stands");
+  write("src/z.js", long("tall", 300));
+  const beside = check(["--write"], "HEAD"), still = check([], "HEAD");
+  ok(beside.status === 0 && still.status === 1 && /1 function passes/.test(still.out) && !/held already/.test(still.out) && !("function: src/z.js#tall" in JSON.parse(fs.readFileSync(path.join(at, "checks/shape-baseline.json"), "utf8")).listed),
+    "--write told the base lists no new breach in the place of one the base holds that still stands", `${beside.out}\n${still.out}`);
 }
 
 // a suite held to its time
