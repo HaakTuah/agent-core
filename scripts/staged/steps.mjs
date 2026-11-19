@@ -103,6 +103,7 @@ export const UNPLANTED = {
   "16 November 2026, what a game is for": "it needs a game, whose next pull request adding a feature writes its page first, and this case's project is a private tool that is no game",
   "16 November 2026, milestones named in order": "what it asks is the manifest's list taking a module, the act \"13 November 2026, the modules a project takes\" already plants; the milestones are a reading of what the project builds",
   "17 November 2026, a team's owners read from the host": "it needs a second person's account the host lets write, and the case's scratch repository holds its owner's alone",
+  "19 November 2026, a project's records one file per entry": "it needs a record that the project's merged pull requests keep adding to, and this case's scratch project has no history of merged pull requests to read one from",
   "17 November 2026, held packages looked up again": "its outcome is what npm's or NuGet's registry answers on the day of a package the project holds, which no scratch project can plant without a package of its own, and what the session puts in a sync pull request's description is no file a script reads after",
 };
 

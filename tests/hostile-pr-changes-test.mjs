@@ -4,8 +4,9 @@
 // range, and nothing at all; each refuses, taking nothing of it as a pass. The readers: pure-sync.mjs and
 // comment-only.mjs, run as a merger runs them in a scratch project whose core is reached by a git rewrite (no network);
 // select.mjs, run as the tests workflow runs it there; copy-tree.mjs, on trees made here; and pr-description.mjs's reader of
-// what a pull request adds under its manifest's "Differences" (#756), on commits made here; and read-total.mjs's
-// cut and its conditions (#469), on trees held in memory. Test data is made up. Run
+// what a pull request adds under its manifest's "Differences" (#756), on commits made here; reading.mjs's reader of the
+// checkout's rule files (#848), on a checkout made here; and read-total.mjs's cut and its conditions (#469), on trees
+// held in memory. Test data is made up. Run
 // by the core's tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
 //
 //   node tests/hostile-pr-changes-test.mjs
@@ -367,5 +368,28 @@ ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "co
   try { total(readTree(null, dir), []); } catch (e) { thrown = e; }
   ok(thrown && mended(`FAIL: ${thrown.message}`) && Date.now() - slow < 5000, "read-total: five thousand modules added are refused with their mend, within 5 s");
 }
+
+// ---- reading.mjs: the rule files of a checkout, which a fork's branch may make links (#848) ----
+// (a link to a pipe never answers, one to a file outside the checkout is not the checkout's: both read as no file, so the
+// check ends at once with a failure naming the file whose "when" it cannot read, never waiting on it)
+if (process.platform !== "win32") {
+  const rd = path.join(tmp, "reading"), outside = path.join(tmp, "outside-reading");
+  for (const d of ["roles", "floor/topics", "tasks"]) fs.mkdirSync(path.join(rd, d), { recursive: true });
+  fs.mkdirSync(outside);
+  fs.writeFileSync(path.join(rd, "floor/security.md"), "# The floor\n");
+  fs.writeFileSync(path.join(rd, "roles/builder.md"), "# The builder\n\nRead at the start of every task by the role `builder`.\n");
+  fs.writeFileSync(path.join(outside, "x.md"), "# Read when a task calls for it.\n");
+  const made = spawnSync("mkfifo", [path.join(outside, "pipe")]).status === 0;
+  if (made) {
+    fs.symlinkSync(path.join(outside, "pipe"), path.join(rd, "tasks/zero.md"));
+    fs.symlinkSync(path.join(outside, "x.md"), path.join(rd, "tasks/out.md"));
+    fs.symlinkSync(path.join(outside, "pipe"), path.join(rd, "roles/builder-link.md"));
+    fs.symlinkSync(path.join(outside, "pipe"), path.join(rd, "core-manifest.md"));
+    const started = Date.now(), r = spawnSync(process.execPath, [path.join(root, "scripts", "reading.mjs"), "--check"], { cwd: rd, env, encoding: "utf8", timeout: 5000 });
+    const out = `${r.stdout}${r.stderr}`;
+    ok(r.error === undefined && r.status !== null && Date.now() - started < 5000, `reading.mjs --check: a rule file that is a link to a pipe, and the manifest too, is read as no file and never waited on, in ${Date.now() - started} ms`);
+    ok(!raw(out) && !out.includes("The floor") && /tasks\/zero\.md/u.test(out) && /tasks\/out\.md/u.test(out) && mended(out), "reading.mjs --check: each link is named as a file that says no when it is read, with its mend, and none is read as the file it leads to");
+  } else console.log("skip reading.mjs: a rule file that is a link to a pipe: no pipe can be made here");
+} else console.log("skip reading.mjs: a rule file that is a link to a pipe: no pipe can be made here (Windows)");
 
 process.exit(failed ? 1 : 0);

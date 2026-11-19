@@ -18,7 +18,7 @@ export const DEEPEST = 128;
 
 // A text's tokens with each list or mapping nested past DEEPEST, a document counted as one, made an empty value, read
 // without recursion so that a text nested past any stack is read; the offsets of those made so, which hold no key.
-function pruned(tokens) {
+export function pruned(tokens) {
   const nests = new Set(["document", "block-map", "block-seq", "flow-collection"]), cut = new Set(), todo = [[tokens, 0]];
   while (todo.length) {
     const [holder, depth] = todo.pop();

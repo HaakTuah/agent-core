@@ -1,7 +1,7 @@
 # Review guidelines
 
 Read at its start by every reviewer (`roles/reviewer.md`): what it judges a change by, read whole with its brief, the
-project's own guidelines, its `SECURITY.md` and the floor. Changes only on the owner's word.
+project's own guidelines, its `SECURITY.md` and the floor.
 
 ## How a review passes
 
@@ -25,8 +25,8 @@ project's own guidelines, its `SECURITY.md` and the floor. Changes only on the o
   sample, and each file the comparison of old against new flags. It does not mean a security review is skipped (floor
   rule 8), nor a move with judgement in each file. Reason: reading hundreds of like changes one by one finds no more,
   and takes rounds. Held by no check.
-- **A later round** checks that the earlier points were fixed and reviews what changed since. Something new about work
-  it already saw is raised only if it blocks.
+- **A later round** checks that the earlier points were fixed. Something new about work it already saw is raised only
+  if it blocks.
 
 ## What blocks
 
@@ -34,15 +34,14 @@ project's own guidelines, its `SECURITY.md` and the floor. Changes only on the o
 - a departure from the design or from the PR's description;
 - a broken rule of the project, the core or the floor;
 - a quote of the owner's, in the change or its description, that holds more than a decision and the reason behind it,
-  or anything personal, or that is left misspelled where it is no floor yes relayed word for word as its issue holds it
+  or that is left misspelled where it is no floor yes relayed word for word as its issue holds it
   (floor rules 3 and 4);
 - a size mark raised without its reason in the PR (one on what every session reads: below);
 - an entry that joins the shape check's or the strength check's baseline under "grown" without its reason in the PR
   and a fresh session's word there that it found no other way (`tasks/code-shape.md`, "Never worse");
-- a test weakened, skipped or deleted beyond what the task forces, or one the PR does not name under "Readings taken"
-  with a reason that holds (`tasks/code-shape.md`, #253);
-- against "One fact, one place" in `roles/shared/how-to-work.md`, a fact, rule or piece of logic written a second time
-  instead of pointed to;
+- a test weakened, skipped or deleted beyond what the task forces, or one the PR does not name with a reason that
+  holds, each line `core/scripts/weakened.mjs` lists ruled on (`tasks/code-shape.md`, #253);
+- against "One fact, one place" in `roles/shared/how-to-work.md`, a second copy of a fact, rule or piece of logic;
 - a new job a maintained package does written by hand, a reader of a format someone else defines above all, with no
   line naming its exception or, past about 50 lines, `Looked for:` (`tasks/code-shape.md`, #486).
 
@@ -96,3 +95,23 @@ makes a process measure its goal (`tasks/cleaning.md`).
   it cannot be read (the core's `AGENTS.md`, "What can be read is never asked or declared").
 - A finding: proof asked beyond what a thing costs others (the core's `AGENTS.md`, "Proof is sized to what a thing
   costs others").
+
+## Worked examples
+
+Each kind of blocking point above, one that blocks, then one that does not (#307):
+- departure: a PR said to fix a sum also drops negative numbers; not: a local variable renamed.
+- broken rule: a live key in a test's fixture; not: a fake key built from pieces at run time.
+- quote: the owner's praise kept beside a decision, or a typo left; not: the reason alone, or a floor yes as recorded.
+- mark: a cap raised with no "Leanness check:"; not: one beside a fresh session's answer.
+- baseline: an entry under "grown" with the reason "it reads YAML"; not: one whose reason is that its fault changes
+  nothing the program does, a fresh session's word beside it.
+- test: an assertion taken out, named nowhere; not: one named on `Tests changed:`, the case moved.
+- second copy: a new loop summing where `sum()` stands; not: two tests setting up the same three numbers.
+- package: a YAML reader by hand with no `Looked for:`; not: ten lines splitting a format the project defines.
+- text users read: a button "Click here to proceed"; not: "Save".
+- trim: one cutting a rule's reason since the archive holds it; not: one cutting what floor rule 4 says alike.
+- brief: one giving its reader a title it lacks, or counting its own goal; not: one naming its role.
+- screen: one changed with no critique; not: one with no pictures where no browser ran, so said, the tool's issue filed.
+- rule file: a rule its issue never asked for; not: one narrower, with why. A core rule with no reason; not: one whose
+  reason could be shorter. One no agent can carry out; not: one an agent does. A fact read from nowhere; not: one
+  whose reader is named.

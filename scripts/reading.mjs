@@ -140,12 +140,14 @@ export const pathIn = manifest => /^Core: \S+(?: at [0-9a-f]{40}, copied whole|,
 // Where the core lies under `dir`: the manifest's path in a project (core/ as a rule), "" in the core's own repository,
 // null where neither holds its roles and floor.
 export function coreAt(dir) {
-  let manifest = null;
-  try { manifest = fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8"); } catch { /* (the core's own root, or no project) */ }
+  const manifest = regular(path.join(dir, "core-manifest.md")); // (null: the core's own root, or no project)
   return [...(manifest === null ? [] : [pathIn(manifest)]), ""].find(prefix => fs.existsSync(path.join(dir, prefix, "roles")) && fs.existsSync(path.join(dir, prefix, FLOOR))) ?? null;
 }
+// A file's text where it is a regular file, else null: a link (to a pipe, which never answers, to an endless device or to
+// a file outside the checkout), a device, a pipe or a folder reads as no file, as a fork's branch may hold one (#848).
+const regular = at => { try { return fs.lstatSync(at).isFile() ? fs.readFileSync(at, "utf8") : null; } catch { return null; } };
 export function library(dir, prefix) {
-  const read = f => { try { return fs.readFileSync(path.join(dir, prefix, f), "utf8"); } catch { return null; } };
+  const read = f => regular(path.join(dir, prefix, f));
   const list = folder => { try { return fs.readdirSync(path.join(dir, prefix, folder)).filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`); } catch { return []; } };
   return gather(read, list);
 }
@@ -386,12 +388,12 @@ function main(argv) {
   if (argv.includes("--hook")) { const line = hookLine(dir); if (line) console.log(line); return 0; }
   const prefix = coreAt(dir);
   if (prefix === null) { console.error("FAIL: the core's roles/ and floor/ are not here. Mend: run it from the project's root, where core-manifest.md names the core's path, or from the core's own root"); return 1; }
-  const manifest = prefix ? (() => { try { return fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8"); } catch { return ""; } })() : "";
+  const manifest = prefix ? regular(path.join(dir, "core-manifest.md")) : null; // (leftOut reads none as no line)
   const lib = taken(library(dir, prefix), leftOut(manifest)), at = f => `${prefix}${f}`, self = `node ${prefix}scripts/reading.mjs`;
   const mode = alone(argv, dir, prefix, lib);
   if (mode !== null) return mode;
   const role = argv[0] && !argv[0].startsWith("--") ? argv[0] : "", tools = many(argv, "--tool"), task = taskOf(argv, dir, lib, self);
-  const config = prefix ? OWN.find(f => fs.existsSync(path.join(dir, f))) : undefined, own = config ? ownPaths(fs.readFileSync(path.join(dir, config), "utf8")) : [];
+  const config = prefix ? OWN.find(f => fs.existsSync(path.join(dir, f))) : undefined, own = config ? ownPaths(regular(path.join(dir, config))) : [];
   if (argv.includes("--line")) {
     const called = calledByPaths(lib, task.paths, own);
     console.log(`${READ_LINE} ${called.length ? called.map(c => `\`${at(c.file)}\``).join(", ") : "nothing its paths call for"}`);
