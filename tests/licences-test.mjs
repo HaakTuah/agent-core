@@ -1,16 +1,18 @@
 // Checks the licence check's lists and readers (scripts/licences.mjs), alone, on invented names: how a licence
 // expression is read, which list allows what, a package known by its registry address, npm's settings; and, of the
-// core's own files, that its audit's entry for Node names the version the core pins (#592). The check on a whole
-// project, and its scan, are checked by licence-scan-test.mjs. Run by the core's tests workflow
+// core's own files, that its audit's entry for Node names the version the core pins (#592); and that the config's
+// schema and the check's own checks of its form, its fallback where ajv is not installed, read it alike (#530). The
+// check on a whole project, and its scan, are checked by licence-scan-test.mjs. Run by the core's tests workflow
 // (.github/workflows/tests.yml).
 //
 //   node tests/licences-test.mjs
 import { readable } from "../scripts/licence-yes.mjs";
 import { actionLists, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 let failed = 0;
 const ok = (cond, what, more = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) { failed++; if (more) console.log(more); } };
@@ -165,6 +167,31 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
     writeFileSync(join(dir, ".npmrc"), "ignore-scripts=true\n");
     r = check(config, dir, "HEAD", config);
     ok(r.failures.some((m) => m.includes("min-release-age")), "an .npmrc the base did not hold, added without the wait, fails", JSON.stringify(r));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+// the config's form (#530): its schema, read by ajv, and the check's own checks of it, which read it where ajv is not
+// installed (a copy of the scripts with no packages), refuse the same configs, each with its mend, and pass the same
+{
+  const base = { lockfiles: ["package-lock.json", "tools/package-lock.json"], ships: ["package.json"], data: ["spdx-exceptions"], fonts: [], ignoreScriptsIn: [".npmrc"],
+    audit: "audit.json", notices: "NOTICES.txt", scan: { served: ["site/"], tools: ["scripts/"], skip: ["x.mjs"] }, nuget: { any: 1 }, accepted: [], agentTools: [] };
+  const set = (o, k, v) => { const x = structuredClone(o); if (v === undefined) delete x[k]; else x[k] = v; return x; };
+  const configs = [base, {}, { ships: [] }, { ships: [], lockfiles: [] }, { ships: [], audit: "a.json" }, { ...base, extra: 1 }, { ...base, Ships: [] }];
+  for (const k of ["lockfiles", "ships", "data", "fonts", "ignoreScriptsIn", "audit", "notices"]) {
+    for (const v of [undefined, [], [""], ["a"], "a", "", 5, null, [5], {}, ["a", ""]]) configs.push(set(base, k, v), set(set(base, "audit", undefined), k, v), set(set(base, "lockfiles", undefined), k, v));
+  }
+  for (const v of [undefined, null, [], {}, "x", { served: [] }, { served: [""] }, { served: ["./x"] }, { served: ["/x"] }, { served: ["."] }, { served: [""], skip: [""] }, { served: [], tools: [5] },
+    { served: "x" }, { servd: [] }, { tools: [] }, { served: ["../x"] }, { served: ["a//b"] }]) configs.push(set(base, "scan", v), set(set(base, "audit", undefined), "scan", v));
+  const dir = mkdtempSync(join(tmpdir(), "licence-config-")), bare = join(dir, "bare"), file = join(dir, "c.json");
+  try {
+    cpSync(new URL("../scripts/", import.meta.url), join(bare, "scripts"), { recursive: true });
+    cpSync(new URL("../floor/", import.meta.url), join(bare, "floor"), { recursive: true });
+    const [withAjv, without] = await Promise.all([import("../scripts/licences.mjs"), import(pathToFileURL(join(bare, "scripts", "licences.mjs")).href)]);
+    const said = (m, c) => { writeFileSync(file, JSON.stringify(c)); try { m.loadConfig(file); return null; } catch (e) { return e.message; } };
+    const apart = configs.map((c) => [c, said(withAjv, c), said(without, c)]).filter(([, a, b]) => (a === null) !== (b === null) || [a, b].some((m) => m !== null && !/ Mend: \S/u.test(m)));
+    const passed = configs.filter((c) => said(withAjv, c) === null).length;
+    ok(!apart.length && passed > 10 && passed < configs.length - 100, `the config's schema and the check's own checks of its form refuse the same ${configs.length - passed} of ${configs.length} configs, each saying its mend, and pass the same ${passed}`,
+      apart.slice(0, 5).map((x) => JSON.stringify(x)).join("\n"));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
