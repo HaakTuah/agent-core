@@ -2,7 +2,8 @@
 // package list names it (INSTALLS: .packages/, or the parser's .packages/parser/, #719) alone, never a project's own
 // install of the same name at another version, and only where what is installed there is what its lock file names,
 // each entry by its version, address and integrity (npm's own record of the install, node_modules/.package-lock.json,
-// read against the lock file beside it), so a folder an earlier install
+// read against the lock file beside it, the package's own entry too; never one the lock flags dev, which only the core's
+// own tests run, reading it themselves), so a folder an earlier install
 // of another lock file left is never run. Where it is not so, the check that needs it did not run, and says so with the command that installs it
 // (#254, #457); it never passes. In a project's pull request whose install could not reach the registry, a script asks
 // unreached() first, and says that part did not run as a warning (#654, point 4).
@@ -86,8 +87,10 @@ function matches(install) {
 // it, or null.
 function entry(name) {
   const install = installOf(name);
-  // (the package's own entry too, whatever its dev flag, so a folder an earlier install left is never taken for it: #719)
-  if (!install || !matches(install) || !same(recordOf(install), `node_modules/${name}`)) return null;
+  // (the package's own entry too, so a folder an earlier install left is never taken for it; and never one the lock flags
+  // dev, which only the core's own tests run, reading it themselves: no script loads one, nor what it brings; #719)
+  const k = `node_modules/${name}`;
+  if (!install || !matches(install) || recordOf(install).wanted?.[k]?.dev || !same(recordOf(install), k)) return null;
   try {
     const own = fs.realpathSync(path.join(dirOf(install), "node_modules")) + path.sep;
     const at = need(install).resolve(name);
@@ -191,10 +194,19 @@ export function unreached(name) {
   return process.env.CORE_PACKAGES_UNREACHED === "1" && !installed(name);
 }
 
+// The failure where no package list of the core's names the package: no install puts it there, so the mend is the core's
+// copy taken back as the core holds it (#254, #719).
+function unlisted(name) {
+  const lists = Object.values(INSTALLS).map(f => `${f}/package.json`).join(", ");
+  console.error(`FAIL: the check did not run: the package ${name} is not installed: no package list of the core's names it (${lists}). Mend: take the core's copy back as the core holds it (in a project, sync it with node core/scripts/sync.mjs; in the core, git checkout origin/main -- .packages), then run the check again`);
+  process.exit(1);
+}
+
 // The package's entry file; where it is not installed, the failure, which never passes: in a job of a workflow, the
 // mend is the install step the job lacks, in a pull request of its own, so that a sync pull request stays pure.
 function found(name) {
   const file = entry(name);
+  if (!file && !installOf(name)) unlisted(name);
   if (!file) {
     const which = installOf(name) ?? FIRST, named = which === FIRST ? "" : ` ${which}`;
     const install = path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"));
