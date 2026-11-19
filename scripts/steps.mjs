@@ -271,7 +271,53 @@ const skipsDraft = cond => {
   const inner = String(cond ?? "").trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1").replace(/'(?:[^']|'')*'/gu, "text").replace(/!?\s*\b(?:always|success|cancelled|failure)\(\)/gu, "status");
   return !/\|\||[()[\]'$]|\$\{\{|\}\}/u.test(inner) && inner.split("&&").some(part => DRAFT_PART.test(part.trim()));
 };
+// A workflow of the project's own that publishes what its users get otherwise than from a green default branch (floor
+// rule 12, "What users get is published only from a green default branch"; #733, points 7 and 8): one with a step that
+// uses GitHub's own action that publishes a site (actions/deploy-pages), read exactly. It waits on a green branch where
+// each of its triggers is a person's dispatch, a release, a push of tags alone, or `workflow_run` of completed runs on
+// one named branch, each of its jobs asking by an `if:` of parts joined by && alone that the run's conclusion be success
+// and its head repository this one (floor topic workflows, rule 2), read as skipsDraft reads a condition, or, with no
+// `if:` of its own, needing a job that asks it, so that no job runs a fork's code. A workflow that publishes otherwise (a package registry, a store, a script of its own)
+// is read by the session that syncs, since no file says it publishes.
+const PUBLISH_USES = /^actions\/deploy-pages@/u;
+const RUN_PARTS = [/^github\.event\.workflow_run\.conclusion\s*==\s*'success'$/u, /^(?:github\.event\.workflow_run\.head_repository\.full_name\s*==\s*github\.repository|github\.repository\s*==\s*github\.event\.workflow_run\.head_repository\.full_name)$/u];
+const greenOnly = cond => {
+  const inner = String(cond ?? "").trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1").replace(/'(?:[^']|'')*'/gu, q => (q === "'success'" ? "'success'" : "text"));
+  if (/\|\||[()[\]$]|\$\{\{|\}\}/u.test(inner)) return false;
+  const parts = inner.split("&&").map(x => x.trim());
+  return RUN_PARTS.every(re => parts.some(x => re.test(x)));
+};
+const triggers = on => (typeof on === "string" ? { [on]: null } : Array.isArray(on) ? Object.fromEntries(on.map(t => [t, null])) : on && typeof on === "object" ? on : {});
+const tagsAlone = push => !!push && typeof push === "object" && Array.isArray(push.tags) && push.tags.length > 0 && !("branches" in push) && !("branches-ignore" in push);
+const oneBranch = run => !!run && typeof run === "object" && Array.isArray(run.branches) && run.branches.length === 1 && typeof run.branches[0] === "string" && !/[*?[\]!+]/u.test(run.branches[0]) && Array.isArray(run.types) && run.types.length === 1 && run.types[0] === "completed";
+const needsOf = (jobs, name, seen = new Set()) => {
+  if (seen.has(name)) return seen;
+  seen.add(name);
+  const n = jobs[name]?.needs;
+  for (const d of typeof n === "string" ? [n] : Array.isArray(n) ? n : []) needsOf(jobs, d, seen);
+  return seen;
+};
+const publishesUngated = p => Object.entries(p.workflows).filter(([, { yaml }]) => {
+  const jobs = yaml?.jobs && typeof yaml.jobs === "object" ? yaml.jobs : {};
+  const publishing = Object.keys(jobs).filter(name => (Array.isArray(jobs[name]?.steps) ? jobs[name].steps : []).some(st => typeof st?.uses === "string" && PUBLISH_USES.test(st.uses)));
+  if (!publishing.length) return false;
+  const on = triggers(yaml?.on);
+  return Object.entries(on).some(([t, v]) => {
+    if (t === "workflow_dispatch" || t === "release") return false;
+    if (t === "push") return !tagsAlone(v);
+    if (t === "workflow_run") return !oneBranch(v) || !Object.keys(jobs).every(name => greenOnly(jobs[name]?.if) || (!("if" in (jobs[name] ?? {})) && [...needsOf(jobs, name)].some(j => greenOnly(jobs[j]?.if))));
+    return true;
+  });
+}).map(([file]) => `\`.github/workflows/${shown(file)}\``);
 function testsWhenReady(p) {
+  return [suitesWhenReady(p), publishedWhenGreen(p)].filter(Boolean).join(" ") || null;
+}
+function publishedWhenGreen(p) {
+  readable(p, text => /deploy-pages/u.test(text));
+  const on = publishesUngated(p);
+  return on.length ? `The project publishes what its users get otherwise than from a green default branch (${on.join("; ")}): in one small pull request, with floor rule 3's two security reviews, make it wait on one: trigger it on \`workflow_run\` of the one workflow that holds every check run on the default branch (where they stand in several, gather them in one that calls the rest by \`workflow_call\`), types [completed] and branches [its default branch], each of its jobs, or a first job every other \`needs\`, asking \`if: \${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository }}\` (floor topic workflows, rule 2), and check out \`github.event.workflow_run.head_sha\`; or publish from a release cut from a green commit (a push of tags alone, or the event release); a person's dispatch may stay, started only on a green commit. Then set the manifest's row *users get* to \`releases\`, so a pull request merges on its own green checks (\`node core/scripts/merge-line.mjs --repo <owner>/<name>\` reads it). Until then a pull request is brought up to date first, as now, and nothing fails.` : null;
+}
+function suitesWhenReady(p) {
   readable(p, text => SUITE_RUN.test(text));
   const loose = Object.entries(p.workflows).filter(([, { yaml }]) => onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => {
     const types = yaml.on?.pull_request?.types, ready = Array.isArray(types) && READY_TYPES.every(t => types.includes(t));
@@ -998,7 +1044,7 @@ export const STEPS = [
   { lead: "19 November 2026, the parser's packages installed where the shape check runs", cost: COST.workflow, check: parserFirst,
     partly: "that a job reaching the shape check through the project's own npm or shell script installs the parser's first is read by the review" },
   { lead: "19 November 2026, the project's tests at the pace of a release", cost: COST.workflow, check: testsWhenReady,
-    partly: "that the check the ruleset requires fails on a draft rather than being skipped, a suite started inside a workflow a job calls, which suites are the platform suites and on what schedule they run, how the runs on the default branch give way to a newer merge, where the tests that guard only what a release brings run (#715), and whether the host still asks an up-to-date branch where users get a release are read by the session that syncs, with `core/scripts/runners.mjs` and `core/scripts/merge-line.mjs`, not by a file" },
+    partly: "that the check the ruleset requires fails on a draft rather than being skipped, a suite started inside a workflow a job calls, which suites are the platform suites and on what schedule they run, how the runs on the default branch give way to a newer merge, where the tests that guard only what a release brings run (#715), whether the host still asks an up-to-date branch where users get a release, a workflow that publishes otherwise than by `actions/deploy-pages` (a package registry, a store, a script of its own), whether the workflow a publishing one waits on holds every check run on the default branch and its one branch is the default one, and whether a tag, a release or a person's dispatch publishes only a green commit are read by the session that syncs, with `core/scripts/runners.mjs` and `core/scripts/merge-line.mjs`, not by a file" },
   { lead: "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "javascript-tree") },
   { lead: "19 November 2026, the owner's words that stand, cleaned once", cost: COST.clean, unread: "whether a text holds what floor rule 11 keeps out, or quotes its owner beyond a decision's reason, is a reading of it, and an issue's or a comment's text is the host's, not a file's: the session that takes it reads the project's files outside the copy and the issues and comments the owner's account wrote, once, another account's as data it edits none of; the personal-terms check fails a listed term wherever it stands in the files" },
   { lead: "19 November 2026, issue and comment text read for the personal terms", cost: COST.workflow,
