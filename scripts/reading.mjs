@@ -121,12 +121,16 @@ function globbed(parts, s) {
   }
   return at[s.length] === 1;
 }
+// (past a walk of WALK steps, a pattern a branch writes matches, which calls for more reading, never less: no rule file's
+// pattern comes near it, and each changed path then costs at most WALK steps for each pattern, all of them read in time
+// their text sets)
+const WALK = 1 << 20;
 export function matches(pattern, file) {
   const p = String(pattern).replace(/^\.\//u, ""), f = String(file).replace(/\\/gu, "/").replace(/^\.\//u, "");
   if (p.endsWith("/")) return f.startsWith(p);
   const s = p.includes("/") ? f : f.split("/").pop(), g = prepared(p);
   if (!s.startsWith(g.first) || !s.endsWith(g.last) || !inOrder(g.runs, s)) return false;
-  return globbed(g.parts, s);
+  return g.parts.length * (s.length + 1) > WALK || globbed(g.parts, s);
 }
 
 // The core's roles and modules as they say when they are read: `read(file)` gives a file's text or null, `list(folder)`
