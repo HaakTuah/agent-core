@@ -204,8 +204,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   it did not start before, and fails a pull request that adds a copy until the mend its failure words is made; by the
   heading "What it asks of a project" below; and, for the dose, by the scheduled look (`scripts/look.mjs`), which
   reads it from the shape check's baseline (`scripts/dose.mjs`).
-- **A release says what it asks, step by step.** Whoever adds an entry to `setup/sync-notes.md`
-  gives it a step in `scripts/steps.mjs` that answers done or not done exactly, never by guessing: a check of its own
+- **A release says what it asks, step by step.** Whoever adds an entry to the sync notes (`setup/sync-notes/`)
+  gives it a step in `scripts/steps/` that answers done or not done exactly, never by guessing: a check of its own
   with its mend, worded so a session acts on it with no rule file open; a check of the project's that fails where it
   is not done; or, where no check reads it, why, held by the staged case `steps`. Every standing entry has one. Every sync
   runs them all (`scripts/sync.mjs`) and prints, for the sync pull request's description, only the steps not done, and
@@ -381,6 +381,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `scripts/holders.mjs`, in `.github/workflows/tests.yml`, which fails where `holders.json` names a rule that no longer
   stands, a check that is not there or a number in no form, and by the heading's check, which asks the line "Number:"
   where the heading holds more than "None".
+- **A project's own rules name what holds them** (#662). By default the rules a project writes for itself, in the
+  rule files its sessions read as its own files name them, are read as the core's are: `scripts/holders.mjs --own`,
+  run from the project, reads them against its list `checks/holders.json`, which the starter kit writes and a sync's
+  step asks for (`setup/sync-notes.md`, which gives the files and the list's forms). Each month the session that takes
+  the project's state report files, for each rule it lists with no holder, those read at a session's start first, a
+  task at the project's pace: a check where one can read the breach exactly, the rule moved to where it is read on
+  need, or a proposal that it goes, which is the owner's to decide. The staged cases and the pruning stay the core's,
+  for the whole sessions each costs a month. Nothing changes it. It does not mean that a rule with no holder, or a wrong
+  line of the list, fails anything, is removed or stops binding, that a session rewords a project's rule on its own
+  reading, nor that a review, or how often a rule is cited, holds one. Reason: a rule file read at every session's
+  start with nothing that enforces it is the case the study behind #545 measured, no gain in the work and more cost.
+  Held by `tests/holders-test.mjs`, on a scratch project with one rule held and one not, by `tests/look-test.mjs`, for
+  the report's list, and by the step `scripts/steps.mjs` reads for the first list.
 - **Staged cases hold what no check reads** (#235). By default a rule is held by a check; where none
   can read its breach exactly, since the breach lies in what a session does, a staged case holds it: a scratch project
   (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by
@@ -438,8 +451,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   Kept out: adjectives that measure nothing (`clean`, `performant`), `should consider`, which binds no one, lists of
   preferred technologies, which date within months, and whatever a check's failure can say at the moment it matters
   (#254). A rule that stands and no change touches is the one exception: the audit of the core against itself (#259)
-  brings it to the pattern instead. It does not mean a project's own rules are asked anything; they may be written the
-  same way. Reason: in one evening three rules were read against what the owner meant, each for want of an observable
+  brings it to the pattern instead. It does not mean a project's own rules are asked to take this pattern; they may be
+  written the same way, and what holds them is listed as "A project's own rules name what holds them" says. Reason: in one evening three rules were read against what the owner meant, each for want of an observable
   trigger or a reason. Held by `scripts/general.mjs` with its list "phrases" (`scripts/general.json`), and by the review
   guidelines ("A rule file changed").
 - **What can be read is never asked or declared** (#481). By default a fact about a project's set-up
@@ -465,14 +478,18 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `archive/` and `reports/` for a gendered pronoun, a line quoted with `>` (the owner's own words) and a record moved
   word for word aside, while the older records stay as they were.
 - **A record pull requests add to is a folder of one file per entry** (#750, point 1). By default each part of the
-  inventory (`INVENTORY.md`) stands in a file of its own under `inventory/`, read in the order of the files' names by
-  the scripts that read it (`scripts/inventory.mjs`), so that two pull requests that add an entry never edit the same
-  lines, as each archive item stands already ("A new archive item is named by its issue"). Whoever adds an entry adds
-  its file, named to stand between its neighbours. Nothing changes it. It does not mean that what the record holds, or
-  the order it is read in, changes. Reason: of 39 pull requests merged between 18 and 19 November 2026, 8 changed
-  `INVENTORY.md`, and under merge-on-green pull requests that add to one file merge side by side and collide. Held by
-  `tests/mend-test.mjs`, which reads the inventory whole, and fails a folder `INVENTORY.md` does not name and a part's
-  line written in `INVENTORY.md` itself.
+  inventory (`INVENTORY.md`) stands in a file of its own under `inventory/`, and each entry of the sync notes
+  (`setup/sync-notes.md`) under `setup/sync-notes/`, its step in a file of the same name under `scripts/steps/`, each
+  read in the order of the files' names by the scripts that read it (`scripts/inventory.mjs`, `scripts/sync-notes.mjs`,
+  `scripts/steps.mjs`), so that two pull requests that add an entry never edit the same lines, as each archive item
+  stands already ("A new archive item is named by its issue"). Whoever adds an entry adds its file, named to stand
+  between its neighbours. Nothing changes it. It does not mean that what the record holds, or the order it is read in,
+  changes. Reason: of 39 pull requests merged between 18 and 19 November 2026, 8 changed `INVENTORY.md`, 10
+  `setup/sync-notes.md` and 7 `scripts/steps.mjs`, and under merge-on-green pull requests that add to one file merge
+  side by side and collide. Held by `tests/mend-test.mjs`, which reads the inventory whole, and fails a folder
+  `INVENTORY.md` does not name and a part's line written in `INVENTORY.md` itself; and by `tests/steps-test.mjs`, which
+  reads the notes whole, and fails an entry or a step without its pair of the same name and an entry written in
+  `setup/sync-notes.md` itself.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
   `tests/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its
