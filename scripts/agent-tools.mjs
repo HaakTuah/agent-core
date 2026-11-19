@@ -996,6 +996,10 @@ function heldBy(head, baseProject, mended) {
 
 // The whole check, from the project's root: { fail, notes }.
 export function run(root, file, { core = false, base = baseOf(root) } = {}) {
+  // (each run reads the commits as they stand when it starts: what an earlier run in the same process listed of "HEAD"
+  // may be another commit's)
+  listings.clear();
+  shown.clear();
   let config;
   try { config = parseBounded(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
     return { fail: [`${file} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`], notes: [] };
@@ -1047,12 +1051,18 @@ function sortUnlisted(unlisted, { head, base, held, file }, fail, notes) {
   if (unlisted.some(held)) notes.push(`not listed, as the base held them: ${unlisted.filter(held).map(describe).join(", ")}. Write the list as the sync note of 16 November 2026 says`);
 }
 
+// What the check prints, in order, and its exit status: { lines: [[stream ("out" or "err"), line]], status }.
+export function printed(root, file, opts) {
+  const { fail, notes } = run(root, file, opts);
+  const lines = [...notes.map(n => ["out", `note ${logged(n)}`]), ...fail.map(f => ["err", `FAIL: ${logged(f)}`]),
+    ["out", fail.length ? `${fail.length} of the agent's own tools not as floor topic 15 asks` : "ok   every tool the project configures for its agents is listed"]];
+  return { lines, status: fail.length ? 1 : 0 };
+}
+
 if (started(import.meta.url)) {
   const args = process.argv.slice(2), file = args.find(a => !a.startsWith("--"));
   if (!file) { console.error("usage: node core/scripts/agent-tools.mjs <the licence check's config> [--core]"); process.exit(2); }
-  const { fail, notes } = run(process.cwd(), file, { core: args.includes("--core") });
-  for (const n of notes) console.log(`note ${logged(n)}`);
-  for (const f of fail) console.error(`FAIL: ${logged(f)}`);
-  console.log(fail.length ? `${fail.length} of the agent's own tools not as floor topic 15 asks` : "ok   every tool the project configures for its agents is listed");
-  process.exitCode = fail.length ? 1 : 0;
+  const { lines, status } = printed(process.cwd(), file, { core: args.includes("--core") });
+  for (const [stream, line] of lines) (stream === "err" ? console.error : console.log)(line);
+  process.exitCode = status;
 }
