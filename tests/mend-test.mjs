@@ -12,6 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { failures, mended, unmended } from "../scripts/mend.mjs";
+import { folders, partsIn, whole } from "../scripts/inventory.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what) => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}`); } };
@@ -109,22 +110,24 @@ for (const wf of workflows) {
 ok(unlisted.size === 0, `every script a workflow names, and every workflow with a step that fails by itself, is a check with its test or is said to fail no pull request${unlisted.size ? `: not so for ${[...unlisted].join(", ")}. Mend: add it to CHECKS in tests/mend-test.mjs with the test that reads its failures, or to NOT_CHECKS with why it fails no pull request` : ""}`);
 for (const [name, why] of Object.entries(NOT_CHECKS)) ok(fs.existsSync(path.join(root, name)) && why, `${name} is there, and says why it is no check`);
 
-// the inventory: a part's line is a bullet, its lines joined; the files it names are the backticked ones before its
-// first ": "
-const inventory = fs.readFileSync(path.join(root, "INVENTORY.md"), "utf8");
+// the inventory, read whole (scripts/inventory.mjs; #750, point 1): a part's line is a bullet, its lines joined; the
+// files it names are the backticked ones before its first ": "
+const inventory = whole(root);
+const stray = fs.readdirSync(path.join(root, "inventory")).filter(d => !folders(root).includes(`inventory/${d}`));
+ok(stray.length === 0 && folders(root).every(f => partsIn(root, f).length > 0), `each folder of inventory/ is named in INVENTORY.md, and holds its parts${stray.length ? `: not so for ${stray.join(", ")}. Mend: name it under its heading in INVENTORY.md with the line "Its parts stand in \`inventory/<folder>/\`, a file each, read in the order of their names.", or move its files into a folder named there` : ""}`);
 const parts = new Set();
 for (const part of inventory.split(/\r?\n(?! )/u).filter(l => /^- /u.test(l))) {
   for (const m of part.replace(/\s*\r?\n\s*/gu, " ").split(": ")[0].matchAll(/`([^`]+)`/gu)) parts.add(m[1]);
 }
 const runs = [...named, ...fs.readdirSync(path.join(root, ".github/workflows")).map(f => `.github/workflows/${f}`)];
 const left = runs.filter(name => !parts.has(name)).sort();
-ok(left.length === 0, `each script a workflow or a hook names, and each workflow, has its line in INVENTORY.md${left.length
-  ? `: not so for ${left.join(", ")}. Mend: add a line for each to INVENTORY.md, under the heading it belongs to, as its "How a line reads" says: what it does, where it must run, what else does it (searched on the web too), and a verdict`
+ok(left.length === 0, `each script a workflow or a hook names, and each workflow, has its line in the inventory${left.length
+  ? `: not so for ${left.join(", ")}. Mend: add a file for each to the folder of inventory/ that INVENTORY.md names under the heading it belongs to, named to stand in order between its neighbours (NNN-<name>.md), its line as INVENTORY.md's "How a line reads" says: what it does, where it must run, what else does it (searched on the web too), and a verdict`
   : ""}`);
 const gone = [...parts].filter(name => /^(?:scripts|\.github|setup)\//u.test(name)
   && (name.split("/").includes("..") || !fs.existsSync(path.join(root, name)))).sort();
-ok(gone.length === 0, `each file a line of INVENTORY.md names is there${gone.length
-  ? `: not so for ${gone.join(", ")}. Mend: in INVENTORY.md, name the file where it went, or take out the line of a part that is gone`
+ok(gone.length === 0, `each file a part of the inventory names is there${gone.length
+  ? `: not so for ${gone.join(", ")}. Mend: in the part's file under inventory/, name the file where it went, or take out the file of a part that is gone`
   : ""}`);
 // a part's line that records a trial of a maintained tool (*Tried:*) says which of the part's bugs the tool reads
 // (*Replayed:*; tasks/choices.md, "A trial of a maintained tool replays the part's past bugs"; #593)
@@ -133,7 +136,7 @@ const unreplayed = text => text.split(/\r?\n(?! )/u).filter(l => /^- /u.test(l))
 ok(unreplayed("- `a.mjs`: reads.\n  *Tried:* a tool, 2 s.\n- `b.mjs`: reads. *Tried:* a tool. *Replayed:* #1 read.\n- `c.mjs`: reads.").join() === "`a.mjs`",
   "a part's line that records a trial and replays none of its bugs is found, one that replays them or records no trial is not");
 const notReplayed = unreplayed(inventory);
-ok(notReplayed.length === 0, `each part's line of INVENTORY.md that records a trial says which of the part's bugs the tool reads and which it does not${notReplayed.length
+ok(notReplayed.length === 0, `each part of the inventory that records a trial says which of the part's bugs the tool reads and which it does not${notReplayed.length
   ? `: not so for ${notReplayed.join(", ")}. Mend: for each bug filed against the part, run the tool on the test cases its merged fix added or changed, taken from those on the default branch and never from the issue's text, and add to its line "*Replayed:*" with each bug's number and whether the tool reads its case or not ("none" where no bug was filed; a bug whose fix added or changed no test case named as not run), as tasks/choices.md says ("A trial of a maintained tool replays the part's past bugs")`
   : ""}`);
 

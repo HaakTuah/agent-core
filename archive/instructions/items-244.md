@@ -179,3 +179,11 @@ The index, and how an item is written: `archive/instructions.md`.
      happens to read it. The owner agreed to it in a chat session, as the third of three ways to gain on what the
      core already has. It stands behind "The audit's reader has a fixed brief and fixed questions" in
      `tasks/cleaning.md`.
+263. **19 November 2026**, #750, point 1. A record that pull requests add to is a folder of one file per entry, read
+     in order by the scripts that read it, so that two pull requests never edit the same lines; what the record holds,
+     and the order it is read in, stay as they were. Of the 39 pull requests merged between 18 and 19 November, 12
+     changed `QUEUE.md`, 10 `setup/sync-notes.md`, 8 `INVENTORY.md`, 7 `scripts/steps.mjs`, 6
+     `scripts/holders.json` and 5 the archive, and under merge-on-green pull requests that add to one file merge side
+     by side and collide. The owner agreed to the issue's seven points, found by an audit of those pull requests, and
+     asked that they be a priority. It stands behind "A record pull requests add to is a folder of one file per entry"
+     in `AGENTS.md`.

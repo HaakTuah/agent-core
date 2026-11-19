@@ -358,6 +358,14 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that list in the PR that rewords it. The owner is never "he" or "his" in new text: the same check reads each line a
   PR adds under `archive/` and `reports/` for a gendered pronoun, a line quoted with `>` (the owner's own words, as
   `words/` keeps them) and a record moved word for word aside, while the older records stay as they were.
+- **A record pull requests add to is a folder of one file per entry** (#750, point 1). By default each part of the
+  inventory (`INVENTORY.md`) stands in a file of its own under `inventory/`, read in the order of the files' names by
+  the scripts that read it (`scripts/inventory.mjs`), so that two pull requests that add an entry never edit the same
+  lines. Whoever adds an entry adds its file, named to stand between its neighbours. It does not mean that what the
+  record holds, or the order it is read in, changes. Reason: of 39 pull requests merged between 18 and 19 November
+  2026, 8 changed `INVENTORY.md`, and under merge-on-green pull requests that add to one file merge side by side and
+  collide. Held by `tests/mend-test.mjs`, which reads the inventory whole and fails a folder `INVENTORY.md` does not
+  name.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
   `tests/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its
