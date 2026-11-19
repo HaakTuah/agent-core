@@ -52,7 +52,7 @@ export const REACH = {
     process: { runs: runsOf(["Process.Start", "new Process", "new ProcessStartInfo"]), imports: [] },
   },
   python: {
-    clock: { runs: runsOf(["time.sleep", "asyncio.sleep", "time.time", "time.monotonic", "time.perf_counter", "datetime.now", "datetime.utcnow", "datetime.datetime.now", "datetime.datetime.utcnow"]), imports: [] },
+    clock: { runs: runsOf(["time.sleep", "asyncio.sleep", "time.time", "time.monotonic", "time.perf_counter", "datetime.now", "datetime.utcnow", "datetime.datetime.now", "datetime.datetime.utcnow"]), imports: ["time"] },
     process: { runs: runsOf(["os.system", "os.popen"]), imports: ["subprocess", "multiprocessing"] },
   },
 };

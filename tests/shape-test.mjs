@@ -144,11 +144,21 @@ const reaching = survey({
   "tests/test_run.py": "import subprocess\nimport time\n\ndef test_a():\n    time.sleep(1)\n",
 }, reachCfg, new Set(reachTests));
 ok(same(ids(reaching).filter(id => /^(timed|process): /.test(id)), ["process: Tests/WaitTests.cs -> Process.Start", "process: src/a.test.js -> node:child_process", "process: src/c.test.js -> runTool", "process: src/d.test.js -> spawnly",
-  "process: tests/test_run.py -> subprocess", "timed: Tests/WaitTests.cs -> Thread.Sleep", "timed: src/a.test.js -> Date.now", "timed: src/c.test.js -> Clock.wait", "timed: src/d.test.js -> new Date()", "timed: tests/test_run.py -> time.sleep"])
+  "process: tests/test_run.py -> subprocess", "timed: Tests/WaitTests.cs -> Thread.Sleep", "timed: src/a.test.js -> Date.now", "timed: src/c.test.js -> Clock.wait", "timed: src/d.test.js -> new Date()", "timed: tests/test_run.py -> time"])
   && reaching.read.timed === 5 && reaching.read.processes === 5,
   "a test that calls or imports what reaches a real clock or starts another process, by its language's names or the config's, is one entry of each kind, its first name in order; a name in a string, a comment, after a dot or with what follows it, and code that is no test, are none", ids(reaching).filter(id => /^(timed|process): /.test(id)));
 ok(readerOf("timed: src/a.test.js -> Date.now", reaching.readers) === "clocks" && readerOf("process: src/a.test.js -> node:child_process", reaching.readers) === "processes" && fileOf("timed: src/a.test.js -> Date.now") === "src/a.test.js",
   "each kind is the entry of a reader of its own, \"clocks\" and \"processes\", in the test's file");
+const faked = survey({
+  "src/f.test.js": "vi.useFakeTimers();\nsetTimeout(() => {}, 5);\nimport { spawnSync } from 'node:child_process';\n",
+  "tests/test_sleep.py": "from time import sleep\n\ndef test_a():\n    sleep(1)\n",
+}, reachCfg, new Set(["src/f.test.js", "tests/test_sleep.py"]));
+ok(same(ids(faked).filter(id => /^(timed|process): /.test(id)), ["process: src/f.test.js -> node:child_process", "timed: tests/test_sleep.py -> time"]),
+  "a test that installs a fake clock reaches no real one, and a module of the clock imported by name counts (Python's from time import sleep)", ids(faked));
+ok(unclaimed(new Map([["timed: src/a.test.js -> Date.now", true]]), new Map([["timed: src/a.test.js -> setTimeout", true]])).length === 0
+  && unclaimed(new Map([["process: src/a.test.js -> runTool", true]]), new Map([["process: src/a.test.js -> node:child_process", true]])).length === 0
+  && unclaimed(new Map([["timed: src/b.test.js -> setTimeout", true]]), new Map([["timed: src/a.test.js -> setTimeout", true]])).length === 1,
+  "a listed test that reaches another name, or keeps a later one, stands under its old entry; another test's entry is never its");
 ok(screened.reach.get("src/e2e/d.test.js") === undefined && same([...screened.reach.get("src/rules/a.test.js")], ["src/rules/a.js"]), "each file's imports of the project's own files are told, for the selection", JSON.stringify([...screened.reach]));
 
 // ---- the readers of other code ----

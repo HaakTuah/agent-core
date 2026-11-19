@@ -254,6 +254,8 @@ function opensScreen(ctx, from, names) {
 // REACH): each test file is one entry of each kind it reaches, "timed: <test> -> <what>" or "process: <test> ->
 // <what>", its first name in order; found by the readers "clocks" and "processes".
 const KINDS = { clock: "timed", process: "process" }, LISTS = { clock: "clocks", process: "processes" };
+// (what installs a fake clock: Jest's, Vitest's and Sinon's timers, .NET's FakeTimeProvider, freezegun's freeze_time)
+const FAKE_CLOCKS = ["useFakeTimers", "FakeTimeProvider", "freeze_time"];
 const IMPORTS = Object.fromEntries(Object.keys(KINDS).map(kind => [kind, [...new Set(Object.values(REACH).flatMap(l => l[kind].imports))]]));
 function reached(ctx, kind, file, name) {
   const of = ctx.reached.get(file) ?? { clock: new Set(), process: new Set() };
@@ -263,15 +265,17 @@ function reached(ctx, kind, file, name) {
 function testReach(ctx, file, r) {
   if (!ctx.tests.has(file)) return;
   const at = (run, k) => run.every((v, j) => r.toks[k + j].v === v && r.toks[k + j].t !== "str") && !(r.toks[k - 1]?.t === "punct" && r.toks[k - 1].v === ".");
+  // (a test that installs a fake clock hands the time in already: its clock is none)
+  if (FAKE_CLOCKS.some(name => r.toks.some(t => t.v === name && t.t !== "str"))) ctx.faked.add(file);
   for (const kind of ["clock", "process"]) {
     const own = REACH[r.lang]?.[kind]?.runs ?? [], named = reachRuns(ctx.config[LISTS[kind]]);
     for (const { run, what } of [...own, ...named]) for (let k = 0; k + run.length <= r.toks.length; k++) if (at(run, k)) { reached(ctx, kind, file, what); break; }
   }
 }
 function reachEntries(ctx) {
-  for (const [file, of] of ctx.reached) for (const kind of ["clock", "process"]) {
+  for (const [file, of] of ctx.reached) for (const kind of ctx.faked.has(file) ? ["process"] : ["clock", "process"]) {
     const what = [...of[kind]].sort()[0];
-    if (what !== undefined) add(ctx, KINDS[kind], `${file} -> ${what}`, what);
+    if (what !== undefined) add(ctx, KINDS[kind], `${file} -> ${what}`, file);
   }
 }
 
@@ -382,7 +386,7 @@ export function survey(texts, config, tests = new Set()) {
   const readings = code.map(file => [file, reading(file, texts[file])]);
   const idx = index(readings, texts), js = manifests(texts);
   const ctx = { config, tests, texts, unsure: new Set(), files: new Set(Object.keys(texts)), idx, packages: js.packages, ships: new Set([...js.ships, ...idx.ships]), declared: new Set([...js.declared, ...idx.declared]),
-    entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map(), reached: new Map() };
+    entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map(), reached: new Map(), faked: new Set() };
   for (const [file, r] of readings) oneFile(ctx, file, r);
   reachEntries(ctx);
   sharedSpace(ctx);
@@ -404,6 +408,8 @@ export function groupOf(id) {
   if (kind === "cycle") return { kind, group: "cycle" };
   if (kind === "lost") return { kind, group: key }; // (a file lost covers itself alone)
   if (kind === "clock" || kind === "global") return { kind, group: key.slice(key.lastIndexOf(": ") + 2) };
+  // (a test's reach is its file's: one that reaches another name, or keeps a later one, stands under its old entry)
+  if (kind === "timed" || kind === "process") return { kind, group: key.slice(0, key.lastIndexOf(" -> ")) };
   return { kind, group: key.slice(key.lastIndexOf(" -> ") + 4) };
 }
 
