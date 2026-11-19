@@ -226,7 +226,7 @@ try {
   const { everyInstall } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href);
   const older = path.join(tmp, "older-copy");
   fs.mkdirSync(path.join(older, ".packages"), { recursive: true });
-  ok(JSON.stringify(everyInstall(copy)) === '["all"]' && JSON.stringify(everyInstall(older)) === "[]", "the sync and the starter kit name every install to a copy that holds the parser's package list, and none to an older copy's installer");
+  ok(JSON.stringify(everyInstall(copy)) === '["all"]' && JSON.stringify(everyInstall(older)) === "[]", "everyInstall(), which the sync and the starter kit hand a copy's installer, names every install to a copy that holds the parser's package list, and none to an older copy's (that they call it, the mutation tool's report on their lines holds)");
   ok(every.status === 0 && /into \.packages\/node_modules\//u.test(every.stdout) && /into \.packages\/parser\/node_modules\//u.test(every.stdout) && loadParser().status === 0, "and install.mjs all installs every one, as the sync and the starter kit run it", `${every.stdout}${every.stderr}`);
   // (an install npm recorded for another lock file is no install of this one: the package did not run)
   const record = path.join(pk, "node_modules/.package-lock.json"), kept = fs.readFileSync(record, "utf8");
