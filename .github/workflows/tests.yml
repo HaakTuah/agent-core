@@ -206,6 +206,9 @@ jobs:
       - name: The session's cost line
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/session-cost-test.mjs ')) }}
         run: node tests/session-cost-test.mjs
+      - name: The queue's reader
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-test.mjs ')) }}
+        run: node tests/queue-test.mjs
       - name: The core's own measurement
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-cost-test.mjs ')) }}
         run: node tests/core-cost-test.mjs

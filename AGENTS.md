@@ -32,8 +32,8 @@ Read when a task calls for it, each saying when in its opening line: the files o
 `floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
 `tasks/tools.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`, `tools/antigravity.md`,
 `tasks/github-calls.md`, `tasks/hosts.md`, `tasks/repositories.md`, `roles/shared/teams.md`, `roles/orchestrator.md`,
-`tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md`, `tasks/done-when.md`
-and `tasks/planning.md`.
+`tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md`, `tasks/done-when.md`,
+`tasks/planning.md` and `roles/shared/records.md`.
 
 Not taken, each for its reason:
 
@@ -60,7 +60,7 @@ queue's order; the
 issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`tasks/roles.md`,
 `roles/orchestrator.md`); the *hard work*: a new or changed rule; the *size marks*: the caps of
 `scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*:
-the suites of `.github/workflows/tests.yml`; *planning design*: none; the *other builders' checks*: those suites, which any tool's
+the suites of `.github/workflows/tests.yml`; *planning design*: none; the *quick check*: `node scripts/holders.mjs && node scripts/size.mjs && node scripts/reading.mjs --check && node tests/holders-test.mjs && node tests/manifest-reads-test.mjs && node tests/general-test.mjs`; the *other builders' checks*: those suites, which any tool's
 session here runs before it finishes, every file here being protected (`SECURITY.md`).
 
 ## The queue
@@ -73,16 +73,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   joins only where that PR relays the owner's yes to its issue, as the chat session records it ("Whose words an issue
   holds"): that PR is the gate, so no verdict of the stand-in's queues one here, a difference from `roles/shared/inbox.md`.
   A test, a check for a rule that already stands, a task the scheduled look opens (#248) and a small finding of an
-  audit (#259) join without the owner's word. A bug waits for no line, as that module says. A line leaves in the PR
-  that closes its issue.
+  audit (#259) join without the owner's word. A bug waits for no line, as that module says. A line does not leave in
+  the PR that closes its issue: the readers of the file skip the line of a closed issue, and the next PR that changes
+  the file takes such lines out together (`node scripts/queue.mjs --clear`; #750, point 1), as that module says, since
+  PRs merging side by side collided on it. Held here by `own-description.yml`, which fails a ready PR that changes the
+  file and leaves one.
 - **Queued means wanted: nothing queued waits for a second word.** Where the floor asks the owner's
   yes in a PR (floor rule 3: a change to the floor or the review guidelines), the yes the owner gave when its issue was
   queued is that yes: the builder relays it into the PR word for word as it was recorded (floor rule 3), and it covers
   the change as the issue describes it. A PR that goes beyond its issue is not covered by it, and the design check
   says so.
 - **The file holds no note.** Where a module asks for one in the *progress file* (a lane that waits), it goes in the
-  description of the line's own PR, which the next builder reads with the branch, as a passed gate's note does
-  (`roles/shared/work-flow.md`).
+  description of the line's own PR, which the next builder reads with the branch, as a hand-off note does
+  (`tasks/tools.md`, "A change of tool loses nothing").
 - **Whose words an issue holds.** Of the issues open on 14 November 2026 and labelled `queued` and `by:chat`, the owner
   said the decisions quoted in them are the owner's, and so are the answers on other issues that their notes name.
   What the chat session records is the owner's word on any day: an issue or note from the
@@ -99,7 +102,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   writes it from the owner's word recorded on the issue ("Whose words an issue holds"), adds it to the archive as an
   item of its own, naming the issue as its source, and takes what it leaves open as `roles/shared/inbox.md` says of any
   open point. This is the second
-  difference from that module, where only the design session writes rules from the owner's words.
+  difference from that module and `roles/shared/records.md`, where only the design session writes rules from the owner's
+  words.
 - **A bug fix and a rework of tests are built on Sonnet** (#767). By default, where "The builders" of
   `roles/orchestrator.md` picks Claude for a line that fixes a bug or reworks tests, the orchestrator starts its builder
   on Sonnet at high effort; a line that writes or changes a rule, touches security or reads a format another publisher
@@ -122,7 +126,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   by `scripts/builder-trial.mjs`, which counts each kind by its builder from what `scripts/review-record.mjs` reads and
   from the session-cost lines; which model and effort the orchestrator starts, by nothing yet.
 - **An orchestrator may work the file** (`roles/orchestrator.md`) while it holds a line a session can take. The
-  owner starts it; once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
+  owner starts it, or the owner's adviser on the owner's word (`roles/adviser.md`); once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
   wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from
   a project's root and there is no copy here, and what `setup/sync-notes.md` asks, which it asks of projects.
 - **One batch, then one release.** A batch is the lines the file holds between two releases, and the release after it

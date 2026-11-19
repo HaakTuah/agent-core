@@ -155,12 +155,13 @@ ok(reader.passed && reader.security.state === "pending" && unread.passed && unre
 
 // a pull request that leaves the check's scripts alone, whose head holds none: from before the check only where it was
 // opened before each script first came to the default branch, as the host dates the merge of its first commit there,
-// never a later change to it; where that cannot be read, it is held
-const FIRST = "f".repeat(40), NEWER = "e".repeat(40), BEFORE = "9".repeat(40);
-const merged = (at, ref = "main") => [{ merged_at: at, base: { ref } }];
-// (the first commit's own: its first parent, which holds no copy of the script, as the host gives it)
+// read against that branch's own line before the merge, never a later change to it; where that cannot be read, it is held
+const FIRST = "f".repeat(40), NEWER = "e".repeat(40), BEFORE = "9".repeat(40), MERGE = "8".repeat(40), TIP = "7".repeat(40);
+const merged = (at, ref = "main") => [{ merged_at: at, base: { ref }, merge_commit_sha: MERGE }];
+// (the merge that brought the first commit: its first parent, the default branch before it, which holds no copy of the
+// script, as the host gives it; and the first commit's own first parent, which holds none either)
 const history = (first, newer) => ({ "commits\\?path=": [{ sha: NEWER }, { sha: FIRST }], [`commits/${FIRST}/pulls`]: merged(first), [`commits/${NEWER}/pulls`]: merged(newer),
-  [`commits/${FIRST}$`]: { sha: FIRST, parents: [{ sha: BEFORE }] } });
+  [`commits/${MERGE}$`]: { sha: MERGE, parents: [{ sha: BEFORE }, { sha: FIRST }] }, [`commits/${FIRST}$`]: { sha: FIRST, parents: [{ sha: BEFORE }] } });
 const alone = (data) => check(3, OWN, [], data, { names: ["notes.txt"] });
 const since = alone(history("2026-11-10T00:00:00Z", "2026-11-16T00:00:00Z")), before = alone(history("2026-11-16T00:00:00Z", "2026-11-17T00:00:00Z")), unknown = alone({});
 ok(since.passed && since.security.state === "pending" && since.code.state === "pending" && since.security.description.includes(`merge ${OWN.slice(0, 7)} unproved`),
@@ -169,15 +170,22 @@ ok(before.passed && before.security.state === "success" && before.code.state ===
   "  one opened before the check first came is told, never held", before.out + JSON.stringify([before.security, before.code]));
 // each answer of the host's that is not as it should be dates nothing, so the pull request is held, and the step still
 // writes both statuses: a list of commits that is no list, or an empty one, a first commit merged by no pull request
-// or only into another branch, one whose parent cannot be read, or whose first parent holds the script already (a
-// commit listed first by a date its author set)
+// or only into another branch, a merge with no time or commit that can be read, one whose parents cannot be read or
+// that has none, or whose first parent holds the script already
 const early = history("2026-11-16T00:00:00Z", "2026-11-17T00:00:00Z");
 const odd = [{ ...early, "commits\\?path=": { sha: FIRST } }, { ...early, "commits\\?path=": [] }, { ...early, [`commits/${FIRST}/pulls`]: [] },
-  { ...early, [`commits/${FIRST}/pulls`]: merged("2026-11-16T00:00:00Z", "other") }, { ...early, [`commits/${FIRST}$`]: { sha: FIRST } },
+  { ...early, [`commits/${FIRST}/pulls`]: merged("2026-11-16T00:00:00Z", "other") }, { ...early, [`commits/${FIRST}/pulls`]: merged("soon") },
+  { ...early, [`commits/${FIRST}/pulls`]: [{ merged_at: "2026-11-16T00:00:00Z", base: { ref: "main" } }] },
+  { ...early, [`commits/${MERGE}$`]: { sha: MERGE } }, { ...early, [`commits/${MERGE}$`]: { sha: MERGE, parents: [] } },
   { [`contents/scripts/[^?]+\\?ref=${BEFORE}`]: { sha: "1".repeat(40) }, ...early }].map(alone);
-const rooted = alone({ ...early, [`commits/${FIRST}$`]: { sha: FIRST, parents: [] } });
-ok(odd.every((r) => r.passed && r.security.state === "pending" && r.code.state === "pending") && rooted.passed && rooted.security.state === "success",
-  "  and an answer of the host's not as it should be dates nothing, so it is held; a first commit with no parent dates it", odd.map((r) => JSON.stringify([r.security.state, r.code.state])).join(" ") + rooted.out);
+ok(odd.every((r) => r.passed && r.security.state === "pending" && r.code.state === "pending"),
+  "  and an answer of the host's not as it should be dates nothing, so it is held", odd.map((r) => JSON.stringify([r.security.state, r.code.state])).join(" "));
+// (the first of two merges that hold the commit dates it; and the date counts only as the default branch's own line
+// shows it: where that branch, just before the merge, already held the script, nothing is dated)
+const twice = alone({ ...early, [`commits/${FIRST}/pulls`]: [{ ...merged("2026-11-18T00:00:00Z")[0], merge_commit_sha: TIP }, ...merged("2026-11-16T00:00:00Z")] });
+const onLine = alone({ ...early, [`commits/${MERGE}$`]: { sha: MERGE, parents: [{ sha: TIP }, { sha: FIRST }] }, [`contents/scripts/[^?]+\\?ref=${TIP}`]: { sha: "1".repeat(40) } });
+ok(twice.passed && twice.security.state === "success" && onLine.passed && onLine.security.state === "pending" && onLine.code.state === "pending",
+  "  it is dated by the first merge that brought the script, read on the default branch's own line", twice.out + onLine.out + JSON.stringify([twice.security, onLine.security, onLine.code]));
 const long = alone({ ...history("2026-11-16T00:00:00Z", "2026-11-17T00:00:00Z"), "commits\\?path=": Array.from({ length: 100 }, () => ({ sha: FIRST })) });
 ok(unknown.passed && unknown.security.state === "pending" && unknown.code.state === "pending" && long.passed && long.security.state === "pending" && long.code.state === "pending",
   "  and where when it came cannot be read, or its history runs past five pages, it is held", unknown.out + long.out + JSON.stringify([unknown.security, unknown.code, long.security, long.code]));
