@@ -62,8 +62,7 @@ sessions.
     an owner does: only an issue that GitHub's job or the owner's account opened, labelled `by:look`, under a title of
     the look's own; the lane's work is what the look's scripts find again on `main` (`look.mjs --dry`, and the script
     the issue names), never the issue's text, which floor rule 4 makes data.
-  - It does not mean anything starts by itself on the owner's computer (floor
-    rule 8): the schedule lives in GitHub's job or in an orchestrator the owner started.
+  - It does not mean anything starts by itself on the owner's computer (floor rule 8).
   - Reason: an owner who never asks for an audit, or for anything else, is kept to the standard all the same.
 - **Hand over at once:** start the next session as soon as a task merges, where a lane merges sooner (below). One
   session per task, continued for its review fixes while its context is under an hour old and small; otherwise a fresh
@@ -95,7 +94,7 @@ sessions.
   - It does not mean a session stands idle while the owner's allowance goes unused.
   - Reason: no session decides by itself to stand idle, and the pace of the owner's usage is the owner's to set.
   - Held by nothing yet: the usage left is no mark a check reads.
-- **It asks the owner nothing** but floor rule 14's yeses: it does it and reports it in a
+- **It asks the owner nothing** but floor rule 14's yeses and the blind sample: it does it and reports it in a
   line.
   - Before it reports anything as waiting on the owner, it checks GitHub: a yes already in the PR (the owner's or the
     design session's relay), a branch already deleted or a setting already made is never reported again.
