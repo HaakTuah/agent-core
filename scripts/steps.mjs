@@ -25,7 +25,7 @@ import { parse as parseChoices, where as choicesAt } from "./choices.mjs";
 import { CORE } from "./core-address.mjs";
 import { corePath } from "./core-path.mjs";
 import { installed } from "./packages.mjs";
-import { modulesOf } from "./manifest-reads.mjs";
+import { differencesOf, modulesOf } from "./manifest-reads.mjs";
 import { progressOf } from "./done-when.mjs";
 import { leadsOut } from "./guards.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
@@ -65,7 +65,7 @@ export const leads = text => [...String(text).matchAll(/^- \*\*([^*]+?)\.\*\*/gm
 export function project(root) {
   const { listed, read, safe, unread } = ownFiles(root);
   const manifest = read("core-manifest.md") ?? "";
-  const differences = (/^## Differences\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(manifest)?.[1] ?? "").split("\n").filter(l => l.trim());
+  const differences = differencesOf(manifest);
   const workflows = Object.fromEntries(listed.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(f)).map(f => {
     let yaml = null;
     try { yaml = parseYaml(read(f)); } catch { /* (a workflow this reader cannot read: a check that needs it says so) */ }

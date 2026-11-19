@@ -36,8 +36,9 @@ function holderOf(key, value, root) {
   return { kind, by: what, part: Boolean(m[5]) };
 }
 
-// What holders.json names, and the items behind each rule, or the line of why it cannot be read.
-function named(root) {
+// What holders.json names, and the items behind each rule, or the line of why it cannot be read (reasons.mjs, beside
+// this file, reads it too).
+export function named(root) {
   try { const j = JSON.parse(fs.readFileSync(path.join(root, FILE), "utf8")); return { named: j.holders ?? {}, behind: j.behind ?? {}, numbers: j.numbers ?? {} }; }
   catch (e) { return { named: {}, behind: {}, numbers: {}, wrong: `${FILE} cannot be read (${e.message}). Mend: write it as JSON, its "holders" an object keyed by each rule's file and lead` }; }
 }

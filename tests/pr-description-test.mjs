@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { asked, calledFor, copyAtBase, costMend, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, numberMend, PARTS, waitsMend, waitsOn } from "../scripts/pr-description.mjs";
+import { asked, calledFor, copyAtBase, costMend, differencesAdded, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, numberMend, PARTS, reasonsMend, waitsMend, waitsOn } from "../scripts/pr-description.mjs";
 import { lineMend } from "../scripts/reading.mjs";
 
 let failed = 0;
@@ -101,9 +101,38 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   commit(null); commit(manifest("vendor/core/"));
   ok(copyAtBase(tmp) === "scripts/pr-description.mjs", "where the base holds no manifest, the core's own scripts/ are read, though the head adds one");
 }
+// the line "Reasons read:", asked of a pull request that adds a line under the manifest's "Differences" (#756)
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pr-description-reasons-"));
+  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
+  const git = (...a) => execFileSync("git", a, { cwd: tmp, env, stdio: ["ignore", "pipe", "pipe"] });
+  const manifest = (...lines) => `# Core manifest\r\n\r\n## Differences\r\n\r\n${lines.join("\r\n")}\r\n\r\n## Slots\r\n\r\n- a slot: its row\r\n`;
+  const commit = text => { if (text === null) fs.rmSync(path.join(tmp, "core-manifest.md"), { force: true }); else fs.writeFileSync(path.join(tmp, "core-manifest.md"), text); git("add", "-A"); git("commit", "-q", "--allow-empty", "-m", "x"); };
+  git("init", "-q");
+  commit(null); commit(null);
+  ok(differencesAdded(tmp).length === 0, "a head with no manifest adds no difference");
+  commit(manifest("None."));
+  ok(differencesAdded(tmp).length === 0, "a first manifest whose \"Differences\" says None adds none");
+  commit(manifest("- `core/tasks/x.md`, \"A rule\": here it is so, on the owner's word."));
+  const one = differencesAdded(tmp);
+  ok(one.length === 1 && one[0].startsWith("- `core/tasks/x.md`"), "a line added under \"Differences\" is read, lines that end both ways");
+  commit(manifest("- `core/tasks/x.md`, \"A rule\": here it is so, on the owner's word.", "- a second") .replace("## Slots\r\n\r\n- a slot: its row", "## Slots\r\n\r\n- a slot: another row"));
+  ok(differencesAdded(tmp).join() === "- a second", "only the lines the change adds are read, and none under another heading");
+  commit(manifest("- a second"));
+  ok(differencesAdded(tmp).length === 0, "a difference taken out asks nothing");
+  commit(null); commit(manifest("- a first difference"));
+  ok(differencesAdded(tmp).join() === "- a first difference", "where the base holds no manifest, each difference of the head's is added");
+  git("checkout", "-q", "--orphan", "alone"); git("commit", "-q", "-m", "no parent");
+  ok(differencesAdded(tmp) === null, "with no base to read against, nothing is asked");
+  ok(reasonsMend("No line.", []) === null && reasonsMend("No line.", null) === null, "a pull request that adds no difference is asked nothing");
+  ok(reasonsMend("x\n Reasons read: core archive 161 and #156; its reason does not hold here, since this project has no players.\n", ["- a"]) === null, "a line \"Reasons read:\" with what was read passes, whatever its words");
+  const mend = reasonsMend("x\nReasons read:\n", ["- `core/tasks/x.md`, a difference"]);
+  ok(mend !== null && mend.includes("core/tasks/x.md") && mend.includes("reasons.mjs") && mended(`FAIL ${mend}`) && reasonsMend("x", ["- a"]) !== null, "an empty line, or none, fails, naming the difference and the script that prints its reasons, with the mend");
+}
 // run, each failure says its mend (no pull request's date given, so the line is not asked of it here)
 const run = body => spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/pr-description.mjs", import.meta.url))], { env: { ...process.env, PR_BODY: body, PR_CREATED: "" }, encoding: "utf8" });
 const none = run("The change, and nothing else.");
 ok(none.status === 1 && /has no heading "Readings taken"\. Mend: add "## Readings taken"/.test(none.stdout) && mended(none.stdout) && run(whole).status === 0, "run, a description without its headings fails, each failure saying its mend, and one with them passes");
-ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon")}`) && mended(`FAIL ${costMend("x")}`) && mended(`FAIL ${numberMend("## What holds it\n- a rule")}`), "so do the lines' own failures, as the script prints them");
+ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon")}`) && mended(`FAIL ${costMend("x")}`) && mended(`FAIL ${numberMend("## What holds it\n- a rule")}`) && mended(`FAIL ${reasonsMend("x", ["- a"])}`), "so do the lines' own failures, as the script prints them");
 process.exit(failed ? 1 : 0);
