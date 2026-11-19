@@ -141,6 +141,25 @@ const CRLF = bytesOf("crlf", "a\r\nb\r\n", "a\r\nb\r\nours\r\n", "a\r\nb\r\nthei
 const is = (at) => proved(pullOf(at, [at]), listed(r, at), r).join() === at;
 ok(!is(BINARY) && !is(REWRITTEN) && is(LATIN) && is(CRLF),
   "  bytes as they are: a binary file emptied, or a byte that is no UTF-8 rewritten, is not proved; that byte kept, and a file of CR LF lines, are");
+// a path that is no UTF-8 names its own file: built with git's plumbing alone, so no such name is written to disk, a
+// merge that writes into the path \xff what no review saw, and the kept-both blob into the path U+FFFD, is not proved
+// (the fallback reviewer's fourth check on #753)
+const plumb = (args, input) => execFileSync("git", args, { cwd: r, env: { ...env, GIT_INDEX_FILE: path.join(tmp, "byte-index") }, input, encoding: "latin1", stdio: ["pipe", "pipe", "pipe"] }).trim();
+const blobOf = (text) => plumb(["hash-object", "-w", "--stdin"], Buffer.from(text, "latin1"));
+const treeOf = (files) => {
+  plumb(["read-tree", "--empty"]);
+  plumb(["update-index", "-z", "--index-info"], Buffer.concat(Object.entries(files).map(([name, text]) => Buffer.from(`100644 ${blobOf(text)}\t${name}\0`, "latin1"))));
+  return plumb(["write-tree"]);
+};
+const commitOf = (tree, ...parents) => plumb(["commit-tree", tree, ...parents.flatMap((p) => ["-p", p]), "-m", "bytes"]);
+const FFFD = Buffer.from("\ufffd", "utf8").toString("latin1");
+const NAME_BASE = commitOf(treeOf({ "\xff": "a\n", [FFFD]: "harmless\n" }));
+const NAME_PR = commitOf(treeOf({ "\xff": "a\nours\n", [FFFD]: "harmless\n" }), NAME_BASE);
+const NAME_MAIN = commitOf(treeOf({ "\xff": "a\ntheirs\n", [FFFD]: "harmless\n" }), NAME_BASE);
+const NAME_EVIL = commitOf(treeOf({ "\xff": "EVIL: never reviewed\n", [FFFD]: "a\nours\ntheirs\n" }), NAME_PR, NAME_MAIN);
+const NAME_KEPT = commitOf(treeOf({ "\xff": "a\nours\ntheirs\n", [FFFD]: "harmless\n" }), NAME_PR, NAME_MAIN);
+ok(proved(pullOf(NAME_EVIL, [NAME_EVIL]), listed(r, NAME_EVIL), r).length === 0 && proved(pullOf(NAME_KEPT, [NAME_KEPT]), listed(r, NAME_KEPT), r).join() === NAME_KEPT,
+  "  a path that is no UTF-8 is read as its own bytes: content written into it is not proved, both sides kept in it are");
 git(r, "checkout", "-q", "-B", "mode", ADDS);
 const MODE = merge(r, MAIN_ADDS, () => { write(r, "a.txt", "one\ntwo\nthree\nmain's line\nthe pull request's line\n"); fs.chmodSync(path.join(r, "a.txt"), 0o755); git(r, "update-index", "--add", "--chmod=+x", "a.txt"); });
 git(r, "checkout", "-q", "-B", "gone", B0);

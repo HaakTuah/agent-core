@@ -35,7 +35,8 @@ export function isGits(at, parents, cwd) {
     // (its parents as git holds them, so that a list that names others proves nothing)
     if (git(["show", "-s", "--format=%P", at], cwd) !== parents.join(" ")) return false;
     // (a conflict exits 1, and lists each file in conflict by its stages; anything else proves nothing)
-    const run = spawnSync("git", ["merge-tree", "--write-tree", "--no-messages", "-z", parents[0], parents[1]], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 26 });
+    // (read as bytes, as every listing of paths here is, so that a path is never decoded into another's name)
+    const run = bytes(["merge-tree", "--write-tree", "--no-messages", "-z", parents[0], parents[1]], cwd);
     if (run.error || (run.status !== 0 && run.status !== 1)) return false;
     const [made, ...listed] = run.stdout.split("\0").filter((field) => field !== "");
     const tree = git(["rev-parse", `${at}^{tree}`], cwd);
@@ -61,11 +62,14 @@ function bothKept(made, tree, listed, cwd) {
     stages.get(file)[stage] = { mode, blob };
   }
   // (every file that differs from git's merge is one in conflict, and only in its content)
-  const raw = git(["diff-tree", "-r", "-z", "--no-renames", made, tree], cwd).split("\0").filter((field) => field !== "");
+  const listing = (args) => { const out = bytes(args, cwd); if (out.error || out.status !== 0) throw new Error("git"); return out.stdout.split("\0").filter((field) => field !== ""); };
+  const raw = listing(["diff-tree", "-r", "-z", "--no-renames", made, tree]);
+  // (the tree's every file, by its path's bytes: no path is handed back to git as an argument)
+  const entries = new Map(listing(["ls-tree", "-r", "-z", "--full-tree", tree]).map((entry) => [entry.slice(entry.indexOf("\t") + 1), entry]));
   for (let i = 0; i < raw.length; i += 2) if (!stages.has(raw[i + 1]) || !/^:(\d{6}) \1 /u.test(raw[i])) return false;
   for (const [file, { 1: base, 2: ours, 3: theirs }] of stages) {
     if (!base || !ours || !theirs || ours.mode !== theirs.mode) return false;
-    const kept = git(["--literal-pathspecs", "ls-tree", "-z", tree, "--", file], cwd).split("\0")[0];
+    const kept = entries.get(file);
     const both = keptBoth(base.blob, ours.blob, theirs.blob, cwd);
     if (both === null || !both.some((blob) => SHA.test(blob) && kept === `${ours.mode} blob ${blob}\t${file}`)) return false;
   }
