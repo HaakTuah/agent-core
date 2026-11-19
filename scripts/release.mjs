@@ -88,18 +88,21 @@ function after(flag, argv) {
 // a release waits on the newest run of the tests' workflow there that ran once an hour or was started by hand, which
 // holds the Windows suites, to have passed. A reason it holds the release, or null.
 export const TESTS = ".github/workflows/tests.yml";
-// When a run started: its run's start, else its creation, else never (read as the oldest).
-const startOf = r => [r?.run_started_at, r?.created_at].map(t => (typeof t === "string" ? Date.parse(t) || 0 : 0)).find(Boolean) ?? 0;
-// The newest of runs, by when each started, the higher id of two that started together.
-const newestOf = runs => runs.reduce((a, b) => (startOf(b) > startOf(a) || (startOf(b) === startOf(a) && Number(b?.id ?? 0) > Number(a?.id ?? 0)) ? b : a));
+// When a run last changed (its finish, for one that completed); never, read as the oldest.
+const finishOf = r => (typeof r?.updated_at === "string" ? Date.parse(r.updated_at) || 0 : 0);
+// The last of runs to finish, the higher id of two that finished together.
+const lastOf = runs => runs.reduce((a, b) => (finishOf(b) > finishOf(a) || (finishOf(b) === finishOf(a) && Number(b?.id ?? 0) > Number(a?.id ?? 0)) ? b : a));
 // The tests' runs in full on a commit: those once an hour or started by hand.
 const inFull = list => (Array.isArray(list?.workflow_runs) ? list.workflow_runs : []).filter(r => r?.path === TESTS && ["schedule", "workflow_dispatch"].includes(r?.event));
+// (it holds while any full run on the commit is unfinished, and reads the last to finish: an hourly run skips only
+// where none other is going and the last to finish passed, so a skipped one never reads a failure away)
 export function fullRun(list) {
   const runs = inFull(list);
   if (!runs.length) return "the tests have not run in full on it yet, the Windows suites with them: start the tests workflow on main by hand (its page under Actions), or wait for its hourly run, and start the release again once it has passed";
-  const newest = newestOf(runs), how = newest?.event === "schedule" ? "hourly" : "hand-started";
-  if (newest?.status === "completed" && newest?.conclusion === "success") return null;
-  return `the tests in full (their ${how} run): ${newest?.status === "completed" ? newest?.conclusion : newest?.status ?? "unreadable"}`;
+  const going = runs.find(r => r?.status !== "completed");
+  if (going) return `the tests in full (their ${going?.event === "schedule" ? "hourly" : "hand-started"} run): ${going?.status ?? "unreadable"}`;
+  const last = lastOf(runs), how = last?.event === "schedule" ? "hourly" : "hand-started";
+  return last?.conclusion === "success" ? null : `the tests in full (their ${how} run): ${last?.conclusion ?? "unreadable"}`;
 }
 
 function whyNot(name, sha, staged, runs, fullFile) {

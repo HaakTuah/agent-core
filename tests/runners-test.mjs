@@ -8,6 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { main, read, runnersRow, workflowsIn } from "../scripts/runners.mjs";
 
 let failed = 0, count = 0;
@@ -53,7 +54,7 @@ try {
   ok(r.where === "local", "a job that starts no suite through the shape check runs no tests here, whatever it runs");
   const hostedMatrix = `on: pull_request\njobs:\n  test:\n    strategy:\n      matrix:\n        os: [ubuntu-latest, windows-latest]\n        node: ["20.x"]\n    runs-on: \${{ matrix.os }}\n    steps:\n${suite}`;
   const fromJson = `on: pull_request\njobs:\n  test:\n    strategy:\n      matrix:\n        include: \${{ fromJSON(github.event_name == 'push' && '[{"os":"ubuntu-latest","node":".nv"}]' || '[{"os":"windows-latest","suite":"x"}]') }}\n    runs-on: \${{ matrix.os }}\n    steps:\n${suite}`;
-  const called = "on: pull_request\njobs:\n  review:\n    uses: someone/core/.github/workflows/core.yml@0123456789abcdef0123456789abcdef01234567\n";
+  const called = `on: pull_request\njobs:\n  review:\n    uses: ${CORE}/.github/workflows/core.yml@0123456789abcdef0123456789abcdef01234567\n`;
   const reusable = `on:\n  workflow_call:\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n${suite}`;
   r = read({ repo: "o/n", dir: flows({ "ci.yml": "on: pull_request\njobs:\n  tests:\n    uses: ./.github/workflows/reusable.yml\n", "reusable.yml": reusable }), manifest: rel, gh: host(false) });
   ok(r.where === "hosted" && r.cadence === "hourly", "a local reusable workflow a pull request's workflow calls is followed: its jobs are where the tests run", r.said.join(" | "));
@@ -62,10 +63,17 @@ try {
   ok(/could not be read/.test(r.advice ?? "") && r.said.some(l => /its users get: a release, as the manifest's row/.test(l)), "a call to a local workflow that is not there is a runner not read, advised on in a public repository, and what users get is printed", r.said.join(" | ") + (r.advice ?? ""));
   const fromVars = `on: pull_request\njobs:\n  test:\n    strategy:\n      matrix:\n        include: \${{ fromJSON(vars.MATRIX || '[{"os":"ubuntu-latest"}]') }}\n    runs-on: \${{ matrix.os }}\n    steps:\n${suite}`;
   ok(read({ repo: "o/n", dir: flows({ "v.yml": fromVars }), manifest: rel, gh: host(true) }).where === "self-hosted", "a matrix whose fromJSON may give a variable's value is not read, and taken as the owner's own");
+  r = read({ repo: "o/n", dir: flows({ "ci.yml": "on: pull_request\njobs:\n  tests:\n    uses: someone/else/.github/workflows/t.yml@0123456789abcdef0123456789abcdef01234567\n" }), manifest: rel, gh: host(false) });
+  ok(/could not be read/.test(r.advice ?? ""), "a call to another repository's workflow, not the core's, is a runner not read, advised on", r.advice);
+  const chain = Object.fromEntries([...Array(7).keys()].map(i => [`c${i}.yml`, i === 0 ? "on: pull_request\njobs:\n  a:\n    uses: ./.github/workflows/c1.yml\n" : i < 6 ? `on: workflow_call\njobs:\n  a:\n    uses: ./.github/workflows/c${i + 1}.yml\n` : `on: workflow_call\njobs:\n  t:\n    runs-on: self-hosted\n    steps:\n${suite}`]));
+  ok(/could not be read|owner's own/.test(read({ repo: "o/n", dir: flows(chain), manifest: rel, gh: host(false) }).advice ?? ""), "a chain of calls past the depth followed is a runner not read, never read as none");
+  const mixed = `on: pull_request\njobs:\n  test:\n    strategy:\n      matrix:\n        os: [ubuntu-latest]\n        include: \${{ fromJSON(vars.EXTRA) }}\n    runs-on: \${{ matrix.os }}\n    steps:\n${suite}`;
+  const fromBody = `on: pull_request\njobs:\n  test:\n    strategy:\n      matrix:\n        include: \${{ fromJSON(github.event.pull_request.body || '[{"os":"ubuntu-latest"}]') }}\n    runs-on: \${{ matrix.os }}\n    steps:\n${suite}`;
+  ok(read({ repo: "o/n", dir: flows({ "m.yml": mixed }), manifest: rel, gh: host(true) }).where === "self-hosted" && read({ repo: "o/n", dir: flows({ "b.yml": fromBody }), manifest: rel, gh: host(true) }).where === "self-hosted", "an include from a variable beside a plain list, or one that may take a pull request's text, is not read, and taken as the owner's own");
   const loopA = "on: pull_request\njobs:\n  a:\n    uses: ./.github/workflows/b.yml\n", loopB = "on: workflow_call\njobs:\n  b:\n    uses: ./.github/workflows/a.yml\n";
   ok(read({ repo: "o/n", dir: flows({ "a.yml": loopA, "b.yml": loopB }), manifest: rel, gh: host(false) }).where === "local", "two workflows that call each other are each read once, and nothing loops");
   r = read({ repo: "o/n", dir: flows({ "m.yml": hostedMatrix, "j.yml": fromJson, "c.yml": called }), manifest: rel, gh: host(false) });
-  ok(r.where === "hosted" && r.cadence === "hourly" && !r.advice, "a matrix whose runs-on key takes only the host's labels, beside other keys, in a list or in fromJSON's literals, reads as the host's, and a job that calls another repository's workflow takes no runner of its own", r.said.join(" | ") + (r.advice ?? ""));
+  ok(r.where === "hosted" && r.cadence === "hourly" && !r.advice, "a matrix whose runs-on key takes only the host's labels, beside other keys, in a list or in fromJSON's literals, reads as the host's, and a job that calls the core's own workflow takes no runner of its own", r.said.join(" | ") + (r.advice ?? ""));
   r = read({ repo: "o/n", dir: flows({ "ci.yml": ci, "deploy.yml": "on: push\njobs:\n  deploy:\n    runs-on: self-hosted\n    steps:\n      - run: ./deploy\n" }), manifest: rel, gh: host(false) });
   ok(r.where === "hosted" && r.cadence === "hourly" && /forks off that job/.test(r.advice ?? ""), "a deploy job on the owner's machine is not where the tests run, but in a public repository it is advised on all the same", r.advice);
   const bad = workflowsIn(flows({ "ci.yml": ci, "broken.yml": "on: [\n" }));

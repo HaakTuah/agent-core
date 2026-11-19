@@ -19,6 +19,7 @@
 //   node core/scripts/runners.mjs --repo <owner>/<name>
 import fs from "node:fs";
 import path from "node:path";
+import { CORE } from "./core-address.mjs";
 import { aRepository, oneLine } from "./guards.mjs";
 import { ghApi } from "./labels.mjs";
 import { coreOwn, override } from "./merge-line.mjs";
@@ -50,18 +51,23 @@ function labelsOf(job) {
   else {
     const matrix = job?.strategy?.matrix;
     walk(matrix?.[key], 0);
-    for (const entry of entriesOf(matrix?.include)) walk(entry?.[key], 0);
-    if (!out.length) out.push(on); // (no value read for the key: the expression stands, and is not read)
+    const entries = entriesOf(matrix?.include);
+    for (const entry of entries ?? []) walk(entry?.[key], 0);
+    // (no value read for the key, or an include not read: the expression stands, and is not read)
+    if (!out.length || entries === null) out.push(on);
   }
   return { labels: out, group: !!on && typeof on === "object" && !Array.isArray(on) && "group" in on };
 }
 
 // A matrix's `include`: a list, or `${{ fromJSON('...') }}` whose literal lists are read where they parse; [] otherwise.
+// Where `include` is an expression, it is read only where, its quoted literals aside, it holds nothing but fromJSON,
+// the event's name, comparisons, parentheses and && and ||: then its entries are those its literal lists hold. Any
+// other expression (a variable's value, an input, the event's text) is not read: null.
+const PLAIN = /^\$\{\{(?:\s|fromJSON|github\.event_name|==|!=|&&|\|\||[()]|'')*\}\}$/u;
 function entriesOf(include) {
   if (Array.isArray(include)) return include;
-  if (typeof include !== "string") return [];
-  // (an expression that may also give a value of a variable, an input or a job's output is not read: no entry stands)
-  if (/\b(?:vars|inputs|needs|env|secrets|steps)\./u.test(include.replace(/'[^']*'/gu, ""))) return [];
+  if (include === undefined || include === null) return [];
+  if (typeof include !== "string" || !PLAIN.test(include.slice(0, 200000).replace(/'[^']*'/gu, "''").trim())) return null;
   return [...include.slice(0, 200000).matchAll(/'(\[[^']*\])'/gu)].flatMap(m => { try { const v = JSON.parse(m[1]); return Array.isArray(v) ? v : []; } catch { return []; } });
 }
 
@@ -98,7 +104,9 @@ export function workflowsIn(dir, parse = loadSync("yaml").parse) {
       // (a job that calls a workflow takes no runner of its own: the called workflow's jobs do, followed above where it
       // stands here)
       // (a call to this folder that leads to no workflow read here is a runner not read: its jobs cannot be seen)
-      if (jobsOf(read[f]).some(j => { const c = LOCAL.exec(typeof j?.uses === "string" ? j.uses.trim() : "")?.[1]; return typeof j?.uses === "string" && j.uses.trim().startsWith("./") && !(c && c in read); })) out.unknown = true;
+      // (a call whose jobs cannot be seen is a runner not read: to this folder, a workflow not read here or past the depth
+      // followed; to another repository, any but the core's own, whose jobs run on the host's runners)
+      if (jobsOf(read[f]).some(j => unseen(j, read, seen))) out.unknown = true;
       for (const job of jobsOf(read[f]).filter(j => typeof j?.uses !== "string")) {
         const runner = runnerOf(job);
         out.selfHosted ||= runner === "own";
@@ -118,10 +126,20 @@ function reached(read) {
   const seen = new Set(started), queue = started.map(f => [f, 0]);
   for (let k = 0; k < queue.length; k++) {
     const [f, depth] = queue[k];
-    const calls = depth < 4 ? jobsOf(read[f]).map(j => LOCAL.exec(typeof j?.uses === "string" ? j.uses.trim() : "")?.[1]) : [];
+    const calls = depth < 4 ? jobsOf(read[f]).map(j => LOCAL.exec(typeof j?.uses === "string" ? j.uses.trim() : "")?.[1]) : []; // (past it, not followed: unseen)
     for (const c of calls.filter(c => c && c in read && !seen.has(c))) { seen.add(c); queue.push([c, depth + 1]); }
   }
   return seen;
+}
+
+// Whether a job calls a workflow whose jobs are not read: one of this folder not read or not reached, or another
+// repository's, save the core's own.
+function unseen(job, read, seen) {
+  const uses = typeof job?.uses === "string" ? job.uses.trim() : null;
+  if (uses === null) return false;
+  const local = LOCAL.exec(uses)?.[1];
+  if (uses.startsWith("./")) return !(local && local in read && seen.has(local));
+  return !uses.startsWith(`${CORE}/.github/workflows/`);
 }
 
 // A workflow's jobs, as a list; none where it holds no mapping of them.

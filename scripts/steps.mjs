@@ -287,16 +287,21 @@ function passedRuns(p) {
 // Each job of the project's own that starts a suite through the shape check on a pull request, as every suite is
 // started, starts once the pull request is marked ready and skips a draft (tasks/tests.md, "No test run on a draft";
 // #733, point 7): its trigger's types hold opened, synchronize, reopened and ready_for_review, and its job's `if:` skips
-// a draft, `!github.event.pull_request.draft` or `github.event.pull_request.draft == false` among its parts.
+// a draft: a condition of parts joined by && alone, one of them `!github.event.pull_request.draft` or
+// `github.event.pull_request.draft == false`; any other shape (an ||, a negation of more) is read as not done.
 const SUITE_RUN = /shape\.mjs\b[^\n]*--suite\b/u;
 const READY_TYPES = ["opened", "synchronize", "reopened", "ready_for_review"];
-const SKIPS_DRAFT = /!\s*github\.event\.pull_request\.draft\b|\bgithub\.event\.pull_request\.draft\s*==\s*false\b/u;
+const DRAFT_PART = /^(?:!\s*github\.event\.pull_request\.draft|github\.event\.pull_request\.draft\s*==\s*false)$/u;
+const skipsDraft = cond => {
+  const inner = String(cond ?? "").trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1");
+  return !/\|\||[()]/u.test(inner) && inner.split("&&").some(part => DRAFT_PART.test(part.trim()));
+};
 function testsWhenReady(p) {
   readable(p, text => SUITE_RUN.test(text));
   const loose = Object.entries(p.workflows).filter(([, { yaml }]) => onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => {
     const types = yaml.on?.pull_request?.types, ready = Array.isArray(types) && READY_TYPES.every(t => types.includes(t));
     return Object.entries(yaml.jobs ?? {})
-      .filter(([, job]) => (Array.isArray(job?.steps) ? job.steps : []).some(st => typeof st?.run === "string" && SUITE_RUN.test(st.run)) && !(ready && SKIPS_DRAFT.test(String(job?.if ?? ""))))
+      .filter(([, job]) => (Array.isArray(job?.steps) ? job.steps : []).some(st => typeof st?.run === "string" && SUITE_RUN.test(st.run)) && !(ready && skipsDraft(job?.if)))
       .map(([name]) => `\`.github/workflows/${shown(file)}\`, its job \`${shown(name)}\``);
   });
   return loose.length ? `In one small pull request, with floor rule 3's two security reviews, bring the project's own test workflow to \`core/tasks/tests.md\` as its kind reads it (${loose.join("; ")}): give its \`pull_request\` trigger the types opened, synchronize, reopened and ready_for_review, and have each job that starts a suite skip a draft (\`if: \${{ !github.event.pull_request.draft }}\`), the check the ruleset requires failing on a draft rather than skipped, since a required check whose job is skipped passes (the core's own \`tests.yml\` shows it); then run the platform suites on the schedule \`node core/scripts/runners.mjs --repo <owner>/<name>\` prints from where the tests run, who pays and what users get (where every merge goes live, on each pull request, as now; where users get a release, at the default branch's newest commit), and give the runs on the default branch one concurrency group that cancels the run in progress. Where \`node core/scripts/merge-line.mjs --repo <owner>/<name>\` says the project's users get a release and the host still asks an up-to-date branch, file the issue it names for the owner, labelled needs-owner; nothing waits on it.` : null;
