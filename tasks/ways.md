@@ -35,9 +35,9 @@ name: whoever writes the part, or finds it, names it there in that pull request.
 lines, from the core's copy in a project, and prints each configured hook or setting a line names as installed by that
 way, failing nothing for its being unlisted under "agentTools". Nothing changes it. It does not mean the rest of the
 check passes it: a hook whose command is not in the starter kit's form fails as any hook does (floor rule 3); nor that
-what a way writes outside the project's files is read. Reason: a hook a way writes would read as the project's own, unlisted, or
-pass unseen. Held, in part, by `scripts/agent-tools.mjs`, which fails a line *Installs:* in no form it reads; that a
-line names all a way writes, by nothing yet.
+what a way writes outside the project's files is read. Reason: a hook a way writes would read as the project's own,
+unlisted, or pass unseen. Held, in part, by `scripts/agent-tools.mjs`, which fails a line *Installs:* in no form it
+reads; that a line names all a way writes, by nothing yet.
 
 **The floor, said for each way** (#397). By default a session started through a way is one of "the sessions those
 start" of floor rules 8 and 18, each in a folder and a clone of its own, and the way is given no sign-in of another
@@ -62,13 +62,13 @@ recorded; that the runs are made, by nothing yet.
   through the cloud's own tools (such as one that creates a session and one that sends it a message), in a container
   of its own with the repository cloned.
 - *State:* the cloud reports each session's state (such as working, blocked, ready for review, completed or failed),
-  which the orchestrator reads and gives `scripts/stalled.mjs` (above).
+  which the orchestrator gives `scripts/stalled.mjs` as working, blocked or waiting (above).
 - *Review:* a fresh session started there as a task is, given the review's brief, takes it; the order and each
   tool's way: `tasks/reviews.md`, point 1, and the tool's part.
 - *Installs:* none: read on 19 November 2026 in a cloud session's own container, where git showed nothing written into
   `.claude/`, `.codex/` or `.kiro/`, ignored files included.
-- *Floor:* each session it starts is one the owner's session started, in a container and a clone of its own; its
-  environment holds no other tool's sign-in, and no key in its variables (floor rule 1).
+- *Floor:* each session it starts is started by the owner or from a session the owner started, in a container and a
+  clone of its own; its environment holds no other tool's sign-in, and no key in its variables (floor rule 1).
 
 ## Side by side: `side-by-side`
 
@@ -79,9 +79,9 @@ recorded; that the runs are made, by nothing yet.
 - *Review:* a fresh session started through it, given the review's brief, takes it; each tool's command stands in its
   part, under *Side by side:*.
 - *Installs:* not yet: #397.
-- *Floor:* each session it starts is one the orchestrator the owner started there started, in a pane and a clone of
-  its own, under the agents' account; it is given no sign-in of its own, each tool keeping its own, Codex's under an
-  account of its own (`setup/server.md`, point 6).
+- *Floor:* each session it starts is started from the orchestrator the owner started there, in a pane and a clone of
+  its own, under the agents' account; it is given no sign-in of its own, each tool keeping its own, a second tool's
+  under an account of its own (`setup/server.md`, point 6).
 
 ## A plain terminal: `terminal`
 

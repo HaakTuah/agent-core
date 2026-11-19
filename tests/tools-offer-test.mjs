@@ -62,7 +62,7 @@ ok(says(check(heading("tools")), "which is no file in the repository") && says(c
 const waysText = fs.readFileSync(path.join(root, "tasks/ways.md"), "utf8");
 const withWays = to => check(text, { read: f => (f === "tasks/ways.md" ? to : fs.readFileSync(path.join(root, f), "utf8")) });
 ok(withWays(waysText).wrong.length === 0 && (waysText.match(/^## /gmu) ?? []).length === 3, "each way's part holds its labels in order, and passes");
-ok(says(withWays(waysText.replace("- *Floor:* each session it starts is one the owner's", "- each session it starts is one the owner's")), "the part `cloud` holds *Task:*, *State:*, *Review:*, *Installs:*, where each part holds"), "a part that leaves out a label fails, naming it and saying its mend");
+ok(says(withWays(waysText.replace("- *Floor:*", "-")), "the part `cloud` holds *Task:*, *State:*, *Review:*, *Installs:*, where each part holds"), "a part that leaves out a label fails, naming it and saying its mend");
 ok(says(withWays(waysText.replace("- *Task:* the owner starts", "- *Statex:* x\n- *Task:* the owner starts").replace("- *State:* none given", "- *Task:* none given")), "the part `terminal` holds"), "a part with a label twice or out of order fails");
 ok(says(withWays(waysText.replace("## A plain terminal: `terminal`", "## A plain terminal")), "names no way") && says(withWays(waysText.replace("`terminal`", "`cloud`")), "has two parts"), "a heading that names no way, or a way named twice, fails");
 ok(says(withWays(waysText.replace("- *Installs:* none: a terminal", "- *Installs:* a terminal")), "line *Installs:* is in no form read here"), "a line *Installs:* in no form read fails");
