@@ -103,7 +103,7 @@ else {
   r = program(c3, "", "", [], undefined, main, "", undefined, { [c3]: red });
   ok(r.status === 0 && r.out.includes("none of the last 3 commits") && !/gh issue/.test(r.calls), "a project past every commit that passed is never sent back", r.out);
   r = program(c1, "", "", [], undefined, main, "", undefined, { [c3]: "fail" });
-  ok(r.status === 0 && r.out.includes("could not be asked") && /issue create/.test(r.calls), "where the host cannot be asked of the checks, main's newest commit is taken, as before, and said so", r.out);
+  ok(r.status === 0 && r.out.includes("could not be asked") && r.out.endsWith(": nothing\n") && !/gh issue/.test(r.calls), "where the host cannot be asked of the checks, no commit is taken, and that is said", r.out);
   r = program(c1, "", "", [], undefined, path.join(main, "none"), "", undefined, {});
   ok(r.status === 1 && !/gh /.test(r.calls), "a core that cannot be fetched fails before anything is written", r.out + r.calls);
   r = program("abc", B, "");

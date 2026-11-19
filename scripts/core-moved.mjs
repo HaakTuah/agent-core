@@ -92,9 +92,10 @@ function newestOf(follows, pin, manifest) {
   if (follows === "main") {
     // (main's newest commit whose checks all passed, which needs its history: fetched as the releases' is; #733)
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "core-main-"));
-    let green;
+    let green = null;
     try { fetchCore(dir); green = greenMain(dir); moved = !!green.sha && green.sha !== pin && past(pin, green.sha, dir); }
-    catch { fail("the core's main could not be fetched"); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    catch { /* (said below, once the folder is gone) */ } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    if (!green) fail("the core's main could not be fetched");
     console.log(green.said);
     newest = green.sha ?? pin;
   } else {

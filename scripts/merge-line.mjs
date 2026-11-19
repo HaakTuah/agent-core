@@ -79,7 +79,8 @@ function newestOf(repo, branch, gh) {
   try { sha = json(gh(`repos/${repo}/commits/${encodeURIComponent(branch)}`))?.sha ?? null; } catch { /* (not read) */ }
   if (!/^[0-9a-f]{40}$/u.test(String(sha))) return { sha: null, state: null, said: `the default branch's newest commit: not read, so whether its checks passed is not known` };
   try { list = json(gh(`repos/${repo}/actions/runs?head_sha=${sha}&branch=${encodeURIComponent(branch)}&event=push&per_page=100`)); } catch { /* (held says so) */ }
-  const reasons = held(list), going = r => /: (?:queued|in_progress|waiting|pending|requested)$/u.test(r);
+  // (no workflow is set aside: a project's own release workflow, run on a push, is one of its checks)
+  const reasons = held(list, null), going = r => /: (?:queued|in_progress|waiting|pending|requested)$/u.test(r);
   const state = !reasons.length ? "passed" : list?.workflow_runs && reasons.every(r => going(r) || r === "no check has passed on it yet") ? "running" : reasons.some(r => /could not be read|were read/u.test(r)) ? null : "failed";
   const what = { passed: "its checks all passed", running: "its checks are still running", failed: `a check failed (${reasons.filter(r => !going(r)).map(r => oneLine(r).slice(0, 80)).join("; ")})` }[state] ?? "its checks could not be read";
   return { sha, state, said: `the default branch's newest commit, ${sha.slice(0, 7)}: ${what}` };

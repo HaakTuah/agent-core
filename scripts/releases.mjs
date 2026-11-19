@@ -134,14 +134,14 @@ export function newestRelease(pin, dir) {
 // The newest commit of the core's main whose checks all passed, which a project that follows main takes (floor rule
 // 12: the core's users get a release, and main may be red until its fix merges; #733): of the last `depth` commits of
 // main's first line, newest first, the first that `held` lets stand, as the host lists the runs its push to main
-// started (`ask`, the route's answer as text). { sha, said }, `sha` null where none of them passed; where the host
-// cannot be asked for the newest, main's newest commit, said so, as before this was read.
+// started (`ask`, the route's answer as text). { sha, said }, `sha` null where none of them passed, or where the host
+// cannot be asked: nothing is taken that was not read to pass, and a full SHA still takes any commit (sync.mjs).
 export function greenMain(dir, ask = route => execFileSync("gh", ["api", route], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30000 }), depth = 30) {
   const shas = git(["rev-list", "--first-parent", "-n", String(depth), "refs/heads/main"], dir).split("\n").filter(x => SHA.test(x));
   for (const [i, sha] of shas.entries()) {
     let list;
     try { list = JSON.parse(ask(`repos/${CORE}/actions/runs?head_sha=${sha}&branch=main&event=push&per_page=100`)); }
-    catch { if (i === 0) return { sha, said: `the host could not be asked for the checks of the core's main, so its newest commit, ${sha.slice(0, 7)}, is taken, as before they were read` }; return { sha: null, said: `the host stopped answering before a commit of the core's main whose checks all passed was found` }; }
+    catch { return { sha: null, said: `the host could not be asked for the checks of the core's main (gh signed in answers it), so no commit of it is taken` }; }
     if (!held(list).length) return { sha, said: i === 0 ? `the core's main is at ${sha.slice(0, 7)}, its checks all passed` : `the core's main is at ${shas[0].slice(0, 7)}, whose checks have not all passed; the newest whose have is ${sha.slice(0, 7)}, ${i} commits back` };
   }
   return { sha: null, said: `none of the last ${shas.length} commits of the core's main has passed all its checks yet` };

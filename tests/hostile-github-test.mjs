@@ -151,7 +151,9 @@ if (process.platform !== "win32") {
     fs.writeFileSync(path.join(dir, "main"), main);
     fs.writeFileSync(path.join(dir, "issues"), issues);
     fs.writeFileSync(path.join(bin, "git"), `#!/bin/sh\ncat "${path.join(dir, "main")}"\n`, { mode: 0o755 });
-    fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh\nprintf 'gh %s\\n' "$*" >> "${log}"\n[ "$1" = api ] && cat "${path.join(dir, "issues")}"\nexit 0\n`, { mode: 0o755 });
+    // (the checks of main's commits, asked of the host, all passed: the newest whose did is what the project takes)
+    fs.writeFileSync(path.join(dir, "green"), JSON.stringify({ total_count: 1, workflow_runs: [{ name: "tests", path: ".github/workflows/tests.yml", status: "completed", conclusion: "success" }] }));
+    fs.writeFileSync(path.join(bin, "gh"), `#!/bin/sh\nprintf 'gh %s\\n' "$*" >> "${log}"\ncase "$2" in *actions/runs*) cat "${path.join(dir, "green")}"; exit 0;; esac\n[ "$1" = api ] && cat "${path.join(dir, "issues")}"\nexit 0\n`, { mode: 0o755 });
     const r = spawnSync(process.execPath, [script("./core-moved.mjs")], { cwd: dir, encoding: "utf8", env: { PATH: `${bin}:${process.env.PATH}`, GITHUB_REPOSITORY: repo, TMPDIR: dir } });
     return { status: r.status, out: `${r.stdout}${r.stderr}`, calls: fs.existsSync(log) ? fs.readFileSync(log, "utf8") : "" };
   };
