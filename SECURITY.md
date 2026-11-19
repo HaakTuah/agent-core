@@ -24,8 +24,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository
      (the workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`,
      `scripts/releases.mjs`, `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`,
-     `scripts/clean-merges.mjs`, `scripts/security-review.mjs` and `scripts/merge-line.mjs`, and a pull request's one
-     file and the issues its queue lines name, by `scripts/queue-only.mjs`; hostile tests:
+     `scripts/clean-merges.mjs`, `scripts/security-review.mjs`, `scripts/merge-line.mjs` and `scripts/runners.mjs`, and
+     a pull request's one file and the issues its queue lines name, by `scripts/queue-only.mjs`; hostile tests:
      `tests/hostile-github-test.mjs`, and for the last `tests/queue-only-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
@@ -36,9 +36,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      the work tree and a pull request's base hold them: read by the copies and pointer checks (`scripts/copies.mjs`,
      `scripts/pointers.mjs`, through `scripts/rule-files.mjs`); hostile tests: `tests/copies-tools-test.mjs`.
    - a project's build, package and workflow files: read by the licence, exact-versions, NuGet, workflow and
-     agent-tools checks (`scripts/licences.mjs`, `scripts/exact-versions.mjs`, `scripts/nuget.mjs`,
-     `scripts/workflows.mjs`, `scripts/agent-tools.mjs`) and the sync's move of the pins (`scripts/sync.mjs`); hostile
-     tests: `tests/hostile-build-files-test.mjs`.
+     agent-tools checks and the reader of where the tests run (`scripts/licences.mjs`, `scripts/exact-versions.mjs`,
+     `scripts/nuget.mjs`, `scripts/workflows.mjs`, `scripts/agent-tools.mjs`, `scripts/runners.mjs`) and the sync's move
+     of the pins (`scripts/sync.mjs`); hostile tests: `tests/hostile-build-files-test.mjs`.
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the

@@ -201,9 +201,10 @@ const server = http.createServer((req, res) => {
   asks.push({ url: req.url, auth: req.headers.authorization });
   const ok2 = req.url.startsWith(`/repos/moss/bark/commits/${head}/check-runs?check_name=tests&`);
   res.setHeader("content-type", "application/json");
-  res.end(JSON.stringify({ check_runs: ok2 ? [{ name: "tests", status: "completed", conclusion: state, app: { slug: app } }] : [] }));
+  res.end(JSON.stringify({ check_runs: ok2 ? [...before, { id: 9, name: "tests", status: "completed", conclusion: state, app: { slug: app }, started_at: "2026-11-19T10:00:00Z" }] : [] }));
 });
-let state = "success", app = "github-actions";
+// (`before`: an older run of the check on the same head, as a draft's gate leaves one; #733)
+let state = "success", app = "github-actions", before = [];
 await new Promise(done => server.listen(0, "127.0.0.1", done));
 const host = { GITHUB_API_URL: `http://127.0.0.1:${server.address().port}`, GITHUB_REPOSITORY: "moss/bark", GH_TOKEN: "pretend" };
 const runLive = (args, env) => new Promise(done => {
@@ -220,6 +221,13 @@ ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /no run
 app = "github-actions"; state = "failure"; fs.writeFileSync(envFile, "");
 r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
 ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /did not pass on the merged head/.test(r.out), "where the check failed there, the whole suite runs", r.out);
+state = "success"; before = [{ id: 3, name: "tests", status: "completed", conclusion: "failure", app: { slug: "github-actions" }, started_at: "2026-11-19T09:00:00Z" }]; fs.writeFileSync(envFile, "");
+r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
+ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=none\n", "a draft's failed gate before the run that passed on the same head is read as the older: its newest run decides (#733)", r.out);
+state = "failure"; before = [{ id: 3, name: "tests", status: "completed", conclusion: "success", app: { slug: "github-actions" }, started_at: "2026-11-19T09:00:00Z" }]; fs.writeFileSync(envFile, "");
+r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
+ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /its newest run did not pass/.test(r.out), "and a pass before a newer run that failed is no pass: the whole suite runs", r.out);
+before = []; state = "success";
 fs.writeFileSync(envFile, "");
 r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GH_TOKEN: "", GITHUB_ENV: envFile });
 ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /no repository or token/.test(r.out), "with no token, the host is not asked and the whole suite runs", r.out);
