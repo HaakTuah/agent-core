@@ -41,6 +41,10 @@ ok(cleared(queue, () => false) === queue && cleared(queue.replace(/\n/gu, "\r\n"
 // a line held for the owner, and one that names several issues (the fallback reviewer's findings on #757)
 const held = "| #30 | the owner | on hold, after #29 |\n| #31 | builder | #29 |\n| #32, #33 and #34 | builder | |\n| #35 to #36 | builder | |\n";
 ok(read(held, n => n === 29).next?.issues[0] === 31, "a line held for the owner is never next, whatever it waits on");
+const holds = "| #40 | builder | on hold, after #39 |\n| #41 | builder | #593's points 1 to 3 |\n| #42 | builder | #39 and #593 |\n";
+ok(read(holds, n => [39, 593].includes(n)).next?.issues[0] === 41 && read(holds.replace(/^.*#41.*\n/mu, ""), n => [39, 593].includes(n)).next?.issues[0] === 42, "a line whose wait names only issues, or points of one, is free once they have closed (Codex's finding on #757)");
+ok(read("| #40 | builder | on hold, after #39 |\n", n => n === 39).next === null, "a line that waits on a hold besides an issue stays waiting once the issue has closed");
+ok(linesOf("| #679 to #682 | builder | |\n")[0].issues.join() === "679,680,681,682" && linesOf("| #1 to #500 | builder | |\n")[0].issues.join() === "1,500" && read("| #679 to #682 | builder | |\n", n => n !== 681).gone.length === 0, "a range of issues is read whole, and its line stays while one of them is open; one past a hundred wide names its two ends");
 ok(linesOf(held)[2].issues.join() === "32,33,34" && read(held, n => n === 32).gone.length === 0 && read(held, n => [32, 33, 34].includes(n)).gone.map(l => l.issues[0]).join() === "32" && cleared(held, n => n === 35) === held,
   "a line that names several issues goes only once all of them have closed");
 

@@ -24,8 +24,15 @@ import { started } from "./started.mjs";
 
 export const FILE = "QUEUE.md";
 export const LARGEST = 1 << 20; // (bytes: a progress file past it is refused, never read; SECURITY.md, rule 5)
-const ROW = /^\|([^|]*)\|/u, ITEM = /^\s*[-*]\s+(?:\[[ xX]\]\s+)?#(\d{1,9})\b/u, NUMBER = /#(\d{1,9})\b/gu;
-const numbers = text => [...String(text).matchAll(NUMBER)].map(w => Number(w[1]));
+const ROW = /^\|([^|]*)\|/u, ITEM = /^\s*[-*]\s+(?:\[[ xX]\]\s+)?#(\d{1,9})\b/u;
+// The numbers a text names, a range "#a to #b" (at most a hundred wide) named whole.
+const numbers = text => [...String(text).matchAll(/#(\d{1,9})\b(?:\s+to\s+#(\d{1,9})\b)?/gu)].flatMap(m => {
+  const [from, to] = [Number(m[1]), m[2] === undefined ? null : Number(m[2])];
+  return to !== null && to > from && to - from <= 100 ? Array.from({ length: to - from + 1 }, (_, i) => from + i) : to === null ? [from] : [from, to];
+});
+// What a line waits on beyond the issues it names: its words with each reference ("#n", "#n's points 1 to 3") and the
+// words that join them taken out; a line whose words keep anything else (a hold, the owner's word) still waits.
+const beyond = words => String(words).replace(/#\d{1,9}(?:'s\s+points?\s+[\d\s,]+(?:(?:to|and)\s+\d+)?)?/gu, " ").replace(/\b(?:and|after|then|or)\b|[,;.]/gu, " ").trim();
 
 // The lines of a progress file's text, in order: { at, text, issues, waits, words, owner }: `at` its index among the
 // text's lines; `issues` the issues it names first (a row's first cell, all it names there; an item's first);
@@ -44,12 +51,12 @@ export function linesOf(text) {
 
 // The progress file as its readers take it, given `closed` (a number => whether that issue or pull request has
 // closed): { open, gone, next }, `gone` the lines all of whose issues have closed, `next` the first open line that no
-// one holds for the owner and that waits on nothing open (what it waits on empty, or naming only what has closed),
-// or null.
+// one holds for the owner and that waits on nothing open (what it waits on empty, or naming only what has closed and
+// nothing else, such as a hold), or null.
 export function read(text, closed) {
   const lines = linesOf(text), done = l => l.issues.every(closed);
   const gone = lines.filter(done), open = lines.filter(l => !done(l));
-  const free = l => !l.owner && (l.waits.length ? l.waits.every(closed) : l.words === "");
+  const free = l => !l.owner && l.waits.every(closed) && beyond(l.words) === "";
   return { open, gone, next: open.find(free) ?? null };
 }
 
