@@ -134,7 +134,7 @@ passes(run(project({ ".claude/settings.json": ownHook, ...listing({ kind: "hook"
   ok(!/listed nowhere|is not listed/u.test(inPr.out) && /not in the starter kit's form/u.test(inPr.out), "nor as new in a pull request where no list is written, while a command not in the kit's form fails as any hook's does (floor rule 3)", inPr.out);
   fails(byWay(project({ ".claude/settings.json": ownHook, ...listing() }), "none"), "a hook no way names is the project's own, unlisted", 'the hook "PostToolUse Write: true"');
   fails(byWay(project({ ".claude/settings.json": ownHook, ...listing() }), "not yet: #397"), "nor does a way the core has not read excuse it", 'the hook "PostToolUse Write: true"');
-  for (const bad of ["a hook of its own", "`PostToolUse Write: true`", ""]) fails(byWay(project(), bad), `a line *Installs:* in no form read fails: ${JSON.stringify(bad)}`, "the part `a-way`'s line *Installs:* is in no form read here");
+  for (const bad of ["a hook of its own", "`PostToolUse Write: true`", "", "`plugin some-plugin@market`"]) fails(byWay(project(), bad), `a line *Installs:* in no form read fails: ${JSON.stringify(bad)}`, "the part `a-way`'s line *Installs:* is in no form read here");
   const real = waysOf();
   ok(real.problems.length === 0 && real.ways.map(w => w.name).join() === "cloud,side-by-side,terminal" && installedBy().fail.length === 0, "the core's own parts are read, each line *Installs:* in its form", JSON.stringify(real));
   ok(installedBy(waysOf(() => { throw new Error("gone"); })).notes.length === 1 && installedBy(waysOf(() => { throw new Error("gone"); })).fail.length === 0, "a module that cannot be read is noted and fails nothing");

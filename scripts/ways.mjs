@@ -13,8 +13,9 @@ export const MODULE = "tasks/ways.md";
 export const LABELS = ["*Task:*", "*State:*", "*Review:*", "*Installs:*", "*Floor:*"];
 const HEADING = /^## (.*)$/u, NAMED = /: `([a-z][a-z0-9-]{0,39})`$/u;
 const INSTALLS = "*Installs:*";
-// (what the agent-tools check names a tool by: its kind, a space, and its name)
-const TOOL = /^(?:plugin|server|skill|hook) \S/u;
+// (a hook, as the agent-tools check names one: what a way installs is a hook or setting, never a plug-in, tool server
+// or skill, which would skip that check's pin of its version)
+const TOOL = /^hook \S/u;
 
 // The parts of the module's text: { ways: [{ name, installs, problem? }], problems }, `installs` the keys the part's
 // line "*Installs:*" names (an empty list for "none"; null for "not yet", which the check expects nothing of), and
