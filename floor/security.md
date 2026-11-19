@@ -86,8 +86,10 @@ saved data; a weakened check).
 - The check `personal-terms.yml` fails a PR holding a term from the Actions secret `PERSONAL_TERMS`.
 
 **12. `main` is the owners'.**
-- It is never pushed to, and changes only by a merged pull request, brought up to date with `main`, its checks
-  passed and the approvals the host asks given: what its users get is built from it.
+- It is never pushed to, and changes only by a merged pull request, its checks passed and the approvals the host asks
+  given, brought up to date with `main` where every merge goes live: what its users get is built from it.
+- Where users get a release, `main` is tested at its newest commit, a red one fixed before any other merge, and a
+  release cut only from a green one (`tasks/hosts.md`).
 
 **13. Each project's files stay in its own repository,** never written into another's.
 

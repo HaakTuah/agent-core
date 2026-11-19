@@ -10,7 +10,8 @@
 // core-address.mjs, beside this file. Where the line says a library carries the core, it syncs nothing: the library's
 // own repository does (tasks/repositories.md).
 //
-//   node core/scripts/sync.mjs              to the newest of what the project follows: the core's main, or its newest
+//   node core/scripts/sync.mjs              to the newest of what the project follows: the core's main at its newest
+//                                           commit whose checks all passed (greenMain), or its newest
 //                                           release where it follows the releases (releases.mjs, beside this file),
 //                                           unless that release changes nothing the project takes (staysAt there)
 //   node core/scripts/sync.mjs <full SHA>   to that commit of the core's main, whatever the project follows
@@ -25,7 +26,8 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
-import { NOTES, asksBetween, fetchCore, followsOf, hostSaid, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
+import { everyInstall } from "./packages.mjs";
+import { NOTES, asksBetween, fetchCore, followsOf, greenMain, hostSaid, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
 // git's own variables that point elsewhere left out: releases.mjs)
@@ -65,8 +67,18 @@ function targetOf({ manifest, text, old, first, at }, tmp) {
   const pin = arg ?? (first ? old : null);
   if (pin) return { pin, release: "" };
   const follows = followsOf(text, hostSaid()) ?? fail(`${manifest} does not say what the project follows: its *follows* row is \`main\` or \`releases\`, once, or left out where the owner's account is read: its one row, or the repository's own account where the host says a person holds it`);
-  if (follows === "main") return { pin: git(["rev-parse", "refs/heads/main"], tmp), release: "" };
+  if (follows === "main") return greenToTake({ old, at }, tmp);
   return releaseToTake({ text, old, at }, tmp);
+}
+
+// The newest commit of the core's main whose checks all passed, where the project follows main (releases.mjs,
+// greenMain; floor rule 12, #733); null, said, where none has passed or the copy is past it already.
+function greenToTake({ old, at }, tmp) {
+  const green = greenMain(tmp);
+  console.log(green.said);
+  if (!green.sha) { console.log("nothing to sync until one has (a full SHA takes a commit of its main)"); return null; }
+  if (old && green.sha !== old && past(green.sha, old, tmp)) { console.log(`${at} at ${old.slice(0, 7)} is past it already: nothing to sync`); return null; }
+  return { pin: green.sha, release: "" };
 }
 
 // The core's newest release, where the project follows the releases; null, said, where it brings nothing to sync.
@@ -165,11 +177,24 @@ function sync(tmp) {
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
   execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(tmp, ["archive", pin], { encoding: "buffer", maxBuffer: 1 << 28 }) });
   fs.writeFileSync(manifest, text.replace(lineRe, line => line.replace(old, pin)));
+  install(dir);
 
   const moved = moveCalls(pin, tmp);
   if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); return; }
   sayMoved({ at, old, pin, release, manifest, moved }, tmp);
   report(at, dir, kitsOf(old, tmp));
+}
+
+// The new copy's packages, installed from its lock file by its own install script, into its .packages/node_modules/,
+// which git does not track (#654); a copy from before it has none. One that fails twice leaves the copy written and says so, with the
+// command to run again: the sync's pull request holds the copy alone, and no registry's silence fails it.
+function install(dir) {
+  const script = path.join(dir, "scripts", "install.mjs");
+  if (!fs.existsSync(script)) return;
+  // (every install of the copy's, the parser's too, for the session that works in the project: #719)
+  const r = spawnSync(process.execPath, [script, ...everyInstall(dir)], { encoding: "utf8" });
+  process.stdout.write(r.stdout ?? "");
+  if (r.status !== 0) console.log(`note the copy is written, but its packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node ${path.relative(process.cwd(), script)} before running a check`);
 }
 
 // The core is fetched into a temporary folder, removed however the sync ends.

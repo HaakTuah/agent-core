@@ -1,0 +1,17 @@
+# The packages of other publishers the core's scripts run, installed from .packages/package-lock.json, and the parser's
+# from .packages/parser/package-lock.json (#719), by scripts/install.mjs: never tracked, here or in a project's copy, where this file stands at the copy's root (#654), nor
+# a link in their place; nor the folder an install before they moved into .packages/ left at the root, which a clone
+# made then still holds. The copy's package lists, lock files and .npmrc files, in the dot folder .packages/ so that no
+# workspace pattern of a project's own package list takes them in, are tracked there even where the project's own
+# .gitignore leaves such files, or dot folders, out.
+!/.packages/
+/.packages/node_modules
+/.packages/parser/node_modules
+/node_modules
+!/.packages/.npmrc
+!/.packages/package.json
+!/.packages/package-lock.json
+!/.packages/parser/
+!/.packages/parser/.npmrc
+!/.packages/parser/package.json
+!/.packages/parser/package-lock.json

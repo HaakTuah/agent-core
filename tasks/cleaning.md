@@ -64,7 +64,8 @@ code is held to: `tasks/code-shape.md`.
     4. Which files always change together and live apart?
     5. Can each part be tested alone, and how long does it take?
     6. Does any data have two owners?
-    7. What ties the code to one platform, and is each tie needed?
+    7. What ties the code to one platform, and is each tie needed? And where do the tests of the code outside the
+       domain `platform` run, and what does that cost beside the cheapest place they could run (#457)?
     8. What does a reader see that no check does?
     9. Which of the project's *descriptions* (its README, its design notes, what it tells a user, the pointers in its
        rule files) no longer say what the code does, each by its document and line and the file or behaviour it no
