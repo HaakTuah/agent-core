@@ -13,7 +13,7 @@
 // "Changes: <keys>.", and each it names is marked back, "Changed by: <keys>." (marksOf(); #756, point 3). holders.mjs,
 // beside this file, reads it for the items its list names and fails what inStep() finds. Node's own modules.
 //
-//   import { items, inStep, KEY, marksOf } from "./archive.mjs";
+//   import { items, inStep, KEY, MARK, marksOf } from "./archive.mjs";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -121,7 +121,7 @@ function unmarked(r) {
   const FORM = `write one line "Changes: <keys>." on the item that changes others and one "Changed by: <keys>." on each it changes, each below the item's opening line, the keys as the archive writes them (98, #744, #733.1), joined by ", "`;
   for (const [n, m] of marks) {
     const file = r.items.get(n).file;
-    for (const line of m.wrong) wrong.push(`${file}: item ${n} has the line "${line}", a mark not in its form or given twice. Mend: ${FORM}`);
+    for (const line of m.wrong) wrong.push(`${file}: item ${n} has the line ${JSON.stringify(line)}, a mark not in its form or given twice. Mend: ${FORM}`);
     for (const e of m.changes) {
       if (e === n || !marks.has(e)) wrong.push(`${file}: item ${n} says it changes ${e}, which is ${e === n ? "itself" : "no item of the archive"}. Mend: name the earlier item it changes by its key, or take ${e} out of its line "Changes:"`);
       else if (!marks.get(e).changedBy.includes(n)) wrong.push(`${file}: item ${n} changes item ${e}, which is not marked so. Mend: give item ${e}, in ${r.items.get(e).file}, the line "Changed by: ${[...marks.get(e).changedBy, n].join(", ")}." in place of any it has, its text otherwise as it stands`);
