@@ -12,12 +12,12 @@ and whether the reviewer takes a brief (*Review:*), what the way installs (*Inst
 (*Floor:*). The agents inside read the same `AGENTS.md` and meet the same checks, so a part says only what lies around
 a session. Whoever adds or changes what the core says of a way writes it in its part, naming a product only as an
 example, and "not yet", with its issue, where the core has not read the way's documentation. The one condition that
-changes it: a way with no part, which a project names in its manifest's "Tools" table and files with the core
-(`README.md`, "Reporting to the core"). It does not mean a way is an agent tool: it gets no column in the table of
-`tasks/tools.md`, and its part repeats nothing a tool's part or `tasks/reviews.md` says. Reason: the core had one page
-to set up a machine and a place in the order of ways, and no word on how a session is handed work, read or reviewed
-through each. Held, in part, by `scripts/tools-offer.mjs`, which fails a part with a label left out or out of order;
-that each way has a part, by nothing yet.
+changes it: a way with no part, which a project names in its manifest's "Tools" table and reports to the core as its
+README says. A way is no agent tool: it gets no column in the table of `tasks/tools.md`, and its part repeats nothing
+a tool's part or `tasks/reviews.md` says. Reason: the core had one page to set up a machine and a place in the order
+of ways, and no word on how a session is handed work, read or reviewed through each. Held, in part, by the tools'
+offer (`scripts/tools-offer.mjs`), which a part fails with a label left out or out of order; that each way has a part,
+by nothing yet.
 
 **A session's state is read where the way gives it** (#397). By default, where a way reports whether a session is
 working, blocked or waiting, the orchestrator reads that first, and writes it, on each wake, into a JSON file of each
@@ -43,8 +43,8 @@ reads; that a line names all a way writes, by nothing yet.
 start" of floor rules 8 and 18, each in a folder and a clone of its own, and the way is given no sign-in of another
 tool's; each part's line *Floor:* says so in plain words, and what else of the floor the way meets. Nothing changes it.
 It does not mean a way loosens or adds to the floor. Reason: a way starts sessions that no agent tool's part covers,
-and floor rules 8 and 18 name only the sessions the owner starts and those they start. Held, in part, by
-`scripts/tools-offer.mjs`, which fails a part with no line *Floor:*; what the way is given, by nothing yet.
+and floor rules 8 and 18 name only the sessions the owner starts and those they start. Held, in part, by the check of
+the parts' form named above, as a line *Floor:* is one of the labels; what the way is given, by nothing yet.
 
 **A staged run through each way** (#397). By default the staged cases are run once through each way, with sessions
 started through it, and recorded with its name beside the tool and the model (`node scripts/staged.mjs --read <case>
@@ -90,5 +90,5 @@ recorded; that the runs are made, by nothing yet.
 - *Review:* through a plug-in in the session's tool or the host's app, as `tasks/reviews.md`, point 1, orders them;
   whether each takes a brief, its tool's part says.
 - *Installs:* none: a terminal writes nothing into a tool's folder.
-- *Floor:* the session the owner starts works in a folder of its own with the sign-ins the owner gave it, and one it
-  starts in a folder and a clone of its own; nothing runs there that the owner did not start (floor rule 8).
+- *Floor:* floor rule 8 holds the session the owner starts there as any on the owner's computer, and one it starts
+  works in a folder and a clone of its own.
