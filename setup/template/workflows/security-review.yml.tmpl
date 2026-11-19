@@ -5,7 +5,7 @@
 # the core's workflow: it runs the default branch's copy of the core's script, never a pull request's, and its token
 # can read, and write a commit status, nothing more. No secret. Before it, the core's queue-only.yml proves a pull
 # request that changes only the progress file, which then needs no review of its own (floor rule 8): its job alone may
-# read issues, and it runs only where the check runs; in a private repository, where each run is a billed job, only
+# read issues, and it runs wherever the check can; in a private repository, where each run is a billed job, only
 # where its call is given `with: private: true`, the owner's choice, and otherwise such a pull request is reviewed as
 # any other.
 name: security-review

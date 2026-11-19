@@ -19,11 +19,6 @@ on:
         required: false
         type: string
         default: core
-      advisory:
-        description: As security-review.yml's, so that it runs where that check runs. Left out, true.
-        required: false
-        type: boolean
-        default: true
       private:
         description: Whether it runs in a private repository, where each run is a billed job. Left out, it does not, and such a pull request is reviewed as any other.
         required: false
@@ -41,22 +36,17 @@ permissions:
 
 jobs:
   prove:
-    # (where security-review.yml's job runs, in a private repository only where the caller passes "private", and of a
-    # pull request's events only one that changes one file)
+    # (wherever security-review.yml's job can run, so that its answer is there when that job reads it: in a private
+    # repository only where the caller passes "private"; of a pull request's events only one that changes one file; of
+    # its comments any from Codex or from an account that can write, since which of them starts a review is said once,
+    # in that job's own condition, and a proof that job never reads costs a job of three minutes at most)
     if: >-
       ${{ (!github.event.repository.private || inputs.private)
       && ((github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.pull_request.changed_files == 1
       && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')
       || (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.issue.state == 'open'
-      && ((github.event.comment.user.login == 'chatgpt-codex-connector[bot]'
-      && startsWith(github.event.comment.body, '<!-- codex-pull-request-review-summary -->'))
-      || (contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
-      && (startsWith(github.event.comment.body, 'Security review:')
-      || startsWith(github.event.comment.body, '**Security review:')
-      || (!inputs.advisory && (startsWith(github.event.comment.body, 'Code review:')
-      || startsWith(github.event.comment.body, '**Code review:')
-      || startsWith(github.event.comment.body, 'Design check:')
-      || startsWith(github.event.comment.body, '**Design check:')))))))) }}
+      && (github.event.comment.user.login == 'chatgpt-codex-connector[bot]'
+      || contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)))) }}
     # (one at a time for a pull request, in the order they came, as the security-review job its answer feeds)
     concurrency:
       group: queue-only-${{ github.event.issue.number || github.event.pull_request.number }}

@@ -36,7 +36,6 @@ jobs:
     uses: ./.github/workflows/queue-only.yml
     with:
       root: .
-      advisory: false
 
   security-review:
     needs: queue

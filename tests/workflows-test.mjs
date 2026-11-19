@@ -180,7 +180,7 @@ ok(JSON.stringify(ownReview.on) === JSON.stringify(kitReview.on), `the core's ow
 // (its two calls: the review's, and the queue-only proof's that feeds it, #750)
 const ownCall = Object.values(ownReview.jobs ?? {});
 const callOf = (name) => ownCall.filter((job) => job.uses === `./.github/workflows/${name}`);
-ok(ownCall.length === 2 && ["security-review.yml", "queue-only.yml"].every((name) => callOf(name).length === 1 && callOf(name)[0].with?.root === "." && callOf(name)[0].with?.advisory === false),
+ok(ownCall.length === 2 && ["security-review.yml", "queue-only.yml"].every((name) => callOf(name).length === 1 && callOf(name)[0].with?.root === ".") && callOf("security-review.yml")[0].with?.advisory === false,
   "and calls the core's workflow, and the queue-only proof before it, with its scripts at the root and advisory turned off");
 
 // ---- when the core's tests run (#733, points 2 to 4 and 6) ----
