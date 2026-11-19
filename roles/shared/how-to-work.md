@@ -45,5 +45,4 @@ pillars hold it up: **one fact, one place**, **split by meaning**, **keep it lea
   review guidelines, which hold it to the core's test for a rule.
 - **The smallest setup that tests the rule:** each test sets up only what it needs; what the tests
   cost and when they run: `tasks/tests.md`.
-- **Rule files state rules,** briefly, with at most a pointer to the archive (in the core, none: the list of its
-  rules names their items); a new rule replaces text rather than adding to it.
+- **Rule files state rules,** briefly, with at most a pointer to the archive; a new rule replaces text rather than adding to it.

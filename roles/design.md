@@ -1,6 +1,6 @@
 # The design session
 
-Read at its start by the role `design`: the design session, which `roles/shared/inbox.md`, "The owner's words are kept
+Read at its start by the role `design`: the design session, which `roles/shared/records.md`, "The owner's words are kept
 once", says who it is and what it alone does.
 
 **Reads at its start:** `roles/builder.md` and what that names, since it builds what it designs, and

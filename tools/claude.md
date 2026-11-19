@@ -8,7 +8,7 @@ if you run at high.
 
 - **Pass both model and effort** whenever you start a session or helper, save a helper whose
   definition gives them: one of a type the project defines, or a plug-in's own (`codex:codex-rescue`). Never above high,
-  but for escalation and the adviser, Opus at xhigh as advice to whoever starts it, Fable on the owner's word; never max.
+  but for escalation and the adviser, Opus at xhigh as advice to whoever starts it; never max.
 - **Name models by family alone.**
 - **Fable's usage runs out first:** it takes only what needs judgement; where it is unavailable, its call goes to Opus
   at high.

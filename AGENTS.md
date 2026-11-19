@@ -98,7 +98,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   writes it from the owner's word recorded on the issue ("Whose words an issue holds"), adds it to the archive as an
   item of its own, naming the issue as its source, and takes what it leaves open as `roles/shared/inbox.md` says of any
   open point. This is the second
-  difference from that module, where only the design session writes rules from the owner's words.
+  difference from that module and `roles/shared/records.md`, where only the design session writes rules from the owner's
+  words.
 - **An orchestrator may work the file** (`roles/orchestrator.md`) while it holds a line a session can take. The
   owner starts it, or the owner's adviser on the owner's word (`roles/adviser.md`); once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
   wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from

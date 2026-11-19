@@ -10,8 +10,7 @@ the fallback reviewer takes a review no other gives; the design check, the stand
 against the design and the owner's words; escalation takes what has beaten a builder twice.
 
 **A file for each role** (#304). By default what a role reads at its start is the floor's
-`security.md`, its own file under `roles/` (the builder's, the orchestrator's, a reviewer's, the stand-in's, the design
-session's, the adviser's) and the shared files that file names on its line "Reads at its start:". Whoever writes or changes a rule
+`security.md`, its own file under `roles/` and the shared files that file names on its line "Reads at its start:". Whoever writes or changes a rule
 puts one that a single role needs in that role's file, and one that several roles share in one shared file their files
 name, so that no rule stands in two files; a role's file says in a line each what the role hands each neighbouring role
 and gets back, and nothing of how the neighbour works. It does not mean a module read by task belongs to a role (a
@@ -54,7 +53,7 @@ nothing yet: builder and reviewer post under one login (#187).
 
 | Tier | Its jobs | Effort |
 | --- | --- | --- |
-| Strongest | the main lane, design readings and the *hard work*, the orchestrator, the adviser (at xhigh: `tools/claude.md`), the fallback reviewer, the design and leanness checks, the stand-in, a choice's challenger, blind picker and judge, escalation's first step, a helper that needs design judgement | high |
+| Strongest | the main lane, design readings and the *hard work*, the orchestrator, the adviser, the fallback reviewer, the design and leanness checks, the stand-in, a choice's challenger, blind picker and judge, escalation's first step, a helper that needs design judgement | high |
 | Middle | routine lanes (polish, docs, splits, tests) and parallel helpers (`tasks/helpers.md`) | high for a builder; a helper medium, high for the hard work |
 | Light | search | low |
 | Scarce top | planning design, escalation's last step, work the owner gives it by name | high |

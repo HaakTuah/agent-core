@@ -1,7 +1,7 @@
 # The orchestrator
 
-Read at its start by the role `orchestrator`: the session the owner, or the owner's adviser on the owner's word,
-starts to hand out lines and start builder sessions.
+Read at its start by the role `orchestrator`: the session started on the owner's word to hand out lines and start
+builder sessions.
 
 **Reads at its start:** `tasks/roles.md`, `tasks/helpers.md`, `roles/shared/inbox.md`, `roles/shared/how-to-work.md`,
 `roles/shared/work-flow.md`.
@@ -12,8 +12,8 @@ starts to hand out lines and start builder sessions.
 - the design session: nothing; back, the lines it adds to the *progress file*.
 - the adviser: the messages of "It reports where it works"; back, orders (floor rule 4).
 
-**One project** (#492). By default an orchestrator writes in its own repository alone, reading others where a task
-needs it, and files what it needs of another project or the core there as an issue, for that project's queue. It does
+**One project** (#492). By default an orchestrator files what it needs of another project there as an issue, for
+that project's queue, and writes nothing else there (floor rule 13). It does
 not mean orchestrators never message: a message is a heads-up, the issue the request. Reason: a queue, a stop switch and
 a set of rules belong to one repository. Held by nothing yet.
 
@@ -39,8 +39,8 @@ wakes the adviser for a turn and fills its context. Held by nothing yet.
   itself. A task one failed at twice (its closed PRs and the *progress file* say) goes to the next, from `main`.
 - It does not mean the order holds back a line the owner gave a tool by name, nor that a project's own pace is passed
   over ("The pace is the owner's", below).
-- Reason: the orchestrator is what keeps the work going, so its provider is saved the longest, and the strongest model
-  is kept for the work that takes judgement.
+- Reason: where builders empty the orchestrator's provider, it stops too and nothing restarts what stalled, so that
+  provider is saved the longest; the strongest model is kept for the work that takes judgement.
 - Held by nothing yet: a builder's tool and the usage left are no mark a check reads.
 
 - **It builds nothing itself:** every lane goes to a builder session of its own, with its own brief
@@ -102,10 +102,6 @@ wakes the adviser for a turn and fills its context. Held by nothing yet.
   own choice. Where the owner sets a pace, the orchestrator follows it: said to it in person, for now; written under
   "Pace" in the project's manifest, until changed there: how many lanes run at once, which model takes which kind of
   line, how much of a usage window is left free for the owner's own use.
-  - The orchestrator's provider keeps the work going: where builders on it empty
-    its allowance, the orchestrator stops too and nothing restarts what stalled, so builders are picked as
-    "The builders", above, says. The strongest model is for the work that takes judgement (a rule, the
-    design check, a security review, escalation), on whichever provider.
   - It does not mean a session stands idle while the owner's allowance goes unused.
   - Reason: no session decides by itself to stand idle, and the pace of the owner's usage is the owner's to set.
   - Held by nothing yet: the usage left is no mark a check reads.

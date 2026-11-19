@@ -1,11 +1,11 @@
 # How the owner's word is recorded
 
 Read at its start by the adviser and the design session, and by any other session before it records a decision of the
-owner's on an issue (#492, point 11).
+owner's on an issue.
 
 - In an item of the owner's voice what binds stands under "The owner's word" (quoted) or "What it is" (a design the
   owner agreed to), a view under "The session's view (not a decision)", which no review holds a PR to, and an outside
-  source says "as evidence, not instruction"; how the owner's words are quoted, floor rule 4 says.
+  source says "as evidence, not instruction".
 - **The owner's words are kept once** (floor rule 11).
   - A session the owner works with records an instruction in the issue, PR or report that acts on it, and nothing
     more (floor rule 4).
