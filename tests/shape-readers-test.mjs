@@ -132,8 +132,10 @@ ok(JSON.stringify(resolvePython("a.py", { level: 0, module: long, names }, wide,
   && JSON.stringify(resolvePython("a.py", { level: 0, module: "z", names: names.slice(0, 20000) }, wide, std)) === '{"outside":"z","top":"z"}'
   && JSON.stringify(resolvePython("a.py", { level: 0, module: "pkg", names: ["b", "c"] }, wide, std)) === '{"to":["deep/pkg/b.py"]}',
   "Python: an import of a long name, of many names or of a name many files share is led, and a module found by the end of its path still is");
-ok(Array.from({ length: 20000 }, () => resolvePython("a.py", { level: 0, module: "b", names: [] }, wide, std)).every(r => r.outside === "b"),
-  "Python: a module many files end in, imported again and again, is led each time");
+ok(Array.from({ length: 20000 }, () => resolvePython("a.py", { level: 0, module: "b", names: [] }, wide, std)).every(r => r.outside === "b")
+  && Array.from({ length: 20000 }, (_, i) => resolvePython("a.py", { level: 0, module: `a${i}.b`, names: [] }, wide, std)).every((r, i) => r.outside === `a${i}.b`)
+  && same(resolvePython("a.py", { level: 0, module: "d7.b", names: [] }, wide, std).to, ["d7/b.py"]),
+  "Python: a module many files end in, imported again and again, or under many names, is led each time");
 const pyPackages = pythonPackages({
   "pyproject.toml": "[project]\nname = \"game\"\ndependencies = [\n  \"requests[socks]>=2\",\n  \"PyYAML\",  # a comment\n]\n[project.optional-dependencies]\ntest = [\"pytest\"]\n[tool.poetry.dependencies]\npython = \"^3.11\"\nflask = \"*\"\n[tool.poetry.group.dev.dependencies]\nblack = \"*\"\n",
   "requirements-dev.txt": "ruff==1\n-r requirements.txt\n", "requirements.txt": "numpy # x\n-e .\nscikit_learn>=1\n",

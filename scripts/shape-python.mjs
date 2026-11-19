@@ -303,6 +303,11 @@ function bySuffix(parts, files) {
   if (!ENDS.has(files)) ENDS.set(files, new Map());
   const known = ENDS.get(files);
   if (known.has(key)) return known.get(key);
+  // (a module of more parts is answered from the folders' index, a plain name being read there as it is here)
+  if (parts.length > 1 && plain(parts.at(-1))) {
+    known.set(key, one(endingIn(files, parts.slice(0, -1).join("/").split("/")), parts.at(-1)));
+    return known.get(key);
+  }
   const ends = [`${p}.py`, `${p}/__init__.py`];
   const found = ends.flatMap(e => (byName(files).get(path.posix.basename(e) === "__init__.py" ? `${parts.at(-1)}/__init__.py` : path.posix.basename(e)) ?? []).filter(f => f === e || f.endsWith(`/${e}`)));
   known.set(key, found.length === 1 ? found[0] : null);
