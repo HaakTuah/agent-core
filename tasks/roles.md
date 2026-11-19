@@ -11,7 +11,7 @@ against the design and the owner's words; escalation takes what has beaten a bui
 
 **A file for each role** (#304). By default what a role reads at its start is the floor's
 `security.md`, its own file under `roles/` (the builder's, the orchestrator's, a reviewer's, the stand-in's, the design
-session's) and the shared files that file names on its line "Reads at its start:". Whoever writes or changes a rule
+session's, the adviser's) and the shared files that file names on its line "Reads at its start:". Whoever writes or changes a rule
 puts one that a single role needs in that role's file, and one that several roles share in one shared file their files
 name, so that no rule stands in two files; a role's file says in a line each what the role hands each neighbouring role
 and gets back, and nothing of how the neighbour works. It does not mean a module read by task belongs to a role (a
@@ -25,7 +25,7 @@ where that tool is not at hand, to the next it names:
 
 | Role | Preferred | When it is not at hand |
 | --- | --- | --- |
-| Orchestrator, the session that syncs the core | Claude | any tool the owner has |
+| Adviser, orchestrator, the session that syncs the core | Claude | any tool the owner has |
 | Builder | as "The builders" says (`roles/orchestrator.md`) | the next tool there |
 | Code reviewer | a tool that cannot build here (Codex's app, then Copilot's), then a builder of a tool other than the builder's | the fallback reviewer |
 | Security reviewer | Codex's app, which starts by itself (floor rule 8) | the fallback reviewer |
@@ -54,7 +54,7 @@ nothing yet: builder and reviewer post under one login (#187).
 
 | Tier | Its jobs | Effort |
 | --- | --- | --- |
-| Strongest | the main lane, design readings and the *hard work*, the orchestrator, the fallback reviewer, the design and leanness checks, the stand-in, a choice's challenger, blind picker and judge, escalation's first step, a helper that needs design judgement | high |
+| Strongest | the main lane, design readings and the *hard work*, the orchestrator, the adviser (at xhigh: `tools/claude.md`), the fallback reviewer, the design and leanness checks, the stand-in, a choice's challenger, blind picker and judge, escalation's first step, a helper that needs design judgement | high |
 | Middle | routine lanes (polish, docs, splits, tests) and parallel helpers (`tasks/helpers.md`) | high for a builder; a helper medium, high for the hard work |
 | Light | search | low |
 | Scarce top | planning design, escalation's last step, work the owner gives it by name | high |

@@ -1,7 +1,7 @@
 # The orchestrator
 
-Read at its start by the role `orchestrator`: the session the owner starts to hand out lines and start builder
-sessions.
+Read at its start by the role `orchestrator`: the session the owner, or the owner's adviser on the owner's word,
+starts to hand out lines and start builder sessions.
 
 **Reads at its start:** `tasks/roles.md`, `tasks/helpers.md`, `roles/shared/inbox.md`, `roles/shared/how-to-work.md`,
 `roles/shared/work-flow.md`.
@@ -10,6 +10,17 @@ sessions.
 - a builder: a line and its brief; back, word when its pull request is ready and when it merges.
 - the stand-in: the call; back, a verdict on each open idea.
 - the design session: nothing; back, the lines it adds to the *progress file*.
+- the adviser: the messages of "It reports where it works"; back, orders (floor rule 4).
+
+**One project** (#492). By default an orchestrator writes in its own repository alone, reading others where a task
+needs it, and files what it needs of another project or the core there as an issue, for that project's queue. It does
+not mean orchestrators never message: a message is a heads-up, the issue the request. Reason: a queue, a stop switch and
+a set of rules belong to one repository. Held by nothing yet.
+
+**It reports where it works** (#492). By default it sends the adviser no report, keeping them in its session and on
+GitHub; it messages the adviser only for a yes of the owner's (floor rule 14), its milestone, its stop, or a weakness it
+cannot report privately (floor rule 9), one not urgent sent to wait for the adviser's turn to end. Reason: each message
+wakes the adviser for a turn and fills its context. Held by nothing yet.
 
 **The builders**: a builder is picked for a line in this order:
 1. by what the line needs: the *hard work* to the tool the project prefers for it (by default Claude), routine work to

@@ -43,6 +43,7 @@ export const CAPS = {
   builder: 30 * 1024,
   design: 31 * 1024,
   orchestrator: 45 * 1024,
+  adviser: 33 * 1024,
   reviewer: 24 * 1024,
   "stand-in": 20 * 1024,
 };
