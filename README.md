@@ -527,7 +527,7 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
 <one row per role it orders otherwise than the core's default; none: the default>
 
 ## Pace
-<one line each, where the owner sets one: lanes at once, which model takes which kind of line, a share of a usage window left free; none: the default>
+<one line each, where the owner sets one: lanes at once, which model takes which kind of line, a share of a usage window left free, whether a second allowance takes over when the first runs out; none: the default>
 
 ## Differences
 <only where it differs from a module's rule ("How a project takes the core", point 7), one line each>
