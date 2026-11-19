@@ -44,7 +44,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #464 | rule builder | #459, whose rule list it reads |
 | #469 | rule builder; it changes what every role reads at its start | |
 | #441, with #484, points 6 and 7 | rule builder; the file stays whole where #469's measure finds no kind of task reads less | #469 |
-| #471 | rule builder; it changes what the orchestrator reads at its start | |
 | #355 | builder | #530: the readers left go on the parser #529 brings |
 | #542, point 5 | rule builder | #457 |
 | #675 | builder | |
