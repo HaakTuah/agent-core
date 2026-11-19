@@ -31,10 +31,11 @@ export function everyInstall(copy) {
 // The install whose package list names `name`, the first where none does; and, of each, its folder and how a package
 // is found from there.
 const lists = {};
+const listOf = install => (lists[install] ??= (() => { try { return JSON.parse(fs.readFileSync(path.join(root, INSTALLS[install], "package.json"), "utf8")); } catch { return {}; } })());
 function installOf(name) {
-  for (const [install, dir] of Object.entries(INSTALLS)) {
-    lists[install] ??= (() => { try { return JSON.parse(fs.readFileSync(path.join(root, dir, "package.json"), "utf8")); } catch { return {}; } })();
-    if (Object.hasOwn(lists[install].dependencies ?? {}, name) || Object.hasOwn(lists[install].devDependencies ?? {}, name)) return install;
+  for (const install of Object.keys(INSTALLS)) {
+    const list = listOf(install);
+    if (Object.hasOwn(list.dependencies ?? {}, name) || Object.hasOwn(list.devDependencies ?? {}, name)) return install;
   }
   return FIRST;
 }
@@ -66,7 +67,10 @@ function matches(install) {
   if (current[install] === undefined) {
     const read = f => { try { return JSON.parse(fs.readFileSync(path.join(dirOf(install), f), "utf8")).packages ?? {}; } catch { return null; } };
     const wanted = read("package-lock.json"), had = read("node_modules/.package-lock.json");
-    current[install] = Boolean(wanted && had) && Object.keys(wanted).filter(k => k && !wanted[k].dev).every(k => had[k] && ["version", "resolved", "integrity"].every(f => wanted[k][f] === had[k][f]));
+    // (and each package the package list names has its entry in the lock, so an install never reads as current where the
+    // lock names fewer packages than the list it stands beside: #719)
+    const named = Object.keys(listOf(install).dependencies ?? {});
+    current[install] = Boolean(wanted && had) && named.every(n => wanted[`node_modules/${n}`]) && Object.keys(wanted).filter(k => k && !wanted[k].dev).every(k => had[k] && ["version", "resolved", "integrity"].every(f => wanted[k][f] === had[k][f]));
   }
   return current[install];
 }
@@ -118,6 +122,8 @@ export function lockFaults(list, lock) {
   // (the package list's own packages at one exact version each: floor rule 7)
   for (const f of ["dependencies", "devDependencies"]) for (const [n, v] of Object.entries(list?.[f] ?? {})) if (!/^\d+\.\d+\.\d+$/u.test(String(v))) out.push(`package.json ${f}: ${JSON.stringify(n)} at ${JSON.stringify(v)}, not one exact version`);
   out.push(...formFaults(lock));
+  // (npm writes the root entry "" in every lock of its own form: one without it would hold the package list to nothing)
+  if (plainObject(lock?.packages) && !Object.hasOwn(lock.packages, "")) out.push("package-lock.json: no root entry \"\" of npm's own form, which holds the package list's packages");
   for (const [k, e] of Object.entries(lock?.packages ?? {})) out.push(...(k ? entryFaults(k, e ?? {}, specs) : rootFaults(e, list)));
   return out;
 }

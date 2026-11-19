@@ -95,7 +95,8 @@ for (const name of named.length ? named : [first]) {
   // every job that names `all` would otherwise pay a run of npm for; a lock whose root names a package it holds no entry
   // for goes to npm, which refuses it; #719)
   const { packages: entries = {} } = JSON.parse(fs.readFileSync(path.join(root, lock), "utf8"));
-  if (Object.keys(entries).every(k => !k) && !Object.keys({ ...entries[""]?.dependencies, ...entries[""]?.devDependencies }).length) { console.log(`ok   ${lock} names no package: nothing to install`); continue; }
+  const list = JSON.parse(fs.readFileSync(path.join(root, REGISTRIES[name].folder, "package.json"), "utf8"));
+  if (Object.keys(entries).every(k => !k) && !Object.keys({ ...list.dependencies, ...list.devDependencies, ...entries[""]?.dependencies, ...entries[""]?.devDependencies }).length) { console.log(`ok   ${lock} names no package: nothing to install`); continue; }
   const began = Date.now();
   let r = run();
   if (r.status !== 0) {

@@ -41,7 +41,8 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
     { lockfileVersion: 3, requires: true, dependencies: { yaml: { version: "git+https://example.invalid/yaml.git" } } }, { ...lock, packages: null }, { ...lock, dependencies: {} },
     { ...lock, packages: { ...lock.packages, "node_modules/a.tgz": lock.packages["node_modules/yaml"] } },
     { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], resolved: `${lock.packages["node_modules/yaml"].resolved}?d` } } },
-    { ...lock, packages: { ...lock.packages, "": { ...lock.packages[""], scripts: {} } } }, []];
+    { ...lock, packages: { ...lock.packages, "": { ...lock.packages[""], scripts: {} } } }, [],
+    { ...lock, packages: Object.fromEntries(Object.entries(lock.packages).filter(([k]) => k)) }, { ...lock, packages: {} }];
   ok([...bad, null, []].every(l => lockFaults(l, lock).length > 0) && badLocks.every(l => lockFaults(list, l).length > 0) && lockFaults(list, { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], dependencies: { z: "^1.2.3 || ~2", y: "latest" } } } }).length === 0,
     "and a field of its own, a spec naming git, a file or a tarball, a linked entry or one from another address, each is one it refuses; a range or a tag is none");
   const acted = { ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], optional: true, integrity: "sha512-AAAA" } } };
@@ -245,6 +246,18 @@ try {
   const unentered = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
   fs.writeFileSync(path.join(pp, "package-lock.json"), keptLock);
   ok(unentered.status === 1 && !/nothing to install/u.test(unentered.stdout) && mended(unentered.stderr), "and a lock whose root names a package it holds no entry for is no empty one: npm is run, and the install fails, saying the mend", `${unentered.status} ${unentered.stdout}${unentered.stderr}`);
+  // (nor one with no root entry at all beside a package list that names a package: refused before npm, as npm writes none so)
+  fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: {} }, null, 2));
+  const rootless = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
+  fs.writeFileSync(path.join(pp, "package-lock.json"), keptLock);
+  ok(rootless.status === 1 && /no root entry ""/u.test(rootless.stderr) && !/nothing to install/u.test(rootless.stdout) && mended(rootless.stderr), "and a lock with no root entry beside a package list that names a package is refused before npm runs, saying the mend", `${rootless.status} ${rootless.stdout}${rootless.stderr}`);
+  // (and whatever the install did, an install left from before is never loaded where the lock names fewer packages than
+  // the package list beside it: the package did not run)
+  const reinstalled = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
+  fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license } } }, null, 2));
+  const leftover = loadParser();
+  fs.writeFileSync(path.join(pp, "package-lock.json"), keptLock);
+  ok(reinstalled.status === 0 && leftover.status === 1 && /did not run: the package is-number is not installed/u.test(leftover.stderr) && mended(leftover.stderr), "an install left from before is not loaded where the lock beside the package list names none of its packages", `${reinstalled.status} ${leftover.status} ${leftover.stdout}${leftover.stderr}`);
   // (an install npm recorded for another lock file is no install of this one: the package did not run)
   const record = path.join(pk, "node_modules/.package-lock.json"), kept = fs.readFileSync(record, "utf8");
   const other = JSON.parse(kept);
