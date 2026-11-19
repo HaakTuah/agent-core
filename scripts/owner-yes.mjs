@@ -68,18 +68,37 @@ export function quoted(body) {
 // The fewest words one piece of a quoted line holds, so that a letter or two, or common words strung by "[…]", found in
 // any text is no yes. Words are counted as Unicode segments words, so a script written without blanks counts too.
 export const WORDS = 3;
-const STARTS = /^[\p{L}\p{N}\p{M}]/u, ENDS = /[\p{L}\p{N}\p{M}]$/u;
 const segments = new Intl.Segmenter("und", { granularity: "word" });
 const words = piece => [...segments.segment(piece)].filter(s => s.isWordLike).length;
-// Whether a letter, digit or mark runs on into a piece at `at` (before) or `end` (after) in `text`: one next to it, or
-// one past an apostrophe or hyphen that joins it (owner's, well-known), read by code points.
-const runsBefore = (text, at) => /[\p{L}\p{N}\p{M}]['’\-]?$/u.test(text.slice(Math.max(0, at - 3), at));
-const runsAfter = (text, end) => /^['’\-]?[\p{L}\p{N}\p{M}]/u.test(text.slice(end, end + 3));
+// Each text segmented once and kept, the last few, since every quoted line is looked for in the same texts.
+const SEGMENTED = new Map(), KEPT = 16;
+const segmented = text => {
+  if (!SEGMENTED.has(text)) {
+    if (SEGMENTED.size >= KEPT) SEGMENTED.delete(SEGMENTED.keys().next().value);
+    SEGMENTED.set(text, segments.segment(text));
+  }
+  return SEGMENTED.get(text);
+};
+// Whether `at` falls on a boundary of the segmenter's words in `text`: the start of a segment, or the text's end. In a
+// script written without blanks a clause has a letter next to it, so a boundary, not the want of a letter beside it, is
+// what makes it whole.
+const bound = (text, at) => at === text.length || segmented(text).containing(at)?.index === at;
+// Whether a word runs on across an edge through an apostrophe or hyphen that joins it (owner's, well-known), where the
+// segmenter may set a boundary: a joiner just outside the piece with a letter, digit or mark past it, or a joiner at the
+// piece's edge with one just outside. Read by code points.
+const RUN = "[\\p{L}\\p{N}\\p{M}]", JOIN = "['’\\-\u2010\u2011]";
+const JOINED_BEFORE = new RegExp(`${RUN}${JOIN}$`, "u"), RUN_BEFORE = new RegExp(`${RUN}$`, "u"), JOIN_START = new RegExp(`^${JOIN}`, "u");
+const JOINED_AFTER = new RegExp(`^${JOIN}${RUN}`, "u"), RUN_AFTER = new RegExp(`^${RUN}`, "u"), JOIN_END = new RegExp(`${JOIN}$`, "u");
+const runsOn = (text, piece, at, end) => {
+  const before = text.slice(Math.max(0, at - 3), at), after = text.slice(end, end + 3);
+  return JOINED_BEFORE.test(before) || (JOIN_START.test(piece) && RUN_BEFORE.test(before)) ||
+    JOINED_AFTER.test(after) || (JOIN_END.test(piece) && RUN_AFTER.test(after));
+};
 // Where `piece` stands in `text` as whole words, from `from` on: the end of its first such place, or -1.
 const wholeAt = (text, piece, from) => {
   for (let at = text.indexOf(piece, from); at !== -1; at = text.indexOf(piece, at + 1)) {
     const end = at + piece.length;
-    if (!(STARTS.test(piece) && runsBefore(text, at)) && !(ENDS.test(piece) && runsAfter(text, end))) return end;
+    if (!runsOn(text, piece, at, end) && bound(text, at) && bound(text, end)) return end;
   }
   return -1;
 };

@@ -135,6 +135,10 @@ ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon"
     "the pieces of a quote are found in their order, each once, one of them three words or more: common words strung by […] are no yes");
   ok(found("我同意这个改动", [readable("我同意这个改动。")]) && !found("𝐚bc plan is here", [readable("x𝐚bc plan is here")]) && !found("s note […] a", [readable("The owner's note, a plan")]) && !found("cafe\u0301 is fine", [readable("x\u0301cafe\u0301 is fine")]) && found("“the owner's note is", [readable("He said: “the owner's note is final.")]),
     "words are counted and their edges read by code points: a script without blanks, a letter past the first plane, a mark and an apostrophe are read as letters are");
+  ok(found("我同意这个改动", [readable("他说我同意这个改动。")]) && found("この変更に同意します", [readable("私はこの変更に同意します。")]),
+    "a clause quoted from inside a sentence of a script written without blanks is found: its edges fall on the segmenter's word boundaries");
+  ok(!found("’s note is final", [readable("the owner’s note is final")]) && !found("-known plan is", [readable("a well-known plan is")]) && !found("final word of the owner’", [readable("the final word of the owner’s note")]) && found("final word of the owner’", [readable("the final word of the owner’ is given")]),
+    "a piece that opens or ends with an apostrophe or hyphen joining a word in the text is cut inside that word, and no yes");
   // where the core lies, from the base's manifest alone, never the head's
   // (a base that holds `files`, and `manifest`'s text where it holds core-manifest.md, as git answers for HEAD^1)
   const git = (files, manifest = null) => args => args[0] === "show" ? (manifest === null ? { status: 1, stdout: "" } : { status: 0, stdout: manifest })
