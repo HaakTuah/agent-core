@@ -19,7 +19,7 @@ import { CORE } from "../scripts/core-address.mjs";
 import { rules } from "../scripts/rules.mjs";
 import { scratch } from "../scripts/scratch-core.mjs";
 import { CASES, MONTHS, TOOL, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, lost, setCase, toolNamed, tools, unplaced, wellFormed } from "../scripts/staged.mjs";
-import { LABELS, LIMITS, OWNER, PROGRAM, REPO, Unreadable, branchesOf, originGit as readOrigin, changed, folderFit, inCommits, memoOf, testPasses, touched } from "../scripts/staged/scratch.mjs";
+import { LABELS, LIMITS, OWNER, PROGRAM, REPO, Unreadable, branchesOf, keepKits, originGit as readOrigin, changed, folderFit, inCommits, memoOf, testPasses, touched } from "../scripts/staged/scratch.mjs";
 import { PLANTED, UNPLANTED } from "../scripts/staged/steps.mjs";
 import { tells } from "../scripts/staged/weakness.mjs";
 import { STEPS } from "../scripts/steps.mjs";
@@ -34,6 +34,8 @@ const inPart = part => PARTS.includes("all") || PARTS.includes(part);
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
 const s = scratch("staged-test-");
+// (the starter kit runs once for each commit and options, its output copied into each later case: #715)
+keepKits(path.join(s.tmp, "kits"));
 
 if (inPart("first")) {
 // ---- each case names rules that stand, and every unread step is planted or says why not ----
