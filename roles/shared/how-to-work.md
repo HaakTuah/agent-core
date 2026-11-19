@@ -34,7 +34,7 @@ The aim: as much finished work of full quality as the week's usage allows, at th
 - **Split by meaning, from the start:** each file holds one thing people look up on its own, as
   small as that thing is; new work goes into its own file.
   - A file past the *size marks*' split mark asks, before it is changed, how a split lets a reader read less: split
-    so, in its own PR, behaviour proven unchanged, or, where none, kept whole (`tasks/cleaning.md`, "Size asks").
+    so, or, where none, kept whole (`tasks/cleaning.md`).
 - **Principles over rules:** where a rule's letter would defeat its purpose, follow the purpose, say
   so under "Readings taken", and flag the rule to be fixed.
   - Never for the floor, nor for a rule the project's `AGENTS.md` marks as a safety rule.

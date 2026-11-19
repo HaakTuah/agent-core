@@ -48,8 +48,8 @@ code is held to: `tasks/code-shape.md`.
   A part that is rewritten instead states what it keeps (`tasks/code-shape.md`). It does not mean that the numbers
   are the aim: a baseline can empty while the code stays one piece, so the audit's reader judges what no number
   shows. Reason: the owner wants a codebase that cleans itself, by rules that are there for a reason and pay off in
-  the long run. Held by the reviews ("a split goes in its own PR, behaviour proven unchanged",
-  `roles/shared/how-to-work.md`), by the shape check, which fails a mended entry left in the baseline, and by the audit.
+  the long run. Held by the reviews (a split "in a pull request of its own with behaviour proven
+  unchanged", "Size asks; a reader who reads less answers" below), by the shape check, which fails a mended entry left in the baseline, and by the audit.
 - **The audit's reader has a fixed brief and fixed questions.** By default an audit is a run of the measures
   (`core/scripts/code-shape.mjs`) read by a fresh session that built none of what it reads. The session that takes
   the audit's task starts that reader, writes its answers as a report in the *audits*, named by its day, beside the
