@@ -35,11 +35,14 @@ import { started } from "./started.mjs";
 // package rule, its pointers in the review guidelines and how-to-work, its leanness check having found 135 bytes of
 // room, made, for 262 over, and 65 more in trims of the guidelines that its issue did not ask for. The builder's, the
 // design session's and the orchestrator's, each raised one step on 19 November 2026 for #702's merge line, their
-// leanness check having found 216 bytes of room for the orchestrator, made, and too little for the three.
+// leanness check having found 216 bytes of room for the orchestrator, made, and too little for the three. The
+// orchestrator's, raised one step again on 19 November 2026 for #467's tiers in tasks/roles.md, merged after #702's, its
+// fresh leanness check having found 118 bytes of room for 940 over: 17 made in tools/claude.md, and 101 in rules its
+// issue did not ask for, not made.
 export const CAPS = {
   builder: 30 * 1024,
   design: 31 * 1024,
-  orchestrator: 44 * 1024,
+  orchestrator: 45 * 1024,
   reviewer: 24 * 1024,
   "stand-in": 20 * 1024,
 };

@@ -427,6 +427,12 @@ jobs:
       - name: Each agent tool's entry file here pulls in what the core's own AGENTS.md names
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/entry-files.mjs --core
+      - name: The check of what the core offers each agent tool
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/tools-offer-test.mjs ')) }}
+        run: node tests/tools-offer-test.mjs
+      - name: What the core offers one agent tool it offers each, a cell for each tool
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
+        run: node scripts/tools-offer.mjs
       - name: The reading script, by role and by task
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/reading-test.mjs ')) }}
         run: node tests/reading-test.mjs

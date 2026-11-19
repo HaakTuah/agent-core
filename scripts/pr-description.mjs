@@ -34,7 +34,8 @@
 // "What holds it" is asked and holds more than "None", of a pull request opened since the copy on its base held
 // NUMBER_SINCE, a line under it that names a rule's number in its form ("Number: findings; outcome: robust";
 // outcomes.mjs's NUMBER; #303). And, since YES_SINCE, the owner's yes where the core's floor or review guidelines change
-// (owner-yes.mjs, beside this file; #549).
+// (owner-yes.mjs, beside this file; #549). A line asked for passes where it begins in its form, whatever
+// follows it (#750, point 4).
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
 //
@@ -49,9 +50,13 @@ import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths
 import { started } from "./started.mjs";
 
 // The line a description ends with, saying what the pull request waits on: nothing (its builder goes on), a review, its
-// checks, another item ("#241"), or the owner, with the question in one sentence after a colon.
+// checks, another item ("#241"), or the owner, with the question in one sentence after a colon. A line that begins with
+// a form, in any case, is in it, whatever follows ("#724, then the orchestrator's word"): the check fails what is
+// missing, never phrasing (#750, point 4).
 export const WAITS = "Waits on:";
-const FORMS = [["nothing", /^nothing$/], ["a review", /^a review$/], ["checks", /^checks$/], ["item", /^#[1-9]\d{0,8}$/], ["the owner", /^the owner: \S.*\?$/]];
+const FORMS = [["nothing", /^nothing(?![\w-])/iu], ["a review", /^a review(?![\w-])/iu], ["checks", /^checks(?![\w-])/iu], ["item", /^#[1-9]\d{0,8}(?![\w-])/u], ["the owner", /^the owner: \S[^?]*\?/iu]];
+// a rule's number in its form at the start of a line, whatever follows it, in any case (#750, point 4)
+const NUMBER_FIRST = new RegExp(NUMBER.source.replace(/\$$/u, "(?![\\w-])"), "iu");
 export const WAITS_SINCE = "2026-11-16T00:00:00Z";
 // The day from which the line "Read for it:" is asked, of a pull request opened since the copy on its base held this.
 export const READS_SINCE = "2026-11-16T00:00:00Z";
@@ -79,7 +84,7 @@ export function numberMend(body) {
   const part = lines.slice(at + 1, end < 0 ? undefined : end).map(l => l.trim()).filter(Boolean);
   if (part.every(l => /^None\b/u.test(l))) return null;
   const named = part.map(l => /(?:^|[\s*-])Number: (.*[^.\s])[.\s]*$/u.exec(l)?.[1]).filter(Boolean);
-  if (named.some(n => NUMBER.test(n))) return null;
+  if (named.some(n => NUMBER_FIRST.test(n))) return null;
   return `the part "${HOLDS}" names no rule's number${named.length ? ` in its form (it reads "${named[0]}")` : ""}. Mend: under it, for each rule this pull request adds or widens, add a line "Number: <findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for, with "; rare harm" at its end where the rule guards against rare and severe harm, as scripts/holders.json keeps it under "numbers"; or write "None" alone under the heading where it adds no rule`;
 }
 

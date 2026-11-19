@@ -62,6 +62,12 @@ r = words({ "archive/old.md": `${OLD}\n2. **2 November**. Then he asked again.\n
 ok(r.status === 0, "a record moved to another file, its lines taken away and added word for word, is not new text", r.out);
 r = words({ "archive/old.md": `${OLD}\n2. **2 November**. Then he asked again.\n` }, { "archive/old.md": null, "archive/moved.md": `${OLD}\n2. **2 November**. Then he asked again.\n`, "reports/new.md": "Then he asked again.\n2. **2 November**. Then he asked again.\n" });
 ok(r.status === 1 && /reports\/new\.md:2: "he"/.test(r.out), "a moved line added a second time is new text: each line taken away excuses one", r.out);
+// (a model's name, in its own case, outside the tools' parts alone: #467)
+const models = { ...config, paths: ["floor", "tasks", "tools"], words: [...config.words, { pattern: "\\b(?:Opus|Fable)\\b", case: true, outside: ["tools"], say: "the tier" }] };
+r = words({}, { "tasks/b.md": "# A module\n\nThe builder runs on Opus.\n", "tools/c.md": "# A part\n\nStrongest: Opus. A fable here.\n" }, true, models);
+ok(r.status === 1 && r.out.includes("tasks/b.md:3") && !r.out.includes("tools/c.md") && mended(r.out), "a model's name fails in a module and passes in a tool's part (#467)", r.out);
+r = words({}, { "tasks/b.md": "# A module\n\nA fable, and an opus.\n", "tools/c.md": "# A part\n" }, true, models);
+ok(r.status === 0, "a word matched in its own case passes in another case", r.out);
 const bad = spawnSync(process.execPath, [script, "general.json", "--base", "--ext-diff"], { cwd: path.join(tmp, "repo-1"), env, encoding: "utf8" });
 const none = spawnSync(process.execPath, [script, "general.json", "--base", "no-such-commit"], { cwd: path.join(tmp, "repo-1"), env, encoding: "utf8" });
 ok(bad.status === 1 && none.status === 1 && /--base needs a commit/.test(bad.stdout + none.stdout) && mended(bad.stdout) && mended(none.stdout), "a --base that is an option, or no commit, is refused", `${bad.stdout}${bad.stderr}${none.stdout}`);
