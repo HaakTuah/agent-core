@@ -479,16 +479,16 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   word for word aside, while the older records stay as they were.
 - **A record pull requests add to is a folder of one file per entry** (#750, point 1). By default each part of the
   inventory (`INVENTORY.md`) stands in a file of its own under `inventory/`, and each entry of the sync notes
-  (`setup/sync-notes.md`) under `setup/sync-notes/`, its step in a file of the same name under `scripts/steps/`, each
-  read in the order of the files' names by the scripts that read it (`scripts/inventory.mjs`, `scripts/sync-notes.mjs`,
-  `scripts/steps.mjs`), so that two pull requests that add an entry never edit the same lines, as each archive item
+  (`setup/sync-notes.md`) under `setup/sync-notes/`, its step in a file of the same name under `scripts/steps/` and, where the step has
+  a check, its stage for the tests under `scripts/stages/`, each read in the order of the files' names by the scripts
+  that read it (`scripts/inventory.mjs`, `scripts/sync-notes.mjs`, `scripts/steps.mjs`, `scripts/steps-stage.mjs`), so that two pull requests that add an entry never edit the same lines, as each archive item
   stands already ("A new archive item is named by its issue"). Whoever adds an entry adds its file, named to stand
   between its neighbours. Nothing changes it. It does not mean that what the record holds, or the order it is read in,
   changes. Reason: of 39 pull requests merged between 18 and 19 November 2026, 8 changed `INVENTORY.md`, 10
   `setup/sync-notes.md` and 7 `scripts/steps.mjs`, and under merge-on-green pull requests that add to one file merge
   side by side and collide. Held by `tests/mend-test.mjs`, which reads the inventory whole, and fails a folder
   `INVENTORY.md` does not name and a part's line written in `INVENTORY.md` itself; and by `tests/steps-test.mjs`, which
-  reads the notes whole, and fails an entry or a step without its pair of the same name and an entry written in
+  reads the notes whole, and fails an entry, a step or a stage without its pair of the same name and an entry written in
   `setup/sync-notes.md` itself.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
