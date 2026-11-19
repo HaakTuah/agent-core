@@ -15,7 +15,8 @@ const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   $
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const text = fs.readFileSync(path.join(root, TABLE), "utf8");
 const tools = JSON.parse(fs.readFileSync(path.join(root, "scripts/staged-tools.json"), "utf8")).tools;
-// (the files of a tool's own folders, read from the checkout, beneath the git the script asks)
+// (the files of a tool's own folders and the root's Markdown files, read from the checkout in place of the list of git's
+// the script asks for; so a clean checkout, as CI's is: a file a tool wrote there and git does not track fails the first case)
 const under = d => fs.readdirSync(path.join(root, d), { withFileTypes: true }).flatMap(e => (e.isDirectory() ? under(`${d}/${e.name}`) : [`${d}/${e.name}`]));
 const tracked = [...TOOL_DIRS.filter(d => fs.existsSync(path.join(root, d))).flatMap(under), ...fs.readdirSync(root).filter(f => /\.md$/u.test(f))];
 // (the core's table with the cell of one row and one tool's column written anew)
