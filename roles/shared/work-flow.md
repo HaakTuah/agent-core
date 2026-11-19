@@ -46,10 +46,11 @@ owner creates from any device to stop its agents and deletes to let them go on.
   starts on a broken `main` cannot tell its own faults from those it inherited.
 - **A builder hands over by its context** (#750, point 7). By default a builder carries its task to its merge in one
   session; once its context passes about 250,000 tokens (a first guess), as `core/scripts/session-cost.mjs --context`
-  prints it, it stops at its next passed gate (checks green, a review answered), its hand-off note, which any session
-  that stops mid-task commits and writes (`tasks/tools.md`), in its pull request's description, and the orchestrator
-  starts a fresh one from that note. It does not mean it stops mid-step, nor that one no orchestrator started stops.
-  Reason: each step costs more as a context grows; one builder ran to 553,000. Held by no check; that reading shows it.
+  prints it, it stops at its next passed gate (checks green, a review answered) with its hand-off note in its pull
+  request's description, as any session that stops mid-task commits and writes it (`tasks/tools.md`), and the
+  orchestrator starts a fresh one from that note. It does not mean it stops mid-step, nor where the script prints
+  nothing, nor that one no orchestrator started stops. Reason: each step costs more as a context grows; one builder
+  ran to 553,000. Held by no check; that reading shows it.
 - A builder session that no orchestrator started, and the orchestrator on every wake, first checks whether the core
   has moved (`core/scripts/core-moved.mjs --dry`) and syncs it if so (`core/scripts/sync.mjs`, then each step and
   difference it reports), between tasks, a floor change at once (`tasks/planning.md`); where checks cost money, not on a day a sync PR was already opened. Then both read what reviews left after a merge (`tasks/reviews.md`, point 2), and take up a check failed on `main`'s newest commit that no running session owns (`tasks/tests.md`).
