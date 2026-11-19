@@ -31,9 +31,10 @@ const KINDS = { security: "Security review", code: "Code review", design: "Desig
 const SHAS = /(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/giu;
 // A posted review's form, as security-review.mjs's form() writes it with the score's line after (#710), for each kind:
 // each mend that names it says it whole within GitHub's 140 characters, the situation before it worded short to leave
-// it room. (The security-review status's own mends, worded to that limit already, name the form without the score: a
-// review posted by one of them is asked its score here.)
-const formOf = kind => `${kind}: <whole SHA>⏎Blocking findings: N.⏎Other findings: M.⏎Score: S of 10.`;
+// it room; the code-review status's own mends name it too (code-review-wait.mjs). (The security-review status's own
+// mends, worded to that limit already, name the form without the score: a review posted by one of them is asked its
+// score here.)
+export const formOf = kind => `${kind}: <whole SHA>⏎Blocking findings: N.⏎Other findings: M.⏎Score: S of 10.`;
 const counts = (c, whose) => typeof whose === "function" && whose(c?.user) === true;
 
 // Of the posted reviews among `comments` (an issue's, as GitHub's API gives them) by an account whose review counts

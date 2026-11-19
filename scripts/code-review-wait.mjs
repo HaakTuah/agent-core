@@ -46,10 +46,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
 import { copyOf } from "./core-path.mjs";
-import { marksWait } from "./review-marks.mjs";
+import { formOf, marksWait } from "./review-marks.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
-import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, counted, form, pinsAlone, reviewersOf, standsFrom, status, unproved, whole, writersOf } from "./security-review.mjs";
+import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, counted, pinsAlone, reviewersOf, standsFrom, status, unproved, whole, writersOf } from "./security-review.mjs";
 
 export const CONTEXT = "code-review";
 const SHA = /^[0-9a-f]{40}$/u;
@@ -104,8 +104,8 @@ function reviewRan(sha, posted, review, pull, commits, bound, merges) {
   // (where a merge from main that git would not make stops it, the status names that merge: #323)
   const cut = unproved(pull, flat(commits), sha, merges);
   const why = cut !== undefined && [...standsFrom(pull, flat(commits), sha)].some((at) => seen.has(at))
-    ? `merge ${cut.slice(0, 7)} unproved. Mend: another reviews, posts ${form("Code")}`
-    : `no code review yet. Mend: ask one, or another reviews, posts ${form("Code")}`;
+    ? `merge ${cut.slice(0, 7)} unproved. Mend: review, post ${formOf("Code review")}`
+    : `no code review. Mend: ask one, or review, post ${formOf("Code review")}`;
   // a pull request whose head does not hold this check as the default branch does stood before it came: reported only
   return bound ? { sha, done: false, why } : { sha, done: true, why: `before this check came, so not waited for: ${why}` };
 }

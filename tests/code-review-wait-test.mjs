@@ -60,7 +60,7 @@ const commit = (sha, ...parents) => ({ sha, parents: parents.map((p) => ({ sha: 
 const line = [commit(OLD, "8".repeat(40)), commit(HEAD, OLD)]; // OLD, then HEAD on it
 const code = [{ filename: "src/x.js", status: "modified", patch: "@@ -1 +1 @@\n-a\n+b" }];
 const had = (comments, commits = line, files = code, p = pull, rules = [], bound = true, copy = null) => judge({ commits: commits.length, changed_files: files.length, ...p }, comments, commits, files, rules, bound, undefined, copy);
-ok(is(had([]), false, "no code review yet") && is(had([summary({ commit_sha: null, status: null })]), false, "ask one, or another reviews, posts"), "one that needs a code review and had none waits, and says how to mend it");
+ok(is(had([]), false, "no code review") && is(had([summary({ commit_sha: null, status: null })]), false, "ask one, or review, post"), "one that needs a code review and had none waits, and says how to mend it");
 ok(is(had([summary(done)]), true, "a code review has run") && is(had([said(`Code review: of ${HEAD}`)]), true, "a code review has run") && is(had([said(`**Code review:** of ${HEAD}`, "COLLABORATOR")]), true, "a code review has run"), "Codex's completed on the head, or one posted naming the head whole, settles it");
 ok(is(had([summary({ ...done, commit_sha: OLD })]), false, "no code review") && is(had([said(`Code review: of ${OLD}`)]), false, "no code review"), "one of an earlier commit with a commit of the builder's after it does not");
 ok(is(had([said(`Code review: of ${HEAD.slice(0, 39)}`)]), false, "no code review") && is(had([said(`Code review: of ${HEAD}`, "NONE")]), false, "no code review") && is(had([said(`Security review: of ${HEAD}`)]), false, "no code review"), "nor one naming part of the SHA, by another account, or that is no code review");
@@ -68,7 +68,8 @@ const updated = [commit(OLD, "8".repeat(40)), commit(M, OLD, MAIN), commit(HEAD,
 ok(is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but updates from main") && is(had([said(`Code review: of ${OLD}`)], updated), true, "nothing but updates"), "one of an earlier commit followed only by merges from main stands");
 // Given the merges clean-merges.mjs proved (#323), only those carry a review past them; the status names the one that
 // stops it, with its mend
-// The marks reviews leave (review-marks.mjs; #551): a session's posted review declares its two lines, and, in the core,
+// The marks reviews leave (review-marks.mjs; #551): a session's posted review declares its two lines and its score (#710),
+// and, in the core,
 // a design-checked pull request has a design check of the head
 {
   // (a review counts for the marks as the security-review status counts one: here the repository's owner, "someone")
@@ -109,7 +110,7 @@ ok(is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but 
     "a design check from a member who may only read settles nothing; one from a member who may write settles it");
   // a posted code review that ends the wait counts the same way: never by GitHub's association alone
   const review = member(`Code review: of ${HEAD}\n${lines}`);
-  ok(is(had([summary(running), review], line, code, org, [], true, null, reads), false, "still running") && is(had([review], line, code, org, [], true, null, reads), false, "no code review yet") && is(had([review], line, code, org), false, "no code review yet"),
+  ok(is(had([summary(running), review], line, code, org, [], true, null, reads), false, "still running") && is(had([review], line, code, org, [], true, null, reads), false, "no code review") && is(had([review], line, code, org), false, "no code review"),
     "a code review posted by a member who may only read, or whose right was not read, neither ends a running review's wait nor stands for one");
   ok(is(had([summary(running), review], line, code, org, [], true, null, writes), true, "is posted") && is(had([review], line, code, org, [], true, null, writes), true, "a code review has run")
     && is(had([review], line, code, org, [], true, null, { reviewers: ["reader"] }), true, "a code review has run") && is(had([member(`Code review: of ${HEAD}\n${lines}`, "some-org")], line, code, org), true, "a code review has run"),
@@ -137,12 +138,13 @@ ok(is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but 
 const proved = (comments, merges, commits = updated) => judge({ commits: commits.length, changed_files: 1, ...pull }, comments, commits, code, [], true, merges);
 const stopped = proved([summary({ ...done, commit_sha: OLD })], [HEAD]);
 ok(is(proved([summary({ ...done, commit_sha: OLD })], [HEAD, M]), true, "nothing but updates from main") && is(proved([said(`Code review: of ${M}`)], [HEAD]), true, "nothing but updates"), "a review stands across the merges proved the ones git makes, and a review of the merge where they stop stands too");
-ok(is(stopped, false, "merge eeeeeee unproved. Mend: another reviews") && is(proved([said(`Code review: of ${OLD}`)], []), false, "merge ccccccc unproved") && is(proved([summary({ ...done, commit_sha: OLD })], {}), false, "merge ccccccc unproved")
-  && mended(`Waiting: ${stopped.why}`) && `Waiting: ${stopped.why}`.length <= 140, "one of an earlier commit with a merge not proved after it waits, naming that merge and the mend, within GitHub's 140 characters (a list that is no list proves none)");
+ok(is(stopped, false, "merge eeeeeee unproved. Mend: review, post") && is(proved([said(`Code review: of ${OLD}`)], []), false, "merge ccccccc unproved") && is(proved([summary({ ...done, commit_sha: OLD })], {}), false, "merge ccccccc unproved")
+  && mended(`Waiting: ${stopped.why}`) && [`Waiting: ${stopped.why}`, `Advisory: ${stopped.why}`, `Advisory: ${proved([], []).why}`].every((d) => d.length <= 140), "one of an earlier commit with a merge not proved after it waits, naming that merge and the mend, within GitHub's 140 characters (a list that is no list proves none)");
 // (each mend names what the posted review carries: its kind and whole SHA, and its two lines of counts; #403)
-ok(is(stopped, false, "Mend: another reviews, posts Code review: <whole SHA>⏎Blocking findings: N.⏎Other findings: M.") && is(proved([], []), false, "Mend: ask one, or another reviews, posts Code review: <whole SHA>⏎Blocking findings: N.⏎Other findings: M."), "each mend names the posted review's form and its two lines of counts");
+ok(is(stopped, false, "Mend: review, post Code review: <whole SHA>⏎Blocking findings: N.⏎Other findings: M.⏎Score: S of 10.") && is(proved([], []), false, "Mend: ask one, or review, post Code review: <whole SHA>⏎Blocking findings: N.⏎Other findings: M.⏎Score: S of 10."),
+  "each mend names the posted review's form, its two lines of counts and its score");
 ok([stopped, proved([], [])].every((v) => [true, false].every((a) => status(v, a, undefined, CONTEXT).description === `${a ? "Advisory" : "Waiting"}: ${v.why}`)), "each mend stands whole in its status, advisory or not, within GitHub's 140 characters");
-ok(is(proved([], []), false, "no code review yet. Mend: ask one") && is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but updates"), "with no review behind the merge it waits as before, and given no list of the merges proved (an older workflow) the parents alone are read, as before");
+ok(is(proved([], []), false, "no code review. Mend: ask one") && is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but updates"), "with no review behind the merge it waits as before, and given no list of the merges proved (an older workflow) the parents alone are read, as before");
 const mixed = [commit(OLD, "8".repeat(40)), commit(F, OLD), commit(HEAD, F, MAIN)];
 const branch = [commit(OLD, "8".repeat(40)), commit(F, "6".repeat(40)), commit(HEAD, OLD, F)];
 ok(is(had([summary({ ...done, commit_sha: OLD })], mixed), false, "no code review") && is(had([summary({ ...done, commit_sha: OLD })], branch), false, "no code review") && is(had([summary({ ...done, commit_sha: OLD })], [commit(HEAD, "5".repeat(40), OLD)]), false, "no code review"), "not with a commit of the builder's among them, a merge of a branch of the pull request's own, or a merge whose first parent is not the pull request's");
@@ -202,7 +204,7 @@ try {
   ok(strict.status.state === "pending" && mended(strict.status.description) && strict.status.description.length < 140 && strict.status.target_url.endsWith("/runs/9") && run(pull, [[summary(running), said(`Code review: of ${HEAD}`)]], { ADVISORY: "false" }).status.state === "success", "told it is not advisory, it waits until the review finishes or another's is posted");
   const counts = { ...pull, commits: 2, changed_files: 1 };
   const none = run(counts, [], { ADVISORY: "false" }, [line], [code]);
-  ok(none.status.state === "pending" && none.status.description.startsWith("Waiting: no code review yet") && mended(none.status.description) && run(counts, [[summary(done)]], { ADVISORY: "false" }, [line], [code]).status.state === "success"
+  ok(none.status.state === "pending" && none.status.description.startsWith("Waiting: no code review. Mend") && mended(none.status.description) && run(counts, [[summary(done)]], { ADVISORY: "false" }, [line], [code]).status.state === "success"
     && run({ ...counts, created_at: "2026-11-14T09:00:00Z" }, [], { ADVISORY: "false", BOUND: "false", SINCE: "2026-11-14T10:00:00Z" }, [line], [code]).status.state === "success"
     && run({ ...counts, created_at: "2026-11-14T11:00:00Z" }, [], { ADVISORY: "false", BOUND: "false", SINCE: "2026-11-14T10:00:00Z" }, [line], [code]).status.state === "pending",
   "given the commits and files too, it waits for a code review that has not run, and says how to mend it; told the pull request is from before the check and opened before the default branch's copy came, it waits not; opened since, it waits");
