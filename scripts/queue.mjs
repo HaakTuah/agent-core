@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { copyOf } from "./core-path.mjs";
+import { copyOf, readCore } from "./core-path.mjs";
 import { progressOf } from "./done-when.mjs";
 import { aRepository, inProject } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
@@ -194,13 +194,13 @@ function checking(FILE, gone, stale, at) {
 
 // The progress file where the command runs: a project's, as its manifest names it; the core's own where none stands.
 // A project's slot is input (SECURITY.md, rule 5): a path taken only where it is a Markdown file inside the project,
-// out of .git, and no protected file (floor rule 3: RULES, an agent tool's folder, and `rules`, the files its
-// SECURITY.md adds); else null, which fails.
+// out of .git and of `outside` (the core's copy, or the library that carries it), and no protected file (floor rule 3:
+// RULES, an agent tool's folder, and `rules`, the files its SECURITY.md adds); else null, which fails.
 const TOOLS = /^\.git(?:\/|$)|(?:^|\/)\.(?:codex|kiro|agents?)(?:\/|$)/iu;
-export const fileAt = (manifest, rules = [], core = "core/") => {
+export const fileAt = (manifest, rules = [], outside = "core/") => {
   if (manifest === null) return FILE;
   const at = progressOf(manifest), plain = path.posix.normalize(String(at).replace(/\\/gu, "/"));
-  return inProject(at) && /\.md$/iu.test(plain) && !RULES.test(plain) && !TOOLS.test(plain) && !plain.toLowerCase().startsWith(core.toLowerCase()) && !rules.some(r => r.toLowerCase() === plain.toLowerCase()) ? plain : null;
+  return inProject(at) && /\.md$/iu.test(plain) && !RULES.test(plain) && !TOOLS.test(plain) && !plain.toLowerCase().startsWith(outside.toLowerCase()) && !rules.some(r => r.toLowerCase() === plain.toLowerCase()) ? plain : null;
 };
 // Whether any part of a path inside the project is a link, which --clear's write would follow, to a protected file
 // inside the project as readily as to one outside it.
@@ -216,7 +216,7 @@ const inCopy = () => { const core = copyOf(); return path.relative(process.cwd()
 export function unplaced(copy, file) {
   const out = file !== null && linked(file);
   if (!copy && out) return `FAIL: ${FILE} is reached through a link. Mend: make ${FILE} a plain file at the repository's root, the queue's lines in it`;
-  if (file === null || out) return "FAIL: the progress file core-manifest.md names is no plain Markdown file inside the project (outside .git and the core's copy, no protected file, reached through no link). Mend: name the progress file in the manifest's row *progress file* as a path such as docs/PROGRESS.md";
+  if (file === null || out) return "FAIL: the progress file core-manifest.md names is no plain Markdown file inside the project (outside .git, the core's copy and any library that carries it, no protected file, reached through no link). Mend: name the progress file in the manifest's row *progress file* as a path such as docs/PROGRESS.md";
   if (fs.existsSync(file) && fs.statSync(file).size > LARGEST) return `FAIL: ${file} is ${fs.statSync(file).size} bytes, past the ${LARGEST} the reader takes. Mend: take out the lines of finished work and any notes, which belong in the pull requests' descriptions`;
   return null;
 }
@@ -224,7 +224,8 @@ export function unplaced(copy, file) {
 // Where the command runs: { copy, file, repo } or { fail }, the failure with its mend.
 function placed() {
   const copy = inCopy(), manifest = copy && fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null;
-  const file = copy ? fileAt(manifest ?? "", ownRules(), copy) : FILE, fail = unplaced(copy, file);
+  // (never inside the copy, nor inside the library that carries it, whose files are its own repository's)
+  const file = copy ? fileAt(manifest ?? "", ownRules(), readCore(manifest ?? "").library ?? copy) : FILE, fail = unplaced(copy, file);
   if (fail) return { fail };
   const origin = spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout;
   const repo = aRepository(process.env.GITHUB_REPOSITORY) ? process.env.GITHUB_REPOSITORY : repoOf(origin) ?? (copy ? null : CORE);
