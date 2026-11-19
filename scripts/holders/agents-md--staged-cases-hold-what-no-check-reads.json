@@ -1,0 +1,4 @@
+{
+  "rule": "AGENTS.md: Staged cases hold what no check reads",
+  "behind": [228]
+}

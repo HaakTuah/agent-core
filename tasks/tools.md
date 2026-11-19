@@ -31,7 +31,7 @@ is read; that a session then opens what is printed, by nothing yet.
 
 **Hooks save time; checks are the guarantee.** By default no rule is held by a hook alone: what a
 tool's hook holds is also held where the tool does not matter, by a check on the pull request, a staged case or the
-daily look. Where a rule's only holder in `scripts/holders.json` is a hook, `scripts/holders.mjs` lists it in the core's
+daily look. Where a rule's only holder in `scripts/holders/` is a hook, `scripts/holders.mjs` lists it in the core's
 monthly state report as held by none, until another holder is named. Each hook is carried to every tool whose
 documentation gives its event, as the tool's part says, the starter kit writing it; the helper hook reads Claude Code's
 own helper tool, so it goes to no other. It does not mean a hook is taken out: it still saves a session the work a

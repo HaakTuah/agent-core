@@ -1,0 +1,5 @@
+{
+  "rule": "AGENTS.md: A tool that only runs is fetched at set-up, as its own program",
+  "behind": ["#534.1"],
+  "number": "findings; outcome: robust"
+}

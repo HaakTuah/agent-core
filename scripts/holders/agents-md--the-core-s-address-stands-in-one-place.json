@@ -1,0 +1,4 @@
+{
+  "rule": "AGENTS.md: The core's address stands in one place",
+  "behind": [192]
+}

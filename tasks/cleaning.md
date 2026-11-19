@@ -91,7 +91,7 @@ of a kind, or builds what it asks (#593): the kinds `cleaning`, `audit` and `swe
 - **A sweep's scope is read, not listed** (#593). By default an issue names what it covers. The one condition that
   changes it: an issue asks something of every or all of a kind (an inventory, an audit, a sorting, a check of each
   file), a *sweep*. The trigger is such an issue written: whoever writes it names the source a script counts that kind
-  from (the tracked files, a workflow's steps, the manifest's rows, `core/scripts/holders.json`), and whoever builds the
+  from (the tracked files, a workflow's steps, the manifest's rows, `core/scripts/holders/`), and whoever builds the
   check that holds the sweep has it read its coverage from that source: each thing the source holds has its line in the
   sweep, or lies under a path the sweep marks as left out, with the reason, and the check fails each that has neither,
   saying the mend. It does not mean a sweep may leave nothing out: what it leaves out is said. Reason: a scope written

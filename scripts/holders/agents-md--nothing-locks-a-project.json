@@ -1,0 +1,4 @@
+{
+  "rule": "AGENTS.md: Nothing locks a project",
+  "behind": [201, 202, 207, 215]
+}
