@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { asked, calledFor, copyAtBase, costMend, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, numberMend, PARTS, waitsMend, waitsOn } from "../scripts/pr-description.mjs";
 import { lineMend } from "../scripts/reading.mjs";
@@ -143,7 +144,7 @@ ok(mended(`FAIL ${waitsMend("x")}`) && mended(`FAIL ${waitsMend("Waits on: soon"
   // (a base that holds `files`, and `manifest`'s text where it holds core-manifest.md, as git answers for HEAD^1)
   const git = (files, manifest = null) => args => args[0] === "show" ? (manifest === null ? { status: 1, stdout: "" } : { status: 0, stdout: manifest })
     : args[0] === "ls-tree" && files !== null ? { status: 0, stdout: args.slice(4).filter(f => files.includes(f)).join("\n") } : { status: 1, stdout: "" };
-  const copy = "Core: HaakTuah/agent-core at " + "a".repeat(40) + ", copied whole under core/\n", core = ["roles", "floor/security.md"];
+  const copy = `Core: ${CORE} at ` + "a".repeat(40) + ", copied whole under core/\n", core = ["roles", "floor/security.md"];
   ok(coreAtBase(".", git(core)) === "" && coreAtBase(".", git(["core-manifest.md", "core/roles", "core/floor/security.md"], copy)) === "core/"
     && coreAtBase(".", git(["core-manifest.md", ...core], copy)) === "" && coreAtBase(".", git(["core-manifest.md", ...core], "no line")) === ""
     && coreAtBase(".", git(null)) === null && coreAtBase(".", git(["core-manifest.md"], copy)) === null && coreAtBase(".", git(["core-manifest.md", "core/roles", "core/floor/security.md"])) === null,
