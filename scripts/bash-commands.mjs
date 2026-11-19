@@ -115,7 +115,8 @@ function commandsIn(parse, text, offset, ctx) {
 const AS_WRITTEN = new Set(["test_command", "declaration_command", "unset_command"]);
 function walk(node, ctx) {
   if (node.type === "comment") return;
-  if (node.type === "negated_command") return negated(node, ctx);
+  // (the grammar binds a "!" before a pipeline to its first command alone, where bash turns over the whole pipeline's)
+  if (node.type === "negated_command" || (node.type === "pipeline" && node.namedChildren[0]?.type === "negated_command")) return negated(node, ctx);
   if (node.type === "heredoc_body") return unended(node, ctx);
   const body = node.type === "redirected_statement" ? node.childForFieldName("body") : null;
   if (body?.type === "command") return redirected(node, body, ctx);
@@ -126,12 +127,12 @@ function walk(node, ctx) {
 }
 // A command led by "!": the "!" stays its first word, as the reader before this one read it, since it turns the
 // command's status over, and a reader that takes the command for a plain run would take a check that cannot fail for
-// one that runs (Codex's security review of 76119ae).
+// one that runs (Codex's security review of 76119ae). Each command it holds is led by it, a pipeline's and a group's
+// too, whose status is their last command's.
 function negated(node, ctx) {
   const from = ctx.out.length;
-  for (const child of node.namedChildren) walk(child, ctx);
-  const first = ctx.out.slice(from).reduce((a, c) => (a && a.at <= c.at ? a : c), null);
-  if (first) first.words.unshift({ text: "!", dynamic: false });
+  for (const child of node.namedChildren) (child.type === "negated_command" ? child.namedChildren : [child]).forEach(c => walk(c, ctx));
+  for (const c of ctx.out.slice(from)) if (c.words[0]?.text !== "!") c.words.unshift({ text: "!", dynamic: false });
 }
 // A here-document with no line that ends it: its lines read as commands, each alone, so that one inside another's is
 // read once, never again with each that holds it.

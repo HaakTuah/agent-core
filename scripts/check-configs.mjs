@@ -146,8 +146,11 @@ const CHDIR = /^(?:cd|pushd|popd|chdir|set-location|sl|push-location|pop-locatio
 // and node's own options; { moves } where the command changes the folder; { inner }, the commands a shell is given as
 // one word; {} where it runs nothing with node.
 function nodeRuns(words) {
-  let i = pastWrappers(words);
+  // (a command led by "!" still changes its folder, since bash with -e does not stop on it; a run behind it is none)
+  const negated = words[0]?.text === "!";
+  let i = negated ? 1 + pastWrappers(words.slice(1)) : pastWrappers(words);
   if (i < words.length && CHDIR.test(words[i].text)) return { moves: true };
+  if (negated) return {};
   if (i < words.length && SHELL.test(words[i].text)) return inline(words, i);
   if (i >= words.length || !NODE.test(words[i].text)) return {};
   const shifted = words.slice(0, i).some(w => CHDIR_OPTION.test(w.text)); // (env --chdir=app node …: another folder)

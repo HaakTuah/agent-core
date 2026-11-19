@@ -882,6 +882,10 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
   ok(JSON.stringify(shown("! node core/scripts/lookup.mjs c.json\nif ! node a.mjs; then x; fi")) === JSON.stringify(["! node core/scripts/lookup.mjs c.json", "! node a.mjs", "x"])
     && notRead("copies", { "a.yml": stepped("! node core/scripts/copies.mjs config/c.json") }),
     "a command led by \"!\" keeps it as its first word, and a check's run under it is not read as its run");
+// (the fallback reviewer's check of d32e5f0: a folder changed behind "!" is changed, and a pipeline under it is led by
+// it in each of its commands)
+ok(["! cd app; node core/scripts/copies.mjs config/c.json", "! pushd app\nnode core/scripts/copies.mjs config/c.json", "! echo x | node core/scripts/copies.mjs config/c.json"]
+  .every(run => notRead("copies", { "a.yml": stepped(run) })), "a folder changed behind \"!\" leaves the run after it not read, and so does a check's run in a pipeline under \"!\"");
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions`);
