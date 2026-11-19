@@ -3,6 +3,8 @@
 // live site. The words, with what to say instead, are its config's (scripts/general.json), which also names the files
 // a word may stand in; a word a project finds untrue for it joins that list. One word is no part of the list: the login
 // of the account the core is under (core-address.mjs), which the rules name only as the *owner's account*.
+// A word may name folders it is not read in ("outside"), and be matched in its own case ("case"), as a model's name
+// is, which stands in a tool's part alone (tasks/roles.md, "The rules name tiers, never a model"; #467).
 // A word may also name folders ("added") whose dated records it reads only where a change adds a line, against the
 // commit --base names: there the owner is never "he" or "his" in new text, while older records stay as they were
 // (core archive 201). A line quoted with ">", the owner's own words as the archive keeps them, is not read. Without
@@ -29,7 +31,7 @@ const baseRev = at >= 0 ? args[at + 1] : null;
 if (at >= 0 && (!/^[\w^~./][\w^~./-]*$/.test(baseRev ?? "") || (() => { try { execFileSync("git", ["rev-parse", "--verify", "--quiet", "--end-of-options", `${baseRev}^{commit}`], { stdio: "ignore" }); return false; } catch { return true; } })())) { console.log(`FAIL --base needs a commit of this repository, and "${baseRev ?? ""}" is none. Mend: fetch the base (git fetch origin main) and name its commit after --base`); process.exit(1); }
 const config = JSON.parse(fs.readFileSync(args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--base") ?? "scripts/general.json", "utf8"));
 const account = { pattern: OWNER.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&"), say: "the *owner's account*, or the repository's own address" };
-const words = [...config.words, account].map(w => ({ re: new RegExp(w.pattern, "iu"), say: w.say }));
+const words = [...config.words, account].map(w => ({ re: new RegExp(w.pattern, w.case ? "u" : "iu"), say: w.say, outside: w.outside ?? [] }));
 const exempt = new Set(config.exempt);
 if (!config.words.length) { console.log("FAIL the config's list \"words\" is empty, so the check would pass anything. Mend: put its words back in scripts/general.json"); process.exit(1); }
 const files = config.paths
@@ -63,7 +65,8 @@ const quoted = text => /^\s*>/.test(text);
 let found = 0;
 for (const file of files) {
   fs.readFileSync(file, "utf8").split("\n").forEach((line, i) => {
-    for (const { re, say } of words) {
+    for (const { re, say, outside } of words) {
+      if (outside.some(dir => file.startsWith(`${dir}/`))) continue;
       const hit = line.match(re);
       if (hit) { found++; console.log(`FAIL ${file}:${i + 1}: "${hit[0]}" fits only some projects. Mend: say ${say}`); }
     }
