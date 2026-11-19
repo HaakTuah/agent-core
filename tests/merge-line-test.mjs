@@ -23,7 +23,7 @@ const sha = letter => letter.repeat(40);
 const host = ({ owner = "User", priv = false, rules = [], classic = "404", plan = "free" }) => route => {
   if (route === "repos/o/n") return JSON.stringify({ default_branch: "main", private: priv, owner: { type: owner, login: "o" } });
   if (route.startsWith("repos/o/n/rules/branches/")) { if (rules === null) throw new Error("HTTP 403"); return JSON.stringify(rules); }
-  if (route.includes("/protection/")) { if (classic === "404") throw new Error("gh: Branch not protected (HTTP 404)"); if (classic === null) throw new Error("HTTP 403"); return JSON.stringify(classic); }
+  if (route.includes("/protection/")) { if (classic === "404") throw new Error("gh: Branch not protected (HTTP 404)"); if (classic === "404-other") throw new Error("gh: Not Found (HTTP 404)"); if (classic === null) throw new Error("HTTP 403"); return JSON.stringify(classic); }
   if (route === "orgs/o") { if (plan === null) throw new Error("HTTP 403"); return JSON.stringify({ plan: { name: plan } }); }
   throw new Error(`no such route: ${route}`);
 };
@@ -31,25 +31,27 @@ const strict = [{ type: "required_status_checks", parameters: { strict_required_
 
 let f = facts({ repo: "o/n", gh: host({ rules: strict }) });
 ok(f.upToDate === true && f.queue === "none" && f.billed === false, "a person's public repository: up to date asked, no queue, minutes free", JSON.stringify(f));
-ok(/kept by hand/.test(follows(f)) && !/Advice/.test(follows(f)), "and the line is kept by hand, with no advice", follows(f));
+ok(/kept by hand/.test(follows(f)) && !/needs-owner/.test(follows(f)), "and the line is kept by hand, with no issue for the owner", follows(f));
 f = facts({ repo: "o/n", gh: host({ owner: "Organization", rules: strict }) });
-ok(f.queue === "offered" && f.billed === false && /Advice for the owner, named once, nothing waiting on it/.test(follows(f)), "an organisation's public repository is offered the queue, and its owner is advised once", follows(f));
+ok(f.queue === "offered" && f.billed === false && /file one for the owner, labelled needs-owner, and nothing waits on it/.test(follows(f)), "an organisation's public repository is offered the queue, and one issue is filed for its owner", follows(f));
 f = facts({ repo: "o/n", gh: host({ owner: "Organization", priv: true, rules: strict, plan: "team" }) });
 ok(f.queue === "none" && f.billed === true, "an organisation's private one on a smaller plan: no queue, minutes billed", JSON.stringify(f));
 ok(facts({ repo: "o/n", gh: host({ owner: "Organization", priv: true, rules: strict, plan: "enterprise" }) }).queue === "offered", "and on the largest plan, the queue offered");
+ok(facts({ repo: "o/n", gh: host({ owner: "Organization", priv: true, rules: strict, plan: "a plan to come" }) }).queue === null, "a plan whose name it does not know is not read, never guessed");
 f = facts({ repo: "o/n", gh: host({ owner: "Organization", priv: true, rules: strict, plan: null }) });
-ok(f.queue === null && /not read .*taken as not offered/.test(f.said[1]) && !/Advice/.test(follows(f)), "a plan that cannot be read is said so, taken as no queue", f.said[1]);
+ok(f.queue === null && /not read .*taken as not offered/.test(f.said[1]) && !/needs-owner/.test(follows(f)), "a plan that cannot be read is said so, taken as no queue", f.said[1]);
 f = facts({ repo: "o/n", gh: host({ owner: "Organization", rules: [{ type: "merge_queue" }] }) });
 ok(f.queue === "on" && f.upToDate === true && /merge queue keeps the line/.test(follows(f)), "a queue that is on keeps the line", follows(f));
 f = facts({ repo: "o/n", gh: host({ rules: [] }) });
 ok(f.upToDate === false && /nothing to act on, and nothing waits/.test(follows(f)), "a branch with no up-to-date rule or protection asks no line", follows(f));
 ok(facts({ repo: "o/n", gh: host({ rules: [], classic: { strict: true } }) }).upToDate === true, "the classic protection's up-to-date rule is read too");
+ok(facts({ repo: "o/n", gh: host({ rules: [], classic: "404-other" }) }).upToDate === null, "a 404 that is not the host's \"Branch not protected\" is not read as no protection");
 f = facts({ repo: "o/n", gh: host({ rules: null, classic: null }) });
 ok(f.upToDate === null && /not read .*so the line is kept/.test(f.said[0]) && /kept by hand/.test(follows(f)), "rules that cannot be read are said so, and the line is kept", f.said[0]);
 
 const manifest = "| *merge queue* | `on` |\n| *billed minutes* | `yes` |\n";
 f = facts({ repo: "o/n", manifest, gh: host({ rules: strict }) });
-ok(f.queue === "on" && f.billed === true && /manifest's row \*merge queue\* says \(read: none\)/.test(f.said[1]), "a row of the manifest overrides a reading, and what was read is still printed", f.said.join(" | "));
+ok(f.queue === "on" && f.billed === true && /manifest's row \*merge queue\* says \(read: none\)/.test(f.said[1]) && /\*billed minutes\* says \(read: no,/.test(f.said[2]), "a row of the manifest overrides a reading, and what was read is still printed", f.said.join(" | "));
 ok(override("| *merge queue* | `maybe` |", "merge queue", ["on", "offered", "none"]) === undefined, "a row with no value the slot takes overrides nothing");
 
 // The measure: three merged pull requests, oldest first #1, #2, #3 (and #9 into another branch, left out); #2 was

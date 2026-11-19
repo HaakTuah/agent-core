@@ -39,7 +39,8 @@ export function facts({ repo, manifest = null, gh = ghApi }) {
   let rules = null, classic = null;
   try { rules = json(gh(`repos/${repo}/rules/branches/${encodeURIComponent(branch)}`)); } catch { /* (not read) */ }
   try { classic = json(gh(`repos/${repo}/branches/${encodeURIComponent(branch)}/protection/required_status_checks`)).strict === true; }
-  catch (e) { classic = /\b404\b|Not Found|not protected/iu.test(e.message) ? false : null; }
+  // (only the host's own "Branch not protected" is read as no protection: a 404 may also be a sign-in short of the right)
+  catch (e) { classic = /Branch not protected/u.test(e.message) ? false : null; }
   const strict = Array.isArray(rules) && rules.some(x => x.type === "required_status_checks" && x.parameters?.strict_required_status_checks_policy === true);
   const queued = Array.isArray(rules) && rules.some(x => x.type === "merge_queue");
   const upToDate = strict || classic === true || queued ? true : Array.isArray(rules) && classic === false ? false : null;
@@ -51,14 +52,16 @@ export function facts({ repo, manifest = null, gh = ghApi }) {
   else if (!r.private) queue = "offered";
   else {
     try { plan = json(gh(`orgs/${r.owner.login}`))?.plan?.name; } catch { plan = undefined; }
-    queue = plan === undefined ? null : /enterprise/iu.test(plan) ? "offered" : "none";
+    // (the plans whose names it knows; any other is not read, never guessed)
+    queue = { free: "none", team: "none", enterprise: "offered" }[String(plan).toLowerCase()] ?? null;
   }
   const queueOver = override(manifest, "merge queue", ["on", "offered", "none"]);
   said.push(queueOver ? `its merge queue: ${queueOver}, as the manifest's row *merge queue* says (read: ${queue ?? "not read"})`
     : `its merge queue: ${queue === "on" ? "on" : queue === "offered" ? "offered and off" : queue === "none" ? "not offered" : "not read (the organisation's plan did not answer), so taken as not offered"}, ${queued ? "by its rules on the default branch" : `the repository being ${r.private ? "private" : "public"} and ${r.owner?.type === "Organization" ? `an organisation's${plan ? ` on the plan ${oneLine(plan).slice(0, 40)}` : ""}` : "a person's account's"}`}`);
   const billedOver = override(manifest, "billed minutes", ["yes", "no"]);
   const billed = billedOver ? billedOver === "yes" : r.private === true;
-  said.push(billedOver ? `its runner minutes billed: ${billedOver}, as the manifest's row *billed minutes* says` : `its runner minutes billed: ${billed ? "yes, the repository being private" : "no, the repository being public"}`);
+  const billedRead = r.private === true ? "yes, the repository being private" : "no, the repository being public";
+  said.push(billedOver ? `its runner minutes billed: ${billedOver}, as the manifest's row *billed minutes* says (read: ${billedRead})` : `its runner minutes billed: ${billedRead}`);
   return { upToDate, queue: queueOver ?? queue, billed, branch, said };
 }
 
@@ -67,7 +70,7 @@ export function follows(f) {
   if (f.upToDate === false) return "No up-to-date branch is asked before a merge: the line has nothing to act on, and nothing waits.";
   if (f.queue === "on") return "The host's merge queue keeps the line: bringing branches up to date by hand has nothing to act on.";
   const line = "The line is kept by hand, as the core's roles/shared/work-flow.md says: only the first ready pull request is brought up to date.";
-  return f.queue === "offered" ? `${line} Advice for the owner, named once, nothing waiting on it: the host offers a merge queue for this repository, a setting of the default branch's rules only the owner makes, which would keep the line.` : line;
+  return f.queue === "offered" ? `${line} The host offers a merge queue for this repository, a setting of the default branch's rules only the owner makes, which would keep the line: where no open issue names it, file one for the owner, labelled needs-owner, and nothing waits on it. (A queue set in the branch's classic protection is not read here; the owner's settings show it.)` : line;
 }
 
 // The times of a pull request's markings ready, read from its timeline: the last, or null where it was never a draft.

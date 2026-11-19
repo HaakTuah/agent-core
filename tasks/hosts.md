@@ -34,17 +34,17 @@ reports so to the core, whose design session then names it proven here. It does 
 be proven: it runs the checks from plain git meanwhile. Reason: a host's documentation says what it offers, not that the
 core's checks run there. Held by nothing yet.
 
-**The merge line follows the host** (#702). By default the line of ready pull requests
-(`roles/shared/work-flow.md`, "Ready pull requests merge in a line") is kept by hand. Where the host offers a merge
-queue for the repository and it is on, the queue takes the line, and bringing branches up to date by hand has nothing
-to act on; where it is offered and off, turning it on is a setting only the owner makes, named once as advice, with
-nothing waiting on it ("Nothing locks a project"). Whether a branch must be up to date before it merges, whether a
-queue is offered and on, and whether runner minutes are billed are read from the host, never declared: `node
-core/scripts/merge-line.mjs --repo <owner>/<name>` prints what it read and what follows, and the manifest's rows
-*merge queue* and *billed minutes* only override it. It does not mean a project is moved to another account or plan to
-gain a queue, nor that a branch merges behind the default branch (floor rule 12). Reason: what is cheapest differs by
-kind of repository (a person's public one has free minutes and no queue, an organisation's public one is offered the
-queue, a private one pays for its minutes), and no project should make a worse choice for what fits another. Held by
+**The merge line follows the host** (#702). By default the line of ready pull requests that `roles/shared/work-flow.md`
+sets is kept by hand. Where the host offers a merge queue for the repository and it is on, the queue takes the line, and
+bringing branches up to date by hand has nothing to act on; where it is offered and off, turning it on is a setting only
+the owner makes: the session that first reads it so files one issue for the owner, labelled `needs-owner`, where none
+stands, and nothing waits on it ("Nothing locks a project"). Whether a branch must be up to date before it merges,
+whether a queue is offered and on, and whether runner minutes are billed are read from the host, never declared: `node
+core/scripts/merge-line.mjs --repo <owner>/<name>` prints what it read and what follows, and the manifest's rows *merge
+queue* and *billed minutes* only override it. It does not mean a project is moved to another account or plan to gain a
+queue, nor that a branch merges behind the default branch (floor rule 12). Reason: what is cheapest differs by kind of
+repository (a person's public one has free minutes and no queue, an organisation's public one is offered the queue, a
+private one pays for its minutes), and no project should make a worse choice for what fits another. Held by
 `tests/merge-line-test.mjs`, which reads each kind, in `.github/workflows/tests.yml`.
 
 **Where the front waits behind the cap, runs far from their turn are cancelled** (#702). By default no run is
