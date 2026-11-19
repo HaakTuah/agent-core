@@ -1,5 +1,6 @@
 // Who wrote an item and what state it is in, and how an agent's comment opens (roles/shared/inbox.md, "Labels and openers say
-// who wrote what"; core archive 217): the list is labels.json, beside this file. Run from a project's root, it asks
+// who wrote what"; core archive 217): the list is labels.json, beside this file, its shape held by its schema
+// (schemas/labels.json, which the labels test reads; #530). Run from a project's root, it asks
 // GitHub, through gh, for the repository origin names, and reports, each with its mend, worded so an agent acts on it
 // alone with no rule file open:
 //   - the labels of the list the repository lacks, or holds in another colour or description;
@@ -12,9 +13,11 @@
 //   - an open issue labelled `correction` that the owner's account filed without the lines that name the pull request
 //     it corrects and its kind, in its body or a note of that account (outcomes.mjs, beside this file, counts them);
 //   - a queued issue whose newest verdict is the stand-in's sure yes, with no note in the owner's voice after it,
-//     that lacks the mark `stand-in-yes`, and one that keeps the mark after such a note;
+//     that lacks the mark `stand-in-yes`, and one that keeps the mark after such a note (save in the core's own
+//     repository, where no verdict queues an issue);
 //   - a queued issue with SEVERAL notes in the owner's voice newer than its current text (its description, or its
-//     newest note from the owner's account that says "This is the issue's current text.", as last edited).
+//     newest note from the owner's account that says "This is the issue's current text.", as last edited, or that
+//     says the description above was updated in the same step and is the issue's current text).
 // It reads only and fails nothing (exit 0), save where it is not run from a repository's root or is given a wrong
 // option; where gh gives no answer, nothing is asked, and it says so. With --make it makes the labels the repository
 // lacks and sets those of the list to its colour and description, naming what each was, touching no other label and no issue. The owner's
@@ -93,13 +96,15 @@ function unmarked(issues, comments, mine, names) {
 // What is to be mended, each { what, items }. `issues`: the open issues, not pull requests, as GitHub gives them;
 // `comments`: comments on open issues and pull requests, each with `issue` (its number); `notes`: for each queued
 // issue's number, all its comments; `owner`: the owner's account; `have`: the repository's labels.
-export function check({ issues, comments = [], notes = new Map(), owner, have, since = SINCE }) {
+// `core`: whether this is the core's own repository, where no verdict of the stand-in's queues an issue (the core's
+// AGENTS.md, "The queue"), so the mark stand-in-yes is not asked.
+export function check({ issues, comments = [], notes = new Map(), owner, have, since = SINCE, core = false }) {
   const mine = u => String(u?.login ?? "").toLowerCase() === String(owner).toLowerCase();
   const names = i => (Array.isArray(i?.labels) ? i.labels : []).map(l => (typeof l === "string" ? l : l?.name)).filter(n => typeof n === "string");
   const count = (i, list) => names(i).filter(n => list.includes(n)).length;
   const fresh = at => String(at ?? "") >= since;
   const ctx = { issues, comments, notes, have, mine, names, count, fresh };
-  const found = [listedLabels, stateLabels, senderLabels, foundLines, commentOpeners, strayViewItems, standInMarks, currentTexts]
+  const found = [listedLabels, stateLabels, senderLabels, foundLines, commentOpeners, strayViewItems, ...(core ? [] : [standInMarks]), currentTexts]
     .map(part => part(ctx)).filter(f => f.items.length);
   return [...found, ...unmarked(issues, comments, mine, names)];
 }
@@ -153,12 +158,17 @@ function standInMarks({ issues, notes, mine, names }) {
       ...issues.filter(i => names(i).includes("stand-in-yes") && notes.has(i.number) && !onYes(i)).map(i => `#${i.number} (to take off)`)] };
 }
 
+// A note that says the description is the issue's current text, as a chat session's note writes it when it updates the
+// description in the same step ("The description above is updated in the same step and is the issue's current text").
+const NAMES_CURRENT = /\bThe description above is updated in the same step and is the issue's current text\b/;
+
 function currentTexts({ issues, notes, mine, names }) {
   return { what: `A current text newer than the notes that change what the issue asks: where ${SEVERAL} or more notes in the owner's voice stand after it, an agent gathers them in a note that says at its top "${LIST.headings.current}", the older notes kept as they are (core/roles/shared/inbox.md)`,
     items: issues.filter(i => names(i).includes("queued") && notes.has(i.number)).filter(i => {
       const all = ownerNotes(notes, mine, i);
-      // (the current text counts from its last edit, since a note that changes what the issue asks updates it)
-      const current = all.filter(c => String(c.body ?? "").includes(LIST.headings.current)).at(-1);
+      // (the current text counts from its last edit, since a note that changes what the issue asks updates it; a note
+      // that says the description is the issue's current text, updated in the same step, dates the description's edit)
+      const current = all.filter(c => String(c.body ?? "").includes(LIST.headings.current) || NAMES_CURRENT.test(String(c.body ?? ""))).at(-1);
       const at = current ? current.updated_at ?? current.created_at : i.created_at;
       return all.filter(c => String(c.created_at) > String(at) && ownVoiceNote(c.body)).length >= SEVERAL;
     }).map(i => `#${i.number}`) };
@@ -252,9 +262,10 @@ function main(args) {
   let manifest = "";
   try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { /* (the core itself, or no manifest yet) */ }
   const owner = by >= 0 ? args[by + 1] : ownerOf(manifest) ?? repo.split("/")[0];
+  const core = !manifest && fs.existsSync("scripts/labels.mjs"); // (the core's own repository: its scripts at the root)
   try {
     if (make) makeLabels(repo);
-    else console.log(report(check({ ...gather(repo, since), owner, since }), repo));
+    else console.log(report(check({ ...gather(repo, since), owner, since, core }), repo));
   } catch (e) {
     console.log(unreadMessage(repo, e));
   }

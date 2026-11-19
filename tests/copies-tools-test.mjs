@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
+import { parserLeftOut } from "../scripts/packages.mjs";
 
 let failed = 0;
 const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) { failed++; if (detail) console.log(`     ${detail.replaceAll("\n", "\n     ")}`); } };
@@ -23,8 +24,10 @@ try {
   const g = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   const commit = what => { g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", what); return g("rev-parse", "HEAD").trim(); };
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of ["copies.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "yaml-keys.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
-  fs.cpSync(path.join(here, "..", "third-party"), path.join(dir, "core/third-party"), { recursive: true });
+  for (const f of ["copies.mjs", "whole-output.mjs", "blobs.mjs", "guards.mjs", "rule-files.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "schemas.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
+  fs.cpSync(path.join(here, "schemas"), path.join(dir, "core/scripts/schemas"), { recursive: true });
+  fs.cpSync(path.join(here, "..", ".packages"), path.join(dir, "core/.packages"), { recursive: true, filter: parserLeftOut });
+  fs.copyFileSync(path.join(here, "..", ".gitignore"), path.join(dir, "core/.gitignore")); // (the copy's own: the installed packages, each install's, are no file of the project's)
   put("AGENTS.md", `# A project\n\n${SAID}.\n`);
   put("SECURITY.md", "# Security\n\n**3. The protected files,** here, **the rule files:** `docs/a.md`;\n");
   put("docs/a.md", `# Developing\n\n${OTHER}.\n`);
@@ -86,21 +89,23 @@ try {
   ok(!/agent tool's file|own\.md/.test(`${prose.stdout}${prose.stderr}`), "a config that reads no rule files reads no agent tool's file either", `${prose.stdout}${prose.stderr}`);
   fs.rmSync(path.join(dir, "checks/prose.json"));
 
-  // (the packages the core's copy carries are no code of the project's: a pattern that reaches them reads none)
+  // (the packages the core installs beside its copy are no code of the project's, and git does not track them: a
+  // pattern that reaches them reads none)
   const block = `${Array.from({ length: 10 }, (_, i) => `const value${i} = compute(${i}, "a string long enough to make the run count");`).join("\n")}\n`;
-  put("core/third-party/a/dist/one.js", block); put("core/third-party/a/dist/two.js", block);
+  put("core/.packages/node_modules/a/dist/one.js", block); put("core/.packages/node_modules/a/dist/two.js", block);
   put("checks/code.json", `${JSON.stringify({ baseline: "checks/code-baseline.json", code: ["*.js"], prose: [], proseFromSecurity: false })}\n`);
   g("add", "-A");
   const code = (...flags) => { const c = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/code.json", ...flags], { cwd: dir, encoding: "utf8", env: { ...process.env, COPIES_BASE: "" } }); return { status: c.status, out: `${c.stdout}${c.stderr}` }; };
   code("--first");
   const first = JSON.parse(fs.readFileSync(path.join(dir, "checks/code-baseline.json"), "utf8"));
   r = code();
-  ok(r.status === 0 && !/third-party/.test(r.out) && !Object.keys(first.windows ?? {}).length, "a pattern of the project's that reaches the packages the core's copy carries reads none of them, though they hold a copy", r.out);
+  ok(r.status === 0 && !/node_modules/.test(r.out) && !Object.keys(first.windows ?? {}).length, "a pattern of the project's that reaches the packages the core installs beside its copy reads none of them, though they hold a copy", r.out);
   put("src/one.js", block); put("src/two.js", block);
   g("add", "-A");
   r = code();
-  ok(r.status === 1 && /^FAIL: a new copy: src\/(one|two)\.js/m.test(r.out) && !/third-party/.test(r.out), "while the same copy in the project's own files fails", r.out);
-  g("rm", "-q", "-f", "-r", "core/third-party/a", "src", "checks/code.json");
+  ok(r.status === 1 && /^FAIL: a new copy: src\/(one|two)\.js/m.test(r.out) && !/node_modules/.test(r.out), "while the same copy in the project's own files fails", r.out);
+  g("rm", "-q", "-f", "-r", "src", "checks/code.json");
+  fs.rmSync(path.join(dir, "core/.packages/node_modules/a"), { recursive: true, force: true });
   fs.rmSync(path.join(dir, "checks/code-baseline.json"));
 
   // (against the base, the config is held to every file the base's read, an agent tool's among them)
@@ -158,6 +163,19 @@ try {
     const through = commit("a link to a folder, and one through a linked folder");
     r = check({ COPIES_BASE: through });
     ok(r.status === 0 && !/EISDIR/.test(r.out) && /not yet in the baseline: .*through\.md.*the pull request's base held it/.test(r.out), "a link to a folder in a tool's folder is passed over, and a file reached through a linked folder is read through it at the base too", r.out);
+  }
+  // (with the core's packages not installed, its shape is left unchecked, said as a warning, and a config the check
+  // cannot read still fails with its mend: Codex's and the fallback reviewer's reviews of 95abcdb)
+  {
+    const packages = path.join(dir, "core/.packages/node_modules"), aside = `${packages}-aside`;
+    fs.renameSync(packages, aside);
+    try {
+      const unchecked = text => { put("checks/raw.json", text); const c = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/raw.json"], { cwd: dir, encoding: "utf8", env: { ...process.env, COPIES_BASE: "" } }); return { status: c.status, out: `${c.stdout}${c.stderr}` }; };
+      const bad = ["null", "[]", '{"code":["docs"]}', '{"baseline":5}'].map(unchecked), odd = unchecked('{"baseline":"checks/raw-baseline.json","code":[{"toString":1},5,""],"prose":"docs","proseFromSecurity":"no"}');
+      ok(bad.every(r => r.status === 1 && mended(r.out) && /^FAIL: the config is not a JSON object that names its "baseline"\./m.test(r.out) && /::warning::The config's shape was not checked/.test(r.out) && !/TypeError/.test(r.out)),
+        "with the packages not installed, a config that is no object, or names no baseline, fails with its mend, the shape's warning said", bad.map(r => r.out).join("\n"));
+      ok(!/TypeError|at file:/.test(odd.out) && /::warning::The config's shape was not checked/.test(odd.out) && !/AGENTS\.md/.test(odd.out), "and lists of the wrong shape are read as no paths, and a proseFromSecurity that is not true reads no rule file, never crashing", odd.out);
+    } finally { fs.renameSync(aside, packages); }
   }
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 process.exit(failed ? 1 : 0);

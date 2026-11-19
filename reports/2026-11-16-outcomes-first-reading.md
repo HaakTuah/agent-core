@@ -3,7 +3,7 @@
 The first reading of the outcomes #302 asks for (point 3), from history, for 15 September to 15 November 2026: the
 numbers before the rules of #303 and the rest of the batch land, kept beside every later state report
 (`scripts/outcomes.mjs` reads `reports/outcomes-first-reading.json`, beside this file, for the core). Counts and kinds
-only, and none of a private project's.
+only, and none of a project of another owner's.
 
 ## How it was taken
 
@@ -39,9 +39,9 @@ The repository began on 9 November 2026, so its span is six days: 207 tasks merg
 - **Corrections found by reading:** 4 (misread 2, rule missing 1, does not work 1), 3 of them unsure of their kind or
   of the pull request they correct; one names no pull request.
 
-## A project of another owner (private)
+## A project of another owner
 
-Read the same way, and its numbers not published here: a private project's measures stand in the core's public files
+Read the same way, and its numbers not published here: such a project's measures stand in the core's public files
 only where its own owner has said they may (the security review of #450). Nothing of it is kept elsewhere.
 
 ## The two public game projects, read on 17 November 2026 (#451)

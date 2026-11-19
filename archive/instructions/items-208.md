@@ -45,6 +45,7 @@ The index, and how an item is written: `archive/instructions.md`.
      says otherwise. Behind: the release of the first batch in "One batch, then one release" in `AGENTS.md`: the owner's
      word for it, given ahead, so the session that finds the file worked through starts the `release` workflow, which
      itself cuts nothing unless every check on `main`'s newest commit has passed.
+     Changed by: 211.
 
 211. **14 November 2026** (the core; chat with a session the owner works with, not the design session, as quoted on
      issue #260, and the orchestrator, in the message that started it). Asked: what to make of the queue's first build.
@@ -65,6 +66,7 @@ The index, and how an item is written: `archive/instructions.md`.
      owner's word on any day, in "Whose words an issue holds"; and what joins the queue without the owner: a bug, a
      test, a check for a rule that already stands, a task the scheduled look opens and a small finding of an audit,
      while a new or changed rule still joins only on the owner's yes.
+     Changes: 210.
 
 212. **14 November 2026** (the core, to the orchestrator, which passed it on word for word to the builder of this
      correction; source: issue #260 and its correction). Asked: the correction of how far a record from a chat session
@@ -101,7 +103,7 @@ The index, and how an item is written: `archive/instructions.md`.
      issue #277, and the orchestrator, which passed it on word for word to the builder of this rule). Asked: whether the
      session's proposed pattern is the optimal way for development and for phrasing the rules. The session had proposed
      one pattern for writing a rule, after three rules of the core had been read against what the owner meant that
-     evening, each for want of an observable trigger or a reason. Decided: The owner agreed to the six points the
+     day, each for want of an observable trigger or a reason. Decided: The owner agreed to the six points the
      session set out: the default first, then the exception; a trigger someone can observe; one actor and one action;
      what it does not mean; its reason in one line; and what holds it. The owner agreed to what is kept out of a rule
      (adjectives that measure nothing, "should consider", lists of preferred technologies, and what a check's failure

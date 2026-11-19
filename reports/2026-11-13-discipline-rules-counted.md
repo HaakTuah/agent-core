@@ -7,15 +7,15 @@ review the core, not the design session.
 
 ## The answer
 
-**Corrected the same day: no rule is a candidate to go.** This report first named "Match effort to the task" as one,
-on two grounds, and both were wrong. It said no archive item stands behind the rule: the owner's own standing line
-does, word for word, in core archive 25 ("Match effort to the task. Docs, READMEs, small fixes and config: one pass,
-no subagents."); the rule only lacked its pointer, which it now has. And it said the rule repeats the file's first
-line: its first half does, its second is said nowhere else, and `modules/helpers.md` leans on it ("Not for one-pass
-work" names no kinds of work since a lean pass of 10 November left that to this rule). The count below is unchanged:
-the rule was never cited in either project's pull requests. That zero was a reason to read the rule again, as "How it
-was counted" says, and the reading stopped at the rule's own line where it should have gone on to the archive and to
-what points at the rule. The paragraph below stands as first written, with this said above it.
+**Corrected the same day: no rule is a candidate to go.** This report first named "Match effort to the task" as one, on
+two grounds, and both were wrong. It said no archive item stands behind the rule: the owner's own standing line does, in
+core archive 25: docs, READMEs, small fixes and config are done in one pass, with no helpers; the rule only lacked its
+pointer, which it now has. And it said the rule repeats the file's first line: its first half does, its second is said
+nowhere else, and `modules/helpers.md` leans on it ("Not for one-pass work" names no kinds of work since a lean pass of
+10 November left that to this rule). The count below is unchanged: the rule was never cited in either project's pull
+requests. That zero was a reason to read the rule again, as "How it was counted" says, and the reading stopped at the
+rule's own line where it should have gone on to the archive and to what points at the rule. The paragraph below stands
+as first written, with this said above it.
 
 **One rule is a candidate to go: "Match effort to the task" (`modules/how-to-work.md`).** The other 42 stay. The count
 does not show a set of dead rules: 33 of the 43 show in at least one pull request's "Readings taken" or comments, and
