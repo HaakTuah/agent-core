@@ -16,7 +16,11 @@ import { MessageChannel, Worker, receiveMessageOnPort } from "node:worker_thread
 import { installedFile, unnamed, unreached } from "./packages.mjs";
 
 // Each language read, by the name a reader asks for, and its grammar's package and file.
-const GRAMMARS = { csharp: ["tree-sitter-c-sharp", "tree-sitter-c_sharp.wasm"], bash: ["tree-sitter-bash", "tree-sitter-bash.wasm"] };
+const GRAMMARS = {
+  csharp: ["tree-sitter-c-sharp", "tree-sitter-c_sharp.wasm"], bash: ["tree-sitter-bash", "tree-sitter-bash.wasm"],
+  javascript: ["tree-sitter-javascript", "tree-sitter-javascript.wasm"],
+  typescript: ["tree-sitter-typescript", "tree-sitter-typescript.wasm"], tsx: ["tree-sitter-typescript", "tree-sitter-tsx.wasm"],
+};
 // Whether the parser or the grammar of `language` could not be installed, the registry not answering, in a project's
 // pull request (install.mjs), or was never installed, a project's own job naming only the core's first install
 // (unnamedFor; #719): its reader then reads no file of it, and the check that runs it says so as a warning, failing
