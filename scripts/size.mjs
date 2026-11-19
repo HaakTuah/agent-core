@@ -67,13 +67,15 @@ import { started } from "./started.mjs";
 // (824 once point 1 was written whole), in the stop switch's words, which the staged case stop holds; a sixth found 45
 // in roles/design.md for the design session's 122 over, and 231 in the orchestrator's start for its 219, of which 80
 // cut a rule's explanation, leaving 151 that a trim may take: too little each time, in rules and lines #829 did not
-// ask for, and so not made.
+// ask for, and so not made. The reviewer's, raised one step on 19 November 2026 for #307's worked examples in the
+// review guidelines, merged after #829: a seventh fresh leanness check found 51 bytes of room in the guidelines, made,
+// for 1,073 over.
 export const CAPS = {
   builder: 31 * 1024,
   design: 33 * 1024,
   orchestrator: 47 * 1024,
   adviser: 33 * 1024,
-  reviewer: 25 * 1024,
+  reviewer: 26 * 1024,
   "stand-in": 20 * 1024,
 };
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a

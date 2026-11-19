@@ -34,15 +34,14 @@ project's own guidelines, its `SECURITY.md` and the floor.
 - a departure from the design or from the PR's description;
 - a broken rule of the project, the core or the floor;
 - a quote of the owner's, in the change or its description, that holds more than a decision and the reason behind it,
-  or anything personal, or that is left misspelled where it is no floor yes relayed word for word as its issue holds it
+  or that is left misspelled where it is no floor yes relayed word for word as its issue holds it
   (floor rules 3 and 4);
 - a size mark raised without its reason in the PR (one on what every session reads: below);
 - an entry that joins the shape check's or the strength check's baseline under "grown" without its reason in the PR
   and a fresh session's word there that it found no other way (`tasks/code-shape.md`, "Never worse");
 - a test weakened, skipped or deleted beyond what the task forces, or one the PR does not name with a reason that
   holds, each line `core/scripts/weakened.mjs` lists ruled on (`tasks/code-shape.md`, #253);
-- against "One fact, one place" in `roles/shared/how-to-work.md`, a fact, rule or piece of logic written a second time
-  instead of pointed to;
+- against "One fact, one place" in `roles/shared/how-to-work.md`, a second copy of a fact, rule or piece of logic;
 - a new job a maintained package does written by hand, a reader of a format someone else defines above all, with no
   line naming its exception or, past about 50 lines, `Looked for:` (`tasks/code-shape.md`, #486).
 
