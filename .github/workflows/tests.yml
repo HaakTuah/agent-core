@@ -14,10 +14,10 @@
 # Windows half after each part (#508).
 # A third runs the reference parsers the hand-written readers are held to, tools that only run, the devDependencies of
 # the core's lock file, which its own jobs install and a copy does not (tests/readers-test.mjs, on Linux).
-# Each job first installs the core's own packages from its lock file in .packages/, from npm's registry, running no
-# install script (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
+# Each job first installs the core's own packages from its lock files in .packages/, the parser's in .packages/parser/
+# among them (#719), from npm's registry, running no install script (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
 # tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
-# Once, on Linux, the core's own lock file is held as a project's is: each package it brings looked up in npm's
+# Once, on Linux, the core's own lock files are held as a project's are: each package it brings looked up in npm's
 # registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures).
 # Each job of the suites, two on Linux and seven on Windows on each Node, and the upgrade test, are each held to a time
 # mark (the "suites" of .github/shape.json, by scripts/shape.mjs; tasks/tests.md, "The tests have a time mark").
@@ -106,9 +106,9 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ${{ matrix.node }}
-      - name: The core's packages, installed from its lock file for the suites (#654)
+      - name: The core's packages, installed from its lock files for the suites, the parser's among them (#654, #719)
         id: install
-        run: node scripts/install.mjs
+        run: node scripts/install.mjs all
       - name: The suites this change can reach (on main, and in a re-run, every one, but none where the merged head passed this tree whole)
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
@@ -404,7 +404,9 @@ jobs:
       - name: The registry's signature on each of the core's own installed packages (floor rule 7; once, on Linux)
         if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }} # (only where the install passed)
         working-directory: .packages
-        run: npm audit signatures --prefix=. # (the folder's own settings and every package of its lock, never a workspace root above it)
+        # (in each install's folder, with its own settings and every package of its lock, never a workspace root above it;
+        # an install whose lock names no package has no node_modules/, and nothing to verify)
+        run: for d in . parser; do if [ -d "$d/node_modules" ]; then (cd "$d" && npm audit signatures --prefix=.); fi; done # (bash -e: the first that fails fails the step)
       - name: Every tool the core's own agents load is listed (floor topic 15)
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
         run: node scripts/agent-tools.mjs .github/licences.json --core
@@ -463,8 +465,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
-      - name: The core's packages, installed from its lock file for the upgrade test (#654)
-        run: node scripts/install.mjs
+      - name: The core's packages, installed from its lock files for the upgrade test, the parser's among them (#654, #719)
+        run: node scripts/install.mjs all
       - name: The tests this change can reach (on main, and in a re-run, every one)
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}

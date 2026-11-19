@@ -32,7 +32,7 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
   // (what the package list and lock file hold, as install.mjs reads them before npm runs: their own fields, registry
   // entries alone, and every spec a version, range or tag of npm's registry)
   const { lockFaults, ENTRY_FIELDS } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href);
-  const faults = lockFaults(list, lock);
+  const faults = [...lockFaults(list, lock), ...lockFaults(json(".packages/parser/package.json"), json(".packages/parser/package-lock.json")).map(f => `parser's ${f}`)];
   ok(faults.length === 0, "the package list and the lock file hold what install.mjs takes: their own fields, registry entries alone, and every spec a version, range or tag of npm's registry", faults.slice(0, 5).join("; "));
   const bad = [{ ...list, overrides: {} }, { ...list, devDependencies: { x: "git+https://example.invalid/x.git" } }, { ...list, devDependencies: { x: "ids.tgz" } }, { ...list, devDependencies: { x: "1.0.0 || a.tar.gz" } }, { ...list, devDependencies: { x: "file:x" } }, { ...list, devDependencies: { x: "x.tar_gz" } }, { ...list, devDependencies: { x: "^1.0.0" } }];
   const badLocks = [{ ...lock, packages: { ...lock.packages, "node_modules/yaml": { ...lock.packages["node_modules/yaml"], dependencies: { b: "git+https://example.invalid/b.git" } } } },
@@ -55,7 +55,7 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(G
     .filter(k => record[k]?.link || ["version", "resolved", "integrity"].some(f => record[k]?.[f] !== lock.packages[k]?.[f]));
   ok(differ.length === 0, "what npm installed, by its own record, is each entry of the lock file as written, and nothing else", `${differ.slice(0, 5).join(", ")}\nMend: run node scripts/install.mjs; where it still differs, an entry of the lock file or a spec in it names another source than npm's registry, which goes`);
   const config = json(".github/licences.json");
-  ok((config.lockfiles ?? []).includes(".packages/package-lock.json"), "the core's licence check reads the lock file, so the licence check and the lookup hold each package (floor rules 10 and 15)");
+  ok(["", "parser/"].every(d => (config.lockfiles ?? []).includes(`.packages/${d}package-lock.json`) && (config.ignoreScriptsIn ?? []).includes(`.packages/${d}.npmrc`)), "the core's licence check reads the lock file, so the licence check and the lookup hold each package (floor rules 10 and 15)");
   // (an install script never runs, whatever npm command is run at the core's root or a copy's: the mechanism holds it)
   const npmrc = fs.readFileSync(path.join(root, ".packages/.npmrc"), "utf8");
   ok(/^ignore-scripts\s*=\s*true$/mu.test(npmrc) && /^min-release-age\s*=\s*7$/mu.test(npmrc) && (config.ignoreScriptsIn ?? []).includes(".packages/.npmrc"), "the core's .npmrc, which the copy carries, keeps every package's install script off and waits a week, and the licence check holds it there (floor rules 7 and 15)", npmrc);
@@ -151,7 +151,7 @@ if (failed) { console.log(`FAIL ${failed} of the lock file's checks above failed
   const theirs = f => /(?:^|\/)node_modules(?:\/|$)/u.test(f) || f.startsWith("third-party/");
   ok(!tracked.some(theirs), "no file of another publisher's is tracked in the core, nor a link in its install's place: its packages are installed, never carried", tracked.filter(theirs).slice(0, 5).join(", "));
   const ignore = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
-  ok(/^\/\.packages\/node_modules$/mu.test(ignore) && ["/.packages/", "/.packages/.npmrc", "/.packages/package.json", "/.packages/package-lock.json"].every(f => ignore.split("\n").includes(`!${f}`)), "the core's .gitignore, which travels to the copy's root, keeps the install out of git, a link in its place too, and the copy's package list, lock file and .npmrc in it");
+  ok(/^\/\.packages\/node_modules$/mu.test(ignore) && /^\/\.packages\/parser\/node_modules$/mu.test(ignore) && ["/.packages/", "/.packages/.npmrc", "/.packages/package.json", "/.packages/package-lock.json", "/.packages/parser/", "/.packages/parser/.npmrc", "/.packages/parser/package.json", "/.packages/parser/package-lock.json"].every(f => ignore.split("\n").includes(`!${f}`)), "the core's .gitignore, which travels to the copy's root, keeps the install out of git, a link in its place too, and the copy's package list, lock file and .npmrc in it");
   // (the .npmrc the copy carries holds the core's own two settings alone, which install.mjs holds it to too)
   const { npmrcOthers } = await import(pathToFileURL(path.join(root, "scripts/packages.mjs")).href), npmrc = fs.readFileSync(path.join(root, ".packages/.npmrc"), "utf8");
   ok(npmrcOthers(npmrc).length === 0, "the core's .npmrc holds nothing but its own two settings, so the install and the signatures' check ask npm's own registry, with no token, proxy or certificate of another's", npmrcOthers(npmrc).join(" | "));
@@ -172,7 +172,15 @@ try {
   // no such pattern takes in, and install on their own all the same)
   fs.writeFileSync(path.join(project, "package.json"), JSON.stringify({ name: "project", private: true, workspaces: ["*", "**"] }));
   fs.cpSync(path.join(root, "scripts"), path.join(copy, "scripts"), { recursive: true });
-  for (const f of [".packages/package.json", ".packages/package-lock.json", ".gitignore", ".packages/.npmrc"]) fs.cpSync(path.join(root, f), path.join(copy, f));
+  for (const f of [".packages/package.json", ".packages/package-lock.json", ".gitignore", ".packages/.npmrc", ".packages/parser/package.json", ".packages/parser/package-lock.json", ".packages/parser/.npmrc"]) fs.cpSync(path.join(root, f), path.join(copy, f));
+  // (the parser's install holding one package, a small one of the registry's, so that what installs it, and what does
+  // not, is seen whatever the core's parser's lock holds today: #719)
+  // (is-number 7.0.0, of 2018, as npm's registry gives it, which no other lock file of the core's names)
+  const pp = path.join(pk, "parser");
+  const staged = { version: "7.0.0", resolved: "https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz", integrity: "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==", license: "MIT", engines: { node: ">=0.12.0" } };
+  const parserList = { ...JSON.parse(fs.readFileSync(path.join(pp, "package.json"), "utf8")), dependencies: { "is-number": staged.version } };
+  fs.writeFileSync(path.join(pp, "package.json"), JSON.stringify(parserList, null, 2));
+  fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license, dependencies: parserList.dependencies }, "node_modules/is-number": staged } }, null, 2));
   // (each script that loads a package, by the call that loads it; a script that loads one and has no case here fails)
   const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")` };
   const loads = fs.readdirSync(path.join(root, "scripts")).filter(f => f.endsWith(".mjs") && f !== "packages.mjs" && /\bload(?:Sync)?\("/u.test(fs.readFileSync(path.join(root, "scripts", f), "utf8")));
@@ -190,8 +198,8 @@ try {
   fs.writeFileSync(path.join(project, ".gitignore"), ".*\n!.gitignore\n.npmrc\npackage-lock.json\npackage.json\n");
   execFileSync("git", ["init", "-q"], { cwd: project });
   execFileSync("git", ["add", "-A"], { cwd: project });
-  const staged = execFileSync("git", ["ls-files"], { cwd: project, encoding: "utf8" }).split("\n");
-  ok(["core/.packages/.npmrc", "core/.packages/package.json", "core/.packages/package-lock.json"].every(f => staged.includes(f)) && !staged.some(f => f.startsWith("core/.packages/node_modules/")), "a project whose .gitignore leaves out .npmrc and lock files, and dot folders, tracks the copy's all the same", staged.filter(f => f.startsWith("core/") && !f.startsWith("core/scripts/")).join(", "));
+  const tracked = execFileSync("git", ["ls-files"], { cwd: project, encoding: "utf8" }).split("\n");
+  ok(["core/.packages/.npmrc", "core/.packages/package.json", "core/.packages/package-lock.json", "core/.packages/parser/.npmrc", "core/.packages/parser/package.json", "core/.packages/parser/package-lock.json"].every(f => tracked.includes(f)) && !tracked.some(f => /^core\/\.packages\/(?:parser\/)?node_modules\//u.test(f)), "a project whose .gitignore leaves out .npmrc and lock files, and dot folders, tracks the copy's all the same", tracked.filter(f => f.startsWith("core/") && !f.startsWith("core/scripts/")).join(", "));
   fs.rmSync(path.join(project, ".git"), { recursive: true, force: true });
   const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env });
   const lock = JSON.parse(fs.readFileSync(path.join(pk, "package-lock.json"), "utf8"));
@@ -201,6 +209,19 @@ try {
   ok(tests.length > 0 && !tests.some(([k]) => fs.existsSync(path.join(pk, k))), "and none that only the core's own tests run: a copy holds no tests", tests.map(([k]) => k).join(", "));
   const loaded = spawnSync(process.execPath, ["--input-type=module", "-e", `const { load } = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); const m = await load("yaml"); console.log(m.project ? "project" : typeof m.Lexer);`], { cwd: project, encoding: "utf8", env });
   ok(loaded.status === 0 && loaded.stdout.trim() === "function", "and load() takes the copy's own, never the project's", `${loaded.stdout}${loaded.stderr}`);
+  // (the parser's install only where a job names it: with none named, its packages are not there, and a script that
+  // loads one says it did not run, naming the install; `install.mjs parser` installs it, and `all` every one: #719)
+  const loadParser = () => spawnSync(process.execPath, ["--input-type=module", "-e", `const { loadSync } = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(loadSync("is-number")(7));`], { cwd: project, encoding: "utf8", env });
+  const notNamed = loadParser();
+  ok(!fs.existsSync(path.join(pp, "node_modules")) && notNamed.status === 1 && /did not run: the package is-number is not installed in \S*parser\S*node_modules as \.packages\/parser\/package-lock\.json names it\. Mend: run node \S*install\.mjs parser,/u.test(notNamed.stderr) && mended(notNamed.stderr),
+    "the parser's install is not installed where no job names it, and what loads one of its packages says it did not run, naming the install", `${notNamed.stdout}${notNamed.stderr}`);
+  const parser = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "parser"], { cwd: project, encoding: "utf8", timeout: 300000, env });
+  const named = loadParser();
+  ok(parser.status === 0 && /into \.packages\/parser\/node_modules\//u.test(parser.stdout) && !/into \.packages\/node_modules\//u.test(parser.stdout) && named.status === 0 && named.stdout.trim() === "true",
+    "install.mjs parser installs the parser's alone, and its package then loads from there", `${parser.stdout}${parser.stderr}${named.stdout}${named.stderr}`);
+  fs.rmSync(path.join(pp, "node_modules"), { recursive: true, force: true });
+  const every = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), "all"], { cwd: project, encoding: "utf8", timeout: 300000, env });
+  ok(every.status === 0 && /into \.packages\/node_modules\//u.test(every.stdout) && /into \.packages\/parser\/node_modules\//u.test(every.stdout) && loadParser().status === 0, "and install.mjs all installs every one, as the sync and the starter kit run it", `${every.stdout}${every.stderr}`);
   // (an install npm recorded for another lock file is no install of this one: the package did not run)
   const record = path.join(pk, "node_modules/.package-lock.json"), kept = fs.readFileSync(record, "utf8");
   const other = JSON.parse(kept);
@@ -232,14 +253,16 @@ try {
   const warned = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env: { ...inPr, [["npm_config_regi", "stry"].join("")]: "http://127.0.0.1:9/", npm_config_fetch_retries: "0", npm_config_cache: path.join(tmp, "empty-cache") } });
   ok(warned.status === 0 && /^::warning::The core's packages could not be installed .*twice/mu.test(warned.stdout) && /Mend: run this job again/u.test(warned.stdout) && /^CORE_PACKAGES_UNREACHED=1$/mu.test(fs.readFileSync(jobEnv, "utf8")), "in a project's pull request a registry that does not answer twice is a warning, and tells the job's later checks", `${warned.status} ${warned.stdout}${warned.stderr}`);
   // (what would reach past the core's own files: a shrinkwrap npm reads first, another registry, a link in the install's place)
-  const refuses = (what, plant, unplant, said) => {
+  const refuses = (what, plant, unplant, said, names = []) => {
     plant();
-    const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs")], { cwd: project, encoding: "utf8", timeout: 300000, env });
+    const r = spawnSync(process.execPath, [path.join(copy, "scripts/install.mjs"), ...names], { cwd: project, encoding: "utf8", timeout: 300000, env });
     unplant();
     ok(r.status === 1 && said.test(r.stderr) && mended(r.stderr), `install.mjs installs nothing where ${what}, saying the mend`, `${r.status} ${r.stdout}${r.stderr}`);
   };
   fs.rmSync(path.join(pk, "node_modules"), { recursive: true, force: true });
   refuses("a shrinkwrap stands beside the lock file", () => fs.copyFileSync(path.join(pk, "package-lock.json"), path.join(pk, "npm-shrinkwrap.json")), () => fs.rmSync(path.join(pk, "npm-shrinkwrap.json")), /npm-shrinkwrap\.json stands beside the lock file/u);
+  refuses("a file stands in the parser's folder beside its own", () => fs.writeFileSync(path.join(pp, "npmrc"), "\n"), () => fs.rmSync(path.join(pp, "npmrc")), /parser holds "npmrc" beside the package list/u, ["parser"]);
+  refuses("the parser's folder is a link", () => { fs.renameSync(pp, `${pp}-moved`); fs.symlinkSync(`${pp}-moved`, pp, "junction"); }, () => { fs.unlinkSync(pp); fs.renameSync(`${pp}-moved`, pp); }, /parser is a link/u, ["parser"]);
   refuses("a file stands in .packages/ beside the core's own", () => { fs.mkdirSync(path.join(pk, "etc")); fs.writeFileSync(path.join(pk, "etc", "npmrc"), "\n"); }, () => fs.rmSync(path.join(pk, "etc"), { recursive: true }), /holds "etc" beside the package list/u);
   const copyNpmrc = fs.readFileSync(path.join(pk, ".npmrc"), "utf8");
   refuses("the .npmrc holds a line beside the core's own two settings", () => fs.appendFileSync(path.join(pk, ".npmrc"), `"${["regi", "stry"].join("")}" = https://example.invalid/\n`), () => fs.writeFileSync(path.join(pk, ".npmrc"), copyNpmrc), /holds a line beside the core's own two settings/u);

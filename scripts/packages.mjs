@@ -1,7 +1,8 @@
-// A package of another publisher, as the core installs it (#654): from .packages/node_modules/ in the core alone, never
-// a project's own install of the same name at another version, and only where what is installed there is what the lock
-// file names, each entry by its version, address and integrity (npm's own record of the install,
-// .packages/node_modules/.package-lock.json, read against .packages/package-lock.json), so a folder an earlier install
+// A package of another publisher, as the core installs it (#654): from the node_modules/ of the core's own install whose
+// package list names it (INSTALLS: .packages/, or the parser's .packages/parser/, #719) alone, never a project's own
+// install of the same name at another version, and only where what is installed there is what its lock file names,
+// each entry by its version, address and integrity (npm's own record of the install, node_modules/.package-lock.json,
+// read against the lock file beside it), so a folder an earlier install
 // of another lock file left is never run. Where it is not so, the check that needs it did not run, and says so with the command that installs it
 // (#254, #457); it never passes. In a project's pull request whose install could not reach the registry, a script asks
 // unreached() first, and says that part did not run as a warning (#654, point 4).
@@ -15,10 +16,24 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-// (the core's dot folder of its package list, lock file and install, which no workspace pattern of a project takes in)
-const packages = path.join(root, ".packages");
+// The core's installs, each by the name install.mjs knows it by, and its folder below the core, which holds its own
+// package list, lock file, .npmrc and install: the first in every job, the parser's only where a job names it (#719).
+export const INSTALLS = { npm: ".packages", parser: ".packages/parser" };
 
-const need = createRequire(path.join(packages, "package.json"));
+const FIRST = Object.keys(INSTALLS)[0];
+// The install whose package list names `name`, the first where none does; and, of each, its folder and how a package
+// is found from there.
+const lists = {};
+function installOf(name) {
+  for (const [install, dir] of Object.entries(INSTALLS)) {
+    lists[install] ??= (() => { try { return JSON.parse(fs.readFileSync(path.join(root, dir, "package.json"), "utf8")); } catch { return {}; } })();
+    if (Object.hasOwn(lists[install].dependencies ?? {}, name) || Object.hasOwn(lists[install].devDependencies ?? {}, name)) return install;
+  }
+  return FIRST;
+}
+const dirOf = install => path.join(root, INSTALLS[install]);
+const needs = {};
+const need = install => (needs[install] ??= createRequire(path.join(dirOf(install), "package.json")));
 
 // The package's module, imported from the core's own .packages/node_modules/; where it is not there, a failure that says the mend.
 export async function load(name) {
@@ -27,34 +42,36 @@ export async function load(name) {
 
 // The same, required at once: a package whose entry is CommonJS, loaded where a function first uses it.
 export function loadSync(name) {
-  return need(found(name));
+  return need(installOf(name))(found(name));
 }
 
-// Whether the package is installed in the core's own .packages/node_modules/, for what reads it and must not stop where it is
-// not (steps.mjs, which never fails over one step).
+// Whether the package is installed in the core's own install that names it, for what reads it and must not stop where it
+// is not (steps.mjs, which never fails over one step).
 export function installed(name) {
   return entry(name) !== null;
 }
 
-// Whether .packages/node_modules/ holds what .packages/package-lock.json names: each entry of the lock file in npm's record of the install,
-// at the same version, from the same address, with the same integrity; all but those only the core's tests run, which
-// no script loads and a copy does not install.
-let current;
-function matches() {
-  if (current === undefined) {
-    const read = f => { try { return JSON.parse(fs.readFileSync(path.join(packages, f), "utf8")).packages ?? {}; } catch { return null; } };
+// Whether an install's node_modules/ holds what its lock file names: each entry of the lock file in npm's record of the
+// install, at the same version, from the same address, with the same integrity; all but those only the core's tests run,
+// which no script loads and a copy does not install.
+const current = {};
+function matches(install) {
+  if (current[install] === undefined) {
+    const read = f => { try { return JSON.parse(fs.readFileSync(path.join(dirOf(install), f), "utf8")).packages ?? {}; } catch { return null; } };
     const wanted = read("package-lock.json"), had = read("node_modules/.package-lock.json");
-    current = Boolean(wanted && had) && Object.keys(wanted).filter(k => k && !wanted[k].dev).every(k => had[k] && ["version", "resolved", "integrity"].every(f => wanted[k][f] === had[k][f]));
+    current[install] = Boolean(wanted && had) && Object.keys(wanted).filter(k => k && !wanted[k].dev).every(k => had[k] && ["version", "resolved", "integrity"].every(f => wanted[k][f] === had[k][f]));
   }
-  return current;
+  return current[install];
 }
 
-// The package's entry file, in the core's own .packages/node_modules/ alone, as the lock file names it, or null.
+// The package's entry file, in the node_modules/ of the core's own install that names it alone, as its lock file names
+// it, or null.
 function entry(name) {
-  if (!matches()) return null;
+  const install = installOf(name);
+  if (!matches(install)) return null;
   try {
-    const own = fs.realpathSync(path.join(packages, "node_modules")) + path.sep;
-    const at = need.resolve(name);
+    const own = fs.realpathSync(path.join(dirOf(install), "node_modules")) + path.sep;
+    const at = need(install).resolve(name);
     return fs.realpathSync(at).startsWith(own) ? at : null;
   } catch { return null; }
 }
@@ -158,12 +175,13 @@ export function unreached(name) {
 function found(name) {
   const file = entry(name);
   if (!file) {
+    const which = installOf(name), named = which === FIRST ? "" : ` ${which}`;
     const install = path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"));
-    const at = path.relative(process.cwd(), path.join(packages, "node_modules"));
+    const at = path.relative(process.cwd(), path.join(dirOf(which), "node_modules"));
     const mend = process.env.GITHUB_ACTIONS === "true"
-      ? `in a pull request of its own, never a sync pull request, add the step if [ -f ${install} ]; then node ${install}; fi to this job before the step that runs this check, then run the job again; where the job has such a step, run the job again`
-      : `run node ${install}, which installs the core's packages from its lock file, then run the check again`;
-    console.error(`FAIL: the check did not run: the package ${name} is not installed in ${at} as .packages/package-lock.json names it. Mend: ${mend}`);
+      ? `in a pull request of its own, never a sync pull request, add the step if [ -f ${install} ]; then node ${install}${named}; fi to this job before the step that runs this check, then run the job again; where the job has such a step${named ? `, name${named} in it` : ""}, run the job again`
+      : `run node ${install}${named}, which installs the core's packages from its lock file, then run the check again`;
+    console.error(`FAIL: the check did not run: the package ${name} is not installed in ${at} as ${INSTALLS[which]}/package-lock.json names it. Mend: ${mend}`);
     process.exit(1);
   }
   return file;

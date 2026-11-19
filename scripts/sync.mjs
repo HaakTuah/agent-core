@@ -179,7 +179,8 @@ function sync(tmp) {
 function install(dir) {
   const script = path.join(dir, "scripts", "install.mjs");
   if (!fs.existsSync(script)) return;
-  const r = spawnSync(process.execPath, [script], { encoding: "utf8" });
+  // (every install of the copy's, the parser's too, for the session that works in the project: #719)
+  const r = spawnSync(process.execPath, [script, "all"], { encoding: "utf8" });
   process.stdout.write(r.stdout ?? "");
   if (r.status !== 0) console.log(`note the copy is written, but its packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node ${path.relative(process.cwd(), script)} before running a check`);
 }

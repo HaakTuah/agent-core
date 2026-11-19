@@ -307,8 +307,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   #519 weighed the template; `git archive`, which the sync already uses. *Bugs:* 2, 8 and 4. **Keep:** nothing fits;
   what a release asks is the core's.
 - `scripts/install.mjs`, `scripts/packages.mjs`: install the packages of other publishers the scripts run from the
-  core's lock file in `.packages/` into `.packages/node_modules/`, and load each from there alone, a missing one saying
-  its mend (#654). *Runs:* any session, at its start and at each sync, and on the host's runners before each check.
+  core's lock file in `.packages/` into `.packages/node_modules/`, and the parser's from `.packages/parser/` only where
+  a job names it (#719), and load each from its own install alone, a missing one saying its mend (#654). *Runs:* any session, at its start and at each sync, and on the host's runners before each check.
   *Else:* npm's own `npm ci`, which does the install, kept; a folder of carried packages (#528), dropped on the owner's
   decision of 18 November 2026. *Bugs:* none. **Keep:** the install is npm's; the scripts run it once more after a
   failed fetch and say the mend.
