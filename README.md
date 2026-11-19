@@ -320,8 +320,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      who made it, since builder and reviewer may post under one login. Dependabot's own pull request passes it (floor
      rule 17); one that needs no security review and gets none by itself (floor rule 8) says so in such a comment.
      Beside it, in the same job, the status `code-review` waits while Codex's code review runs on the head commit, until
-     it finishes or a comment that opens "Code review:" from the owner, a member or a collaborator names that commit by
-     its whole SHA (`tasks/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
+     it finishes or a comment that opens "Code review:", from an account the security review counts, names that commit
+     by its whole SHA (`tasks/reviews.md`, point 2), and while a pull request that needs a code review (not docs alone,
      nor a sync's shape) has had none on its head, or on a commit only such updates from `main` follow; while the newest
      "Security review:", "Code review:" or "Design check:" posted from 18 November lacks its lines "Blocking findings:"
      and "Other findings:" (`tasks/reviews.md`, point 3); and, in the core's own repository, while a pull request opened

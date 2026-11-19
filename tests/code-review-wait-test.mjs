@@ -15,7 +15,8 @@ let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
 const HEAD = "c".repeat(40);
 const OLD = "d".repeat(40);
-const pull = { state: "open", draft: false, head: { sha: HEAD } };
+// (its owner, "someone", is whose posted reviews count with no right read: security-review.mjs, counted)
+const pull = { state: "open", draft: false, head: { sha: HEAD }, base: { repo: { owner: { login: "someone" } } } };
 const secDone = { commit_sha: HEAD, has_any_findings: null, has_unresolved_findings: null, status: "completed" };
 // the summary as Codex's app writes it and GitHub's API gives it, with its code review in the state given
 const summary = (code, who = { login: "chatgpt-codex-connector[bot]", type: "Bot" }) => ({
@@ -41,7 +42,7 @@ const same = judge({ ...pull, head: { sha: SAME } }, [summary({ ...running, comm
 ok(same?.sha === SAME && same.done === false && same.why.includes("still running"), "an earlier review of a commit with the same first seven characters does not end the wait on a new head");
 ok(is(judge(pull, [summary(running), said(`Code review: of ${HEAD.toUpperCase()}`)]), true, "is posted"), "the whole SHA in capitals counts too");
 ok(is(judge(pull, [summary(running), said(`Code review: of f${HEAD}`)]), false, "still running") && is(judge(pull, [summary(running), said(`Code review: of ${HEAD}0`)]), false, "still running") && is(judge(pull, [summary(running), said(`Code review: of ${HEAD}.`)]), true, "is posted"), "the SHA must stand alone: glued to more hex it names no commit, and the wait goes on");
-ok(["MEMBER", "COLLABORATOR"].every((a) => is(judge(pull, [summary(running), said(`**Code review:** of ${HEAD}`, a)]), true, "is posted")), "and so does one from a member or collaborator, in bold too, naming the whole commit");
+ok(["MEMBER", "COLLABORATOR"].every((a) => is(judge(pull, [summary(running), said(`**Code review:** of ${HEAD}`, a)]), true, "is posted")), "and so does the repository's owner's, whatever association GitHub gives it, in bold too, naming the whole commit");
 ok(is(judge(pull, [summary(running), said(`Code review: of ${OLD}`)]), false, "still running"), "one posted of another commit does not");
 ok(["NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", null].every((a) => is(judge(pull, [summary(running), said(`Code review: of ${HEAD}`, a)]), false, "still running")), "nor one from anyone else");
 ok(["code review: of " + HEAD, "> Code review: of " + HEAD, "The Code review: of " + HEAD, "Security review: of " + HEAD].every((b) => is(judge(pull, [summary(running), said(b)]), false, "still running")), "nor one that does not open with the words");
@@ -106,6 +107,14 @@ ok(is(had([summary({ ...done, commit_sha: OLD })], updated), true, "nothing but 
     "one from a member the host's rights let write, or whom the project names, holds it until posted again");
   ok(is(had([...ran, member(`Design check: ${HEAD}\n${lines}`)], line, tasks, orgCore, [], true, null, reads), false, "no design check of head") && is(had([...ran, member(`Design check: ${HEAD}\n${lines}`)], line, tasks, orgCore, [], true, null, writes), true, "a code review has run"),
     "a design check from a member who may only read settles nothing; one from a member who may write settles it");
+  // a posted code review that ends the wait counts the same way: never by GitHub's association alone
+  const review = member(`Code review: of ${HEAD}\n${lines}`);
+  ok(is(had([summary(running), review], line, code, org, [], true, null, reads), false, "still running") && is(had([review], line, code, org, [], true, null, reads), false, "no code review yet") && is(had([review], line, code, org), false, "no code review yet"),
+    "a code review posted by a member who may only read, or whose right was not read, neither ends a running review's wait nor stands for one");
+  ok(is(had([summary(running), review], line, code, org, [], true, null, writes), true, "is posted") && is(had([review], line, code, org, [], true, null, writes), true, "a code review has run")
+    && is(had([review], line, code, org, [], true, null, { reviewers: ["reader"] }), true, "a code review has run") && is(had([member(`Code review: of ${HEAD}\n${lines}`, "some-org")], line, code, org), true, "a code review has run"),
+    "one from a member the host's rights let write, an account the project names, or the repository's owner does");
+  ok(is(had([summary(running), review], line, code, org, [], false, null, reads), true, "is posted"), "on a pull request from before the check, a member's posted code review counts as it did");
   // each mend says the whole form of what is to be posted within GitHub's 140 characters, advisory or waiting
   const kinds = [["Security review", "Security review"], ["Code review", "Code review"], ["Design check", "Design check"]];
   const rendered = kinds.map(([kind]) => had([...ran, now(`${kind}: ${HEAD}`)])).concat([had(ran, line, tasks, core)]);

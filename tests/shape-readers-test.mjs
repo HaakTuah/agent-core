@@ -9,6 +9,7 @@ import { Worker } from "node:worker_threads";
 import { csTokens, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "../scripts/shape-csharp.mjs";
 import { STDLIB, logicalLines, pythonPackages, readPython, resolvePython } from "../scripts/shape-python.mjs";
 import { ParserFailed, inParser } from "../scripts/parser.mjs";
+import { LARGEST } from "../scripts/tree-walk.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -444,6 +445,10 @@ ok(same(shown(readCsharp(outside).functions), ["(anonymous):2:3:2:2", "C:4:1:0:0
 // review).
 const newer = `class A\n{\n    void Long()\n    {\n${"        x++;\n".repeat(100)}        a?.b += 1;\n    }\n}\n`;
 ok(readCsharp(newer).functions === null, "C#: a file the grammar cannot read whole has no functions told, so that the check counts it and says so");
+// (and one past the largest a reader gives its grammar, lost unread: its tree's memory is what a generated file costs)
+const sized = n => `class A { int[] W = { ${Array.from({ length: n }, (_, k) => k).join(", ")} }; void M() { } }\n`;
+ok(sized(LARGEST / 9).length <= LARGEST && same(shown(readCsharp(sized(LARGEST / 9)).functions), ["M:1:1:0:0"]) && sized(LARGEST / 6).length > LARGEST && readCsharp(sized(LARGEST / 6)).functions === null,
+  "C#: a file past the largest the grammar is given is lost unread, and one under it is read whole");
 // The parser's thread: a call that fails there is told as the file's ("read"), and the next call gets its own answer,
 // never an earlier one's.
 let failedAs = null;
