@@ -437,7 +437,7 @@
     "tasks/tests.md: No test run on a draft": [264],
     "tasks/tests.md: The default branch is tested at its newest commit": [264],
     "tasks/tests.md: The slow suites run once per batch, wherever they run": [264],
-    "tasks/tests.md: A test that reaches the network runs once per batch": [265]
+    "tasks/tests.md: A test that reaches the network runs once per batch": [267]
   },
   "numbers": {
     "floor/security.md: The owner's word": "findings; outcome: readable; rare harm",
