@@ -199,7 +199,11 @@
     ],
     "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part",
     "floor/security.md: The owner's yes in the PR": "check: scripts/pr-description.mjs, in part",
-    "roles/shared/teams.md: The higher right gives the floor's yeses": "check: scripts/pr-description.mjs, in part"
+    "roles/shared/teams.md: The higher right gives the floor's yeses": "check: scripts/pr-description.mjs, in part",
+    "roles/shared/review-guidelines.md: Every reviewer": "check: scripts/code-review-wait.mjs, in part",
+    "tasks/reviews.md: What a posted review declares": "check: scripts/code-review-wait.mjs, in part",
+    "tasks/reviews.md: The design check": "check: scripts/code-review-wait.mjs, in part",
+    "tasks/reviews.md: A late review is still read": "check: scripts/look.mjs, in part"
   },
   "behind": {
     "AGENTS.md": [208, 209, 213],

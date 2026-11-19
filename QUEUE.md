@@ -61,7 +61,6 @@ it merges last.
 | #542 | rule builder; it changes what the orchestrator reads at its start | #457 |
 | #337 | builder | |
 | #426 | builder | |
-| #404 | builder | |
 | #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467 |
 | #492 | rule builder; it changes floor rule 4, who may start the orchestrator, and what every role reads at its start | #397 and #467 |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
