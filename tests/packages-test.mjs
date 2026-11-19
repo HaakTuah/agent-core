@@ -210,6 +210,29 @@ try {
   ok(tests.length > 0 && !tests.some(([k]) => fs.existsSync(path.join(pk, k))), "and none that only the core's own tests run: a copy holds no tests", tests.map(([k]) => k).join(", "));
   const loaded = spawnSync(process.execPath, ["--input-type=module", "-e", `const { load } = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); const m = await load("yaml"); console.log(m.project ? "project" : typeof m.Lexer);`], { cwd: project, encoding: "utf8", env });
   ok(loaded.status === 0 && loaded.stdout.trim() === "function", "and load() takes the copy's own, never the project's", `${loaded.stdout}${loaded.stderr}`);
+  // (an install left from before is never loaded for a package its lock does not name as installed: where the package
+  // list and lock name nothing, and where the package's own entry is flagged dev at another version; #719)
+  const keptMainList = fs.readFileSync(path.join(pk, "package.json"), "utf8"), keptMainLock = fs.readFileSync(path.join(pk, "package-lock.json"), "utf8");
+  const leftoverCases = [];
+  {
+    const list = JSON.parse(keptMainList);
+    delete list.dependencies; delete list.devDependencies;
+    fs.writeFileSync(path.join(pk, "package.json"), JSON.stringify(list, null, 2));
+    fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify({ name: list.name, lockfileVersion: 3, requires: true, packages: { "": { name: list.name, license: list.license } } }, null, 2));
+    leftoverCases.push(["a package list and lock that name nothing", call("yaml-keys.mjs", CALLS["yaml-keys.mjs"])]);
+  }
+  {
+    const list = JSON.parse(keptMainList), lock = JSON.parse(keptMainLock);
+    list.dependencies = { ...list.dependencies, yaml: "2.8.0" };
+    lock.packages[""].dependencies = { ...lock.packages[""].dependencies, yaml: "2.8.0" };
+    lock.packages["node_modules/yaml"] = { ...lock.packages["node_modules/yaml"], version: "2.8.0", resolved: "https://registry.npmjs.org/yaml/-/yaml-2.8.0.tgz", integrity: `sha512-${Buffer.alloc(64, 9).toString("base64")}`, dev: true };
+    fs.writeFileSync(path.join(pk, "package.json"), JSON.stringify(list, null, 2));
+    fs.writeFileSync(path.join(pk, "package-lock.json"), JSON.stringify(lock, null, 2));
+    leftoverCases.push(["the package's own entry flagged dev at another version", call("yaml-keys.mjs", CALLS["yaml-keys.mjs"])]);
+  }
+  fs.writeFileSync(path.join(pk, "package.json"), keptMainList);
+  fs.writeFileSync(path.join(pk, "package-lock.json"), keptMainLock);
+  for (const [what, r] of leftoverCases) ok(r.status === 1 && /did not run: the package yaml is not installed/u.test(r.stderr) && mended(r.stderr), `an install left from before is not loaded where ${what}`, `${r.status} ${r.stdout}${r.stderr}`);
   // (the parser's install only where a job names it: with none named, its packages are not there, and a script that
   // loads one says it did not run, naming the install; `install.mjs parser` installs it, and `all` every one: #719)
   const loadParser = () => spawnSync(process.execPath, ["--input-type=module", "-e", `const { loadSync } = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts/packages.mjs")).href)}); console.log(loadSync("is-number")(7));`], { cwd: project, encoding: "utf8", env });

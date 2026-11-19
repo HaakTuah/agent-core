@@ -28,8 +28,8 @@ const FIRST = Object.keys(INSTALLS)[0];
 export function everyInstall(copy) {
   return fs.existsSync(path.join(copy, INSTALLS.parser, "package.json")) ? ["all"] : [];
 }
-// The install whose package list names `name`, the first where none does; and, of each, its folder and how a package
-// is found from there.
+// The install whose package list names `name`, or null where none does: a package no list names is loaded from no
+// install, whatever a folder holds (#719); and, of each, its folder and how a package is found from there.
 const lists = {};
 const listOf = install => (lists[install] ??= (() => { try { return JSON.parse(fs.readFileSync(path.join(root, INSTALLS[install], "package.json"), "utf8")); } catch { return {}; } })());
 function installOf(name) {
@@ -37,7 +37,7 @@ function installOf(name) {
     const list = listOf(install);
     if (Object.hasOwn(list.dependencies ?? {}, name) || Object.hasOwn(list.devDependencies ?? {}, name)) return install;
   }
-  return FIRST;
+  return null;
 }
 const dirOf = install => path.join(root, INSTALLS[install]);
 const needs = {};
@@ -50,7 +50,8 @@ export async function load(name) {
 
 // The same, required at once: a package whose entry is CommonJS, loaded where a function first uses it.
 export function loadSync(name) {
-  return need(installOf(name))(found(name));
+  const file = found(name);
+  return need(installOf(name))(file);
 }
 
 // Whether the package is installed in the core's own install that names it, for what reads it and must not stop where it
@@ -59,18 +60,24 @@ export function installed(name) {
   return entry(name) !== null;
 }
 
+// An install's lock file and npm's record of what it installed: { wanted, had }, each its entries, or null.
+const records = {};
+function recordOf(install) {
+  const read = f => { try { return JSON.parse(fs.readFileSync(path.join(dirOf(install), f), "utf8")).packages ?? {}; } catch { return null; } };
+  return (records[install] ??= { wanted: read("package-lock.json"), had: read("node_modules/.package-lock.json") });
+}
+// Whether the entry `k` stands in npm's record as the lock file names it: the same version, address and integrity.
+const same = ({ wanted, had }, k) => Boolean(wanted?.[k] && had?.[k]) && ["version", "resolved", "integrity"].every(f => wanted[k][f] === had[k][f]);
+
 // Whether an install's node_modules/ holds what its lock file names: each entry of the lock file in npm's record of the
 // install, at the same version, from the same address, with the same integrity; all but those only the core's tests run,
-// which no script loads and a copy does not install.
+// which no script loads and a copy does not install. And each package the package list names has its entry in the
+// lock, so an install never reads as current where the lock names fewer packages than the list beside it (#719).
 const current = {};
 function matches(install) {
   if (current[install] === undefined) {
-    const read = f => { try { return JSON.parse(fs.readFileSync(path.join(dirOf(install), f), "utf8")).packages ?? {}; } catch { return null; } };
-    const wanted = read("package-lock.json"), had = read("node_modules/.package-lock.json");
-    // (and each package the package list names has its entry in the lock, so an install never reads as current where the
-    // lock names fewer packages than the list it stands beside: #719)
-    const named = Object.keys(listOf(install).dependencies ?? {});
-    current[install] = Boolean(wanted && had) && named.every(n => wanted[`node_modules/${n}`]) && Object.keys(wanted).filter(k => k && !wanted[k].dev).every(k => had[k] && ["version", "resolved", "integrity"].every(f => wanted[k][f] === had[k][f]));
+    const rec = recordOf(install), named = Object.keys(listOf(install).dependencies ?? {});
+    current[install] = Boolean(rec.wanted && rec.had) && named.every(n => rec.wanted[`node_modules/${n}`]) && Object.keys(rec.wanted).filter(k => k && !rec.wanted[k].dev).every(k => same(rec, k));
   }
   return current[install];
 }
@@ -79,7 +86,8 @@ function matches(install) {
 // it, or null.
 function entry(name) {
   const install = installOf(name);
-  if (!matches(install)) return null;
+  // (the package's own entry too, whatever its dev flag, so a folder an earlier install left is never taken for it: #719)
+  if (!install || !matches(install) || !same(recordOf(install), `node_modules/${name}`)) return null;
   try {
     const own = fs.realpathSync(path.join(dirOf(install), "node_modules")) + path.sep;
     const at = need(install).resolve(name);
@@ -122,8 +130,6 @@ export function lockFaults(list, lock) {
   // (the package list's own packages at one exact version each: floor rule 7)
   for (const f of ["dependencies", "devDependencies"]) for (const [n, v] of Object.entries(list?.[f] ?? {})) if (!/^\d+\.\d+\.\d+$/u.test(String(v))) out.push(`package.json ${f}: ${JSON.stringify(n)} at ${JSON.stringify(v)}, not one exact version`);
   out.push(...formFaults(lock));
-  // (npm writes the root entry "" in every lock of its own form: one without it would hold the package list to nothing)
-  if (plainObject(lock?.packages) && !Object.hasOwn(lock.packages, "")) out.push("package-lock.json: no root entry \"\" of npm's own form, which holds the package list's packages");
   for (const [k, e] of Object.entries(lock?.packages ?? {})) out.push(...(k ? entryFaults(k, e ?? {}, specs) : rootFaults(e, list)));
   return out;
 }
@@ -149,6 +155,8 @@ function formFaults(lock) {
   if (lock?.lockfileVersion !== 3) out.push("package-lock.json: not npm's own form, version 3");
   if (top.length) out.push(`package-lock.json: the field${top.length === 1 ? "" : "s"} ${top.join(", ")}, which npm's own form, version 3, does not hold`);
   if (!lock?.packages || typeof lock.packages !== "object" || Array.isArray(lock.packages)) out.push("package-lock.json: no \"packages\" of npm's own form");
+  // (npm writes the root entry "" in every lock of its own form: one without it would hold the package list to nothing)
+  else if (!Object.hasOwn(lock.packages, "")) out.push("package-lock.json: no root entry \"\" of npm's own form, which holds the package list's packages");
   return out;
 }
 
@@ -188,7 +196,7 @@ export function unreached(name) {
 function found(name) {
   const file = entry(name);
   if (!file) {
-    const which = installOf(name), named = which === FIRST ? "" : ` ${which}`;
+    const which = installOf(name) ?? FIRST, named = which === FIRST ? "" : ` ${which}`;
     const install = path.relative(process.cwd(), path.join(root, "scripts", "install.mjs"));
     const at = path.relative(process.cwd(), path.join(dirOf(which), "node_modules"));
     const mend = process.env.GITHUB_ACTIONS === "true"
