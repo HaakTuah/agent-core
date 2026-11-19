@@ -85,16 +85,17 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      gets its reviews. Where `scripts/queue-only.mjs`, run from the default branch on the head, proves that it
      changes the *progress file* alone, from a branch of the repository's own into the default branch, each line it
      adds in a form the file's lines already take and naming an open, queued issue of the *owner's account* that
-     carries the owner's word as "Whose words an issue holds" in the core's `AGENTS.md` reads it, or needs none, and
-     each line it removes a closed one (what it reads, and what it leaves to the reviews: the script's header), it
-     merges on its checks as a pure sync does: the `security-review` and `code-review` statuses pass with no review,
-     a review that starts by itself still waited for, and its builder asks none. It does not mean a line joins
-     without the owner's word where one is needed, that any other file rides along, nor that a line the script cannot
-     read (a test, a check for a rule that stands, an audit's small finding, words new to the file) is refused: that
-     pull request is reviewed as any other, and what a review passed joins what later lines may say. Reason: 4 of 39
-     merges only added queue lines, each through Codex's two reviews, a fallback's review and the full tests, where
-     what a review would read is exactly what a script can read. Held by `scripts/queue-only.mjs`, which the core's
-     own caller of the `security-review` workflow runs, and its test.
+     carries the owner's word as "Whose words an issue holds" in the core's `AGENTS.md` reads it, in the one form a
+     script reads exactly, or needs none, and each line it removes a closed one (that form, what it reads, and what
+     it leaves to the reviews: the script's header), it merges on its checks as a pure sync does: the
+     `security-review` and `code-review` statuses pass with no review, a review that starts by itself still waited
+     for, and its builder asks none. It does not mean a line joins without the owner's word where one is needed, that
+     any other file rides along, nor that a line the script cannot read (a test, a check for a rule that stands, an
+     audit's small finding, words new to the file, the owner's word in other words) is refused: that pull request is
+     reviewed as any other, and what a review passed joins what later lines may say. Reason: 4 of 39 merges only
+     added queue lines, each through Codex's two reviews, a fallback's review and the full tests, where what a review
+     would read is exactly what a script can read. Held by `scripts/queue-only.mjs`, which the core's own caller of
+     the `security-review` workflow runs, and its test.
    - **What a posted review declares** (#299): by default a review posted in a comment that opens "Security review:",
      "Code review:" or "Design check:" covers one kind of review, and declares what it found on two lines of their own:
      "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other finding.", and its score

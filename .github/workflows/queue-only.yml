@@ -10,8 +10,9 @@
 # "Nothing locks a project"), whose queue-only pull requests are then reviewed as any other. It checks out the default
 # branch, never the pull request, reads only, and writes nothing. No secret: untrusted text (the pull request's, its
 # issues') reaches the script only as files and env, never a run line (floor rule 2). Its files are read from the
-# comparison of the pull request's base and head commits, as the pull request's answer names them, so they are that
-# head's files whatever is pushed meanwhile.
+# comparison of the default branch's commit it checked out with the head the pull request's answer names, so they are
+# that head's files whatever is pushed meanwhile, and proved only where they are the files GitHub lists for the pull
+# request.
 name: queue-only
 
 on:
@@ -79,10 +80,15 @@ jobs:
           [ -f "$ROOT/scripts/queue-only.mjs" ] || { echo "The default branch holds no queue-only.mjs yet."; exit 0; }
           gh api "repos/$REPO/pulls/$NUMBER" > "$d/pull.json" || exit 0
           [ "$(jq '.changed_files' "$d/pull.json")" = 1 ] || { echo "It changes more than one file: not queue-only."; exit 0; }
-          base=$(jq -r '.base.sha' "$d/pull.json") tip=$(jq -r '.head.sha' "$d/pull.json")
-          [[ "$base" =~ ^[0-9a-f]{40}$ && "$tip" =~ ^[0-9a-f]{40}$ ]] || { echo "The pull request names no base and head commits."; exit 0; }
+          # (from the default branch's commit checked out here, whose progress file the form is read from, as GitHub lists
+          # the pull request's files from where its head leaves that branch: the answer's base.sha can stand behind it)
+          base=$(git rev-parse HEAD) tip=$(jq -r '.head.sha' "$d/pull.json")
+          [[ "$base" =~ ^[0-9a-f]{40}$ && "$tip" =~ ^[0-9a-f]{40}$ ]] || { echo "The pull request names no head commit."; exit 0; }
           # (the files of exactly the head the pull request's answer names, read by its SHA, never by the branch's name)
           gh api "repos/$REPO/compare/$base...$tip" --jq '.files' > "$d/files.json" || exit 0
+          # (and the one file the comparison gives is the one GitHub lists for the pull request, whose list the review job reads)
+          listed=$(gh api "repos/$REPO/pulls/$NUMBER/files" --jq '[.[].filename] | join("/")') || exit 0
+          [ "$listed" = "$(jq -r '[.[].filename] | join("/")' "$d/files.json")" ] || { echo "Its files are not those it was compared to: not proved."; exit 0; }
           if head=$(timeout 90 node "$ROOT/scripts/queue-only.mjs" "$d/pull.json" "$d/files.json") && [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
             echo "Queue-only, as queue-only.mjs proves: $head"
             echo "head=$head" >> "$GITHUB_OUTPUT"

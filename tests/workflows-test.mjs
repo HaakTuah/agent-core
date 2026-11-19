@@ -206,6 +206,12 @@ ok(ownCall.length === 2 && ["security-review.yml", "queue-only.yml"].every((name
 const queueProof = parseYaml(fs.readFileSync(path.join(wfDir, "queue-only.yml"), "utf8"));
 ok(ownReview.concurrency === undefined && kitReview.concurrency === undefined && Object.values(queueProof.jobs).every((job) => job.concurrency === undefined),
   "and neither caller holds its whole run in a group, nor the proof its job, so no comment's run cancels one waiting to record a review");
+// (the proof compares from the default branch's commit it checked out, whose progress file gives the form, and proves
+// only files that are those GitHub lists for the pull request, which the review job reads: the answer's base.sha can
+// stand behind where the head leaves that branch)
+const proveRun = String(queueProof.jobs.prove.steps.find((step) => step.id === "prove")?.run);
+ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.sha") && /compare\/\$base\.\.\.\$tip/u.test(proveRun) && /pulls\/\$NUMBER\/files/u.test(proveRun),
+  "and the proof compares the head from the default branch's commit it checked out, its files held to those GitHub lists for the pull request");
 
 // ---- when the core's tests run (#733, points 2 to 4 and 6) ----
 // A pull request's run starts once it is ready, never on a draft, on Linux alone; main is tested on Linux at its newest

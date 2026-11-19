@@ -2,33 +2,37 @@
 // Is this pull request queue-only (floor rule 8; #750, point 2)? A pull request that only changes lines of the
 // *progress file* needs no review of its own where this proves it: GitHub's list of its files holds that one file
 // alone, whole, changed in place, its patch given, from a branch of the repository's own, never a fork's (floor rule
-// 4), into the default branch, the file being no rule file (rule-files.mjs); each line it adds is in the file's form
-// (formFault: a row ending with its last "|", or an item, as the file's lines on the default branch are, each cell
-// after a row's first, or an item's text after its issues, one a line there holds word for word, issues and numbers
-// aside, 240 characters at most), names no points or steps of an issue before what it waits on, and names,
-// first on the line, an issue (#n) that is open, no pull request, opened by the *owner's account*, labelled `queued`
-// and neither `on-hold` nor `stand-in-yes`, and that either carries the owner's word, as AGENTS.md's "Whose words an
-// issue holds" says (labelled `by:owner`, its text holding no agent's attribution line, opener or "Found while:"; or
-// `by:chat` or `by:design`, with its current text quoting the owner under "The owner's word", or saying, in a sentence
-// or clause that opens so under "What it is" or "The owner's word" and ends with a full stop, that the owner agreed,
-// with no word of doubt, refusal or a part in it, fenced blocks read as neither), or needs none (labelled `bug`, or
-// opened by the scheduled look, `by:look`); and each line it removes names an issue that is closed, or one a line it
-// adds names again (a line edited or moved in place). A line is read as the progress file's readers read it
-// (queue.mjs's linesOf: a row or an item that names its issues first), each issue it names first counted. A line that
-// names no issue so, or is in no such form, an inbox file, issues that cannot be read whole, more than a dozen issues
-// (MOST), or an issue that cannot be read, proves nothing, and the pull request gets its reviews as any other. So
-// words new to the file, which no script can read exactly, are read by a review, and join what later lines may say
-// only once a review passed them. What needs no word but cannot be read exactly (a test, a check for a rule that
-// stands, an audit's small finding) is left to the reviews too. It reads the labels and the text a review would read,
-// so a label set wrongly is caught by neither. It does not read the order: where the line joins, and which of the
-// file's builders it names (a rule's issue given to a plain builder), stay with whoever writes the file
-// (roles/shared/inbox.md; AGENTS.md, "Who builds a line, the line says").
+// 4), into the default branch, the file being no rule file (rule-files.mjs, where it can read them); each line it adds
+// is in the file's form (formFault: a row ending with its last "|", or an item, as the file's lines on the default
+// branch are, each cell after a row's first, or an item's text after its issues, one a line there holds word for word,
+// issues and numbers aside, 240 characters at most), names no points or steps of an issue before what it waits on, and
+// names, first on the line, an issue (#n) that is open, no pull request, opened by the *owner's account*, labelled
+// `queued` and neither `on-hold` nor `stand-in-yes`, and that either carries the owner's word, as AGENTS.md's "Whose
+// words an issue holds" says, in a form a script reads exactly (labelled `by:owner`, its text holding no agent's
+// attribution line, opener or "Found while:"; or `by:chat` or `by:design`, its current text holding text under "What it
+// is" and one heading "The owner's word", whose last line, a rule, attribution lines and "Found while:" aside, is
+// wholly AGREEMENT, HTML comments and fenced blocks read as nothing, since GitHub shows neither as the issue's word),
+// or needs none (labelled `bug`, or opened by the scheduled look, `by:look`); and each line it removes names an issue
+// that is closed, or one a line it adds names again (a line edited or moved in place). A record of the owner's word in
+// any other words (a quote of the owner's, an agreement to some points, or one any word follows) is read by a review,
+// since whether words agree, hedge or withdraw is meaning, which no list of words reads exactly; a withdrawal is read
+// from the labels and the issue's state (`on-hold`, `queued` taken off, closed), never from its words. A line is read
+// as the progress file's readers read it (queue.mjs's linesOf: a row or an item that names its issues first), each
+// issue it names first counted. A line that names no issue so, or is in no such form, an inbox file, issues that cannot
+// be read whole, more than a dozen issues (MOST), or an issue that cannot be read, proves nothing, and the pull request
+// gets its reviews as any other. So words new to the file, which no script can read exactly, are read by a review, and
+// join what later lines may say only once a review passed them. What needs no word but cannot be read exactly (a test,
+// a check for a rule that stands, an audit's small finding) is left to the reviews too. It reads the labels and the
+// text a review would read, so a label set wrongly is caught by neither. It does not read the order: where the line
+// joins, and which of the file's builders it names (a rule's issue given to a plain builder), stay with whoever writes
+// the file (roles/shared/inbox.md; AGENTS.md, "Who builds a line, the line says").
 // Run by the core's own security-review caller (.github/workflows/own-security-review.yml) from the default branch's
 // copy, in a job of its own whose token may read issues, which the core's shared workflow's may not (a project's caller
 // grants it no such right), never from the pull request's: it hands the head it proved to that workflow, whose scripts
 // then ask no review of it (security-review.mjs, code-review-wait.mjs). The progress file and the owner's account are
-// read from the default branch's manifest on disk (AGENTS.md in the core; core-manifest.md in a project), and the file's
-// form from its copy there, as git holds it (1 MB at most, queue.mjs's LARGEST).
+// read from the default branch's manifest on disk (AGENTS.md in the core; core-manifest.md in a project), and the
+// file's form from its copy there, as git holds it (1 MB at most, queue.mjs's LARGEST): the commit the pull request's
+// files are compared from (queue-only.yml).
 //
 // Usage:  node scripts/queue-only.mjs <the pull request, as GitHub's API gives it> <its files, the same>
 //         REPO (or GITHUB_REPOSITORY) the repository; GH_TOKEN for gh. Prints the head's SHA and exits 0 where it
@@ -47,15 +51,16 @@ const WORD = new Set(["by:owner", "by:chat", "by:design"]), NONE = new Set(["bug
 const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry) => entry !== null && typeof entry === "object");
 const same = (a, b) => String(a ?? "").toLowerCase() === String(b ?? "").toLowerCase();
 
-// the lines a patch adds and removes ({ added, removed }), or null where it is no patch of lines GitHub gives
-export function changed(patch) {
+// the lines a file's patch adds and removes ({ added, removed }), or null where it is no patch of lines GitHub gives, or
+// one whose lines are not as many as GitHub counts for the file, so that a patch cut short is never read as whole
+export function changed({ patch, additions, deletions } = {}) {
   if (typeof patch !== "string" || patch === "" || !patch.startsWith("@@")) return null;
   const added = [], removed = [];
   for (const line of patch.split("\n")) {
     if (line.startsWith("+")) added.push(line.slice(1));
     else if (line.startsWith("-")) removed.push(line.slice(1));
   }
-  return { added, removed };
+  return added.length === additions && removed.length === deletions ? { added, removed } : null;
 }
 
 // the issues a line names first, as "#n", as the progress file's readers read it (queue.mjs); null where it names
@@ -102,39 +107,40 @@ export function formFault(line, form) {
 const POINTS = /\b(?:points?|steps?|cases?|parts?)\b/iu;
 export const namesPoints = (line) => POINTS.test(ROW.test(line) ? cellsOf(line).slice(0, -1).join("|") : line.replace(/\bwaits\s+on\b.*$/isu, ""));
 
-// the lines under a heading of a text (a Markdown heading, or a line wholly in bold), to the next heading; a fenced
-// block's lines are neither heading nor text, since what a fence holds is shown as code, never as the issue's word
-const headingOf = (line) => /^ {0,3}#{1,6}[ \t]+(.*?)[ \t#]*$/u.exec(line)?.[1] ?? /^\*\*([^*].*?)\*\*:?[ \t]*$/u.exec(line.trim())?.[1] ?? null;
+// the lines of a text as GitHub shows them: an HTML comment's, over one line or several and to the text's end where it
+// is never closed, and a fenced block's are blank, since GitHub shows neither as the issue's word (a fence's as code)
 const FENCE = /^ {0,3}(`{3,}|~{3,})/u;
-function unfenced(text) {
+function shownLines(text) {
   let fence = null;
-  return String(text ?? "").split(/\r\n|\r|\n/u).map((line) => {
+  const bare = String(text ?? "").replace(/<!--[\s\S]*?(?:-->|$)/gu, (hidden) => hidden.replace(/[^\r\n]/gu, ""));
+  return bare.split(/\r\n|\r|\n/u).map((line) => {
     const mark = FENCE.exec(line)?.[1];
     if (fence === null && mark) { fence = mark; return ""; }
     if (fence !== null) { if (mark && mark[0] === fence[0] && mark.length >= fence.length && !line.trim().slice(mark.length).trim()) fence = null; return ""; }
     return line;
   });
 }
+// the lines under a heading of a text (a Markdown heading, or a line wholly in bold), to the next heading, or null where
+// the heading stands not once alone, so that no second section of the same name goes unread
+const headingOf = (line) => /^ {0,3}#{1,6}[ \t]+(.*?)[ \t#]*$/u.exec(line)?.[1] ?? /^\*\*([^*].*?)\*\*:?[ \t]*$/u.exec(line.trim())?.[1] ?? null;
 export function under(text, name) {
-  const lines = unfenced(text), at = lines.findIndex((l) => headingOf(l)?.replace(/[*_:]/gu, "").trim().toLowerCase() === name.toLowerCase());
-  if (at < 0) return null;
+  const lines = shownLines(text), named = (l) => headingOf(l)?.replace(/[*_:]/gu, "").trim().toLowerCase() === name.toLowerCase();
+  const at = lines.findIndex(named);
+  if (at < 0 || lines.findIndex((l, i) => i > at && named(l)) >= 0) return null;
   const end = lines.findIndex((l, i) => i > at && headingOf(l) !== null);
   return lines.slice(at + 1, end < 0 ? undefined : end).filter((l) => l.trim());
 }
 
-// whether an issue's current text carries the owner's word as "Whose words an issue holds" reads it: the owner quoted
-// under "The owner's word", or a design set out under "What it is" that the text says the owner agreed to, where they
-// stand on the owner's voice (roles/shared/inbox.md), never under "The session's view (not a decision)": a sentence,
-// or a clause after ", and", that opens "the owner agreed" and ends with a full stop, with no word of doubt, refusal
-// or a part in it ("not", "if", "whether", "nothing", "yet", "only", "points" and the like), since an agreement in
-// doubt, supposed, withheld or given to a part is no yes to the whole issue
-const AGREED = /(?:^|[.!?]\s+|,\s+and\s+)(?:[-*>]\s+)?the owner agreed\b([^.!?]*)\./giu;
-const DOUBT = /\b(?:not|never|no|none|nothing|if|unless|whether|yet|later|only|part|parts|partly|points?|steps?|cases?)\b|n't\b/iu;
-const agrees = (line) => [...line.matchAll(AGREED)].some((m) => !DOUBT.test(m[1]));
+// whether an issue's current text carries the owner's word in the one form a script reads exactly: a design set out
+// under "What it is", and, under "The owner's word", AGREEMENT as the record's last line, the trailer an agent's text
+// ends with aside (a rule, its attribution lines, "Found while:"). The one sentence names the whole design, so no part
+// is read for the whole, and nothing after it can hedge, narrow or withdraw it; any other record (a quote, which may
+// say no; an agreement in other words) is meaning, left to the reviews.
+export const AGREEMENT = `The owner agreed to every point under "${LIST.headings.design}" above.`;
+const trailer = (line) => /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/u.test(line) || line.trim().replace(/^\*\*/u, "").startsWith(LIST.headings.found) || byAgent(line);
 export function carries(body) {
-  const word = under(body, LIST.headings.word) ?? [], design = under(body, LIST.headings.design) ?? [];
-  if (word.some((l) => /^\s*>\s*\S/u.test(l))) return true;
-  return design.length > 0 && [...design, ...word].some(agrees);
+  const design = under(body, LIST.headings.design), word = under(body, LIST.headings.word);
+  return Boolean(design?.length) && word !== null && word.filter((l) => !trailer(l)).at(-1)?.trim() === AGREEMENT;
 }
 
 // whether an issue labelled by:owner reads as typed by the owner: no agent's attribution line, no line that opens as
@@ -189,16 +195,16 @@ function branchFault(pull) {
 // { head, why }: head the pull request's SHA where it is queue-only, else null, and why. `progress` the progress file's
 // path, `owner` the owner's account, `read(item)` an issue as done-when.mjs's readItem gives it, `base` the progress
 // file's text on the default branch, whose form an added line must have, `rules` the project's rule files as
-// rule-files.mjs lists them, beside those its RULES names: a progress file that is one is read at a session's start as
-// a rule, and changing it asks a code review (floor rule 8).
+// rule-files.mjs lists them, beside those its RULES names, or null where they cannot be read: a progress file that is
+// one is read at a session's start as a rule, and changing it asks a code review (floor rule 8).
 export function judge(pull, files, { progress, owner, read, base, rules = [] }) {
   const head = pull?.head?.sha;
   if (pull?.state !== "open" || typeof head !== "string" || !SHA.test(head)) return { head: null, why: "no open pull request with a head to prove" };
   const form = formOf(base), list = flat(files);
   const why = setFault(pull, progress, rules, form) ?? fileFault(pull, list, progress);
   if (why) return { head: null, why };
-  const lines = changed(list[0].patch);
-  const off = lines === null ? "GitHub gives no patch of its lines" : lineFault(lines, form);
+  const lines = changed(list[0]);
+  const off = lines === null ? "GitHub gives no patch of its lines, whole as it counts them" : lineFault(lines, form);
   if (off) return { head: null, why: off };
   const adds = lines.added.flatMap(itemsOf), removes = lines.removed.flatMap(itemsOf);
   if (new Set([...adds, ...removes]).size > MOST) return { head: null, why: `it names more than ${MOST} issues` };
@@ -208,10 +214,11 @@ export function judge(pull, files, { progress, owner, read, base, rules = [] }) 
   return { head, why: `queue-only: ${n} line${n === 1 ? "" : "s"} added, ${m} removed, each issue as floor rule 8 asks` };
 }
 
-// why the progress file, or the branches the pull request joins, keep it from being proved, or null: a rule file
-// (whose change asks a code review, floor rule 8), branches as branchFault reads them, or a file on the default branch
+// why the progress file, or the branches the pull request joins, keep it from being proved, or null: a rule file, or
+// rule files that cannot be read (a change to one asks a code review, floor rule 8), branches as branchFault reads them, or a file on the default branch
 // whose form cannot be read
 function setFault(pull, progress, rules, form) {
+  if (!Array.isArray(rules)) return "the project's rule files could not be read, whose change asks a code review (floor rule 8)";
   if (RULES.test(progress) || rules.includes(progress)) return `${progress} is a rule file, whose change asks a code review (floor rule 8)`;
   return branchFault(pull) ?? (form === null ? `${progress} on the default branch could not be read` : null);
 }
@@ -225,6 +232,14 @@ function lineFault(lines, form) {
     if (off) return `a line it adds ${off}`;
   }
   return null;
+}
+
+// the project's rule files as `list` gives them; where SECURITY.md is not there or lists none of the project's own, as
+// in the core, none beyond those floor rule 3 names by name alone (RULES); null on any other failure, which proves
+// nothing, since a list that failed may have held the progress file
+const UNLISTED = /^(?:the project has no SECURITY\.md yet|SECURITY\.md, rule 3, has no "the rule files:" line)/u;
+export function rulesHere(list) {
+  try { return list(); } catch (e) { return UNLISTED.test(String(e?.message)) ? [] : null; }
 }
 
 if (started(import.meta.url)) {
@@ -242,8 +257,7 @@ if (started(import.meta.url)) {
   // (the progress file as the default branch's commit holds it, from git, so that a link is never followed)
   const shown = spawnSync("git", ["show", `HEAD:${progress}`], { encoding: "utf8", maxBuffer: LARGEST + 1 });
   const base = shown.status === 0 && shown.stdout.length <= LARGEST ? shown.stdout : null;
-  // (where SECURITY.md lists no rule files of the project's own, as in the core, those floor rule 3 names by name alone)
-  const rules = (() => { try { return ruleFiles(undefined, undefined, { tools: true }); } catch { return []; } })();
+  const rules = rulesHere(() => ruleFiles(undefined, undefined, { tools: true }));
   const verdict = /^[\w-]+\/[\w.-]+$/u.test(repo) ? judge(read(pullFile), read(filesFile), { progress, owner, read: (item) => readItem(repo, item, ".", owner), base, rules })
     : { head: null, why: "no repository named" };
   console.log(verdict.head ?? `not queue-only: ${verdict.why}`);
