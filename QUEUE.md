@@ -15,7 +15,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #772 | builder; `tests.yml` | #770 |
 | #530, step 5 | builder; licence readers | |
 | #534, point 12 | rule builder; it changes `tasks/cleaning.md` | |
-| #593, points 8 and 9 | rule builder | |
 | #625 | builder | #624 |
 | #626 | builder | #624 |
 | #627 | builder | #624 |
