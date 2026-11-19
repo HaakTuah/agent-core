@@ -28,7 +28,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
      a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`), the rule files a checkout
      holds, the manifest too (`scripts/reading.mjs`, which reads a rule file that is a link, a pipe or a device as no
-     file, and matches a path pattern by a walk of at most a million steps, past which the pattern matches), and the rule files the total read sums and reads for a cut or a join
+     file, and matches a path pattern by a walk of at most a million steps, and 64 million in a run, past which the
+     pattern matches), and the rule files the total read sums and reads for a cut or a join
      (`scripts/read-total.mjs`, which prints each name with its control characters written out, and reads a link, what
      is no regular file of the checkout's own, and a name a rule file gives that is absolute or holds a ".." segment as
      no file); limits: 64 MB of git's answer (256 MB for the comments proof, the selection and the total read, 16 MB

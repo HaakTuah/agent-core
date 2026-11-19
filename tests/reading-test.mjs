@@ -43,7 +43,7 @@ const slowAt = Date.now();
 ok(matches("**/x", "x") && matches("**/x", "a/b/x") && matches("a*a", "aa") && !matches("a*a", "a") && matches("*b*", "abc") && !matches("x*", "abc") && matches("a?b", "a?b") && !matches("a?b", "axb") && matches("src/a.(x)", "src/a.(x)") && !matches(`${"*a".repeat(40)}b`, "a".repeat(200)) && !matches(`${"**/".repeat(40)}*z*z*z*q`, "a/".repeat(100)) && Date.now() - slowAt < 1000,
   "a pattern's stars, ** across folders and literal parts match as before, and one of many stars side by side that matches nothing answers at once");
 const walkAt = Date.now();
-ok(matches("*a".repeat(200), "a".repeat(2000)) && matches(`x/${"*".repeat(100000)}y`, `x/${"z/".repeat(25000)}y`) && !matches("x/a*b", "x/a/zb") && matches("a**b", "a\nb") && !matches("a*b", "a\n/b") && Date.now() - walkAt < 2000,
+ok(matches("*a".repeat(200), "a".repeat(2000)) && matches(`x/${"*".repeat(100000)}y`, `x/${"z/".repeat(25000)}y`) && !matches("x/a*b", "x/a/zb") && matches("a**b", "a\nb") && !matches("x/a*b", "x/a\n/b") && Date.now() - walkAt < 2000,
   "a pattern that passes the one-pass check is walked in time its parts times the path's length, a run of stars as one part, * never across a folder, and ** across a line's end too (where the old expression did not, so such a path calls for more, never less)");
 ok(matches(`x/${"*a".repeat(600)}q`, `x/${"a/".repeat(1000)}aq`) && !matches(`x/${"*a".repeat(100)}q`, `x/${"a/".repeat(200)}aq`),
   "a pattern whose walk would pass a million steps matches, calling for more reading, and one within it is walked");
@@ -204,6 +204,11 @@ if (process.platform !== "win32") {
 }
 const imported = spawnSync(process.execPath, ["--input-type=module", "-e", `import ${JSON.stringify(new URL("../scripts/reading.mjs", import.meta.url).href)}; console.log("imported")`, "builder"], { cwd: root, encoding: "utf8" });
 ok(imported.status === 0 && imported.stdout === "imported\n", "imported by a script named on node's command line, it runs nothing of its own", imported.stdout + imported.stderr);
+
+// (last, since it spends the budget of the run's walks, past which every pattern matches)
+const near = `x/${"a/".repeat(1000)}aq`, walked = Array.from({ length: 200 }, () => matches(`x/${"*a".repeat(240)}q`, near));
+ok(!walked[0] && walked[199],
+  "a run's walks together stop at their budget, past which a pattern matches, so many patterns near the cap of one walk add no walk beyond it");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the reading script`);
 process.exit(failed ? 1 : 0);
