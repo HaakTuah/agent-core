@@ -7,7 +7,7 @@
 // is, which stands in a tool's part alone (tasks/roles.md, "The rules name tiers, never a model"; #467).
 // A word may also name folders ("added") whose dated records it reads only where a change adds a line, against the
 // commit --base names: there the owner is never "he" or "his" in new text, while older records stay as they were
-// (core archive 201). A line quoted with ">", the owner's own words as the archive keeps them, is not read. Without
+// (core archive 201). A line quoted with ">", the owner's own words, is not read. Without
 // --base those folders are not read, and it says so.
 // The config's second list, "phrases", is the phrases a rule may not use ("A rule is written to one pattern" in
 // AGENTS.md; core archive 214), nor a brief (tasks/helpers.md, "A brief is written as a rule is"; core archive 229).

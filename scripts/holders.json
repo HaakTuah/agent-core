@@ -111,7 +111,9 @@
     "tasks/tests.md: No test run on a draft": "check: .github/workflows/tests.yml, in part",
     "tasks/tests.md: The default branch is tested at its newest commit": "check: .github/workflows/tests.yml, in part",
     "tasks/tests.md: The slow suites run once per batch, wherever they run": "check: .github/workflows/tests.yml, in part",
+    "tasks/tests.md: A test that reaches the network runs once per batch": "check: .github/workflows/tests.yml, in part",
     "tasks/tests.md: A test that fails for no reason is mended or removed, never retried in silence": "audit",
+    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": "check: scripts/look.mjs, in part",
     "tasks/tests.md: A test opens a screen only where the screen is what it guards": "check: scripts/shape.mjs",
     "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check: scripts/shape.mjs",
     "tasks/tests.md: A test asserts no time measured on a real clock": "audit",
@@ -129,6 +131,7 @@
       "check: .github/workflows/tests.yml, in part"
     ],
     "tasks/updates.md: CodeQL": "check: .github/workflows/codeql.yml",
+    "tasks/updates.md: A question or difference about a rule of the core starts from its reasons": "check: scripts/pr-description.mjs, in part",
     "roles/shared/work-flow.md: Review in the background": "check: GitHub's ruleset on the default branch, in part",
     "roles/shared/work-flow.md: Sessions": "check: scripts/work-saved.sh, in part",
     "tasks/roles.md: The roles, by what they do": "describes",
@@ -407,6 +410,7 @@
     "tasks/hosts.md: One layer knows no host": [236],
     "tasks/hosts.md: Proven host by host": [236],
     "tasks/hosts.md: Where users get a release, a pull request merges on its own green checks": [261],
+    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": ["#542.1"],
     "tasks/hosts.md: The merge line follows the host": [259],
     "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": [259],
     "tasks/planning.md": [243],
@@ -450,6 +454,7 @@
     "tasks/roles.md: The rules name tiers, never a model": ["#467"],
     "tasks/updates.md: Node": [39, 253],
     "tasks/updates.md: The newest stable version, unless there is a reason": [37, 65],
+    "tasks/updates.md: A question or difference about a rule of the core starts from its reasons": ["#756.1"],
     "tools/claude.md: Name models by family alone": [80, 81],
     "tools/claude.md: Pass both model and effort": [128],
     "tools/claude.md: Who to call": [70, 71, 73],
@@ -460,7 +465,8 @@
     "tasks/tests.md: A time mark measures and never fails": ["#733.2"],
     "tasks/tests.md: No test run on a draft": ["#733.2"],
     "tasks/tests.md: The default branch is tested at its newest commit": ["#733.2"],
-    "tasks/tests.md: The slow suites run once per batch, wherever they run": ["#733.2"]
+    "tasks/tests.md: The slow suites run once per batch, wherever they run": ["#733.2"],
+    "tasks/tests.md: A test that reaches the network runs once per batch": ["#733.9"]
   },
   "numbers": {
     "floor/security.md: The owner's word": "findings; outcome: readable; rare harm",
@@ -486,6 +492,7 @@
     "tasks/roles.md: The rules name tiers, never a model": "check fires; outcome: usable",
     "tasks/code-shape.md: A job a maintained package does is done by it": "findings; outcome: robust",
     "tasks/updates.md: Node": "correction: does not work; outcome: robust",
+    "tasks/updates.md: A question or difference about a rule of the core starts from its reasons": "findings; outcome: asked",
     "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",
     "AGENTS.md: Every rule says what holds it": "findings; outcome: robust",
     "AGENTS.md: A new archive item is named by its issue": "check fires; outcome: fast",
@@ -520,11 +527,13 @@
     "tasks/tests.md: No test run on a draft": "findings; outcome: fast",
     "tasks/tests.md: The default branch is tested at its newest commit": "findings; outcome: fast",
     "tasks/tests.md: The slow suites run once per batch, wherever they run": "findings; outcome: fast",
+    "tasks/tests.md: A test that reaches the network runs once per batch": "check fires; outcome: fast",
     "roles/shared/work-flow.md: Ready pull requests merge in a line": "findings; outcome: fast",
     "roles/orchestrator.md: A new lane only where it merges sooner": "findings; outcome: fast",
     "tasks/hosts.md: Where users get a release, a pull request merges on its own green checks": "findings; outcome: fast",
     "tasks/hosts.md: The merge line follows the host": "findings; outcome: fast",
     "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": "findings; outcome: fast",
-    "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check fires; outcome: fast"
+    "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check fires; outcome: fast",
+    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": "check fires; outcome: fast"
   }
 }

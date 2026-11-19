@@ -169,6 +169,9 @@ try {
   const nineteen = core("floor/security.md", "# The floor\n\n**1. Nothing secret.** As rule 19 says.\n");
   ok(nineteen.status === 1 && mended(nineteen.out) && /FAIL: a broken pointer: floor\/security\.md:3: rule 19: no such rule in the floor\. Mend: point it at/.test(nineteen.out), "and one that no floor file holds fails", nineteen.out);
   put("floor/security.md", "# The floor\n\n**1. Nothing secret.** Text.\n");
+  const manifest = core("tasks/a.md", "# A module\n\nRead when a pull request changes the path `core-manifest.md`, or `core-manifests.md`.\n");
+  ok(manifest.status === 1 && !/`core-manifest\.md`/.test(manifest.out) && /`core-manifests\.md` is no tracked file/.test(manifest.out), "in the core's own run a project's manifest, which only a project has, is not looked for; a name beside it still is", manifest.out);
+  put("tasks/a.md", "# A module\n\nNothing cited.\n");
   // (a file that points from a path the rules left is read too: the path it names and its import line)
   const points = core("modules/a.md", "# Moved: A module\n\n[`tasks/a.md`](../tasks/a.md) holds these rules now: read it whole.\n\n@../tasks/a.md\n");
   ok(points.status === 0, "in the core's own run a file at a path the rules left is read: the path it names and its import line, each leading to a file", points.out);

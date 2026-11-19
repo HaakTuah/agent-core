@@ -82,10 +82,10 @@ function withMarks(verdict, pull, list, commits, files, bound, merges, more) {
 function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges, copy, more) {
   const short = sha.slice(0, 7);
   // the whole SHAs a posted code review names, never a prefix: an old review naming the first characters of another
-  // commit must not stand for this one; and, where the pull request is held (bound), only as it was first posted and
-  // from an account security-review.mjs counts (more: the accounts the project names, and the host's rights read)
+  // commit must not stand for this one; only from an account security-review.mjs counts (more: the accounts the
+  // project names, and the host's rights read); and, where the pull request is held (bound), only as it was first posted
   const whose = counted(pull, more?.reviewers, writersOf(more?.rights));
-  const posted = new Set(list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && (!bound || (asPosted(comment) && whose(comment.user))))
+  const posted = new Set(list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && whose(comment.user) && (!bound || asPosted(comment)))
     .flatMap((comment) => (comment.body.match(/(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/giu) ?? []).map((found) => found.toLowerCase())));
   const running = review !== null && typeof review === "object" && review.commit_sha === sha && RUNNING.includes(review.status);
   if (running) {

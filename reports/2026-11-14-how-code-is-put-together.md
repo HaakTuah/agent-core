@@ -6,11 +6,10 @@ baseline. Each of the owner's projects has its own half, filed there (#245's com
 the core's: the core's rules and checks against the practices, the core's own code measured, the owner's two games
 measured from a read-only clone, and for each practice a proposal for #246. The audit writes no rule.
 
-What the audit asked for, in the owner's words on the issue:
+What the audit asked for: the owner asked on the issue for a full audit of what the rules and their enforcement leave
+out of best practices, size checks or more sophisticated ones, for the reason in the owner's words:
 
-> But i want good codebases. […] Should we have size checks, or
-> more sophisticated checks? I think this requires a full audit. What does our rules and enforcement leave out of best
-> practices?
+> I want good codebases.
 
 **The measures are a script now,** so the next audit is a run and not a study: `node core/scripts/code-shape.mjs` in a
 project (`node scripts/code-shape.mjs` here, `--repo <folder>` for a clone it does not lie in) prints the summary
@@ -140,11 +139,10 @@ own tools, so no boundary between them could be checked until #246 names them.
 
 ## 3. The owner's two games, read from a clone
 
-On the owner's word, given in person to the orchestrator on 14 November 2026 and passed on word for word:
-
-> Yes: sessions may read `amarna-letters` and `barkstreet-snakes` for #243 and #245. Read only; nothing is written
-> there. #245's session also measures what a read-only clone of each allows and puts it in the core's report. #246 and
-> #253 wait on that report alone. The games' own halves, in their own issues, hold up no line and no release.
+On the owner's word, given in person to the orchestrator on 14 November 2026: the owner agreed that sessions may read
+`amarna-letters` and `barkstreet-snakes` for #243 and #245, read only, with nothing written there; that #245's session
+also measures what a read-only clone of each allows and puts it in the core's report; that #246 and #253 wait on that
+report alone; and that the games' own halves, in their own issues, hold up no line and no release.
 
 Nothing was written to either repository: no branch, push, issue or comment. Each game's own half of the audit stays
 with that game's issue, for its own sessions to do with its own tools.
