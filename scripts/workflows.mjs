@@ -91,7 +91,7 @@ const NOT_READ = [ // (by `size`: 0 for a part nested too deep, 1 for a text too
 
 // What the base's own entry is counted as: a key by its name, a part not read by its reason, so that a file nested too
 // deep on the base does not hold the entry of one that has grown too long (#752).
-const heldAs = ({ key, size }) => key ?? (size ? "\0long" : "\0deep");
+const heldAs = ({ key, size }) => (key === null ? (size ? 1 : 0) : `k:${key}`);
 
 // The keys given twice (yaml-keys.mjs) in files, each { file, text }, as { fails, notes }, each a line with its mend.
 // `before` gives a file's text on the base (null where it held none), or is null where there is no base to read
@@ -102,8 +102,8 @@ export function repeated(files, before) {
     const held = new Map();
     for (const found of before ? twice(before(file) ?? "") : []) held.set(heldAs(found), (held.get(heldAs(found)) ?? 0) + 1);
     for (const { line, key, first, size } of twice(text)) {
-      const old = !before || held.get(heldAs({ key, size })) > 0;
-      held.set(heldAs({ key, size }), (held.get(heldAs({ key, size })) ?? 0) - 1);
+      const id = heldAs({ key, size }), old = !before || held.get(id) > 0;
+      held.set(id, (held.get(id) ?? 0) - 1);
       const was = old ? (before ? ", as it did on the base" : "") : "";
       (old ? notes : fails).push(key === null
         ? `${old ? "note" : "FAIL"} ${file}:${line}: ${NOT_READ[+Boolean(size)].said}${was}. Mend: ${NOT_READ[+Boolean(size)].mend}`

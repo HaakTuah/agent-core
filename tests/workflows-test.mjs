@@ -78,6 +78,9 @@ ok(huge.length === 1 && huge[0].startsWith("FAIL huge.yml:1: the file is longer 
 const grown = repeated([{ file: "grown.yml", text: `a: ${"x".repeat(LONGEST)}\n` }], () => `on: push\nx: ${"[".repeat(200)}1${"]".repeat(200)}\n`);
 ok(grown.fails.length === 1 && grown.notes.length === 0 && /grown\.yml:1: the file is longer/u.test(grown.fails[0]) && mended(grown.fails[0]),
   "a file past the length read, over a base nested too deep, fails, and is not noted as held on the base", grown.fails.join("\n"));
+// (nor does a key spelt like a reason, which a base may give twice, hold the entry of one grown too long)
+const spelt = repeated([{ file: "spelt.yml", text: `a: ${"x".repeat(LONGEST)}\n` }], () => 'on: push\n"\\0long": 1\n"\\0long": 2\n');
+ok(spelt.fails.length === 1 && spelt.notes.length === 0, "a key spelt like a reason, given twice on the base, holds no part not read of the head", spelt.fails.join("\n"));
 const lower = `on: push\n${Array.from({ length: 37 }, (_, i) => `k${i}: 1\n`).join("")}z: ${"[".repeat(200)}${"]".repeat(200)}\n`;
 const lowerFails = repeated([{ file: "lower.yml", text: lower }], () => null).fails;
 ok(dup(lower) === "null@39<null" && lowerFails.length === 1 && lowerFails[0].startsWith("FAIL lower.yml:39: the file nests") && mended(lowerFails[0]),
