@@ -91,7 +91,10 @@ const ITEMS = tracked.filter(f => new RegExp(`^${HOME}archive/instructions/items
 const parsed = new Map();
 function parse(file) {
   if (parsed.has(file)) return parsed.get(file);
-  const lines = text(file).split(/\r\n?|\n/u), md = readMarkdown(text(file)); // (lines end as the lexer ends them, a Windows checkout's too)
+  const lines = text(file).split(/\r\n?|\n/u); // (lines end as the lexer ends them, a Windows checkout's too)
+  let md;
+  // (a file nested deeper than the lexer can follow, thousands of quotes or lists, fails, saying so, never in silence)
+  try { md = readMarkdown(text(file)); } catch (e) { console.error(`FAIL: ${logged(`${file} could not be read as Markdown (${e.message})`)}. Mend: nest its quotes and lists less deep`); process.exit(1); }
   const heads = md.heads.map(h => ({ level: h.level, i: h.i }));
   const anchors = [...md.heads.map(h => ({ title: plain(h.text), level: h.level, from: h.i })), ...md.bolds.map(b => ({ title: plain(b.text.replace(/[.:,]$/u, "")), level: 9, from: b.i }))]
     .sort((a, b) => a.from - b.from || a.level - b.level);

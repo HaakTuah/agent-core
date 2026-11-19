@@ -46,6 +46,9 @@ ok(r.code === 0 && /^ok /m.test(r.out), "rule files whose pointers all lead some
 // (a project's own job that ran the check before the core's packages came installs nothing: the sync never turns it red)
 r = run(broken, { installed: false });
 ok(r.code === 0 && /::warning::The pointer check did not run: the package marked is not installed[^\n]*Mend: /.test(r.out) && /core\/scripts\/install\.mjs/.test(r.out), "in a project with the core's packages not installed, the check says as a warning that it did not run, with the install step as its mend, and fails nothing", r.out);
+// (a rule file nested deeper than the lexer follows fails, saying so, never in silence: the fallback reviewer's finding)
+r = run({ ...FILES, "docs/developing.md": `${FILES["docs/developing.md"]}${">".repeat(5000)} deep\n` });
+ok(r.code === 1 && mended(r.out) && /docs\/developing\.md could not be read as Markdown/.test(r.out), "a rule file nested deeper than the lexer can follow fails, naming the file, with its mend");
 r = run(crlf(FILES));
 ok(r.code === 0 && /^ok /m.test(r.out), "the same files with a Windows checkout's line endings pass");
 for (const [files, ending] of [[broken, "either"], [crlf(broken), "a Windows"]]) {

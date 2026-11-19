@@ -21,7 +21,8 @@ export async function markdownReader() {
 }
 
 const breaks = s => (s.match(/\n/gu) || []).length;
-const rows = raw => raw.replace(/\n+$/u, "").split("\n");
+// (a token's lines, those empty at its end left out: no pattern that backtracks over a run of line ends)
+const rows = raw => { const lines = raw.split("\n"); while (lines.length && lines.at(-1) === "") lines.pop(); return lines; };
 const joined = lines => lines.map(l => ` ${l.trim()}`).join("");
 const item = /^\s*(?:[-*+]|\d+[.)])\s/u;
 
