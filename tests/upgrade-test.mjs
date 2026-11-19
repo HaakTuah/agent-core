@@ -69,6 +69,12 @@ ok(yaml.name === "x" && yaml.on.workflow_call.inputs.a.default === true && yaml.
   const flow = parseYaml("on: [push]\nenv: {A: '1', B: x}\nbase: &b {runs-on: ubuntu-latest}\njobs:\n  j: *b\n__proto__: p\n");
   let twice = false;
   try { parseYaml("a: 1\na: 2\n"); } catch { twice = true; }
+  // (a warning, as of an unknown tag, prints nothing: it would print the project's own line into a job's log)
+  const emit = process.emitWarning;
+  let warned = 0;
+  process.emitWarning = () => { warned++; };
+  try { parseYaml("a: !foo x\n"); } catch { /* (an error throws, for the caller) */ } finally { process.emitWarning = emit; }
+  ok(warned === 0, "the reader prints no warning of the package's, as of an unknown tag", `${warned} warnings`);
   ok(flow.on[0] === "push" && flow.env.A === "1" && flow.env.B === "x" && flow.jobs.j["runs-on"] === "ubuntu-latest" && Object.hasOwn(flow, "__proto__") && Object.getPrototypeOf(flow) === Object.prototype
     && twice && JSON.stringify(parseYaml("# only a comment\n")) === "{}", "the reader reads a flow mapping and an anchor, refuses a key given twice, keeps __proto__ a key, and reads no value as an empty mapping", JSON.stringify(flow));
 }

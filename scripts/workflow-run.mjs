@@ -27,7 +27,8 @@ export function parseYaml(text) {
   // reports the file as not read and goes on)
   if (!installed("yaml")) throw new Error("the check did not run: the package yaml is not installed beside the core's copy, so no YAML can be read. Mend: run the core's scripts/install.mjs (in a project, node core/scripts/install.mjs), then run this again");
   const { parse } = loadSync("yaml"); // (loaded where it is used: no import of this file needs it)
-  return parse(text, { schema: "core", uniqueKeys: true }) ?? {};
+  // (an error throws, for the caller to say; a warning prints nothing, since it would print the workflow's own line)
+  return parse(text, { schema: "core", uniqueKeys: true, logLevel: "error" }) ?? {};
 }
 
 // ---- GitHub's expressions ----
