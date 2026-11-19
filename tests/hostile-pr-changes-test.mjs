@@ -242,12 +242,12 @@ ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "co
   fs.writeFileSync(path.join(d, "docs", "m.md"), manifest("- a difference behind a link", "- another, only the target changed")); commit();
   ok(differencesAdded(d) === UNREADABLE, "pr-description: a link whose target alone changes is unreadable");
   fs.rmSync(path.join(d, "core-manifest.md")); fs.rmSync(path.join(d, "docs"), { recursive: true }); put(manifest("None.")); commit();
-  // markup: a difference that holds a runner's command and control characters is read as one line added, and quoted
-  // in the mend with none of them able to open a line
   // run from a folder below the checkout's root: the manifest at the root is still read
   put(manifest("- a difference read from below the root")); fs.mkdirSync(path.join(d, "sub")); fs.writeFileSync(path.join(d, "sub", "x"), "x\n"); commit();
   ok(differencesAdded(path.join(d, "sub")).join() === "- a difference read from below the root", "pr-description: run from a folder below the root, the root's manifest is read, never taken for absent");
   fs.rmSync(path.join(d, "sub"), { recursive: true }); put(manifest("None.")); commit();
+  // markup: a difference that holds a runner's command and control characters is read as one line added, and quoted
+  // in the mend with none of them able to open a line
   put(manifest("- ::error::x\u0085\u2028::warning::y\u001b[2J")); commit();
   const marked = differencesAdded(d), markedMend = reasonsMend("", marked);
   ok(Array.isArray(marked) && marked.length === 1 && mended(`FAIL ${markedMend}`) && !/[\r\n\u0085\u2028\u001b]/u.test(markedMend), "pr-description: markup in a difference is one line added, quoted with no character that ends a line or drives a terminal");
