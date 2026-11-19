@@ -54,7 +54,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   Simian, dropped on fact: no licence the Open Source Initiative approves. *Bugs:* 9, and 4 naming `copies.yml`, the
   most of any check. **Try** jscpd for the finding, its definition taking the core's place by default (#534, point 3);
   the baseline and the near-copies the audit reads stay the core's glue. This weighs again the "Kept" of #486's
-  inventory, whose reason was the core's own definition.
+  inventory, whose reason was the core's own definition. Its config's shape is held by a schema and ajv (`scripts/schemas.mjs`;
+  #530, item 7).
 - `scripts/pointers.mjs`: fails a pointer in the rule files, to a file, a section, a numbered point, a floor rule or an
   archive item, that leads nowhere. *Runs:* any session and the runners. *Else:* lychee (offline, with Markdown's
   anchors), remark-validate-links, markdown-link-check and linkinator, each kept for Markdown's own links and dropped,

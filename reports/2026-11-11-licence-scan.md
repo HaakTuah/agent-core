@@ -1,6 +1,6 @@
 # One licence scan
 
-Tonight's audit of both games against the core (the owner's words: `reports/2026-11-11-shared-checks.md`) found the
+The audit of both games against the core (the owner's words: `reports/2026-11-11-shared-checks.md`) found the
 licence check whole in only one of them. Snakes' own scan (`tools/licences.js`) fails a PR that uses anything its audit
 does not name: an action, a package fetched by npx or npm install, a font, image or sound, code copied in with someone's
 notice. Amarna has no such scan: the core's check holds only its lockfile, so its workflows' seven actions, its 127

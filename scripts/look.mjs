@@ -12,6 +12,9 @@
 //     with no push for longer than stalled.mjs's hours: draft or ready, its checks, what its description says it waits
 //     on (pr-description.mjs) and for how long, a draft with green checks first; and one whose line and label
 //     needs-owner disagree.
+//   - Late review findings to answer (review-marks.mjs; tasks/reviews.md, "A late review is still read"): Codex's
+//     findings inline of the last LATE_DAYS days made after their pull request merged, with no reply from an account
+//     the host lets write.
 //   - Steps of a release not done (steps.mjs), in a project.
 //   - Labels and openers to mend (labels.mjs).
 //   - The scheduled look missed a run: where its record shows no run for longer than MISSED hours. The look never
@@ -52,7 +55,10 @@ import { asked, FOLDER, repoOf } from "./inbox.mjs";
 import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
 import { WAITS, waitsOn } from "./pr-description.mjs";
 import { pathIn } from "./reading.mjs";
+import { lateBody, lateOf, pullOf, repliersOf } from "./review-marks.mjs";
+import { codexFind } from "./review-record.mjs";
 import { ownerOf } from "./releases.mjs";
+import { writersOf } from "./security-review.mjs";
 import { HOURS, openPulls, stalled } from "./stalled.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { started } from "./started.mjs";
@@ -72,7 +78,11 @@ export const TITLES = {
   labels: "Labels and openers to mend",
   missed: "The scheduled look missed a run",
   stale: "Packages gone stale",
+  late: "Late review findings to answer",
 };
+// How far back a late finding is read (tasks/reviews.md, "A late review is still read": the last week), the most pull
+// requests whose merge is read for it in one run, and the most pages of the week's review comments read for it.
+export const LATE_DAYS = 7, LATE_PULLS = 30, LATE_PAGES = 50;
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
 // issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over
 // the choices that are hard to undo and a sign of theirs that has tripped (choices.mjs); and the cleaning and the audit
@@ -267,13 +277,42 @@ export function staleFinding(run = () => spawnSync(process.execPath, [fileURLToP
   return { title: TITLES.stale, what: null, unread: "the packages the project holds could not be looked up in their registries this time" };
 }
 
+// The late findings, through `add` (review-marks.mjs; #551): Codex's findings of the last LATE_DAYS days made after
+// their pull request merged with no reply, or why they could not be read; `gh` in ghApi's form. Only the pull requests
+// that hold a finding of Codex's are looked up, the newest first, and what is past LATE_PULLS or LATE_PAGES is said to be
+// unread, never dropped: with nothing found, the issue is left as it stands. The comments are read newest first, so a
+// reply, always newer than its finding, is read before it past the cap. The rights of at most LATE_PULLS accounts that
+// replied are read; a reply of any other counts as none, and that too is said.
+export function lateFinding(repo, add, at, gh = ghApi) {
+  try {
+    const since = new Date(Date.parse(at) - LATE_DAYS * 86400000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    let pages = 0;
+    const inline = pagesOf(`repos/${repo}/pulls/comments?sort=created&direction=desc&since=${since}`, route => (++pages > LATE_PAGES ? "[]" : gh(route)));
+    const all = [...new Set(inline.filter(c => codexFind(c)).map(pullOf).filter(Number.isInteger))].sort((a, b) => b - a);
+    const merged = new Map(all.slice(0, LATE_PULLS).map(n => [n, JSON.parse(gh(`repos/${repo}/pulls/${n}`)).merged_at ?? null]).filter(([, m]) => typeof m === "string"));
+    const left = [pages > LATE_PAGES && `the review comments past the first ${LATE_PAGES * 100} of the week`, all.length > LATE_PULLS && `Codex's findings on ${all.length - LATE_PULLS} older pull requests`].filter(Boolean);
+    // a reply answers a finding only where the host says its author may write: a right not read, or past LATE_PULLS
+    // accounts, counts as none, so its finding stays listed, and is said
+    const repliers = repliersOf(inline), rights = [], unknown = repliers.slice(LATE_PULLS);
+    for (const login of repliers.slice(0, LATE_PULLS)) { try { rights.push(JSON.parse(gh(`repos/${repo}/collaborators/${login}/permission`))); } catch { unknown.push(login); } }
+    if (unknown.length) left.push(`the rights of ${unknown.length} account${unknown.length === 1 ? "" : "s"} that replied, whose replies are counted as none`);
+    const body = lateBody(lateOf(inline, merged, since, writersOf(rights)));
+    if (left.length === 0) return add(TITLES.late, body);
+    if (body === null) return add(TITLES.late, null, `${left.join(" and ")} could not be read this run`);
+    add(TITLES.late, `${body}\n\nNot read this run: ${left.join("; ")}.`);
+  } catch {
+    add(TITLES.late, null, "the review comments could not be read: the token here may not read pull requests");
+  }
+}
+
 // What the look finds, kind by kind, each { title, what, unread }; and `stepsLeft`, the count of a release's steps not
 // done (null where they were not read), for the state report.
 function findingsOf({ repo, manifest, owner, at }, reach, last) {
   const findings = [];
   const add = (title, what, unread = null) => findings.push({ title, what, unread });
-  // pull requests that stand idle
+  // pull requests that stand idle, and late review findings
   idleFinding(repo, add);
+  lateFinding(repo, add, at);
   // steps of a release not done, in a project
   let stepsLeft = null;
   if (manifest !== null) {

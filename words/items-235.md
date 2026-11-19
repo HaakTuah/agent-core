@@ -27,9 +27,8 @@ What these are and how they are kept: `words/README.md`.
 236. **14 November 2026** (the core; in chats with a session the owner had asked to look through the core, not the
      design session, as that session recorded them on issue #250, labelled `by:chat`, the last under "What this issue
      asks to be built, in one place", saying the owner agreed to it). The session had set out three decisions before
-     the core could be used at work: a licence, a team's shape and another host. The owner:
-
-     > I want to see if i can use this core in future work projects also.
+     the core could be used by a team: a licence, a team's shape and another host. The owner's reason: the core
+     might be used in a project built by a team.
 
      The licence was decided apart (#257; item 221). Of the other two:
 
@@ -107,8 +106,7 @@ What these are and how they are kept: `words/README.md`.
      > value and then never grow into monsters again? […] So the tests are maybe some of the biggest bottlenecks on
      > development right now
 
-     and agreed to those seven points. The same day, having watched a suite of a desktop program open the program's
-     window for test after test, the owner asked whether the core says clearly:
+     and agreed to those seven points. The same day, having watched a suite open a window for test after test, the owner asked whether the core says clearly:
 
      > Test everything without such things first? Only add if it has to for utility?
 
@@ -147,7 +145,7 @@ What these are and how they are kept: `words/README.md`.
 
      > Should sessions wait around for all of this?
 
-     The session answered that the suites are worth keeping, since another owner's project is built on Windows, but not
+     The session answered that the suites are worth keeping, since a project's own platform needs them, but not
      worth waiting on in a loop. A fifth point, that a builder runs before it pushes the suites its own machine can
      run, came from that answer and is the session's own addition, told to the owner the same day; it is no decision
      of the owner's, and waits as an open point (#321). To the orchestrator, passed on word for word to the builder of
@@ -200,7 +198,7 @@ What these are and how they are kept: `words/README.md`.
 
 241. **15 November 2026** (every project in more than one repository, and a library shared by several projects; in a
      chat with a session the owner works with, not the design session, as that session recorded it on issue #285,
-     labelled `by:chat`, saying the owner agreed to it). Of a part one of the owner's projects may one day split off,
+     labelled `by:chat`, saying the owner agreed to it). Of a part a project may one day split off,
      the owner agreed to keeping it in the project's repository to begin with, "abiding by the new rules strictly, so
      it is easy to sort out", and of afterwards said:
 
