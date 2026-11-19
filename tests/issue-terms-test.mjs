@@ -125,9 +125,21 @@ const bump = { id: 23, html_url: "https://github.com/o/r/pull/3#issuecomment-23"
 const bumped = run([], { extra: [bump, app] });
 ok(!bumped.edits.some(e => e.route.endsWith("/comments/23")) && bumped.edits.some(e => e.route.endsWith("/comments/22")) && /read 7 texts/.test(bumped.out), "Dependabot's text is neither edited nor counted, GitHub's own job's is", bumped.out);
 
+// Codex's text is an outsider's too: its review of a fork's pull request can quote it
+const codex = { ...bump, id: 24, html_url: "https://github.com/o/r/pull/3#issuecomment-24", node_id: "C24", user: { type: "Bot", login: "chatgpt-codex-connector[bot]" } };
+const reviewed = run([], { extra: [codex] });
+ok(!reviewed.edits.some(e => e.route.endsWith("/comments/24")) && /read 6 texts/.test(reviewed.out), "Codex's text is neither edited nor counted", reviewed.out);
+
 // the repository as GitHub names it, so that an origin in another case reads every row
 const cased = run([], { at: "O/R" });
 ok(/took a term out of 5/.test(cased.out), "an origin written in another case still reads the repository's texts", cased.out);
+for (const [what, answer] of [["GitHub refuses", null], ["GitHub gives no name", {}], ["a name not of its shape", { full_name: "o/r/../x" }]]) {
+  const named = (() => { const lines = [], edits = [], asked = [];
+    const status = main([], { env: { TERMS, GITHUB_ACTIONS: "true" }, now: NOW, repo: "x/y", top: null, say: m => lines.push(m), edit: () => { edits.push(1); return true; },
+      gh: (...args) => { asked.push(args[0]); if (args[0] === "repos/x/y") { if (answer === null) throw new Error("no"); return JSON.stringify(answer); } return "[]"; } });
+    return { status, out: lines.join("\n"), edits, asked }; })();
+  ok(named.status === 0 && /nothing was read/.test(named.out) && /Mend: \S+\s+\S/.test(named.out) && named.edits.length === 0 && named.asked.length === 1, `${what} of the repository's name: nothing is read, and it says so with the mend`, named.out);
+}
 
 // a row of GitHub's answers not of its shape is left out (floor topic 5)
 const bent = [{ ...comment, id: "11/lock" }, { ...comment, id: -1 }, { ...comment, id: 1.5 }, { ...comment, id: 31, html_url: "https://github.com/x/y/issues/1#issuecomment-31" },

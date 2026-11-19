@@ -82,10 +82,10 @@ const whole = n => Number.isSafeInteger(n) && n > 0;
 const anAddress = (v, repo) => typeof v === "string" && v.length <= 500 && v.startsWith(`https://github.com/${repo}/`) && !/[\s\u0000-\u001f\u007f]/u.test(v);
 const aNode = v => typeof v === "string" && /^[\w-]{1,100}$/u.test(v);
 const aText = v => v === null || (typeof v === "string" && v.length <= 1 << 20);
-// (those the host lets write, and the apps named here, whose text no outsider shapes: GitHub's own job, and Codex's
-// reviews of this repository's own pull requests, which a fork's never are here; anyone else is an outsider, Dependabot
-// among them, whose descriptions carry another publisher's release notes)
-const APPS = new Set(["github-actions[bot]", "chatgpt-codex-connector[bot]"]);
+// (those the host lets write, and GitHub's own job, whose text no outsider shapes, since a fork's pull request gets no
+// write token; anyone else is an outsider, Dependabot among them, whose descriptions carry another publisher's release
+// notes, and Codex, whose review of a fork's pull request can quote it)
+const APPS = new Set(["github-actions[bot]"]);
 export const insider = row => ["OWNER", "MEMBER", "COLLABORATOR"].includes(row?.author_association) || (row?.user?.type === "Bot" && APPS.has(row?.user?.login));
 
 // What is read, from GitHub's answers through `gh` (ghApi's form): each text as { kind, url, node, fields, route, method,
@@ -202,12 +202,14 @@ function named({ all, changed, refused, terms, dry, gh, say }) {
 function termsFrom(file, env, top) {
   if (file === undefined) return { terms: termsOf(env.TERMS) };
   let real = null;
-  try { real = fs.realpathSync(file); } catch {}
+  try { real = fs.realpathSync.native(file); } catch {}
   if (real === null) return { refused: "FAIL issue-terms.mjs could not read the file --terms-file names. Mend: give the path of a file of the terms, one a line, kept outside the repository." };
-  if (top && (real === top || real.startsWith(`${top}${path.sep}`))) return { refused: "FAIL issue-terms.mjs was given a terms file inside the repository's work tree, where a commit could take it in. Mend: move the file outside the repository, and give its new path." };
+  // (where the file system is blind to case, as on macOS and Windows, so is the comparison)
+  const fold = p => (process.platform === "win32" || process.platform === "darwin" ? p.toLowerCase() : p);
+  if (top && (fold(real) === fold(top) || fold(real).startsWith(fold(`${top}${path.sep}`)))) return { refused: "FAIL issue-terms.mjs was given a terms file inside the repository's work tree, where a commit could take it in. Mend: move the file outside the repository, and give its new path." };
   try { return { terms: termsOf(fs.readFileSync(real, "utf8")) }; } catch { return { refused: "FAIL issue-terms.mjs could not read the file --terms-file names. Mend: give the path of a file of the terms, one a line, kept outside the repository." }; }
 }
-const workTree = () => { const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }); try { return r.status === 0 ? fs.realpathSync(r.stdout.trim()) : null; } catch { return null; } };
+const workTree = () => { const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }); try { return r.status === 0 ? fs.realpathSync.native(r.stdout.trim()) : null; } catch { return null; } };
 
 // The repository's name as GitHub holds it (its full_name), since the addresses read are held to it exactly: an
 // origin written in another case, or before a rename, would leave every row out and the run read as clean. Null where
