@@ -539,7 +539,7 @@
     "tasks/code-shape.md: A part whose gaps repeat is read for its whole input": "correction: does not work; outcome: robust",
     "AGENTS.md: The size caps keep the rules lean and decide nothing else": "check fires; outcome: fast",
     "AGENTS.md: A record pull requests add to is a folder of one file per entry": "check fires; outcome: fast",
-    "tasks/planning.md: A record pull requests keep adding to is a folder of one file per entry": "correction: does not work; outcome: fast",
+    "tasks/planning.md: A record pull requests keep adding to is a folder of one file per entry": "findings; outcome: fast",
     "tasks/updates.md: Node": "correction: does not work; outcome: robust",
     "tasks/updates.md: A question or difference about a rule of the core starts from its reasons": "findings; outcome: asked",
     "AGENTS.md: A rule is for what an agent can do": "findings; outcome: robust",

@@ -44,20 +44,19 @@ file*, changes their order or names a milestone, as the orchestrator and the des
   asks of a pull request that does the *hard work* whether its approach was known before it was built
   (`tasks/reviews.md`, point 4).
 - **A record pull requests keep adding to is a folder of one file per entry** (#750, point 1). By default each record
-  of a project's that its pull requests add to entry by entry (a line, a row or an item each: a running table in its
-  *progress file*, its own archive, a log of its releases) stands as a folder of one file per entry, each file named to
-  stand between its neighbours and read in the order of the names by whatever reads the record. The one condition that
-  changes it: where the order of a record's lines is what it records, as the *progress file*'s is, its lines stay in one
-  file and leave in a batch, as `roles/shared/inbox.md` says of the *progress file*. The trigger: a pull request that
-  adds such a record, and a record that two of the project's pull requests merged in one week each added an entry to.
-  The builder of that pull request writes the record so from the start; a record that stands whole is split by the
-  session that takes the sync's step (`setup/sync-notes/740-a-project-s-records-one-file-per-entry.md`), in a pull
-  request of its own, its readers following. It does not mean that what a record holds, or the order it is read in,
-  changes, nor that anything fails or waits while a record stands whole ("Nothing locks a project", in the core's
-  `AGENTS.md`). Reason: pull requests that add to one file merge side by side and collide, as 10 of the core's 39
-  merged between 18 and 19 November 2026 did on its sync notes. Held by no check, since which records a project's pull
-  requests keep adding to is a reading of its history that no file states; the sync's step asks it once, its reason
-  with the staged case `steps`.
+  of a project's that its pull requests add to entry by entry (a line, a row or an item each), such as a running table
+  in its *progress file* or its own archive, stands as a folder of one file per entry, each file named to stand between
+  its neighbours and read in the order of the names by whatever reads the record. The one condition that changes it:
+  where the order of a record's lines is what it records, as the *progress file*'s is, its lines stay in one file and
+  leave in a batch (`roles/shared/inbox.md`). The trigger: a record that two pull requests merged in one week each
+  added an entry to. Whoever finds one standing whole, first the session that takes the sync's step
+  (`setup/sync-notes/740-a-project-s-records-one-file-per-entry.md`), splits it in a pull request of its own, its
+  readers following. It does not mean that what a record holds, or the order it is read in, changes, that a record read
+  outside the repository as one file (a changelog its users get with a package) is split, nor that anything fails or
+  waits while a record stands whole. Reason: pull requests that add to one file merge side by side and collide, as 10
+  of the core's 39 merged between 18 and 19 November 2026 did on its sync notes. Held by no check, since which records
+  these are is a reading of a project's history that no file states; the sync's step asks it once, its reason with the
+  staged case `steps`.
 - **A task finishes under the copy of the core it began with.** By default a session syncs the core only between its
   tasks (`roles/shared/work-flow.md`, "Sessions"), and a task in flight finishes under the rules of the copy it began
   with, though its branch takes a newer copy when it is brought up to date with `main`. The one condition that changes
