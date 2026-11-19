@@ -286,17 +286,20 @@ function passedRuns(p) {
 
 // Each job of the project's own that starts a suite through the shape check on a pull request, as every suite is
 // started, starts once the pull request is marked ready and skips a draft (tasks/tests.md, "No test run on a draft";
-// #733, point 7): its trigger's types hold ready_for_review, and its job's `if:` names the draft.
+// #733, point 7): its trigger's types hold opened, synchronize, reopened and ready_for_review, and its job's `if:` skips
+// a draft, `!github.event.pull_request.draft` or `github.event.pull_request.draft == false` among its parts.
 const SUITE_RUN = /shape\.mjs\b[^\n]*--suite\b/u;
+const READY_TYPES = ["opened", "synchronize", "reopened", "ready_for_review"];
+const SKIPS_DRAFT = /!\s*github\.event\.pull_request\.draft\b|\bgithub\.event\.pull_request\.draft\s*==\s*false\b/u;
 function testsWhenReady(p) {
   readable(p, text => SUITE_RUN.test(text));
   const loose = Object.entries(p.workflows).filter(([, { yaml }]) => onPullRequests(yaml?.on)).flatMap(([file, { yaml }]) => {
-    const types = yaml.on?.pull_request?.types, ready = Array.isArray(types) && types.includes("ready_for_review");
+    const types = yaml.on?.pull_request?.types, ready = Array.isArray(types) && READY_TYPES.every(t => types.includes(t));
     return Object.entries(yaml.jobs ?? {})
-      .filter(([, job]) => (Array.isArray(job?.steps) ? job.steps : []).some(st => typeof st?.run === "string" && SUITE_RUN.test(st.run)) && !(ready && /\bdraft\b/u.test(String(job?.if ?? ""))))
+      .filter(([, job]) => (Array.isArray(job?.steps) ? job.steps : []).some(st => typeof st?.run === "string" && SUITE_RUN.test(st.run)) && !(ready && SKIPS_DRAFT.test(String(job?.if ?? ""))))
       .map(([name]) => `\`.github/workflows/${shown(file)}\`, its job \`${shown(name)}\``);
   });
-  return loose.length ? `In one small pull request, with floor rule 3's two security reviews, bring the project's own test workflow to \`core/tasks/tests.md\` as its kind reads it (${loose.join("; ")}): give its \`pull_request\` trigger the types opened, synchronize, reopened and ready_for_review, and have each job that starts a suite skip a draft (\`if: \${{ !github.event.pull_request.draft }}\`), the check the ruleset requires failing on a draft rather than skipped, since a required check whose job is skipped passes (the core's own \`tests.yml\` shows it); then, as \`node core/scripts/runners.mjs --repo <owner>/<name>\` prints where the tests run, who pays and the schedule, run the platform suites at the default branch's newest commit on that schedule, and give the runs on the default branch one concurrency group that cancels the run in progress. Where \`node core/scripts/merge-line.mjs --repo <owner>/<name>\` says the project's users get a release and the host still asks an up-to-date branch, file the issue it names for the owner, labelled needs-owner; nothing waits on it.` : null;
+  return loose.length ? `In one small pull request, with floor rule 3's two security reviews, bring the project's own test workflow to \`core/tasks/tests.md\` as its kind reads it (${loose.join("; ")}): give its \`pull_request\` trigger the types opened, synchronize, reopened and ready_for_review, and have each job that starts a suite skip a draft (\`if: \${{ !github.event.pull_request.draft }}\`), the check the ruleset requires failing on a draft rather than skipped, since a required check whose job is skipped passes (the core's own \`tests.yml\` shows it); then run the platform suites on the schedule \`node core/scripts/runners.mjs --repo <owner>/<name>\` prints from where the tests run, who pays and what users get (where every merge goes live, on each pull request, as now; where users get a release, at the default branch's newest commit), and give the runs on the default branch one concurrency group that cancels the run in progress. Where \`node core/scripts/merge-line.mjs --repo <owner>/<name>\` says the project's users get a release and the host still asks an up-to-date branch, file the issue it names for the owner, labelled needs-owner; nothing waits on it.` : null;
 }
 
 // The shape check's config and baseline as a project holds them: { at, config, reads } (the readers its baseline names),
@@ -1012,7 +1015,7 @@ export const STEPS = [
   { lead: "19 November 2026, the parser's packages installed where the shape check runs", cost: COST.workflow, check: parserFirst,
     partly: "that a job reaching the shape check through the project's own npm or shell script installs the parser's first is read by the review" },
   { lead: "19 November 2026, the project's tests at the pace of a release", cost: COST.workflow, check: testsWhenReady,
-    partly: "which suites are the platform suites and on what schedule they run, how the runs on the default branch give way to a newer merge, where the tests that guard only what a release brings run (#715), and whether the host still asks an up-to-date branch where users get a release are read by the session that syncs, with `core/scripts/runners.mjs` and `core/scripts/merge-line.mjs`, not by a file" },
+    partly: "that the check the ruleset requires fails on a draft rather than being skipped, a suite started inside a workflow a job calls, which suites are the platform suites and on what schedule they run, how the runs on the default branch give way to a newer merge, where the tests that guard only what a release brings run (#715), and whether the host still asks an up-to-date branch where users get a release are read by the session that syncs, with `core/scripts/runners.mjs` and `core/scripts/merge-line.mjs`, not by a file" },
 ];
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the

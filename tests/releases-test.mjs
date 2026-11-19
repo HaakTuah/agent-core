@@ -213,8 +213,8 @@ ok([null, undefined, {}, [], "text", { workflow_runs: [] }, { total_count: "1", 
 const handed = older("release-7", "b".repeat(40));
 ok(handed.includes(`node core/scripts/sync.mjs ${"b".repeat(40)}`) && handed.includes("older than release-1") && handed.includes("release-7"), "each release says how a copy older than release-1 takes it: once, with the release's full SHA (#365)", handed);
 // (asked of the script itself, in this repository: each stops before anything is fetched or pushed)
-const cutting = (...args) => { const r = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/release.mjs", import.meta.url)), "--cut", ...args], { encoding: "utf8" }); return r.status === 1 && /--cut needs --at <sha> and --runs <file>|needs a value/.test(r.stderr) && !r.stdout; };
-ok(cutting() && cutting("--at", "a".repeat(40)) && cutting("--runs", "runs.json") && cutting("--runs", "runs.json", "--at"), "a cut asked for without the commit it is for, or without the checks on it, is refused before anything is fetched");
+const cutting = (...args) => { const r = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/release.mjs", import.meta.url)), "--cut", ...args], { encoding: "utf8" }); return r.status === 1 && /--cut needs --at <sha>, --runs <file> and --full <file>|needs a value/.test(r.stderr) && !r.stdout; };
+ok(cutting() && cutting("--at", "a".repeat(40)) && cutting("--runs", "runs.json") && cutting("--runs", "runs.json", "--at") && cutting("--at", "a".repeat(40), "--runs", "runs.json"), "a cut asked for without the commit it is for, without the checks on it, or without the tests' runs there, is refused before anything is fetched");
 ok(held({ total_count: 2, workflow_runs: [null, run("tests", "completed", "success")] }).join() === "a check: unreadable" && held(list({ name: "tests", path: "p" })).join() === "tests: unreadable", "and a run in it that cannot be read");
 
 // git's own variables that point elsewhere: a project's repository is never touched, and the guard is not fooled

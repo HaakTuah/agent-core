@@ -14,12 +14,13 @@
 // only.
 //
 //   node scripts/release.mjs          what the next release would be, and what it carries
-//   node scripts/release.mjs --cut --at <sha> --runs <file>
+//   node scripts/release.mjs --cut --at <sha> --runs <file> --full <file>
 //                                     cuts it: the tag is pushed to the core's repository, and nothing else is. Only
-//                                     where main's newest commit is <sha>, and the checks listed in <file>, GitHub's
-//                                     answer to repos/<core>/actions/runs?head_sha=<sha>&branch=main, have all
-//                                     passed: those its push started, and the newest hourly or hand-started run of
-//                                     the tests (fullRun); without the two it cuts nothing
+//                                     where main's newest commit is <sha>, the checks listed in --runs, GitHub's
+//                                     answer to repos/<core>/actions/runs?head_sha=<sha>&branch=main&event=push, have
+//                                     all passed, and the newest hourly or hand-started run of the tests in --full,
+//                                     its answer to repos/<core>/actions/workflows/tests.yml/runs?head_sha=<sha>, has
+//                                     passed too (fullRun); without the three it cuts nothing
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -83,9 +84,6 @@ function after(flag, argv) {
 
 // Why the release `name` at `sha` is not cut, or null: the staged cases hold it (`staged`, from atRelease), or a check
 // on that commit has not passed, as the list of the runs there (`runs`, a file) says.
-// The runs a list holds that the push of its commit started: what `held` reads (the list itself where it is no list).
-const pushed = list => (Array.isArray(list?.workflow_runs) ? { ...list, workflow_runs: list.workflow_runs.filter(r => r?.event === "push"), total_count: list.workflow_runs.filter(r => r?.event === "push").length + (Number.isSafeInteger(list.total_count) ? list.total_count - list.workflow_runs.length : 0) } : list);
-
 // The core's tests in full on a commit (#733, points 3 and 6): a pull request's run and a push's are on Linux alone, so
 // a release waits on the newest run of the tests' workflow there that ran once an hour or was started by hand, which
 // holds the Windows suites, to have passed. A reason it holds the release, or null.
@@ -104,12 +102,12 @@ export function fullRun(list) {
   return `the tests in full (their ${how} run): ${newest?.status === "completed" ? newest?.conclusion : newest?.status ?? "unreadable"}`;
 }
 
-function whyNot(name, sha, staged, runs) {
+function whyNot(name, sha, staged, runs, fullFile) {
   if (staged.held) return `${name} is not cut: ${staged.held}.`;
-  let list = null;
-  try { list = JSON.parse(fs.readFileSync(runs, "utf8")); } catch { /* (held, below, says it could not be read) */ }
-  const full = list ? fullRun(list) : null;
-  const reasons = [...held(pushed(list)), ...full ? [full] : []];
+  const readList = f => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } };
+  const list = readList(runs), full = readList(fullFile);
+  const notFull = Array.isArray(full?.workflow_runs) ? fullRun(full) : "the tests' runs on it could not be read";
+  const reasons = [...held(list), ...notFull ? [notFull] : []];
   return reasons.length ? `${name} is not cut: the checks on ${sha.slice(0, 7)} have not all passed. Start the release again once they have.\n${reasons.map(r => `  ${r}`).join("\n")}` : null;
 }
 
@@ -118,9 +116,10 @@ function main(argv) {
   if (!inTheCore()) return fail("run it in the core's own repository: a project cuts no release");
   const cut = argv.includes("--cut");
   let at, runs;
-  try { at = after("--at", argv); runs = after("--runs", argv); } catch (e) { return fail(e.message); }
+  let full;
+  try { at = after("--at", argv); runs = after("--runs", argv); full = after("--full", argv); } catch (e) { return fail(e.message); }
   // (asked before anything is fetched: a cut is never tried without the commit it is for and the checks on it)
-  if (cut && (at === null || runs === null)) return fail("--cut needs --at <sha> and --runs <file>: the release workflow gives both (.github/workflows/release.yml)");
+  if (cut && (at === null || runs === null || full === null)) return fail("--cut needs --at <sha>, --runs <file> and --full <file>: the release workflow gives all three (.github/workflows/release.yml)");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "core-release-"));
   try {
     fetchCore(dir);
@@ -136,7 +135,7 @@ function main(argv) {
     const staged = atRelease(sha, before, rev => inBare(dir, rev));
     console.log(staged.said);
     if (!cut) { console.log(older(name, sha)); console.log("Not cut: the release workflow cuts it, started on the owner's word."); return; }
-    const stop = whyNot(name, sha, staged, runs);
+    const stop = whyNot(name, sha, staged, runs, full);
     if (stop) return fail(stop);
     // (the commit goes straight to the new tag on the core's repository: a tag that exists is never moved)
     inBare(dir, ["push", "--quiet", `https://github.com/${CORE}`, `${sha}:refs/tags/${name}`]);

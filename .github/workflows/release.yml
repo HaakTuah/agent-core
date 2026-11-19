@@ -109,9 +109,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          runs=$(mktemp)
-          gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs" -f head_sha="$GITHUB_SHA" -f branch=main -F per_page=100 > "$runs"
+          # (the runs the push of that commit started, and, apart, the tests' runs on it newest first, of which the newest
+          # hourly or hand-started one decides, however many stand there)
+          runs=$(mktemp) full=$(mktemp)
+          gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs" -f head_sha="$GITHUB_SHA" -f branch=main -f event=push -F per_page=100 > "$runs"
+          gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$GITHUB_SHA" -f branch=main -F per_page=100 > "$full"
           # (git asks this helper for the push's password; it answers from the step's own environment)
           git config --global credential.https://github.com.helper \
             '!f() { test "$1" = get && printf "username=x-access-token\npassword=%s\n" "$GH_TOKEN"; }; f'
-          node scripts/release.mjs --cut --at "$GITHUB_SHA" --runs "$runs" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          node scripts/release.mjs --cut --at "$GITHUB_SHA" --runs "$runs" --full "$full" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"

@@ -525,7 +525,8 @@ jobs:
   # on Linux passed that the run started, on Windows too where it started them; a job that ran out of its time is
   # cancelled, which no failing test is, so the gate says which it was. On a draft it runs and fails, since a check the
   # ruleset requires passes where its job is skipped, and a draft's head is tested only once it is marked ready; on an
-  # hourly run where main did not move it is skipped, which no pull request or release reads)
+  # hourly run where main did not move it is skipped, which only ever follows a full run that passed, so a release reads
+  # it as that pass)
   tests:
     needs: [moved, suites, upgrade]
     if: ${{ always() && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}

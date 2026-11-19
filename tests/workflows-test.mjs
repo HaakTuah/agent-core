@@ -174,8 +174,8 @@ ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] =
   ok(tests.on.schedule?.length === 1 && /^\d{1,2} \* \* \* \*$/.test(tests.on.schedule[0].cron) && tests.jobs.moved.if === "${{ github.event_name == 'schedule' }}" && /event == "schedule" or \.event == "workflow_dispatch"/.test(tests.jobs.moved.steps.at(-1).run) && /status=completed/.test(tests.jobs.moved.steps.at(-1).run) && /sort_by\(\.run_started_at\) \| last \| \.conclusion/.test(tests.jobs.moved.steps.at(-1).run) && /if \[ "\$done" = success \]; then echo "run=false"/.test(tests.jobs.moved.steps.at(-1).run),
     "Windows once an hour, at main's newest commit, skipped only where the newest full run there, hourly or by hand, passed, so no skipped run hides a failure from the release (point 6)");
   const cut = release.jobs.release.steps.at(-1).run;
-  ok("workflow_dispatch" in tests.on && !("workflow_call" in tests.on) && /actions\/runs" -f head_sha="\$GITHUB_SHA" -f branch=main -F per_page=100/.test(cut) && !/event=push/.test(cut),
-    "and both in full by hand, which the release waits on: it reads every run on its commit, the hourly and hand-started ones with the push's, and the tests stay a workflow no project calls (point 6; release.mjs, fullRun)", cut);
+  ok("workflow_dispatch" in tests.on && !("workflow_call" in tests.on) && /actions\/runs" -f head_sha="\$GITHUB_SHA" -f branch=main -f event=push /.test(cut) && /actions\/workflows\/tests\.yml\/runs" -f head_sha="\$GITHUB_SHA"/.test(cut) && /--runs "\$runs" --full "\$full"/.test(cut),
+    "and both in full by hand, which the release waits on: it reads the push's runs and, apart, the tests' runs on its commit, newest first, and the tests stay a workflow no project calls (point 6; release.mjs, fullRun)", cut);
 }
 
 process.exit(failed ? 1 : 0);

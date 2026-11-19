@@ -60,6 +60,8 @@ function labelsOf(job) {
 function entriesOf(include) {
   if (Array.isArray(include)) return include;
   if (typeof include !== "string") return [];
+  // (an expression that may also give a value of a variable, an input or a job's output is not read: no entry stands)
+  if (/\b(?:vars|inputs|needs|env|secrets|steps)\./u.test(include.replace(/'[^']*'/gu, ""))) return [];
   return [...include.slice(0, 200000).matchAll(/'(\[[^']*\])'/gu)].flatMap(m => { try { const v = JSON.parse(m[1]); return Array.isArray(v) ? v : []; } catch { return []; } });
 }
 
@@ -95,6 +97,8 @@ export function workflowsIn(dir, parse = loadSync("yaml").parse) {
     for (const f of seen) {
       // (a job that calls a workflow takes no runner of its own: the called workflow's jobs do, followed above where it
       // stands here)
+      // (a call to this folder that leads to no workflow read here is a runner not read: its jobs cannot be seen)
+      if (jobsOf(read[f]).some(j => { const c = LOCAL.exec(typeof j?.uses === "string" ? j.uses.trim() : "")?.[1]; return typeof j?.uses === "string" && j.uses.trim().startsWith("./") && !(c && c in read); })) out.unknown = true;
       for (const job of jobsOf(read[f]).filter(j => typeof j?.uses !== "string")) {
         const runner = runnerOf(job);
         out.selfHosted ||= runner === "own";
@@ -169,7 +173,8 @@ export function read({ repo, dir = ".github/workflows", manifest = null, gh = gh
   const advice = (w.selfHosted || w.unknown) && priv === false
     ? `A public repository runs a job on ${w.selfHosted ? "a runner of the owner's own" : "a runner that could not be read, perhaps the owner's own"}, where a stranger's pull request would run its code (floor rule 18): keep pull requests from forks off that job at once (an \`if:\` that its head repository is this one), and, where no open issue names it, file one for the owner, labelled needs-owner, to move that job to the host's runners or have every outside contributor's run approved first; nothing else waits on it.`
     : null;
-  return { where: s.where, billed: s.billed, cadence, said: saidOf(s, priv, w.unread), when: WHEN[cadence], advice };
+  const usersSaid = `its users get: ${users === "releases" ? "a release" : "each merge"}${override(manifest, "users get", ["merges", "releases"]) ? ", as the manifest's row *users get* says" : ", as no row *users get* says otherwise (it cannot be read)"}`;
+  return { where: s.where, billed: s.billed, cadence, said: [...saidOf(s, priv, w.unread), usersSaid], when: WHEN[cadence], advice };
 }
 
 export function main(argv, { gh = ghApi, say = console.log } = {}) {
