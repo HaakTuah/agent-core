@@ -55,6 +55,8 @@ function kit(name, o, { held = true } = {}) {
   // (the copies check's first baseline as the starter kit writes it, its two entry files' shared sentence listed)
   execFileSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: dir, stdio: "ignore" });
   fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), `${JSON.stringify({ reads: Object.keys(READERS), listed: {} }, null, 2)}\n`);
+  // (the first list of what holds the project's own rules, as the starter kit writes it: #662)
+  execFileSync(process.execPath, ["core/scripts/holders.mjs", "--own", "--write"], { cwd: dir, stdio: "ignore" });
   if (held) roundTrip(name, o, dir);
   return dir;
 }
