@@ -23,13 +23,16 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      `tests/hostile-pr-changes-test.mjs`.
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the
      reviews' records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look
-     (`scripts/look.mjs`) and the inbox (`scripts/inbox.mjs`); hostile tests: `tests/hostile-issues-test.mjs`.
+     (`scripts/look.mjs`), the inbox (`scripts/inbox.mjs`) and the personal terms' take-out (`scripts/issue-terms.mjs`,
+     which edits only an insider's text); hostile tests: `tests/hostile-issues-test.mjs`, and for the take-out
+     `tests/issue-terms-test.mjs`.
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository
      (the workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`,
      `scripts/releases.mjs`, `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`,
      `scripts/clean-merges.mjs`, `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs` and
-     `scripts/tools-offer.mjs`, and an account's rights by the code-review wait (`scripts/code-review-wait.mjs`) and
-     the scheduled look (`scripts/look.mjs`) through `security-review.mjs`'s reader; hostile tests:
+     `scripts/tools-offer.mjs`, and an account's rights by the code-review wait (`scripts/code-review-wait.mjs`), the
+     scheduled look (`scripts/look.mjs`) and the size check (`scripts/size.mjs`, from `size.yml`) through
+     `security-review.mjs`'s reader; hostile tests:
      `tests/hostile-github-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,

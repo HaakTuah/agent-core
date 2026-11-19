@@ -18,7 +18,9 @@ import { mended } from "../scripts/mend.mjs";
 import { CODEX, codexState, codexs, commentsAlone, judge, named, reviewersOf, standsFrom, status, whole } from "../scripts/security-review.mjs";
 import { lateFinding } from "../scripts/look.mjs";
 import { lateOf, repliersOf } from "../scripts/review-marks.mjs";
-import { answered, capsOf, raised } from "../scripts/size.mjs";
+import { answered as answeredBy, capsOf, raised as raisedBy, whoseOf } from "../scripts/size.mjs";
+// (the size check counts an answer from the repository's owner, "someone" here, with no right read)
+const owner = whoseOf("someone", []), answered = (comments) => answeredBy(comments, owner), raised = (base, head, comments) => raisedBy(base, head, comments, capsOf(head), owner);
 import { NONE, said as toolsSaid, tally } from "../scripts/tools-read.mjs";
 
 let failed = 0;
@@ -39,7 +41,7 @@ const lean = (body, more) => said(body, more);
 // the size check's own text, and a base whose builder's cap is one step lower, so that the head raises it
 const sizeText = fs.readFileSync(fileURLToPath(new URL("../scripts/size.mjs", import.meta.url)), "utf8");
 const base = sizeText.replace(/^  builder: (\d+) \* 1024,$/mu, (_, n) => `  builder: ${Number(n) - 1} * 1024,`);
-const lacks = (comments) => /no comment that opens "Leanness check:"\. Mend: /u.test(raised(base, sizeText, comments) ?? "");
+const lacks = (comments) => /no comment that opens "Leanness check:" from the owner or a person the host lets write\. Mend: /u.test(raised(base, sizeText, comments) ?? "");
 // what the code review waits on, outside the core's own repository, a file of code changed
 const code = (comments, p = pull, f = files) => codeJudge(p, comments, commits, f);
 
@@ -172,7 +174,7 @@ function runSize(baseFile, commentsText) {
   try {
     fs.writeFileSync(path.join(tmp, "base.mjs"), base);
     fs.writeFileSync(path.join(tmp, "comments.json"), commentsText);
-    return spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/size.mjs", import.meta.url)), "--raise", baseFile ?? "base.mjs", "comments.json"], { cwd: tmp, encoding: "utf8", timeout: 20000 });
+    return spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/size.mjs", import.meta.url)), "--raise", baseFile ?? "base.mjs", "comments.json"], { cwd: tmp, encoding: "utf8", timeout: 20000, env: { ...process.env, OWNER: "someone" } });
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 

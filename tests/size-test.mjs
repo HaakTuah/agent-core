@@ -8,7 +8,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { CAPS, QUEUE, answered, capsOf, counted, raised, rolesAt } from "../scripts/size.mjs";
+import { ghStandIn } from "../scripts/scratch-core.mjs";
+import { onPath, parseYaml } from "../scripts/workflow-run.mjs";
+import { CAPS, DUE_TITLE, QUEUE, answered, capsAt, capsOf, counted, due, judged, raised as raisedWith, rolesAt, whoseOf } from "../scripts/size.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -28,13 +30,20 @@ ok([at(0), at("052"), at("5e1"), at("-1"), "let CAP = 52 * 1024;\n", "export con
   "a block or line spelled any other way, two of them, a role named twice, or no text at all gives no caps");
 
 // whose comment answers
-const comment = (body, author_association = "OWNER") => ({ body, author_association });
-ok(answered([comment("Leanness check: a fresh session read all the rules and found too little room.")]) && answered([[comment("x")], [comment("**Leanness check:** no room", "COLLABORATOR")]]) && answered([comment("Leanness check: found", "MEMBER")]),
-  "a comment that opens with the leanness check's answer, from the owner, a member or a collaborator, answers, in a list or a list of pages");
-ok(!answered([]) && !answered([comment("About the Leanness check: none yet")]) && !answered([comment(" Leanness check: x")]) && !answered([comment("leanness check: x")]) && !answered([comment("Leanness check")]),
+// (the repository's owner, "someone", whose answer counts with no right read: security-review.mjs, counted)
+const comment = (body, author_association = "OWNER", login = "someone") => ({ body, author_association, user: { login, type: "User" } });
+const owner = whoseOf("someone", []), raised = (base, head, comments, running = capsOf(head)) => raisedWith(base, head, comments, running, owner);
+const right = (login, role_name, permission, push) => ({ role_name, permission, user: { login, type: "User", permissions: { push } } });
+ok(answered([comment("Leanness check: a fresh session read all the rules and found too little room.")], owner) && answered([[comment("x")], [comment("**Leanness check:** no room", "COLLABORATOR")]], owner) && answered([comment("Leanness check: found", "MEMBER")], owner),
+  "a comment that opens with the leanness check's answer, from the owner, answers, in a list or a list of pages, whatever association GitHub gives it");
+ok(answered([comment("Leanness check: found", "MEMBER", "writer")], whoseOf("someone", [right("writer", "write", "write", true)])) && answered([comment("Leanness check: found", "COLLABORATOR", "Writer")], whoseOf("someone", [right("writer", "maintain", "write", true)]))
+  && !answered([comment("Leanness check: found", "MEMBER", "reader")], whoseOf("someone", [right("reader", "read", "read", false)])) && !answered([comment("Leanness check: found", "COLLABORATOR", "reader")], owner)
+  && !answered([comment("Leanness check: found")]) && !answered([comment("Leanness check: found", "MEMBER", "writer")], whoseOf("someone", [right("writer", "triage", "read", false)])),
+  "a member's or collaborator's answers only where the host's rights let them write; one who may only read or triage, or whose right was not read, does not, nor does any, with no one counted");
+ok(!answered([], owner) && !answered([comment("About the Leanness check: none yet")], owner) && !answered([comment(" Leanness check: x")], owner) && !answered([comment("leanness check: x")], owner) && !answered([comment("Leanness check")], owner),
   "one that only speaks of it, or opens any other way, does not");
-ok(["NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "MANNEQUIN", null, 5].every(who => !answered([comment("Leanness check: x", who)])), "nor does anyone else's, whatever it says");
-ok(!answered(null) && !answered({}) && !answered("Leanness check: x") && !answered([null, 1, "Leanness check: x", { author_association: "OWNER" }, { body: 5, author_association: "OWNER" }]), "nor a list in any other form, or an entry that is no comment");
+ok(["NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "MANNEQUIN", null, 5].every(who => !answered([comment("Leanness check: x", who)], owner)), "nor does anyone else's, whatever it says");
+ok(!answered(null, owner) && !answered({}, owner) && !answered("Leanness check: x", owner) && !answered([null, 1, "Leanness check: x", { author_association: "OWNER" }, { body: 5, author_association: "OWNER" }], owner), "nor a list in any other form, or an entry that is no comment");
 
 // a pull request's raise
 const yes = [comment("Leanness check: read whole; too little room.")];
@@ -65,11 +74,27 @@ ok(eq(rolesAt(root).sort(), Object.keys(CAPS).sort()) && rolesAt(root).every(r =
 ok(counted("design", root).includes("roles/builder.md") && counted("orchestrator", root).includes("roles/orchestrator.md") && !counted("builder", root).includes("roles/orchestrator.md") && !counted("stand-in", root).includes("roles/shared/git.md"),
   "a role's count holds what its file names, a role's file named there with what that names, and nothing another role alone reads");
 
+// what a pull request or the default branch makes of what stands past a cap (#750, point 6)
+const past = [{ what: "builder", said: "what the role builder reads at its start", total: 110, cap: 100, kind: "role" }];
+ok(eq(judged(past).fail, []) && /is 10 bytes over its cap$/.test(judged(past).task[0]), "with no base, what stands past a cap is a task");
+ok(judged(past, { builder: 90 }).fail.length === 1 && /is 10 bytes over its cap\. Mend:/.test(judged(past, { builder: 90 }).fail[0]) && judged(past, {}).fail.length === 1, "against a base under the cap, or one without the role, it fails");
+ok(judged(past, { builder: 105 }).fail.length === 1 && /5 of them this change's own/.test(judged(past, { builder: 105 }).fail[0]), "against a base past the cap already, a change that grows it fails, saying how much is its own");
+ok(judged(past, { builder: 100 }).fail.length === 1 && !/this change's own/.test(judged(past, { builder: 100 }).fail[0]), "a base exactly at the cap was not past it");
+ok(eq(judged(past, { builder: 110 }).fail, []) && eq(judged(past, { builder: 120 }).fail, []) && /as it stood before this change/.test(judged(past, { builder: 120 }).task[0]), "one that does not grow it is a task");
+ok(judged(past, { builder: 110 }, { builder: 120 }).fail.length === 1 && /which this change lowers from 0\.1171875 KB to 0\.09765625 KB\. Mend: set it back to 0\.1171875 \* 1024, the base's cap/.test(judged(past, { builder: 110 }, { builder: 120 }).fail[0]) && eq(judged(past, { builder: 110 }, { builder: 100 }).fail, []) && eq(judged(past, { builder: 110 }, {}).fail, []), "a change that lowers a cap below what stands fails, where the base set a higher one (the design check of 9bfbe79)");
+{ const lowered = [{ what: QUEUE.file, said: QUEUE.file, total: 6000, cap: 5 * 1024, kind: "queue" }], f = judged(lowered, { [QUEUE.file]: 6000 }, { [QUEUE.file]: 6 * 1024 }).fail[0];
+  ok(mended(`FAIL: ${f}`) && /over its mark, which this change lowers from 6 KB to 5 KB\. Mend: set it back to 6 \* 1024, the base's mark/.test(f) && eq(Object.keys(capsAt("HEAD")).sort(), [...Object.keys(CAPS), QUEUE.file].sort()) && Object.values(capsAt("HEAD")).every(b => b > 0 && b % 1024 === 0) && eq(capsAt("--output=x"), {}), "the queue's mark lowered below what stands fails with its mend, and capsAt reads a cap for each role and the mark a revision sets, in whole KB, whatever the working tree holds, and nothing from a revision it refuses (the fallback reviewer's check of 94d700d)"); }
+ok(due({ manifest: "a project's manifest" }) === null, "the scheduled look keeps no such issue in a project");
+const here = process.cwd(), empty = fs.mkdtempSync(path.join(os.tmpdir(), "size-empty-"));
+try { process.chdir(empty); ok(due({ manifest: null }) === null, "nor where no roles/ or queue stands to count"); } finally { process.chdir(here); fs.rmSync(empty, { recursive: true, force: true }); }
+const kept = due({ manifest: null });
+ok(kept.title === DUE_TITLE && (kept.body === null || /^- what the role \S+ reads at its start is \d+ bytes over its cap\.$/m.test(kept.body) || /^- QUEUE\.md is/m.test(kept.body)), "in the core it keeps the issue while a start or the queue stands past its cap, and closes it once none does", JSON.stringify(kept));
+
 // the script itself
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "size-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const put = (name, text) => { const to = path.join(tmp, name); fs.writeFileSync(to, text); return to; };
-const run = (...args) => { const r = spawnSync(process.execPath, [file, ...args], { cwd: root, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
+const run = (...args) => { const r = spawnSync(process.execPath, [file, ...args], { cwd: root, encoding: "utf8", env: { ...process.env, OWNER: "someone" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 const kb = Object.fromEntries(Object.entries(CAPS).map(([r, n]) => [r, n / 1024]));
 const same = put("same.mjs", own), lower = put("lower.mjs", caps({ ...kb, builder: kb.builder - 1 })), old = put("old.mjs", at(kb.builder)), none = put("none.json", "[[]]"), one = put("one.json", JSON.stringify([yes]));
 ok(run().status === 0 && Object.keys(CAPS).every(r => new RegExp(`^what the role ${r} reads at its start \\(floor/security\\.md, .*\\): \\d+ bytes of ${CAPS[r]}$`, "m").test(run().out)), "with no argument it holds each role's start to its cap", run().out);
@@ -77,7 +102,9 @@ ok(QUEUE.mark < 20 * 1024 && /^the queue \(QUEUE\.md\): \d+ bytes of its mark, \
 const queueFile = path.join(root, QUEUE.file), queueText = fs.readFileSync(queueFile);
 try {
   fs.writeFileSync(queueFile, Buffer.concat([queueText, Buffer.alloc(QUEUE.mark, "x")]));
-  ok(run().status === 1 && /QUEUE\.md is \d+ bytes past its mark\. Mend: take out each finished line/.test(run().out) && mended(run().out), "a queue past its mark fails, saying the mend", run().out);
+  const based = run("--base", "HEAD");
+  ok(based.status === 1 && /QUEUE\.md is \d+ bytes over its cap\. Mend: take out each finished line/.test(based.out) && mended(based.out), "a queue this change takes past its mark fails, saying the mend", based.out);
+  ok(run().status === 0 && /::warning::QUEUE\.md is \d+ bytes over its cap, which fails nothing: a task to trim/.test(run().out), "with no base, as on the default branch, a queue past its mark is a warning and a task, never a failure", run().out);
 } finally { fs.writeFileSync(queueFile, queueText); }
 ok(run("--raise", same, none).status === 0 && run("--raise", same, none).out.includes("no role's cap is raised") && run("--raise", old, none).status === 0, "against a base with the same caps, or the one cap of before at the builder's, it passes with no comment");
 ok(run("--raise", lower, none).status === 1 && run("--raise", lower, none).out.includes("Leanness check:") && mended(run("--raise", lower, none).out) && run("--raise", lower, one).status === 0 && run("--raise", lower, one).out.includes("holds a leanness check's answer"), "against a base with a lower cap for a role it fails without the answer, saying the mend, and passes with it", run("--raise", lower, none).out);
@@ -88,10 +115,27 @@ ok(run("--raise", over, one).status === 1 && /more than one step\. Mend: set it 
 // role's start has outgrown)
 for (const part of ["scripts", "roles", "tasks", "floor"]) fs.cpSync(path.join(root, part), path.join(tmp, part), { recursive: true });
 fs.copyFileSync(queueFile, path.join(tmp, QUEUE.file));
-const copy = path.join(tmp, "scripts", "size.mjs"), at2 = (...args) => { const r = spawnSync(process.execPath, [copy, ...args], { cwd: tmp, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
+const copy = path.join(tmp, "scripts", "size.mjs"), at2 = (...args) => { const r = spawnSync(process.execPath, [copy, ...args], { cwd: tmp, encoding: "utf8", env: { ...process.env, OWNER: "someone" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 ok(at2().status === 0, "a copy of the core counts as the core does", at2().out);
+const git = (...args) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: tmp, encoding: "utf8" });
+git("init", "-q"); git("add", "-A"); git("commit", "-qm", "base");
+const standIn = Number(new RegExp(`the role stand-in reads at its start \\(.*\\): (\\d+) bytes of`).exec(at2().out)?.[1]);
+fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), "x".repeat(CAPS["stand-in"] - standIn));
+ok(at2("--base", "HEAD").status === 0 && new RegExp(`stand-in reads at its start \\(.*\\): ${CAPS["stand-in"]} bytes of`).test(at2().out) && !/::warning::/.test(at2().out), "a start exactly at its cap is not past it", at2().out);
+git("checkout", "-q", "--", "roles/stand-in.md");
 fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), `\n${"x".repeat(CAPS["stand-in"])}\n`);
-ok(at2().status === 1 && /what the role stand-in reads at its start is \d+ bytes over its cap\. Mend: say the rules/.test(at2().out) && mended(at2().out) && !/the role builder reads at its start is/.test(at2().out), "a role whose start has outgrown its cap fails, it alone, saying the mend", at2().out);
+let r = at2("--base", "HEAD");
+ok(r.status === 1 && /what the role stand-in reads at its start is \d+ bytes over its cap\. Mend: say the rules/.test(r.out) && mended(r.out) && !/the role builder reads at its start is/.test(r.out), "a role whose start this change takes past its cap fails, it alone, saying the mend", r.out);
+ok(at2().status === 0 && /::warning::what the role stand-in reads at its start is \d+ bytes over its cap, which fails nothing/.test(at2().out), "with no base, as on the default branch, it is a warning and a task (#750, point 6)", at2().out);
+git("commit", "-qam", "past the cap");
+r = at2("--base", "HEAD");
+ok(r.status === 0 && /::warning::what the role stand-in reads at its start is \d+ bytes over its cap, as it stood before this change, which does not grow it/.test(r.out), "past its cap at the base already, a change that does not grow it passes, with the warning", r.out);
+fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), "one line more\n");
+r = at2("--base", "HEAD");
+ok(r.status === 1 && /over its cap, 14 of them this change's own\. Mend:/.test(r.out) && mended(r.out), "one that grows it further fails, saying how much is its own", r.out);
+git("checkout", "-q", "--", "roles/stand-in.md");
+for (const bad of [at2("--base", "no-such-revision"), at2("--base"), at2("--other"), at2("--base", "--output=x"), at2("--base", "HEAD:roles")]) ok(bad.status === 1 && mended(bad.out), "a base git cannot read, or an option it does not know, fails, saying the mend", bad.out);
+fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), `\n${"x".repeat(CAPS["stand-in"])}\n`);
 fs.writeFileSync(path.join(tmp, "roles", "planner.md"), "# The planner\n\nRead at its start by the role `planner`.\n\n**Reads at its start:** `roles/shared/git.md`.\n");
 ok(/the role planner has no cap\. Mend: give it a line in CAPS/.test(at2().out) && mended(at2().out), "a role with a file and no cap fails, saying the line to add", at2().out);
 fs.rmSync(path.join(tmp, "roles", "planner.md")); fs.rmSync(path.join(tmp, "roles", "reviewer.md"));
@@ -103,6 +147,33 @@ const elsewhere = spawnSync(process.execPath, [file], { cwd: os.tmpdir(), encodi
 ok(elsewhere.status === 1 && /cannot be counted: roles\/ is not here/.test(elsewhere.stderr) && mended(elsewhere.stderr), "where the core is not there (run from another folder), it fails and says so", elsewhere.stdout + elsewhere.stderr);
 ok(run("--raise").status === 1 && run("--raise", same).status === 1 && run("--raise", same, path.join(tmp, "missing.json")).status === 1 && run("--raise", same, put("bad.json", "{")).status === 1 && run("--raise", path.join(tmp, "missing.mjs"), one).status === 1,
   "without its two files, or with one it cannot read, it fails");
+
+// size.yml's step that reads the rights of those who answered, run as it stands, against a stand-in for GitHub's API:
+// a writer's right is read, and counts; a reader's is read, and does not; one the host does not answer, nor the
+// owner's, which needs none, nor an account outside the repository, is asked for
+{
+  const step = parseYaml(fs.readFileSync(path.join(root, ".github/workflows/size.yml"), "utf8")).jobs.size.steps.find((s) => /rights of those who answered/u.test(s.name ?? ""));
+  const repo = fs.mkdtempSync(path.join(tmp, "repo-"));
+  const git = (...args) => spawnSync("git", args, { cwd: repo, encoding: "utf8" });
+  git("init", "-q"); fs.mkdirSync(path.join(repo, "scripts")); fs.writeFileSync(path.join(repo, "scripts", "size.mjs"), own);
+  for (const m of ["base", "head"]) { git("add", "-A"); git("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", m); }
+  // (git's config count given where the environment holds none, as on a runner, since the stand-in adds one to it)
+  const { env, ghData, ghLog } = ghStandIn({ ...process.env, GIT_CONFIG_COUNT: process.env.GIT_CONFIG_COUNT ?? "0" }, fs.mkdtempSync(path.join(tmp, "gh-")), repo);
+  const says = (login, author_association) => ({ user: { login, type: "User" }, author_association, body: "Leanness check: too little room." });
+  fs.writeFileSync(ghData, JSON.stringify({ "issues/1/comments": [says("SomeOne", "OWNER"), says("writer", "COLLABORATOR"), says("reader", "MEMBER"), says("silent", "MEMBER"), says("outsider", "NONE"), says("bad;name", "MEMBER")],
+    "collaborators/writer/permission$": right("writer", "write", "write", true), "collaborators/reader/permission$": right("reader", "read", "read", false) }));
+  fs.writeFileSync(ghLog, "");
+  const runner = fs.mkdtempSync(path.join(tmp, "runner-"));
+  // (in bash as GitHub runs a step, found as the workflow runner finds it: on Windows, Git for Windows' own)
+  const script = path.join(runner, "step.sh");
+  fs.writeFileSync(script, step.run);
+  const r = spawnSync(onPath("bash", env), ["-e", script], { cwd: repo, encoding: "utf8", env: { ...env, ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}), GH_TOKEN: "not-a-token", NUMBER: "1", OWNER: "someone", RUNNER_TEMP: runner, GITHUB_REPOSITORY: "someone/project" } });
+  if (r.status !== 0) console.error(r.stdout + r.stderr);
+  const rights = JSON.parse(fs.readFileSync(path.join(runner, "raise", "rights.json"), "utf8")), whose = whoseOf("someone", rights);
+  ok(r.status === 0 && rights.length === 2 && whose({ login: "writer", type: "User" }) && !whose({ login: "reader", type: "User" }) && !whose({ login: "silent", type: "User" }) && whose({ login: "SomeOne", type: "User" })
+    && r.stdout.includes("The host's rights of silent could not be read") && !/outsider|bad;name|someone\b/iu.test(r.stdout),
+    "size.yml reads the rights of those who answered: a writer's counts, a reader's and one not answered do not, and the owner, an outsider and a login of any other form are not asked for", r.stdout + r.stderr);
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the cap's check`);
 process.exit(failed ? 1 : 0);
