@@ -88,9 +88,10 @@ saved data; a weakened check).
 
 **12. `main` is the owners'.**
 - It is never pushed to, and changes only by a merged pull request, its checks passed and the approvals the host asks
-  given, brought up to date with `main` where every merge goes live: what its users get is built from it.
-- Where users get a release, `main` is tested at its newest commit, a red one fixed before any other merge, and a
-  release cut only from a green one (`tasks/hosts.md`).
+  given.
+- What users get is published only from a green `main`'s newest commit or a release cut there, never on a merge
+  alone; a red `main` is fixed first (save as `tasks/hosts.md` says), and while a project publishes per merge, a pull
+  request is brought up to date first.
 
 **13. Each project's files stay in its own repository,** never written into another's.
 

@@ -1,18 +1,41 @@
 // Checks the licence check's lists and readers (scripts/licences.mjs), alone, on invented names: how a licence
-// expression is read, which list allows what, a package known by its registry address, npm's settings. The check on a
-// whole project, and its scan, are checked by licence-scan-test.mjs. Run by the core's tests workflow
+// expression is read, which list allows what, a package known by its registry address, npm's settings; and, of the
+// core's own files, that its audit's entry for Node names the version the core pins (#592). The check on a whole
+// project, and its scan, are checked by licence-scan-test.mjs. Run by the core's tests workflow
 // (.github/workflows/tests.yml).
 //
 //   node tests/licences-test.mjs
 import { readable } from "../scripts/licence-yes.mjs";
 import { actionLists, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 let failed = 0;
 const ok = (cond, what, more = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) { failed++; if (more) console.log(more); } };
+
+// the pin, .node-version, is one fact that the audit's entry for Node and node.sh's sums each name: the scan reads the
+// download as pinned by the entry's version, so an entry left behind when the pin moves would pass unseen (#592)
+{
+  const core = f => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
+  const pin = core(".node-version").trim();
+  const entry = JSON.parse(core(".github/licences-audit.json")).entries.filter(e => e.name === "Node.js");
+  // (node.sh's case on "$want-$(uname -m)" read strictly, line by line: the pin's x86_64 arm, its aarch64 arm, each
+  // with one sum, then the closing *) alone, so that no glob, alternative, extra arm or form the test does not know,
+  // above the pin's lines or among them, passes)
+  const block = /^case "\$want-\$\(uname -m\)" in\n([\s\S]*?)\nesac$/mu.exec(core("scripts/node.sh").replace(/\r\n/gu, "\n"))?.[1];
+  const v = pin.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const shapes = [new RegExp(`^  ${v}-x86_64\\) arch=x64 sum=[0-9a-f]{64} ;;$`, "u"), new RegExp(`^  ${v}-aarch64\\) arch=arm64 sum=[0-9a-f]{64} ;;$`, "u"), /^  \*\) (?:[^;]|;(?!;))*;;$/u];
+  const lines = block === undefined ? [] : block.split("\n");
+  const odd = block === undefined ? ['no line `case "$want-$(uname -m)" in` closed by `esac`'] : [
+    ...lines.flatMap((line, i) => (shapes[i]?.test(line) ? [] : [`line ${i + 1} of the case, ${JSON.stringify(line)}`])),
+    ...shapes.slice(lines.length).map((_, i) => `no line ${lines.length + i + 1}`)];
+  const want = ["x86_64", "aarch64"].map(arch => `${pin}-${arch}`);
+  ok(entry.length === 1 && entry[0].version === pin && odd.length === 0,
+    `the audit's entry for Node, and node.sh's sums, one for each architecture, name the pin in .node-version, ${pin}`,
+    `the entry names ${entry.map(e => e.version).join(", ") || "nothing"}; in scripts/node.sh, ${odd.join("; ") || "the case is as wanted"}; where the case wants exactly three lines: \`  ${want[0]}) arch=x64 sum=<its sha256> ;;\`, \`  ${want[1]}) arch=arm64 sum=<its sha256> ;;\` and \`  *) <one command line, no ;;> ;;\`. Mend: set "version" of the entry "Node.js" in .github/licences-audit.json to the version .node-version names, and give node.sh's case on "$want-$(uname -m)" that version's two sums, one for x86_64 and one for aarch64, in those three lines and no other, in the pull request that moves the pin (tasks/updates.md, "Node")`);
+}
 
 const lists = policy({ data: ["mossgrip-data"], fonts: ["mossgrip-face"] });
 const code = lists.allowedFor("mossgrip-lib"), data = lists.allowedFor("mossgrip-data"), font = lists.allowedFor("mossgrip-face");

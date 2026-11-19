@@ -1,5 +1,6 @@
 // Who wrote an item and what state it is in, and how an agent's comment opens (roles/shared/inbox.md, "Labels and openers say
-// who wrote what"; core archive 217): the list is labels.json, beside this file. Run from a project's root, it asks
+// who wrote what"; core archive 217): the list is labels.json, beside this file, its shape held by its schema
+// (schemas/labels.json, which the labels test reads; #530). Run from a project's root, it asks
 // GitHub, through gh, for the repository origin names, and reports, each with its mend, worded so an agent acts on it
 // alone with no rule file open:
 //   - the labels of the list the repository lacks, or holds in another colour or description;
