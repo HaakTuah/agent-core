@@ -73,7 +73,6 @@ it merges last.
 | #594 | rule builder; it changes the README | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
-| #652 | rule builder | |
 | #650 | rule builder | |
 | #661 | builder | |
 | #662 | rule builder | |
@@ -89,7 +88,6 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #549 | builder; a workflow, two security reviews | |
 | #550 | builder; a case a PR | |
 | #551 | builder | #549 |
 | #552 | builder | #551 |

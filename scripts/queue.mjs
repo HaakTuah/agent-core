@@ -28,7 +28,7 @@ import { started } from "./started.mjs";
 
 export const FILE = "QUEUE.md";
 export const LARGEST = 1 << 20; // (bytes: a progress file past it is refused, never read; SECURITY.md, rule 5)
-const ROW = /^\|([^|]*)\|/u, ITEM = /^\s*[-*]\s+(?:\[[ xX]\]\s+)?#(\d{1,9})\b/u;
+const ROW = /^\|([^|]*)\|/u, ITEM = /^(\s*)(?:[-*+]|\d{1,9}[.)])\s+(?:\[[ xX]\]\s+)?#(\d{1,9})\b/u;
 // The numbers what a line waits on names, a range "#a to #b" (at most a hundred wide) named whole, a number another
 // repository's name leads (`owner/name#n`) skipped.
 const numbers = text => [...String(text).matchAll(/(?<![\w/-])#(\d{1,9})\b(?:\s+to\s+#(\d{1,9})\b)?/gu)].flatMap(m => {
@@ -38,7 +38,8 @@ const numbers = text => [...String(text).matchAll(/(?<![\w/-])#(\d{1,9})\b(?:\s+
 // The issues a line names first, read so that none is missed, since one read too many keeps a line a little longer
 // and one missed loses it: { issues, kept }. Every "#n" counts, and a range in any of its spellings ("#a to #b",
 // "#a-#b", "#a–b", "#a..#b", "#a through #b", ...) at most a hundred wide is read whole; one wider, or backwards,
-// keeps the line, as does a row's first cell holding anything but issues, the words that join them and their points.
+// keeps the line, as does a row's first cell holding anything but issues, the words that join them and their points,
+// steps, cases or parts; a bare number joined to an issue ("#12, 13 and 14", "#12/13") is read as one.
 const RANGE = /#(\d{1,9})\b\s*(?:-|\u2013|\u2014|\.{2,3}|\u2026|\bup\s+to\b|\bto\b|\bthrough\b|\bthru\b|\btill\b|\buntil\b)\s*#?(\d{1,9})\b/giu;
 function named(text, strict) {
   const issues = [];
@@ -49,8 +50,8 @@ function named(text, strict) {
     else { kept = true; issues.push(from, to); }
     return " ";
   });
-  for (const m of rest.matchAll(/#(\d{1,9})\b/gu)) issues.push(Number(m[1]));
-  const left = rest.replace(/#\d{1,9}\b/gu, " ").replace(/\bpoints?\b[^#]*/giu, " ").replace(/\b(?:and|or)\b|[,;&+/]/giu, " ").trim();
+  for (const m of rest.matchAll(/#(\d{1,9})\b((?:\s*(?:[,&+/]|\band\b)\s*\d{1,9}\b)*)/gu)) issues.push(Number(m[1]), ...[...m[2].matchAll(/\d{1,9}/gu)].map(Number));
+  const left = rest.replace(/#\d{1,9}\b/gu, " ").replace(/\b(?:points?|steps?|cases?|parts?)\b[^#]*/giu, " ").replace(/\b(?:and|or)\b|[,;&+/]/giu, " ").trim();
   return { issues: [...new Set(issues)], kept: kept || (strict && left !== "") };
 }
 // What a line waits on beyond the issues it names: its words with each reference ("#n", "#n's points 1 to 3") and the
@@ -58,35 +59,52 @@ function named(text, strict) {
 const beyond = words => String(words).replace(/#\d{1,9}(?:'s\s+points?\s+[\d\s,]+(?:(?:to|and)\s+\d+)?)?/gu, " ").replace(/\b(?:and|after|then|or)\b|[,;.]/gu, " ").trim();
 
 // The lines of a progress file's text, in order: { at, text, issues, waits, words, owner }: `at` its index among the
-// text's lines; `issues` the issues it names first (a row's first cell; an item's text before what it waits on);
+// text's lines, `span` how many it takes (an item's wrapped text and the items under it); `issues` the issues it names first (a row's first cell; an item's text before what it waits on);
 // `kept` whether they could not be read whole, a line that never goes by itself;
 // `waits` the numbers what it waits on names (a row's last cell, or what an item names after "waits on"), `words`
 // that text; `owner` whether a row's second cell holds it for the owner ("the owner", AGENTS.md, "The queue").
 export function linesOf(text) {
-  return String(text ?? "").split("\n").map((line, at) => {
-    const plain = line.replace(/\r$/u, ""), row = ROW.exec(plain), item = row ? null : ITEM.exec(plain);
-    const head = row ? (/^\s*#\d/u.test(row[1]) ? named(row[1], true) : null) : item ? named(plain.replace(/\bwaits on\b.*$/iu, ""), false) : null;
+  const all = String(text ?? "").split("\n").map(l => l.replace(/\r$/u, ""));
+  return all.map((plain, at) => {
+    const row = ROW.exec(plain), item = row ? null : ITEM.exec(plain);
+    const { span, wraps } = item ? wrapped(all, at, item[1].length) : { span: 1, wraps: 1 }, whole = all.slice(at, at + wraps).join(" ");
+    const head = row ? (/^\s*#\d/u.test(row[1]) ? named(row[1], true) : null) : item ? named(whole.replace(/\bwaits\s+on\b.*$/iu, ""), false) : null;
     if (!head?.issues.length) return null;
     const cells = row ? plain.split("|").slice(1, -1) : [];
-    const words = (row ? cells.at(-1) ?? "" : /\bwaits on\b(.*)$/iu.exec(plain)?.[1] ?? "").trim();
-    return { at, text: line, issues: head.issues, kept: head.kept, waits: numbers(words), words, owner: row !== null && /^\s*the owner\b/iu.test(cells[1] ?? "") };
+    const words = (row ? cells.at(-1) ?? "" : /\bwaits\s+on\b(.*)$/iu.exec(whole)?.[1] ?? "").trim();
+    return { at, span, text: String(text).split("\n")[at], issues: head.issues, kept: head.kept, waits: numbers(words), words, owner: row !== null && /^\s*the owner\b/iu.test(cells[1] ?? "") };
   }).filter(Boolean);
+}
+// What an item at `at` spans: { span, wraps }, `span` itself and each line after it indented past its bullet (its
+// wrapped text, and the items under it that name no issue, which leave with it; one that names an issue is a line of
+// its own and ends the span), `wraps` how many of those are its own text, wrapped,
+// before the first line that is a bullet of its own.
+const BULLET = /^\s*(?:[-*+]|\d{1,9}[.)])\s/u;
+function wrapped(all, at, indent) {
+  let span = 1, wraps = 1;
+  while (at + span < all.length && new RegExp(`^ {${indent + 1},}\\S`, "u").test(all[at + span]) && !ROW.test(all[at + span].trim()) && !ITEM.test(all[at + span])) {
+    if (wraps === span && !BULLET.test(all[at + span])) wraps++;
+    span++;
+  }
+  return { span, wraps };
 }
 
 // The progress file as its readers take it, given `closed` (a number => whether that issue or pull request has
-// closed): { open, gone, next }, `gone` the lines all of whose issues have closed, `next` the first open line that no
+// closed): { open, gone, stale, next }, `gone` the lines all of whose issues have closed, `stale` the lines kept, their
+// issues not read whole, though each issue read has closed, which only a hand takes out, `next` the first open line,
+// not stale, that no
 // one holds for the owner and that waits on nothing open (what it waits on empty, or naming only what has closed and
 // nothing else, such as a hold), or null.
 export function read(text, closed) {
   const lines = linesOf(text), done = l => !l.kept && l.issues.every(closed);
-  const gone = lines.filter(done), open = lines.filter(l => !done(l));
-  const free = l => !l.owner && l.waits.every(closed) && beyond(l.words) === "";
-  return { open, gone, next: open.find(free) ?? null };
+  const gone = lines.filter(done), open = lines.filter(l => !done(l)), stale = open.filter(l => l.kept && l.issues.every(closed));
+  const free = l => !l.owner && !stale.includes(l) && l.waits.every(closed) && beyond(l.words) === "";
+  return { open, gone, stale, next: open.find(free) ?? null };
 }
 
 // The text with each line all of whose issues have closed taken out, and nothing else changed.
 export function cleared(text, closed) {
-  const out = new Set(read(text, closed).gone.map(l => l.at));
+  const out = new Set(read(text, closed).gone.flatMap(l => Array.from({ length: l.span }, (_, i) => l.at + i)));
   return String(text).split("\n").filter((_, at) => !out.has(at)).join("\n");
 }
 
@@ -115,13 +133,13 @@ export function statesOf(repo, gh = route => {
 }
 
 // Whether one issue or pull request has closed, read alone, so that --clear takes out no line whose issue the list
-// read a page at a time missed as it moved between pages: true where it is closed or does not exist; throws where
+// read a page at a time missed as it moved between pages: true where it is closed, deleted or does not exist; throws where
 // GitHub's answer is neither.
 export function closedAt(repo, n, gh = route => spawnSync("gh", ["api", route], { encoding: "utf8" })) {
   const r = gh(`repos/${repo}/issues/${n}`);
   let body = null;
   try { body = JSON.parse(r.stdout); } catch { /* (checked below) */ }
-  if (r.status !== 0 && body?.message === "Not Found") return true;
+  if (r.status !== 0 && ["Not Found", "This issue was deleted"].includes(body?.message)) return true;
   if (r.status !== 0 || body === null || body.number !== n || !["open", "closed"].includes(body.state)) throw new Error(`GitHub's answer for #${n} is no issue with its state`);
   return body.state === "closed";
 }
@@ -146,18 +164,29 @@ function readIn(flag, at, FILE) {
 export function command(flag, at) {
   const FILE = at.file ?? "QUEUE.md", got = readIn(flag, at, FILE);
   if (got.fail) return { status: 1, out: got.fail };
-  const { open, gone, next } = got.all, named = gone.map(l => l.issues.map(n => `#${n}`).join(" and ")).join(", ");
-  if (flag === "--clear") {
-    const sure = new Map(), closed = n => got.closed(n) && (at.confirm ? (sure.has(n) ? sure.get(n) : sure.set(n, at.confirm(n)).get(n)) : true);
-    try { at.write(cleared(got.text, closed)); } catch (e) { return { status: 1, out: `FAIL: the issues the queue names could not be read: ${e.message}. Mend: run it again; where gh is not signed in, sign it in, or set GH_TOKEN` }; }
-    return { status: 0, out: gone.length ? `${FILE}: took out the lines of ${named}, closed` : `${FILE}: no line of a closed issue` };
-  }
-  if (flag === "--check") {
-    if (gone.length) return { status: 1, out: `FAIL: ${FILE} holds the line of ${gone.length === 1 ? "an issue" : "issues"} closed: ${named}, and this pull request changes the queue. Mend: run node ${at.project ? "core/" : ""}scripts/queue.mjs --clear and commit ${FILE}` };
-    return { status: 0, out: `ok   ${FILE} holds no line of a closed issue` };
-  }
-  const last = [`${open.length} open lines${gone.length ? `, ${gone.length} of closed issues skipped (${named}), which the next pull request that changes the queue takes out` : ""}`, next ? `next: ${next.issues.map(n => `#${n}`).join(" and ")}` : "next: none that a session takes waits on nothing open"];
+  const { open, gone, stale, next } = got.all;
+  if (flag === "--clear") return clearing(FILE, got, at);
+  if (flag === "--check") return checking(FILE, gone, stale, at);
+  const last = [`${open.length} open lines${gone.length ? `, ${gone.length} of closed issues skipped (${namesOf(gone)}), which the next pull request that changes the queue takes out` : ""}`, next ? `next: ${next.issues.map(n => `#${n}`).join(" and ")}` : "next: none that a session takes waits on nothing open"];
   return { status: 0, out: [...open.map(l => l.text), ...last].join("\n") };
+}
+const namesOf = lines => lines.map(l => l.issues.map(n => `#${n}`).join(" and ")).join(", ");
+
+// --clear: each line whose issues have all closed, each read alone where `at.confirm` is given, taken out; nothing
+// written where one cannot be read, and what it says it took out what it did.
+function clearing(FILE, got, at) {
+  const sure = new Map(), closed = n => got.closed(n) && (!at.confirm || (sure.has(n) ? sure.get(n) : sure.set(n, at.confirm(n)).get(n)));
+  let done, text;
+  try { done = read(got.text, closed).gone; text = cleared(got.text, closed); } catch (e) { return { status: 1, out: `FAIL: the issues the queue names could not be read: ${e.message}. Mend: run it again; where gh is not signed in, sign it in, or set GH_TOKEN; where an issue's line stays, take it out by hand` }; }
+  at.write(text);
+  return { status: 0, out: done.length ? `${FILE}: took out the lines of ${namesOf(done)}, closed` : `${FILE}: no line of a closed issue` };
+}
+
+// --check: fails where a line of a closed issue stands, one --clear takes out, or one kept that only a hand does.
+function checking(FILE, gone, stale, at) {
+  if (gone.length) return { status: 1, out: `FAIL: ${FILE} holds the line of ${gone.length === 1 ? "an issue" : "issues"} closed: ${namesOf(gone)}, and this pull request changes the queue. Mend: run node ${at.project ? "core/" : ""}scripts/queue.mjs --clear and commit ${FILE}` };
+  if (stale.length) return { status: 1, out: `FAIL: ${FILE} holds a line whose issues read have all closed, though the reader cannot read them whole: ${stale.map(l => l.text.trim()).join("; ")}. Mend: take the line out of ${FILE} by hand, or name its issues as "#n", "#a to #b" or "#n, points ..." and run node ${at.project ? "core/" : ""}scripts/queue.mjs --clear` };
+  return { status: 0, out: `ok   ${FILE} holds no line of a closed issue` };
 }
 
 // The progress file where the command runs: a project's, as its manifest names it; the core's own where none stands.
@@ -168,7 +197,7 @@ const TOOLS = /^\.git(?:\/|$)|(?:^|\/)\.(?:codex|kiro|agents?)(?:\/|$)/iu;
 export const fileAt = (manifest, rules = []) => {
   if (manifest === null) return FILE;
   const at = progressOf(manifest), plain = path.posix.normalize(String(at).replace(/\\/gu, "/"));
-  return inProject(at) && /\.md$/iu.test(plain) && !RULES.test(plain) && !TOOLS.test(plain) && !rules.includes(plain) ? plain : null;
+  return inProject(at) && /\.md$/iu.test(plain) && !RULES.test(plain) && !TOOLS.test(plain) && !rules.some(r => r.toLowerCase() === plain.toLowerCase()) ? plain : null;
 };
 // Whether any part of a path inside the project is a link, which --clear's write would follow, to a protected file
 // inside the project as readily as to one outside it.

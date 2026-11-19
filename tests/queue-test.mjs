@@ -110,6 +110,22 @@ let wrote = null;
 r = command("--clear", { file: "Q.md", read: () => "| #7 | b | |\n| #8 | b | |\n| #20 | b | |\n", write: t => { wrote = t; }, closed: () => n => n !== 20, confirm: n => n === 7 });
 ok(r.status === 0 && wrote === "| #8 | b | |\n| #20 | b | |\n", "--clear takes out a line only once each of its issues, read alone, has closed: one the list missed stays", wrote);
 
+// the fallback reviewer's third check of #757's fixes: a kept line of closed issues, a numbered item, a wrapped one,
+// what --clear says, a deleted issue, and a bare number joined to an issue
+const keptShut = "| #502, the first half | builder | |\n| #503 | builder | |\n";
+ok(read(keptShut, n => n === 502).next?.issues[0] === 503 && read(keptShut, n => n === 502).stale.length === 1 && mended(command("--check", { file: "Q.md", read: () => keptShut, closed: () => n => n === 502 }).out) && /first half/u.test(command("--check", { file: "Q.md", read: () => keptShut, closed: () => n => n === 502 }).out),
+  "a line kept, its issues read all closed, is never next, and the check names it, to be taken out by hand");
+ok(cleared("| #502, case 1, step 2 | b | |\n", n => n === 502) === "", "a row's cases and steps, as its points, keep no line of an issue closed");
+const numbered = "1. #20 the menu\n2) #21 the sound\n+ #22 the save\n";
+ok(linesOf(numbered).map(l => l.issues[0]).join() === "20,21,22" && cleared(numbered, n => n === 21) === "1. #20 the menu\n+ #22 the save\n", "a numbered item, and one bulleted with +, is a line, as the starter kit's progress file writes them");
+const wraps = "- #12 the menu, with\n  #13 the sound\n- #14 the save, waits\n  on #15\n  - a note under it\n  - #16 a part of its own\n- #17 x\n";
+ok(cleared(wraps, n => n === 12) === wraps && cleared(wraps, n => n === 12 || n === 13) === wraps.replace("- #12 the menu, with\n  #13 the sound\n", "") && linesOf(wraps)[1].waits.join() === "15" && cleared(wraps, n => n === 14) === "- #12 the menu, with\n  #13 the sound\n  - #16 a part of its own\n- #17 x\n",
+  "an item wrapped onto the lines after it is read and cleared whole, the items under it leaving with it, one that names an issue of its own staying", cleared(wraps, n => n === 14));
+r = command("--clear", { file: "Q.md", read: () => "| #7 | b | |\n| #8 | b | |\n| #9 | b | |\n", write: () => {}, closed: () => n => n !== 9, confirm: n => n === 7 });
+ok(/lines of #7, closed$/u.test(r.out), "--clear says it took out only the lines it took out", r.out);
+ok(closedAt("o/r", 5, () => ({ status: 1, stdout: '{"message":"This issue was deleted"}' })), "a deleted issue counts closed, as one not there does");
+ok(cleared("- #12, 13 and 14: parts\n- #12/13 x\n- #12 & 13\n| #12\u2212#14 | b | |\n", n => n !== 13).split("\n").length === 5 && fileAt(slot("docs/r.md"), ["docs/R.md"]) === null, "a bare number joined to an issue is read as one, a minus sign joins a range, and a project's rule file is refused whatever its letters' case");
+
 // a queue that leads outside through a link: in the core, the mend names the core's own file, not a manifest it lacks
 const here = process.cwd(), scratch = fs.mkdtempSync(path.join(os.tmpdir(), "queue-"));
 fs.writeFileSync(path.join(scratch, "elsewhere.md"), "| #1 | builder | |\n");
