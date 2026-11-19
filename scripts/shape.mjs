@@ -109,7 +109,8 @@ const plainPath = s => typeof s === "string" && /^[\w@.-][\w@. -]*(\/[\w@.-][\w@
 // so that no mark a config holds can make the check slow (a pattern of its own could backtrack past any bound a count
 // of its quantifiers sets); at most 120 characters, no control character, at most 20 of them (the schema's, which a
 // config unchecked is held to here).
-const plainMark = s => s.length <= 120 && !/[\p{Cc}]/u.test(s);
+// (its length in characters, as the schema counts them, never in UTF-16's halves, so that a mark the schema takes is kept)
+const plainMark = s => [...s].length <= 120 && !/[\p{Cc}]/u.test(s);
 const marked = v => strings(v) && v.length <= 20 && v.every(plainMark);
 const KIT_FORM = "write it as the starter kit does (core/setup/template/shape.json.tmpl): a JSON object with \"baseline\", the baseline's path, and \"code\", git pathspecs of the code to read";
 

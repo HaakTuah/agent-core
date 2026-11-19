@@ -691,6 +691,9 @@ ok(["../shape.json", "checks/../../shape.json", "/etc/shape.json", "C:/shape.jso
   const odd = parse(JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"], marks: JSON.parse('{"lines":"x","depth":2,"constructor":5,"__proto__":7}'), suites: { q: {}, r: 30 }, tests: "test/", wiat: 3 })), none = parse(JSON.stringify({ baseline: "b.json" }));
   ok(/"marks":\{"lines":60,"depth":2,"branches":15\}/.test(odd) && /"suites":\{"r":30\}/.test(odd) && /"tests":\[\]/.test(odd) && mended(none) && /names no "baseline" and "code"/.test(none),
     "with the core's packages not installed, the config's shape goes unchecked: what holds its form is read, the rest (a key no mark has, a platform's empty seconds) takes its default, and a config with no code still fails with its mend", `${odd}\n${none}`);
+  const wide = "\u{1F600}".repeat(70), marks = parse(JSON.stringify({ baseline: "checks/shape-baseline.json", code: ["src"], changes: ["Ticket: ABC-", wide] }));
+  ok(marks.includes("ABC-") && marks.includes(wide),
+    "and a project's marks of a change are read there too, one of 70 characters outside the Basic Multilingual Plane among them", marks);
   fs.writeFileSync(path.join(bare, "shape.json"), config({}));
   for (const a of [["init", "-q"], ["add", "shape.json"]]) execFileSync("git", a, { cwd: bare });
   const said = spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json", "--first"], { cwd: bare, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });

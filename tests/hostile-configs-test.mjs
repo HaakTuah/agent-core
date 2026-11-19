@@ -122,6 +122,11 @@ ok(mended(shape("")) && mended(shape("{}")), "shape.mjs: parseConfig refuses wit
 // many or holding a control character)
 for (const [changes, what] of [[["x".repeat(121)], "a mark too long"], [Array.from({ length: 21 }, (_, i) => `Mark${i}:`), "too many marks"], [["Changed:\u0000"], "a control character"], [["Changed:\n"], "a line break"], [[7], "a mark of the wrong type"], ["Changed:", "a mark that is no list"]])
   ok(mended(shape({ ...SHAPE, changes })), `shape.mjs: parseConfig refuses with its mend the marks of a change with ${what}`);
+// (a mark's length counted in characters, as the schema counts them: one of 70 characters outside the Basic Multilingual
+// Plane, 140 of UTF-16's halves, is kept, and one of 121 refused)
+const wide = "\u{1F600}".repeat(70);
+ok(parseConfig(JSON.stringify({ ...SHAPE, changes: [wide] }), KIT).changes.some(([name]) => name === JSON.stringify(wide)) && mended(shape({ ...SHAPE, changes: ["\u{1F600}".repeat(121)] })),
+  "shape.mjs: a mark of a change is held to 120 characters, never to UTF-16's halves: one the schema takes is kept, one past it refused");
 const asText = ["^(a+)+$", "a*a*a*b", "(a|a)*b", "<b>Changed</b>:"];
 ok(!shape({ ...SHAPE, changes: asText }), "shape.mjs: parseConfig takes the marks of a change as plain text, a pattern's or markup's characters only text to match");
 const slowFor = parseConfig(JSON.stringify({ ...SHAPE, changes: asText }), KIT), t0 = Date.now();
