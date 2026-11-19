@@ -44,7 +44,7 @@ file*, changes their order or names a milestone, as the orchestrator and the des
   asks of a pull request that does the *hard work* whether its approach was known before it was built
   (`tasks/reviews.md`, point 4).
 - **Each entry of a busy record stands in a file of its own** (#750, point 1). By default a busy record
-  of a project's, one that two pull requests merged in one week each added an entry to (a line, a row or an item each),
+  of a project's, one that two pull requests merged in one week of the last month each added an entry to (a line, a row or an item each),
   such as a running table in its *progress file* or its own archive, stands as a folder of one file per entry, each file named to stand between
   its neighbours and read in the order of the names by whatever reads the record. The one condition that changes it:
   where the order of a record's lines is what it records, as the *progress file*'s is, its lines stay in one file and
