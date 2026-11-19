@@ -12,7 +12,6 @@ it merges last.
 | Issue | Who | Waits on |
 | --- | --- | --- |
 | #715 | rule builder; `tests.yml` steps one by one, 2 security reviews | |
-| #733 | rule builder; it changes the floor (rule 12); two security reviews | |
 | #744 | rule builder; it changes the archive's key and its check | |
 | #750 | rule builder; it changes floor rule 8 (point 2); two security reviews | |
 | #756 | rule builder | |

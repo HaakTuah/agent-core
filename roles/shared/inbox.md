@@ -46,7 +46,7 @@ Read at the start of every task.
   nothing done; a stage of the project's design needs no issue, says what is next and points to its PRs for the rest.
   - Its one writer, the orchestrator or the design session, adds issues in a PR, the trust gate: no issue is built
     before its line joins, save a bug ("Bugs don't wait"). Any other session
-    changes only its own line; a closed issue's line goes with the file's next change. Bugs, tests, checks of standing rules and tasks the
+    changes only its own line; a closed issue's line goes with the next edit. Bugs, tests, checks of standing rules and tasks the
     scheduled look opens need no word of the owner's.
   - Reason: every session reads it at its start. Its own size mark comes with its first trim (`core/scripts/steps.mjs`).
 - **An obvious improvement is built at once,** in its own PR, save where the floor needs the owner's
