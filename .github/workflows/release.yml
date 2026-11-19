@@ -43,7 +43,9 @@ jobs:
   # the two releases with the copy older than the first, and the newer release; #304, #515, #715)
   upgrade:
     needs: main
-    if: ${{ github.event_name != 'schedule' || !github.event.repository.private }}
+    # (the daily run only where the repository is known to be public, its minutes free: one whose event does not say
+    # so pays nothing)
+    if: ${{ github.event_name != 'schedule' || github.event.repository.private == false }}
     name: upgrade (windows-latest, ${{ matrix.part }})
     strategy:
       fail-fast: false
