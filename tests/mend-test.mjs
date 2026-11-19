@@ -31,6 +31,7 @@ ok(failures("FAILED to read\n  FAIL indented\nFAIL: a. Mend: do it now.\r\nFAIL\
 const CHECKS = {
   "scripts/copies.mjs": "tests/init-test.mjs",
   "scripts/pointers.mjs": "tests/pointers-test.mjs",
+  "scripts/install.mjs": "tests/packages-test.mjs",
   "scripts/reading-size.mjs": "tests/init-test.mjs",
   "scripts/workflows.mjs": "tests/workflows-test.mjs",
   "scripts/licences.mjs": "tests/licence-scan-test.mjs",

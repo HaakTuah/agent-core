@@ -10,7 +10,7 @@ own, what the core lacks that a maintained tool gives at once, first a general l
 It decides nothing by itself. A **replace** or a **try** becomes a line of `QUEUE.md` only on the owner's word, each a
 pull request of its own that shows the comparison, old against new (#534, point 2); no tool or package arrives before
 #488's points 1, 3, 4 and 5 have merged; and the order is #534's, point 7: the tools that only run first, then the
-packages carried in the copy, then the form the rules are delivered in.
+packages installed from the core's lock file (#654), then the form the rules are delivered in.
 
 Weighed whole: 2026-11-17
 
@@ -306,6 +306,12 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   session, in the project. *Else:* Copier and Cookiecutter, dropped on fact: Python and an install in the project, and
   #519 weighed the template; `git archive`, which the sync already uses. *Bugs:* 2, 8 and 4. **Keep:** nothing fits;
   what a release asks is the core's.
+- `scripts/install.mjs`, `scripts/packages.mjs`: install the packages of other publishers the scripts run from the
+  core's lock file in `.packages/` into `.packages/node_modules/`, and load each from there alone, a missing one saying
+  its mend (#654). *Runs:* any session, at its start and at each sync, and on the host's runners before each check.
+  *Else:* npm's own `npm ci`, which does the install, kept; a folder of carried packages (#528), dropped on the owner's
+  decision of 18 November 2026. *Bugs:* none. **Keep:** the install is npm's; the scripts run it once more after a
+  failed fetch and say the mend.
 - **What the starter kit holds** (`setup/template/`, 32 files on 17 November 2026), weighed by the challenge: eight
   templates of rule files and records, exempt as content (#534, point 9); three of hooks, weighed in the hook's line
   above; three of Dependabot, the host's own format already; three configs of the core's checks and twelve workflows,
@@ -402,7 +408,8 @@ as the trials above were, over the scripts on `main` that day (36,896 lines of J
   the sessions already keep.
 - **A scan of the packages for known faults.** *Else:* the host's Dependabot alerts, free on a private repository too,
   whose alerts the owner reads and passes on (floor rule 9); OSV-Scanner (Apache-2.0, one program). **Keep** without
-  one: the core carries no package yet, and the first comes only after #488's points 1, 3, 4 and 5; weighed again then.
+  one: the core's packages stand in its lock file since #654, which the host's Dependabot alerts read; #650 brings the
+  scan against a vulnerability database.
 - **A type checker.** **Keep** without it: #519's record weighed it on 33 fixed bugs and a writing trial, and found no
   fault it would have caught.
 - **A linter for Markdown.** *Else:* markdownlint-cli2 (MIT, 89 packages). **Keep** without it, on a measure the
@@ -471,5 +478,5 @@ points 1, 3, 4 and 5 have merged. What the challenge proposes is not among them 
    staged cases; and of what the core lacks, **try** a general linter for its scripts (oxlint, then Biome), ShellCheck
    with actionlint, and knip after the linter.
 2. The reading under the package checks: **replace** with `npm sbom`; **try** nuget-license and the SDK's own list.
-3. The packages carried in the copy: as #486's inventory and #519's path have them.
+3. The packages, installed from the core's lock file (#654): as #486's inventory and #519's path have them.
 4. The form the rules are delivered in: **try** the skill format (#534, point 8).
