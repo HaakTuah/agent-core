@@ -2,14 +2,14 @@
 
 What these are and how they are kept: `words/README.md`.
 
-157. **12 November 2026** (the core, in the design chat), on the seller's name a product of another owner needs: the
+157. **12 November 2026** (the core, in the design chat), on a company's name in a project of another owner: the
      owner decided that a company's name, naming no person, may stand in a repository.
 
 158. **12 November 2026** (the core, in the design chat), on development with another provider's tool: the owner
      decided that the core must not inhibit it, while it keeps working as it does now.
 
 159. **12 November 2026** (the core, in the design chat), on how a project learns that the core has moved, and on
-     sessions reporting to the core: the owner agreed to the second point of the advice, and on the first held that
+     sessions reporting to the core: the owner agreed to the second point of the advice, and on the first proposed that
      reports should reach the core's own issues, under rigid guidelines, anything sensitive going by a private route.
 
 160. **12 November 2026** (the core, in the design chat), on the orchestrator's row in the table of models: the owner

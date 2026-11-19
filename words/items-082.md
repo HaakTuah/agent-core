@@ -75,8 +75,8 @@ What these are and how they are kept: `words/README.md`.
      owner's: the owner asked for some version of both.
 
 103. **10 November 2026** (the core), on the design session's proposed wording, which stopped depth where a player could
-     no longer follow the cause: the owner agreed, with a nuance: a model does not take its own trouble conveying the
-     mechanics for a player's inability to follow them.
+     no longer follow the cause: the owner agreed, with a nuance: a model does not automatically take its own trouble
+     conveying the mechanics for a player's inability to follow them.
 
 104. **10 November 2026** (the core), to the two principles reworded with the owner's nuance and with those Amarna
      Letters rules folded in as their forms, the owner agreed.

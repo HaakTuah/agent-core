@@ -59,7 +59,7 @@ What these are and how they are kept: `words/README.md`.
 
 18. **1 November 2026** (Amarna Letters, item 123; for both games), on Claude and Codex building together: the owner
     decided to run them together, reviewing each other, with Claude falling back to its own builders when Codex does not
-    answer, and agreed to the steps that followed.
+    answer, and agreed to it as the first step to try.
 
 19. **1 November 2026** (Amarna Letters, item 124; for both games), on a 15-minute wait for Codex: the owner agreed to
     shorter waits.

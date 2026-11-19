@@ -51,7 +51,7 @@ What these are and how they are kept: `words/README.md`.
     owner decided that what is put to the owner comes with its context.
 
 56. **3 November 2026** (Amarna Letters, item 206; for both games), on why a thing was not in a file both games read:
-    the owner decided it goes in one, with a condition: each instance reads only what pertains to it.
+    the owner decided it goes in one, with a condition: ideally, each instance reads what pertains to it.
 
 57. **3 November 2026** (Amarna Letters, item 207; for both games), on whether the codebase's core pillars are clearly
     stated and enforced: the owner agreed, so that all of them are covered.

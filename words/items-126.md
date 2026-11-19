@@ -17,8 +17,10 @@ What these are and how they are kept: `words/README.md`.
      agreed to fix the guide in the core now.
 
 130. **10 November 2026** (the core), on a game's ruleset, which required neither code scanning nor code quality
-     results: the owner chose to require code scanning and status checks with Copilot's review on, code quality left
-     off, and agreed that the false-alarm line and Copilot's review be worded so in every project.
+     results: the owner chose to require code scanning and status checks with Copilot's review on; agreed that the
+     floor's false-alarm line says the pull request waits for the owner's dismissal, with the same setting in every
+     project, and that Copilot's review is advisory in the rules; and then set code quality results required as well,
+     since without the check present it would not trigger.
 
 131. **10 November 2026** (the core), on a builder taking every comment from the owner's account with Claude Code's
      attribution line for its own: the owner agreed to a rule that such a comment is not necessarily the reader's own.
@@ -59,8 +61,8 @@ What these are and how they are kept: `words/README.md`.
 142. **11 November 2026** (the core), on the stand-in and ideas: the owner agreed that the stand-in gives its verdicts
      on ideas in the answers it already gives, with one weekly sweep for the rest.
 
-143. **11 November 2026** (the core), on rules the games repeat or hold for every project: the owner agreed to move
-     them into the core.
+143. **11 November 2026** (the core), on rules the games repeat or hold for every project: the owner agreed to all
+     of it.
 
 144. **28 October 2026** (Amarna Letters, in the design chat), on a reading listed with what it rests on, moved here on
      11 November 2026: the owner decided that Code should note where it has made an assumption, so that it can be
