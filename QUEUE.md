@@ -1,10 +1,7 @@
 # The core's queue
 
-The first line that waits on nothing is next.
-
-**Who:** *builder*, any builder session; *rule builder*, one on Opus; *the owner*, no session takes it up before
-the owner's word. A line on points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or "Fixes" it if
-it merges last.
+**Who** (`AGENTS.md`, "The queue"): *rule builder*, one on Opus; *the owner*, none before the owner's word. A line on
+points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or "Fixes" it if it merges last.
 
 ## In order
 
@@ -13,6 +10,9 @@ it merges last.
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #744 | rule builder; it changes the archive's key and its check | |
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
+| #778, point 2 | rule builder | #774 |
+| #782 | rule builder | |
+| #783 | builder | #782 |
 | #756 | rule builder | |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
 | #773 | rule builder; it changes floor rule 4 | |
