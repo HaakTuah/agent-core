@@ -6,8 +6,10 @@
 # Linux runs on every pull request and push in tests.yml), since what it guards reaches a project only through a
 # release and on Windows it set the length of every pull request's run (#715); it runs it too once a day on main, where
 # it cuts nothing, so a break is found among a day's merges, and where minutes are billed (a private repository, or
-# one whose visibility could not be read) only before a release. It cuts only where that test passed, every check the push of that commit to main started has
-# finished and passed, and main has not moved on since the run began (scripts/release.mjs, which also numbers the
+# one whose visibility could not be read) only before a release. It cuts only where that test passed, every check the
+# push of that commit to main started has finished and passed, the newest run of the core's tests on that commit, once
+# an hour or started by hand, has passed too, so the Windows suites passed there (#733, points 3 and 6: a pull
+# request's run and a push's are on Linux alone), and main has not moved on since the run began (scripts/release.mjs, which also numbers the
 # release and never moves a tag that exists); otherwise it fails, says which check holds it, and is started again
 # later. This repository only; no project calls it. The cut may write this repository's contents, which the tag needs,
 # and read its Actions runs; that token reaches the one step that cuts, through git's own credential helper, and is
@@ -103,13 +105,18 @@ jobs:
           node-version-file: .node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: The core's packages, installed from its lock file for the release (#654)
         run: node scripts/install.mjs
-      - name: The release, cut where the upgrade test on Windows and every check on main's newest commit have passed
+      - name: The release, cut where the upgrade test on Windows, every check on main's newest commit and the newest of its hourly or hand-started runs of the tests have passed, none of them unfinished
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          runs=$(mktemp)
+          # (the runs the push of that commit started, and, apart, the tests' runs on it, of whose hourly or hand-started
+          # ones none may be unfinished and the newest, by when it last started, decides, however many stand there)
+          runs=$(mktemp) full=$(mktemp)
           gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs" -f head_sha="$GITHUB_SHA" -f branch=main -f event=push -F per_page=100 > "$runs"
+          # (the tests' runs, every page of them, gathered into one list: a page that cannot be read stops the step)
+          gh api --paginate -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$GITHUB_SHA" -f branch=main -F per_page=100 --jq '.workflow_runs[]' > "$full.pages"
+          jq -s '{ workflow_runs: . }' "$full.pages" > "$full"
           # (git asks this helper for the push's password; it answers from the step's own environment)
           git config --global credential.https://github.com.helper \
             '!f() { test "$1" = get && printf "username=x-access-token\npassword=%s\n" "$GH_TOKEN"; }; f'
-          node scripts/release.mjs --cut --at "$GITHUB_SHA" --runs "$runs" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          node scripts/release.mjs --cut --at "$GITHUB_SHA" --runs "$runs" --full "$full" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
