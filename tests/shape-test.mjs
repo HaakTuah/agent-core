@@ -296,6 +296,40 @@ ok(mended(said(v)) && /src\/z\.js#tall/.test(said(v)), "the entry of a breach th
 const lowered = listed([fn("src/b.js#tall", 80)]);
 v = judge({ now: { "src/b.js": long("tall", 80) }, baseline: lowered, base: baseOf(listed([f100]), { "src/a.js": long("tall", 100) }) });
 ok(v.fail.length === 0, "a baseline this change lowered, of a breach it moved and shrank, still covers it", said(v));
+// (an entry covers no more than the base held: #751's sixth round. `nested`: a function of so many lines, so deep, with
+// as many branch points)
+const nested = (name, lines, depth) => `export function ${name}(a) {\n${"if (a) {\n".repeat(depth)}${"  a++;\n".repeat(lines - 2 - 2 * depth)}${"}\n".repeat(depth)}}\n`;
+const dn = (id, lines, depth) => [`function: ${id}`, { lines, depth, branches: depth }], low = cfg({ marks: { lines: 60 } }), loose = config({ marks: { lines: 120 } });
+const stale = listed([dn("src/p.js#tall", 80, 1), dn("src/m.js#tall", 65, 6)]), flat = { "src/s.js": nested("tall", 100, 1) };
+const lowering = (now, baseline = stale, was = flat) => judge({ now, conf: low, baseline, base: baseOf(stale, was, loose) });
+v = lowering({ "src/s.js": nested("tall", 65, 6) });
+ok(mended(said(v)) && /1 function passes/.test(said(v)) && /src\/s\.js#tall \(line 1\): 65 lines, 6 deep/.test(said(v)) && [100, 65].every(n => /held already/.test(said(lowering({ "src/s.js": nested("tall", n, 1) })))),
+  "a breach the base held that no entry covers, the check reading more than it did, takes no mended entry's numbers to grow into: it fails as new where it nests deeper, and is to be listed, under no mended entry, where it stands as it stood or shrank (the fallback reviewer's finding on #751's sixth round)", said(v));
+const asTest = { "src/t.test.js": nested("tall", 62, 1) }, wasTest = { ...baseOf(stale, asTest, config({ tests: ["src/t.test.js"] })), own: () => ({ texts: asTest, tests: new Set(Object.keys(asTest)) }) };
+v = lowering({ "src/s.js": nested("tall", 65, 6) }, stale, { "src/s.js": nested("tall", 62, 1) });
+ok(mended(said(v)) && /1 function passes/.test(said(v)) && /src\/s\.js#tall/.test(said(v)) && /src\/t\.test\.js#tall \(line 1\): 65 lines, 6 deep/.test(said(judge({ now: { "src/t.test.js": nested("tall", 65, 6) }, baseline: stale, base: wasTest }))),
+  "nor where a mended entry's numbers would cover it: what a baseline left as it is covers is what the base's own check read under it, by the base's config, with its marks and its tests", said(v));
+v = lowering({ "src/s.js": nested("tall", 65, 6) }, listed([dn("src/s.js#tall", 65, 6)]));
+ok(mended(said(v)) && /1 function passes/.test(said(v)) && /neither listed nor held/.test(said(v)) && lowering({ "src/s.js": nested("tall", 65, 1) }, listed([dn("src/s.js#tall", 65, 1)])).fail.length === 0,
+  "nor where the change lists it so: the entry it writes covers it only within what the base held of it", said(v));
+const pairs = listed([dn("src/a.js#tall", 100, 2), dn("src/x.js#tall", 90, 6)]), paired = { "src/a.js": nested("tall", 100, 2), "src/y.js": nested("tall", 70, 6) };
+v = lowering({ "src/m.js": nested("tall", 64, 6) }, listed([dn("src/m.js#tall", 64, 6)]));
+ok(mended(said(v)) && /src\/m\.js#tall/.test(said(v)) && [pairs, listed([dn("src/a.js#tall", 80, 6)])].every(b => judge({ now: { "src/a.js": nested("tall", 80, 6) }, baseline: b, base: baseOf(pairs, paired) }).fail.length === 0),
+  "an entry the change wrote covers a breach within what one of the base's stood under there, its entry in the base's baseline, as it did before --write wrote it; a mended one that comes back, listed a line lower, takes no other's place past what that one held", said(v));
+const crossed = listed([dn("src/e1.js#tall", 100, 6), dn("src/e2.js#tall", 120, 1)]), cross = { "src/s1.js": nested("tall", 100, 1), "src/s2.js": nested("tall", 60, 6) };
+v = judge({ now: { ...cross, "src/s2.js": nested("tall", 120, 4) }, baseline: crossed, base: baseOf(crossed, cross) });
+ok(mended(said(v)) && /src\/s2\.js#tall \(line 1\): 120 lines/.test(said(v)), "a breach of the base's that the order of claiming left without an entry is lent none whatever its numbers", said(v));
+const reason = { grown: { "function: src/g.js#tall": "no other way" } }, why = entries => JSON.stringify({ ...reason, listed: Object.fromEntries(entries) });
+const elsewhere = baseline => judge({ now: { "src/h.js": long("tall", 200), "src/g.js": long("tall", 200) }, baseline, base: baseOf(why([fn("src/g.js#tall", 200)]), { "src/h.js": long("tall", 200) }) });
+v = elsewhere(why([fn("src/g.js#tall", 200)]));
+ok(mended(said(v)) && /1 function passes/.test(said(v)) && /src\/g\.js#tall/.test(said(v)) && /src\/g\.js#tall/.test(said(elsewhere(why([fn("src/g.js#tall", 200), fn("src/h.js#tall", 200)])))),
+  "an entry \"grown\" gives a reason for, its breach moved by an earlier pull request, covers that one and no new one at its id beside it, nor once --write has kept the new one under the old reason", said(v));
+const adds = (now, entries) => judge({ now: { "src/g.js": long("tall", 200), ...now }, baseline: why([fn("src/g.js#tall", 200), ...entries]), base: baseOf(listed([fn("src/s.js#tall", 150)]), { "src/s.js": long("tall", 150) }) });
+const raised = judge({ now: { "src/g.js": long("tall", 250), "src/t.js": long("tall", 220) }, baseline: why([fn("src/g.js#tall", 250), fn("src/t.js#tall", 220)]), base: baseOf(listed([fn("src/g.js#tall", 200), fn("src/s.js#tall", 220)]), { "src/g.js": long("tall", 200), "src/s.js": long("tall", 220) }) });
+const second = judge({ now: { "src/g.js": long("tall", 250), "src/z.js": long("tall", 190) }, baseline: why([fn("src/g.js#tall", 250), fn("src/z.js#tall", 190)]), base: baseOf(listed([fn("src/g.js#tall", 200)]), { "src/g.js": long("tall", 200) }) });
+v = adds({ "src/z.js": long("tall", 200) }, []);
+ok(mended(said(v)) && /1 function passes/.test(said(v)) && /src\/z\.js#tall/.test(said(v)) && adds({ "src/t.js": long("tall", 140) }, [fn("src/t.js#tall", 140)]).fail.length === 0 && raised.fail.length === 0 && /1 function passes/.test(said(second)) && /src\/z\.js#tall/.test(said(second)),
+  "one the change adds with its reason covers its own breach and no second in the place of a breach of the base's that the change mended; one of the base's that moved and shrank beside it is covered by the entry listed for it, as is one that moved beside an entry raised with its reason, whose breach of the base's backs no second entry", `${said(v)}\n${said(raised)}\n${said(second)}`);
 v = judge({ now: { "src/b.js": long("tall", 100) }, baseline: listed([f100]) });
 ok(v.fail.length === 0 && /gone or moved/.test(noted(v)) && !/functions? pass/.test(said(v)), "a listed function that moved is no new breach: its old entry is said, for --write to list where it stands", noted(v));
 ok(mended(`FAIL: ${(() => { try { judge({ now: {}, baseline: "{}" }); return ""; } catch (e) { return e.message; } })()}`), "a baseline that is none is refused, with its mend");
@@ -540,6 +574,29 @@ if (process.platform !== "win32") { // (a link is made without a privilege only 
   const beside = check(["--write"], "HEAD"), still = check([], "HEAD");
   ok(beside.status === 0 && still.status === 1 && /1 function passes/.test(still.out) && !/held already/.test(still.out) && !("function: src/z.js#tall" in JSON.parse(fs.readFileSync(path.join(at, "checks/shape-baseline.json"), "utf8")).listed),
     "--write told the base lists no new breach in the place of one the base holds that still stands", `${beside.out}\n${still.out}`);
+  there("checkout", "-q", "--", ".");
+  fs.rmSync(path.join(at, "src/z.js"));
+  there("mv", "src/y.js", "src/s.js");
+  write("src/s.js", nested("tall", 100, 1));
+  write("checks/shape.json", loose);
+  write("checks/shape-baseline.json", stale);
+  step("c3, a function under a higher mark, two mended entries left listed");
+  write("checks/shape.json", config({ marks: { lines: 60 } }));
+  write("src/s.js", nested("tall", 65, 6));
+  const deeper = check([], "HEAD"), lists = check(["--write"], "HEAD"), yet = check([], "HEAD");
+  const unlisted = !("function: src/s.js#tall" in JSON.parse(fs.readFileSync(path.join(at, "checks/shape-baseline.json"), "utf8")).listed);
+  there("checkout", "-q", "--", ".");
+  there("rm", "-q", "src/s.js");
+  write("checks/shape.json", config({}));
+  for (const [file, text] of Object.entries(paired)) write(file, text);
+  write("checks/shape-baseline.json", pairs);
+  step("c4, a breach an earlier pull request moved and shrank, its entry left as it was");
+  fs.rmSync(path.join(at, "src/y.js"));
+  write("src/a.js", nested("tall", 80, 6));
+  const twice = [1, 2].map(() => [check(["--write"], "HEAD").status, fs.readFileSync(path.join(at, "checks/shape-baseline.json"), "utf8"), check([], "HEAD")]);
+  ok(deeper.status === 1 && lists.status === 0 && yet.status === 1 && [deeper, yet].every(x => mended(x.out) && /1 function passes/.test(x.out) && /src\/s\.js#tall/.test(x.out)) && unlisted
+    && twice.every(([status, text, after]) => status === 0 && after.status === 0 && text === twice[0][1]) && JSON.parse(twice[0][1]).listed["function: src/a.js#tall"].lines === 80,
+  "a breach the base held under a higher mark, nested deeper as the mark is lowered, fails as new, and --write told the base lists it in no mended entry's place; --write reads what a baseline covers as the check does, so one it wrote, of a breach in a moved one's place, it writes the same again", `${deeper.out}\n${lists.out}\n${yet.out}\n${twice.map(([, text, after]) => `${text}\n${after.out}`).join("\n")}`);
 }
 
 // a suite held to its time
