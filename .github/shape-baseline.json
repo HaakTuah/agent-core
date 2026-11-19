@@ -19,6 +19,7 @@
     "changes"
   ],
   "grown": {
+    "process: tests/read-total-test.mjs -> node:child_process": "Its last tests run the total read as a command, as the size workflow and the state report run it: its exit code, the line it prints, the failure with its mend for a call it does not know, and that from a project's copy it says it did not run and fails nothing, which is what they guard (#469).",
     "timed: tests/stryker-test.mjs -> Date.now": "It holds Stryker's run to its budget and a test to its limit with a fault in, both measured on the clock the run itself reads, which is what the test guards (#581).",
     "process: tests/stryker-test.mjs -> node:child_process": "It runs Stryker, another publisher's tool, as the strength step runs it, and stops a run by a signal: the process and its group are what the test guards (#581).",
     "process: tests/issue-terms-test.mjs -> node:child_process": "It runs the personal-terms check's own shell lines (its link and unlinked) in bash on each text, which is what holds the two matchers in step (#783).",
@@ -118,6 +119,7 @@
     "process: tests/pr-description-test.mjs -> node:child_process": true,
     "process: tests/pruning-test.mjs -> node:child_process": true,
     "process: tests/pure-sync-test.mjs -> node:child_process": true,
+    "process: tests/read-total-test.mjs -> node:child_process": true,
     "process: tests/reading-test.mjs -> node:child_process": true,
     "process: tests/reasons-test.mjs -> node:child_process": true,
     "process: tests/releases-test.mjs -> node:child_process": true,

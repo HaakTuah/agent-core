@@ -128,6 +128,10 @@ ok([core, proj0()].every(r => r.includes("**The rounds of review**\n- Not read b
   "each report names the step that adds the rounds of review, the median beside the last report's and the five that took the most (#477)", core);
 ok(core.includes("**The pruning of the rules**\n- ") && /node scripts\/pruning\.mjs/.test(core) && !proj0().includes("pruning") && body({ core: true, month: "2026-11", measures: null, previous: null, overdue: [], pruning: ["- Not due: x."], scripts: "scripts" }).includes("**The pruning of the rules**\n- Not due: x."),
   "the core's report, and only the core's, says whether the rules' pruning is due (#303)", core);
+// (the total read, the core's alone: now, and the last report's read back; "Not read" where it could not be; #469)
+const read = body({ core: true, month: "2026-12", measures: null, previous: "**The total read**\n- Now: 3700 KB, each role's start.\n- The last report's: none.", overdue: [], holders: [], pruning: null, read: 3650, scripts: "scripts" });
+ok(/\*\*The total read\*\*\n- Now: 3650 KB, .*\n- The last report's: 3700 KB\./.test(read) && body({ core: true, month: "2026-12", measures: null, previous: null, overdue: [], holders: [], pruning: null, read: null, scripts: "scripts" }).includes("- Not read: `scripts/read-total.mjs` could not read it.\n- The last report's: none.") && !proj0().includes("The total read"),
+  "the core's report gives the total read beside the last report's, says where it could not read it, and a project's gives none");
 function proj0() { return body({ core: false, month: "2026-11", measures: null, previous: null, overdue: [], counts: null, scripts: "core/scripts" }); }
 const proj = body({ core: false, month: "2026-11", measures: { at: "checks/copies-baseline.json", count: 4 }, previous: "**x**\n- copies: 6 old copies", overdue: [{ number: 7, title: "Steps of a release not done", since: "2026-11-01T05:41:00Z" }],
   counts: { pin: "a".repeat(40), behind: 3, steps: 2, merged: { all: 4, sync: 1, upkeep: 1, update: 0, own: 2 } }, scripts: "core/scripts" });

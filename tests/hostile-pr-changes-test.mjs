@@ -4,7 +4,8 @@
 // range, and nothing at all; each refuses, taking nothing of it as a pass. The readers: pure-sync.mjs and
 // comment-only.mjs, run as a merger runs them in a scratch project whose core is reached by a git rewrite (no network);
 // select.mjs, run as the tests workflow runs it there; copy-tree.mjs, on trees made here; and pr-description.mjs's reader of
-// what a pull request adds under its manifest's "Differences" (#756), on commits made here. Test data is made up. Run
+// what a pull request adds under its manifest's "Differences" (#756), on commits made here; and read-total.mjs's
+// cut and its conditions (#469), on trees held in memory. Test data is made up. Run
 // by the core's tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
 //
 //   node tests/hostile-pr-changes-test.mjs
@@ -15,6 +16,7 @@ import { CORE } from "../scripts/core-address.mjs";
 import { coreIsFolder, entries } from "../scripts/copy-tree.mjs";
 import { MANIFEST_MAX, UNREADABLE, differencesAdded, reasonsMend } from "../scripts/pr-description.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { conditions, cuts, total } from "../scripts/read-total.mjs";
 import { scratchDir, scratchEnv, root } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
@@ -259,6 +261,25 @@ ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "co
   fs.mkdirSync(path.join(d, "core-manifest.md")); fs.writeFileSync(path.join(d, "core-manifest.md", "x"), "x\n"); commit();
   put(manifest("- a difference over an unreadable base")); commit();
   ok(differencesAdded(d).join() === "- a difference over an unreadable base", "pr-description: over a base whose manifest cannot be read, each difference of the head's counts as added");
+}
+
+// read-total.mjs (#469): the files a pull request adds to the core's rule folders, read for a cut or a join: a name with
+// control characters, too long a file, binary text, a path, nothing at all; none breaks a line printed or runs long
+{
+  const memory = texts => ({ read: f => texts[f] ?? null, list: folder => Object.keys(texts).filter(f => f.startsWith(`${folder}/`) && !f.slice(folder.length + 1).includes("/") && f.endsWith(".md")).sort(), size: f => (f in texts ? Buffer.byteLength(texts[f]) : null) });
+  const lines = (tag, n) => Array.from({ length: n }, (_, i) => `- A rule of ${tag}, number ${i}, which says what it says at some length.`).join("\n");
+  const base = { "floor/security.md": "# F\n", "roles/builder.md": "# B\n\nRead at the start by the role `builder`.\n\n**Reads at its start:** `roles/shared/w.md`.\n", "roles/shared/w.md": "# W\n\nRead at the start of every task.\n", "tasks/s.md": `# S\n\nRead when a screen changes: the kinds \`screen\` and \`polish\`.\n\n${lines("s", 60)}\n` };
+  const run = head => { const b = total(memory(base), []), h = total(memory(head), [], b); return conditions(total(memory(base), [], h), h, ""); };
+  const odd = "tasks/a\nFAIL: forged\u001b[2J\u2028.md";
+  const got = run({ ...base, [odd]: `# A\n\nRead when a screen changes: the kind \`screen\`.\n\n${lines("s", 60)}\n` });
+  ok(got.cut && got.failures.length && got.failures.every(f => !/[\u0000-\u001f\u2028]/u.test(f)) && got.failures.every(f => mended(`FAIL: ${f}`)), "read-total: a file named with a line's end, an escape or a separator is printed with them written out, each failure saying its mend");
+  let slow = Date.now();
+  const huge = run({ ...base, "tasks/huge.md": `# H\n\nRead when a screen changes: the kind \`screen\`.\n\n${"- a line of a file far too long to be a rule, said again and again.\n".repeat(80000)}` });
+  ok(!huge.cut && Date.now() - slow < 5000, "read-total: a file of five megabytes of new text is no cut, read in no time");
+  const binary = run({ ...base, "tasks/bin.md": Buffer.from(Array.from({ length: 65536 }, (_, i) => i % 256)).toString("latin1") });
+  ok(!binary.cut && !binary.failures.length, "read-total: a file of binary text is no cut, and fails nothing");
+  ok(!run({ ...base, "tasks/../../etc.md": base["tasks/s.md"] }).failures.some(f => /[\u0000-\u001f]/u.test(f)), "read-total: a path that climbs out of its folder is a name, printed as it is, and opens nothing");
+  ok(!run(base).cut && !run({}).failures.some(f => !mended(`FAIL: ${f}`)) && JSON.stringify(cuts(total(memory({}), []), total(memory({}), []))) === JSON.stringify({ added: [], gone: [] }), "read-total: nothing at all is no cut, and each failure on an empty tree says its mend");
 }
 
 process.exit(failed ? 1 : 0);

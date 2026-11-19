@@ -12,8 +12,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    most, as its hostile tests time it (`scripts/hostile.mjs`), and each JSON it parses is nested 200 deep at most
    (`scripts/guards.mjs`); its limits name what it reads beyond that.
    - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the line
-     "Read for it:" by `scripts/reading.mjs`); limits: none of its own on the text, which GitHub holds to 65,536
-     characters; 100 commits, one page; 8 s for the reading list's calls; hostile tests: `tests/hostile-pr-text-test.mjs`.
+     "Read for it:" by `scripts/reading.mjs`, and the line "Never needed:" by `scripts/read-total.mjs`, line by line);
+     limits: none of its own on the text, which GitHub holds to 65,536 characters; 100 commits, one page; 8 s for the
+     reading list's calls; hostile tests: `tests/hostile-pr-text-test.mjs`.
    - the comments and reviews on a pull request, their bodies and authors: read by the security-review check and
      the code-review wait (`scripts/security-review.mjs`, `scripts/code-review-wait.mjs`) and the size check's reader
      of a "Leanness check:" answer (`scripts/size.mjs`), with the descriptions of merged pull requests by the tools
@@ -25,9 +26,11 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
-     a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`); limits: 64 MB of git's
-     answer (256 MB for the comments proof and the selection, 16 MB for the manifest, past which it is reported
-     unread), and none in count, since every changed path is read; hostile tests: `tests/hostile-pr-changes-test.mjs`.
+     a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`), and the rule files the
+     total read sums and reads for a cut or a join (`scripts/read-total.mjs`, which prints each name with its control
+     characters written out); limits: 64 MB of git's answer (256 MB for the comments proof, the selection and the
+     total read, 16 MB for the manifest, past which it is reported unread), and none in count, since every changed
+     path is read; hostile tests: `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`); limits: 1 MB of the file, past
      which it is refused unread; 64 MB of an answer and 100 pages of 100 for the open issues, past which it stops;

@@ -33,8 +33,8 @@ The aim: as much finished work of full quality as the week's usage allows, at th
   "old" copies, nothing left unused. Look for an existing helper or package (`tasks/code-shape.md`) before writing one.
 - **Split by meaning, from the start:** each file holds one thing people look up on its own, as
   small as that thing is; new work goes into its own file.
-  - A file past the *size marks*' split mark asks, before it is changed, how a split lets a reader read less: split
-    so, or, where none, kept whole (`tasks/cleaning.md`).
+  - A split goes in its own PR, behaviour proven unchanged; a file past the *size marks*' split mark asks, before it is
+    changed, how a split lets someone read less (`tasks/cleaning.md`).
 - **Principles over rules:** where a rule's letter would defeat its purpose, follow the purpose, say
   so under "Readings taken", and flag the rule to be fixed.
   - Never for the floor, nor for a rule the project's `AGENTS.md` marks as a safety rule.

@@ -310,7 +310,7 @@
     "roles/shared/how-to-work.md: One fact, one place": [3, 57, 58],
     "roles/shared/how-to-work.md: Principles over rules": [25],
     "roles/shared/how-to-work.md: Rule files state rules": [74],
-    "roles/shared/how-to-work.md: Split by meaning, from the start": [25, 26, 45],
+    "roles/shared/how-to-work.md: Split by meaning, from the start": [25, 26, 45, "#469"],
     "roles/shared/how-to-work.md: The smallest setup that tests the rule": [12],
     "roles/shared/how-to-work.md: The work never waits": [134, 144],
     "roles/shared/inbox.md: A correction is marked": [244],

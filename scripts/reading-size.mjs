@@ -9,7 +9,7 @@
 //     project's own files for more than half that copy, a note gives the mark to set);
 //   - when the PR changes a file past "split" (about 50 KB), unless "past" lists it, as { "mark", "why" }: a mark it has
 //     not grown a quarter past, and why it stays whole or the issue of its split (tasks/cleaning.md, "Size asks"; #469).
-//     A line written before it took a why, a mark alone, fails only once the file is changed. The copy of the core
+//     A line of a mark alone that stood on the base fails, as before, only where the file grew past it, and is noted. The copy of the core
 //     (core/, changed only by a sync PR), the paths under "skip" (such as the archive: dated records, added to by every
 //     merge) and binary files are not counted.
 // A PR that crosses a mark moves the mark in the config only as roles/shared/review-guidelines.md says ("A mark on what
@@ -24,6 +24,7 @@
 //   node core/scripts/reading-size.mjs <config>
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { corePath, floorCopy, projectAt } from "./core-path.mjs";
 import { sizeOf as size } from "./file-size.mjs";
@@ -45,6 +46,7 @@ if (shape.includes(false)) {
   process.exit(1);
 }
 marks.past ??= {};
+const MARKS_AT = path.resolve(MARKS); // (the config's path from where it was named, read on the base after the move below)
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
 // (a submodule's files too, at their paths from here: a library that carries the core brings its copy so; core-path.mjs)
@@ -90,11 +92,19 @@ if (base) {
   // request moves the library, is not seen as changed, which leaves its split mark unheld, as before such files were read)
   let changed;
   try { changed = new Set(git(["diff", "--name-only", base]).split("\n")); } catch { console.error(`FAIL: ${base} is not a commit here. Mend: fetch it (git fetch origin ${base}), or set SIZES_BASE to the pull request's base`); process.exit(1); }
+  // (the base's own lines of "past", where its config can be read there: a line the base did not hold is this PR's)
+  let basePast = {};
+  try { const was = JSON.parse(git(["show", `${base}:${path.relative(process.cwd(), MARKS_AT).split(path.sep).join("/")}`])); if (was?.past && typeof was.past === "object") basePast = was.past; } catch { /* (no config on the base: every line is this PR's) */ }
   const ask = `ask in what ways it could be split so that someone reads less (core/tasks/cleaning.md, "Size asks"): split it along one first, in a pull request of its own that proves its behaviour unchanged, and change it after; or, where there is none, list it under "past" in ${MARKS} as`;
   for (const f of big.filter(f => changed.has(f))) {
     const at = marks.past[f], mark = num(at) ? at : at?.mark, why = String(at?.why ?? "").trim(), n = size(f), entry = `{ "mark": ${n}, "why": "<why no split lets anyone read less, or the split's issue>" }`;
+    // (a line of a mark alone that stood on the base stands as it did, failing only where its file grew past it; a line
+    // this pull request writes says why, a word or the split's issue)
+    const stood = num(at) && basePast[f] === at;
     if (mark === undefined) fail.push(`${f} is ${n} bytes, past the ${marks.split}-byte mark, and this PR changes it. Mend: ${ask} ${entry}`);
-    else if (!/\p{L}/u.test(why)) fail.push(`${f} is listed under "past" in ${MARKS} with no reason it stays whole, and this PR changes it. Mend: write its line as ${entry}, having asked in what ways it could be split so that someone reads less (core/tasks/cleaning.md, "Size asks")`);
+    else if (stood && n > mark) fail.push(`${f} is ${n} bytes, past its mark of ${mark} under "past" in ${MARKS}, and this PR changes it. Mend: ${ask} ${entry}`);
+    else if (stood) notes.push(`${f} is listed under "past" in ${MARKS} with a mark alone: when next you change its line, write it as ${entry} (core/tasks/cleaning.md, "Size asks")`);
+    else if (!/\p{L}|#\d/u.test(why)) fail.push(`${f} is listed under "past" in ${MARKS} with no reason it stays whole, a line this PR writes. Mend: write its line as ${entry}, having asked in what ways it could be split so that someone reads less (core/tasks/cleaning.md, "Size asks")`);
     else if (n > mark * 1.25) fail.push(`${f} is ${n} bytes, grown more than a quarter past its mark of ${mark} under "past" in ${MARKS}, and this PR changes it. Mend: ${ask} ${entry}, its why one that still holds`);
   }
 } else notes.push("no base to compare with (set SIZES_BASE), so the files past the split mark were not checked for changes");

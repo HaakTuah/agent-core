@@ -48,8 +48,8 @@ code is held to: `tasks/code-shape.md`.
   A part that is rewritten instead states what it keeps (`tasks/code-shape.md`). It does not mean that the numbers
   are the aim: a baseline can empty while the code stays one piece, so the audit's reader judges what no number
   shows. Reason: the owner wants a codebase that cleans itself, by rules that are there for a reason and pay off in
-  the long run. Held by the reviews (a split "in a pull request of its own with behaviour proven
-  unchanged", "Size asks; a reader who reads less answers" below), by the shape check, which fails a mended entry left in the baseline, and by the audit.
+  the long run. Held by the reviews ("a split goes in its own PR, behaviour proven unchanged",
+  `roles/shared/how-to-work.md`), by the shape check, which fails a mended entry left in the baseline, and by the audit.
 - **The audit's reader has a fixed brief and fixed questions.** By default an audit is a run of the measures
   (`core/scripts/code-shape.mjs`) read by a fresh session that built none of what it reads. The session that takes
   the audit's task starts that reader, writes its answers as a report in the *audits*, named by its day, beside the
@@ -71,6 +71,9 @@ code is held to: `tasks/code-shape.md`.
     9. Which of the project's *descriptions* (its README, its design notes, what it tells a user, the pointers in its
        rule files) no longer say what the code does, each by its document and line and the file or behaviour it no
        longer matches? Each it finds is a task of the cleaning lane, taken at the dose (#563).
+  - **In the core's own repository** the reader is also given what `scripts/read-total.mjs --candidates` prints: the
+    files several kinds of task open, most read first. It says of each whether a part is all most of its readers need,
+    as "A cut or a join lowers the total read" asks.
   - **A limit on its own proposals:** it proposes a new check only where a finding came up at two audits or costs
     work today.
   - The tests are audited by the same reader. Where the project names a *mutation tool*, the session that takes the
@@ -122,29 +125,32 @@ code is held to: `tasks/code-shape.md`.
   not read them. Reason: a number made a goal stops measuring what it stood for. Held by no check: none reads a target
   set in prose without guessing; the brief's rule (`tasks/helpers.md`) and the reviews carry it.
 - **Size asks; a reader who reads less answers** (#469). By default a file past its mark, the *size marks*' split mark
-  (about 20 KB where they set none), sets whoever changes it one question: in what ways could it be split so that
-  someone reads less? That builder lists the ways found in the pull request, each with the reader who would read less,
-  a role or a kind of task. Where there is one, the file is split along it, in a pull request of its own with behaviour
-  proven unchanged; where none, it stays whole, its line in the marks' baseline (`"past"`) giving the reason, and the
-  question is not asked again until it has grown by a quarter or a new kind of reader comes. A split leaves no reader
-  reading more: where whoever reads one part needs the other every time, it is no split. A dated record (the reports)
-  is cut by month where it is cut at all, those that stand kept as they are. It does not mean
-  a file is cut to meet a number, nor that the caps on what a role reads at its start go, where size is the cost itself
-  (the core's `AGENTS.md`, on its size caps). Reason: a mark on size is a
-  weak sign that a file holds two things, and files were cut where nothing was gained. Held by the reading-size check
-  (`core/scripts/reading-size.mjs`), which fails a file past its mark that a pull request changes with no line in
-  `"past"`, one whose line names neither a split's issue nor why it stays whole, and one grown a quarter past it.
-- **A cut or a join lowers the total read** (#469). By default what a change to how rule files are cut brings down is
-  the sum of what the core's tasks read, each file opened counted as a cost of its own, never one file's size:
-  `core/scripts/read-total.mjs` works it out from what the reading script gives each role and kind of task and from
-  the last 30 merged pull requests, each read as the kinds of task its changed paths make it. Whoever cuts or joins
-  such files runs it on the base and on the branch (`--compare`) and shows both in the pull request, which passes three
+  (about 20 KB where they name no number), sets whoever changes it one question: in what ways could it be split so
+  that someone reads less? That builder lists the ways found in the pull request, each with the reader who would read
+  less, a role or a kind of task. Where there is one, the file is split along it, in a pull request of its own with
+  behaviour proven unchanged; where none, it stays whole, its line in the marks' baseline (`"past"`) giving the reason
+  or the split's issue, and the question is not asked again until it has grown by a quarter or a new kind of reader
+  comes. A split leaves no reader reading more: where whoever reads one part needs the other every time, it is no
+  split. A dated record (the reports) is cut by month where it is cut at all, those that stand kept as they are. It
+  does not mean a file is cut to meet a number, nor that the caps on what a role reads at its start go, where size is
+  the cost itself (the core's `AGENTS.md`, on its size caps), nor that a line of `"past"` that stood is written again
+  before its file is next changed. Reason: a mark on size is a weak sign that a file holds two things, and files were
+  cut where nothing was gained. Held by the reading-size check (`core/scripts/reading-size.mjs`), which fails a file
+  past its mark that a pull request changes with no line in `"past"`, one whose new line names neither a split's issue
+  nor why it stays whole, and one grown a quarter past its line's mark, or past a mark alone that stood.
+- **A cut or a join lowers the total read** (#469). By default what a change to how the core's rule files are cut
+  brings down is the sum of what the core's tasks read, each file opened counted as a cost of its own, never one file's
+  size: `core/scripts/read-total.mjs` works it out from what the reading script gives each role and kind of task and
+  from the last 30 merged pull requests, each read as the kinds of task its changed paths make it. A cut or a join is
+  a file the reading script names added with text the base's files held, or taken out with its text standing in
+  another; a file of new rules, one taken out whose rules go and a rename are none. Whoever cuts or joins such files
+  runs it on the base and on the branch (`--compare`) and shows both in the pull request, which passes three
   conditions: the sum goes down; no role or kind of task reads more, its extra opens counted; and none loses a file it
   read before, unless the pull request says why it never needed it, on a line `Never needed:`. It goes both ways: two
-  files the same readers always open together are joined where the sum goes down by it, and where a part of a long
-  file is all a kind of task needs, the reading script may name the part, the file staying whole. A file of any size
-  that several kinds of task open is a candidate, and the audit's reader is shown those (`read-total.mjs
-  --candidates`). It does not mean reading is cut by keeping a session from what its task calls for. Reason: the
-  lowest total has an optimum, since each file opened is a call and one more file a session can miss. Held by
-  `read-total.mjs --compare` in the core's size workflow, which fails a pull request that adds or takes out a file the
-  reading script names where a condition fails, and by the state report, which gives the sum beside the last one's.
+  files the same readers always open together are joined where the sum goes down by it, and a file of any size that
+  several kinds of task open is a candidate, the core's audit's reader being shown those most read first (`--candidates`).
+  It does not mean reading is cut by keeping a session from what its task calls for, nor anything in a project, whose
+  copy of the core changes only by a sync and whose own files "Size asks" holds. Reason: the lowest total has an
+  optimum, since each file opened is a call and one more file a session can miss. Held by `read-total.mjs --compare` in
+  the core's size workflow, which fails a cut or a join where a condition fails, and by the state report, which gives
+  the sum beside the last one's.

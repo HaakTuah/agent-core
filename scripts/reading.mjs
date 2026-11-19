@@ -152,7 +152,7 @@ export function kindsOf(lib) {
 
 // A changed path as it is printed: as it is spelled, or, where it holds a control character (a line break, an escape),
 // in quotes with that character written out, so that no path's name reads as a line of this script's own.
-const shown = p => (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(p) ? JSON.stringify(p).replace(/[\u007f-\u009f\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`) : p);
+export const shown = p => (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(p) ? JSON.stringify(p).replace(/[\u007f-\u009f\u2028\u2029]/gu, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`) : p);
 // What the changed paths call for, whatever the role: [{ file, why }], each file once, by the first path that called it.
 export function calledByPaths(lib, paths, own = []) {
   const out = new Map(), kinds = new Map();
