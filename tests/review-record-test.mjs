@@ -8,7 +8,7 @@
 //   node tests/review-record-test.mjs
 import { fileURLToPath } from "node:url";
 import { blockingOf as trialBlocking, builderOf, changedOf, effortOf, findingsOf, groupOf, kindOf, print as trialPrint, verdict } from "../scripts/builder-trial.mjs";
-import { blockingOf, broughtBy, bugs, codexFind, foundTwice, otherOf, perPull, postedKind, print, ruleOf, rulesIn, rulesNamed, secondFound, standing, tally } from "../scripts/review-record.mjs";
+import { blockingOf, broughtBy, bugs, codexFind, foundTwice, otherOf, perPull, postedKind, print, ruleOf, rulesIn, rulesNamed, secondFound, stanceOf, standing, tally } from "../scripts/review-record.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -92,6 +92,12 @@ ok(same(r.postedSecurity, { got: true, blocked: "yes", points: 1, other: 2, othe
   "a review in the form gives its blocking and its other points, each round added", JSON.stringify(r));
 
 // the tally and the second security review
+ok(stanceOf("Code review: a\nStance: adversarial.\nNo blocking finding.") === "adversarial" && stanceOf("Code review: a\n**Stance: regular.**") === "regular" && stanceOf("Code review: a\nNo blocking finding.") === null
+  && stanceOf("Code review: a\nStance: adversarial.\nStance: regular.") === null && stanceOf("Code review: a\n```\nStance: adversarial.\n```") === null,
+  "a posted code review's stance is read from its line alone; none, two that disagree, or one in a fenced block reads as none");
+r = perPull([posted("Code review: a\nStance: adversarial.\nBlocking findings: 2.\nOther findings: 1."), posted("Code review: b\nStance: regular.\nNo blocking finding.\nNo other finding."), posted("Code review: c\nNo blocking finding.\nNo other finding.")], [], OWNER);
+ok(same(r.postedAdversarial, { got: true, blocked: "yes", points: 2, other: 1, otherUnread: false }) && same(r.postedRegular, { got: true, blocked: "no", points: 0, other: 0, otherUnread: false }) && r.postedCode.points === 2,
+  "posted code reviews are counted again by their stance, one that says none in neither row");
 const pull = (number, kind, over = {}) => ({ number, kind, reviews: { ...perPull([], [], OWNER), ...over } });
 const rv = (blocked, points = 0, other = 0, otherUnread = false) => ({ got: true, blocked, points, other, otherUnread });
 const pulls = [pull(1, "own", { codexSecurity: rv("no"), postedSecurity: rv("yes", 2) }), pull(2, "own", { codexSecurity: rv("no"), postedSecurity: rv("unread", 0, 0, true) }), pull(3, "upkeep", { codexSecurity: rv("yes", 1), postedSecurity: rv("yes", 1) }),
@@ -194,6 +200,8 @@ ok(trialBlocking(five(ran("yes", 2, 3), ran("no", 0, 1))) === 2 && findingsOf(fi
   && trialBlocking(five(ran("yes", 2), ran("unread", 0))) === null && findingsOf(five(ran("yes", 2), ran("unread", 0))) === null
   && trialBlocking(five(ran("no", 0, 1, true), idle)) === 0 && findingsOf(five(ran("no", 0, 1, true), idle)) === null && findingsOf(five(idle, idle)) === 0,
   "the trial's findings are each review's, blocking and other, and unknown where a count of a review that ran was not read, never none");
+const staged = { ...five(ran("yes", 1, 1), idle), postedCode: ran("yes", 2, 1), postedAdversarial: ran("yes", 2, 1), postedRegular: idle };
+ok(trialBlocking(staged) === 3 && findingsOf(staged) === 5, "a posted code review counted again by its stance is counted once in the trial");
 ok(effortOf("Fixes #3 (a builder on Sonnet at medium).") === "medium" && effortOf("Fixes #3, on Sonnet at High.") === "high" && effortOf("Fixes #3, a high-risk fix.") === null
   && effortOf("at medium, then at high") === null && effortOf("x\non Sonnet at medium") === null,
   "the effort is the one the first line names, \"at medium\" or \"at high\"; anything else is not read");
