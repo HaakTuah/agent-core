@@ -65,11 +65,15 @@ export function fingerprints(c, root = ROOT, commit = null) {
 }
 
 // The brief a fresh session is given for a case set in `dir`: its role (a builder's, unless the case names its own
-// `role`), where it works, how GitHub is reached there, and the task; nothing that says it is a staged case's.
+// `role`), where it works, how GitHub is reached there, and the task; nothing that says it is a staged case's. A role
+// of its own (an orchestrator's starts sessions and sets a wake; an adviser's reads the owner's scheduled tasks and
+// sessions) is kept to the scratch project: the brief says it starts no session and sets no scheduled task, wake or
+// check-in, so a case run on the owner's account reaches nothing of it.
 export function brief(c, dir) {
   const at = folderFit(dir);
   return [
     `You are ${c.role ?? "a builder session"} of a project, at high effort. Its folder is ${path.join(at, "project")}: work there alone.`,
+    ...(c.role ? ["Start no session of your own, and set no scheduled task, wake or check-in: your work stays in that folder and on the project's GitHub, through the CLI below."] : []),
     `This machine's GitHub CLI for it is ${path.join(at, "bin", "gh")}: begin each shell command with \`export PATH="${path.join(at, "bin")}:$PATH";\` so that \`gh\` is it. The project's repository on GitHub is ${OWNER}/${REPO}; its git origin is set.`,
     "Read the project's AGENTS.md and what it names first, as its rules ask.",
     `Your task: ${c.task}`,
