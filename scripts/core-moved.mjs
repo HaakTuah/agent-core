@@ -1,6 +1,6 @@
 // The core has moved (README.md, "How a project takes the core", point 5), for a project whose orchestrator does not
 // wake every day: it compares the commit the project's core-manifest.md pins with the newest of what the project
-// follows (releases.mjs, beside this file: the newest commit of the core's main, or the core's newest release, which
+// follows (releases.mjs, beside this file: the newest commit of the core's main whose checks all passed, or the core's newest release, which
 // has moved only where it is past the pin and changes something the project takes) and keeps one issue open for the owner while the project is behind, saying
 // what changed and how a session takes it; once the project holds it again, it closes that issue. It opens no pull
 // request and changes no file: a session makes the sync (sync.mjs, beside this file), since a pull request a workflow
@@ -17,10 +17,9 @@ import path from "node:path";
 import { aRepository } from "./guards.mjs";
 import { CORE } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
-import { fetchCore, followsOf, hostSaid, newestRelease, ownerOf, staysAt } from "./releases.mjs";
+import { fetchCore, followsOf, greenMain, hostSaid, newestRelease, ownerOf, past, staysAt } from "./releases.mjs";
 import { started } from "./started.mjs";
 
-const SHA = /^[0-9a-f]{40}$/;
 // The one issue it keeps: found again by this title among the issues the workflow itself opened.
 export const TITLE = "The core has moved past this project's copy";
 const BOT = "github-actions[bot]";
@@ -91,9 +90,13 @@ const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8", stdio: ["
 function newestOf(follows, pin, manifest) {
   let newest, moved, release = "", stays = false;
   if (follows === "main") {
-    newest = run("git", ["ls-remote", `https://github.com/${CORE}`, "refs/heads/main"]).split(/\s/)[0];
-    if (!SHA.test(newest)) fail("the core's main gave no commit");
-    moved = newest !== pin;
+    // (main's newest commit whose checks all passed, which needs its history: fetched as the releases' is; #733)
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "core-main-"));
+    let green;
+    try { fetchCore(dir); green = greenMain(dir); moved = !!green.sha && green.sha !== pin && past(pin, green.sha, dir); }
+    catch { fail("the core's main could not be fetched"); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    console.log(green.said);
+    newest = green.sha ?? pin;
   } else {
     // (which commit is past which takes the core's history: fetched into a folder of its own, removed again)
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "core-releases-"));

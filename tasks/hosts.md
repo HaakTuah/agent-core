@@ -39,20 +39,22 @@ brought up to date with the default branch before it merges (floor rule 12). The
 the project's users get a release and not each merge (the *users get* slot), a pull request merges once its own checks
 and reviews have passed on its head, up to date or not, and the default branch is tested at its newest commit. The
 trigger is a pull request whose reviews answered with no finding open: its builder reads the checks of the default
-branch's newest commit (`tasks/github-calls.md`) and, where none failed, merges it or turns auto-merge on, as
-`roles/shared/work-flow.md`, point 1, says. Where one failed, no pull request but its fix merges: the session that reads
-it so, a builder before its merge or the orchestrator on its wake, gives the fix the first lane, or takes it as a bug
-("Bugs don't wait"), where no open pull request says it fixes it. A release is cut only where every check on the default
-branch's newest commit passed. Where the host still asks an up-to-date branch, a setting only the owner changes, each is
-brought up to date in its turn, as the merge line says, and the owner is advised to switch it off as a queue offered is,
-by one issue (`core/scripts/merge-line.mjs` prints the advice); nothing waits on it ("Nothing locks a project"). It does
-not mean a pull request merges with a failing check or an open finding, nor that a conflict git reports is merged
-unresolved: that one is brought up to date as before. Reason: bringing each pull request up to date and testing it
-again, one at a time, made the tests the pace of all work, where what users get is built from a release that waits on a
-green default branch anyway. Held by the release workflow, which cuts none from a default branch with a failed check
-(the core's `release.yml`); by `tests/merge-line-test.mjs`, for what `core/scripts/merge-line.mjs` prints of it; by the
-host's ruleset, once the owner sets it; a red default branch fixed first, by nothing yet: a check that failed each pull
-request while it is red would fail its fix too.
+branch's newest commit (`core/scripts/merge-line.mjs` prints them) and, where none failed, merges it or turns auto-merge
+on, as `roles/shared/work-flow.md`, point 1, says. Where one failed, no pull request but its fix merges: the session
+that reads it so, a builder before its merge or the orchestrator on its wake, turns auto-merge off on every other open
+pull request (`tasks/github-calls.md`) and gives the fix the first lane, or takes it as a bug ("Bugs don't wait") where
+no open pull request says it fixes it. A release is cut only where every check on the default branch's newest commit
+passed. Where the host still asks an up-to-date branch, a setting only the owner changes, each is brought up to date in
+its turn, as the merge line says, and the owner is advised to switch it off as a queue offered is, by one issue (the
+same script prints the advice); nothing waits on it ("Nothing locks a project"). It does not mean a pull request merges
+with a failing check or an open finding, nor that a conflict git reports is merged unresolved: that one is brought up to
+date as before. Reason: bringing each pull request up to date and testing it again, one at a time, made the tests the
+pace of all work, where what users get is built from a release that waits on a green default branch anyway. Held by the
+release workflow, which cuts none from a default branch with a failed check (the core's `release.yml`); by
+`tests/merge-line-test.mjs`, for what `core/scripts/merge-line.mjs` reads and prints of it; by the host's ruleset, once
+the owner sets it; a red default branch fixed first, by nothing yet: a check that failed each pull request while it is
+red would fail its fix too, and auto-merge already on merges a pull request that went green before the default branch
+went red.
 
 **The merge line follows the host** (#702). By default the line of ready pull requests that `roles/shared/work-flow.md`
 sets is kept by hand. Where the host offers a merge queue for the repository and it is on, the queue takes the line, and

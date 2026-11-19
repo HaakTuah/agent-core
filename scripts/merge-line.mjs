@@ -20,6 +20,7 @@ import fs from "node:fs";
 import { aRepository, oneLine } from "./guards.mjs";
 import { timeOf } from "./moment.mjs";
 import { ghApi } from "./labels.mjs";
+import { held } from "./releases.mjs";
 import { started } from "./started.mjs";
 import { COUNT, lastMerged, median } from "./wait.mjs";
 
@@ -70,6 +71,20 @@ function queueOf(r, queued, gh) {
   return { queue, said: `its merge queue: ${what}, ${why}` };
 }
 
+// Where users get a release: whether the checks of the default branch's newest commit all passed, as the host lists
+// the runs its push started (held, in releases.mjs, as a release reads them): { sha, state ("passed", "running",
+// "failed" or null where it could not be read), said }. A run still going is "running"; any other reason "failed".
+function newestOf(repo, branch, gh) {
+  let sha = null, list = null;
+  try { sha = json(gh(`repos/${repo}/commits/${encodeURIComponent(branch)}`))?.sha ?? null; } catch { /* (not read) */ }
+  if (!/^[0-9a-f]{40}$/u.test(String(sha))) return { sha: null, state: null, said: `the default branch's newest commit: not read, so whether its checks passed is not known` };
+  try { list = json(gh(`repos/${repo}/actions/runs?head_sha=${sha}&branch=${encodeURIComponent(branch)}&event=push&per_page=100`)); } catch { /* (held says so) */ }
+  const reasons = held(list), going = r => /: (?:queued|in_progress|waiting|pending|requested)$/u.test(r);
+  const state = !reasons.length ? "passed" : list?.workflow_runs && reasons.every(r => going(r) || r === "no check has passed on it yet") ? "running" : reasons.some(r => /could not be read|were read/u.test(r)) ? null : "failed";
+  const what = { passed: "its checks all passed", running: "its checks are still running", failed: `a check failed (${reasons.filter(r => !going(r)).map(r => oneLine(r).slice(0, 80)).join("; ")})` }[state] ?? "its checks could not be read";
+  return { sha, state, said: `the default branch's newest commit, ${sha.slice(0, 7)}: ${what}` };
+}
+
 // The three facts of `repo`, read through `gh`, and overridden by `manifest`'s rows: { upToDate (true, false or null
 // where it could not be read), queue ("on", "offered", "none" or null), billed (true or false), users ("merges" or
 // "releases", the row *users get*), branch, said }, `said` how each was read.
@@ -80,17 +95,20 @@ export function facts({ repo, manifest = null, gh = ghApi }) {
   const billedOver = override(manifest, "billed minutes", ["yes", "no"]);
   const billedRead = r.private === true ? "yes, the repository being private" : "no, the repository being public";
   const users = override(manifest, "users get", ["merges", "releases"]);
+  const newest = users === "releases" ? newestOf(repo, branch, gh) : null;
   const said = [up.said,
     queueOver ? `its merge queue: ${queueOver}, as the manifest's row *merge queue* says (read: ${q.queue ?? "not read"})` : q.said,
     billedOver ? `its runner minutes billed: ${billedOver}, as the manifest's row *billed minutes* says (read: ${billedRead})` : `its runner minutes billed: ${billedRead}`,
-    users ? `its users get: ${users === "releases" ? "a release" : "each merge"}, as the manifest's row *users get* says` : "its users get: each merge, as no row *users get* says otherwise (it cannot be read from the host)"];
-  return { upToDate: up.upToDate, queue: queueOver ?? q.queue, queueRead: q.queue, billed: billedOver ? billedOver === "yes" : r.private === true, users: users ?? "merges", branch, said };
+    users ? `its users get: ${users === "releases" ? "a release" : "each merge"}, as the manifest's row *users get* says` : "its users get: each merge, as no row *users get* says otherwise (it cannot be read from the host)",
+    ...newest ? [newest.said] : []];
+  return { upToDate: up.upToDate, queue: queueOver ?? q.queue, queueRead: q.queue, billed: billedOver ? billedOver === "yes" : r.private === true, users: users ?? "merges", newest, branch, said };
 }
 
 // What follows from the facts, as tasks/hosts.md says: who keeps the line, and the one line of advice to the owner.
 export function follows(f) {
   if (f.users === "releases") {
-    const own = "Its users get a release: a pull request merges on its own green checks, up to date or not, while no check on the default branch's newest commit failed (floor rule 12; the core's tasks/hosts.md).";
+    const own = "Its users get a release: a pull request merges on its own green checks, up to date or not, while no check on the default branch's newest commit failed (floor rule 12; the core's tasks/hosts.md)."
+      + (f.newest?.state === "failed" ? " That commit has a failed check: no pull request but its fix merges. Turn auto-merge off on every other open pull request (the core's tasks/github-calls.md), and give the fix the first lane, or take it as a bug where no open pull request says it fixes it." : f.newest?.state === null ? " Whether that commit's checks passed could not be read: read them before a merge." : "");
     if (f.upToDate === false) return `${own} No up-to-date branch is asked: the line has nothing to act on.`;
     if (f.upToDate === null) return `${own} Whether the host asks an up-to-date branch was not read, so the line is kept by hand meanwhile, as the core's roles/shared/work-flow.md says.`;
     return `${own} The host still asks an up-to-date branch, a setting of the default branch's rules only the owner changes: where no open issue names it, file one for the owner, labelled needs-owner, to switch it off, and nothing waits on it. Until then the line is kept${f.queue === "on" ? " by the host's merge queue" : " by hand, as the core's roles/shared/work-flow.md says"}.`;
@@ -193,9 +211,10 @@ export function cancel({ repo, keep, manifest = null, gh = ghApi }) {
 // The script's run: its exit code, what it prints through `say` (and failures through `warn`), read through `gh`.
 // The core's own repository holds no manifest: its slots stand in its AGENTS.md ("the *users get*: `releases`"),
 // read as a row of one; null elsewhere.
-function coreOwn() {
-  if (!fs.existsSync("scripts/merge-line.mjs") || !fs.existsSync("AGENTS.md")) return null;
-  const m = /the \*users get\*:\s+`(merges|releases)`/u.exec(fs.readFileSync("AGENTS.md", "utf8"));
+export function coreOwn(root = ".") {
+  const at = name => `${root}/${name}`;
+  if (!fs.existsSync(at("scripts/merge-line.mjs")) || !fs.existsSync(at("AGENTS.md"))) return null;
+  const m = /the \*users get\*:\s+`(merges|releases)`/u.exec(fs.readFileSync(at("AGENTS.md"), "utf8"));
   return m ? `| *users get* | \`${m[1]}\` |\n` : null;
 }
 

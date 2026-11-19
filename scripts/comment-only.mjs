@@ -7,7 +7,8 @@
 //
 // It reads the head commit, not the working tree, against the merge base with the project's main (fetched), or against
 // the commit given, one before the head that it grew from, for a later commit reviewed only for what it changes (floor
-// rule 8); a head not up to date with main is refused, being no head that merges. It reads every file the pull request
+// rule 8); a head not up to date with main is refused, since it reads the change against main only where the head
+// holds it. It reads every file the pull request
 // changes under .github/ or .claude/ (the folders themselves too, any case, at any depth), and every action.yml, a
 // project's own action: each must be a YAML file changed in place, its mode kept, no link or submodule there on either
 // side, whose two versions differ only in YAML comments, blank lines between entries, and the `name` of a job's steps.

@@ -96,7 +96,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    have passed (`AGENTS.md`, "A release is cut on the owner's word"; `scripts/release.mjs`). A project whose *owner's
    account* is not the account the core is under follows the releases, unless its manifest's *follows* row says `main`;
    the projects of the core's own owner follow `main`, unless theirs says `releases` (`scripts/releases.mjs`). Following
-   the releases, the sync script takes the newest release past the project's pin and nothing in between, and wherever
+   `main`, the sync script and the core-moved check take its newest commit whose checks all passed, never one ahead of
+   them, since a pull request merges here without being brought up to date (floor rule 12; `greenMain` in
+   `scripts/releases.mjs`; #733). Following the releases, the sync script takes the newest release past the project's pin and nothing in between, and wherever
    this README or a script says the core has moved, it has moved only when such a release is cut and asks a sync of the
    project (below); a full SHA still takes any commit of `main`, but such a sync is no pure sync there: it is reviewed
    like any PR (core archive 201). Why: a pure sync brings scripts, hooks and workflows that no review in the project
