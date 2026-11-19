@@ -370,4 +370,14 @@ export const STAGES = {
     // (as the step words it: the baseline written again)
     mend: dir => spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } }),
   },
+
+  "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser": {
+    asked: true,
+    // (a baseline written before the check read JavaScript's functions on the parser, as that of C#'s above)
+    stage: dir => {
+      const baseline = fs.existsSync(at(dir, "checks/shape-baseline.json")) ? JSON.parse(read(dir, "checks/shape-baseline.json")) : { reads: Object.keys(READERS), listed: {} };
+      write(dir, "checks/shape-baseline.json", `${JSON.stringify({ ...baseline, reads: (baseline.reads ?? []).filter(r => r !== "javascript-tree") }, null, 2)}\n`);
+    },
+    mend: dir => spawnSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } }),
+  },
 };
