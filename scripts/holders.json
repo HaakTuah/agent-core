@@ -420,7 +420,7 @@
     "tasks/reviews.md: No sign in about 5 minutes, no finished review in about 20, or an answer that is not a review": [19, 20],
     "tasks/reviews.md: Security": [47, 48, 49, 50, 51, 174, 177, 227],
     "tasks/reviews.md: The design check": [22],
-    "tasks/reviews.md: What a posted review declares": [235],
+    "tasks/reviews.md: What a posted review declares": [155, 235],
     "tasks/reviews.md: What a posted review stands for": [220, 250],
     "tasks/reviews.md: When a PR passes": [130],
     "tasks/roles.md: A file for each role": [234],
@@ -514,6 +514,7 @@
     "tasks/hosts.md: The merge line follows the host": "findings; outcome: fast",
     "tasks/hosts.md: Where the front waits behind the cap, runs far from their turn are cancelled": "findings; outcome: fast",
     "tasks/tests.md: A test reaches a real clock or another process only where it guards it": "check fires; outcome: fast",
-    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": "check fires; outcome: fast"
+    "tasks/tests.md: A check that fails on the default branch has an owner, and is run again once": "check fires; outcome: fast",
+    "tasks/reviews.md: What a posted review declares": "check fires; outcome: readable"
   }
 }
