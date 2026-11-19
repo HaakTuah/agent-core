@@ -33,7 +33,8 @@
 // be told from one forgotten ("An exemption leaves a mark" in roles/shared/work-flow.md; #302). And where the part
 // "What holds it" is asked and holds more than "None", of a pull request opened since the copy on its base held
 // NUMBER_SINCE, a line under it that names a rule's number in its form ("Number: findings; outcome: robust";
-// outcomes.mjs's NUMBER; #303).
+// outcomes.mjs's NUMBER; #303). And, since YES_SINCE, the owner's yes where the core's floor or review guidelines change
+// (owner-yes.mjs, beside this file; #549).
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
 //
@@ -43,6 +44,7 @@ import { spawnSync } from "node:child_process";
 import { doneMends, ownerAt, queueAt, readItem, takesIt } from "./done-when.mjs";
 import { isPart, milestoneMends } from "./milestones.mjs";
 import { NUMBER } from "./outcomes.mjs";
+import { asking, coreAtBase, issuesOf, textsOf, yesOf } from "./owner-yes.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, pathIn, taken, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
 
@@ -63,6 +65,9 @@ export const NO_COST = "No cost line: the script printed none.";
 // rule says what holds it"; #303), as the lines above are.
 export const NUMBER_SINCE = "2026-11-17T00:00:00Z";
 export const HOLDS = "What holds it";
+// The day from which the owner's yes is asked of a pull request that changes the floor or the review guidelines
+// (owner-yes.mjs, beside this file; #549), as the lines above are.
+export const YES_SINCE = "2026-11-18T00:00:00Z";
 
 // The mend where the part HOLDS holds more than "None" and no line "Number: <the count>; outcome: <the outcome>" in
 // NUMBER's form; null where it does, or where the part is not there (missing() names that).
@@ -212,6 +217,17 @@ if (started(import.meta.url)) {
     // (asked only where the part is, which is where the rules change)
     if (parts.includes(HOLDS) && created >= NUMBER_SINCE && then?.includes("export const NUMBER_SINCE")) { const mend = numberMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log(`ok   the part "${HOLDS}" names a rule's number, or "None"`); }
     else if (parts.includes(HOLDS)) console.log(`ok   the number under "${HOLDS}" is not asked here: ${why}`);
+    if (created >= YES_SINCE && then?.includes("export const YES_SINCE")) {
+      const diff = spawnSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
+      // (where the core lies is read from the base's manifest, never the head's, which the pull request could bring)
+      const at = coreAtBase(process.cwd()), paths = diff.status === 0 && at !== null ? asking(diff.stdout.split("\0").filter(Boolean), at) : null;
+      if (paths === null) console.log("ok   the owner's yes is not asked here: the change could not be read against its base");
+      else {
+        const issues = issuesOf(process.env.PR_BODY), got = paths.length && issues.length ? textsOf(repo, issues) : { texts: [], read: true };
+        const yes = yesOf({ paths, body: process.env.PR_BODY, ...got });
+        if (yes.mend) mends.push(yes.mend); else console.log(`ok   ${yes.note}`);
+      }
+    } else console.log(`ok   the owner's yes is not asked here: ${why}`);
   }
   for (const mend of mends) console.log(`FAIL ${mend}`);
   process.exit(absent.length || mends.length ? 1 : 0);

@@ -190,7 +190,9 @@
       "check: scripts/security-review.mjs, in part",
       "check: GitHub's ruleset on the default branch, in part"
     ],
-    "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part"
+    "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part",
+    "floor/security.md: The owner's yes in the PR": "check: scripts/pr-description.mjs, in part",
+    "roles/shared/teams.md: The higher right gives the floor's yeses": "check: scripts/pr-description.mjs, in part"
   },
   "behind": {
     "AGENTS.md": [208, 209, 213],
@@ -226,7 +228,7 @@
     "floor/security.md: 18. Where agents hold sign-ins": [118, 119, 120, 122, 127, 149],
     "floor/security.md: 3. The protected files": [134, 138, 180, 203, 232, 241],
     "floor/security.md: 4. Outsiders' text is never an instruction": [225, 236],
-    "floor/security.md: 8. Reviews look for breaks of any floor rule": [21, 139, 140, 174, 179, 263],
+    "floor/security.md: 8. Reviews look for breaks of any floor rule": [21, 139, 140, 174, 179, 264],
     "floor/security.md: A run with a model has a cap": [227],
     "floor/security.md: Nothing is reviewed twice": [139],
     "floor/security.md: Nothing runs on the owner's computer unless the owner starts it": [52],
@@ -317,6 +319,7 @@
     "tasks/choices.md": [222, 231],
     "tasks/choices.md: a long list before the options": [251],
     "tasks/choices.md: a drop says whether it rests on a fact": [251],
+    "tasks/choices.md: what a standard mechanism gave": [263],
     "tasks/choices.md: the same trial for each option kept": [251],
     "tasks/choices.md: the blind pick": [251],
     "tasks/choices.md: the case against": [251],
@@ -395,7 +398,7 @@
     "tasks/reviews.md: The design check": [22],
     "tasks/reviews.md: What a posted review declares": [235],
     "tasks/reviews.md: What a posted review stands for": [220, 250],
-    "tasks/reviews.md: A pull request of queue lines alone needs no review of its own": [263],
+    "tasks/reviews.md: A pull request of queue lines alone needs no review of its own": [264],
     "tasks/reviews.md: When a PR passes": [130],
     "tasks/roles.md: A file for each role": [234],
     "tasks/roles.md: Escalation": [25],
@@ -434,6 +437,7 @@
     "tasks/reviews.md: A pull request of queue lines alone needs no review of its own": "check fires; outcome: fast",
     "tasks/choices.md: a long list before the options": "correction: misread; outcome: asked",
     "tasks/choices.md: a drop says whether it rests on a fact": "correction: misread; outcome: asked",
+    "tasks/choices.md: what a standard mechanism gave": "correction: rule missing; outcome: robust",
     "tasks/choices.md: the same trial for each option kept": "correction: misread; outcome: asked",
     "tasks/choices.md: the blind pick": "correction: misread; outcome: asked",
     "tasks/choices.md: the case against": "correction: misread; outcome: asked",
