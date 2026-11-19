@@ -63,7 +63,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #460, point 5 (a report's size) | builder | |
 | #502, case 2 | rule builder; it changes what every role reads at its start | |
 | #593, points 4 and 12 | rule builder; it changes what a builder reads at its start | |
-| #594 | rule builder; it changes the README | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
 | #650 | rule builder | |

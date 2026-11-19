@@ -9,6 +9,21 @@ takes the core the same way, its *owner's account* its own (read, or filled in: 
 its own (core archive 148), save in `archive/`, whose reasoning stays the core's owner's: its stand-in weighs it after
 its own owner's words, and marks an answer that rests on it alone unsure (`roles/shared/inbox.md`; core archive 166).
 
+## What the core is for
+
+agent-core rests on one bet: that agents working by themselves can produce work their owner would approve if shown it
+blind, and that the right checks and balances are what gets them there. Everything here is judged by that. A rule or a
+check stays while it raises that share and goes when it does not. It will never be finished; it is refined toward the
+best point within reach, and refined again as the tools change (core archive #594).
+
+This README is the core's settling reference, so this is also the purpose a session follows where a rule's letter
+would defeat it (`roles/shared/how-to-work.md`, "Principles over rules"). Each month a blind sample measures it: with
+the state report, the scheduled look draws ten of the month before's merged changes at random, Dependabot's left out,
+and lays each out by its diff alone, with no word of who built it, why, or what its reviews found, in one issue
+labelled `needs-owner` (`scripts/blind-sample.mjs`). The owner answers each "yes" or "no" with a correction's kind, and
+the next report gives the share approved beside the other outcomes. Nothing waits on it: a month not answered is said
+as not read, and each "no" is a correction, built as any is.
+
 A person who owns a project that takes the core reads `setup/owner-guide.md` first: one plain page on what it does for
 the project, the yeses it asks, the stop switch, what it costs and the settings that are theirs.
 
@@ -219,7 +234,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    - **The outcomes:** `outcomes.mjs` and `outcomes-read.mjs`, which the monthly state report leads with: the five
      outcomes the owner named, each by its direct measure or said to have none yet, then what the work cost, read
      through gh from the pull requests, issues and the label `correction` (`roles/shared/inbox.md`, "A correction is
-     marked"; `tasks/cleaning.md`). The look's job runs them with the permissions it has; they add no job.
+     marked"; `tasks/cleaning.md`), and after them the share of the blind sample approved (`blind-sample.mjs`; "What
+     the core is for"). The look's job runs them with the permissions it has; they add no job.
    - **Its calls to the core's workflows:** its own `core.yml`, `personal-terms.yml`, `copies.yml`, `licences.yml`,
      `codeql.yml`, `delete-merged-branches.yml`, `pr-description.yml` and, if it has versions Dependabot cannot see,
      `versions.yml` keep their triggers and call the core's of the same name
