@@ -363,7 +363,8 @@ function tokensOf(root, text, comments) {
     if (STRINGS.has(node.type)) { toks.push({ t: "str", v: node.type === "character_literal" ? node.text.slice(1, -1) : "", line }); continue; }
     if (node.type === "interpolated_string_expression") {
       toks.push({ t: "str", v: "", line });
-      const raw = /^\$+"""/u.test(text.slice(node.startIndex, node.startIndex + 64)); // (the grammar's interpolation_start holds the $ signs alone)
+      RAW.lastIndex = node.startIndex;
+      const raw = RAW.test(text); // (the grammar's interpolation_start holds the $ signs alone, as many as they are)
       const holes = raw ? [] : node.namedChildren.filter(c => c.type === "interpolation");
       for (let k = holes.length - 1; k >= 0; k--) for (const c of [...holes[k].children].reverse()) if (!["interpolation_brace", "interpolation_alignment_clause", "interpolation_format_clause"].includes(c.type)) stack.push(c);
       if (!raw) for (const tok of misreadHoles(node, holes, text)) toks.push(tok);
@@ -378,8 +379,11 @@ function tokensOf(root, text, comments) {
 // The grammar reads a hole right after an escaped brace (`$"{{{x}}}"`) as the string's text, where C# reads `{{` then a
 // hole: a run of an odd count of `{` in the text outside the holes the grammar read. Its code, to the `}` that closes it
 // (before an alignment's `,` or a format's `:` at its own depth), is given as tokens after the string's, split as words,
-// numbers, strings and signs, as the lexer gave them, so a run of the clock in it is still read.
-const SPLIT = /\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*|@?[A-Za-z_\u0080-\uffff][\w\u0080-\uffff]*|\d[\w.]*|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|=>|\S/gu;
+// numbers, strings and signs, as the lexer gave them, so a run of the clock in it is still read. A quote left unclosed
+// runs to the line's end, so the code is split in time linear in it.
+const SPLIT = /\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*|@?[A-Za-z_\u0080-\uffff][\w\u0080-\uffff]*|\d[\w.]*|"(?:[^"\\\n]|\\.)*"?|'(?:[^'\\\n]|\\.)*'?|=>|\S/gu;
+// Whether an interpolated string is raw: its $ signs, then three quotes, at the place it is tried from.
+const RAW = /\$+"""/uy;
 function misreadHoles(node, holes, text) {
   const out = [];
   let at = node.startIndex, row = node.startPosition.row + 1, seen = at; // (lines counted once each, as the holes are passed in order)

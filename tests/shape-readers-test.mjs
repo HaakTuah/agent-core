@@ -86,6 +86,12 @@ const rawHoles = readCsharp("class C { void M() { var s = $$\"\"\"{y} {{Clock.No
 ok(!rawHoles.toks.some(t => ["y", "Clock", "Task"].includes(t.v)), "C#: a raw interpolated string's code is not read, and none of its text is taken for a hole", JSON.stringify(rawHoles.toks.map(t => t.v).filter(Boolean)));
 const holesStarted = Date.now(), manyHoles = readCsharp(`class C { string s = $@"${"\n{{{x}}}".repeat(40000)}"; }`), holesTook = Date.now() - holesStarted, xs = manyHoles.toks.filter(t => t.v === "x");
 ok(xs.length === 40000 && xs.at(-1).line === 40001 && holesTook < 5000, `C#: 40,000 holes after escaped braces, a line each, are read in time, each on its line (${holesTook} ms)`, JSON.stringify({ n: xs.length, last: xs.at(-1)?.line }));
+// (the fallback reviewer's cases at 63c974eb: a hole's unclosed quote, before many escaped quotes, is split in time
+// linear in the hole; and a raw string's $ signs are read whatever their count, so one of 70 has no hole misread)
+const quotesStarted = Date.now(), manyQuotes = readCsharp(`class C { string s = $"{{{${'\\"'.repeat(128000)}}}}"; }`), quotesTook = Date.now() - quotesStarted;
+ok(manyQuotes.toks.length > 0 && quotesTook < 5000, `C#: a hole after escaped braces holding 128,000 escaped quotes and no closing one is read in time (${quotesTook} ms)`, String(manyQuotes.toks.length));
+const manySigns = readCsharp(`class C { void M() { var s = ${"$".repeat(70)}"""{y} {{Clock.Now}}"""; } }\n`);
+ok(!manySigns.toks.some(t => ["y", "Clock"].includes(t.v)), "C#: a raw interpolated string of 70 $ signs is read as raw, none of its text taken for a hole", JSON.stringify(manySigns.toks.map(t => t.v).filter(Boolean)));
 const typeArg = readCsharp("using Alias = Game.Rules.Box<global::System.String>;\nusing B = global::M.N;\nclass C {}\n");
 ok(same(typeArg.usings.map(u => u.target), ["Game.Rules.Box"]), "C#: a global:: inside the target's type arguments leaves the target named; one that qualifies the target names nothing", JSON.stringify(typeArg.usings));
 const manyLines = readCsharp(`/*${"\n".repeat(600000)}*/ class C { void M() { } }\n`);
