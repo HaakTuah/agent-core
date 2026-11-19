@@ -26,7 +26,7 @@ export const ASSERT = /\b(?:assert\w*|expect|ok|equal|deepEqual|deepStrictEqual|
 // A line that skips a case, or runs one alone and so skips the rest: .skip, .todo and .only, xit, [Ignore] and
 // Skip =, pytest's and unittest's skip, Go's t.Skip, Rust's #[ignore], JUnit's @Disabled, node:test's skip, todo or only option set to anything but false in a test call's options, or set true or to a reason on a line of its own,
 // mocha's this.skip().
-export const SKIP = /#\[ignore\b|\bpytest\.skip\s*\(|\b(?:it|test|describe|context|suite)\.(?:skip|todo|only)\b|\b(?:xit|xtest|xdescribe|xcontext|fit|fdescribe)\s*\(|\[(?:Ignore|Skip)\b|\bSkip\s*=|@pytest\.mark\.(?:skip|xfail)\w*|@unittest\.skip\w*|@(?:Disabled|Ignore)\b|\bt\.Skip\w*\s*\(|\b(?:it|test|describe|suite)\s*\([^)]*[{,]\s*(?:skip|todo|only)\s*:(?!\s*false\b)|^\s*(?:skip|todo|only)\s*:\s*(?:true\b|["'`])|\bthis\.skip\s*\(/u;
+export const SKIP = /#\[ignore\b|\bpytest\.skip\s*\(|\b(?:it|test|describe|context|suite)\.(?:skip|todo|only)\b|\b(?:xit|xtest|xdescribe|xcontext|fit|fdescribe)\s*\(|\[(?:Ignore|Skip)\b|\bSkip\s*=|@pytest\.mark\.(?:skip|xfail)\w*|@unittest\.skip\w*|@(?:Disabled|Ignore)\b|\bt\.Skip\w*\s*\(|\b(?:it|test|describe|suite)\s*\((?:[^)]*[{,]|\s*(?:"[^"]*"|'[^']*'|`[^`]*`)\s*,\s*\{(?:[^}]*?,)?)\s*(?:skip|todo|only)\s*:(?!\s*false\b)|^\s*(?:skip|todo|only)\s*:\s*(?:true\b|["'`])|\bthis\.skip\s*\(/u;
 
 // The longest line a pattern reads: a longer one is read by its first part, so that no line holds a check up.
 const LONG = 1000;

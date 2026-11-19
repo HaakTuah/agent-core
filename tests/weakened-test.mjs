@@ -19,7 +19,7 @@ for (const l of ["assert.equal(sum([1, 2, 3]), 6);", "  expect(total).toBe(6);",
   ok(ASSERT.test(l), `an assertion is read: ${l.trim()}`);
 for (const l of ["const total = sum([1, 2]);", "import assert from \"node:assert/strict\";", "const fs = require(\"node:fs\");", "// equal parts"])
   ok(!ASSERT.test(l), `no assertion: ${l.trim()}`);
-for (const l of ["it.skip(\"sums\", () => {", "test.only(\"sums\", () => {", "xit(\"sums\", () => {", "[Fact(Skip = \"later\")]", "[Ignore]", "@pytest.mark.skip(reason=\"later\")", "#[ignore]", "    pytest.skip(\"later\")", "\tt.Skip(\"later\")", "@Disabled", "test(\"sums\", { skip: !hasGit }, () => {", "test(\"sums\", { skip: true }, () => {", "test(\"sums\", { timeout: 1000, skip: true }, () => {", "  skip: \"until #9\",", "this.skip();"])
+for (const l of ["it.skip(\"sums\", () => {", "test.only(\"sums\", () => {", "xit(\"sums\", () => {", "[Fact(Skip = \"later\")]", "[Ignore]", "@pytest.mark.skip(reason=\"later\")", "#[ignore]", "    pytest.skip(\"later\")", "\tt.Skip(\"later\")", "@Disabled", "test(\"sums\", { skip: !hasGit }, () => {", "test(\"sum() of none\", { skip: true }, () => {", "test(\"sum() of none\", { timeout: 9, only: true }, () => {", "test(\"sums\", { skip: true }, () => {", "test(\"sums\", { timeout: 1000, skip: true }, () => {", "  skip: \"until #9\",", "this.skip();"])
   ok(SKIP.test(l), `a skip is read: ${l.trim()}`);
 for (const l of ["test(\"sums\", { timeout: 1000, skip: false }, () => {", "test(\"sums\", { skip: false }, () => {", "it(\"skips the blank lines\", () => {", "const skipped = rows.filter(r => r.skip);", "ok(x, \"comment-only: a step\", y);", "const o = { only: \"copies.yml\" };", "const kept = { skip: [] };", "// todo: later"])
   ok(!SKIP.test(l), `no skip: ${l.trim()}`);
