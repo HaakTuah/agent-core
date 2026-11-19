@@ -34,19 +34,23 @@ export const grammarOf = file => GRAMMAR[path.posix.extname(file)] ?? "javascrip
 export function javascriptFunctions(file, src) {
   try { return inParser(import.meta.url, "read", grammarOf(file), src); } catch (e) {
     if (e?.kind === "read") return null;
-    // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step: #719)
-    if (e?.kind === "load") throw new Error(`The parser or JavaScript's grammars could not be loaded: ${/ Mend: /u.test(e.message) ? e.message : `${e.message}. Mend: run node core/scripts/install.mjs parser (in the core, scripts/install.mjs parser), which installs the parser's packages from its lock file, then run this again`}`);
+    // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step: #719; tested apart
+    // from the message, since the mutation tool's lexer misreads a regular expression inside a template literal)
+    const mended = / Mend: /u.test(e?.message ?? "");
+    if (e?.kind === "load") throw new Error(`The parser or JavaScript's grammars could not be loaded: ${mended ? e.message : `${e.message}. Mend: run node core/scripts/install.mjs parser (in the core, scripts/install.mjs parser), which installs the parser's packages from its lock file, then run this again`}`);
     throw e;
   }
 }
 
-// (how long the grammar may take on one file, in milliseconds: its recovery from an error grows faster than the text,
-// and the core's largest file parses in a few; a file it cannot read within it has no functions told)
-const BUDGET = 3000;
+// (how long the grammar may take on one file, in milliseconds, a second and 4 more for each thousand characters: it
+// reads JavaScript in time in step with its size, about 1 ms for each thousand characters, and the core's largest file
+// in a few; its recovery from text that is no JavaScript grows faster than the text, a line of 300,000 "/[" past two
+// minutes. A file it cannot read within it has no functions told)
+const budgetOf = src => 1000 + src.length / 250;
 
 /** The functions of `src`, read with the parser's `parse` and the grammar named (in its thread: javascriptFunctions). */
 export function read(parse, grammar, src) {
-  const tree = parse(grammar, src, BUDGET);
+  const tree = parse(grammar, src, budgetOf(src));
   if (!tree) return null;
   try { return tree.rootNode.hasError && !wordsAlone(tree.rootNode) ? null : walk(tree.rootNode); } finally { tree.delete(); }
 }

@@ -90,7 +90,10 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   packages) and madge, for cycles and boundaries, dropped on fact: JavaScript and TypeScript alone, where the check
   reads C# and Python too. *Bugs:* 3. **Keep:** fitting costs more than keeping, each tool knowing one language or
   fixing its definitions; its readers go to the parser, as #486's group 3 and #519's path say, C#'s functions the
-  first (`scripts/csharp-functions.mjs`, #529).
+  first (`scripts/csharp-functions.mjs`, #529), then JavaScript's and TypeScript's (`scripts/javascript-functions.mjs`).
+  *Tried:* 19 November 2026 (#723), tree-sitter's JavaScript grammar 0.25.0 and TypeScript's 0.23.2, on the core's 204
+  files of JavaScript and every case of the lexer's tests: the same where the lexer read by its definition, mended where
+  it misread. *Replayed:* none: no bug filed names the reader; the review findings its tests hold all read.
 - `scripts/choices.mjs`: fails a choice record a pull request adds without its lines, says when the pass is due, and
   reads each sign written in a measure. *Runs:* any session and the runners. *Else:* none found; the decision records'
   tools (adr-tools, log4brains) write records and check no form. *Bugs:* 1. **Keep:** nothing fits; the form is the
