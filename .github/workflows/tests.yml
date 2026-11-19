@@ -5,7 +5,8 @@
 # hour, on Windows, at main's newest commit where its full run has not already passed there; and in full on both, on
 # a start by hand. A release waits on the tests' full runs on its commit, hourly or by hand: none unfinished, the newest
 # passed (.github/workflows/release.yml, scripts/release.mjs). Every suite runs though another failed, so one run
-# shows them all. This repository only; no project calls it. Reads only, with no secret; nothing is installed but the core's own packages, below. The suites run on the core's one exact Node, the pin
+# shows them all. This repository only; no project calls it. Reads only, with no secret; nothing is installed but the
+# core's own packages, below. The suites run on the core's one exact Node, the pin
 # (.node-version), and on the least long-term Node its scripts promise to run on (.node-least, which scripts/node.sh
 # keeps on a machine that holds it; #526); the upgrade test and the staged cases on the pin alone. One suite writes and
 # builds a .NET project with the .NET SDK the runner holds, in a scratch folder, and takes a few packages from nuget.org
