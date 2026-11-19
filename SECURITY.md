@@ -34,18 +34,19 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the reviews'
      records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look (`scripts/look.mjs`), the
      inbox (`scripts/inbox.mjs`) and the personal terms' take-out (`scripts/issue-terms.mjs`, which edits only an
-     insider's text); limits: 256 MB of an answer, 500 pages of 100, and for the take-out 1,048,576 characters of a
-     text, past which it is left unread, and the first 100 edits of its history; hostile tests:
-     `tests/hostile-issues-test.mjs`, and for the take-out `tests/issue-terms-test.mjs`.
+     insider's text); limits: 256 MB of an answer (16 MB for the inbox's own), 500 pages of 100, and for the take-out
+     1,048,576 characters of a text, past which it is left unread, and the first 100 edits of its history; hostile
+     tests: `tests/hostile-issues-test.mjs`, and for the take-out `tests/issue-terms-test.mjs`.
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository (the
      workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`, `scripts/releases.mjs`,
      `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`, `scripts/clean-merges.mjs`,
      `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs` and `scripts/tools-offer.mjs`, and
      an account's rights by the code-review wait (`scripts/code-review-wait.mjs`), the scheduled look
      (`scripts/look.mjs`) and the size check (`scripts/size.mjs`, from `size.yml`) through `security-review.mjs`'s
-     reader; limits: 1 MB of an answer to `core-moved.mjs` and `releases.mjs`, 64 MB or 256 MB to the others, 30 merged
-     pull requests for the wait, 50 pages for the stalled look, 200 for the cost, 10 for the merge line, 20 s for the
-     tools' offer, 30 s for the host's account; hostile tests: `tests/hostile-github-test.mjs`.
+     reader; limits: 1 MB of an answer to `core-moved.mjs`, `releases.mjs` and `tools-offer.mjs`, 64 MB or 256 MB to the
+     others, 30 commits and 30 s each for the green main of `releases.mjs`, 30 merged pull requests for the wait, 50
+     pages for the stalled look, 200 for the cost, 10 for the merge line, 20 s for the tools' offer, 30 s for the host's
+     account; hostile tests: `tests/hostile-github-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`), the sync and its steps

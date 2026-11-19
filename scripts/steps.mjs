@@ -518,7 +518,7 @@ function limitsOf(item) {
 // path such as `scripts/exact-versions.mjs` says nothing of the input).
 // An item that says its input carries none ("carries no version", "without a version number") says nothing of one
 // either; one that names its version otherwise ("refused without a version", "no version newer") still does.
-const versioned = item => /\bversions?\b/i.test(item.replace(/\blimits:[\s\S]*?(?=hostile\s+tests\b|$)/i, "").replace(/`[^`]*`/g, "")
+const versioned = item => /\bversions?\b/i.test(item.replace(/`[^`]*`/g, "").replace(/\blimits:[\s\S]*?(?=hostile\s+tests\b|$)/i, "")
   .replace(/\b(?:(?:carries|carry|has|have|holds?)\s+no\s+versions?(?:\s+numbers?)?|without\s+an?\s+version\s+numbers?)\b/gi, ""));
 // (an item's words as a mend shows them: no control character, which would reach the sync's log as it stands, and no
 // character that reorders or hides text, which would make the mend read otherwise than it is)
@@ -534,7 +534,7 @@ function hostileTests(p) {
   const first = l => short(l.split("\n")[0].trim().slice(2).trim());
   const bare = items.filter(l => !namesTests(p, l)).map(first);
   const unlimited = items.filter(l => !limitsOf(l)).map(first);
-  const unversioned = items.filter(l => limitsOf(l) && versioned(l) && !/\bversions?\b[^,;]*?\d/i.test(limitsOf(l))).map(first);
+  const unversioned = items.filter(l => limitsOf(l) && versioned(l) && !/\bversions?\W{0,3}v?\d/i.test(limitsOf(l))).map(first);
   const wrong = [
     bare.length && `each input names, after the words "hostile tests:", in backticks, a file or folder of the project that holds them (${CASES}): write those tests where they are missing, and name them so. Naming none that is there: ${bare.join("; ")}.`,
     unlimited.length && `each input names, after the words "limits:", its limit in size, in count and in time, each as a number where it applies, as its reader holds it (or "limits: none", with why, where its shape has none), and its "too long" test uses that number. Naming none: ${unlimited.join("; ")}.`,

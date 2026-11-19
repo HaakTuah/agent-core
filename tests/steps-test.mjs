@@ -344,6 +344,9 @@ ok(!rule5("   - a saved game, its version read first; limits: 1 MB, 5 s, version
 ok(rule5("   - a saved game, its version read first; limits: 1 MB, 5 s, a newer version refused; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1
   && rule5("   - a saved game, its version read first, `limits: version 3`; limits: 1 MB; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1,
   "a version named among the limits with no number, or a version only in backticks, does not read done");
+ok(rule5("   - a saved game, its version read first; limits: 1 MB, a newer version refused, 5 s; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1
+  && rule5("   - a saved game, `limits: x`, its version read first; limits: 1 MB; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1,
+  "a later number in the clause is no version's, and a \"limits:\" in backticks hides none of the item's words");
 ok(!rule5("   - a peer's message, which carries no version number; limits: 64 KB; hostile tests: `tests/hostile/link.test.mjs`.\n").length,
   "an item that says its input carries no version is not asked to name one");
 missedInputs = rule5("   - a saved game, refused without a version; limits: 1 MB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a save, \u001b[31mred\u0007\u009b\u200f\u2028\u202e\u2066\ufeff; limits: 1 MB; hostile tests: none\n");

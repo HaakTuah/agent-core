@@ -15,7 +15,8 @@ Read before a task touches what anyone but the user at hand can shape, and by a 
     them against the reader's code. Whoever names an input, or changes the code that reads one, writes its limits in
     that pull request; an input named without them is a task, which the same step reports. It does not mean a limit
     made up where a shape has none: "limits: none", with why, is an answer, nor a limit for every field, nor that a
-    pull request waits on limits an input lacked before it. Reason: "too long" means nothing until an input says how long is allowed.
+    pull request waits on limits an input lacked before it. Reason: "too long" means nothing until an input says how
+    long is allowed.
 - **Every named input has hostile tests:** too long, the wrong type, markup, a file path, a number
   out of range, and nothing at all, each refused with nothing of it used. Whoever adds an input, or changes the code
   that reads one, writes its tests in that pull request; an input named without them is a task of its own, which the
@@ -29,8 +30,9 @@ Read before a task touches what anyone but the user at hand can shape, and by a 
   knows. Whoever adds such an input, or changes the code that reads one, writes the case in that pull request; an input
   that lacks it is a task, which the same step reports.
   - It does not mean that an input with no version number gains one for this, nor that an older number is refused: how
-    long those are read is the format's own record (#309, point 3). Reason: the rest of this rule guards an input against a stranger,
-    not an older program against a newer one's data, which reaches every user once a second version exists.
+    long those are read is the format's own record (#309, point 3). Reason: the rest of this rule guards an input
+    against a stranger, not an older program against a newer one's data, which reaches every user once a second
+    version exists.
 - **A failure refuses:** where a check cannot be made (who is asking, whether it is allowed, whether
   it is well formed), the answer is no; an error a user sees names nothing of the program's insides (no stack, path,
   query or version).
