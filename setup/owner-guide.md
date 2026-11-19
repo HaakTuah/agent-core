@@ -29,6 +29,10 @@ you can correct it (floor rule 14, `roles/shared/inbox.md`). A yes is asked for:
 A step only you can do, such as a setting on your account, is reported as an issue labelled `needs-owner` and waits for
 you alone; the work goes on without it.
 
+Besides the yeses, one issue asks you a word a month, "The blind sample": ten changes merged the month before, drawn at
+random and shown by their diffs alone, each for a "yes" or a "no" (`README.md`, "What the core is for"). Nothing waits
+on it, and a month you skip is only reported as not answered.
+
 ## How to stop the agents
 
 Create a branch named `agents-stop` on your repository, from any device. Every agent reads it at its start and before
