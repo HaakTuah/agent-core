@@ -385,15 +385,24 @@ function alone(argv, dir, prefix, lib) {
   return 0;
 }
 
-function main(argv) {
-  const dir = process.cwd();
-  if (argv.includes("--hook")) { const line = hookLine(dir); if (line) console.log(line); return 0; }
+// Where the core lies under `dir`, its roles and modules, and the project's manifest; the exit code, said, where the
+// core is not there or a link stands where its rules do.
+function located(dir) {
   const prefix = coreAt(dir);
   if (prefix === null) { console.error("FAIL: the core's roles/ and floor/ are not here as a real folder and file, none of them or the folders above them a link. Mend: run it from the project's root, where core-manifest.md names the core's path, or from the core's own root; where the core's copy is a link, put the copy itself in its place"); return 1; }
   const manifest = prefix ? regular(dir, "core-manifest.md") : null; // (leftOut reads none as no line)
   const all = library(dir, prefix);
   for (const l of all.links) console.error(`FAIL: ${prefix}${l} is a symbolic link where the core's rules stand, and is read as nothing. Mend: put the file or folder itself in its place, or take the link out`);
   if (all.links.length) return 1;
+  return { prefix, all, manifest };
+}
+
+function main(argv) {
+  const dir = process.cwd();
+  if (argv.includes("--hook")) { const line = hookLine(dir); if (line) console.log(line); return 0; }
+  const core = located(dir);
+  if (typeof core === "number") return core;
+  const { prefix, all, manifest } = core;
   const lib = taken(all, leftOut(manifest)), at = f => `${prefix}${f}`, self = `node ${prefix}scripts/reading.mjs`;
   const mode = alone(argv, dir, prefix, lib);
   if (mode !== null) return mode;
