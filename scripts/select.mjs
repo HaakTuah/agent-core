@@ -17,11 +17,22 @@
 // The config is the shape check's (shape.mjs, where()): its "code", "tests", "aliases" and "select" ({ "proof",
 // "whole", "none" }, each git pathspecs).
 //
-//   node core/scripts/select.mjs [<config>] [--failed <file>] [--env <NAME>]
+// A tree that passed is not run again (tasks/tests.md; #457): on a push, given --passed and the name of the check that
+// gates the tests, where HEAD merges a pull request's head whose tree it holds (the head was up to date), the change it
+// brings selects the whole suite, as that pull request's run selected it, and the check passed on that head, nothing is
+// selected. Where any of that cannot be told (no merge of two, a tree that differs, a selection, no answer from the
+// host, a check not passed), the whole suite runs. The check's runs are asked of GitHub (GITHUB_API_URL, the
+// repository GITHUB_REPOSITORY names), with the token GH_TOKEN holds, which needs to read checks and nothing more, and
+// only those GitHub Actions posted count. That the head held the default branch is read from the tree, never assumed:
+// floor rule 12 lets a pull request merge without being brought up to date where users get a release.
+//
+//   node core/scripts/select.mjs [<config>] [--failed <file>] [--env <NAME>] [--passed <check>]
 //       with SELECT_BASE the pull request's base (origin/main, fetched; or HEAD^1 of the merge a pull request's run
 //       checks out): prints what it selected and why; --failed names a file of the tests that failed last time, one
 //       path a line; --env appends NAME=" <test> <test> " (or NAME=all) to the file GITHUB_ENV names, for the steps
-//       that follow. Reads only, but for those two files; git and Node's own modules.
+//       that follow, or NAME=none where nothing is selected; --passed, on a push alone (no SELECT_BASE), names the check
+//       whose pass on the merged head lets the run select nothing. Reads only, but for those two files and that one question to the host; git and Node's own
+//       modules.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -191,20 +202,22 @@ function readFailed(file) {
 
 function said(s, total) {
   if (s.all) return [`The selection: the whole suite, ${total} tests: ${s.why}.`];
+  if (s.none) return [`The selection: none of ${total} tests: ${s.why}.`];
   const lines = [`The selection: ${s.tests.length} of ${total} tests, those the change can reach.`];
   for (const t of s.tests) lines.push(`  ${t}: ${s.why.get(t)}`);
   return lines;
 }
 
-// The words after the config: { "--failed", "--env" }, each where given.
+// The words after the config: { "--failed", "--env", "--passed" }, each where given.
 function options(rest, self) {
   const opts = {};
   for (let i = 0; i < rest.length; i += 2) {
-    if (!["--failed", "--env"].includes(rest[i]) || rest[i + 1] === undefined) refuse(`the selection does not know ${rest.slice(i).join(" ")}`, `run node ${self} [<config>] [--failed <file>] [--env <NAME>]`);
+    if (!["--failed", "--env", "--passed"].includes(rest[i]) || rest[i + 1] === undefined) refuse(`the selection does not know ${rest.slice(i).join(" ")}`, `run node ${self} [<config>] [--failed <file>] [--env <NAME>] [--passed <check>]`);
     opts[rest[i]] = rest[i + 1];
   }
   if (opts["--env"] !== undefined && !/^[A-Z_][A-Z0-9_]*$/u.test(opts["--env"])) refuse(`--env ${JSON.stringify(opts["--env"]).slice(0, 40)} is no name of a variable`, "name it in capitals, digits and _, as RUN");
   if (opts["--env"] !== undefined && !process.env.GITHUB_ENV) refuse("--env was given and GITHUB_ENV names no file", "run it as a step of a workflow, or leave --env out");
+  if (opts["--passed"] !== undefined && !/^[\w .()/-]{1,100}$/u.test(opts["--passed"])) refuse(`--passed ${JSON.stringify(opts["--passed"]).slice(0, 40)} is no name of a check`, "name the check that gates the tests on a pull request, as its job is named, such as tests");
   return opts;
 }
 
@@ -222,26 +235,77 @@ function configOf(at) {
   try { return fs.existsSync(notLinked(at)) ? parseConfig(fs.readFileSync(at, "utf8"), at) : null; } catch { return null; }
 }
 
-function main(argv) {
+// Whether the tree HEAD holds passed whole on the pull request it merges (the header): { none: true, why } where it did,
+// else { all: true, why }. `selects` gives what the change from HEAD's first parent selects; `asked` answers whether
+// the check `check` passed on a commit, from the host.
+export async function passedWhole({ check, selects, asked = askHost }) {
+  let parents;
+  try { parents = git(["rev-list", "--parents", "-n", "1", "HEAD"]).trim().split(" "); } catch { parents = []; }
+  if (parents.length !== 3) return { all: true, why: "HEAD merges no two commits (a squash, a rebase, or no merge), so what ran on a pull request's head cannot be told" };
+  const [, , head] = parents, tree = c => { try { return git(["rev-parse", "--verify", "--quiet", `${c}^{tree}`]).trim(); } catch { return null; } };
+  const at = tree("HEAD");
+  if (!at || at !== tree(head)) return { all: true, why: `the merged head ${head.slice(0, 12)} held another tree: it was not up to date with the branch it merged into` };
+  const s = selects();
+  if (!s.all) return { all: true, why: `the pull request's run selected ${s.tests.length} tests, not the whole suite` };
+  const passed = await asked(head, check);
+  if (passed !== true) return { all: true, why: `the check ${check} did not pass on the merged head ${head.slice(0, 12)}${typeof passed === "string" ? ` (${passed})` : ""}` };
+  return { none: true, why: `the merged head ${head.slice(0, 12)} held this tree, ran the whole suite and passed ${check} on it: a tree that passed is not run again` };
+}
+
+// The newest of a check's runs on one head, which decides, as it does for a ruleset: a draft's gate fails by design and
+// the run started when the pull request was marked ready, on the same head, is the newer (#733). A run with no start
+// time reads as the oldest; of two that started together, the higher id.
+const startOf = run => (typeof run?.started_at === "string" ? Date.parse(run.started_at) || 0 : 0);
+const newestOf = runs => runs.reduce((a, b) => (startOf(b) > startOf(a) || (startOf(b) === startOf(a) && Number(b?.id ?? 0) > Number(a?.id ?? 0)) ? b : a));
+
+// Whether the check `check` passed on the commit `sha`, as the host says: true; else what kept it from saying so.
+async function askHost(sha, check) {
+  const api = process.env.GITHUB_API_URL || "https://api.github.com", repo = process.env.GITHUB_REPOSITORY || "", token = process.env.GH_TOKEN || "";
+  if (!/^[\w.-]+\/[\w.-]+$/u.test(repo) || !token) return "no repository or token to ask the host with (GITHUB_REPOSITORY, GH_TOKEN)";
+  try {
+    const r = await fetch(`${api}/repos/${repo}/commits/${sha}/check-runs?check_name=${encodeURIComponent(check)}&filter=latest&per_page=100`,
+      { headers: { authorization: `Bearer ${token}`, accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(20000) });
+    if (!r.ok) return `the host answered ${r.status}`;
+    const runs = (await r.json())?.check_runs;
+    if (!Array.isArray(runs) || !runs.length) return "the host knows no such run";
+    // (only GitHub Actions' own runs: an app of another's, or a check of that name it posts, says nothing of the suite)
+    const ours = runs.filter(run => run?.app?.slug === "github-actions");
+    if (!ours.length) return "no run of it by GitHub Actions";
+    const newest = newestOf(ours);
+    return (newest?.name === check && newest?.status === "completed" && newest?.conclusion === "success") || "its newest run did not pass";
+  } catch (e) { return `the host could not be asked: ${String(e?.message ?? e).slice(0, 80)}`; }
+}
+
+// What a run takes, { all, why, tests }: the whole suite where the config cannot be read or no base is told, what the
+// change from the base selects, or, on a push given --passed (`passed`), nothing where the merged tree passed whole.
+async function chosen({ config, at, base, passed, select }) {
+  if (passed !== undefined && base) refuse("--passed was given with SELECT_BASE: a pull request's run is never skipped", "give --passed only on a push to the default branch, with SELECT_BASE empty");
+  if (!config) return { all: true, why: `the shape check's config (${at}) cannot be read, so what each test reaches cannot be told` };
+  if (base) return select(base);
+  if (passed === undefined) return { all: true, why: "no base is told (SELECT_BASE), as on main, on a schedule and before a release" };
+  const s = await passedWhole({ check: passed, selects: () => select("HEAD^1") });
+  return s.none ? { ...s, all: false, tests: [] } : s;
+}
+
+async function main(argv) {
   const self = path.relative(process.cwd(), fileURLToPath(import.meta.url)).replace(/\\/gu, "/");
   const named = argv[0] && !argv[0].startsWith("--") ? argv[0] : null, opts = options(named ? argv.slice(1) : argv, self);
   const rules = ["core-manifest.md", "AGENTS.md"].find(f => fs.existsSync(f));
   const at = named ?? where(rules ? fs.readFileSync(rules, "utf8") : ""), base = baseOf(), config = configOf(at);
   const now = config ? standing(config) : null, failed = readFailed(opts["--failed"]);
-  const s = !config ? { all: true, why: `the shape check's config (${at}) cannot be read, so what each test reaches cannot be told` }
-    : !base ? { all: true, why: "no base is told (SELECT_BASE), as on main, on a schedule and before a release" }
-    : selection({ changed: changedSince(base), texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests)), unread: unreadConftests(now.texts), failed, config });
+  const s = await chosen({ config, at, base, passed: opts["--passed"], select: from => selection({ changed: changedSince(from), texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests)), unread: unreadConftests(now.texts), failed, config }) });
   // (a name the variable cannot hold as one word, a space or a line's end in it, runs the whole suite: no file's name
   // sets another variable for the steps after it)
   if (!s.all && s.tests.some(t => !PLAIN.test(t))) Object.assign(s, { all: true, why: "a test's file name holds what a list of names cannot (a space or a line's end)" });
   const lines = said(s, now ? now.tests.size : "all its");
   console.log(lines.join("\n"));
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
-  if (opts["--env"]) fs.appendFileSync(process.env.GITHUB_ENV, `${opts["--env"]}=${s.all ? "all" : ` ${s.tests.join(" ")} `}\n`);
+  // (nothing selected is "none", as everything is "all": a runner given an empty list would run every test)
+  if (opts["--env"]) fs.appendFileSync(process.env.GITHUB_ENV, `${opts["--env"]}=${s.all ? "all" : s.none ? "none" : ` ${s.tests.join(" ")} `}\n`);
   return 0;
 }
 
 if (started(import.meta.url)) {
-  try { process.exitCode = main(process.argv.slice(2)); }
+  try { process.exitCode = await main(process.argv.slice(2)); }
   catch (e) { if (!(e instanceof Refused)) throw e; console.error(`FAIL: ${logged(e.message)}`); process.exitCode = 1; }
 }

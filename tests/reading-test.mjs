@@ -117,8 +117,8 @@ ok(eq(asked("**What it is**\nAn idea, `not this`.\n\n**What to read**\nThe kinds
 // the core's own files, and the script run
 const run = (cwd, ...args) => { const r = spawnSync(process.execPath, [file, ...args], { cwd, encoding: "utf8", env: { ...process.env, GITHUB_REPOSITORY: "" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 const core = library(root, "");
-ok(coreAt(root) === "" && run(root, "--check").status === 0 && /each of the \d+ modules and 5 roles says when it is read/.test(run(root, "--check").out), "in the core, every module and role says when it is read", run(root, "--check").out);
-ok(["builder", "design", "orchestrator", "reviewer", "stand-in"].every(r => !reading(core, { role: r }).error) && [...kindsOf(core).values()].flat().every(f => fs.existsSync(path.join(root, f))), "the core has a file for each of its five roles, and every kind leads to files that stand");
+ok(coreAt(root) === "" && run(root, "--check").status === 0 && /each of the \d+ modules and 6 roles says when it is read/.test(run(root, "--check").out), "in the core, every module and role says when it is read", run(root, "--check").out);
+ok(["adviser", "builder", "design", "orchestrator", "reviewer", "stand-in"].every(r => !reading(core, { role: r }).error) && [...kindsOf(core).values()].flat().every(f => fs.existsSync(path.join(root, f))), "the core has a file for each of its six roles, and every kind leads to files that stand");
 let r = run(root, "builder", "--tool", "claude");
 ok(r.status === 0 && /^Read at the start, in the role builder \(each whole\):\n  floor\/security\.md\n  roles\/builder\.md\n/.test(r.out) && /  tools\/claude\.md\n/.test(r.out) && !/tools\/other-builders\.md/.test(r.out) && /Nothing more is called for by this task as given\./.test(r.out), "run for a builder, it prints the start, the tool's part in it", r.out);
 r = run(root, "reviewer", "--kind", "security-review", "--path", ".github/workflows/tests.yml", "--kind", "nonesuch");
@@ -133,7 +133,7 @@ process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
 const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
 const git = (...args) => execFileSync("git", args, { cwd: project, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-for (const part of ["floor", "tasks", "roles", "scripts", "third-party"]) fs.cpSync(path.join(root, part), path.join(project, "core", part), { recursive: true });
+for (const part of ["floor", "tasks", "roles", "scripts", ".packages"]) fs.cpSync(path.join(root, part), path.join(project, "core", part), { recursive: true });
 fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\nFloor: whole. Modules: `screens.md`, `updates.md`, `choices.md`, `helpers.md`, `reviews.md`, `tools.md`.\nNot taken: `game-design.md` (no game).\n");
 fs.mkdirSync(path.join(project, "checks"));
 fs.writeFileSync(path.join(project, "checks", "reading.json"), `${JSON.stringify({ paths: { "src/screens/": "screen" } })}\n`);

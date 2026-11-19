@@ -1,16 +1,23 @@
 // The stalled lanes (roles/orchestrator.md, "A stalled lane"; core archive 200): run in a project's clone on every
 // wake of its orchestrator, it reads the repository's open pull requests (gh, page by page) and the time of each one's
 // newest commit, and prints those whose branch has had no push for longer than the given hours (HOURS unless --hours
-// says otherwise), oldest first, so that no session's word that a lane is "running" stands in for the clock. Pull requests
-// from a fork and Dependabot's own are no lanes and are left out. It prints one line when none has stalled, reads
+// says otherwise), oldest first, so that no session's word that a lane is "running" stands in for the clock, each
+// marked where its description holds no hand-off note (tasks/tools.md, "A change of tool loses nothing"; #306), the
+// line "Hand-off:" the fresh builder reads first. Pull requests from a fork and Dependabot's own are no lanes and are
+// left out. It prints one line when none has stalled, reads
 // only, posts nothing and always exits 0 where it could read: what to do with a stalled lane stays the orchestrator's.
 // gh and Node's own modules.
 //
 //   node core/scripts/stalled.mjs [--hours N] [--repo owner/name]
 import { execFileSync } from "node:child_process";
 import { REPO } from "./core-cost.mjs";
+import { read } from "./queue.mjs";
 import { timeOf } from "./moment.mjs";
 import { started } from "./started.mjs";
+
+// A description's hand-off note: a line that opens "Hand-off:", bare, bold, a heading or an item of a list.
+export const HAND_OFF = /^(?:[-*] |#{1,6} )?(?:\*\*)?Hand-off:/mu;
+export const handedOff = body => HAND_OFF.test(typeof body === "string" ? body : "");
 
 // How long a lane may go without a push before it counts as stalled, unless --hours says otherwise.
 export const HOURS = 3;
@@ -31,23 +38,23 @@ const plain = text => String(text ?? "").replace(/[\u0000-\u001f\u007f-\u009f]/g
 export function print(lanes, open, hours) {
   if (!lanes.length) return `No lane stalled: ${open} open, none without a push for over ${hours} h.`;
   return [`Stalled, no push for over ${hours} h: ${lanes.length} of ${open} open`,
-    ...lanes.map(l => `  #${l.number} ${plain(l.ref)}: ${l.waited.toFixed(1)} h since ${l.at} (${plain(l.title)})`)].join("\n");
+    ...lanes.map(l => `  #${l.number} ${plain(l.ref)}: ${l.waited.toFixed(1)} h since ${l.at} (${plain(l.title)})${handedOff(l.body) ? "" : "; no hand-off note"}`)].join("\n");
 }
 
 // The open pull requests of `repo`, through `api` (gh api's route and --jq, as main gives it), page by page, since a
 // cloud session's gh cannot follow pages by itself: each { number, title, ref, sha, own, draft, body, labels, at }, `at`
 // the time of its newest commit where its branch is in this repository. Also read by the scheduled look (look.mjs).
-// The work standing still (roles/orchestrator.md, "Never held back in silence"; #471): the lines of the *progress file*
-// a session could take (a row of a table that names an issue, waits on nothing, and is not the owner's or on hold),
-// where no pull request of the repository's own was pushed in the last `hours` (a day by default) and no issue titled
-// NOTICE is open, the orchestrator's word to the owner that it holds builders back. [issue numbers], or null where the
-// work goes on, a notice says why it does not, or no line could be taken.
+// The work standing still (roles/orchestrator.md, "Never held back in silence"; #471): the *progress file*'s next line,
+// as its readers read it (queue.mjs's `read`, given `closed`: a closed issue's line skipped, one held for the owner, or
+// waiting on anything open or on a hold, not taken), where no pull request of the repository's own was pushed in the
+// last `hours` (a day by default) and no issue titled NOTICE is open, the orchestrator's word to the owner that it holds
+// builders back. The issue numbers that line names first, or null where the work goes on, a notice says why it does
+// not, or no line could be taken.
 export const NOTICE = "Builders held back for usage";
-export function standingStill({ queue, pulls, notices, now, hours = 24 }) {
+export function standingStill({ queue, closed, pulls, notices, now, hours = 24 }) {
   if (notices.some(t => String(t).startsWith(NOTICE))) return null;
-  if (pulls.some(p => p.own && p.at && now - Date.parse(p.at) < hours * 3600 * 1000)) return null;
-  const free = String(queue ?? "").split(/\r?\n/u).map(l => /^\|\s*#(\d{1,7})\b[^|]*\|([^|]*)\|\s*\|\s*$/u.exec(l)).filter(m => m && !/\bthe owner\b|\bon hold\b/iu.test(m[2])).map(m => Number(m[1]));
-  return free.length ? [...new Set(free)] : null;
+  if (pulls.some(p => p.own && timeOf(p.at) !== null && now - timeOf(p.at) < hours * 3600 * 1000)) return null;
+  return read(String(queue ?? ""), closed).next?.issues ?? null;
 }
 
 export function openPulls(repo, api) {

@@ -1,115 +1,34 @@
 // What the upgrade test stands on (upgrade-test.mjs): it runs a workflow of the core's as GitHub would run it for a
 // project, job by job and step by step, so that the test runs each check's own shell and not a copy of it. It reads
-// the YAML the core's workflows are written in (block mappings and sequences, block scalars, plain and quoted scalars,
-// flow sequences, comments), evaluates GitHub's expressions (`${{ }}`: contexts, literals, ! == != && || and the
-// functions the core's workflows use), and runs each job whose `if` holds, a job for each combination of its matrix:
-// each `run` step in bash as GitHub runs it (with -e, and pipefail where its shell is named bash), its env and its
-// expressions filled in, its outputs read from GITHUB_OUTPUT; each `uses`
-// step by a handler the caller gives for that action, or not at all, said so. A context, function or form it does not
-// know throws, so a workflow the core changes in a way this cannot read fails the test, and is taught here, rather than
-// running other than GitHub would. Run by the tests, and by check.mjs, which runs the core's checks from plain git where
-// no GitHub runs them (tasks/hosts.md); no workflow of the core's runs it. Node's own modules.
+// the workflow's YAML with the YAML package (parseYaml), evaluates GitHub's expressions (`${{ }}`: contexts, literals,
+// ! == != && || and the functions the core's workflows use), and runs each job whose `if` holds, a job for each
+// combination of its matrix: each `run` step in bash as GitHub runs it (with -e, and pipefail where its shell is named
+// bash), its env and its expressions filled in, its outputs read from GITHUB_OUTPUT; each `uses` step by a handler the
+// caller gives for that action, or not at all, said so. A context or function it does not know throws, so a workflow
+// the core changes in a way this cannot read fails the test, and is taught here, rather than running other than GitHub
+// would. Its runner is run by the tests, and by check.mjs, which runs the core's checks from plain git where no GitHub
+// runs them (tasks/hosts.md); no workflow of the core's runs it. Its reader of YAML is used too by the scripts that read
+// a project's workflows (steps.mjs, checks.mjs, check-configs.mjs, pruning.mjs). Node's own modules, and the YAML
+// package.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { installed, loadSync } from "./packages.mjs";
 
-// ---- YAML, as the core's workflows write it ----
+// ---- YAML ----
 
-const strip = line => { // a comment after a value: " #" outside quotes
-  let q = "";
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (q) { if (c === q) q = ""; continue; }
-    if ((c === '"' || c === "'") && (i === 0 || /[\s:[,{-]/.test(line[i - 1]))) q = c;
-    else if (c === "#" && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i).trimEnd();
-  }
-  return line.trimEnd();
-};
-function scalar(text) {
-  const t = text.trim();
-  if (t.startsWith("'")) { if (!t.endsWith("'") || t.length < 2) throw new Error(`a quoted value not ended: ${t}`); return t.slice(1, -1).replace(/''/g, "'"); }
-  if (t.startsWith('"')) { if (!t.endsWith('"') || t.length < 2) throw new Error(`a quoted value not ended: ${t}`); return JSON.parse(t); }
-  if (t.startsWith("[")) {
-    if (!t.endsWith("]")) throw new Error(`a flow sequence not ended: ${t}`);
-    const inner = t.slice(1, -1).trim();
-    return inner ? inner.split(",").map(scalar) : [];
-  }
-  if (t.startsWith("{") || t.startsWith("&") || t.startsWith("*") || t.startsWith("!")) throw new Error(`a YAML form this reader does not know: ${t}`);
-  if (t === "true" || t === "false") return t === "true";
-  if (t === "" || t === "null" || t === "~") return null;
-  if (/^-?\d+$/.test(t)) return Number(t);
-  return t;
-}
-
-// A key set as the mapping's own, even where it is __proto__, which a plain assignment would take as its prototype.
-const own = (map, key, value) => Object.defineProperty(map, key, { value, enumerable: true, writable: true, configurable: true });
-/** The workflow's YAML as plain values (keys as written: `on` stays the string "on"). */
+/** The workflow's YAML as plain values, read by the YAML package the core installs from its lock file (packages.mjs;
+ *  #530): YAML 1.2's core schema, as GitHub reads a workflow (keys as written: `on` stays the string "on", and a key
+ *  `__proto__` is the mapping's own). A key given twice, or more than one document, throws, as GitHub refuses either;
+ *  a text with no value is an empty mapping. Where the package is not installed, it throws, saying so. */
 export function parseYaml(text) {
-  const raw = text.replace(/\r\n/g, "\n").split("\n");
-  let i = 0;
-  const indentOf = l => l.length - l.trimStart().length;
-  const blank = l => l.trim() === "" || l.trim().startsWith("#");
-  const next = () => { while (i < raw.length && blank(raw[i])) i++; return i < raw.length ? raw[i] : null; };
-
-  function block(header, parent) { // a block scalar: | or > with its chomping
-    const style = header[0], chomp = header.includes("-") ? "strip" : header.includes("+") ? "keep" : "clip";
-    const lines = [];
-    let at = null;
-    while (i < raw.length) {
-      const l = raw[i];
-      if (l.trim() === "") { lines.push(""); i++; continue; }
-      const n = indentOf(l);
-      if (n <= parent) break;
-      at ??= n;
-      if (n < at) break;
-      lines.push(l.slice(at));
-      i++;
-    }
-    while (chomp !== "keep" && lines.length && lines.at(-1) === "") lines.pop();
-    let out = style === "|" ? lines.join("\n")
-      : lines.reduce((acc, l, k) => (k === 0 ? l : l === "" ? `${acc}\n` : acc.endsWith("\n") ? acc + l : `${acc} ${l}`), "");
-    if (chomp !== "strip" && lines.length) out += "\n";
-    return out;
-  }
-
-  function value(rest, indent) { // what follows "key:" or "- "
-    const r = strip(rest);
-    if (/^[|>][-+]?$/.test(r)) return block(r, indent);
-    if (r !== "") return scalar(r);
-    const l = next();
-    if (l === null) return null;
-    const n = indentOf(l);
-    if (n > indent || (n === indent && l.trimStart().startsWith("- "))) return node(n);
-    return null;
-  }
-
-  function node(indent) {
-    const first = next();
-    if (first.trimStart().startsWith("- ") || first.trim() === "-") {
-      const list = [];
-      for (let l = next(); l !== null && indentOf(l) === indent && (l.trimStart().startsWith("- ") || l.trim() === "-"); l = next()) {
-        const content = l.trimStart().slice(2);
-        if (/^[\w.-]+:(\s|$)/.test(content)) { // a mapping that starts on the dash's line
-          raw[i] = " ".repeat(indent + 2) + content;
-          list.push(node(indent + 2));
-        } else { i++; list.push(value(content, indent)); }
-      }
-      return list;
-    }
-    const map = {};
-    for (let l = next(); l !== null && indentOf(l) === indent && !l.trimStart().startsWith("- "); l = next()) {
-      const m = /^([\w.-]+|"[^"]*"|'[^']*'):(?:\s(.*)|$)/.exec(l.trimStart());
-      if (!m) throw new Error(`a line this reader does not know: ${l.trim()}`);
-      i++;
-      own(map, scalar(m[1]), value(m[2] ?? "", indent));
-    }
-    const l = next();
-    if (l !== null && indentOf(l) > indent) throw new Error(`a line indented where no value begins: ${l.trim()}`);
-    return map;
-  }
-
-  return next() === null ? {} : node(indentOf(next()));
+  // (where the package is not installed it throws, never stops the process, so a reader that asks, as the steps do,
+  // reports the file as not read and goes on)
+  if (!installed("yaml")) throw new Error("the check did not run: the package yaml is not installed beside the core's copy, so no YAML can be read. Mend: run the core's scripts/install.mjs (in a project, node core/scripts/install.mjs), then run this again");
+  const { parse } = loadSync("yaml"); // (loaded where it is used: no import of this file needs it)
+  // (an error throws, for the caller to say; a warning prints nothing, since it would print the workflow's own line)
+  return parse(text, { schema: "core", uniqueKeys: true, logLevel: "error" }) ?? {};
 }
 
 // ---- GitHub's expressions ----

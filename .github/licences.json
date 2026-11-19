@@ -1,5 +1,8 @@
 {
+  "lockfiles": [".packages/package-lock.json", ".packages/parser/package-lock.json", "tests/mutation/package-lock.json"],
+  "ignoreScriptsIn": [".packages/.npmrc", ".packages/parser/.npmrc", "tests/mutation/.npmrc"],
   "ships": [],
+  "data": ["spdx-exceptions", "caniuse-lite"],
   "audit": ".github/licences-audit.json",
   "scan": {
     "served": [],
@@ -10,7 +13,8 @@
       "tests/licence-scan-test.mjs",
       "tests/licence-fetch-test.mjs",
       "scripts/agent-tools.mjs",
-      "tests/agent-tools-test.mjs"
+      "tests/agent-tools-test.mjs",
+      "scripts/npm-once.mjs"
     ]
   },
   "agentTools": [

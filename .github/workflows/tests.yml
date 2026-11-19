@@ -1,61 +1,114 @@
-# The core's scripts' own tests, and its own licence audit and copies check, on every pull request here and every push
-# to main, on Linux and on Windows, where a project built there runs the scripts and both hooks (in Git Bash, as Claude
-# Code does). Every suite runs though another failed, so one run shows them all. This repository only; no project calls
-# it. Reads only, with no secret; nothing is installed. The suites run on the core's one exact Node, the pin
+# The core's scripts' own tests, and its own licence audit and copies check, on Linux and on Windows, where a project
+# built there runs the scripts and both hooks (in Git Bash, as Claude Code does). When each runs (#733): on a pull
+# request once it is marked ready and on each push after, never on a draft, on Linux alone, the suites its change can
+# reach; on each push to main, on Linux, main tested at its newest commit, a run giving way to the next merge's; once an
+# hour, on Windows, at main's newest commit where its full run has not already passed there, with the tests that reach
+# the network on both, which no pull request's run or push's carries (tasks/tests.md, "A test that reaches the network
+# runs once per batch"; #733, point 9); and in full on both, on a start by hand. A release waits on the tests' full
+# runs on its commit, hourly or by hand: none unfinished, the newest passed (.github/workflows/release.yml,
+# scripts/release.mjs). Every suite runs though another failed, so one run shows them all. This repository only; no project calls it. Reads only, with no secret; nothing is installed but the
+# core's own packages, below. The suites run on the core's one exact Node, the pin
 # (.node-version), and on the least long-term Node its scripts promise to run on (.node-least, which scripts/node.sh
-# keeps on a machine that holds it; #526): on Linux on every run, on Windows on a push to main; the upgrade test and the
-# staged cases on the pin alone. One suite writes and builds a .NET project with the .NET SDK the runner holds, in a
-# scratch folder, and takes a few packages from nuget.org for it (tests/init-dotnet-test.mjs). Another writes
-# projects with the starter kit of each of the last two releases, syncs them to the commit under test and runs every
-# check of the core on them, taking one package from npm's registry (tests/upgrade-test.mjs): it reads the core's
-# whole history and its release tags, so its checkout fetches them, and it runs in a job of its own, beside the suites,
-# since on Windows it takes as long as a third of them, and there in two jobs, a part of it each. The staged cases'
-# test, which writes a scratch project with the starter kit for each case it reads, runs after it in that job, on
-# Windows half after each part (#508).
-# A third takes four packages from npm's registry, each at one exact version and held to its sha512 before it is
-# unpacked, with no script of theirs run: the reference parsers the hand-written readers are held to, tools that only
-# run, in the core's audit (tests/readers-test.mjs, on Linux).
-# A fourth asks npm's registry of each package the core carries in third-party/ and fetches its tarball, held to its
-# sha512 before it is unpacked, to hold each carried file to it (tests/third-party-test.mjs, on Linux).
-# Each job of the suites, two on Linux and seven on Windows on each Node, and the upgrade test, are each held to a time
-# mark (the "suites" of .github/shape.json, by scripts/shape.mjs; tasks/tests.md, "The tests have a time mark").
+# keeps on a machine that holds it; #526); the upgrade test and the staged cases on the pin alone. One suite writes and
+# builds a .NET project with the .NET SDK the runner holds, in a scratch folder, and takes a few packages from nuget.org
+# for it (tests/init-dotnet-test.mjs). Another writes projects with the starter kit of each of the last two releases,
+# syncs them to the commit under test and runs every check of the core on them, taking one package from npm's registry
+# (tests/upgrade-test.mjs): it reads the core's whole history and its release tags, so its checkout fetches them, and it
+# runs in two jobs of its own, a part of it each, beside the suites, here on Linux alone; on Windows, where it set the
+# length of every run, the release workflow runs it once a day and before each release (#715), since what it guards
+# reaches a project only through a release. The staged cases' test, which writes a scratch project with the starter kit
+# for each case it reads, runs in thirds: on Linux one after another in a job of their own beside the upgrade test's,
+# and on Windows in three jobs of the same name (#508, #715).
+# A third runs the reference parsers the hand-written readers are held to, tools that only run, the devDependencies of
+# the core's lock file, which its own jobs install and a copy does not (tests/readers-test.mjs, on Linux).
+# Each job first installs the core's own packages from its lock files in .packages/, the parser's in .packages/parser/
+# among them (#719), from npm's registry, running no install script (scripts/install.mjs; #654), and a fourth holds that install: its lock file's form, nothing of another publisher's
+# tracked, and each script that loads a package saying it did not run where none is installed (tests/packages-test.mjs).
+# Once, on Linux, the core's own lock files are held as a project's are: each package it brings looked up in npm's
+# registry (scripts/lookup.mjs), and the registry's signature on each installed one (npm audit signatures); the
+# mutation tool's in tests/mutation/ in the job that installs it, the step after its install.
+# Each job of the suites, three on Linux and eight on Windows on each Node, the network's on both, and the upgrade
+# test, are measured against a time mark (the "suites" of .github/shape.json, by scripts/shape.mjs), which a job past
+# it says as a warning and never fails on (tasks/tests.md, "A time mark measures and never fails"; #733, point 5).
 # On a pull request each job runs only the suites its change can reach, against the merge's first parent, its base, and
-# says on its summary what it ran; a push to main, and a re-run, runs every suite (scripts/select.mjs; tasks/tests.md,
-# "A pull request runs the tests its change can reach"); the checks of the core itself, each a step of its own after
-# the suites, run every time.
-# After them, on Linux, the core's own mutation tool puts faults into the lines a pull request changes and runs the
-# tests that name each file against them (scripts/strength.mjs with scripts/mutate.mjs; tasks/code-shape.md, "How
-# strong the tests are"), in working copies of its own, with no secret.
+# says on its summary what it ran; a push to main, the hourly run, a start by hand and a re-run run every suite
+# (scripts/select.mjs; tasks/tests.md, "A pull request runs the tests its change can reach"), but a push's first run
+# that merges a pull request's head whose tree it holds, whose change selected every suite and whose check "tests"
+# passed there runs none of the suites that pull request ran (select.mjs --passed, which asks GitHub of that check with
+# the run's token, given to it on a push alone, that token reading checks besides the contents; tasks/tests.md, "A tree
+# that passed is not run again"; #457); the upgrade test and the staged cases, which read the release tags and the day,
+# never in the tree, run on every push; and the checks of the core itself, each a step of its own after the suites, run
+# every time.
+# After them, on Linux, in the job of the suites projects and sync on the pin, the core's mutation tool, Stryker, installed
+# there from its own lock file in tests/mutation/, puts faults into the lines a pull request changes and runs the tests
+# that name each file against them (scripts/strength.mjs with scripts/stryker.mjs; tasks/code-shape.md, "How strong the
+# tests are"), in a working copy of its own, with no secret.
 name: tests
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-# (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is; a push to main
-# is its own group and is never cancelled; #388)
+# (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is, #388; a run on
+# main after a merge gives way to the next merge's, main being tested at its newest commit only, #733, point 4; the
+# hourly runs are one group that waits rather than cancels, so a long one finishes and the next, on the same commit,
+# skips itself where it passed; a start by hand is a group of its own and never cancelled)
 concurrency:
-  group: tests-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: tests-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.event_name == 'push' || github.event_name == 'schedule') && format('{0}-main', github.event_name) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 jobs:
+  # (the hourly run tests main's newest commit on Windows only where main moved: it skips only where no other full run
+  # on this commit, hourly or by hand, is still going and the newest of them, by when it last started (a re-run moves it),
+  # passed; where one failed, none ran or one still runs, it runs. A skipped run is then the newest only where nothing
+  # started after it,
+  # and the release, which holds while any full run is unfinished and reads the newest (release.mjs, fullRun), never
+  # reads a failure away; where that cannot be read, it runs; #733, point 6)
+  moved:
+    if: ${{ github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: read
+    outputs:
+      run: ${{ steps.moved.outputs.run }}
+    steps:
+      - name: Whether main moved since the tests last passed on it in full
+        id: moved
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # (every page of them, so a re-run of an older one is read however many stand there; a page that cannot be
+          # read leaves the answer empty, and the run happens)
+          list=$(mktemp) done=""
+          if gh api --paginate -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$GITHUB_SHA" -f branch=main -F per_page=100 --jq '.workflow_runs[] | select((.event == "schedule" or .event == "workflow_dispatch") and ((.id | tostring) != env.GITHUB_RUN_ID))' > "$list"; then
+            done=$(jq -rs 'if any(.[]; .status != "completed") then "running" else (sort_by([.run_started_at // "", .id]) | last | .conclusion // "none") end' "$list" || true)
+          fi
+          echo "the full runs on $GITHUB_SHA, hourly or by hand, but this one: ${done:-not read} (the newest, or running where one still is)"
+          if [ "$done" = success ]; then echo "run=false" >> "$GITHUB_OUTPUT"; else echo "run=true" >> "$GITHUB_OUTPUT"; fi
+
   # (the suites are split in parts that run side by side, each under a time mark of its own: the core's checks from
   # plain git on whole scratch projects, with the hostile tests of the core's inputs (projects); the sync and its proof
   # (sync); the starter kit (kit); the steps' test (steps); the check of the core's copy (core.yml) on scratch projects (core), on
   # Windows in two halves of its test, the faults it names and where the copy stands (faults, places); the
   # personal-terms check's own job (terms); the licence, NuGet and lookup (and its lookup again) checks, with the hostile
-  # tests of build files and packages (licences); the agent-tools check (tools), on Windows beside the rest, since its
-  # cases outgrew the licences' mark there and the faults half has no room for them (#603); and the rest (rest). Each
-  # step's condition names its part in the job's list "parts", read by substring: no name holds another, but that core
-  # is named beside its half. On Windows, where a suite that starts many processes runs several times slower, a job
-  # takes kit with steps, the second half with terms, the rest with tools, and each other part alone; on Linux two jobs
-  # take them, kit, core, licences, terms and tools in one, projects, sync, rest and steps,
-  # with the steps run once on Linux, in the other, which keeps the name of the suite that was whole and so its mark,
-  # lowered. Each part is sized by its steps' times on the slow runner, which takes half as long again as another, so
+  # tests of build files and packages (licences); the agent-tools check (tools), on Windows alone, since its cases
+  # outgrew the licences' mark there (#603) and then, beside the rest, the rest's (#647); the tests that reach the
+  # network, in a job of their own on each system once an hour (network); and the rest (rest). Each step's condition
+  # names its part in the job's list "parts", read by substring: no name holds another, but that core is named beside
+  # its half. On Windows, where a suite that starts many processes runs several times slower, a job
+  # takes kit with steps, the second half with terms, and each other part alone; on Linux three jobs
+  # take them, kit, core, licences, terms and tools in one, projects and sync in the second, which keeps the name of the
+  # suite that was whole and so its mark, lowered, and rest and steps, the steps run once on Linux, in the third, since
+  # with the parser reading C# the second passed its mark (#529). Each part is sized by its steps' times on the slow runner, which takes half as long again as another, so
   # that it ends within its mark there too, no mark raised: on Windows, by #506's run on 02b9c4e, about 375 of 600, 320
   # of 600, 135 and 265 of 450, 300 of 450 and 240 of 480 seconds; on Linux, by that run, about 160 and 160 of 240
   # (#504). The sync left projects in #540, when projects took 583 of its 600 seconds on a slow runner, its two longest
@@ -63,24 +116,22 @@ jobs:
   # longer; #387, #405, #411, #424, #425, #489, #504, #540)
   suites:
     name: suites (${{ matrix.os }}, ${{ matrix.parts }}${{ matrix.node == '.node-least' && ', the least Node' || '' }})
+    needs: moved
+    # (no run on a draft, #733, point 2; the hourly one only where main moved)
+    if: ${{ !cancelled() && !(github.event_name == 'pull_request' && github.event.pull_request.draft) && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}
     strategy:
       fail-fast: false
-      # (each job on the pin and on the least long-term Node, the file setup-node reads; on a pull request the seven on
-      # Windows on the pin alone, the least's there kept for a push to main; #526)
+      # (each job on the pin and on the least long-term Node, the file setup-node reads, #526; on a pull request and a
+      # push to main the three on Linux alone, on the hourly run the eight on Windows and the network's on both, and on
+      # a start by hand all of them; #733, points 3, 6 and 9)
+      # (set whole for each event, since GitHub adds back an entry of `include` that matches no combination left after
+      # `exclude`: each job named with its Node, its suite, its runner and its parts)
       matrix:
-        node: [.node-version, .node-least]
-        suite: [suites-kit-core-licences, suites, suites-projects, suites-sync, suites-kit, suites-core, suites-core-places, suites-licences, suites-rest]
-        include:
-          - { suite: suites-kit-core-licences, os: ubuntu-latest, parts: kit core licences terms tools }
-          - { suite: suites, os: ubuntu-latest, parts: projects sync rest steps }
-          - { suite: suites-projects, os: windows-latest, parts: projects }
-          - { suite: suites-sync, os: windows-latest, parts: sync }
-          - { suite: suites-kit, os: windows-latest, parts: kit steps }
-          - { suite: suites-core, os: windows-latest, parts: core faults }
-          - { suite: suites-core-places, os: windows-latest, parts: core places terms }
-          - { suite: suites-licences, os: windows-latest, parts: licences }
-          - { suite: suites-rest, os: windows-latest, parts: rest tools }
-        exclude: ${{ github.event_name == 'pull_request' && fromJSON('[{"node":".node-least","suite":"suites-projects"},{"node":".node-least","suite":"suites-sync"},{"node":".node-least","suite":"suites-kit"},{"node":".node-least","suite":"suites-core"},{"node":".node-least","suite":"suites-core-places"},{"node":".node-least","suite":"suites-licences"},{"node":".node-least","suite":"suites-rest"}]') || fromJSON('[]') }}
+        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"}]' || github.event_name == 'schedule' && '[{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-version","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-version","suite":"suites-network","os":"windows-latest","parts":"network"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-least","suite":"suites-network","os":"windows-latest","parts":"network"}]' || '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-version","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-version","suite":"suites-network","os":"windows-latest","parts":"network"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-least","suite":"suites-network","os":"windows-latest","parts":"network"}]') }}
+    # (the run's token reads the checks too: the selection asks whether "tests" passed on the merged head, on a push)
+    permissions:
+      contents: read
+      checks: read
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     defaults:
@@ -94,10 +145,17 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: ${{ matrix.node }}
-      - name: The suites this change can reach (on main, and in a re-run, every one)
+      - name: The core's packages, installed from its lock files for the suites, the parser's among them (#654, #719)
+        id: install
+        run: node scripts/install.mjs all
+      - name: The suites this change can reach (on main, and in a re-run, every one, but none where the merged head passed this tree whole)
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
-        run: node scripts/select.mjs .github/shape.json --env RUN
+          # (on a push's first run, whose jobs a pull request also runs, all on Linux: the check whose pass on the merged
+          # head, whose tree this push holds, lets the suites select nothing; #457)
+          SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}
+          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}
+        run: node scripts/select.mjs .github/shape.json --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}
       - name: The second the suites start at, for their time mark
         run: echo "SUITES_START=$(date +%s)" >> "$GITHUB_ENV"
       - name: The versions check
@@ -119,7 +177,7 @@ jobs:
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-test.mjs ')) }}
         run: node tests/nuget-test.mjs
       - name: The NuGet check's fetch before the restore, against each package's content hash
-        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-fetch-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-fetch-test.mjs ')) }}
         run: node tests/nuget-fetch-test.mjs
       - name: The hand-written readers, against SPDX's own parser and an XML parser (on Linux, where tar unpacks them)
         if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/readers-test.mjs ')) }}
@@ -133,9 +191,9 @@ jobs:
       - name: The lookup again of what a project holds, on recorded answers
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/held-test.mjs ')) }}
         run: node tests/held-test.mjs
-      - name: The packages the core carries, against npm's registry (on Linux, where tar unpacks them)
-        if: ${{ !cancelled() && runner.os == 'Linux' && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/third-party-test.mjs ')) }}
-        run: node tests/third-party-test.mjs
+      - name: The core's packages, from its lock file alone
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/packages-test.mjs ')) }}
+        run: node tests/packages-test.mjs
       - name: The agent-tools check
         if: ${{ !cancelled() && contains(matrix.parts, 'tools') && (env.RUN == 'all' || contains(env.RUN, ' tests/agent-tools-test.mjs ')) }}
         run: node tests/agent-tools-test.mjs
@@ -148,6 +206,9 @@ jobs:
       - name: The session's cost line
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/session-cost-test.mjs ')) }}
         run: node tests/session-cost-test.mjs
+      - name: The queue's reader
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-test.mjs ')) }}
+        run: node tests/queue-test.mjs
       - name: The core's own measurement
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-cost-test.mjs ')) }}
         run: node tests/core-cost-test.mjs
@@ -178,12 +239,21 @@ jobs:
       - name: What a push waits on, against its mark
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/wait-test.mjs ')) }}
         run: node tests/wait-test.mjs
+      - name: The merge line read from the host, its measure and the runs it cancels
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/merge-line-test.mjs ')) }}
+        run: node tests/merge-line-test.mjs
+      - name: Where a project's tests run and who pays, read from its workflows and its host
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/runners-test.mjs ')) }}
+        run: node tests/runners-test.mjs
       - name: The strength check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/strength-test.mjs ')) }}
         run: node tests/strength-test.mjs
       - name: The core's own mutation tool
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/mutate-test.mjs ')) }}
         run: node tests/mutate-test.mjs
+      - name: Stryker's run as a mutation tool, without Stryker itself
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/stryker-test.mjs ')) }}
+        run: node tests/stryker-test.mjs
       - name: The stand-in's record
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/stand-in-record-test.mjs ')) }}
         run: node tests/stand-in-record-test.mjs
@@ -199,6 +269,9 @@ jobs:
       - name: The scheduled look and its state report
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/look-test.mjs ')) }}
         run: node tests/look-test.mjs
+      - name: The personal terms taken out of issues and comments
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/issue-terms-test.mjs ')) }}
+        run: node tests/issue-terms-test.mjs
       - name: The rules' pruning, when it is due and what it lists
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pruning-test.mjs ')) }}
         run: node tests/pruning-test.mjs
@@ -303,7 +376,7 @@ jobs:
         if: ${{ !cancelled() && contains(matrix.parts, 'kit') && (env.RUN == 'all' || contains(env.RUN, ' tests/init-test.mjs ')) }}
         run: node tests/init-test.mjs
       - name: The starter kit on a .NET project, cloned as Windows clones it, and built
-        if: ${{ !cancelled() && contains(matrix.parts, 'kit') && (env.RUN == 'all' || contains(env.RUN, ' tests/init-dotnet-test.mjs ')) }}
+        if: ${{ !cancelled() && contains(matrix.parts, 'network') && (env.RUN == 'all' || contains(env.RUN, ' tests/init-dotnet-test.mjs ')) }}
         run: node tests/init-dotnet-test.mjs
       - name: The NuGet check's own steps, its first look and its whole job
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/nuget-gate-test.mjs ')) }}
@@ -332,6 +405,9 @@ jobs:
       - name: What holds each rule of the floor and the modules, read
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/holders-test.mjs ')) }}
         run: node tests/holders-test.mjs
+      - name: A rule's reasons, printed in one step
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/reasons-test.mjs ')) }}
+        run: node tests/reasons-test.mjs
       - name: What holds each rule names only rules that stand
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/holders.mjs
@@ -365,6 +441,12 @@ jobs:
       - name: Each agent tool's entry file here pulls in what the core's own AGENTS.md names
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/entry-files.mjs --core
+      - name: The check of what the core offers each agent tool
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/tools-offer-test.mjs ')) }}
+        run: node tests/tools-offer-test.mjs
+      - name: What the core offers one agent tool it offers each, a cell for each tool
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
+        run: node scripts/tools-offer.mjs
       - name: The reading script, by role and by task
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/reading-test.mjs ')) }}
         run: node tests/reading-test.mjs
@@ -377,11 +459,25 @@ jobs:
       - name: What the core's own workflows and scripts use, each to its list
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
         run: node scripts/licences.mjs .github/licences.json
+      - name: Every package of the core's own lock files at one exact version, from npm's registry (floor rule 7)
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
+        run: node scripts/exact-versions.mjs .github/licences.json
+      - name: Each package new to the core's own lock file looked up in its registry (floor rule 15; once, on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }}
+        env:
+          LOOKUP_BASE: ${{ github.event.pull_request.base.sha }} # empty on a push to main, where nothing is new
+        run: node scripts/lookup.mjs .github/licences.json
+      - name: The registry's signature on each of the core's own installed packages (floor rule 7; once, on Linux)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'licences') }} # (only where the install passed)
+        working-directory: .packages
+        # (in each install's folder, with its own settings and every package of its lock, never a workspace root above it;
+        # an install whose lock names no package has no node_modules/, and nothing to verify)
+        run: for d in . parser; do if [ -d "$d/node_modules" ]; then (cd "$d" && npm audit signatures --prefix=.); fi; done # (bash -e: the first that fails fails the step)
       - name: Every tool the core's own agents load is listed (floor topic 15)
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') }}
         run: node scripts/agent-tools.mjs .github/licences.json --core
-      - name: The base branch's latest commit, for the core's copies baseline (once, on Linux; not the whole history)
-        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'rest') && github.event_name == 'pull_request' }}
+      - name: The base branch's latest commit, for the core's copies baseline and the strength check (once each, on Linux; not the whole history)
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && (contains(matrix.parts, 'rest') || contains(matrix.parts, 'projects')) && github.event_name == 'pull_request' }}
         env:
           BASE: ${{ github.base_ref }}
         run: git fetch --no-tags --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
@@ -395,33 +491,50 @@ jobs:
         env:
           CHOICES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
         run: node scripts/choices.mjs
-      - name: The suites kept to their time mark
+      # (a job past its mark is said as a warning, never a failure, #733, point 5)
+      - name: The suites measured against their time mark
         env:
           SUITE: ${{ matrix.suite }}
         run: node scripts/shape.mjs .github/shape.json --suite "$SUITE" --since "$SUITES_START"
       # (after the time mark, which it is no part of: the faults put into the lines a pull request changes, with the
-      # base the copies baseline fetched; the tool stops at its budget and says what it left unrun)
+      # base fetched above; the tool stops at its budget and says what it left unrun. In the shortest job, projects and
+      # sync, since in rest and steps it made that job the longest on a large change; #715. Stryker,
+      # the core's mutation tool, is installed first from its own lock file at the versions it pins, with no package's
+      # install scripts (floor rules 7 and 15), and its run tested with it)
+      - name: Stryker, from its lock file, with no install scripts (once, on Linux)
+        id: mutation
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
+        run: node scripts/install.mjs mutation # (its lock file, package list and .npmrc refused before npm runs where they could reach past npm's registry, as each install's are)
+      - name: Stryker's packages, the registry's signature on each (once, on Linux)
+        if: ${{ !cancelled() && steps.mutation.outcome == 'success' && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
+        working-directory: tests/mutation
+        run: npm audit signatures --prefix=. # (only where the install passed, as the core's other installs' are checked, floor rule 7)
+      - name: Stryker's run as a mutation tool, with Stryker itself (once, on Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' && (env.RUN == 'all' || contains(env.RUN, ' tests/stryker-test.mjs ')) }}
+        run: node tests/stryker-test.mjs --tool tests/mutation
       - name: How strong the tests are, on the lines the pull request changes (once, on Linux)
-        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'rest') && github.event_name == 'pull_request' }}
+        if: ${{ !cancelled() && runner.os == 'Linux' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' }}
         env:
           STRENGTH_BASE: origin/${{ github.base_ref }}
           MUTATE_BUDGET: "240"
         run: node scripts/strength.mjs
 
-  # (on each system the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the
-  # older of the two releases with the copy older than the first, and the newer release; the staged cases' test follows
-  # each, its first half after the older and its second after the newer, each half under the suite's own mark, since
-  # whole it took up to 1009 s of its 900 on Windows and up to 264 s of its 240 on Linux; #304, #508, #515)
+  # (on Linux the upgrade test runs in two jobs side by side, each a part of it under the test's time mark: the older
+  # of the two releases with the copy older than the first, and the newer release; on Windows it runs in the release
+  # workflow alone, daily and before each release, and three jobs there run the staged cases' test alone (#715). It
+  # runs in thirds, each under the suite's own mark: on Windows a job each, since in halves the longer took 805 s of
+  # its 900 and set the pull request's time; on Linux the three one after another in a job of their own, each under
+  # the mark, since after the upgrade test's parts they made those jobs the longest; #304, #508, #515, #715)
   upgrade:
-    name: upgrade (${{ matrix.os }}, ${{ matrix.part }})
+    name: ${{ (matrix.os == 'windows-latest' || matrix.part == 'staged') && 'staged' || 'upgrade' }} (${{ matrix.os }}, ${{ matrix.part }})
+    needs: moved
+    if: ${{ !cancelled() && !(github.event_name == 'pull_request' && github.event.pull_request.draft) && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}
     strategy:
       fail-fast: false
+      # (as the suites: on a pull request and a push the three on Linux, on the hourly run the three on Windows, on a
+      # start by hand all six; #733, points 3 and 6)
       matrix:
-        include:
-          - { os: ubuntu-latest, part: older }
-          - { os: ubuntu-latest, part: newer }
-          - { os: windows-latest, part: older }
-          - { os: windows-latest, part: newer }
+        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"os":"ubuntu-latest","part":"older"},{"os":"ubuntu-latest","part":"newer"},{"os":"ubuntu-latest","part":"staged"}]' || github.event_name == 'schedule' && '[{"os":"windows-latest","part":"older"},{"os":"windows-latest","part":"newer"},{"os":"windows-latest","part":"third"}]' || '[{"os":"ubuntu-latest","part":"older"},{"os":"ubuntu-latest","part":"newer"},{"os":"ubuntu-latest","part":"staged"},{"os":"windows-latest","part":"older"},{"os":"windows-latest","part":"newer"},{"os":"windows-latest","part":"third"}]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     defaults:
@@ -435,39 +548,60 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
+      - name: The core's packages, installed from its lock files for the upgrade test, the parser's among them (#654, #719)
+        run: node scripts/install.mjs all
       - name: The tests this change can reach (on main, and in a re-run, every one)
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
         run: node scripts/select.mjs .github/shape.json --env RUN
-      - name: A project of each of the last two releases, or of the one this job's part names, synced to this commit, passes every check unchanged
-        if: ${{ env.RUN == 'all' || contains(env.RUN, ' tests/upgrade-test.mjs ') }}
+      - name: A project of each of the last two releases, or of the one this job's part names, synced to this commit, passes every check unchanged (on Linux; on Windows, the release workflow)
+        if: ${{ runner.os == 'Linux' && matrix.part != 'staged' && (env.RUN == 'all' || contains(env.RUN, ' tests/upgrade-test.mjs ')) }}
         env:
           PART: ${{ matrix.part }}
         run: node scripts/shape.mjs .github/shape.json --suite upgrade -- node tests/upgrade-test.mjs --part "$PART"
-      # (here, not in the suites: a scratch project each, which on Windows would run the suites past their time)
+      # (here, not in the suites: a scratch project each, which on Windows would run the suites past their time; a third
+      # each, a job of its own on Windows, and on Linux the first, then the second and third, each under the mark, in the
+      # job "staged"; none after the upgrade test's parts; #715)
       - name: The staged cases, each read as set, kept and broken; what is due, and when they hold a release
-        if: ${{ !cancelled() && (env.RUN == 'all' || contains(env.RUN, ' tests/staged-test.mjs ')) }}
+        if: ${{ !cancelled() && (runner.os != 'Linux' || matrix.part == 'staged') && (env.RUN == 'all' || contains(env.RUN, ' tests/staged-test.mjs ')) }}
         env:
-          STAGED: ${{ matrix.part == 'older' && 'first' || matrix.part == 'newer' && 'second' || 'all' }}
-        run: node scripts/shape.mjs .github/shape.json --suite staged -- node tests/staged-test.mjs --part "$STAGED"
+          STAGED: ${{ matrix.part == 'staged' && 'first second,third' || matrix.part == 'older' && 'first' || matrix.part == 'newer' && 'second' || matrix.part == 'third' && 'third' || 'all' }}
+        run: | # (each part its own run and its own measure, words of the matrix's alone; every part runs though one failed)
+          failed=0
+          for part in $STAGED; do node scripts/shape.mjs .github/shape.json --suite staged -- node tests/staged-test.mjs --part "$part" || failed=1; done
+          exit "$failed"
 
-  # (the one check the ruleset asks for by name: it passes only where the suites, and the upgrade test with the staged
-  # cases, passed on both; a job that ran out of its time is cancelled, which no failing test is, so the gate says which
-  # it was)
+  # (the one check the ruleset asks for by name: it passes only where the suites, the staged cases and the upgrade test
+  # on Linux passed that the run started, on Windows too where it started them; a job that ran out of its time is
+  # cancelled, which no failing test is, so the gate says which it was. On a draft it runs and fails, since a check the
+  # ruleset requires passes where its job is skipped, and a draft's head is tested only once it is marked ready; on an
+  # hourly run where main did not move it is skipped, which only ever follows a full run that passed, so a release reads
+  # it as that pass)
   tests:
-    needs: [suites, upgrade]
-    if: ${{ always() }}
+    needs: [moved, suites, upgrade]
+    if: ${{ always() && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: The suites, the upgrade test and the staged cases passed on Linux and on Windows
+      - name: The suites, the staged cases and the upgrade test this run started passed
         env:
           SUITES: ${{ needs.suites.result }}
           UPGRADE: ${{ needs.upgrade.result }}
+          DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && 'yes' || '' }}
         run: |
+          if [ -n "$DRAFT" ]; then
+            echo "::error::a draft is not tested here (#733, point 2), so this check stands failed on its head. Mend: run the" \
+              "suites the change reaches in your own working copy, then mark the pull request ready, which starts this run again"
+            exit 1
+          fi
           echo "the suites: $SUITES; the upgrade test and the staged cases: $UPGRADE"
           if [ "$SUITES" = cancelled ] || [ "$UPGRADE" = cancelled ]; then
             echo "::error::a job was cancelled: it ran out of its time (timeout-minutes) or was stopped, which is no" \
-              "failing test; its log shows the step it stood in, and re-running it is the first thing to try"
+              "failing test. Mend: read its log for the step it stood in, and re-run the job once"
+            exit 1
           fi
-          [ "$SUITES" = success ] && [ "$UPGRADE" = success ]
+          if [ "$SUITES" != success ] || [ "$UPGRADE" != success ]; then
+            echo "::error::a suite, the upgrade test or a staged case failed. Mend: read the failing job above, whose" \
+              "failing line says its own mend, and fix that in this pull request"
+            exit 1
+          fi

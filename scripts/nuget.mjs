@@ -92,7 +92,7 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, r
 import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
-import { oneLine, parseBounded } from "./guards.mjs";
+import { leadsOut, oneLine, parseBounded } from "./guards.mjs";
 import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
 import { started } from "./started.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
@@ -353,7 +353,9 @@ export function projectFilesByContent(root, own) {
     if (BUILD_FILE.test(f)) continue;
     let fd = null;
     try {
-      const at = join(root, f), st = statSync(at);
+      const at = join(root, f);
+      if (leadsOut(root, at)) continue; // (a link that leads out of the project: no file of its own, never opened)
+      const st = statSync(at);
       if (!st.isFile() || st.size === 0) continue;
       fd = openSync(at, "r");
       const head = Buffer.alloc(Math.min(st.size, 4096));
@@ -365,12 +367,13 @@ export function projectFilesByContent(root, own) {
   }
   return out;
 }
-// what a reader gives for a path git knows that leads to no file of bytes (a link to a device, a folder or a pipe), which
-// is never read: a device can be endless, and a pipe never ends
+// what a reader gives for a path git knows that leads to no file of bytes of the project's own (NOT_A_FILE_IS), which is
+// never read: a device can be endless, a pipe never ends, and a file outside the project is none of its own (#446)
 export const NOT_A_FILE = Symbol("not a file");
+export const NOT_A_FILE_IS = "no file of bytes of the project's own (a link that leads out of the project, or to a device, a folder or a pipe)";
 /** The bytes of the project's file at `f`, NOT_A_FILE where it leads to none, or null where it is not there. */
 export function readProject(root, f) {
-  try { if (!statSync(join(root, f)).isFile()) return NOT_A_FILE; return readFileSync(join(root, f)); } catch { return null; }
+  try { if (leadsOut(root, join(root, f)) || !statSync(join(root, f)).isFile()) return NOT_A_FILE; return readFileSync(join(root, f)); } catch { return null; }
 }
 export function importsOf(own, read, roots = []) {
   const byName = new Map(), files = new Map(), brought = new Map(), unread = [], typed = [], unreadable = new Map();
@@ -792,7 +795,7 @@ function readNow(c, f) {
 }
 // (what is wrong with a build file, or a file one brings in, as it reads now)
 function buildFileFindings(now, f, text) {
-  return now.unreadable.get(f) === "not a file" ? ["is no file of bytes (a link to a device, a folder or a pipe): this check reads none, so what MSBuild would make of it is unseen. Mend: make it a file, or remove it"]
+  return now.unreadable.get(f) === "not a file" ? [`is ${NOT_A_FILE_IS}: this check reads none, so what MSBuild would make of it is unseen. Mend: make it a file of the project's own, or remove it`]
     : now.unreadable.has(f) ? ["is not plain UTF-8 (a UTF-16 or UTF-32 byte-order mark, another encoding its XML declaration names, a NUL or bytes UTF-8 does not allow): MSBuild reads it by its own encoding, so this check cannot read what it names or imports. Mend: save it as UTF-8"] : [
     /NuGetLockFilePath/iu.test(text) && "names NuGetLockFilePath, and a lock file kept elsewhere is one this check does not read. Mend: take it out, keeping each lock file beside its project",
     /RestorePackagesPath|FallbackFolders/iu.test(text) && "names RestorePackagesPath or a fallback folder: packages restored to, or taken from, another folder are ones this check does not read. Mend: take it out",
@@ -906,7 +909,7 @@ const lockAsBase = (c, f, text) => !c.base || (c.listedThen.includes(f) && textA
 function lockText(c, f) {
   if (!c.lockTexts.has(f)) {
     const bytes = readProject(c.root, f);
-    if (bytes === NOT_A_FILE) c.failures.push(`${f} is no file of bytes (a link to a device, a folder or a pipe), and this check reads none. Mend: make it a file`);
+    if (bytes === NOT_A_FILE) c.failures.push(`${f} is ${NOT_A_FILE_IS}, and this check reads none. Mend: make it a file of the project's own`);
     c.lockTexts.set(f, bytes === NOT_A_FILE ? null : bytes?.toString("utf8") ?? "");
   }
   return c.lockTexts.get(f);
@@ -954,7 +957,7 @@ function auditEntries(config, root) {
   let entries = [];
   if (config.audit) {
     const bytes = readProject(root, config.audit);
-    if (bytes === NOT_A_FILE) throw new Error(`${config.audit} is no file of bytes (a link to a device, a folder or a pipe). Mend: make it a file`);
+    if (bytes === NOT_A_FILE) throw new Error(`${config.audit} is ${NOT_A_FILE_IS}. Mend: make it a file of the project's own`);
     try { entries = parseBounded(bytes === null ? readFileSync(join(root, config.audit), "utf8") : bytes.toString("utf8")).entries; } catch { throw new Error(`${config.audit} cannot be read as JSON. Mend: write the audit there as JSON, { "entries": [...] }, or correct the config's "audit"`); }
     if (!Array.isArray(entries)) throw new Error(`${config.audit} has no "entries" list. Mend: write it as { "entries": [...] }`);
   }
