@@ -32,8 +32,8 @@ Read when a task calls for it, each saying when in its opening line: the files o
 `floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
 `tasks/tools.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`, `tools/antigravity.md`,
 `tasks/github-calls.md`, `tasks/hosts.md`, `tasks/repositories.md`, `roles/shared/teams.md`, `roles/orchestrator.md`,
-`tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md`, `tasks/done-when.md`
-and `tasks/planning.md`.
+`tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`, `tasks/cleaning.md`, `tasks/done-when.md`,
+`tasks/planning.md` and `roles/shared/records.md`.
 
 Not taken, each for its reason:
 
@@ -47,7 +47,8 @@ then one release"; #322), and of `tasks/planning.md` the point on a task's relea
 holds no copy; the *report*: the PR's description (`reports/` keeps
 those written before 12 November 2026, and the staged cases' record); the *audits*: `reports/`; the *choice records*:
 `CHOICES.md`; the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
-the *mutation tool*: `node scripts/mutate.mjs --report {report} {lines}`, the core's own, in `tests.yml`;
+the *mutation tool*: `node scripts/stryker.mjs --tool tests/mutation --report {report} {lines}`, Stryker at the version
+`tests/mutation/`'s lock file pins (#581), in `tests.yml`;
 the archive is `archive/instructions.md`, the items behind each rule listed in `scripts/holders.json`; the *settling references* and the *descriptions*:
 `README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
 `tests.yml`, its baseline empty (#259); the *owner's account*: `HaakTuah`; the *users get*:
@@ -59,7 +60,7 @@ queue's order; the
 issue, with the owner's words quoted on it; the *tools* and the *pace*: the core's defaults (`tasks/roles.md`,
 `roles/orchestrator.md`); the *hard work*: a new or changed rule; the *size marks*: the caps of
 `scripts/size.mjs`, one for each role, and its own mark for `QUEUE.md`, with no split mark; the *major version checks*:
-the suites of `.github/workflows/tests.yml`; *planning design*: none; the *other builders' checks*: those suites, which any tool's
+the suites of `.github/workflows/tests.yml`; *planning design*: none; the *quick check*: `node scripts/holders.mjs && node scripts/size.mjs && node scripts/reading.mjs --check && node tests/holders-test.mjs && node tests/manifest-reads-test.mjs && node tests/general-test.mjs`; the *other builders' checks*: those suites, which any tool's
 session here runs before it finishes, every file here being protected (`SECURITY.md`).
 
 ## The queue
@@ -83,8 +84,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   the change as the issue describes it. A PR that goes beyond its issue is not covered by it, and the design check
   says so.
 - **The file holds no note.** Where a module asks for one in the *progress file* (a lane that waits), it goes in the
-  description of the line's own PR, which the next builder reads with the branch, as a passed gate's note does
-  (`roles/shared/work-flow.md`).
+  description of the line's own PR, which the next builder reads with the branch, as a hand-off note does
+  (`tasks/tools.md`, "A change of tool loses nothing").
 - **Whose words an issue holds.** Of the issues open on 14 November 2026 and labelled `queued` and `by:chat`, the owner
   said the decisions quoted in them are the owner's, and so are the answers on other issues that their notes name.
   What the chat session records is the owner's word on any day: an issue or note from the
@@ -101,7 +102,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   writes it from the owner's word recorded on the issue ("Whose words an issue holds"), adds it to the archive as an
   item of its own, naming the issue as its source, and takes what it leaves open as `roles/shared/inbox.md` says of any
   open point. This is the second
-  difference from that module, where only the design session writes rules from the owner's words.
+  difference from that module and `roles/shared/records.md`, where only the design session writes rules from the owner's
+  words.
 - **A bug fix and a rework of tests are built on Sonnet** (#767). By default, where "The builders" of
   `roles/orchestrator.md` picks Claude for a line that fixes a bug or reworks tests, the orchestrator starts its builder
   on Sonnet at high effort; a line that writes or changes a rule, touches security or reads a format another publisher
@@ -124,7 +126,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   by `scripts/builder-trial.mjs`, which counts each kind by its builder from what `scripts/review-record.mjs` reads and
   from the session-cost lines; which model and effort the orchestrator starts, by nothing yet.
 - **An orchestrator may work the file** (`roles/orchestrator.md`) while it holds a line a session can take. The
-  owner starts it; once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
+  owner starts it, or the owner's adviser on the owner's word (`roles/adviser.md`); once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
   wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from
   a project's root and there is no copy here, and what `setup/sync-notes.md` asks, which it asks of projects.
 - **One batch, then one release.** A batch is the lines the file holds between two releases, and the release after it
@@ -463,6 +465,15 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   that rewords it. The owner is never "he" or "his" in new text: the same check reads each line a PR adds under
   `archive/` and `reports/` for a gendered pronoun, a line quoted with `>` (the owner's own words) and a record moved
   word for word aside, while the older records stay as they were.
+- **A record pull requests add to is a folder of one file per entry** (#750, point 1). By default each part of the
+  inventory (`INVENTORY.md`) stands in a file of its own under `inventory/`, read in the order of the files' names by
+  the scripts that read it (`scripts/inventory.mjs`), so that two pull requests that add an entry never edit the same
+  lines, as each archive item stands already ("A new archive item is named by its issue"). Whoever adds an entry adds
+  its file, named to stand between its neighbours. Nothing changes it. It does not mean that what the record holds, or
+  the order it is read in, changes. Reason: of 39 pull requests merged between 18 and 19 November 2026, 8 changed
+  `INVENTORY.md`, and under merge-on-green pull requests that add to one file merge side by side and collide. Held by
+  `tests/mend-test.mjs`, which reads the inventory whole, and fails a folder `INVENTORY.md` does not name and a part's
+  line written in `INVENTORY.md` itself.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
   `tests/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its

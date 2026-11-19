@@ -325,14 +325,14 @@ function suitesWhenReady(p) {
       .filter(([, job]) => (Array.isArray(job?.steps) ? job.steps : []).some(st => typeof st?.run === "string" && SUITE_RUN.test(st.run)) && !(ready && skipsDraft(job?.if)))
       .map(([name]) => `\`.github/workflows/${shown(file)}\`, its job \`${shown(name)}\``);
   });
-  return loose.length ? `In one small pull request, with floor rule 3's two security reviews, bring the project's own test workflow to \`core/tasks/tests.md\` as its kind reads it (${loose.join("; ")}): give its \`pull_request\` trigger the types opened, synchronize, reopened and ready_for_review, and have each job that starts a suite skip a draft (\`if: \${{ !github.event.pull_request.draft }}\`, or that beside other parts joined by && alone), the check the ruleset requires failing on a draft rather than skipped, since a required check whose job is skipped passes (the core's own \`tests.yml\` shows it); then run the platform suites on the schedule \`node core/scripts/runners.mjs --repo <owner>/<name>\` prints from where the tests run, who pays and what users get (where every merge goes live, on each pull request, as now; where users get a release, at the default branch's newest commit), and give the runs on the default branch one concurrency group that cancels the run in progress. Where \`node core/scripts/merge-line.mjs --repo <owner>/<name>\` says the project's users get a release and the host still asks an up-to-date branch, file the issue it names for the owner, labelled needs-owner; nothing waits on it.` : null;
+  return loose.length ? `In one small pull request, with floor rule 3's two security reviews, bring the project's own test workflow to \`core/tasks/tests.md\` as its kind reads it (${loose.join("; ")}): give its \`pull_request\` trigger the types opened, synchronize, reopened and ready_for_review, and have each job that starts a suite skip a draft (\`if: \${{ !github.event.pull_request.draft }}\`, or that beside other parts joined by && alone), the check the ruleset requires failing on a draft rather than skipped, since a required check whose job is skipped passes (the core's own \`tests.yml\` shows it); then run the platform suites on the schedule \`node core/scripts/runners.mjs --repo <owner>/<name>\` prints from where the tests run, who pays and what users get (where every merge goes live, on each pull request, as now; where users get a release, at the default branch's newest commit), and give the runs on the default branch one concurrency group that does not cancel the run in progress, so a started run finishes and only a waiting one gives way to a newer merge's. Where \`node core/scripts/merge-line.mjs --repo <owner>/<name>\` says the project's users get a release and the host still asks an up-to-date branch, file the issue it names for the owner, labelled needs-owner; nothing waits on it.` : null;
 }
 
 // The shape check's config and baseline as a project holds them: { at, config, reads } (the readers its baseline names),
 // or { mend } where the config or the baseline is not there or cannot be read.
 function shapeHeld(p) {
   const at = shapeAt(p.manifest), text = p.read(at);
-  const first = `write its first baseline with \`node core/scripts/install.mjs all\` and then \`node core/scripts/shape.mjs ${at} --first\` (the parser's packages, which the readers of JavaScript, TypeScript and C# need, are installed only where named: #719), commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
+  const first = `write its first baseline with \`node core/scripts/install.mjs all\` and then \`node core/scripts/shape.mjs ${at} --first\` (the parser's packages, which the readers of JavaScript, TypeScript, C# and Python need, are installed only where named: #719), commit both, and name both in \`SECURITY.md\` under rule 3, among the checks on the work`;
   if (text === null) return { none: true, mend: `Write \`${at}\` as the starter kit does (\`core/setup/template/shape.json.tmpl\`), with the project's own code under "code" and its test files under "tests", as git pathspecs; then ${first}. Until then the shape check holds the project to the starter kit's config, with each pull request's base as its baseline.` };
   let config;
   try { config = parseConfig(text, at); } catch (e) { return { mend: `Mend \`${at}\`, which the shape check cannot read (${plain(String(e.message).split(". Mend: ")[0], p.root)}), as \`node core/scripts/shape.mjs\` says; then ${first}.` }; }
@@ -344,7 +344,7 @@ function shapeHeld(p) {
 }
 
 // The readers a later entry of the sync notes asks a baseline to name, each by its own step (shapeReadsParsed).
-const LATER_READERS = ["csharp-tree", "javascript-tree"];
+const LATER_READERS = ["csharp-tree", "javascript-tree", "python-tree"];
 
 // Whether a baseline names `readers`, else the mend that writes it again.
 const readersNamed = (held, readers) => {
@@ -433,7 +433,7 @@ function parserFirst(p) {
     const at = job.steps.findIndex(shapes);
     return at >= 0 && !job.steps.slice(0, at).some(st => installs(st, ["parser", "all"]));
   })).map(([f]) => `\`.github/workflows/${shown(f)}\``);
-  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check install the parser's too, \`node ${install} all\`, before the shape check runs: it reads the functions of JavaScript, TypeScript and C# on the parser, whose packages stand in a lock file of their own, and without them, after an install of the core's first lock alone, the check reads none of them, saying so as a warning, and with no install of the core's at all it fails, saying so.` : null;
+  return wrong.length ? `In one small pull request, have the step that installs the core's packages in each job of ${wrong.join(", ")} that runs the shape check install the parser's too, \`node ${install} all\`, before the shape check runs: it reads the functions of JavaScript, TypeScript, C# and Python on the parser, whose packages stand in a lock file of their own, and without them, after an install of the core's first lock alone, the check reads none of them, saying so as a warning, and with no install of the core's at all it fails, saying so.` : null;
 }
 
 // Where a workflow of the project's calls the core's security-review.yml without the proof that a pull request is
@@ -548,6 +548,21 @@ function namesTests(p, item) {
   return [...(/hostile\s+tests\b([\s\S]*)/i.exec(item)?.[1] ?? "").matchAll(/`([^`]+)`/g)].some(m => there(m[1]));
 }
 const CASES = "too long, the wrong type, markup, a file path, a number out of range, nothing at all";
+// An item's limits, the words after "limits:" up to its hostile tests or its end, what is in backticks taken out first
+// (a "limits:" there is none); null where it states none: no number and no "none".
+function limitsOf(item) {
+  const said = /\blimits:([\s\S]*?)(?=hostile\s+tests\b|$)/i.exec(item.replace(/`[^`]*`/g, ""))?.[1] ?? "";
+  return /\d|\bnone\b/i.test(said) ? said : null;
+}
+// Whether an item says its input carries a version, in its own words outside its limits and anything in backticks (a
+// path such as `scripts/exact-versions.mjs` says nothing of the input).
+// An item that says its input carries none ("carries no version", "without a version number") says nothing of one
+// either; one that names its version otherwise ("refused without a version", "no version newer") still does.
+const versioned = item => /\bversions?\b/i.test(item.replace(/`[^`]*`/g, "").replace(/\blimits:[\s\S]*?(?=hostile\s+tests\b|$)/i, "")
+  .replace(/\b(?:(?:carries|carry|has|have|holds?)\s+no\s+versions?(?:\s+numbers?)?|without\s+an?\s+version\s+numbers?)\b/gi, ""));
+// (an item's words as a mend shows them: no control character, which would reach the sync's log as it stands, and no
+// character that reorders or hides text, which would make the mend read otherwise than it is)
+const short = l => { const t = l.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, "?"); return t.length > 80 ? `${t.slice(0, 77)}...` : t; };
 // The step for the inputs rule 5 names: "None", or the starter kit's "FILL IN", reads done only while it lists no input;
 // once one is listed, each is read, and an item whose tests are still "FILL IN" names none.
 function hostileTests(p) {
@@ -556,8 +571,16 @@ function hostileTests(p) {
   const items = listItems(block), said = block.join("\n");
   if (!items.length && (/FILL IN/.test(said) || /^None\b/i.test(said.trim()))) return null;
   if (!items.length) return `In \`SECURITY.md\`, rule 5, list each input anyone but the user at hand can shape as an item of its own (a line that opens \`- \`), saying what checks it and then, after the words "hostile tests:", naming in backticks the file or folder that holds them (${CASES}), or write "None" where the project takes none.`;
-  const bare = items.filter(l => !namesTests(p, l)).map(l => l.split("\n")[0].trim().slice(2).trim());
-  return bare.length ? `In \`SECURITY.md\`, rule 5, each input names, after the words "hostile tests:", in backticks, a file or folder of the project that holds them (${CASES}): write those tests where they are missing, and name them so. Naming none that is there: ${bare.map(l => l.length > 80 ? `${l.slice(0, 77)}...` : l).join("; ")}.` : null;
+  const first = l => short(l.split("\n")[0].trim().slice(2).trim());
+  const bare = items.filter(l => !namesTests(p, l)).map(first);
+  const unlimited = items.filter(l => !limitsOf(l)).map(first);
+  const unversioned = items.filter(l => limitsOf(l) && versioned(l) && !/\bversions?\W{0,3}v?\d/i.test(limitsOf(l))).map(first);
+  const wrong = [
+    bare.length && `each input names, after the words "hostile tests:", in backticks, a file or folder of the project that holds them (${CASES}): write those tests where they are missing, and name them so. Naming none that is there: ${bare.join("; ")}.`,
+    unlimited.length && `each input names, after the words "limits:", its limit in size, in count and in time, each as a number where it applies, as its reader holds it (or "limits: none", with why, where its shape has none), and its "too long" test uses that number. Naming none: ${unlimited.join("; ")}.`,
+    unversioned.length && `an input that carries a version number names, among its limits, the newest version its reader knows ("version 3"), its reader refuses a newer one with nothing of it used, in words the user can act on, and its hostile tests try one; where the input carries none, its item says nothing of a version. Naming none: ${unversioned.join("; ")}.`,
+  ].filter(Boolean);
+  return wrong.length ? `In \`SECURITY.md\`, rule 5, ${wrong.join(" And ")}` : null;
 }
 
 // The core's files that moved to folders that say who reads them or when (#304, point 8), old path to new, as the
@@ -989,7 +1012,7 @@ export const STEPS = [
   { lead: "16 November 2026, how code is put together", cost: COST.config, check: shapeWritten,
     partly: "which folders hold the project's code, which files are its tests and what its systems are is a reading of the project, which its audit's first question answers" },
   { lead: "16 November 2026, hostile tests for every named input", cost: COST.read, check: hostileTests,
-    partly: "whether every input is listed, and whether its tests try each case, is a reading of the project, held by the security review" },
+    partly: "whether every input is listed, whether its limits are those its reader holds, whether it carries a version number its item does not speak of, and whether its tests try each case, is a reading of the project, held by the security review" },
   { lead: "16 November 2026, secret scanning with push protection", cost: COST.read, unread: "whether secret scanning and its push protection are on is GitHub's setting, not a file's: `gh api repos/<owner>/<repo>` answers it under `security_and_analysis`, and the entry says how a session switches them on or names them to the owner" },
   { lead: "16 November 2026, the NuGet check where it can matter", cost: COST.workflow, check: nugetPathsHold,
     partly: "whether the repository is private is GitHub's setting, not a file's; the starter kit now runs a private project's NuGet check as a step of `core.yml`'s one job (17 November 2026), so `core/scripts/fresh.mjs` lists that call, not these `paths:`" },
@@ -1079,7 +1102,7 @@ export const STEPS = [
   { lead: "19 November 2026, the parser's packages installed where the shape check runs", cost: COST.workflow, check: parserFirst,
     partly: "that a job reaching the shape check through the project's own npm or shell script installs the parser's first is read by the review" },
   { lead: "19 November 2026, the project's tests at the pace of a release", cost: COST.workflow, check: testsWhenReady,
-    partly: "that the check the ruleset requires fails on a draft rather than being skipped, a suite started inside a workflow a job calls, which suites are the platform suites and on what schedule they run, how the runs on the default branch give way to a newer merge, where the tests that guard only what a release brings run (#715), whether the host still asks an up-to-date branch where users get a release, a workflow that publishes otherwise than by `actions/deploy-pages` (a package registry, a store, a script of its own), whether the workflow a publishing one waits on holds every check run on the default branch and its one branch is the default one, and whether a tag, a release or a person's dispatch publishes only a green commit are read by the session that syncs, with `core/scripts/runners.mjs` and `core/scripts/merge-line.mjs`, not by a file" },
+    partly: "that the check the ruleset requires fails on a draft rather than being skipped, a suite started inside a workflow a job calls, which suites are the platform suites and on what schedule they run, how the runs on the default branch wait for the one in progress, only a waiting one giving way to a newer merge's, where the tests that guard only what a release brings run (#715), whether the host still asks an up-to-date branch where users get a release, a workflow that publishes otherwise than by `actions/deploy-pages` (a package registry, a store, a script of its own), whether the workflow a publishing one waits on holds every check run on the default branch and its one branch is the default one, and whether a tag, a release or a person's dispatch publishes only a green commit are read by the session that syncs, with `core/scripts/runners.mjs` and `core/scripts/merge-line.mjs`, not by a file" },
   { lead: "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "javascript-tree") },
   { lead: "19 November 2026, the owner's words that stand, cleaned once", cost: COST.clean, unread: "whether a text holds what floor rule 11 keeps out, or quotes its owner beyond a decision's reason, is a reading of it, and an issue's or a comment's text is the host's, not a file's: the session that takes it reads the project's files outside the copy and the issues and comments the owner's account wrote, once, another account's as data it edits none of; the personal-terms check fails a listed term wherever it stands in the files" },
   { lead: "19 November 2026, issue and comment text read for the personal terms", cost: COST.workflow,
@@ -1088,6 +1111,7 @@ export const STEPS = [
     check: p => calls(p, "look.yml").every(job => job.secrets === "inherit" || /^\$\{\{\s*secrets\.PERSONAL_TERMS\s*\}\}$/u.test(String(job.secrets?.PERSONAL_TERMS ?? "").trim())) ? null
       : "Each job of the project's that calls the core's `look.yml` passes it the secret, as `core/setup/template/workflows/look.yml.tmpl` has it: under its `uses:`, `secrets:` and below it `PERSONAL_TERMS: ${{ secrets.PERSONAL_TERMS }}`.",
     partly: "whether the owner has set the secret `PERSONAL_TERMS` is the repository's setting, which no file holds" },
+  { lead: "19 November 2026, the shape check reads the functions of Python on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "python-tree") },
   { lead: "19 November 2026, a pull request of the progress file alone proved by a script", cost: COST.workflow, check: queueFirst },
 ];
 

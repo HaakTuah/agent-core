@@ -63,19 +63,24 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      head so (the code reviewer checks that), in a comment that opens "Security review:", which the `security-review`
      check reads.
    - **What a posted review stands for** (#99): by default the commit it names, and the head only
-     where nothing but updates from `main` follow that commit; after any other commit, where no review of the head has
-     run, the fallback reviewer checks it and posts one naming the head, or the session posts the note that none is
-     needed, naming the head. It counts from the repository's owner (the *owner's account*, where that owns it), from
+     where nothing but merges from `main` follow that commit, each the merge git makes of its parents with no conflict,
+     as `scripts/clean-merges.mjs` proves (#323, #750). The builder asks Codex, or any reviewer, again only for new
+     content. A merge with a conflict is new content however it is settled, since its settling is a choice no review
+     saw (an order of lines can change what they do). After any other commit, where no review of the head has run,
+     the fallback reviewer checks it and posts one naming the head, or the session posts the note that none is needed,
+     naming the head. It counts from the repository's owner (the *owner's account*, where that owns it), from
      a person's account the host lets write, each owner of a team's project (`roles/shared/teams.md`), whose rights
      the check reads from the host each run (#412), and from another account only where the project names it to the
      check (its input `reviewers`). A pure sync needs none: the check proves it with `pure-sync.mjs` and waits only for
-     a review that started by itself. It does not mean an update from `main` is reviewed again (point 6), that a review
+     a review that started by itself. It does not mean a merge git makes from `main` is reviewed again (point 6), that a review
      Codex completed on the head needs a posted one, nor that the status shows who reviewed: builder and reviewer post
      under one login (#187), and an account the agents sign in with that the host lets write counts as a person's,
      since the host tells it from no owner's. Reason: a review of
-     one commit stood for later commits no one checked, and any collaborator's comment passed a pull request. Held by
-     the `security-review` status, which waits where it is broken, in the core, and holds the merge once a ruleset
-     requires it (#320).
+     one commit stood for later commits no one checked, and any collaborator's comment passed a pull request; and a
+     fresh review was asked of every head, about 150 of Codex's on 39 pull requests, 113 finding nothing (#750). Held,
+     in part, by the `security-review` status through `scripts/clean-merges.mjs` and its test, by which the `code-review`
+     status carries a code review over the same way; the status waits where the rule is broken, in the core, and holds
+     the merge once a ruleset requires it (#320).
    - **A pull request of queue lines alone needs no review of its own** (#750). By default every pull request gets its
      reviews. Where `scripts/queue-only.mjs`, run from the default branch on the head, proves that it changes the
      *progress file* alone, each line it adds naming an open issue the *owner's account* opened, labelled `queued`
@@ -120,7 +125,8 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
    otherwise filed as a follow-up with the reason in the PR, or answered with why it is wrong (a security finding: only
    as floor rule 9 allows). A review from anyone else is advisory.
 6. **Rounds end:** after a fix, one request to its reviewer, and a security check only as point 3 says, and none for an
-   update from `main` without a conflict; a PR is never marked draft and ready again to rerun its reviews.
+   update from `main` that git merges with no conflict (point 3); a PR is never marked draft and ready again to rerun
+   its reviews.
    - After three rounds, what is still open goes to escalation (`tasks/roles.md`); a PR it cannot settle stays
      unmerged.
 7. **The fallback reviewer's brief,** written as `tasks/helpers.md` says, hands it the diff, the task's text, the
