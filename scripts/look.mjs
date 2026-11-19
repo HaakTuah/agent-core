@@ -73,6 +73,7 @@ import { timeOf } from "./moment.mjs";
 import { due as capPassed } from "./size.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
 import { line as blindLine, reader as blindSample, shareNow, TITLE as BLIND } from "./blind-sample.mjs";
+import { ownReport } from "./holders.mjs";
 import { before as monthBefore, copies, monthOf, pushWait, readCounts, shape, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
 import { notDone, report as stepsReport } from "./steps.mjs";
 
@@ -91,6 +92,9 @@ export const TITLES = {
   late: "Late review findings to answer",
   still: "The work stands still",
 };
+// A project's own rules by what holds them, as holders.mjs --own reads them (#662); null where it cannot.
+const ownHeld = scripts => { try { return ownReport(process.cwd(), scripts); } catch { return null; } };
+
 // How far back a late finding is read (tasks/reviews.md, "A late review is still read": the last week), the most pull
 // requests whose merge is read for it in one run, and the most pages of the week's review comments read for it.
 export const LATE_DAYS = 7, LATE_PULLS = 30, LATE_PAGES = 50;
@@ -434,7 +438,7 @@ function monthlyOf({ repo, owner, manifest, at, scripts }, reach, kept, stepsLef
     const overdue = [...kept.entries()].filter(([t, i]) => i.state === "open" && t !== RECORD && !t.startsWith(`${REPORT}, `) && hoursBetween(i.created_at, at) > 7 * 24)
       .map(([t, i]) => ({ number: i.number, title: t, since: reopenedSince(repo, i) })).filter(o => hoursBetween(o.since, at) > 7 * 24);
     const counts = manifest === null ? null : readCounts({ repo, manifest, month, steps: stepsLeft }), last = previous?.body ?? null;
-    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: last, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), outcomes: outcomesReport({ repo, month: monthBefore(month), manifest, previous: last, blind: blindLine(shareNow(repo, kept.get(BLIND), owner)) }), scripts });
+    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: last, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), outcomes: outcomesReport({ repo, month: monthBefore(month), manifest, previous: last, blind: blindLine(shareNow(repo, kept.get(BLIND), owner)) }), ...(manifest === null ? {} : { holders: ownHeld(scripts) }), scripts });
   }
   return { reportTitle, reportFile, monthly };
 }

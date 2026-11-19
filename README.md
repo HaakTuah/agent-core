@@ -61,6 +61,9 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   may rise: `AGENTS.md`, "The size caps keep the rules lean and decide nothing else".
 - **What holds each rule:** a check that fails where it is broken, a staged case, or the scheduled audit
   (`scripts/holders.json`, which names too the archive's items behind each); the rules with none are listed in the core's monthly state report (`scripts/holders.mjs`).
+  A project's own rules are read the same way, against its list `checks/holders.json`, and those with none listed in
+  its own monthly state report, failing nothing (`node core/scripts/holders.mjs --own`; `AGENTS.md`, "A project's own
+  rules name what holds them").
   A staged case (`scripts/staged/`, run by `scripts/staged.mjs`) gives a fresh session, in a scratch project, a task
   in which one rule is easy to break, and reads what the session did. The cases run in the core alone, once a month and
   when a rule they hold changes; their record is `reports/staged-cases.json` (`AGENTS.md`, "Staged cases hold what no
