@@ -12,6 +12,8 @@
 //   - the clock or randomness of its own in a system of the domain "rules", which is passed both;
 //   - a name that joins the global space scripts with no import or export share: a second name of one file there, or
 //     a name that two such files declare.
+//   - a line of a comment that marks a change, by the marks of shape-readers.mjs and the config's "changes", counted by
+//     file and mark (tasks/code-shape.md, "A comment says why the code is so, never what changed"; #458).
 // What stood before is in the baseline ("baseline", a file the project keeps), and never fails: a listed function may
 // shrink and may not grow, and a listed import may go. The baseline only shrinks: against the branch a pull request
 // merges into (SHAPE_BASE, set by the workflow) an entry may join only where it stood on that branch already, as this
@@ -39,7 +41,8 @@
 // The config's other keys: "code" and "tests", git pathspecs of what is read (tests for their imports alone);
 // "aliases", each prefix an import may start with to the path it stands for; "suites", each suite's time mark in
 // seconds, a number or one for each of Node's names for a platform ({ "linux": 60, "win32": 240 }); and those of what
-// the tests cost (tasks/tests.md; #275, #321): "screens", what a test imports that opens a screen, a window or a
+// the tests cost (tasks/tests.md; #275, #321): "changes", the marks of a change the project adds, each plain text
+// found anywhere in a comment line (the reader "changes"); "screens", what a test imports that opens a screen, a window or a
 // device (a package or module by the name it is imported under, or the start of one), so that each test file that
 // imports one is an entry ("screen: <test> -> <what>", found by the reader
 // "screens"), new ones failing as any breach does; "clocks" and "processes", names beside those the check knows for
@@ -80,7 +83,7 @@ import { CODE, append, cycles, lyingUnder, nameTree, resolve } from "./code-shap
 import { inProject, logged } from "./guards.mjs";
 import { installed, unreached } from "./packages.mjs";
 import { shapeFaults } from "./schemas.mjs";
-import { FIRST_READS, PACKAGE_FILES, REACH, READERS, WHOLE_ON_PARSER, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
+import { CHANGE_MARKS, FIRST_READS, PACKAGE_FILES, REACH, READERS, WHOLE_ON_PARSER, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 
 export const KIT = "checks/shape.json";
@@ -102,6 +105,14 @@ const isObject = v => !!v && typeof v === "object" && !Array.isArray(v);
 const strings = v => Array.isArray(v) && v.every(s => typeof s === "string" && s.length > 0);
 const optional = (v, test) => v === undefined || test(v);
 const plainPath = s => typeof s === "string" && /^[\w@.-][\w@. -]*(\/[\w@.-][\w@. -]*)*\/?$/u.test(s) && !s.split("/").includes("..");
+// A mark of a change the project adds ("changes"): plain text, found anywhere in a comment line's first 400 characters,
+// so that no mark a config holds can make the check slow (a pattern of its own could backtrack past any bound a count
+// of its quantifiers sets); at most 120 characters, no control character, at most 20 of them (the schema's, which a
+// config unchecked is held to here).
+// (its length in characters, as the schema counts them, never in UTF-16's halves, so that a mark the schema takes is kept;
+// counted only where its halves are few enough, since more than 240 cannot be 120 characters)
+const plainMark = s => s.length <= 240 && [...s].length <= 120 && !/[\p{Cc}]/u.test(s);
+const marked = v => strings(v) && v.length <= 20 && v.every(plainMark);
 const KIT_FORM = "write it as the starter kit does (core/setup/template/shape.json.tmpl): a JSON object with \"baseline\", the baseline's path, and \"code\", git pathspecs of the code to read";
 
 // ---- the config ----
@@ -167,7 +178,7 @@ export function parseConfig(text, at = KIT) {
   const list = k => formed(c[k], strings, []), select = Object.fromEntries(SELECT_KEYS.map(k => [k, formed(c.select?.[k], strings, [])]));
   const marks = { ...MARKS, ...Object.fromEntries(Object.entries(formed(c.marks, isObject, {})).filter(([k, n]) => Object.hasOwn(MARKS, k) && Number.isInteger(n) && n > 0)) };
   const suites = Object.fromEntries(Object.entries(formed(c.suites, isObject, {})).filter(([, v]) => aSecond(v) || (isObject(v) && Object.keys(v).length > 0 && Object.values(v).every(aSecond))));
-  return { baseline: c.baseline, code: c.code, tests: list("tests"), systems, platform: list("platform"), screens: list("screens"), clocks: list("clocks"), processes: list("processes"), select, wait: formed(c.wait, aSecond, undefined), long: formed(c.long, aSecond, LONG), marks, aliases: formed(c.aliases, isObject, {}), suites, wrapped: readTogether(systems, at) };
+  return { baseline: c.baseline, code: c.code, tests: list("tests"), systems, platform: list("platform"), screens: list("screens"), clocks: list("clocks"), processes: list("processes"), changes: [...Object.entries(CHANGE_MARKS), ...formed(c.changes, marked, []).map(p => [JSON.stringify(p).replaceAll(": ", ":\\u0020"), { test: t => t.includes(p) }])], select, wait: formed(c.wait, aSecond, undefined), long: formed(c.long, aSecond, LONG), marks, aliases: formed(c.aliases, isObject, {}), suites, wrapped: readTogether(systems, at) };
 }
 
 // ---- what stands ----
@@ -214,6 +225,21 @@ function markedFunctions(ctx, file, fns) {
     seen.set(fn.name, k);
     add(ctx, "function", `${file}#${fn.name}${k > 1 ? `#${k}` : ""}`, fn.name, { lines: fn.lines, depth: fn.depth, branches: fn.branches, line: fn.line });
   }
+}
+
+// The comments that mark a change, by the config's marks ("changes"): for each mark, how many lines of a file's
+// comments hold it, a line counted under the first it holds; counted as each file is read, so that no file's comments
+// are held past its reading.
+function marksOf(config, comments) {
+  const counts = new Map();
+  for (const { text } of comments ?? []) {
+    const mark = config.changes.find(([, re]) => re.test(text));
+    if (mark) counts.set(mark[0], (counts.get(mark[0]) ?? 0) + 1);
+  }
+  return counts;
+}
+function changeMarks(ctx, file, counts) {
+  for (const [mark, count] of counts ?? []) add(ctx, "change", `${file}: ${mark}`, mark, { count });
 }
 
 // The clock and randomness of a file's own, by the runs of tokens its reader names (`own`).
@@ -355,6 +381,7 @@ function oneFile(ctx, file, r) {
   if (!r.functions) { ctx.read.jsx++; add(ctx, "lost", file, file); }
   else if (!ctx.tests.has(file)) markedFunctions(ctx, file, r.functions);
   if (domain === "rules") ownClock(ctx, file, r);
+  changeMarks(ctx, file, r.marks);
   testReach(ctx, file, r);
   // (imports a reader could not read, its parser not installed or the file past it, are as ones it cannot follow)
   if (!r.imports) ctx.unsure.add(file);
@@ -398,7 +425,7 @@ function wrappedOnce(ctx) {
 export function survey(texts, config, tests = new Set()) {
   const code = Object.keys(texts).filter(isCode).sort();
   const read = { files: code.length, functions: 0, imports: 0, jsx: 0, nowhere: 0, unnamed: 0, systems: Object.keys(config.systems).length, noEntrance: Object.values(config.systems).filter(s => !s.entrance).length };
-  const readings = code.map(file => [file, reading(file, texts[file])]);
+  const readings = code.map(file => { const r = reading(file, texts[file]); r.marks = marksOf(config, r.comments); delete r.comments; return [file, r]; });
   const idx = index(readings, texts), js = manifests(texts);
   const ctx = { config, tests, texts, unsure: new Set(), files: new Set(Object.keys(texts)), idx, packages: js.packages, ships: new Set([...js.ships, ...idx.ships]), declared: new Set([...js.declared, ...idx.declared]),
     entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map(), reached: new Map() };
@@ -422,7 +449,7 @@ export function groupOf(id) {
   if (kind === "crossing" || kind === "inside") return { kind, group: key.slice(0, key.indexOf(": ")) };
   if (kind === "cycle") return { kind, group: "cycle" };
   if (kind === "lost") return { kind, group: key }; // (a file lost covers itself alone)
-  if (kind === "clock" || kind === "global") return { kind, group: key.slice(key.lastIndexOf(": ") + 2) };
+  if (kind === "clock" || kind === "global" || kind === "change") return { kind, group: key.slice(key.lastIndexOf(": ") + 2) };
   // (a test's reach is its file's: one that reaches another name, or keeps a later one, stands under its old entry)
   if (kind === "timed" || kind === "process") return { kind, group: key.slice(0, key.lastIndexOf(" -> ")) };
   return { kind, group: key.slice(key.lastIndexOf(" -> ") + 4) };
@@ -432,7 +459,7 @@ export function groupOf(id) {
 export function fileOf(id) {
   const { kind } = groupOf(id), key = id.slice(kind.length + 2);
   if (kind === "function") return key.slice(0, key.indexOf("#", key.lastIndexOf("/") + 1));
-  if (kind === "clock" || kind === "global") return key.slice(0, key.lastIndexOf(": "));
+  if (kind === "clock" || kind === "global" || kind === "change") return key.slice(0, key.lastIndexOf(": "));
   if (kind === "lost") return key;
   const from = kind === "crossing" || kind === "inside" ? key.slice(key.indexOf(": ") + 2) : key;
   return from.slice(0, from.indexOf(" -> "));
@@ -440,7 +467,7 @@ export function fileOf(id) {
 
 // The reader that found an entry: the reader of its file as the check reads it now, the shared space's own; null where
 // the file is not read now.
-const OWN_READER = { global: "scripts", screen: "screens", timed: "clocks", process: "processes" };
+const OWN_READER = { global: "scripts", screen: "screens", timed: "clocks", process: "processes", change: "changes" };
 export const readerOf = (id, readers) => OWN_READER[groupOf(id).kind] ?? readers.get(fileOf(id)) ?? null;
 
 const NUMBERS = ["lines", "depth", "branches", "count"];
@@ -581,6 +608,8 @@ const SAID = {
     "make the file a module that imports what it uses and exports what it offers; where the page cannot load it so, put what it adds under the one name the file declares there already (an object of its functions), and give a name that two files declare one home"],
   screen: n => [`${plural(n, "test imports", "tests import")} what opens a screen, a window or a device, where no test of ${n === 1 ? "its" : "their"} file did before`,
     "test what it guards beneath the screen, through the system it uses, and take the import out; only where the screen, the window or the device itself is what the test guards, list the entry in the baseline with that reason under \"grown\", by its id, and in the pull request"],
+  change: n => [`${plural(n, "comment line marks", "comment lines mark")} what changed, when or for which task, more than the file's comments did before (a change's heading such as "Changed:", what the code was, a change's date, the task that changed it)`,
+    "move what changed, when and for which task to the commit's message or the pull request's description, and keep in the comment only why the code is so, or a pointer to the issue that gives the reason; where a mark of the config's (\"changes\") takes a comment that says why for a change's mark, take that mark out of the config in this pull request; where one of the core's marks takes such a comment, or a notice a licence asks for (Apache-2.0's, that a file was modified), list the entry under \"grown\" in the baseline with that reason, and report the pattern to the core (core/README.md, \"Reporting to the core\")"],
   timed: n => [`${plural(n, "test reaches", "tests reach")} a real clock (a sleep, a timed wait, a read of the time), where no test of ${n === 1 ? "its" : "their"} file did before`,
     "hand the time in, as the rules take it, and test beneath the clock; only where the clock itself is what the test guards, or the test runs under a fake clock it installs (which the check does not tell apart from the real one), list the entry in the baseline with that reason under \"grown\", by its id, and in the pull request"],
   process: n => [`${plural(n, "test starts", "tests start")} another process, where no test of ${n === 1 ? "its" : "their"} file did before`,

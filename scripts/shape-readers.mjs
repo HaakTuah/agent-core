@@ -35,6 +35,7 @@ export const READERS = {
   screens: "the tests that open a screen, a window or a device",
   clocks: "the tests that reach a real clock",
   processes: "the tests that start another process",
+  changes: "the comments that mark a change",
 };
 // The readers that read on the parser and could not run, its packages not installed for the registry not answering in
 // a project's pull request, or for a project's own job naming the core's first install alone (parser.mjs, unreachedFor,
@@ -48,6 +49,26 @@ export const unreachedReaders = () => readersWhere(unreachedFor);
 // where it could not run)
 export const WHOLE_ON_PARSER = ["python-tree"];
 export const unnamedReaders = () => readersWhere(unnamedFor);
+// The marks of a change in a comment (tasks/code-shape.md, "A comment says why the code is so, never what changed";
+// #458), each by its name, read of each line of a comment, a block's own * and a list's - before it aside: a change's
+// heading, a word of change in capitals that opens the line before a colon or a date (a line of a comment that goes on
+// from the one above opens in small letters, and is none; a notice of what is deprecated says what to use now, and is
+// none); what the code was, "Previously:", "Was:" and the like; a change's date, a word of change and a date written as
+// ISO writes one, near each other, opening the line (a change of another's, dated, mid-line, is a reason); and the task
+// that changed it, a word of change and "in", "for", "by" or "per" a pull request's or an issue's number (a tracker's
+// keys, ABC-12, read as a standard's or an advisory's name, RFC-4648, so a project adds its own mark for them). None guesses: a pattern found
+// to does goes off this list in the pull request that finds it, and a project adds its own, plain text, in the config
+// ("changes").
+const WORDS = ["Added", "Changed", "Fixed", "Updated", "Removed", "Modified", "Moved", "Renamed", "Rewritten", "Refactored", "Replaced"];
+const CAPITAL = `(?:${WORDS.flatMap(w => [w, w.toUpperCase()]).join("|")})`, CHANGED = `(?:${WORDS.map(w => w.toLowerCase()).join("|")}|${CAPITAL.slice(3, -1)})`;
+const DATE = "(?:19|20)\\d\\d-[01]\\d-[0-3]\\d";
+const OPENS = "^\\s*(?:/\\s*)?(?:[*-]\\s*)?"; // (a doc comment's third slash, a block's own * and a list's - aside)
+export const CHANGE_MARKS = {
+  "a change's heading": new RegExp(`${OPENS}${CAPITAL}\\s*(?::|\\(?${DATE}\\b)`, "u"),
+  "what the code was": new RegExp(`${OPENS}(?:Previously|Formerly|Was|Old|PREVIOUSLY|FORMERLY|WAS|OLD)\\s*:`, "u"),
+  "a change's date": new RegExp(`${OPENS}(?:${CHANGED}\\b.{0,40}\\b${DATE}\\b|${DATE}\\b\\W{0,3}${CHANGED}\\b)`, "u"),
+  "the task that changed it": new RegExp(`\\b${CHANGED}\\s+(?:in|for|by|per)\\s+(?:#\\d+|PR\\s*#?\\d+|pull request\\s*#?\\d+)\\b`, "u"),
+};
 // What a baseline that names no reader was written with: the check as #246 built it.
 export const FIRST_READS = ["javascript"];
 
@@ -92,11 +113,12 @@ const NEVER_SCRIPTS = [".mjs", ".cjs", ".mts", ".cts"];
 function javascript(file, text) {
   const toks = tokens(text, jsxIn(file)), read = toks.lost ? tokens(text) : toks;
   const functions = unreachedReaders().includes("javascript-tree") ? [] : javascriptFunctions(file, text);
-  return { reader: "javascript-tree", toks: read, functions, imports: imports(read), own: JS_OWN, lang: "javascript" };
+  return { reader: "javascript-tree", toks: read, functions, imports: imports(read), own: JS_OWN, lang: "javascript", comments: toks.lost ? [] : toks.comments };
 }
 
 // Each file of code as its reader reads it: { reader, toks, functions (null where they cannot be told), imports (null
-// where they cannot be read), own, lang }, and of C# its namespaces and types.
+// where they cannot be read), own, lang, comments: each line of its comments, { line, text } }, and of C# its namespaces
+// and types.
 export function reading(file, text) {
   const ext = path.posix.extname(file);
   if (ext === ".cs") { const r = readCsharp(text); return { ...r, reader: "csharp-tree", imports: r.usings, own: CS_OWN, lang: "csharp" }; }

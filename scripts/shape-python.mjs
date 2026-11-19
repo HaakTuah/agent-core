@@ -39,10 +39,10 @@ export const OWN = [
 // A file read (python-tree.mjs, which says how each part is read): { functions: [{ name, line, lines, depth, branches }]
 // (null where the parser cannot read the file whole; none where it could not be installed), imports: [{ level, module,
 // names, line, dynamic, types }] (null where they cannot be told: the parser could not be installed, or could not read
-// the file within its time), toks }.
+// the file within its time), toks, comments: each line of its comments, { line, text } }.
 export function readPython(src) {
-  if (unreachedFor("python")) return { functions: [], imports: null, toks: [] };
-  return pythonTree(src) ?? { functions: null, imports: null, toks: [] };
+  if (unreachedFor("python")) return { functions: [], imports: null, toks: [], comments: [] };
+  return pythonTree(src) ?? { functions: null, imports: null, toks: [], comments: [] };
 }
 
 // ---- where an import leads ----

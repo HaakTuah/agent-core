@@ -39,7 +39,7 @@ import { toolOf } from "./strength.mjs";
 import { Unread, call, calls, commands, uncommented, copiesConfig, folded, given, licenceConfig, marksConfig, nugetConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { draftHoles, reads } from "./workflows.mjs";
-import { twice } from "./yaml-keys.mjs";
+import { DEEPEST, twice } from "./yaml-keys.mjs";
 import { releaseAge, WAIT } from "./licences.mjs";
 import { codeOf, covers, pinFault, pinRead } from "./licence-scan.mjs";
 import { npmPackages, offRegistry } from "./lookup.mjs";
@@ -130,8 +130,13 @@ function keysOnce(p) {
   // (with the core's packages not installed, as after a sync made by a copy from before #654, this step cannot be read:
   // it says so, with the install, and every other step is still told)
   if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`node ${corePath(p.root) || "core/"}scripts/install.mjs\`, then \`node ${corePath(p.root) || "core/"}scripts/steps.mjs\` again.`;
-  const found = reads(p.files).flatMap(f => twice(p.read(f) ?? "").map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
-  return found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : null;
+  const read = reads(p.files).map(f => [f, twice(p.read(f) ?? "")]);
+  const found = read.flatMap(([f, keys]) => keys.filter(k => k.key !== null).map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
+  const deep = read.filter(([, keys]) => keys.some(k => k.key === null)).map(([f]) => `\`${f}\``);
+  const said = [
+    found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : "",
+    deep.length ? `In one pull request, nest the lists and mappings of these workflows or actions no deeper than a workflow needs, a few levels, since past ${DEEPEST} deep a key given twice in them cannot be read: ${deep.join("; ")}.` : ""];
+  return said.filter(Boolean).join(" ") || null;
 }
 
 // Whether what the copies and pointer checks hold against in an agent tool's files is listed (#405; AGENTS.md of the
@@ -1060,6 +1065,7 @@ export const STEPS = [
     partly: "which check gates a project's tests is the project's own, as its ruleset names it, and which entries of a job's matrix a pull request leaves out is a reading of its expressions" },
   { lead: "18 November 2026, the shape check reads C#'s functions on the parser", cost: COST.config, check: p => shapeReadsParsed(p, "csharp-tree") },
   { lead: "18 November 2026, a check a draft skips runs once ready", cost: COST.check, held: "the workflow check" },
+  { lead: "18 November 2026, a blind sample each month", cost: COST.owner, unread: "it asks nothing of the project's files: the look keeps the sample's issue by itself, and whether the owner answers it is the owner's, read by no check" },
   { lead: "19 November 2026, the parser's packages installed where the shape check runs", cost: COST.workflow, check: parserFirst,
     partly: "that a job reaching the shape check through the project's own npm or shell script installs the parser's first is read by the review" },
   { lead: "19 November 2026, the project's tests at the pace of a release", cost: COST.workflow, check: testsWhenReady,

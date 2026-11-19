@@ -295,7 +295,7 @@ ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.y
 const shapeBaseline = path.join(lockProject, "checks/shape-baseline.json"), shapeAsKit = fs.readFileSync(shapeBaseline, "utf8");
 fs.writeFileSync(shapeBaseline, "{\n  \"listed\": {}\n}\n");
 let shapeMissed = notDone(lockProject);
-ok(shapeMissed.length === 4 && shapeMissed[3].lead === "19 November 2026, the shape check reads the functions of Python on the parser" && /written before the check read Python, by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[3].mend) && shapeMissed[2].lead === "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser" && /written before the check read JavaScript and TypeScript, their functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[2].mend) && shapeMissed[1].lead === "18 November 2026, the shape check reads C#'s functions on the parser" && /written before the check read C#, its functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[1].mend) && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, its functions by the lexer, Python, its functions by the lexer, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process:/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
+ok(shapeMissed.length === 4 && shapeMissed[3].lead === "19 November 2026, the shape check reads the functions of Python on the parser" && /written before the check read Python, by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[3].mend) && shapeMissed[2].lead === "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser" && /written before the check read JavaScript and TypeScript, their functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[2].mend) && shapeMissed[1].lead === "18 November 2026, the shape check reads C#'s functions on the parser" && /written before the check read C#, its functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[1].mend) && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, its functions by the lexer, Python, its functions by the lexer, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process, the comments that mark a change:/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
   "a shape baseline that names no reader is reported by each of its steps, each mend to write it with every reader", report(shapeMissed));
 execFileSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: lockProject, env: { ...process.env, SHAPE_BASE: "" } });
 shapeMissed = notDone(lockProject);
@@ -633,6 +633,18 @@ ok(sized.sizes === "c/sizes.json" && configs(inMemory({}, {}, "| *size marks* | 
 const signed = configs(inMemory({ "s.yml": coreCall("signatures.yml", { directory: "${{ inputs.at }}" }) }));
 ok(signed.packages === null && signed.unread.some(u => u.startsWith("the signature check's folder not read")) && configs(inMemory({ "s.yml": coreCall("signatures.yml", {}) })).packages === ".",
   "the signature check's folder passed as an expression is not read; none passed is the root");
+// a workflow nested past what the reader of keys given twice reads is told with its own mend, to nest it less, never
+// as a key given twice it may not hold (#610)
+{
+  const keysStep = STEPS.find(s => s.lead === "16 November 2026, no workflow gives a key twice");
+  const deep = keysStep.check(inMemory({}, { ".github/workflows/deep.yml": `on: push\nx: ${"[".repeat(200)}1${"]".repeat(200)}\n` }));
+  const both = keysStep.check(inMemory({}, { ".github/workflows/deep.yml": `on: push\nx: ${"[".repeat(200)}1${"]".repeat(200)}\n`, ".github/workflows/two.yml": "on: push\non: pull_request\n" }));
+  ok(/nest the lists and mappings of these workflows or actions no deeper than a workflow needs, a few levels, since past 128 deep a key given twice in them cannot be read: `\.github\/workflows\/deep\.yml`\./.test(deep ?? "") && !/keep one of the two keys/.test(deep ?? "")
+    && /keep one of the two keys.*`\.github\/workflows\/two\.yml` line 2, "on"/.test(both ?? "") && /no deeper than a workflow needs.*`\.github\/workflows\/deep\.yml`/.test(both ?? "")
+    && keysStep.check(inMemory({}, { ".github/workflows/flat.yml": "on: push\n" })) === null,
+    "a workflow nested past 128 deep is told to nest less, a key given twice to keep one, each with its own mend, and a plain one passes", [deep, both].join("\n"));
+}
+
 const advisory = STEPS.find(s => s.lead === "13 November 2026, the NuGet check fails from the first day");
 let threw = null;
 try { advisory.check(inMemory({ "n.yml": coreCall("nuget.yml", { config: "c.json", advisory: "${{ vars.ADVISORY }}" }) })); } catch (e) { threw = e; }

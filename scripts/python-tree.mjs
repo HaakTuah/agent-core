@@ -22,7 +22,7 @@
 //
 // A token: each word ("id", a keyword among them), number ("num"), string ("str", one for each literal, an f-string's
 // code in its { } read after it, its format and conversion passed over) and sign ("punct", one for each character but
-// :=), as the lexer gave them; comments are none.
+// :=), as the lexer gave them; comments are none, and are read apart, each with its line, for a change's marks.
 //
 // Where the lexer misread, the grammar reads as the definition says (tests/shape-readers-test.mjs holds each such case),
 // and where the grammar misreads, the reader mends it from the tree (signsInFormats, below). It never guesses: a file the
@@ -30,6 +30,7 @@
 // the shape check counts it and says so (shape.mjs, "lost"); its imports are those the grammar read whole, outside what
 // it could not. A file it cannot read within its time, or past LARGEST, has none of the three told.
 import { inParser } from "./parser.mjs";
+import { COMMENT_READ } from "./code-shape.mjs";
 import { LARGEST, walkFunctions } from "./tree-walk.mjs";
 
 /** The file `src` read: { functions: [{ name, line, lines, depth, branches }] in the order their bodies open, null where
@@ -56,7 +57,8 @@ export function read(parse, src) {
   if (!tree) return null;
   try {
     const root = tree.rootNode, whole = !root.hasError || signsInFormats(root);
-    return { functions: whole ? walkFunctions(root, { functionBody, nameOf, branches, isControl, rowsOf }) : null, imports: importsOf(root), toks: tokensOf(root) };
+    const comments = [], toks = tokensOf(root, comments);
+    return { functions: whole ? walkFunctions(root, { functionBody, nameOf, branches, isControl, rowsOf }) : null, imports: importsOf(root), toks, comments };
   } finally { tree.delete(); }
 }
 
@@ -142,16 +144,18 @@ function statementImports(node) {
 // ---- tokens ----
 
 // The file's tokens, in the order they stand. A string is one token, and an f-string's code in its { } follows it; the
-// leaves of the tree are the rest, a comment none of them.
+// leaves of the tree are the rest, a comment none of them: each comment goes to `comments` instead, its text after the
+// #, as much of it as a change's mark is read in (shape.mjs, "changes").
 const WORDLIKE = /^[A-Za-z_\u0080-\uffff][\w\u0080-\uffff]*$/u;
 const NUMBERS = new Set(["integer", "float"]);
 // (what an f-string's { } holds that is no code: its braces, its conversion (!r) and its format after a :)
 const NOT_CODE = new Set(["{", "}", "type_conversion", "format_specifier"]);
-function tokensOf(root) {
+function tokensOf(root, comments) {
   const toks = [], stack = [root];
   while (stack.length) {
     const node = stack.pop(), line = node.startPosition.row + 1;
-    if (node.type === "comment" || node.type === "line_continuation") continue;
+    if (node.type === "comment") { comments.push({ line, text: node.text.slice(1, 1 + COMMENT_READ) }); continue; }
+    if (node.type === "line_continuation") continue;
     if (node.type === "string") {
       toks.push({ t: "str", v: "", line });
       const holes = node.namedChildren.filter(c => c.type === "interpolation");

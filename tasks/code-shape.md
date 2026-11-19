@@ -142,6 +142,17 @@ one declared entrance.
   replaced, that a kind no source names is guessed, nor a comparison where nothing defines the whole set or on another
   owner's project. Reason: mended one case at a time, four of the core's parts took 22 bugs of the same kind by 17
   November 2026, and kinds listed by hand are as complete as their writer's memory.
+- **A comment says why the code is so, never what changed** (#458). By default a comment explains what a reader cannot
+  see in the code: a reason, a limit, a pointer to where the reason is written; what changed, when and for which task is
+  git's to hold, in the commit's message and the pull request's description. The trigger is a line of a comment that
+  holds a mark of a change in the shape check's list (a change's heading such as "Changed:", what the code was, a
+  change's date, the task that changed it; `core/scripts/shape-readers.mjs`, and the config's "changes", plain text a
+  project adds), in a comment line's first 400 characters: the check counts them by file, those that stand are in its
+  baseline and are worked down at the dose (`tasks/cleaning.md`), and a pull request that adds one fails, its builder
+  moving the words to the commit or the pull request. It does not mean a pointer to an issue that gives the reason, a
+  comment a tool needs, a rule on how many comments code has, nor a rewrite of the comments that stand. Reason: agents
+  write such marks by habit and every later session pays to read them; one project held 13,461 such lines in 1,026
+  files. Held by the shape check, whose list loses, in the pull request that finds it, a pattern that proves to guess.
 
 **What has no mark here.** A hub, a file most others import: one that holds one small fact is as it should be, and
 the audit's reader judges the others. The time a user waits on gets its own measure as its rule comes (#318).
@@ -149,7 +160,7 @@ the audit's reader judges the others. The time a user waits on gets its own meas
 **What the check reads.** JavaScript and TypeScript, JSX among them, C# and Python, each by a reader of its own
 (`core/scripts/shape-readers.mjs`), the functions of each by the parser the core installs, and of Python all it
 reads; in C# what a file takes from another is read from its using directives alone. Of scripts that share one global space (no import, no
-export), it holds that each file adds at most one name there and no two declare the same. It never runs the code it
+export), it holds that each file adds at most one name there and no two declare the same. Of every file's comments, it counts the lines that mark a change. It never runs the code it
 reads, and never guesses: an import that leads nowhere it can tell and a file in another language are counted and said
 on every run, never failed; a file of JavaScript, TypeScript, C# or Python its grammar cannot read whole, and one of
 them past 2 MB, is counted and said too, and one a pull request adds fails, saying its mend; the audit's reader holds
