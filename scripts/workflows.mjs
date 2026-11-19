@@ -106,7 +106,7 @@ export function foreignBroken(files, before) {
     const found = foreignBreaks(text);
     if (!found) continue;
     const old = !before || before(file) === text;
-    (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}:${found.line}: the file holds the line break ${found.code}${found.count > 1 ? ` and ${found.count - 1} more` : ""}, which YAML 1.1 reads as a line end and the YAML package this check reads with does not, so a key given twice or a call left without ready_for_review after it would go unseen${old && before ? ", as on the base" : ""}. Mend: replace each with an ordinary line feed, or, inside a double-quoted string, with its escape (\\u2028)`);
+    (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}:${found.line}: the file holds the line break ${found.code}${found.count > 1 ? ` and ${found.count - 1} more` : ""}, which YAML 1.1 reads as a line end and the YAML package this check reads with does not, so a key given twice or a call left without ready_for_review after it would go unseen${old && before ? ", as on the base" : ""}. Mend: replace each with an ordinary line feed, or, inside a double-quoted string, with the escape of its own code (\\u0085, \\u2028 or \\u2029)`);
   }
   return { fails, notes };
 }
