@@ -2,6 +2,11 @@
 // javascript-functions.mjs, beside this file): each function found with its name, its body's line and lines, the
 // depth its control blocks reach and its branch points, by the reader's own parts. Node's own modules only: none.
 
+/** The largest file a reader gives its grammar, in characters: a tree takes memory in step with its nodes, a 4 MB array
+ *  literal of JavaScript about 2.5 GB, and a file of code that size is data a script wrote, not code someone reads. One
+ *  past it has no functions told, as a file the grammar cannot read whole has none. */
+export const LARGEST = 2_000_000;
+
 /** The functions under `root`, in the order their bodies open, as a baseline numbers functions of one name. `parts`
  *  are the reader's: `functionBody(node)`, the body of a node that is a function, else null; `nameOf(node, parent)`;
  *  `branches(node)`, the branch points a node adds; and `isControl(node, parent)`, whether it opens a control block.

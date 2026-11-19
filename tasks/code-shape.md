@@ -134,8 +134,8 @@ the audit's reader judges the others. The time a user waits on gets its own meas
 takes from another is read from its using directives alone. Of scripts that share one global space (no import, no
 export), it holds that each file adds at most one name there and no two declare the same. It never runs the code it
 reads, and never guesses: an import that leads nowhere it can tell and a file in another language are counted and said
-on every run, never failed; a file of JavaScript, TypeScript or C# its grammar cannot read whole, and one of JavaScript
-or TypeScript past 2 MB, is counted and said too, and one a pull request adds fails, saying its mend; the audit's reader
-holds all that code to these rules. A baseline names the readers whose finds it lists, so a reader that comes later
-turns nothing red: what stood is said until `--write` lists it. A project that has not written its config yet is held to
-the starter kit's own, with each pull request's base as its baseline, from the sync that brings the check.
+on every run, never failed; a file of JavaScript, TypeScript or C# its grammar cannot read whole, and one of them past 2
+MB, is counted and said too, and one a pull request adds fails, saying its mend; the audit's reader holds all that code
+to these rules. A baseline names the readers whose finds it lists, so a reader that comes later turns nothing red: what
+stood is said until `--write` lists it. A project that has not written its config yet is held to the starter kit's own,
+with each pull request's base as its baseline, from the sync that brings the check.

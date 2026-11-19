@@ -23,7 +23,7 @@
 // the shape check counts it and says so (shape.mjs, "lost").
 import path from "node:path";
 import { inParser } from "./parser.mjs";
-import { walkFunctions } from "./tree-walk.mjs";
+import { LARGEST, walkFunctions } from "./tree-walk.mjs";
 
 // The grammar each file is read with, by its extension: TypeScript's own (where <T>x is a cast), TypeScript with JSX,
 // and JavaScript, whose grammar reads JSX wherever it stands.
@@ -49,10 +49,6 @@ export function javascriptFunctions(file, src) {
 // in a few; its recovery from text that is no JavaScript grows faster than the text, a line of 300,000 "/[" past two
 // minutes. A file it cannot read within it has no functions told)
 const budgetOf = src => 1000 + src.length / 250;
-// (the largest file the grammar is given, in characters: its tree takes memory in step with its nodes, a 4 MB array
-// literal about 2.5 GB, and a file of code that size is data a script wrote, not code someone reads; one past it has no
-// functions told)
-export const LARGEST = 2_000_000;
 
 /** The functions of `src`, read with the parser's `parse` and the grammar named (in its thread: javascriptFunctions). */
 export function read(parse, grammar, src) {

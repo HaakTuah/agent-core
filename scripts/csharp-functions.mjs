@@ -18,11 +18,12 @@
 // functions told, and the shape check counts it and says so, and fails one a pull request brings (shape.mjs, "lost").
 // Proven old against new by tests/shape-readers-test.mjs, and against counts taken by hand.
 import { inParser } from "./parser.mjs";
-import { walkFunctions } from "./tree-walk.mjs";
+import { LARGEST, walkFunctions } from "./tree-walk.mjs";
 
 /** The functions of `src`: [{ name, line, lines, depth, branches }], in the order their bodies open; null where they
  *  cannot be told. `directives`, the lines (from 1) the preprocessor holds. Read in the parser's thread (read, below). */
 export function csharpFunctions(src, directives = []) {
+  if (src.length > LARGEST) return null;
   try { return inParser(import.meta.url, "read", src, directives); } catch (e) {
     if (e?.kind === "read") return null;
     // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step: #719)

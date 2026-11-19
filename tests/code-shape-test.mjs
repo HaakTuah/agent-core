@@ -11,7 +11,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { changedTogether, cycles, globals, imports, isModule, jsxIn, measure, tokens } from "../scripts/code-shape.mjs";
-import { LARGEST, javascriptFunctions } from "../scripts/javascript-functions.mjs";
+import { javascriptFunctions } from "../scripts/javascript-functions.mjs";
+import { LARGEST } from "../scripts/tree-walk.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
