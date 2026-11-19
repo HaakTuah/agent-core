@@ -199,10 +199,3 @@ The index, and how an item is written: `archive/instructions.md`.
      once an hour in the core, and to its being a priority, since it holds up everything else. It stands behind "A time
      mark measures and never fails", "No test run on a draft", "The default branch is tested at its newest commit" and
      "The slow suites run once per batch, wherever they run" in `tasks/tests.md`.
-265. **19 November 2026**, #750, point 3. A review carries over to a commit that adds nothing new of the pull request's
-     own: where the commits since it only bring in `main`, each the merge git makes of its parents with no conflict, the
-     review statuses pass on it, and Codex is asked again only for new content; a merge with a conflict is new content
-     however it is settled, since keeping both sides' lines in any order can change what they do, as the fallback
-     reviewer showed on #753. On 39 pull requests about 150 requests for Codex's review were made, 113 finding nothing.
-     The owner agreed to the point as set out on the issue, and asked that it be a priority. It stands behind "What a posted
-     review stands for" in `tasks/reviews.md`.
