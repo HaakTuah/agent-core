@@ -7,7 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
-import { LARGEST, cleared, command, fileAt, linesOf, read, statesOf, unplaced } from "../scripts/queue.mjs";
+import { LARGEST, cleared, closedAt, command, fileAt, linesOf, read, statesOf, unplaced } from "../scripts/queue.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -94,14 +94,35 @@ r = command("--check", at);
 ok(r.status === 1 && mended(r.out) && /could not be read: no answer/u.test(r.out), "where an issue cannot be read, the check fails, saying the mend", r.out);
 for (const bad of [command("--other", at), command(undefined, { ...at, read: () => null })]) ok(bad.status === 1 && mended(bad.out), "an option it does not know, or no queue where it runs, fails, saying the mend", bad.out);
 
+// the issues a line names first, read whole in every spelling, a row's and an item's (the fallback reviewer's second
+// check of #757's fixes): with #13 and #15 open, no line of theirs goes
+const spelled = ["| #12-#14 | b | |", "| #12\u2013#20 | b | |", "| #12..#20 | b | |", "| #12 through #20 | b | |", "| #12 to 20 | b | |", "| #12 up to #20 | b | |", "| #5 to #3 | b | |", "| #12 (with #13) | b | |", "- #12 and #13: x", "* [x] #12/#13 y", "- #12-#15 y"].join("\n") + "\n";
+const two13 = n => n !== 13 && n !== 15;
+ok(cleared(spelled, two13) === spelled && linesOf(spelled).length === 11 && cleared("- #12, waits on #13\n", two13) === "", "a range in any spelling, or a second issue in a row or an item, is read, and --clear takes out no line of an open issue; what an item waits on is not its issue", cleared(spelled, two13));
+ok(cleared("| #593, points 6, 7 widened, 10 and 11 | b | |\n| #12 | b | |\n- #14 build it, waits on #12\n", n => n !== 99) === "", "a row's points, and an item's words, keep no line of issues all closed");
+ok(["docs/threat-model.md", "CLAUDE.local.md", "AGENTS.override.md", "docs/.agents/x.md", "a/.agent/x.md", "x/.kiro/y.md"].every(at => fileAt(slot(at)) === null) && fileAt(slot("docs/RULES-x.md"), ["docs/RULES-x.md"]) === null && fileAt(slot("docs/PLAN.md"), ["docs/RULES-x.md"]) === "docs/PLAN.md",
+  "every file floor rule 3 protects by its name, and each rule file the project's SECURITY.md adds, is refused as the progress file");
+const asked1 = [], answers = { 7: { status: 0, stdout: '{"number":7,"state":"closed"}' }, 8: { status: 0, stdout: '{"number":8,"state":"open"}' }, 9: { status: 1, stdout: '{"message":"Not Found"}' }, 10: { status: 1, stdout: "" }, 11: { status: 0, stdout: '{"number":12,"state":"closed"}' } };
+const one = n => closedAt("o/r", n, route => { asked1.push(route); return answers[n]; });
+ok(one(7) && !one(8) && one(9) && asked1[0] === "repos/o/r/issues/7", "one issue is read alone: closed, open, or not there, which counts closed");
+ok((() => { try { one(10); return false; } catch { return true; } })() && (() => { try { one(11); return false; } catch { return true; } })(), "an answer that is no issue with its state, or another's, throws, never guessing");
+let wrote = null;
+r = command("--clear", { file: "Q.md", read: () => "| #7 | b | |\n| #8 | b | |\n| #20 | b | |\n", write: t => { wrote = t; }, closed: () => n => n !== 20, confirm: n => n === 7 });
+ok(r.status === 0 && wrote === "| #8 | b | |\n| #20 | b | |\n", "--clear takes out a line only once each of its issues, read alone, has closed: one the list missed stays", wrote);
+
 // a queue that leads outside through a link: in the core, the mend names the core's own file, not a manifest it lacks
 const here = process.cwd(), scratch = fs.mkdtempSync(path.join(os.tmpdir(), "queue-"));
 fs.writeFileSync(path.join(scratch, "elsewhere.md"), "| #1 | builder | |\n");
 fs.mkdirSync(path.join(scratch, "repo"));
 fs.symlinkSync(path.join(scratch, "elsewhere.md"), path.join(scratch, "repo", "QUEUE.md"));
 process.chdir(path.join(scratch, "repo"));
+fs.writeFileSync(path.join(scratch, "repo", "AGENTS.md"), "rules\n");
+fs.symlinkSync("../AGENTS.md", path.join(scratch, "repo", "inside.md"));
+fs.mkdirSync(path.join(scratch, "repo", ".github"));
+fs.symlinkSync(".github", path.join(scratch, "repo", "docs"));
 try {
   const core = unplaced(false, "QUEUE.md"), project = unplaced(true, "QUEUE.md");
+  ok(mended(unplaced(true, "inside.md")) && mended(unplaced(true, "docs/PROGRESS.md")) && unplaced(true, "plain.md") === null, "a progress file reached through a link inside the project, to a protected file or through a linked folder, is refused (the fallback reviewer's second check of #757's fixes)");
   ok(mended(core) && /make QUEUE\.md a plain file/u.test(core) && !/manifest/u.test(core) && mended(project) && /manifest/u.test(project), "a queue reached through a link fails, its mend in the core naming QUEUE.md and in a project the manifest's row (the fallback reviewer's finding on #757's fixes)", core);
 } finally { process.chdir(here); fs.rmSync(scratch, { recursive: true, force: true }); }
 

@@ -41,7 +41,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
 import { copyOf } from "./core-path.mjs";
-import { ruleFiles } from "./rule-files.mjs";
+import { RULES, ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
 import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, form, pinsAlone, standsFrom, status, unproved, whole } from "./security-review.mjs";
 
@@ -92,7 +92,6 @@ function reviewRan(sha, posted, review, pull, commits, bound, merges) {
 // whether a pull request needs a code review: not where it holds docs alone, or has a sync's shape (the manifest's pin
 // moved alone among them)
 const MANIFEST = /^(Core: \S+ at )[0-9a-f]{40}(, copied whole under \S+\/.*)$/u; // (at the path the manifest names: core-path.mjs)
-const RULES = /(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|GEMINI|REVIEW)(?:\.[\w-]+)?\.md$|threat-model|^core-manifest\.md$|^core\/|(?:^|\/)\.(?:github|claude|agents?)\//iu;
 // A rule file: by the pattern, by the project's own list, or a file of the core's copy where the default branch's
 // manifest names it (`copy`, given apart from the list, which names files alone).
 const isRule = (name, rules, copy) => RULES.test(name) || rules.includes(name) || (copy !== null && name.startsWith(copy));
