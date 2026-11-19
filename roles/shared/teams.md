@@ -21,7 +21,9 @@ review, by the `security-review` status; whose word a session followed leaves no
 **The higher right gives the floor's yeses.** By default each yes floor rule 14 names, the approvals
 of rule 12 aside, is given by an owner the host gives its higher right (on GitHub: `maintain` or `admin`); a yes from an
 owner who may only write is reported and does not count. It does not mean that other words of a writer count for less.
-Reason: one person with the right to write does not loosen the floor alone. Held by nothing yet.
+Reason: one person with the right to write does not loosen the floor alone. Held, for a pull request that changes the
+core's floor or review guidelines, by the description check, which counts only words on its issue from an account the
+host gives `maintain` or `admin`; for the other yeses, by nothing yet.
 
 **Owners who disagree.** Where two owners' words on one point differ (a task, a reading, a design),
 the session that meets it says so on the issue or pull request, quoting both, labels it `needs-owner`, and takes neither
