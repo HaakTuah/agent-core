@@ -105,7 +105,7 @@ of a kind, or builds what it asks (#593): the kinds `cleaning`, `audit` and `swe
   audit's fixed questions change: the challenge asks what they did not. Reason: whoever builds a sweep builds what its
   issue names, and nothing in the flow asks what the issue itself left out. Held, in part, where a check reads that the
   line is there, as the core's does of its own inventory; whether the challenge was made, no check can read, and
-  `core/scripts/holders.mjs` lists it so.
+  `core/scripts/holders.mjs` counts it among the rules held in part.
 - **The state report leads with the outcomes** (#302). By default the monthly state report names the five outcomes the
   owner named, the product does what was asked, is fast, can be read and changed by a newcomer, can be used by a new
   user, does not break, each with its direct measure first or the words that it has none yet, every other number under
