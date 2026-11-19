@@ -5,7 +5,9 @@
 // that stops reading the mend, fails here. It holds too that each file git tracks is claimed by a line of the inventory
 // of the core's parts (INVENTORY.md; #534, point 4) or left out there with its reason (#593, point 2), that each file
 // a line there names is there, and that a line recording a trial says which of the part's bugs the tool read (#593,
-// point 7). Its tests workflow runs it on every pull request here. Node's own modules and git.
+// point 7), the inventory read whole through scripts/inventory.mjs: each folder of inventory/ named in INVENTORY.md,
+// and no part's line written in INVENTORY.md itself under a heading whose parts stand in a folder (#750, point 1). Its
+// tests workflow runs it on every pull request here. Node's own modules and git.
 //
 //   node tests/mend-test.mjs
 import { execFileSync } from "node:child_process";
@@ -167,6 +169,14 @@ ok(tracked !== null && tracked.length > 0, `the tracked files are read${tracked 
     && partsIn(at, "inventory/b").length === 0, "the inventory is read whole, each folder's parts in the order of their names in place of the line naming it, a file not of Markdown or a folder not there giving none");
   fs.rmSync(at, { recursive: true, force: true });
 }
+// a part's line written in INVENTORY.md itself, under a heading whose parts stand in a folder: the headings, each
+// with the bullets that stand under it
+const inPlace = text => String(text).split(/\r?\n(?=#{1,6}\s)/u).filter(s => /^Its parts stand in `inventory\//mu.test(s))
+  .flatMap(s => s.split(/\r?\n/u).filter(l => /^- /u.test(l)).map(l => `${s.split(/\r?\n/u)[0]}: ${l.slice(0, 60)}`));
+ok(inPlace("# I\n\n- `t`: above.\n\n## A\n\nIts parts stand in `inventory/a/`, a file each, read in the order of their names.\n- `x`: here.\n\n## B\n\n- `y`: left out.\n").join() === "## A: - `x`: here.",
+  "a part's line under a heading whose parts stand in a folder is found, one under another heading is not");
+const written = inPlace(fs.readFileSync(path.join(root, "INVENTORY.md"), "utf8"));
+ok(written.length === 0, `no part's line stands in INVENTORY.md itself under a heading whose parts stand in a folder${written.length ? `: not so for ${written.join("; ")}. Mend: move each such line, byte for byte, into a file of its own in the folder that heading names, named to stand in order between its neighbours (NNN-<name>.md)` : ""}`);
 const inventoryText = whole(root);
 const stray = [...fs.readdirSync(path.join(root, "inventory")).filter(d => !folders(root).includes(`inventory/${d}`)),
   ...folders(root).flatMap(f => fs.readdirSync(path.join(root, f), { withFileTypes: true }).filter(e => !e.isFile() || !e.name.endsWith(".md")).map(e => `${f}/${e.name}`))];

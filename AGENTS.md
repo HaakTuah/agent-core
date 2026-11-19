@@ -466,11 +466,12 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **A record pull requests add to is a folder of one file per entry** (#750, point 1). By default each part of the
   inventory (`INVENTORY.md`) stands in a file of its own under `inventory/`, read in the order of the files' names by
   the scripts that read it (`scripts/inventory.mjs`), so that two pull requests that add an entry never edit the same
-  lines. Whoever adds an entry adds its file, named to stand between its neighbours. It does not mean that what the
-  record holds, or the order it is read in, changes. Reason: of 39 pull requests merged between 18 and 19 November
-  2026, 8 changed `INVENTORY.md`, and under merge-on-green pull requests that add to one file merge side by side and
-  collide. Held by `tests/mend-test.mjs`, which reads the inventory whole and fails a folder `INVENTORY.md` does not
-  name.
+  lines, as each archive item stands already ("A new archive item is named by its issue"). Whoever adds an entry adds
+  its file, named to stand between its neighbours. Nothing changes it. It does not mean that what the record holds, or
+  the order it is read in, changes. Reason: of 39 pull requests merged between 18 and 19 November 2026, 8 changed
+  `INVENTORY.md`, and under merge-on-green pull requests that add to one file merge side by side and collide. Held by
+  `tests/mend-test.mjs`, which reads the inventory whole, and fails a folder `INVENTORY.md` does not name and a part's
+  line written in `INVENTORY.md` itself under a heading whose parts stand in a folder.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
   `tests/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its
