@@ -45,9 +45,9 @@ Read at the start of every task.
 - **The *progress file* holds order only**: each item's issue, who builds it and what it waits on,
   nothing done; a stage of the project's design needs no issue, says what is next and points to its PRs for the rest.
   - Its one writer, the orchestrator or the design session, adds issues in a PR, the trust gate: no issue is built
-    before its line joins, save a bug ("Bugs don't wait"). Any other session
-    changes only its own line; a closed issue's line goes with the next edit. Bugs, tests, checks of standing rules and tasks the
-    scheduled look opens need no word of the owner's.
+    before its line joins, save a bug ("Bugs don't wait"). Any other session changes only its own line; a closed
+    issue's line stays, readers skip it, and the file's next PR takes it out. Bugs, tests, checks of standing rules
+    and tasks the scheduled look opens need no word of the owner's.
   - Reason: every session reads it at its start. Its own size mark comes with its first trim (`core/scripts/steps.mjs`).
 - **An obvious improvement is built at once,** in its own PR, save where the floor needs the owner's
   yes.
@@ -76,6 +76,5 @@ Read at the start of every task.
     batch it was given in: the session acts on it, says so where it acts, and changes no rule file. It becomes a rule
     only where the owner says so in words ("make it a rule", "from now on in every project") or agrees to a proposal
     set out as a rule; even then the session that heard it files the issue, and the rule joins the *progress file* like
-    any other. In doubt, it is for now, said in the *report*, and the owner is asked nothing. It does not mean an order
-    is followed for less than it says. Reason: an orchestrator took an order to slow down for usage as one to rewrite
-    the rules.
+    any other. In doubt, it is for now, said in the *report*. It does not mean an order is followed for less than it
+    says. Reason: an orchestrator took an order to slow down for usage as one to rewrite the rules.
