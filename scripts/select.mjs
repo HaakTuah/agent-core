@@ -23,8 +23,8 @@
 // selected. Where any of that cannot be told (no merge of two, a tree that differs, a selection, no answer from the
 // host, a check not passed), the whole suite runs. The check's runs are asked of GitHub (GITHUB_API_URL, the
 // repository GITHUB_REPOSITORY names), with the token GH_TOKEN holds, which needs to read checks and nothing more, and
-// only those GitHub Actions posted count. That the head held the default branch rests on floor rule 12: a pull request
-// merges brought up to date, its checks passed on that head.
+// only those GitHub Actions posted count. That the head held the default branch is read from the tree, never assumed:
+// floor rule 12 lets a pull request merge without being brought up to date where users get a release.
 //
 //   node core/scripts/select.mjs [<config>] [--failed <file>] [--env <NAME>] [--passed <check>]
 //       with SELECT_BASE the pull request's base (origin/main, fetched; or HEAD^1 of the merge a pull request's run

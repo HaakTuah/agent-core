@@ -70,11 +70,11 @@ reads is the *shape check*'s config.
   red run on the default branch: the session that reads it (`core/scripts/merge-line.mjs` says it, where users get a
   release) narrows it, first by the history of the files its failing test names since the last green run, then by
   halving the merges since that run, running the failing suite alone at each half's commit in its own working copy, and
-  fixes it before any other merge (`tasks/hosts.md`, "Where users get a release, a pull request merges on its own green
-  checks"). It does not mean a pull request's run, a start by hand or the run before a release is cancelled, nor that a
-  red run is merged past. Reason: a batch tested once costs less than each merge tested alone, and a break between
-  merges is rare and quickly found. Held, in the core, by the concurrency its `tests.yml` gives the runs on main, which
-  the workflows test reads; the narrowing, by nothing yet.
+  fixes it before any other merge (floor rule 12; `tasks/hosts.md`). It does not mean a pull request's run, a start by
+  hand or the run before a release is cancelled, nor that a red run is merged past. Reason: a batch tested once costs
+  less than each merge tested alone, and a break between merges is rare and quickly found. Held, in the core, by the
+  concurrency its `tests.yml` gives the runs on main, which the workflows test reads; the narrowing, by nothing yet.
+
 - **The slow suites run once per batch, wherever they run** (#733). By default a pull request's run holds the suites its
   change reaches on one platform, and the platform suites (those on any other platform) and the suites its builders move
   there for their time run at the default branch's newest commit, where it moved since their last run, as often as their
@@ -141,7 +141,8 @@ reads is the *shape check*'s config.
   the check that gates the tests (`core/scripts/select.mjs`), which finds the merged head's tree, its whole selection
   and that check's pass, as GitHub Actions posted it, and then says `none`, which the job's runner honours, or otherwise
   runs the whole suite; that the head held the default
-  branch rests on floor rule 12, which merges a pull request brought up to date. A test that reads what no tree holds
+  branch is read from the tree, never assumed, since floor rule 12 lets a pull request merge without being brought up
+  to date where users get a release. A test that reads what no tree holds
   (a release's tag, the day) stays out of the skip. The trigger is a push that merges a pull request with a merge commit. It does not
   mean a run is skipped where the pull request ran a selection only, where it was merged by a squash or a rebase, on a
   re-run, on a schedule or before a release, nor that a job a pull request does not run is skipped. Reason: in #426's

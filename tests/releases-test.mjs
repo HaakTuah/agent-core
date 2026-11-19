@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
-import { OWN, costed, held, inTheCore, next, older } from "../scripts/release.mjs";
+import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
 import { STEPS } from "../scripts/steps.mjs";
 import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
 
@@ -195,6 +195,13 @@ ok(!staysAt(r4, onlyA, dir), "a release whose notes ask something new asks a syn
 // the checks on the commit a release would stand on
 const run = (name, status, conclusion, path = `.github/workflows/${name}.yml`) => ({ name, path, status, conclusion });
 const list = (...runs) => ({ total_count: runs.length, workflow_runs: runs });
+// the core's tests in full on that commit (#733): the newest run of the tests' workflow there that ran once an hour or
+// was started by hand, which holds the Windows suites, has passed
+const full = (event, conclusion, at, status = "completed") => ({ ...run("tests", status, conclusion), event, run_started_at: `2026-11-19T${at}:00Z` });
+ok(/have not run in full on it yet/.test(fullRun(list({ ...run("tests", "completed", "success"), event: "push" }))), "a commit whose tests ran only on its push, on Linux, has not had them in full, and the release waits, saying how to start them");
+ok(fullRun(list(full("schedule", "success", "10:00"))) === null && fullRun(list(full("workflow_dispatch", "success", "10:00"))) === null, "an hourly or a hand-started run that passed lets the release stand");
+ok(fullRun(list(full("schedule", "failure", "09:00"), full("workflow_dispatch", "success", "10:00"))) === null && /hourly run\): failure/.test(fullRun(list(full("workflow_dispatch", "success", "09:00"), full("schedule", "failure", "10:00")))), "the newest of them decides: a later pass after a failure lets it stand, a later failure holds it");
+ok(/in_progress/.test(fullRun(list(full("schedule", null, "10:00", "in_progress")))) && /not run in full/.test(fullRun(list(full("schedule", "success", "10:00").path && { ...full("schedule", "success", "10:00"), path: ".github/workflows/other.yml" }))), "one still going holds it, and another workflow's run is no run of the tests");
 ok(held(list(run("tests", "completed", "success"), run("size", "completed", "success"))).length === 0, "a commit whose every check has passed may carry a release");
 ok(held(list(run("tests", "completed", "success"), run("size", "completed", "skipped"), run("other", "completed", "neutral"))).length === 0, "a check that was skipped holds nothing where another passed");
 ok(held(list(run("tests", "in_progress", null), run("size", "completed", "success"))).join() === "tests: in_progress" && held(list(run("tests", "queued", null))).join() === "tests: queued", "a check still going holds it");

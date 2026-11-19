@@ -24,8 +24,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository
      (the workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`,
      `scripts/releases.mjs`, `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`,
-     `scripts/clean-merges.mjs`, `scripts/security-review.mjs` and `scripts/runners.mjs`; hostile tests:
-     `tests/hostile-github-test.mjs`.
+     `scripts/clean-merges.mjs`, `scripts/security-review.mjs`, `scripts/merge-line.mjs` and `scripts/runners.mjs`;
+     hostile tests: `tests/hostile-github-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`) and the sync's steps

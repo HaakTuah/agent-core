@@ -136,7 +136,7 @@ ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] =
 // ---- when the core's tests run (#733, points 2 to 4 and 6) ----
 // A pull request's run starts once it is ready, never on a draft, on Linux alone; main is tested on Linux at its newest
 // commit, each run giving way to the next merge's; Windows once an hour at main's newest commit where it moved; both in
-// full on a start by hand and in the release's call before a cut.
+// full on a start by hand, which a release waits on.
 {
   const tests = parseYaml(fs.readFileSync(path.join(wfDir, "tests.yml"), "utf8"));
   const release = parseYaml(fs.readFileSync(path.join(wfDir, "release.yml"), "utf8"));
@@ -167,14 +167,15 @@ ok(groups["security-review.yml"].jobs.report.concurrency["cancel-in-progress"] =
     && only(suites[0], "ubuntu-latest") && only(suites[1], "windows-latest") && named(suites[1]) === [...WINDOWS].sort().join()
     && suites[2].length === suites[0].length + suites[1].length && [".node-version", ".node-least"].every(n => suites[2].filter(x => x.node === n).length === suites[2].length / 2)
     && upgrades && only(upgrades[0], "ubuntu-latest") && only(upgrades[1], "windows-latest") && upgrades[2].length === upgrades[0].length + upgrades[1].length,
-    "a pull request's run and a push's are on Linux alone, the hourly run on Windows alone, every job named whole, and a start by hand or the release's call runs them all, on both Nodes (points 3, 4 and 6)", String(tests.jobs.suites.strategy.matrix.include).slice(0, 300));
+    "a pull request's run and a push's are on Linux alone, the hourly run on Windows alone, every job named whole, and a start by hand runs them all, on both Nodes (points 3, 4 and 6)", String(tests.jobs.suites.strategy.matrix.include).slice(0, 300));
   ok(tests.concurrency.group.includes("format('pr-{0}', github.event.pull_request.number)") && tests.concurrency.group.includes("(github.event_name == 'push' || github.event_name == 'schedule') && format('{0}-main', github.event_name) || github.run_id")
     && tests.concurrency["cancel-in-progress"] === "${{ github.event_name == 'pull_request' || github.event_name == 'push' }}",
     "a run on main after a merge gives way to the next merge's, main tested at its newest commit; the hourly runs wait their turn; a start by hand or a call is never cancelled (point 4)");
   ok(tests.on.schedule?.length === 1 && /^\d{1,2} \* \* \* \*$/.test(tests.on.schedule[0].cron) && tests.jobs.moved.if === "${{ github.event_name == 'schedule' }}" && /event=schedule/.test(tests.jobs.moved.steps.at(-1).run) && /status=completed/.test(tests.jobs.moved.steps.at(-1).run),
     "Windows once an hour, at main's newest commit, where no hourly run finished on it yet (point 6)");
-  ok("workflow_call" in tests.on && "workflow_dispatch" in tests.on && release.jobs.tests.uses === "./.github/workflows/tests.yml" && release.jobs.tests.if === "${{ github.event_name == 'workflow_dispatch' }}" && release.jobs.release.needs.includes("tests"),
-    "and both in full before each release, which waits on them (point 6)");
+  const cut = release.jobs.release.steps.at(-1).run;
+  ok("workflow_dispatch" in tests.on && !("workflow_call" in tests.on) && /actions\/runs" -f head_sha="\$GITHUB_SHA" -f branch=main -F per_page=100/.test(cut) && !/event=push/.test(cut),
+    "and both in full by hand, which the release waits on: it reads every run on its commit, the hourly and hand-started ones with the push's, and the tests stay a workflow no project calls (point 6; release.mjs, fullRun)", cut);
 }
 
 process.exit(failed ? 1 : 0);

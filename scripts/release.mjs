@@ -17,15 +17,16 @@
 //   node scripts/release.mjs --cut --at <sha> --runs <file>
 //                                     cuts it: the tag is pushed to the core's repository, and nothing else is. Only
 //                                     where main's newest commit is <sha>, and the checks listed in <file>, GitHub's
-//                                     answer to repos/<core>/actions/runs?head_sha=<sha>&branch=main&event=push, have
-//                                     all passed: without the two it cuts nothing
+//                                     answer to repos/<core>/actions/runs?head_sha=<sha>&branch=main, have all
+//                                     passed: those its push started, and the newest hourly or hand-started run of
+//                                     the tests (fullRun); without the two it cuts nothing
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { NOTES, RELEASE, asksBetween, fetchCore, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
+import { NOTES, OWN, RELEASE, asksBetween, fetchCore, held, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
 import { atRelease } from "./staged.mjs";
 import { started } from "./started.mjs";
 import { STEPS } from "./steps.mjs";
@@ -58,25 +59,8 @@ export const costed = entry => {
 // sync script knows no release and, run with no SHA, takes the core's newest main, so it syncs once with this SHA.
 export const older = (name, sha) => `A project whose copy is older than release-1 syncs to ${name} once with its full SHA, \`node core/scripts/sync.mjs ${sha}\`: its own sync script, run with none, takes the core's main (setup/sync-notes.md, at its top).`;
 
-// This repository's own release workflow: its runs on a commit are no check of that commit.
-export const OWN = ".github/workflows/release.yml";
-
-// Why a release may not stand on a commit yet, each reason a line, from GitHub's list of the workflow runs that the
-// push of that commit to main started (repos/<core>/actions/runs?head_sha=<sha>&branch=main&event=push); none where
-// it may. It may where every such run has finished and passed, and at least one did more than skip: a run still going,
-// one that failed or was cancelled, a list read only in part, and a commit no check has run on yet each hold it, so a
-// release never stands on a commit whose checks the core's own main has not passed. Nothing is guessed: a list in any
-// other form holds it too.
-export function held(list, own = OWN) {
-  const runs = list?.workflow_runs;
-  if (!Array.isArray(runs) || !Number.isSafeInteger(list.total_count)) return ["the list of the checks on it could not be read"];
-  if (list.total_count !== runs.length) return [`${list.total_count} runs stand on it and ${runs.length} were read`];
-  const checks = runs.filter(r => r?.path !== own);
-  const passed = r => r?.status === "completed" && ["success", "skipped", "neutral"].includes(r.conclusion);
-  const reasons = checks.filter(r => !passed(r)).map(r => `${r?.name ?? "a check"}: ${r?.status === "completed" ? r.conclusion : r?.status ?? "unreadable"}`);
-  if (!reasons.length && !checks.some(r => r.conclusion === "success")) reasons.push("no check has passed on it yet");
-  return reasons;
-}
+// (held and OWN stand in releases.mjs, beside this file, which the syncs read too: #733)
+export { OWN, held };
 
 // Whether this file lies in the core's own repository: its scripts/ at the root of a repository that is no project's
 // copy, even a copy kept as a repository of its own (a clone or a submodule under a project's core/, with the
@@ -99,11 +83,28 @@ function after(flag, argv) {
 
 // Why the release `name` at `sha` is not cut, or null: the staged cases hold it (`staged`, from atRelease), or a check
 // on that commit has not passed, as the list of the runs there (`runs`, a file) says.
+// The runs a list holds that the push of its commit started: what `held` reads (the list itself where it is no list).
+const pushed = list => (Array.isArray(list?.workflow_runs) ? { ...list, workflow_runs: list.workflow_runs.filter(r => r?.event === "push"), total_count: list.workflow_runs.filter(r => r?.event === "push").length + (Number.isSafeInteger(list.total_count) ? list.total_count - list.workflow_runs.length : 0) } : list);
+
+// The core's tests in full on a commit (#733, points 3 and 6): a pull request's run and a push's are on Linux alone, so
+// a release waits on the newest run of the tests' workflow there that ran once an hour or was started by hand, which
+// holds the Windows suites, to have passed. A reason it holds the release, or null.
+export const TESTS = ".github/workflows/tests.yml";
+export function fullRun(list) {
+  const runs = Array.isArray(list?.workflow_runs) ? list.workflow_runs.filter(r => r?.path === TESTS && ["schedule", "workflow_dispatch"].includes(r?.event)) : [];
+  if (!runs.length) return "the tests have not run in full on it yet, the Windows suites with them: start the tests workflow on main by hand (its page under Actions), or wait for its hourly run, and start the release again once it has passed";
+  const start = r => (typeof r?.run_started_at === "string" ? Date.parse(r.run_started_at) || 0 : 0) || (typeof r?.created_at === "string" ? Date.parse(r.created_at) || 0 : 0);
+  const newest = runs.reduce((a, b) => (start(b) > start(a) || (start(b) === start(a) && Number(b?.id ?? 0) > Number(a?.id ?? 0)) ? b : a));
+  return newest?.status === "completed" && newest?.conclusion === "success" ? null
+    : `the tests in full (their ${newest?.event === "schedule" ? "hourly" : "hand-started"} run): ${newest?.status === "completed" ? newest?.conclusion : newest?.status ?? "unreadable"}`;
+}
+
 function whyNot(name, sha, staged, runs) {
   if (staged.held) return `${name} is not cut: ${staged.held}.`;
   let list = null;
   try { list = JSON.parse(fs.readFileSync(runs, "utf8")); } catch { /* (held, below, says it could not be read) */ }
-  const reasons = held(list);
+  const full = list ? fullRun(list) : null;
+  const reasons = [...held(pushed(list)), ...full ? [full] : []];
   return reasons.length ? `${name} is not cut: the checks on ${sha.slice(0, 7)} have not all passed. Start the release again once they have.\n${reasons.map(r => `  ${r}`).join("\n")}` : null;
 }
 

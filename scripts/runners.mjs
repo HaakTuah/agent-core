@@ -21,7 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { aRepository, oneLine } from "./guards.mjs";
 import { ghApi } from "./labels.mjs";
-import { override } from "./merge-line.mjs";
+import { coreOwn, override } from "./merge-line.mjs";
 import { loadSync } from "./packages.mjs";
 import { started } from "./started.mjs";
 
@@ -155,7 +155,8 @@ export function read({ repo, dir = ".github/workflows", manifest = null, gh = gh
 export function main(argv, { gh = ghApi, say = console.log } = {}) {
   const i = argv.indexOf("--repo"), repo = i >= 0 ? argv[i + 1] : undefined;
   if (!aRepository(repo)) { console.error("FAIL: no repository was named. Mend: run node core/scripts/runners.mjs --repo <owner>/<name> from the project's root"); return 1; }
-  const manifest = fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : null;
+  // (the core's own repository holds no manifest: its slots stand in its AGENTS.md, read as merge-line.mjs reads them)
+  const manifest = fs.existsSync("core-manifest.md") ? fs.readFileSync("core-manifest.md", "utf8") : coreOwn();
   const r = read({ repo, manifest, gh });
   say([`Where ${repo}'s tests run and who pays:`, ...r.said.map(s => `- ${s}`),
     r.cadence === "merge" ? `The slow and platform suites run ${r.when}, and in full before each release (the core's tasks/tests.md).`

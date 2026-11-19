@@ -50,7 +50,9 @@ those written before 12 November 2026, and the staged cases' record); the *audit
 the *mutation tool*: `node scripts/mutate.mjs --report {report} {lines}`, the core's own, in `tests.yml`;
 the archive is `archive/instructions.md`, the items behind each rule listed in `scripts/holders.json`; the *settling references* and the *descriptions*:
 `README.md`; the *large file*: past about 50 KB; the *copies check*: `scripts/copies.mjs` on `.github/copies.json`, in
-`tests.yml`, its baseline empty (#259); the *owner's account*: `HaakTuah`; *one at a time*: the queue's lines
+`tests.yml`, its baseline empty (#259); the *owner's account*: `HaakTuah`; the *users get*:
+`releases`, its users taking the core from a release or, following `main`, from its newest commit whose checks all
+passed (#733); *one at a time*: the queue's lines
 that change the same file, and all that add to what a role reads at its start, whose caps they share, in the
 queue's order; the
 *design-checked PRs*: those that add or change a rule of the floor or the modules; the *review reference*: the line's

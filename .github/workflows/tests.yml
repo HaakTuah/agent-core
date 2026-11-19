@@ -3,7 +3,8 @@
 # request once it is marked ready and on each push after, never on a draft, on Linux alone, the suites its change can
 # reach; on each push to main, on Linux, main tested at its newest commit, a run giving way to the next merge's; once an
 # hour, on Windows, at main's newest commit where an hourly run has not already finished on it; and in full on both, on
-# a start by hand and when the release workflow calls it before a cut (.github/workflows/release.yml). Every suite runs
+# a start by hand. A release waits on the newest hourly or hand-started run on its commit (.github/workflows/release.yml,
+# scripts/release.mjs). Every suite runs
 # though another failed, so one run shows them all. This repository only; no project calls it. Reads only, with no
 # secret; nothing is installed but the core's own packages, below. The suites run on the core's one exact Node, the pin
 # (.node-version), and on the least long-term Node its scripts promise to run on (.node-least, which scripts/node.sh
@@ -49,7 +50,6 @@ on:
   schedule:
     - cron: '23 * * * *'
   workflow_dispatch:
-  workflow_call:
 
 permissions:
   contents: read
@@ -57,7 +57,7 @@ permissions:
 # (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is, #388; a run on
 # main after a merge gives way to the next merge's, main being tested at its newest commit only, #733, point 4; the
 # hourly runs are one group that waits rather than cancels, so a long one finishes and the next, on the same commit,
-# skips itself; a start by hand, or the release's call, is a group of its own and never cancelled)
+# skips itself; a start by hand is a group of its own and never cancelled)
 concurrency:
   group: tests-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.event_name == 'push' || github.event_name == 'schedule') && format('{0}-main', github.event_name) || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
@@ -110,7 +110,7 @@ jobs:
       fail-fast: false
       # (each job on the pin and on the least long-term Node, the file setup-node reads, #526; on a pull request and a
       # push to main the three on Linux alone, on the hourly run the eight on Windows alone, and on a start by hand or
-      # the release's call all eleven; #733, points 3 and 6)
+      # the eleven; #733, points 3 and 6)
       # (set whole for each event, since GitHub adds back an entry of `include` that matches no combination left after
       # `exclude`: each job named with its Node, its suite, its runner and its parts)
       matrix:
@@ -484,7 +484,7 @@ jobs:
     strategy:
       fail-fast: false
       # (as the suites: on a pull request and a push the two on Linux, on the hourly run the three on Windows, on a start
-      # by hand or the release's call all five; #733, points 3 and 6)
+      # by hand all five; #733, points 3 and 6)
       matrix:
         include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"os":"ubuntu-latest","part":"older"},{"os":"ubuntu-latest","part":"newer"}]' || github.event_name == 'schedule' && '[{"os":"windows-latest","part":"older"},{"os":"windows-latest","part":"newer"},{"os":"windows-latest","part":"third"}]' || '[{"os":"ubuntu-latest","part":"older"},{"os":"ubuntu-latest","part":"newer"},{"os":"windows-latest","part":"older"},{"os":"windows-latest","part":"newer"},{"os":"windows-latest","part":"third"}]') }}
     runs-on: ${{ matrix.os }}
