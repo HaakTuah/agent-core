@@ -8,7 +8,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { CAPS, QUEUE, answered, capsOf, counted, raised, rolesAt } from "../scripts/size.mjs";
+import { ghStandIn } from "../scripts/scratch-core.mjs";
+import { onPath, parseYaml } from "../scripts/workflow-run.mjs";
+import { CAPS, QUEUE, answered, capsOf, counted, raised as raisedWith, rolesAt, whoseOf } from "../scripts/size.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -28,13 +30,20 @@ ok([at(0), at("052"), at("5e1"), at("-1"), "let CAP = 52 * 1024;\n", "export con
   "a block or line spelled any other way, two of them, a role named twice, or no text at all gives no caps");
 
 // whose comment answers
-const comment = (body, author_association = "OWNER") => ({ body, author_association });
-ok(answered([comment("Leanness check: a fresh session read all the rules and found too little room.")]) && answered([[comment("x")], [comment("**Leanness check:** no room", "COLLABORATOR")]]) && answered([comment("Leanness check: found", "MEMBER")]),
-  "a comment that opens with the leanness check's answer, from the owner, a member or a collaborator, answers, in a list or a list of pages");
-ok(!answered([]) && !answered([comment("About the Leanness check: none yet")]) && !answered([comment(" Leanness check: x")]) && !answered([comment("leanness check: x")]) && !answered([comment("Leanness check")]),
+// (the repository's owner, "someone", whose answer counts with no right read: security-review.mjs, counted)
+const comment = (body, author_association = "OWNER", login = "someone") => ({ body, author_association, user: { login, type: "User" } });
+const owner = whoseOf("someone", []), raised = (base, head, comments, running = capsOf(head)) => raisedWith(base, head, comments, running, owner);
+const right = (login, role_name, permission, push) => ({ role_name, permission, user: { login, type: "User", permissions: { push } } });
+ok(answered([comment("Leanness check: a fresh session read all the rules and found too little room.")], owner) && answered([[comment("x")], [comment("**Leanness check:** no room", "COLLABORATOR")]], owner) && answered([comment("Leanness check: found", "MEMBER")], owner),
+  "a comment that opens with the leanness check's answer, from the owner, answers, in a list or a list of pages, whatever association GitHub gives it");
+ok(answered([comment("Leanness check: found", "MEMBER", "writer")], whoseOf("someone", [right("writer", "write", "write", true)])) && answered([comment("Leanness check: found", "COLLABORATOR", "Writer")], whoseOf("someone", [right("writer", "maintain", "write", true)]))
+  && !answered([comment("Leanness check: found", "MEMBER", "reader")], whoseOf("someone", [right("reader", "read", "read", false)])) && !answered([comment("Leanness check: found", "COLLABORATOR", "reader")], owner)
+  && !answered([comment("Leanness check: found")]) && !answered([comment("Leanness check: found", "MEMBER", "writer")], whoseOf("someone", [right("writer", "triage", "read", false)])),
+  "a member's or collaborator's answers only where the host's rights let them write; one who may only read or triage, or whose right was not read, does not, nor does any, with no one counted");
+ok(!answered([], owner) && !answered([comment("About the Leanness check: none yet")], owner) && !answered([comment(" Leanness check: x")], owner) && !answered([comment("leanness check: x")], owner) && !answered([comment("Leanness check")], owner),
   "one that only speaks of it, or opens any other way, does not");
-ok(["NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "MANNEQUIN", null, 5].every(who => !answered([comment("Leanness check: x", who)])), "nor does anyone else's, whatever it says");
-ok(!answered(null) && !answered({}) && !answered("Leanness check: x") && !answered([null, 1, "Leanness check: x", { author_association: "OWNER" }, { body: 5, author_association: "OWNER" }]), "nor a list in any other form, or an entry that is no comment");
+ok(["NONE", "CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", "FIRST_TIMER", "MANNEQUIN", null, 5].every(who => !answered([comment("Leanness check: x", who)], owner)), "nor does anyone else's, whatever it says");
+ok(!answered(null, owner) && !answered({}, owner) && !answered("Leanness check: x", owner) && !answered([null, 1, "Leanness check: x", { author_association: "OWNER" }, { body: 5, author_association: "OWNER" }], owner), "nor a list in any other form, or an entry that is no comment");
 
 // a pull request's raise
 const yes = [comment("Leanness check: read whole; too little room.")];
@@ -69,7 +78,7 @@ ok(counted("design", root).includes("roles/builder.md") && counted("orchestrator
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "size-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const put = (name, text) => { const to = path.join(tmp, name); fs.writeFileSync(to, text); return to; };
-const run = (...args) => { const r = spawnSync(process.execPath, [file, ...args], { cwd: root, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
+const run = (...args) => { const r = spawnSync(process.execPath, [file, ...args], { cwd: root, encoding: "utf8", env: { ...process.env, OWNER: "someone" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 const kb = Object.fromEntries(Object.entries(CAPS).map(([r, n]) => [r, n / 1024]));
 const same = put("same.mjs", own), lower = put("lower.mjs", caps({ ...kb, builder: kb.builder - 1 })), old = put("old.mjs", at(kb.builder)), none = put("none.json", "[[]]"), one = put("one.json", JSON.stringify([yes]));
 ok(run().status === 0 && Object.keys(CAPS).every(r => new RegExp(`^what the role ${r} reads at its start \\(floor/security\\.md, .*\\): \\d+ bytes of ${CAPS[r]}$`, "m").test(run().out)), "with no argument it holds each role's start to its cap", run().out);
@@ -88,7 +97,7 @@ ok(run("--raise", over, one).status === 1 && /more than one step\. Mend: set it 
 // role's start has outgrown)
 for (const part of ["scripts", "roles", "tasks", "floor"]) fs.cpSync(path.join(root, part), path.join(tmp, part), { recursive: true });
 fs.copyFileSync(queueFile, path.join(tmp, QUEUE.file));
-const copy = path.join(tmp, "scripts", "size.mjs"), at2 = (...args) => { const r = spawnSync(process.execPath, [copy, ...args], { cwd: tmp, encoding: "utf8" }); return { status: r.status, out: r.stdout + r.stderr }; };
+const copy = path.join(tmp, "scripts", "size.mjs"), at2 = (...args) => { const r = spawnSync(process.execPath, [copy, ...args], { cwd: tmp, encoding: "utf8", env: { ...process.env, OWNER: "someone" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 ok(at2().status === 0, "a copy of the core counts as the core does", at2().out);
 fs.appendFileSync(path.join(tmp, "roles", "stand-in.md"), `\n${"x".repeat(CAPS["stand-in"])}\n`);
 ok(at2().status === 1 && /what the role stand-in reads at its start is \d+ bytes over its cap\. Mend: say the rules/.test(at2().out) && mended(at2().out) && !/the role builder reads at its start is/.test(at2().out), "a role whose start has outgrown its cap fails, it alone, saying the mend", at2().out);
@@ -103,6 +112,33 @@ const elsewhere = spawnSync(process.execPath, [file], { cwd: os.tmpdir(), encodi
 ok(elsewhere.status === 1 && /cannot be counted: roles\/ is not here/.test(elsewhere.stderr) && mended(elsewhere.stderr), "where the core is not there (run from another folder), it fails and says so", elsewhere.stdout + elsewhere.stderr);
 ok(run("--raise").status === 1 && run("--raise", same).status === 1 && run("--raise", same, path.join(tmp, "missing.json")).status === 1 && run("--raise", same, put("bad.json", "{")).status === 1 && run("--raise", path.join(tmp, "missing.mjs"), one).status === 1,
   "without its two files, or with one it cannot read, it fails");
+
+// size.yml's step that reads the rights of those who answered, run as it stands, against a stand-in for GitHub's API:
+// a writer's right is read, and counts; a reader's is read, and does not; one the host does not answer, nor the
+// owner's, which needs none, nor an account outside the repository, is asked for
+{
+  const step = parseYaml(fs.readFileSync(path.join(root, ".github/workflows/size.yml"), "utf8")).jobs.size.steps.find((s) => /rights of those who answered/u.test(s.name ?? ""));
+  const repo = fs.mkdtempSync(path.join(tmp, "repo-"));
+  const git = (...args) => spawnSync("git", args, { cwd: repo, encoding: "utf8" });
+  git("init", "-q"); fs.mkdirSync(path.join(repo, "scripts")); fs.writeFileSync(path.join(repo, "scripts", "size.mjs"), own);
+  for (const m of ["base", "head"]) { git("add", "-A"); git("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", m); }
+  // (git's config count given where the environment holds none, as on a runner, since the stand-in adds one to it)
+  const { env, ghData, ghLog } = ghStandIn({ ...process.env, GIT_CONFIG_COUNT: process.env.GIT_CONFIG_COUNT ?? "0" }, fs.mkdtempSync(path.join(tmp, "gh-")), repo);
+  const says = (login, author_association) => ({ user: { login, type: "User" }, author_association, body: "Leanness check: too little room." });
+  fs.writeFileSync(ghData, JSON.stringify({ "issues/1/comments": [says("SomeOne", "OWNER"), says("writer", "COLLABORATOR"), says("reader", "MEMBER"), says("silent", "MEMBER"), says("outsider", "NONE"), says("bad;name", "MEMBER")],
+    "collaborators/writer/permission$": right("writer", "write", "write", true), "collaborators/reader/permission$": right("reader", "read", "read", false) }));
+  fs.writeFileSync(ghLog, "");
+  const runner = fs.mkdtempSync(path.join(tmp, "runner-"));
+  // (in bash as GitHub runs a step, found as the workflow runner finds it: on Windows, Git for Windows' own)
+  const script = path.join(runner, "step.sh");
+  fs.writeFileSync(script, step.run);
+  const r = spawnSync(onPath("bash", env), ["-e", script], { cwd: repo, encoding: "utf8", env: { ...env, ...(process.platform === "win32" ? { NoDefaultCurrentDirectoryInExePath: "1" } : {}), GH_TOKEN: "not-a-token", NUMBER: "1", OWNER: "someone", RUNNER_TEMP: runner, GITHUB_REPOSITORY: "someone/project" } });
+  if (r.status !== 0) console.error(r.stdout + r.stderr);
+  const rights = JSON.parse(fs.readFileSync(path.join(runner, "raise", "rights.json"), "utf8")), whose = whoseOf("someone", rights);
+  ok(r.status === 0 && rights.length === 2 && whose({ login: "writer", type: "User" }) && !whose({ login: "reader", type: "User" }) && !whose({ login: "silent", type: "User" }) && whose({ login: "SomeOne", type: "User" })
+    && r.stdout.includes("The host's rights of silent could not be read") && !/outsider|bad;name|someone\b/iu.test(r.stdout),
+    "size.yml reads the rights of those who answered: a writer's counts, a reader's and one not answered do not, and the owner, an outsider and a login of any other form are not asked for", r.stdout + r.stderr);
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the cap's check`);
 process.exit(failed ? 1 : 0);
