@@ -188,7 +188,9 @@
       "check: scripts/security-review.mjs, in part",
       "check: GitHub's ruleset on the default branch, in part"
     ],
-    "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part"
+    "tasks/reviews.md: A finding seen twice becomes a check": "check: scripts/look.mjs, in part",
+    "floor/security.md: The owner's yes in the PR": "check: scripts/pr-description.mjs, in part",
+    "roles/shared/teams.md: The higher right gives the floor's yeses": "check: scripts/pr-description.mjs, in part"
   },
   "behind": {
     "AGENTS.md": [208, 209, 213],

@@ -91,7 +91,6 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #549 | builder; a workflow, two security reviews | |
 | #550 | builder; a case a PR | |
 | #551 | builder | #549 |
 | #552 | builder | #551 |
