@@ -1,6 +1,10 @@
-// The functions of a file of C#, as the shape check reads them (shape-csharp.mjs, beside this file), read on the
-// parser the core installs (parser.mjs; #529, the first of #530's ports): the grammar, not a lexer written here, tells
-// what is code. It keeps the definition the lexer's reader had, word for word:
+// A file of C# as the shape check reads it (shape-csharp.mjs, beside this file), read on the parser the core installs
+// (parser.mjs; #529, the first of #530's ports, and its item 6): the grammar, not a lexer written here, tells what is
+// code. One read gives the file's functions, its using directives, the namespaces and types it declares, and its
+// tokens, from which the runs of the clock and of a test's reach are read. It keeps the definitions the lexer's reader
+// had.
+//
+// A function, word for word:
 //   - a function is a method, a constructor, a finaliser, an operator, an accessor (get, set, init, add, remove), a
 //     local function, a lambda and an anonymous method with a parameter list, each with a body in braces; a member
 //     written with => alone is no block, and not one;
@@ -12,19 +16,34 @@
 //     catch, finally, using, lock, fixed, unsafe, checked and unchecked, each inside the control block it lies in;
 //   - it branches at each if, loop (for, foreach, while), case, catch and arm of a switch expression, and each and
 //     (&&), or (||, ??, ??=) and choice (? :).
-// A function inside another is measured on its own. The lines the lexer reads as the preprocessor's (`directives`)
-// are blank to the parser, so that it reads both sides of an #if as code, as the lexer did. It never guesses: a file
-// the grammar cannot read whole (C# newer than the grammar the core installs, or no C#), or cannot read in time, has no
-// functions told, and the shape check counts it and says so, and fails one a pull request brings (shape.mjs, "lost").
-// Proven old against new by tests/shape-readers-test.mjs, and against counts taken by hand.
+// A function inside another is measured on its own.
+//
+// A using directive: `using N;`, `using static N.T;` and an alias `using A = N.T;` (a type's arguments left out),
+// global or not, wherever it stands; a using statement is none. A namespace: each one declared, a nested one by its
+// full name, and a file-scoped one over the declarations after it. A type: each class, struct, interface, enum and
+// record, by the name of the namespace around it and its own (a type inside another as one inside its namespace).
+//
+// A token: each word ("id", a keyword among them, an @ before it left out), number ("num"), string and character
+// ("str", one for each, an interpolated string's code in its { } read after it, its alignment and format passed over;
+// a raw string's code not read) and sign ("punct", one for each character but =>), as the lexer gave them; comments and
+// the preprocessor's lines are none, and each line of a comment is read apart, with its line, for a change's marks.
+//
+// A line of the preprocessor is one whose first word, outside a string or a comment, opens with #. Those lines are
+// blank to the parser where it reads the rest, so that it reads both sides of an #if as code, as the lexer did. It
+// never guesses: a file the grammar cannot read whole (C# newer than the grammar the core installs, or no C#) has no
+// functions told, and the shape check counts it and says so, and fails one a pull request brings (shape.mjs, "lost");
+// its usings and declarations are those the grammar read whole. A file past LARGEST, or one it cannot read in time, has
+// none told. Proven old against new by tests/shape-readers-test.mjs, and against counts taken by hand.
+import { commentLines } from "./code-shape.mjs";
 import { inParser } from "./parser.mjs";
 import { LARGEST, walkFunctions } from "./tree-walk.mjs";
 
-/** The functions of `src`: [{ name, line, lines, depth, branches }], in the order their bodies open; null where they
- *  cannot be told. `directives`, the lines (from 1) the preprocessor holds. Read in the parser's thread (read, below). */
-export function csharpFunctions(src, directives = []) {
+/** The file `src` read: { functions: [{ name, line, lines, depth, branches }] in the order their bodies open, null
+ *  where they cannot be told; usings: [{ target, static, alias }]; namespaces; types; toks: [{ t, v, line }] }; null
+ *  where the parser could not read it in time, or it is past LARGEST. Read in the parser's thread (read, below). */
+export function csharpTree(src) {
   if (src.length > LARGEST) return null;
-  try { return inParser(import.meta.url, "read", src, directives); } catch (e) {
+  try { return inParser(import.meta.url, "read", src); } catch (e) {
     if (e?.kind === "read") return null;
     // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step: #719)
     if (e?.kind === "load") throw new Error(`The parser or C#'s grammar could not be loaded: ${/ Mend: /u.test(e.message) ? e.message : `${e.message}. Mend: run node core/scripts/install.mjs parser (in the core, scripts/install.mjs parser), which installs the parser's packages from its lock file, then run the check again`}`);
@@ -41,17 +60,21 @@ const CONTROL = {
 const OPERATORS = new Set(["&&", "||", "??"]);
 const WORD = /^@?[A-Za-z_\u0080-\uffff][\w\u0080-\uffff]*$/u;
 
-/** The functions of `src`, read with the parser's `parse` (in its thread: csharpFunctions, above). */
-export function read(parse, src, directives) {
-  const lines = src.split("\n"), blank = new Set(directives);
-  let text = blank.size ? lines.map((l, k) => (blank.has(k + 1) ? l.replace(/[^\r]/gu, " ") : l)).join("\n") : src;
-  let tree = parse("csharp", text);
+/** `src` read with the parser's `parse` (in its thread: csharpTree, above). */
+export function read(parse, src) {
+  let tree = parse("csharp", src), text = src;
   try {
+    const directives = preprocessor(src, tree.rootNode);
+    if (directives.size) {
+      const lines = src.split("\n");
+      text = lines.map((l, k) => (directives.has(k) ? l.replace(/[^\r]/gu, " ") : l)).join("\n");
+      tree.delete(); tree = parse("csharp", text);
+    }
     const headers = /\bextension\s*[<(]/u.test(text) ? extensionHeaders(text, tree.rootNode) : [];
     if (headers.length) { text = asTypes(text, headers); tree.delete(); tree = parse("csharp", text); }
-    if (tree.rootNode.hasError) return null;
-    const before = leafBefore(tree.rootNode);
-    return walkFunctions(tree.rootNode, { functionBody, nameOf: node => nameOf(node, before), branches, isControl });
+    const root = tree.rootNode, before = root.hasError ? null : leafBefore(root), comments = [], toks = tokensOf(root, text, comments);
+    const functions = before ? walkFunctions(root, { functionBody, nameOf: node => nameOf(node, before), branches, isControl }) : null;
+    return { functions, ...declarations(root, new Set(headers.map(([start]) => start))), toks, comments };
   } finally { tree.delete(); }
 }
 
@@ -218,4 +241,127 @@ function leafBefore(root) {
     while (first.childCount) first = first.child(0);
     return index.get(first.id) ?? null;
   };
+}
+
+// ---- the preprocessor's lines ----
+
+// What a # on a line of its own may lie inside and be no directive: a string's text, a character, or a comment.
+const TEXTS = new Set(["string_literal", "verbatim_string_literal", "raw_string_literal", "interpolated_string_expression", "character_literal", "comment"]);
+// The lines (from 0) of the preprocessor: those whose first sign, after white space alone, is a # that lies in no
+// string or comment of the tree read as it stands.
+function preprocessor(src, root) {
+  const found = new Set();
+  let line = 0;
+  for (let at = 0; at <= src.length; line++) {
+    const end = src.indexOf("\n", at), stop = end < 0 ? src.length : end;
+    let k = at;
+    while (k < stop && (src[k] === " " || src[k] === "\t" || src[k] === "\r" || src[k] === "\f" || src[k] === "\v" || src[k] === "\uFEFF")) k++;
+    if (src[k] === "#" && !inText(root.descendantForIndex(k))) found.add(line);
+    if (end < 0) break;
+    at = end + 1;
+  }
+  return found;
+}
+const inText = node => { for (let at = node; at; at = at.parent) if (TEXTS.has(at.type)) return true; return false; };
+
+// ---- what a file declares and takes ----
+
+const DECLARES = new Set(["class_declaration", "struct_declaration", "interface_declaration", "enum_declaration", "record_declaration", "record_struct_declaration"]);
+const NAMESPACES = new Set(["namespace_declaration", "file_scoped_namespace_declaration"]);
+// (a dotted name as written, the spaces and comments between its parts left out, a type's arguments too: `N.T<int>` is N.T)
+function dotted(node) {
+  if (!node) return "";
+  if (node.type === "identifier") return node.text.replace(/^@/u, "");
+  if (node.type === "generic_name") return dotted(node.namedChildren.find(c => c.type === "identifier"));
+  if (node.type === "qualified_name") return node.namedChildren.map(dotted).filter(Boolean).join(".");
+  return "";
+}
+
+// The using directives, namespaces and types under `root`: { usings, namespaces, types }, each one the grammar read
+// whole, inside a part it could not read too, where its recovery kept it (a using directive with no error in it, a
+// declaration whose name it read); a type a header of C# 14's extension blocks was read as (`injected`, by where each
+// starts) is none.
+function declarations(root, injected) {
+  const usings = [], namespaces = new Set(), types = new Set();
+  const stack = [{ node: root, within: "" }];
+  while (stack.length) {
+    const { node, within } = stack.pop();
+    if (node.isMissing) continue;
+    if (node.type === "using_directive") { const u = usingOf(node); if (u) usings.push(u); continue; }
+    let scope = within; // (what the node's children lie in)
+    if (NAMESPACES.has(node.type)) {
+      const name = join(within, dotted(node.childForFieldName("name")));
+      namespaces.add(name);
+      if (node.type === "namespace_declaration") scope = name;
+    } else if (DECLARES.has(node.type) && !injected.has(node.startIndex)) {
+      const name = node.childForFieldName("name");
+      if (name && !name.hasError) types.add(join(within, name.text.replace(/^@/u, "")));
+    }
+    // (a file-scoped namespace holds the declarations after it, which the grammar gives as its siblings)
+    const after = [];
+    for (const c of node.children) {
+      after.push({ node: c, within: scope });
+      if (c.type === "file_scoped_namespace_declaration" && !c.hasError) scope = join(scope, dotted(c.childForFieldName("name")));
+    }
+    for (let k = after.length - 1; k >= 0; k--) stack.push(after[k]);
+  }
+  return { usings, namespaces: [...namespaces], types: [...types] };
+}
+const join = (a, b) => (a && b ? `${a}.${b}` : a || b);
+
+// A using directive's target: { target, static, alias }; null where it names no dotted name: `using global::N;`, as the
+// lexer read it.
+const GLOBAL = node => { const stack = [node]; while (stack.length) { const n = stack.pop(); if (n.type === "alias_qualified_name") return true; stack.push(...n.namedChildren); } return false; };
+function usingOf(node) {
+  if (node.hasError || GLOBAL(node)) return null;
+  const isStatic = node.children.some(c => c.type === "static"), alias = node.children.some(c => c.type === "=");
+  const named = node.namedChildren.filter(c => ["identifier", "qualified_name", "generic_name"].includes(c.type)).at(-1);
+  const target = dotted(named);
+  return target ? { target, static: isStatic, alias } : null;
+}
+
+// ---- tokens ----
+
+const WORDLIKE = /^@?[A-Za-z_\u0080-\uffff][\w\u0080-\uffff]*$/u;
+const NUMBERS = new Set(["integer_literal", "real_literal"]);
+const STRINGS = new Set(["string_literal", "verbatim_string_literal", "raw_string_literal", "character_literal"]);
+// The file's tokens in the order they stand, from its tree with the preprocessor's lines blank (and the header of each
+// of C# 14's extension blocks read as a type's, `class _`, its own words no tokens): a comment is none; a
+// string or character is one, an interpolated string's code in its { } after it. Each line of a comment goes to
+// `comments` instead, its text after the // or /* (shape.mjs reads them for a change's marks), and one on a line of the
+// preprocessor, blank, nowhere, as the lexer read it.
+function tokensOf(root, text, comments) {
+  const toks = [], stack = [root];
+  while (stack.length) {
+    const node = stack.pop(), line = node.startPosition.row + 1;
+    if (node.type === "comment") { comments.push(...commentOf(node, text, line)); continue; }
+    if (STRINGS.has(node.type)) { toks.push({ t: "str", v: node.type === "character_literal" ? node.text.slice(1, -1) : "", line }); continue; }
+    if (node.type === "interpolated_string_expression") {
+      toks.push({ t: "str", v: "", line });
+      const raw = node.children.some(c => c.type === "interpolation_start" && /"""/u.test(c.text));
+      const holes = raw ? [] : node.namedChildren.filter(c => c.type === "interpolation");
+      for (let k = holes.length - 1; k >= 0; k--) for (const c of [...holes[k].children].reverse()) if (!["interpolation_brace", "interpolation_alignment_clause", "interpolation_format_clause"].includes(c.type)) stack.push(c);
+      continue;
+    }
+    if (node.childCount === 0) { leaf(toks, node, line); continue; }
+    const children = node.children;
+    for (let k = children.length - 1; k >= 0; k--) stack.push(children[k]);
+  }
+  return toks;
+}
+// The lines of a comment, as the lexer read them: of a // comment its text to the line's end (a \r before it kept), and
+// of a /* */ one each line from after its /* to before its */.
+function commentOf(node, text, line) {
+  const out = [], start = node.startIndex, block = text.startsWith("/*", start);
+  const end = block ? (text.startsWith("*/", node.endIndex - 2) && node.endIndex - start >= 4 ? node.endIndex - 2 : node.endIndex) : (text.indexOf("\n", start) + 1 || text.length + 1) - 1;
+  commentLines(out, text, start + 2, end, line);
+  return out;
+}
+function leaf(toks, node, line) {
+  if (NUMBERS.has(node.type)) { toks.push({ t: "num", v: node.text, line }); return; }
+  for (const v of node.text.split(/\s+/u).filter(Boolean)) {
+    if (WORDLIKE.test(v)) toks.push({ t: "id", v: v.replace(/^@/u, ""), line });
+    else if (v === "=>") toks.push({ t: "punct", v, line });
+    else for (const c of v) toks.push({ t: "punct", v: c, line });
+  }
 }
