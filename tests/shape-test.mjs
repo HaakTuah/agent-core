@@ -317,19 +317,41 @@ v = lowering({ "src/m.js": nested("tall", 64, 6) }, listed([dn("src/m.js#tall", 
 ok(mended(said(v)) && /src\/m\.js#tall/.test(said(v)) && [pairs, listed([dn("src/a.js#tall", 80, 6)])].every(b => judge({ now: { "src/a.js": nested("tall", 80, 6) }, baseline: b, base: baseOf(pairs, paired) }).fail.length === 0),
   "an entry the change wrote covers a breach within what one of the base's stood under there, its entry in the base's baseline, as it did before --write wrote it; a mended one that comes back, listed a line lower, takes no other's place past what that one held", said(v));
 const crossed = listed([dn("src/e1.js#tall", 100, 6), dn("src/e2.js#tall", 120, 1)]), cross = { "src/s1.js": nested("tall", 100, 1), "src/s2.js": nested("tall", 60, 6) };
-v = judge({ now: { ...cross, "src/s2.js": nested("tall", 120, 4) }, baseline: crossed, base: baseOf(crossed, cross) });
-ok(mended(said(v)) && /src\/s2\.js#tall \(line 1\): 120 lines/.test(said(v)), "a breach of the base's that the order of claiming left without an entry is lent none whatever its numbers", said(v));
+v = judge({ now: { ...cross, "src/s2.js": nested("tall", 120, 6) }, baseline: crossed, base: baseOf(crossed, cross) });
+ok(mended(said(v)) && /src\/s2\.js#tall \(line 1\): 120 lines/.test(said(v)) && [judge({ now: cross, baseline: crossed, base: baseOf(crossed, cross) }), judge({ now: cross, baseline: crossed })].every(r => r.fail.length === 0),
+  "the order of claiming leaves no breach of the base's without an entry where each can have one: a change that changes no code passes, and one that grows a breach past every entry of its name fails", said(v));
 const reason = { grown: { "function: src/g.js#tall": "no other way" } }, why = entries => JSON.stringify({ ...reason, listed: Object.fromEntries(entries) });
 const elsewhere = baseline => judge({ now: { "src/h.js": long("tall", 200), "src/g.js": long("tall", 200) }, baseline, base: baseOf(why([fn("src/g.js#tall", 200)]), { "src/h.js": long("tall", 200) }) });
 v = elsewhere(why([fn("src/g.js#tall", 200)]));
-ok(mended(said(v)) && /1 function passes/.test(said(v)) && /src\/g\.js#tall/.test(said(v)) && /src\/g\.js#tall/.test(said(elsewhere(why([fn("src/g.js#tall", 200), fn("src/h.js#tall", 200)])))),
-  "an entry \"grown\" gives a reason for, its breach moved by an earlier pull request, covers that one and no new one at its id beside it, nor once --write has kept the new one under the old reason", said(v));
+const kept = elsewhere(why([fn("src/g.js#tall", 200), fn("src/h.js#tall", 200)]));
+ok(mended(said(v)) && v.fail.length === 1 && /held already/.test(said(v)) && /src\/h\.js#tall/.test(said(v)) && mended(said(kept)) && /1 function passes/.test(said(kept)) && /src\/g\.js#tall/.test(said(kept)),
+  "an entry \"grown\" gives a reason for, its breach moved by an earlier pull request, covers one breach and no second: with a new one at its id, the moved one is to be listed where it stands, and once --write has kept the new one under the old reason, that one fails as new", `${said(v)}\n${said(kept)}`);
 const adds = (now, entries) => judge({ now: { "src/g.js": long("tall", 200), ...now }, baseline: why([fn("src/g.js#tall", 200), ...entries]), base: baseOf(listed([fn("src/s.js#tall", 150)]), { "src/s.js": long("tall", 150) }) });
 const raised = judge({ now: { "src/g.js": long("tall", 250), "src/t.js": long("tall", 220) }, baseline: why([fn("src/g.js#tall", 250), fn("src/t.js#tall", 220)]), base: baseOf(listed([fn("src/g.js#tall", 200), fn("src/s.js#tall", 220)]), { "src/g.js": long("tall", 200), "src/s.js": long("tall", 220) }) });
 const second = judge({ now: { "src/g.js": long("tall", 250), "src/z.js": long("tall", 190) }, baseline: why([fn("src/g.js#tall", 250), fn("src/z.js#tall", 190)]), base: baseOf(listed([fn("src/g.js#tall", 200)]), { "src/g.js": long("tall", 200) }) });
 v = adds({ "src/z.js": long("tall", 200) }, []);
 ok(mended(said(v)) && /1 function passes/.test(said(v)) && /src\/z\.js#tall/.test(said(v)) && adds({ "src/t.js": long("tall", 140) }, [fn("src/t.js#tall", 140)]).fail.length === 0 && raised.fail.length === 0 && /1 function passes/.test(said(second)) && /src\/z\.js#tall/.test(said(second)),
   "one the change adds with its reason covers its own breach and no second in the place of a breach of the base's that the change mended; one of the base's that moved and shrank beside it is covered by the entry listed for it, as is one that moved beside an entry raised with its reason, whose breach of the base's backs no second entry", `${said(v)}\n${said(raised)}\n${said(second)}`);
+// (a pull request that only improves passes told a base and told none: each breach finds an entry wherever a
+// one-to-one match exists, whatever the order, and a baseline left as it is reads the same told a base, less the
+// entries the base's check read no breach under: #751's eighth round)
+{
+  const n = (lines, depth) => ({ lines, depth }), crossing = new Map([["function: a1.mjs#main", n(5, 1)], ["function: a2.mjs#main", n(1, 6)], ["function: a3.mjs#main", n(5, 5)]]);
+  const shrunk = [5, 1].map(lines => unclaimed(new Map([["function: b1.mjs#main", n(lines, 5)], ["function: b2.mjs#main", n(1, 6)]]), crossing));
+  ok(shrunk.every(left => left.length === 0), "a breach that shrinks takes no entry another needs: both are covered as before (the design check's finding on #751)", JSON.stringify(shrunk));
+  const two = listed([dn("src/a.js#tall", 100, 1), dn("src/x.js#tall", 65, 6)]), moved = { "src/a.js": nested("tall", 100, 1), "src/z.js": nested("tall", 62, 6) };
+  const both = now => [judge({ now, baseline: two, base: baseOf(two, moved) }), judge({ now, baseline: two })];
+  let runs = both({ "src/d.js": nested("tall", 63, 1), "src/z.js": nested("tall", 62, 6) });
+  ok(runs.every(r => r.fail.length === 0), "a breach moved and shrunk, onto no other's id, passes told the base and told none though a smaller entry of another's would cover it too (the fallback reviewer's finding on #751's seventh round)", runs.map(said).join("\n"));
+  runs = both({ "src/z.js": nested("tall", 90, 1), "src/y.js": nested("tall", 62, 6) });
+  ok(runs.every(r => r.fail.length === 0), "nor does one moved to where a breach of the base's stood, itself moved on, its entry listed elsewhere, fail told the base", runs.map(said).join("\n"));
+  const stands = listed([dn("src/c.js#tall", 90, 6), dn("src/f.js#tall", 150, 5)]), grown = { "src/c.js": nested("tall", 150, 5) };
+  runs = [judge({ now: grown, baseline: stands, base: baseOf(stands, grown) }), judge({ now: grown, baseline: stands })];
+  ok(runs.every(r => r.fail.length === 0), "nor does a change that changes no code, where a breach of the base's stands under another's entry that its own would not fit under: a baseline left as it is lists nothing the base did not", runs.map(said).join("\n"));
+  const first = JSON.stringify({ reads: ["javascript"], listed: Object.fromEntries([fn("src/a.js#tall", 100)]) });
+  v = judge({ now: { "src/0.py": py(100), "src/b.js": long("tall", 100) }, baseline: first });
+  ok(v.fail.length === 0 && /1 breach that stood before is not listed yet/.test(noted(v)), "what a reader the baseline does not name finds claims an entry after every other: it is said, and the moved breach of a reader it names keeps its entry", `${said(v)}\n${noted(v)}`);
+}
 // (a pull request that passes leaves the check told no base passing, as the push to the branch runs it: #751's seventh round)
 {
   const two = listed([dn("src/a.js#tall", 100, 1), dn("src/x.js#tall", 65, 6)]), first = { "src/a.js": nested("tall", 100, 1), "src/c.js": nested("tall", 62, 6) }, then = { "src/x.js": nested("tall", 90, 1), "src/c.js": nested("tall", 62, 6) };
@@ -338,8 +360,8 @@ ok(mended(said(v)) && /1 function passes/.test(said(v)) && /src\/z\.js#tall/.tes
   const steps = [[first, { "src/a.js": nested("tall", 100, 1), "src/x.js": nested("tall", 65, 6) }, two], [then, first, two], [then, first, listed([dn("src/c.js#tall", 62, 6), dn("src/x.js#tall", 90, 1)])], [{ ...flatter, "src/z.py": py(90) }, { ...flatter, "src/a.js": nested("tall", 100, 1) }, other, other]]
     .map(([now, was, baseline, before = two]) => [judge({ now, baseline, base: baseOf(before, was) }), judge({ now, baseline })]);
   v = steps[1][0];
-  ok(steps.every(([told, untold]) => (told.fail.length === 0) === (untold.fail.length === 0)) && [0, 2, 3].every(n => steps[n][0].fail.length === 0) && v.fail.length === 1 && mended(said(v)) && /told no base/.test(said(v)) && /SHAPE_BASE=origin\/main node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(said(v)) && /src\/c\.js#tall \(line 1\): 62 lines, 6 deep/.test(said(v)),
-    "a breach the baseline covers against the base and would not cover told no base, a moved one that stands at another's listed id, fails, with --write as its mend, and nothing else does that the check told no base passes: after two pull requests that only improve, the push's own check passes (the fallback reviewer's finding on #751's seventh round)", steps.map(([told, untold]) => `${said(told)}\n${said(untold)}`).join("\n"));
+  ok(steps.every(([told, untold]) => (told.fail.length === 0) === (untold.fail.length === 0)) && [0, 2, 3].every(n => steps[n][0].fail.length === 0) && v.fail.length === 1 && mended(said(v)) && /held already/.test(said(v)) && /listed under another id/.test(said(v)) && /SHAPE_BASE=origin\/main node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(said(v)) && /src\/c\.js#tall \(line 1\): 62 lines, 6 deep/.test(said(v)),
+    "a breach left without an entry by one that moved to where its entry is listed fails told the base as it would told none, with --write as its mend, and what passes told the base passes told none: after two pull requests that only improve, the push's own check passes (the fallback reviewer's finding on #751's seventh round)", steps.map(([told, untold]) => `${said(told)}\n${said(untold)}`).join("\n"));
 }
 v = judge({ now: { "src/b.js": long("tall", 100) }, baseline: listed([f100]) });
 ok(v.fail.length === 0 && /gone or moved/.test(noted(v)) && !/functions? pass/.test(said(v)), "a listed function that moved is no new breach: its old entry is said, for --write to list where it stands", noted(v));

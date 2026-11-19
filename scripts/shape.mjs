@@ -24,11 +24,11 @@
 // numbers that fell too. A pull request that only improves on the baseline passes and says what --write would take
 // out, which the next pull request that changes the baseline, or a cleaning task, writes; one that changes the
 // baseline and leaves such an entry standing fails, so the baseline it writes lists the debt as it is (#750, point
-// 5: improving pull requests had to rewrite this shared file, and collided), and so does one that leaves a breach
-// where the check told no base, as the push to the branch runs it, would find it no entry (`untold`), so that the
-// push's run passes after every pull request that passed; until it is written, an entry the base's
+// 5: improving pull requests had to rewrite this shared file, and collided); until it is written, an entry the base's
 // code no longer holds covers no breach, in its own place or elsewhere, where the base is told (`heldAt`), and with
-// no base told the mended one could come back unseen, the cost the owner accepted. A baseline names the readers
+// no base told the mended one could come back unseen, the cost the owner accepted. Told the base, the baseline is
+// read as it is told none, less those entries, so what passes there passes on the push to the branch, which is told
+// none (`thenOf`); a breach left where another's entry is listed can leave one without, and fails until --write. A baseline names the readers
 // whose finds it lists ("reads"): what a reader it does not name finds is said, never failed, where the base held it
 // already or no base is told, until --write lists it, so that a sync that brings a reader turns nothing red
 // (AGENTS.md, "Nothing locks a project"). It never guesses:
@@ -456,20 +456,36 @@ const size = n => (n === true ? 0 : NUMBERS.reduce((s, k) => s + (n[k] ?? 0), 0)
 // What `want` claims of `pool`: { left, taken }, `left` the entries of `want` that nothing in the pool covers, `taken`
 // each entry of `want` that claimed one to the id of the one it claimed. Each claims one entry of the pool, the one of
 // its own id where its numbers are within that one's, else one of its kind and group that no entry of `want` stands
-// under any more (what was listed moved, under its name), the smallest that covers it, in the order of `want`. Both
-// are Maps of id to numbers (or true). `groups` gives an id's kind and group: another check that keeps a baseline in
-// this form passes its own (screens.mjs, through `unclaimed`).
+// under any more (what was listed moved, under its name): the smallest still free that covers it, in the order of
+// `want`, and where none is free, one an earlier claimant gives up for another that covers that one (`matched`). So
+// none is left wherever each can be given an entry of its own, whatever the order, and one that shrinks, moves to an
+// id the pool lists nothing at, or goes, leaves no other without. Both are Maps of id to numbers (or true). `groups`
+// gives an id's kind and group: another check that keeps a baseline in this form passes its own (screens.mjs, through
+// `unclaimed`).
 function claims(want, pool, marks = {}, groups = groupOf) {
-  const free = new Map(pool), later = [], left = [], taken = new Map();
-  for (const [id, n] of want) { if (free.has(id) && within(n, free.get(id), marks)) { free.delete(id); taken.set(id, id); } else later.push([id, n]); }
+  const free = new Map(pool), later = new Map(), taken = new Map();
+  for (const [id, n] of want) { if (free.has(id) && within(n, free.get(id), marks)) { free.delete(id); taken.set(id, id); } else later.set(id, n); }
   for (const id of want.keys()) free.delete(id); // one that stands, and grew, lends its place to no other
-  for (const [id, n] of later) {
+  const fits = new Map([...later].map(([id, n]) => {
     const { kind, group } = groups(id);
     const covers = ([other, listed]) => { const o = groups(other); return o.kind === kind && o.group === group && within(n, listed, marks); };
-    const fit = [...free].filter(covers).sort((a, b) => size(a[1]) - size(b[1]) || a[0].localeCompare(b[0]))[0];
-    if (fit) { free.delete(fit[0]); taken.set(id, fit[0]); } else left.push(id);
-  }
-  return { left, taken };
+    return [id, [...free].filter(covers).sort((a, b) => size(a[1]) - size(b[1]) || a[0].localeCompare(b[0])).map(([other]) => other)];
+  }));
+  const held = matched(fits);
+  return { left: [...later.keys()].filter(id => !held.has(id)), taken: new Map([...taken, ...held]) };
+}
+// Each id of `fits` (an id to the entries that cover it, the one it would take first leading) to the entry it is given,
+// each entry given once, as many given one as can be: an id takes its first entry not given yet, and where all are
+// given, one whose holder can take another, that holder's own holder moved the same way.
+function matched(fits) {
+  const holder = new Map();
+  const give = (id, seen) => {
+    const open = fits.get(id).find(entry => !holder.has(entry));
+    if (open !== undefined) return holder.set(open, id);
+    return fits.get(id).some(entry => !seen.has(entry) && seen.add(entry) && give(holder.get(entry), seen) && holder.set(entry, id));
+  };
+  for (const id of fits.keys()) give(id, new Set());
+  return new Map([...holder].map(([entry, id]) => [id, entry]));
 }
 export const unclaimed = (want, pool, marks = {}, groups = groupOf) => claims(want, pool, marks, groups).left;
 // The entries of `want` that `pool` leaves unclaimed of those named in `last`, these claiming after every other, so
@@ -580,8 +596,9 @@ const SAID = {
 // The breaches no entry of the baseline covers: { fail, later }. One that only moved, under its name, claims its old
 // entry and is none: the old entry is stale, and --write lists it where it stands now. One that the base held already,
 // as this config reads the base's code, is no new breach either: the check reads more than it did (a system named, a
-// mark lowered), or the baseline was lowered in this same change past what stands, and --write, told the base, lists
-// it; a breach that still stands where the base held it claims that one first, so a new one of its name takes no
+// mark lowered), the baseline was lowered in this same change past what stands, or its entry is listed under another
+// id, where a breach stands now that takes it or lends it to no other, and --write, told the base, lists it; a
+// breach that still stands where the base held it claims that one first, so a new one of its name takes no
 // breach's place that covers itself. Of a reader the baseline does not list (`unread`), one the base held, or any where
 // no base is told, is `later`: reported, never failed, until --write lists it. The rest are new, each kind with its mend.
 function fresh({ config, at, self, found, current, base, news, unread }) {
@@ -593,7 +610,7 @@ function fresh({ config, at, self, found, current, base, news, unread }) {
     const readMore = news.filter(id => !left.has(id) && !unread(id));
     later.push(...news.filter(id => !left.has(id) && unread(id)));
     news = news.filter(id => left.has(id));
-    if (readMore.length) fail.push([`FAIL: ${plural(readMore.length, "breach", "breaches")} that ${base.name} held already ${readMore.length === 1 ? "is" : "are"} not in ${config.baseline}: the config reads more than it did, or the baseline was lowered past what stands. Mend: list them with SHAPE_BASE=${base.name} node ${self} ${at} --write, and commit the baseline`, ...some(readMore, current)]);
+    if (readMore.length) fail.push([`FAIL: ${plural(readMore.length, "breach", "breaches")} that ${base.name} held already ${readMore.length === 1 ? "is" : "are"} not in ${config.baseline}: the config reads more than it did, the baseline was lowered past what stands, or the entry is listed under another id, where a breach stands now. Mend: list them where they stand with SHAPE_BASE=${base.name} node ${self} ${at} --write, and commit the baseline`, ...some(readMore, current)]);
   }
   return { fail: [...fail, ...byKind(news, found, current, config)], later };
 }
@@ -630,15 +647,14 @@ const readAt = (base, config) => {
   return base;
 };
 
-// What the base's own check read under its baseline: each entry a breach of the base's stands under, under that
-// breach's id. Each breach of the base's, of a reader the baseline names, claims one entry, as a breach claims one now
-// (`claims`), all of them at once. An entry none claims, mended where an earlier pull request left it listed, covers
-// no breach, in its own place or elsewhere, and one that only a group-mate's grown breach stands by covers that one
-// (#750, point 5).
+// What the base's own check read under its baseline: each breach of the base's, of a reader the baseline names, to the
+// id of the entry it claims, as a breach claims one now (`claims`), all of them at once. An entry none claims, mended
+// where an earlier pull request left it listed, covers no breach, in its own place or elsewhere, and one that only a
+// group-mate's grown breach stands by covers that one (#750, point 5).
 function heldAt({ listed, reads }, base, marks) {
   if (!listed.size) return listed;
   const readers = base.found().readers, stood = new Map([...base.stood()].filter(([id]) => reads.includes(readerOf(id, readers))));
-  return new Map([...claims(stood, listed, marks).taken].map(([at, id]) => [at, listed.get(id)]));
+  return claims(stood, listed, marks).taken;
 }
 
 // What a baseline the change wrote covers against the base (`then`, the base's own baseline; `held`, what the base's
@@ -657,24 +673,28 @@ function coverAt({ listed, reads, grown }, base, marks, then, held) {
 }
 
 // A baseline against the base: `then`, the base's own baseline as the check reads it, and `old`, its config (each
-// null where the base holds none the check can read); `held`, what the base's own check read under that baseline, by
-// its own config where this one reads the base's code otherwise (`own`: the base's files as a config reads them);
-// `wrote`, whether the change writes the baseline; and `covers`, what this baseline covers against the base: left as
-// the base holds it, what the base's check read under it, and written, what the base backs of it (`coverAt`).
+// null where the base holds none the check can read); `read`, the ids of the entries the base's own check read a
+// breach under, and `held`, each of those breaches to its entry's numbers, by the base's own config where this one
+// reads the base's code otherwise (`own`: the base's files as a config reads them); `wrote`, whether the change writes the baseline; and `covers`, what of this
+// baseline covers against the base, each entry under its own id, as the check told no base reads it: left as the
+// base holds it, the entries the base's check read a breach under, and written, those the base backs (`coverAt`).
+// Being the baseline less some entries, read by the same matching, it covers nothing the check told no base, as the
+// push to the branch runs it, would not: a pull request that passes leaves that run passing (floor rule 12).
 function thenOf(base, baseline, baselineText, config) {
   const then = base.baseline === null ? null : tolerant(() => parseBaseline(base.baseline, base.name, ""));
   const old = base.config === null ? null : tolerant(() => parseConfig(base.config, base.name));
   const own = old && JSON.stringify(old) !== JSON.stringify(config) ? readAt({ standing: () => (base.own ?? base.standing)(old) }, old) : base;
-  const held = then ? heldAt(then, own, (old ?? config).marks) : new Map(), wrote = asWritten(base.baseline) !== asWritten(baselineText);
-  return { then, old, held, wrote, covers: wrote ? coverAt(baseline, base, config.marks, then, held) : held };
+  const under = then ? heldAt(then, own, (old ?? config).marks) : new Map(), read = new Set(under.values());
+  const held = new Map([...under].map(([at, id]) => [at, then.listed.get(id)])), wrote = asWritten(base.baseline) !== asWritten(baselineText);
+  return { then, old, held, read, wrote, covers: wrote ? coverAt(baseline, base, config.marks, then, held) : new Map([...baseline.listed].filter(([id]) => read.has(id))) };
 }
 
 // Against the pull request's base: what joined the baseline that the base neither listed nor held, and each mark
 // raised, where "grown" gives no reason.
-function againstBase({ config, at, self, baseline, base, found, then, old, held }) {
+function againstBase({ config, at, self, baseline, base, found, then, old, read }) {
   const fail = [];
-  // (what the base's code covers, and each entry the base lists that this baseline keeps at its id, which no other claims)
-  const was = then && new Map([...[...then.listed].filter(([id]) => baseline.listed.has(id)), ...held]);
+  // (of what the base lists: each entry its check read a breach under, and each this baseline keeps at its id, which no other claims)
+  const was = then && new Map([...then.listed].filter(([id]) => read.has(id) || baseline.listed.has(id)));
   // (the readers a baseline names only grow: one dropped would let what it lists go unlisted while it stands)
   const dropped = (then?.reads ?? []).filter(r => !baseline.reads.includes(r));
   if (dropped.length) fail.push([`FAIL: ${config.baseline} no longer names ${plural(dropped.length, "reader")} that ${base.name}'s names: ${dropped.join(", ")}. Mend: take "reads" back as ${base.name} holds it (git checkout ${base.name} -- ${config.baseline}), then run node ${self} ${at} --write if the baseline must be lowered`]);
@@ -687,15 +707,6 @@ function againstBase({ config, at, self, baseline, base, found, then, old, held 
   const unsaid = (old ? raised(config, old) : []).filter(id => !said(baseline.grown, id));
   if (unsaid.length) fail.push([`FAIL: ${at} raises or drops ${plural(unsaid.length, "mark")} against ${base.name}. Mend: first make the code or the suite fit its mark; only where it cannot, give the raise its reason under "grown" in ${config.baseline}, by the id below, and in the pull request, with a fresh session's word there that it found no other way`, ...unsaid.map(id => `  ${id}`)]);
   return fail;
-}
-
-// The breaches the baseline covers against the base that a check told no base would fail, as the push to the branch
-// runs it, reading the baseline as listed: one that moved, and stands where an entry of another's is listed, which a
-// breach that stands there lends to no other (`claims`). They fail, so a pull request that passes leaves that run
-// passing (floor rule 12), and --write, told the base, lists each where it stands.
-function untold({ config, at, self, baseline, base, current, news, unread }) {
-  const apart = unclaimed(current, baseline.listed, config.marks).filter(id => !unread(id) && !news.includes(id)), n = apart.length;
-  return n ? [[`FAIL: ${plural(n, "breach", "breaches")} that ${config.baseline} ${n === 1 ? "covers" : "cover"} against ${base.name} would fail the check told no base, as the push to the branch runs it: the entry of each is listed under another id, where another breach stands now. Mend: list each where it stands with SHAPE_BASE=${base.name} node ${self} ${at} --write, and commit the baseline`, ...some(apart, current)]] : [];
 }
 
 // What the check read and does not hold, each said, never failed.
@@ -727,12 +738,13 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   const kept = id => !current.has(id) && skipped.includes(readerOf(id, found.readers)) && ["function", "lost"].includes(groupOf(id).kind);
   const gone = id => !current.has(id) && !unread(id) && !kept(id);
   // (against the base, a listed entry covers what the base's code still holds of it, wherever it stands now: #750, point 5)
+  // (what a reader the baseline does not name finds claims after every other, so that it leaves no other without)
   const told = base ? thenOf(readAt(base, config), baseline, baselineText, config) : null;
-  const news = unclaimed(current, told?.covers ?? baseline.listed, config.marks);
+  const news = unclaimed(new Map([...current].sort(([a], [b]) => unread(a) - unread(b))), told?.covers ?? baseline.listed, config.marks);
   const { fail, later } = fresh({ config, at, self, found, current, base, news, unread });
   const lowered = staleOf({ config, at, self, baseline, wrote: told?.wrote, gone });
   fail.push(...lowered.fail);
-  if (told) fail.push(...againstBase({ config, at, self, baseline, base, found, ...told }), ...untold({ config, at, self, baseline, base, current, news, unread }));
+  if (told) fail.push(...againstBase({ config, at, self, baseline, base, found, ...told }));
   const reread = [...baseline.listed.keys()].filter(id => !current.has(id) && unread(id) && !kept(id)).length;
   return { fail, notes: [...notesOf(found.read), ...lowered.notes, ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read, kept: [...baseline.listed.keys()].filter(kept).length };
 }
