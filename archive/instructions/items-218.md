@@ -65,15 +65,15 @@ The index, and how an item is written: `archive/instructions.md`.
      counts from the owner's account by default, and from another account only where the project names it, and only
      after what it settles; and the status is required in the core first, then in the owner's own projects once the
      count is made there, and elsewhere only where that project's owner makes it so. Told those answers, the owner
-     raised the case of a project of another owner, built on that owner's own computer, whose reviews run through a
-     plug-in, since the system is not cloud and GitHub only. Decided: where no review starts by itself, every security
-     review is a posted comment from that project's owner's account, counted with nothing to set; a pure sync passes by
-     the proof alone; in a private repository the job stays skipped unless its owner turns it on; and what the status
-     proves there is that a review was posted for the head, not who made it, since builder and reviewer post under one
-     login. To the orchestrator, passed on word for word to the builder of this rule: the owner's yes is given for every
-     queued change, the floor and the review guidelines included, as its issue describes it, and those pull requests
-     quote this. Behind: "What a posted review stands for" in `modules/reviews.md`, `scripts/security-review.mjs`, the
-     core's `security-review.yml` and `own-security-review.yml`.
+     raised the case of a project of another owner where no review starts by itself on GitHub. Decided: where no review
+     starts by itself, every security review is a posted comment from that project's owner's account, counted with
+     nothing to set; a pure sync passes by the proof alone; in a private repository the job stays skipped unless its
+     owner turns it on; and what the status proves there is that a review was posted for the head, not who made it,
+     since builder and reviewer post under one login. To the orchestrator, passed on word for word to the builder of
+     this rule: the owner's yes is given for every queued change, the floor and the review guidelines included, as its
+     issue describes it, and those pull requests quote this. Behind: "What a posted review stands for" in
+     `modules/reviews.md`, `scripts/security-review.mjs`, the core's `security-review.yml` and
+     `own-security-review.yml`.
 
 221. **14 November 2026** (the core; in a chat with a session the owner had asked to look through the core, issue #257,
      its last note gathering what the owner agreed to). Asked: the owner asked for an open licence for the core alone.
@@ -81,12 +81,12 @@ The index, and how an item is written: `archive/instructions.md`.
      records. Of the choice of licence, the owner wanted clear credit from anyone who distributes the core further,
      should it become distributed; so the Apache License 2.0, with a notice file each distributor passes on. Of who the
      notice names as the holder, the owner said an account name is not necessarily permanent while the holder's own name
-     is more likely to be, and so favoured a solution that excepts just this kind of file; and, of a project of another
-     owner, held by a company, that it also ought to be able to do that in such a file. So floor rule 11 excepts a
-     copyright holder's name in a repository's licence and notice files, in the core and in every project, under three
-     guards the owner agreed to: the personal-terms check leaves those two files unread only while they keep their
-     shape, only the holder types the name, and nothing else is excepted. Of the work's name, the owner remarked it
-     would have been fun to call the repository "Hammurabi's agentic code", so the work is also named "Hammurabi's
+     is more likely to be, and so favoured a solution that excepts just this kind of file; and that a project of another
+     owner, whether held by a person or a company, also ought to be able to do that in such a file. So floor rule 11
+     excepts a copyright holder's name in a repository's licence and notice files, in the core and in every project,
+     under three guards the owner agreed to: the personal-terms check leaves those two files unread only while they keep
+     their shape, only the holder types the name, and nothing else is excepted. Of the work's name, the owner remarked
+     it would have been fun to call the repository "Hammurabi's agentic code", so the work is also named "Hammurabi's
      Agentic Code", in the notice and in a line under the README's title, and nothing is renamed. To the orchestrator,
      passed on word for word to the builder of this rule: the owner's yes is given for every queued change, the floor
      and the review guidelines included, as its issue describes it, and those pull requests quote this; and, as the
