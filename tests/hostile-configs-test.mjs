@@ -17,7 +17,9 @@ import { notes } from "../scripts/manifest-reads.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir, root } from "../scripts/scratch-core.mjs";
 import { parseConfig, where, KIT } from "../scripts/shape.mjs";
-import { answered, capsOf } from "../scripts/size.mjs";
+import { answered, capsOf, whoseOf } from "../scripts/size.mjs";
+// (the size check counts an answer from the repository's owner, "someone" here, with no right read)
+const owner = whoseOf("someone", []), me = { login: "someone", type: "User" };
 import { STEPS, notDone } from "../scripts/steps.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
 import { shapeFaults } from "../scripts/schemas.mjs";
@@ -138,9 +140,10 @@ ok([null, 5, {}, [], ""].every(t => capsOf(t) === null), "size.mjs: capsOf reads
 ok(caps("  <script>: 1 * 1024,") === null && caps('  "../x": 1 * 1024,') === null, "size.mjs: capsOf reads no cap of a role named with markup or a path");
 [said, ms] = timed(() => capsOf(`export const CAPS = {\n${"  builder: 1 * 1024,\n".repeat(BIG)}};\n`));
 ok(said === null && ms < 5000, `size.mjs: capsOf reads no cap from ${BIG} lines of one role, in ${ms} ms`);
-ok([null, 5, "Leanness check: yes", {}, [null, 5, "x", [{ author_association: "OWNER", body: 5 }], { author_association: "NONE", body: "Leanness check: yes" }]].every(c => !answered(c)),
+ok([null, 5, "Leanness check: yes", {}, [null, 5, "x", [{ author_association: "OWNER", body: 5, user: me }], { author_association: "NONE", body: "Leanness check: yes", user: me }]].every(c => !answered(c, owner))
+  && answered([{ author_association: "OWNER", body: "Leanness check: yes", user: me }], owner),
   "size.mjs: answered reads no answer from comments of the wrong type, nor one by a writer GitHub does not name");
-[said, ms] = timed(() => answered(Array.from({ length: BIG }, () => ({ author_association: "OWNER", body: `<b>${"x".repeat(100)}` }))));
+[said, ms] = timed(() => answered(Array.from({ length: BIG }, () => ({ author_association: "OWNER", body: `<b>${"x".repeat(100)}`, user: me })), owner));
 ok(said === false && ms < 5000, `size.mjs: answered reads no answer from ${BIG} comments that open with markup, in ${ms} ms`);
 const sizeBase = path.join(tmp, "size-base.mjs"), comments = path.join(tmp, "comments.json");
 fs.copyFileSync(path.join(root, "scripts/size.mjs"), sizeBase);
