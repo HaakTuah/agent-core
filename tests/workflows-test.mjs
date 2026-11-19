@@ -191,8 +191,8 @@ ok(ownCall.length === 1 && ownCall[0].uses === "./.github/workflows/security-rev
   const gate = tests.jobs.tests, gateStep = gate.steps.at(-1);
   ok(tests.on.pull_request.types.includes("ready_for_review") && !tests.on.pull_request.types.includes("edited") && ["suites", "upgrade"].every(j => String(tests.jobs[j].if).includes(DRAFT) && String(tests.jobs[j].if).includes(MOVED)),
     "no run on a draft: a pull request's run starts when it is marked ready, and each job of tests skips a draft and an hourly run where main did not move (point 2)");
-  ok(!String(gate.if).includes("draft") && String(gate.if).startsWith("${{ always()") && String(gate.if).includes(MOVED) && /github\.event\.pull_request\.draft/.test(gateStep.env.DRAFT) && /if \[ -n "\$DRAFT" \]; then[\s\S]*Mend:[\s\S]*exit 1/.test(gateStep.run),
-    "but the gate the ruleset requires runs on a draft and fails there, saying its mend, since a required check whose job is skipped passes");
+  ok(!String(gate.if).includes("draft") && String(gate.if) === `\${{ (github.event_name == 'pull_request' && always() || !cancelled()) && ${MOVED} }}` && /github\.event\.pull_request\.draft/.test(gateStep.env.DRAFT) && /if \[ -n "\$DRAFT" \]; then[\s\S]*Mend:[\s\S]*exit 1/.test(gateStep.run),
+    "but the gate the ruleset requires runs on a draft and fails there, saying its mend, since a required check whose job is skipped passes; a pull request's runs even where its run is cancelled, so a cancelled head never passes, and a run of main, the hour or a hand cancelled whole leaves it aside, never reading failed (#810)", String(gate.if));
   // (the gate's step run in a shell, as the runner runs it: each of its failures says its mend, its pass none)
   if (process.platform !== "win32") {
     const gateRun = env => spawnSync("bash", ["-e", "-c", gateStep.run], { encoding: "utf8", env: { PATH: process.env.PATH, ...env } });

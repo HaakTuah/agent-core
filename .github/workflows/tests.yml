@@ -553,10 +553,12 @@ jobs:
   # cancelled, which no failing test is, so the gate says which it was. On a draft it runs and fails, since a check the
   # ruleset requires passes where its job is skipped, and a draft's head is tested only once it is marked ready; on an
   # hourly run where main did not move it is skipped, which only ever follows a full run that passed, so a release reads
-  # it as that pass)
+  # it as that pass. Where a run of main, the hour or a hand is cancelled whole, it stands aside, so the commit reads
+  # cancelled and never failed, #810; a pull request's always runs, since a skipped one would pass a run cancelled by
+  # hand or by merge-line.mjs --cancel)
   tests:
     needs: [moved, suites, upgrade]
-    if: ${{ always() && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}
+    if: ${{ (github.event_name == 'pull_request' && always() || !cancelled()) && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
