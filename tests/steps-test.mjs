@@ -695,7 +695,9 @@ ok(["c?(x)opies.mjs", "+(c)opies*.mjs", "!(x)*.mjs", "@(copies|x).mjs", "!(x).mj
 const slashes = Date.now();
 ok(copiesOf({ "a.yml": stepped(`node core/scripts${"/".repeat(100000)}x*.mjs c.json\nnode core/scripts/copies.mjs c.json`) }) === "c.json" && Date.now() - slashes < 1500, "a run of \"/\" is read in one pass", `${Date.now() - slashes} ms`);
 const globs = Date.now();
-ok(copiesOf({ "a.yml": stepped(`echo ${"a?(b)".repeat(100000)}\nnode core/scripts/copies.mjs c.json`) }) === "c.json" && Date.now() - globs < 1500, "a long line of extended globs is read in one pass", `${Date.now() - globs} ms`);
+// (on the parser, #530: a text the grammar cannot read within its time is not read at all, since a line read alone
+// would misread a quote or a continued line over it; the fallback reviewer's review of 4ffb50d)
+ok(notRead("copies", { "a.yml": stepped(`echo ${"a?(b)".repeat(100000)}\nnode core/scripts/copies.mjs c.json`) }) && Date.now() - globs < 1500, "a long line of extended globs leaves its step not read, within the time mark", `${Date.now() - globs} ms`);
 const bigEnv = Object.fromEntries(Array.from({ length: 99000 }, (_, k) => [`E${k}`, `v${k}`]));
 const oneRun = { ".github/actions/a/action.yml": "runs:\n  using: composite\n  steps:\n    - run: echo x\n      shell: bash\n" };
 const givenStarted = Date.now();

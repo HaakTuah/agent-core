@@ -8,7 +8,8 @@
 // GitHub's in it is filled only when the workflow runs, or where it holds %NAME%, cmd's variable. A "\" between two
 // letters of a path is kept, read as "/", a folder's parting on Windows. A here-document's lines are data, never
 // commands. Where the grammar cannot read part of the text, what it reads around that part is still given, as the
-// reader before it gave what it could.
+// reader before it gave what it could; a text it cannot read within its time is not read at all, and the step that
+// asks is said not read.
 //
 //   import { bashCommands } from "./bash-commands.mjs";   bashCommands(run) -> [[{ text, dynamic }, ...], ...]
 import { inParser } from "./parser.mjs";
@@ -18,19 +19,22 @@ import { inParser } from "./parser.mjs";
 export function bashCommands(run) {
   const text = String(run);
   // (each text read once: a step that stands thousands of times, or an action called as often, costs one reading)
-  if (READ.has(text)) return structuredClone(READ.get(text));
-  try {
-    const found = inParser(import.meta.url, "read", text);
+  if (!READ.has(text)) {
+    let found;
+    try { found = inParser(import.meta.url, "read", text); } catch (e) {
+      // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step)
+      const mended = / Mend: /u.test(e?.message ?? "");
+      if (e?.kind === "load") throw new Error(`The parser or the grammar of bash could not be loaded: ${mended ? e.message : `${e.message}. Mend: run node core/scripts/install.mjs parser (in the core, scripts/install.mjs parser), which installs the parser's packages from its lock file, then run this again`}`);
+      throw e;
+    }
     if (READ.size >= READ_MOST) READ.clear();
     READ.set(text, found);
-    return structuredClone(found);
-  } catch (e) {
-    // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step)
-    const mended = / Mend: /u.test(e?.message ?? "");
-    if (e?.kind === "load") throw new Error(`The parser or the grammar of bash could not be loaded: ${mended ? e.message : `${e.message}. Mend: run node core/scripts/install.mjs parser (in the core, scripts/install.mjs parser), which installs the parser's packages from its lock file, then run this again`}`);
-    throw e;
   }
+  // (a text the grammar cannot read within its time is not read, said with why: the step that asks is not read)
+  if (READ.get(text) === null) throw new Error(TOO_SLOW);
+  return structuredClone(READ.get(text));
 }
+const TOO_SLOW = "the grammar could not read this step's commands within its time, which no plain step takes. Mend: write the step's commands in plain bash, a glob's own words in quotes";
 
 const READ = new Map(), READ_MOST = 10000;
 
@@ -42,42 +46,39 @@ const READ = new Map(), READ_MOST = 10000;
 const EXPRESSION = /\$\{\{[\s\S]*?(?:\}\}|$)/gu;
 const mark = (kind, n, length) => `GH${kind}${n}Z`.padEnd(length, "_");
 const MARKED = /GH(?:EXPR|GLOB)\d+Z/u;
-// (how long the grammar may take on the whole text, and then on one line of it, in milliseconds: its recovery from an
-// error grows faster than the text, and no step holds a line it cannot read in that time but to hide what it holds. A
-// line it cannot read so is not read, and a naming of the script on it, which no run accounts for, leaves the run not
-// read: check-configs.mjs, `unaccounted`)
-const WHOLE = 500, LINE = 100;
+// (how long the grammar may take on a step's text, every reading of it together, in milliseconds: its recovery from an
+// error grows faster than the text, and no step holds a text it cannot read in that time but to hide what it holds.
+// Such a step is not read at all, never read in parts, since a line read alone misreads a quote or a continued line
+// that runs over it)
+const WHOLE = 500;
 
-/** The commands of `run`, read with the parser's `parse` (in its thread: bashCommands, above). */
+/** The commands of `run`, read with the parser's `parse` (in its thread: bashCommands, above); null where the grammar
+ *  cannot read it within its time. */
 export function read(parse, run) {
-  const filled = [];
+  const filled = [], until = performance.now() + WHOLE;
   const text = run.replace(EXPRESSION, m => { const k = mark("EXPR", filled.length, m.length); filled.push([k, m]); return k; });
   const back = s => filled.reduceRight((acc, [k, m]) => acc.split(k).join(m), s);
-  const out = [];
-  const whole = readable(parse, text, filled, WHOLE);
-  if (whole !== null) commandsIn(parse, whole, 0, { back, out });
-  else {
-    // (the whole past its budget: each line alone, within its own)
-    let at = 0;
-    for (const line of text.split("\n")) {
-      const one = line.trim() ? readable(parse, line, filled, LINE) : null;
-      if (one !== null) commandsIn(parse, one, at, { back, out });
-      at += line.length + 1;
-    }
-  }
-  return out.sort((a, b) => a.at - b.at).map(c => c.words).filter(w => w.length);
+  const whole = readable(parse, text, filled, until);
+  if (whole === null) return null;
+  // (the time is one object every reading shares, so that one past it marks the whole step)
+  const ctx = { back, out: [], time: { until, late: false } };
+  commandsIn(parse, whole, 0, ctx);
+  return ctx.time.late ? null : ctx.out.sort((a, b) => a.at - b.at).map(c => c.words).filter(w => w.length);
 }
+// (what is left of the time until `until`, at least a millisecond, so that a parse past it stops at once)
+const left = until => Math.max(1, until - performance.now());
 
-// `text` with each extended glob stood in for, taken into `filled`, or null where the grammar cannot read it within
-// `budget`.
-function readable(parse, text, filled, budget) {
+// `text` with each extended glob stood in for, taken into `filled`, or null where the grammar cannot read it before
+// `until`.
+function readable(parse, text, filled, until) {
   for (let pass = 0; pass < GLOB_PASSES; pass++) {
-    const tree = parse("bash", text, budget);
+    const tree = parse("bash", text, left(until));
     if (!tree) return null;
     const globs = [];
-    const seek = n => { if (n.type === "subshell" && "?*+@!".includes(text[n.startIndex - 1] ?? "")) globs.push([n.startIndex, n.endIndex]); else for (const c of n.namedChildren) seek(c); };
-    seek(tree.rootNode);
-    tree.delete();
+    try {
+      const seek = n => { if (n.type === "subshell" && "?*+@!".includes(text[n.startIndex - 1] ?? "")) globs.push([n.startIndex, n.endIndex]); else for (const c of n.namedChildren) seek(c); };
+      seek(tree.rootNode);
+    } finally { tree.delete(); }
     if (!globs.length) return text;
     for (const [a, b] of globs.reverse()) { const k = mark("GLOB", filled.length, b - a); filled.push([k, text.slice(a, b)]); text = text.slice(0, a) + k + text.slice(b); }
   }
@@ -91,8 +92,8 @@ const GLOB_PASSES = 4;
 // and the lines of a here-document with no line that ends it, which a shell would read to the step's end, read as
 // commands, each alone, as the reader before this one read them, so that no run is missed.
 function commandsIn(parse, text, offset, ctx) {
-  const tree = parse("bash", text, WHOLE);
-  if (!tree) return;
+  const tree = parse("bash", text, left(ctx.time.until));
+  if (!tree) { ctx.time.late = true; return; }
   try {
     const found = [], local = { ...ctx, out: found, offset, parse };
     walk(tree.rootNode, local);
