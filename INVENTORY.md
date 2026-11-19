@@ -98,6 +98,11 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
 - `scripts/checks.mjs`: runs the checks that need no secret, part by part, as the workflows do and as a session may by
   hand. *Runs:* any session and the runners. *Else:* a task runner (npm scripts, just, make), dropped on fact: a project
   in another stack has none of npm's, and the others are installs. *Bugs:* 2. **Keep:** small and stable glue.
+- `scripts/queue.mjs`: reads `QUEUE.md` as its readers take it, a line of a closed issue skipped and waited on no
+  more, takes those lines out with `--clear`, and, run by `own-description.yml`, fails a pull request that changes the
+  queue and leaves one (#750, point 1). *Runs:* any session and the runners. *Else:* GitHub Projects, whose board hides
+  a closed item by its own workflow, dropped on fact: the queue is a file a pull request changes, the trust gate
+  (`AGENTS.md`, "The queue"), and a board is no file of the repository. *Bugs:* 0. **Keep:** small and stable.
 - `scripts/pr-description.mjs`, `.github/workflows/pr-description.yml`, `.github/workflows/own-description.yml`: fail a
   ready pull request whose description lacks a heading the project names, and, here, the lines the core asks. *Runs:*
   the runners, where the description is; any session given it. *Else:* Danger JS (MIT), its rules written in JavaScript

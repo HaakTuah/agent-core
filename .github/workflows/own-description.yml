@@ -5,7 +5,8 @@
 # (AGENTS.md, "Every rule says what holds it"), and one that changes the floor, a module, a script (the checks), the
 # setup (the starter kit and the sync notes) or a workflow, "What it asks of a project" (AGENTS.md, "Nothing locks a
 # project"): whether it does is read from git alone, the merge commit against its first parent, the base, and nothing
-# of the pull request's own text reaches that step's script. This repository only;
+# of the pull request's own text reaches that step's script. One that changes QUEUE.md leaves no line of a closed issue
+# there (scripts/queue.mjs; AGENTS.md, "The queue"; #750, point 1). This repository only;
 # no project calls it. Reads only, with no secret: the description reaches the script through env and is never
 # written into a run line (floor rule 2).
 name: own-description
@@ -50,3 +51,8 @@ jobs:
             parts="${parts:+$parts|}What it asks of a project"
           fi
           node scripts/pr-description.mjs "+$parts"
+      - name: A pull request that changes the queue takes out the lines of closed issues (scripts/queue.mjs)
+        env:
+          GH_TOKEN: ${{ github.token }} # (read only: the state of each issue the queue names)
+        run: |
+          if git diff --quiet HEAD^1 HEAD -- QUEUE.md; then echo "ok   the queue is not changed"; else node scripts/queue.mjs --check; fi

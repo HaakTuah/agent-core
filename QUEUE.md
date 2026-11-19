@@ -1,6 +1,7 @@
 # The core's queue
 
-The first line that waits on nothing is next.
+The first line of an open issue that waits on nothing open is next (`node scripts/queue.mjs`); a closed issue's line
+stays until the next pull request that changes the queue takes it out (`--clear`).
 
 **Who:** *builder*, any builder session; *rule builder*, a builder on Opus; *the owner*, no session takes it up before
 the owner's own word. A line on points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or "Fixes" it if

@@ -179,3 +179,10 @@ The index, and how an item is written: `archive/instructions.md`.
      happens to read it. The owner agreed to it in a chat session, as the third of three ways to gain on what the
      core already has. It stands behind "The audit's reader has a fixed brief and fixed questions" in
      `tasks/cleaning.md`.
+263. **19 November 2026**, #750, point 1, its queue's part. A line of the core's queue no longer leaves in the pull
+     request that closes its issue: the readers of the queue skip the line of a closed issue, and the next pull request
+     that changes the queue takes such lines out together. Of the 39 pull requests merged between 18 and 19 November,
+     12 changed `QUEUE.md`, and under merge-on-green pull requests that change the same file merge side by side and
+     collide. The owner agreed to the issue's seven points, found by an audit of those pull requests, and asked that
+     they be a priority. It stands behind "An idea is built only from a line, and a line joins in a PR of its own" in
+     `AGENTS.md`.
