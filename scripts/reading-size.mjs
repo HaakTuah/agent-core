@@ -46,7 +46,9 @@ if (shape.includes(false)) {
   process.exit(1);
 }
 marks.past ??= {};
-const MARKS_AT = path.resolve(MARKS); // (the config's path from where it was named, read on the base after the move below)
+// (the config's path from where it was named, read on the base after the move below; as the file system spells it, since git names a folder by its long name where the shell gave a short one, as on Windows)
+const real = p => { try { return fs.realpathSync.native(p); } catch { return p; } };
+const MARKS_AT = real(path.resolve(MARKS));
 process.chdir(fileURLToPath(new URL(".", import.meta.url)));
 process.chdir(projectAt(process.cwd()).root || git(["rev-parse", "--show-toplevel"]).trim()); // (a carried core's project too: core-path.mjs)
 // (a submodule's files too, at their paths from here: a library that carries the core brings its copy so; core-path.mjs)
@@ -94,7 +96,7 @@ if (base) {
   try { changed = new Set(git(["diff", "--name-only", base]).split("\n")); } catch { console.error(`FAIL: ${base} is not a commit here. Mend: fetch it (git fetch origin ${base}), or set SIZES_BASE to the pull request's base`); process.exit(1); }
   // (the base's own lines of "past", where its config can be read there: a line the base did not hold is this PR's)
   let basePast = {};
-  try { const was = JSON.parse(git(["show", `${base}:${path.relative(process.cwd(), MARKS_AT).split(path.sep).join("/")}`])); if (was?.past && typeof was.past === "object") basePast = was.past; } catch { /* (no config on the base: every line is this PR's) */ }
+  try { const was = JSON.parse(git(["show", `${base}:${path.relative(real(process.cwd()), MARKS_AT).split(path.sep).join("/")}`])); if (was?.past && typeof was.past === "object") basePast = was.past; } catch { /* (no config on the base: every line is this PR's) */ }
   const ask = `ask in what ways it could be split so that someone reads less (core/tasks/cleaning.md, "Size asks"): split it along one first, in a pull request of its own that proves its behaviour unchanged, and change it after; or, where there is none, list it under "past" in ${MARKS} as`;
   for (const f of big.filter(f => changed.has(f))) {
     const at = marks.past[f], mark = num(at) ? at : at?.mark, why = String(at?.why ?? "").trim(), n = size(f), entry = `{ "mark": ${n}, "why": "<why no split lets anyone read less, or the split's issue>" }`;
