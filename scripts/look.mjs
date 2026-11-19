@@ -24,7 +24,8 @@
 //     closes this one: a session closes it once it has found why.
 //   - What the dose makes due (dose.mjs; tasks/cleaning.md): cleaning, while the codebase is not in standard, and an
 //     audit by a reader, which the look labels needs-owner in place of queued where the project is in debt and its
-//     baseline no smaller than at the last audit; in the core alone, the staged cases due (staged.mjs); and of the
+//     baseline no smaller than at the last audit; in the core alone, the staged cases due (staged.mjs) and what a
+//     role reads at its start, or the queue, standing past its cap (size.mjs; #750, point 6); and of the
 //     choices that are hard to undo (choices.mjs), the pass over them twice a year, and a sign written in a measure the
 //     shape check keeps, while it holds.
 //   - Once a month, the state report (state-report.mjs, beside this file), opened once and not touched again; and, in a
@@ -66,6 +67,7 @@ import { HOURS, openPulls, stalled } from "./stalled.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { started } from "./started.mjs";
 import { timeOf } from "./moment.mjs";
+import { due as capPassed } from "./size.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
 import { before as monthBefore, copies, monthOf, pushWait, readCounts, shape, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
 import { notDone, report as stepsReport } from "./steps.mjs";
@@ -88,12 +90,13 @@ export const TITLES = {
 // requests whose merge is read for it in one run, and the most pages of the week's review comments read for it.
 export const LATE_DAYS = 7, LATE_PULLS = 30, LATE_PAGES = 50;
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
-// issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over
+// issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs) and a cap passed (size.mjs), in
+// the core alone; the pass over
 // the choices that are hard to undo and a sign of theirs that has tripped (choices.mjs); and the cleaning and the audit
 // the dose makes due (dose.mjs). One that says `owner`, true or false, has its issue's state label kept to it:
 // needs-owner where true, else queued; one that gives `requeue`, the key of a line of its lists, has it put back to
 // queued where an update brings a key the issue did not hold (`updating`).
-export const DUE = [stagedCases, choicesDue, signs, cleaningDue, auditIsDue];
+export const DUE = [stagedCases, capPassed, choicesDue, signs, cleaningDue, auditIsDue];
 export const OWNERS = "needs-owner";
 export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner, ...(typeof d.requeue === "function" ? { requeue: d.requeue } : {}) }));
 const labelsFor = owner => (owner ? [OWNERS, ...LABELS.slice(1)] : LABELS);

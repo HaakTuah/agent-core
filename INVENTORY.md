@@ -232,8 +232,9 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   line moved word for word aside, the dated records' folders) Vale does not read, so no upkeep would move. alex, dropped
   on fact: last published in August 2023, 414 packages; textlint (MIT, 58 packages), found by the challenge and dropped
   as Vale is. *Bugs:* 0. **Keep:** small and stable; the word lists are the core's.
-- `scripts/size.mjs`, `.github/workflows/size.yml`: fails a pull request that grows what a role reads at its start past
-  that role's cap, or raises a cap without its comment; `size.yml` runs it with `scripts/general.mjs` and
+- `scripts/size.mjs`, `.github/workflows/size.yml`: fails a pull request whose own change grows what a role reads at
+  its start, or the queue, past its cap, or raises a cap without its comment; past a cap on `main`, a warning and the
+  scheduled look's task; `size.yml` runs it with `scripts/general.mjs` and
   `scripts/shape.mjs`. *Runs:* any session and the runners. *Else:* none found. *Bugs:* 0. **Keep:** nothing fits; the
   caps are the core's.
 - `scripts/own-modules.mjs`, `scripts/holders.mjs`, `scripts/archive.mjs`, `scripts/rules.mjs`, `scripts/holders.json`:
