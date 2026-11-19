@@ -122,6 +122,17 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   for (const a of [["init", "-q"], ["add", "-A"]]) spawnSync("git", a, { cwd: root });
   const run = spawnSync(process.execPath, ["core/scripts/workflows.mjs"], { cwd: root, encoding: "utf8", timeout: 20000 });
   ok(run.status === 1 && mended(run.stdout) && /a\.yml: a link/u.test(run.stdout) && /c\.yml: not UTF-8/u.test(run.stdout) && !/\n\s+at /u.test(run.stderr), "the workflow check fails a workflow that is a link out of the project, unread, and one in UTF-16, each with its mend");
+  // a workflow nested far past what one holds, in the forms that ran for minutes in the second reader (#837): explicit-key
+  // marks, flow mappings, and a file of many keys just under the depth read; each is read within five seconds, and the
+  // two nested past it are said, with their mend (a note where no base is told, a failure on a pull request's own change: workflows-test.mjs), never silence
+  const deepRoot = path.join(fresh({ "in/.github/workflows/b.yml": "on: push\n" }), "in");
+  fs.cpSync(path.join(root, "core"), path.join(deepRoot, "core"), { recursive: true });
+  const nested = { "keys.yml": `${"? ".repeat(700)}a\n`, "flow.yml": `x: ${"{".repeat(700)}a: 1${"}".repeat(700)}\n`, "many.yml": `on: push\n${`${"? ".repeat(100)}b\n`.repeat(500)}` };
+  for (const [name, body] of Object.entries(nested)) fs.writeFileSync(path.join(deepRoot, ".github/workflows", name), body);
+  for (const a of [["init", "-q"], ["add", "-A"]]) spawnSync("git", a, { cwd: deepRoot });
+  // (the five seconds a hostile input may take are the run's own timeout: it is cut off, with no status, where it takes longer)
+  const deep = spawnSync(process.execPath, ["core/scripts/workflows.mjs"], { cwd: deepRoot, encoding: "utf8", timeout: 5000 });
+  ok(deep.status === 0 && /keys\.yml:\d+: the file nests.*Mend: /u.test(deep.stdout) && /flow\.yml:\d+: the file nests.*Mend: /u.test(deep.stdout) && !/many\.yml/u.test(deep.stdout) && !/\n\s+at /u.test(deep.stderr), "the workflow check reads explicit-key marks and flow mappings nested far past the depth read, and a file of many just under it, within five seconds, and says the first two with their mend");
   // the sync's move of the pins, and NuGet's readers, on a workflow and a build file that are links out (#446)
   const call = `jobs:\n  a:\n    uses: ${CORE}/.github/workflows/x.yml@${"a".repeat(40)}\n`;
   const away = path.join(fresh({ "outside.yml": call, "outside.props": "<Project></Project>\n", "in/.github/workflows/b.yml": "on: push\n" }), "in");
