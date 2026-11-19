@@ -107,16 +107,17 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   result in a pull request of its own: where the bug fixes' verdicts on findings, rounds of review and bugs that reached
   `main` each read "no worse within noise", `tools/claude.md`'s row for the builder names bug fixes among Sonnet's
   routine lanes; where one reads "worse", the row stays, and the note says by how much; where one reads "too few to
-  tell", the trial goes on. Then a second trial changes the effort alone: the same two kinds on Sonnet at medium
-  against Sonnet at high, each builder's first line naming its effort, over about twenty pull requests, read by the
-  same script with `--effort --since` the day it starts, and built the same way: where medium reads no worse, Claude's
-  part gives those lanes medium. It does not mean the order of "The builders" changes, so a line it gives another tool
-  counts in no trial; nor that a Sonnet builder decides what needs judgement (`tools/claude.md`, "Who to call"); nor
-  that a trial changes the model and the effort at once. Reason: on 19 November 2026 all eleven of the core's builders
-  ran on Opus at high, three bug fixes among them, and the earlier rework of the tests (#715) on Opus too, where Claude's
-  part gives routine work to Sonnet. Held, in part, by `scripts/builder-trial.mjs`, which counts each kind by its
-  builder from what `scripts/review-record.mjs` reads and from the session-cost lines; which model the orchestrator
-  starts, by nothing yet.
+  tell", the trial goes on. Then a second trial changes the effort alone: from the day that pull request merges, the
+  orchestrator starts the builder of each such line on Sonnet at medium and at high in turn, its first line naming its
+  effort ("on Sonnet at medium"); once about twenty have merged, the same script with `--effort --since` that day reads
+  them, and the result is built the same way, each kind's verdicts deciding its own lane: where medium reads no worse,
+  Claude's part gives that lane medium. It does not mean the order of "The builders" changes, so a line it gives another
+  tool counts in no trial; nor that a Sonnet builder decides what needs judgement (`tools/claude.md`, "Who to call");
+  nor that a trial changes the model and the effort at once. Reason: on 19 November 2026 all eleven of the core's
+  builders ran on Opus at high, three bug fixes among them, and the earlier rework of the tests (#715) on Opus too,
+  where Claude's part gives routine work to Sonnet. Held, in part, by `scripts/builder-trial.mjs`, which counts each
+  kind by its builder from what `scripts/review-record.mjs` reads and from the session-cost lines; which model and
+  effort the orchestrator starts, by nothing yet.
 - **An orchestrator may work the file** (`roles/orchestrator.md`) while it holds a line a session can take. The
   owner starts it; once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
   wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from
