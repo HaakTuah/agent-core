@@ -15,28 +15,28 @@ The index, and how an item is written: `archive/instructions.md`.
      by:" of the bug forms (`.github/ISSUE_TEMPLATE/bug_report.md` and the starter kit's), and the other points of a
      posted review that `scripts/review-record.mjs` reads.
 
-236. **14 November 2026** (the core, chat, issue #250). Asked: whether the core can be used in projects built by a team,
-     under an employer's rules, too, after the session set out three decisions needed before that: a licence, a team's
-     shape and another host; the owner also asked whether it should work in every git format and every person with
-     rights to the repository be an owner. Decided: The owner wants to see whether the core can be used in such
-     projects. The licence was decided apart (#257; item 221). The owner agreed to the session's take on the other two.
-     Another host, every one that holds a git repository: one layer that knows no host, a single entry point that runs
-     every check of the core from plain git, on a person's machine or in any pipeline; a thin part for each host for
-     what is the host's own (a scheduled job, a request for review, issues and labels, statuses), each naming what
-     stands in inside the repository where the host has none; proven host by host, GitHub proven and any other "should
-     work" until a project runs there, a host's part written when a project first needs it, not before. A team's shape:
-     whoever the host lets write is an owner; the host's own rights decide and no list is kept; whoever may write to the
-     repository may give its agents a task and settle an open reading, the owner's-account slot becoming the owners; the
-     yeses the floor names are given by those with the host's higher right, an admin or maintainer, so that one person
-     with the right to write does not loosen the floor alone; where two owners say opposite things, the agent reports it
-     and takes neither side, and the higher right decides; the stand-in answers from the team's recorded decisions, not
-     one person's taste; a person's approval of each change is a slot that follows the host's own protection of the
-     branch; and a project where one person holds every right changes in nothing. An employer's own rules on tools,
-     models and data come before any of the core's. For the builder of this rule, passed on by the orchestrator: The
-     owner's yes is given for every queued change, the floor and the review guidelines included, as its issue describes
-     it; the builder quotes that yes in those pull requests. Behind: floor rules 4, 12 and 14 as they read a team's
-     owners, their yeses and the approvals the host asks; `modules/hosts.md`, `modules/teams.md` and GitHub's part in
-     `modules/github-calls.md`; the slot *owner's account*; and `scripts/check.mjs`.
+236. **14 November 2026** (the core, chat, issue #250). Asked: whether the core can be used in projects built by a team
+     too, after the session set out three decisions needed before that: a licence, a team's shape and another host; the
+     owner also asked whether it should work in every git format and every person with rights to the repository be an
+     owner. Decided: The owner wants to see whether the core can be used in such projects. The licence was decided apart
+     (#257; item 221). The owner agreed to the session's take on the other two. Another host, every one that holds a git
+     repository: one layer that knows no host, a single entry point that runs every check of the core from plain git, on
+     a person's machine or in any pipeline; a thin part for each host for what is the host's own (a scheduled job, a
+     request for review, issues and labels, statuses), each naming what stands in inside the repository where the host
+     has none; proven host by host, GitHub proven and any other "should work" until a project runs there, a host's part
+     written when a project first needs it, not before. A team's shape: whoever the host lets write is an owner; the
+     host's own rights decide and no list is kept; whoever may write to the repository may give its agents a task and
+     settle an open reading, the owner's-account slot becoming the owners; the yeses the floor names are given by those
+     with the host's higher right, an admin or maintainer, so that one person with the right to write does not loosen
+     the floor alone; where two owners say opposite things, the agent reports it and takes neither side, and the higher
+     right decides; the stand-in answers from the team's recorded decisions, not one person's taste; a person's approval
+     of each change is a slot that follows the host's own protection of the branch; and a project where one person holds
+     every right changes in nothing. An employer's own rules on tools, models and data come before any of the core's.
+     For the builder of this rule, passed on by the orchestrator: The owner's yes is given for every queued change, the
+     floor and the review guidelines included, as its issue describes it; the builder quotes that yes in those pull
+     requests. Behind: floor rules 4, 12 and 14 as they read a team's owners, their yeses and the approvals the host
+     asks; `modules/hosts.md`, `modules/teams.md` and GitHub's part in `modules/github-calls.md`; the slot *owner's
+     account*; and `scripts/check.mjs`.
 
 237. **15 November 2026** (games with a screen, chat, issue #286). Asked: what the core lacks in its ruleset that could
      be prescribed to get better output in projects without the owner iterating and re-prompting so often, since

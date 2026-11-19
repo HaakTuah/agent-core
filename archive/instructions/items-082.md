@@ -206,12 +206,12 @@ The index, and how an item is written: `archive/instructions.md`.
      design session's answer: a short, general floor rule; the machine telling its own agents where they run, in a file
      of its own outside every repository; and the machine's set-up steps kept out of the repository.
 
-120. **10 November 2026** (the core). Asked: the machine's set-up steps and the agents' instructions, kept out of the
-     repository. Decided: The owner asked whether it is important or sensitive, and whether it should just be in the
-     repository, read only by agents on setting up the machine. The owner agreed to the design session's answer (nothing
-     in it is secret, every defence in it holds when known, and it is the one place that says how; a guide in the core
-     that only the setup reads, and floor rule 18 keeping out of repositories only the machine's name and address), on
-     the condition that nothing is read that anyone does not need.
+120. **10 November 2026** (the core). Asked: the machine's set-up steps and the agents' instructions, given to the owner
+     apart from the repository and kept out of it. Decided: The owner asked whether it is important or sensitive, and
+     whether it should just be in the repository, read only by agents on setting up the machine. The owner agreed to the
+     design session's answer (nothing in it is secret, every defence in it holds when known, and it is the one place
+     that says how; a guide in the core that only the setup reads, and floor rule 18 keeping out of repositories only
+     the machine's name and address), on the condition that nothing is read that anyone does not need.
 
 121. **10 November 2026** (the core). Asked: the core repository's name. Decided: The owner asked whether it should be
      called agent-core or core-rules instead, since agent-rules is an awkward name for a repository. Told that
@@ -221,10 +221,11 @@ The index, and how an item is written: `archive/instructions.md`.
 122. **10 November 2026** (the core). Asked: Codex building. Told that Codex's cloud tasks cannot push, that a capped
      API key in a cloud environment would let Claude call Codex there, and that it is no less safe than the same key on
      a machine of the owner's. Decided: The owner asked how running it on the owner's own computer is any safer, and
-     declined the key, as a cost the owner does not take on. Told that a sign-in is kept where no agent that reads
-     outsiders' text can read it, and that a cloud session's machine is reclaimed too often to keep a sign-in it was
-     given, the owner asked whether nothing needs changing for now: Codex stays the reviewer until the owner settles on
-     a machine set-up for it. The owner asked the design session to check whether anything must be updated.
+     declined the key: paying for it would be wasting money. Told that the tool's sign-in opens the account behind it,
+     so it is kept where no agent that reads outsiders' text can read it, and that a cloud session's machine is
+     reclaimed too often to keep a sign-in it was given, the owner asked whether nothing needs changing for now: Codex
+     stays the reviewer until the owner settles on a machine set-up for it. The owner asked the design session to check
+     whether anything must be updated.
 
 123. **10 November 2026** (the core). Asked: the stand-in's sources. Decided: The owner asked whether the Opus session
      in Barkstreet Snakes that answers on the owner's behalf has much data to base it on, and whether these sessions

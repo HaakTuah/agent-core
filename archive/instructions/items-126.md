@@ -226,5 +226,6 @@ The index, and how an item is written: `archive/instructions.md`.
      interferes negatively with the other owner's setup and work now that the project has the core. Rules that enforce
      compliance with best practices are good and make the agents work as they should, but anything that stops work
      because the setup is different must absolutely be addressed. Behind: the end of floor rule 10 (the owner's own work
-     carries the terms the owner gives it, where it said no licence file ever), and the README's lines on how a
-     project's set-up may differ, GitHub's free plan and the default branch among them.
+     carries the terms the owner gives it, where it said no licence file ever), and the README's lines under "How a
+     project takes the core" on GitHub's free plan, "A project that is sold", "The default branch is `main`" and "On
+     Windows".

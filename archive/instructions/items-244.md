@@ -129,9 +129,9 @@ The index, and how an item is written: `archive/instructions.md`.
 257. **18 November 2026**, #457, points 2, 4 and 5. A test that needs time has it handed in and asserts no duration on
      a real clock, a measure of speed excepted with room above its floor; a push that merges an up-to-date pull request
      whose whole suite passed on the same tree runs no test again; and the audit's seventh question asks where the tests
-     of portable code run and what that costs, since in a project of another owner the one failure at random came from
-     a duration asserted on a real clock, and every push to its default branch ran the whole
-     suite again after its pull request had. The owner agreed to the issue's points, and to point 4's skip being built in
+     of portable code run and what that costs, since in a project of another owner (#426) the one failure at random
+     came from a duration asserted on a real clock, and every push to its default branch ran the whole suite again
+     after its pull request had. The owner agreed to the issue's points, and to point 4's skip being built in
      the core's own job of tests and listed for projects as a step with its cost, the starter kit holding none. It stands
      behind "A test asserts no time measured on a real clock" and "A tree that passed is not run again" in
      `tasks/tests.md`, and the seventh question in `tasks/cleaning.md`.
@@ -160,7 +160,7 @@ The index, and how an item is written: `archive/instructions.md`.
      from their turn are cancelled" in `tasks/hosts.md`.
 260. **19 November 2026**, #457, point 1, built as #715 orders it. A test reaches a real clock or another process
      only where the clock or the process is what it guards, counted by the shape check with the share of the tests'
-     time each takes, those that stood listed and a new one failing, since in a project of another owner the
+     time each takes, those that stood listed and a new one failing, since in a project of another owner (#426) the
      few tests that started a process, and those that reached a real clock, took most of its tests' time. The owner
      agreed to the issue's points, and asked on 19 November that #715's work, the count first, be a priority. It stands
      behind "A test reaches a real clock or another process only where it guards it" in `tasks/tests.md`.

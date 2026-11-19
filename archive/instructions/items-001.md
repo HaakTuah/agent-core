@@ -8,7 +8,8 @@ The index, and how an item is written: `archive/instructions.md`.
 
 2. **26 October 2026** (Amarna Letters, item 11; for both games). Asked: a break had been suggested for the two
    sessions. Decided: The owner disagreed with the break: the two sessions work continually until they reach about 90%
-   usage. At that point they take on no bigger task, since the bulk of the remaining usage is kept in reserve.
+   usage. At that point they take on no bigger task, since the bulk of the remaining usage is kept for the owner's own
+   use.
 
 3. **26 October 2026** (Amarna Letters, item 12). Asked: the proposed setup itself. Decided: All of it is done, with a
    condition: nothing important is lost along the way and nothing is duplicated without need, since duplication creates

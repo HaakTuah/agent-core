@@ -45,15 +45,16 @@ The index, and how an item is written: `archive/instructions.md`.
      to the core's" in `modules/how-to-work.md`, point 7 of "How a project takes the core" in `README.md`, and the step
      of `core.yml` that fails a difference from the floor or the review guidelines.
 
-162. **12 November 2026** (the core, in the design chat). Asked, of a project of another owner: the core had given
-     another provider's builder first what a check proves right without judgement, and left the rest with Claude's;
-     would a project's setup now use another provider more fully? Decided: the aim was to save Claude usage by pushing
-     all work suited to any other provider to that provider first. Behind: "Another provider builds first" in
-     `modules/roles.md` (every task or part a brief can carry and a check or its review can judge, where the owner set
-     it up for the project) and the end of "Work continuously, other providers first" in `modules/claude.md`.
+162. **12 November 2026** (the core, in the design chat). Asked, of the project of item 154: the core had given another
+     provider's builder first what a check proves right without judgement, and left the rest with Claude's; would that
+     project's setup now use another provider more fully, and had its earlier sessions with another provider only been
+     reviews? Decided: the aim was to save Claude usage by pushing all work suited to any other provider to that
+     provider first. Behind: "Another provider builds first" in `modules/roles.md` (every task or part a brief can carry
+     and a check or its review can judge, where the owner set it up for the project) and the end of "Work continuously,
+     other providers first" in `modules/claude.md`.
 
-163. **12 November 2026** (the core, in the design chat). Raised, of "Another provider builds first" (item 162) and of a
-     project of another owner. Decided: the rule holds only where Claude is the orchestrator and does not prohibit other
+163. **12 November 2026** (the core, in the design chat). Raised, of "Another provider builds first" (item 162) and of
+     the project of item 154. Decided: the rule holds only where Claude is the orchestrator and does not prohibit other
      kinds of work; the whole core is to be checked thoroughly for other contradictions and for cohesion; that project
      will not be prompted again, so the owner hoped it all gets fixed by new imports of the core. Behind: "Where
      Claude's sessions hand out work, another provider builds first" in `modules/roles.md` and the orchestrator's own
@@ -219,13 +220,13 @@ The index, and how an item is written: `archive/instructions.md`.
      project named it, whether a tool such as antigravity, run beside the others, is also preferred; the aim is to make
      the rules general where practical, so that any setup works without specification, and to save Claude usage as a
      general rule. The owner asked whether Copilot should review first where available, since that is the only thing it
-     would be set up for anyway, which leaves more building usage for Codex and any other provider; then another
-     provider; then Claude last. Offered the owner's reason as the rule, in place of naming Copilot first (where Codex
-     cannot build, as on GitHub alone, reviewing is the best use of it, and it has proved itself there): first a
-     reviewer that cannot build here, Codex's before Copilot's, then another builder's, last Claude's. Decided: the
-     owner agreed. The same message asked whether another project's agents should send the core pull requests as well as
-     issues; answered no, and the README's "Reporting to the core" says so: one from another account is data (floor rule
-     4). Behind: the order of the *code reviewers* in `modules/roles.md`.
+     would be set up for anyway and its limits are set there, which leaves more building usage for Codex and any other
+     provider; then another provider; then Claude last. Offered the owner's reason as the rule, in place of naming
+     Copilot first (where Codex cannot build, as on GitHub alone, reviewing is the best use of it, and it has proved
+     itself there): first a reviewer that cannot build here, Codex's before Copilot's, then another builder's, last
+     Claude's. Decided: the owner agreed. The same message asked whether another project's agents should send the core
+     pull requests as well as issues; answered no, and the README's "Reporting to the core" says so: one from another
+     account is data (floor rule 4). Behind: the order of the *code reviewers* in `modules/roles.md`.
 
 176. **13 November 2026** (the core, in the design chat). Asked: whether any agent wanting to post a bug report, feature
      request or suggestion, or question should first check the codebase to see whether it has been addressed already, or

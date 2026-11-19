@@ -81,18 +81,18 @@ The index, and how an item is written: `archive/instructions.md`.
      records. Of the choice of licence, the owner wanted clear credit from anyone who distributes the core further,
      should it become distributed; so the Apache License 2.0, with a notice file each distributor passes on. Of who the
      notice names as the holder, the owner said an account name is not necessarily permanent while the holder's own name
-     is more likely to be, and so favoured a solution that excepts just this kind of file; and that a project of another
-     owner, whether held by a person or a company, also ought to be able to do that in such a file. So floor rule 11
-     excepts a copyright holder's name in a repository's licence and notice files, in the core and in every project,
-     under three guards the owner agreed to: the personal-terms check leaves those two files unread only while they keep
-     their shape, only the holder types the name, and nothing else is excepted. Of the work's name, the owner remarked
-     it would have been fun to call the repository "Hammurabi's agentic code", so the work is also named "Hammurabi's
-     Agentic Code", in the notice and in a line under the README's title, and nothing is renamed. To the orchestrator,
-     passed on word for word to the builder of this rule: the owner's yes is given for every queued change, the floor
-     and the review guidelines included, as its issue describes it, and those pull requests quote this; and, as the
-     session's own note, #257 has grown, since it now changes floor rule 11 and the personal-terms check, so its line is
-     a rule builder's, not a builder's. Behind: floor rule 11's exception for a copyright holder's name, the exemption
-     and shape check in `.github/workflows/personal-terms.yml`, `LICENSE`, `NOTICE` and "Licence" in `README.md`.
+     is more likely to be, and so favoured a solution that excepts just this kind of file; and that the holder of a
+     project of another owner also ought to be able to do that in such a file. So floor rule 11 excepts a copyright
+     holder's name in a repository's licence and notice files, in the core and in every project, under three guards the
+     owner agreed to: the personal-terms check leaves those two files unread only while they keep their shape, only the
+     holder types the name, and nothing else is excepted. Of the work's name, the owner remarked it would have been fun
+     to call the repository "Hammurabi's agentic code", so the work is also named "Hammurabi's Agentic Code", in the
+     notice and in a line under the README's title, and nothing is renamed. To the orchestrator, passed on word for word
+     to the builder of this rule: the owner's yes is given for every queued change, the floor and the review guidelines
+     included, as its issue describes it, and those pull requests quote this; and, as the session's own note, #257 has
+     grown, since it now changes floor rule 11 and the personal-terms check, so its line is a rule builder's, not a
+     builder's. Behind: floor rule 11's exception for a copyright holder's name, the exemption and shape check in
+     `.github/workflows/personal-terms.yml`, `LICENSE`, `NOTICE` and "Licence" in `README.md`.
 
 222. **15 November 2026** (the core; in chats with a session the owner had asked to look through the core, issue #256,
      its note "What this issue asks to be built, in one place" gathering what the owner agreed to). Asked: the owner

@@ -162,11 +162,12 @@ The index, and how an item is written: `archive/instructions.md`.
     the games differ in substance, each keeps its own; the floor is in two files, the rules any task can break read at
     every start and the rest before a task touches them; Dependabot here is set to the workflow's actions; and a last
     code review comes before the merge. The owner added that only Claude has to stop around 90%, since its remaining
-    usage is kept in reserve, so Codex or whatever else is added will be for project work only. Ideally they time so
-    that 90% is never spent before 100% of them are spent, but that depends on their being in an environment where they
-    can track it, such as the owner's own computer, where they can track and start one another directly; the rules are
-    calibrated for that. Right now every cloud session wastes time establishing that it can track its usage, and wastes
-    tokens posting about it on every PR, possibly more.
+    usage is kept for the owner's own use, so Codex or whatever else is added will be for project work only. Ideally
+    they time so that 90% is never spent before 100% of them are spent, but that depends on their being in an
+    environment where they can track it, such as the owner's own computer, or a second set-up, even better a third,
+    where the owner believes they can track and start one another directly; the rules are calibrated for that. Right now
+    every cloud session wastes time establishing that it can track its usage, and wastes tokens posting about it on
+    every PR, possibly more.
 
 77. **9 November 2026** (Amarna Letters, item 243; Barkstreet Snakes, 9 November 2026). Asked: the owner's yes was asked
     for on this repository's first pull request and on the personal-terms fix in both games; the design session relayed
