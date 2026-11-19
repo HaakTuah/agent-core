@@ -126,6 +126,38 @@ for (const step of STEPS.filter(s => s.check)) {
   ok(reads("ready_for_review", "!github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "github.event.pull_request.draft") && !reads("opened, synchronize, reopened, ready_for_review", "github.event.pull_request.draft == false") && !reads("opened, synchronize, reopened, ready_for_review", "github.actor != 'x' && !github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "always() || !github.event.pull_request.draft") && !reads("opened, synchronize, reopened, ready_for_review", "!cancelled() && !github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "!cancelled() && !(github.event.pull_request.draft || x)") && reads("opened, synchronize, reopened, ready_for_review", "always() }} && !github.event.pull_request.draft && ${{ true") && reads("opened, synchronize, reopened, ready_for_review", "github.actor != ' && !github.event.pull_request.draft && '") && !reads("opened, synchronize, reopened, ready_for_review", "github.actor != 'it''s && x' && !github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "github.event.pull_request.labels[github.actor && !github.event.pull_request.draft && 1]"),
     "a job that starts a suite reads done only with all four types and a condition of parts joined by && that skips a draft, a status function such as `!cancelled()` among them and a quoted string one word, not one that runs on drafts alone, an || that lets one through, text outside its ${{ }}, an index or a draft part inside a string");
 }
+// (and its publishing: a workflow that publishes a site otherwise than from a green default branch reads not done, its
+// mend saying how it waits on one; one on the checks' completed run, each job asking the run's success and its head
+// repository or needing a job that does, a push of tags alone and a person's dispatch read done; #733, points 7 and 8)
+{
+  const READY_LEAD = "19 November 2026, the project's tests at the pace of a release", file = path.join(dir, ".github/workflows/pages.yml");
+  const GREEN = "github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository";
+  const RUN = "  workflow_run:\n    workflows: [tests]\n    types: [completed]\n    branches: [main]";
+  const job = (name, cond, needs, deploy) => `  ${name}:\n${cond === null ? "" : `    if: \${{ ${cond} }}\n`}${needs ? `    needs: ${needs}\n` : ""}    runs-on: ubuntu-latest\n    steps:\n      - ${deploy ? "uses: actions/deploy-pages@v4" : "run: npm run build"}\n`;
+  const flow = (on, jobs) => `name: pages\n\non:\n${on}\n\npermissions:\n  contents: read\n\njobs:\n${jobs}`;
+  const said = (on, jobs = job("deploy", null, null, true)) => { fs.writeFileSync(file, flow(on, jobs)); execFileSync("git", ["add", "-A"], { cwd: dir }); const m = notDone(dir).find(x => x.lead === READY_LEAD); fs.rmSync(file); execFileSync("git", ["add", "-A"], { cwd: dir }); return m; };
+  const onPush = said("  push:\n    branches: [main]");
+  ok(onPush && /publishes what its users get otherwise than from a green default branch \(`\.github\/workflows\/pages\.yml`\)/.test(JSON.stringify(onPush)) && /workflow_run/.test(JSON.stringify(onPush)) && /users get\* to `releases`/.test(JSON.stringify(onPush)),
+    "a workflow that publishes a site on a push alone reads not done, its mend making it wait on the checks' completed run and the row *users get* say releases", JSON.stringify(onPush));
+  const notDoneOn = [
+    ["on that run with no condition", RUN, undefined],
+    ["on that run, the job that builds unguarded", RUN, job("build", null, null, false) + job("deploy", GREEN, "build", true)],
+    ["on that run, a condition joined by ||", RUN, job("deploy", GREEN.replace("&&", "||"), null, true)],
+    ["on that run, the success alone", RUN, job("deploy", "github.event.workflow_run.conclusion == 'success'", null, true)],
+    ["on that run, a part inside a string", RUN, job("deploy", `github.actor != ' && ${GREEN.replace(/'/gu, "''")} && '`, null, true)],
+    ["on that run of every branch", "  workflow_run:\n    workflows: [tests]\n    types: [completed]", job("deploy", GREEN, null, true)],
+    ["on a schedule", "  schedule:\n    - cron: '0 * * * *'", undefined],
+    ["on a push of branches and tags", "  push:\n    branches: [main]\n    tags: ['v*']", undefined],
+  ].filter(([, on, jobs]) => !said(on, jobs)).map(([what]) => what);
+  const doneOn = [
+    ["on that run, its one job guarded", RUN, job("deploy", GREEN, null, true)],
+    ["on that run, a first job guarded and the other needing it", RUN, job("build", GREEN, null, false) + job("deploy", null, "[build]", true)],
+    ["on that run and a person's dispatch", RUN + "\n  workflow_dispatch:", job("deploy", GREEN, null, true)],
+    ["on a push of tags alone", "  push:\n    tags: ['v*']", undefined],
+    ["on a release", "  release:\n    types: [published]", undefined],
+  ].filter(([, on, jobs]) => said(on, jobs)).map(([what]) => what);
+  ok(!notDoneOn.length && !doneOn.length, "a publishing workflow reads done only where each trigger waits on a green branch: on the checks' completed run of one branch with every job guarded, or needing a guarded one, a push of tags alone, a release, a person's dispatch", JSON.stringify({ notDoneOn, doneOn }));
+}
 // several at once, in a project of another kind: exactly those
 const lockProject = dirs["an-npm-project"];
 const some = STEPS.filter(s => s.check).filter((_, i) => i % 2 === 0).map(s => s.lead);
@@ -188,8 +220,8 @@ ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.y
 const shapeBaseline = path.join(lockProject, "checks/shape-baseline.json"), shapeAsKit = fs.readFileSync(shapeBaseline, "utf8");
 fs.writeFileSync(shapeBaseline, "{\n  \"listed\": {}\n}\n");
 let shapeMissed = notDone(lockProject);
-ok(shapeMissed.length === 2 && shapeMissed[1].lead === "18 November 2026, the shape check reads C#'s functions on the parser" && /written before the check read C#, its functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[1].mend) && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, its functions by the lexer, Python, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process:/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
-  "a shape baseline that names no reader is reported by both its steps, each mend to write it with every reader", report(shapeMissed));
+ok(shapeMissed.length === 3 && shapeMissed[2].lead === "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser" && /written before the check read JavaScript and TypeScript, their functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[2].mend) && shapeMissed[1].lead === "18 November 2026, the shape check reads C#'s functions on the parser" && /written before the check read C#, its functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[1].mend) && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, its functions by the lexer, Python, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process:/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
+  "a shape baseline that names no reader is reported by each of its steps, each mend to write it with every reader", report(shapeMissed));
 execFileSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: lockProject, env: { ...process.env, SHAPE_BASE: "" } });
 shapeMissed = notDone(lockProject);
 ok(!shapeMissed.length && JSON.parse(fs.readFileSync(shapeBaseline, "utf8")).reads.length === Object.keys(READERS).length, "and the mend as written makes it done", report(shapeMissed));
