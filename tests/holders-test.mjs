@@ -107,8 +107,8 @@ ok(["names \"tasks/x.md: Gone\"", "core archive 7 is no item", "is no list of th
 
 // (#744: an item after the last numbered one is keyed by its issue, or one point of it, in that issue's own file; a key
 // used twice, one in another file, one in the words and a number past the last each fail; "behind" names keys)
-const keyed = archive({ "items-001.md": r1, "issue-9.md": "# Issue 9\n\n#9. **19 Nov**: h.\n\n#9.2. **19 Nov**: i.\n", "issue-12.md": "#12.1. **19 Nov**: j.\n" });
-ok(!inStep(keyed).length, "items keyed by their issue, or a point of it, each in its issue's file, are in step", inStep(keyed).join("\n"));
+const keyed = archive({ "items-001.md": `${r1}\n262. **19 Nov**, #8: the last numbered.\n`, "issue-9.md": "# Issue 9\n\n#9. **19 Nov**: h.\n\n#9.2. **19 Nov**: i.\n", "issue-12.md": "#12.1. **19 Nov**: j.\n" });
+ok(!inStep(keyed).length, "items keyed by their issue, or a point of it, each in its issue's file, are in step, beside the last item numbered, 262", inStep(keyed).join("\n"));
 const keyedBad = inStep(archive({ "items-001.md": `${r1}\n#9. **19 Nov**: h.\n`, "items-263.md": "263. **19 Nov**, #8: k.\n", "issue-12.md": "#12.1. **19 Nov**: j.\n\n#12.1. **19 Nov**: l.\n" }, { "issue-12.md": "#12.1. **19 Nov**: words.\n" }));
 ok([/items-001\.md:5: item #9 stands outside archive\/instructions\/issue-9\.md, the file its key puts it in\. Mend: move it there$/, /item #12\.1 stands twice, .* Mend: give the one at archive\/instructions\/issue-12\.md:3 a key of its own, "#12\.P"/,
   /item 263 is keyed by a running number, a key that names no issue, .* Mend: key it "#N"/, /words\/issue-12\.md: item #12\.1 adds the owner's words here/].every(re => keyedBad.some(w => re.test(w))) && keyedBad.every(w => /Mend: /.test(w)),
