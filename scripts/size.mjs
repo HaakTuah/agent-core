@@ -15,8 +15,10 @@
 // wrote it: whether the session found too little room stays with the reviews, as does any change to this check itself
 // and the first cap of a role that had none. The size workflow (.github/workflows/size.yml) runs the raise twice: the
 // default branch's version, from the base's own copy before any of the pull request's code runs, reads the head's file
-// as text alone, so that no change to this file decides its own raise; and the pull request's version, as itself, which
-// holds that the caps its text sets are those it runs with. Node's own modules only.
+// as text alone, so that no change to this file decides whether the raise its text sets has its answer; and the pull
+// request's version, as itself, which holds that the caps its text sets are those it runs with. What caps the head's
+// code really holds the rules to, and its count of each role's start, stay its own and its reviews'. Node's own
+// modules only.
 //
 //   node scripts/size.mjs                                  what each role reads at its start, against its cap, and
 //                                                          the queue against its own mark
