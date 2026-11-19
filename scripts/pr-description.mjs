@@ -41,18 +41,17 @@
 //   PR_BODY="$(...)" PR_CREATED="..." node core/scripts/pr-description.mjs ["Part one|Part two"]
 //   PR_BODY="$(...)" node core/scripts/pr-description.mjs "+Part three"     the two, and that one as well
 import { spawnSync } from "node:child_process";
-import fs from "node:fs";
 import { doneMends, ownerAt, queueAt, readItem, takesIt } from "./done-when.mjs";
 import { isPart, milestoneMends } from "./milestones.mjs";
 import { NUMBER } from "./outcomes.mjs";
 import { asking, issuesOf, textsOf, yesOf } from "./owner-yes.mjs";
-import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, taken } from "./reading.mjs";
+import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, pathIn, taken, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
 
 // The line a description ends with, saying what the pull request waits on: nothing (its builder goes on), a review, its
 // checks, another item ("#241"), or the owner, with the question in one sentence after a colon.
 export const WAITS = "Waits on:";
-const FORMS = [["nothing", /^nothing$/], ["a review", /^a review$/], ["checks", /^checks$/], ["item", /^#\d+$/], ["the owner", /^the owner: \S.*\?$/]];
+const FORMS = [["nothing", /^nothing$/], ["a review", /^a review$/], ["checks", /^checks$/], ["item", /^#[1-9]\d{0,8}$/], ["the owner", /^the owner: \S.*\?$/]];
 export const WAITS_SINCE = "2026-11-16T00:00:00Z";
 // The day from which the line "Read for it:" is asked, of a pull request opened since the copy on its base held this.
 export const READS_SINCE = "2026-11-16T00:00:00Z";
@@ -101,7 +100,7 @@ export const planAsked = (created, then) => String(created) >= PLAN_SINCE && Boo
 // What a description says it waits on: its last line that starts with "Waits on:", as { said, kind }, kind null where
 // the line is in none of the forms; null where there is no such line.
 export function waitsOn(body) {
-  const line = String(body ?? "").split(/\r\n|\r|\n/u).map(l => l.trim()).filter(l => l.startsWith(WAITS)).at(-1);
+  const line = textOf(body).split(/\r\n|\r|\n/u).map(l => l.trim()).filter(l => l.startsWith(WAITS)).at(-1);
   if (line === undefined) return null;
   const said = line.slice(WAITS.length).trim();
   return { said, kind: FORMS.find(([, form]) => form.test(said))?.[0] ?? null };
@@ -136,6 +135,15 @@ export function calledFor(dir) {
   return calledByPaths(lib, ownOf(diff.split("\0").filter(Boolean), prefix), own).map(c => ({ ...c, file: `${prefix}${c.file}` }));
 }
 
+// The path of the copy whose history says which lines a pull request is asked, in the checkout at `dir`, the merge commit
+// against its first parent, the base: where the base's manifest puts the core (its "Core:" line, read by pathIn), or the
+// core's own scripts/ where the base holds no manifest; never the head's, so that a pull request cannot move the path to
+// skip the lines (#455).
+export function copyAtBase(dir) {
+  const r = spawnSync("git", ["show", "HEAD^1:core-manifest.md"], { cwd: dir, encoding: "utf8", maxBuffer: 1 << 24 });
+  return `${r.status === 0 ? pathIn(r.stdout) : ""}scripts/pr-description.mjs`;
+}
+
 export const PARTS = ["What the owner can try", "Readings taken"];
 
 // The parts an argument asks for: its own, separated by |, in place of the two; led by a +, added to the two (so a
@@ -150,7 +158,7 @@ export function asked(arg) {
 // The parts, of those asked for, that the description has no heading for.
 export function missing(body, parts = PARTS) {
   // a heading's words: what follows the #, read as milestones.mjs, beside this file, reads a part's heading
-  const headings = String(body ?? "").split(/\r\n|\r|\n/u).map(line => /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(line)?.[1]).filter(Boolean);
+  const headings = textOf(body).split(/\r\n|\r|\n/u).map(line => /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(line)?.[1]).filter(Boolean);
   return parts.filter(part => !headings.some(h => isPart(h, part)));
 }
 
@@ -163,7 +171,7 @@ if (started(import.meta.url)) {
   const created = String(process.env.PR_CREATED ?? ""), base = String(process.env.BASE_SHA ?? ""), repo = String(process.env.GITHUB_REPOSITORY ?? "");
   const mends = [];
   if (/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(created) && created >= WAITS_SINCE && /^[0-9a-f]{40}$/.test(base) && /^[\w-]+\/[\w.-]+$/.test(repo) && !/\/\.+$/.test(repo)) {
-    const file = fs.existsSync("core/scripts/pr-description.mjs") ? "core/scripts/pr-description.mjs" : "scripts/pr-description.mjs";
+    const file = copyAtBase(".");
     const gh = (...a) => { const r = spawnSync("gh", ["api", ...a], { encoding: "utf8", maxBuffer: 1 << 24 }); if (r.status !== 0) throw new Error("no answer"); return r.stdout; };
     // the copy as it stood when the pull request opened, read once
     let then = null;

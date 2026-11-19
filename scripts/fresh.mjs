@@ -51,6 +51,10 @@ function signedIn(p, lock) {
   return lock && path.posix.dirname(lock);
 }
 
+// The folder of NuGet's files: Dependabot's directory where it names one, "/" being the root itself; else the
+// solution's or project file's folder (`built`).
+const nugetFolder = (named, built) => named ? named[1].replace(/\/+$/, "") || "." : built ? path.posix.dirname(built) : ".";
+
 // The starter kit's options for a project of the same kind as `p` (steps.mjs reads it), and the pin its manifest names.
 export function kind(p) {
   const pin = /^Core: \S+ at ([0-9a-f]{40}),/m.exec(p.manifest)?.[1] ?? "0".repeat(40); // (a carried core: none)
@@ -59,15 +63,12 @@ export function kind(p) {
   // the core's checks: a project that lost such a call still shows as one that needs it)
   const own = ownFiles(p);
   const shallowest = re => own.filter(f => re.test(f)).sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b))[0];
-  const folderOf = f => path.posix.dirname(f);
   const lock = shallowest(/(^|\/)package-lock\.json$/);
   const folder = signedIn(p, lock);
   if (folder !== undefined) o.packages = String(folder).replace(/\/+$/, "") || ".";
   const built = shallowest(/\.(sln|slnx|csproj|fsproj|vbproj)$/);
-  // (Dependabot's directory for NuGet where it names one, "/" being the root itself; else the solution's or project
-  // file's folder)
   const named = /package-ecosystem:\s*"?nuget"?\s*\n\s*directory:\s*"?\/?([^"\n]*)"?/.exec(p.read(".github/dependabot.yml") ?? "");
-  if (nugetCalled(p) || built) o.nuget = named ? named[1].replace(/\/+$/, "") || "." : built ? folderOf(built) : ".";
+  if (nugetCalled(p) || built) o.nuget = nugetFolder(named, built);
   if (!p.workflows["codeql.yml"] && !p.workflows["licences.yml"]) o.private = true;
   if (/^Floor: whole\. Modules: all\.$/m.test(p.manifest)) o.game = true;
   return { o, pin };

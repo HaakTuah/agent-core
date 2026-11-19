@@ -28,6 +28,7 @@ import { seen } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { KINDS, LABEL, kindOf } from "./outcomes.mjs";
 import { broughtBy } from "./review-record.mjs";
+import { timeOf } from "./moment.mjs";
 import { ownerOf } from "./releases.mjs";
 import { VERDICT, byAgent, verdict } from "./stand-in-record.mjs";
 import { started } from "./started.mjs";
@@ -38,7 +39,7 @@ const OWN_VOICE = ["by:owner", "by:chat", "by:design"];
 // Items and comments before the rule came stand as they were written: those before the day the project's copy gained
 // this file, and never before SINCE. Labels are read on every open issue.
 export const SINCE = "2026-11-16T00:00:00Z";
-export const cameOn = dates => [SINCE, ...String(dates ?? "").split("\n").map(d => d.trim()).filter(d => /^\d{4}-\d\d-\d\dT/.test(d)).map(d => new Date(d).toISOString().replace(/\.\d{3}Z$/, "Z"))].sort().at(-1);
+export const cameOn = dates => [SINCE, ...String(dates ?? "").split("\n").map(d => d.trim()).filter(d => timeOf(d) !== null).map(d => new Date(timeOf(d)).toISOString().replace(/\.\d{3}Z$/, "Z"))].sort().at(-1);
 // "Several" notes newer than an issue's current text: the issue's own count (#244, part F) was three to six.
 export const SEVERAL = 3;
 
@@ -68,7 +69,8 @@ const ownVoiceNote = body => !byAgent(body) || /^From (?:a chat session with the
 // The labels to make or set: those of the list the repository (`have`: [{ name, color, description }]) lacks or holds
 // otherwise. Names are compared as GitHub does, ignoring case.
 export function toMake(have) {
-  const by = new Map(have.map(l => [String(l.name).toLowerCase(), l]));
+  // (a list that is none, and an entry that is no label, are read as no labels: GitHub's answer shapes them)
+  const by = new Map((Array.isArray(have) ? have : []).filter(l => l && typeof l === "object" && typeof l.name === "string").map(l => [l.name.toLowerCase(), l]));
   return Object.entries({ ...LIST.state, ...LIST.sender, ...LIST.mark }).flatMap(([name, want]) => {
     const l = by.get(name.toLowerCase());
     if (!l) return [{ name, ...want, how: "make" }];
@@ -93,7 +95,7 @@ function unmarked(issues, comments, mine, names) {
 // issue's number, all its comments; `owner`: the owner's account; `have`: the repository's labels.
 export function check({ issues, comments = [], notes = new Map(), owner, have, since = SINCE }) {
   const mine = u => String(u?.login ?? "").toLowerCase() === String(owner).toLowerCase();
-  const names = i => (i.labels ?? []).map(l => (typeof l === "string" ? l : l.name));
+  const names = i => (Array.isArray(i?.labels) ? i.labels : []).map(l => (typeof l === "string" ? l : l?.name)).filter(n => typeof n === "string");
   const count = (i, list) => names(i).filter(n => list.includes(n)).length;
   const fresh = at => String(at ?? "") >= since;
   const ctx = { issues, comments, notes, have, mine, names, count, fresh };

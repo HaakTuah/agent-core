@@ -9,37 +9,39 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    them from its `core/` copy. Each input below is data (floor rule 4), which the scripts it names check against its
    shape and refuse where it fails, as floor topic 5 asks, its hostile tests trying each case.
    - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the line
-     "Read for it:" by `scripts/reading.mjs`); hostile tests: `scripts/hostile-pr-text-test.mjs`.
+     "Read for it:" by `scripts/reading.mjs`); hostile tests: `tests/hostile-pr-text-test.mjs`.
    - the comments and reviews on a pull request, their bodies and authors: read by the security-review check and
      the code-review wait (`scripts/security-review.mjs`, `scripts/code-review-wait.mjs`) and the size check's reader
      of a "Leanness check:" answer (`scripts/size.mjs`), and, with the descriptions of merged pull requests, by the
-     tools reader (`scripts/tools-read.mjs`); hostile tests: `scripts/hostile-pr-comments-test.mjs`.
+     tools reader (`scripts/tools-read.mjs`); hostile tests: `tests/hostile-pr-comments-test.mjs`.
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`) and the tree a copy must be (`scripts/copy-tree.mjs`); hostile
-     tests: `scripts/hostile-pr-changes-test.mjs`.
+     tests: `tests/hostile-pr-changes-test.mjs`.
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the
      reviews' records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look
-     (`scripts/look.mjs`) and the inbox (`scripts/inbox.mjs`); hostile tests: `scripts/hostile-issues-test.mjs`.
+     (`scripts/look.mjs`) and the inbox (`scripts/inbox.mjs`); hostile tests: `tests/hostile-issues-test.mjs`.
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository
      (the workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`,
      `scripts/releases.mjs`, `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`,
-     `scripts/clean-merges.mjs` and `scripts/security-review.mjs`; hostile tests: `scripts/hostile-github-test.mjs`.
+     `scripts/clean-merges.mjs`, `scripts/security-review.mjs` and `scripts/merge-line.mjs`; hostile tests:
+     `tests/hostile-github-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`) and the sync's steps
-     (`scripts/steps.mjs`); hostile tests: `scripts/hostile-configs-test.mjs`.
+     (`scripts/steps.mjs`); hostile tests: `tests/hostile-configs-test.mjs`.
    - the files an agent tool takes its instructions from (`GEMINI.md`, an entry file, each file of a tool's folders), as
      the work tree and a pull request's base hold them: read by the copies and pointer checks (`scripts/copies.mjs`,
-     `scripts/pointers.mjs`, through `scripts/rule-files.mjs`); hostile tests: `scripts/copies-tools-test.mjs`.
+     `scripts/pointers.mjs`, through `scripts/rule-files.mjs`); hostile tests: `tests/copies-tools-test.mjs`.
    - a project's build, package and workflow files: read by the licence, exact-versions, NuGet, workflow and
      agent-tools checks (`scripts/licences.mjs`, `scripts/exact-versions.mjs`, `scripts/nuget.mjs`,
-     `scripts/workflows.mjs`, `scripts/agent-tools.mjs`); hostile tests: `scripts/hostile-build-files-test.mjs`.
+     `scripts/workflows.mjs`, `scripts/agent-tools.mjs`); hostile tests: `tests/hostile-build-files-test.mjs`.
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
-     (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`) and
-     the lookup (`scripts/lookup.mjs`); Node itself is checked against its SHA-256 by `scripts/node.sh`; hostile
-     tests: `scripts/hostile-packages-test.mjs`.
+     (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
+     lookup (`scripts/lookup.mjs`) and its lookup again of what a project holds (`scripts/held.mjs`, through the
+     lookup's readers); Node itself is checked against its SHA-256 by `scripts/node.sh`; hostile
+     tests: `tests/hostile-packages-test.mjs`.
 6. **Rules 6, 7, 10 and 15:** the repository holds documents, the scripts projects run from their `core/` copy
    (`scripts/`, Node's and the shell's own tools) and the workflows projects call; it ships nothing. What it takes are
    tools that only run, each with its licence in its audit (`.github/licences-audit.json`). Among them is Node

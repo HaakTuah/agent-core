@@ -9,7 +9,8 @@
 // here ("npx -y" in a variable), npm init or create, which fetch by another name, npm update or npm audit fix, which
 // take the newest a range allows, another registry or npm config, npm install without its lockfile, a word that is no
 // npm command where npm stands as one (atCommand), a command running on past 16 KB. Other fetchers (curl, wget, pip,
-// pnpm, yarn, bun, playwright install, git clone and the like): OTHER_FETCHER, and Windows' and .NET's: WINDOWS_FETCHER.
+// pnpm, yarn, bun, playwright install, git clone and the like): OTHER_FETCHER, and Windows' and .NET's: WINDOWS_FETCHER;
+// of those, the downloads by address (curl, wget and PowerShell's): downloads.
 // Node's own modules only (none).
 
 // npm's commands that fetch a package, by every spelling npm takes; those that fetch nothing new (the lockfile's own,
@@ -103,6 +104,19 @@ export const WINDOWS_FETCHER = (() => {
 })();
 /** The first fetch in text by a fetcher the scan cannot read, or undefined. */
 export const otherFetch = (text) => (OTHER_FETCHER.exec(text) ?? WINDOWS_FETCHER.exec(text))?.[0];
+// The fetchers among those that download a file by its address, a program among them: curl and wget, and PowerShell's.
+const DOWNLOADER = /(?:curl|wget|Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer|(?<![\w-])(?:iwr|irm)(?![\w-]))/iu;
+/** Each download by address in text, as the two readers above find their fetches: the line each stands in and the
+ *  lines it runs on to (after a "\\" or PowerShell's "`" at a line's end), trimmed, once for each download, so that
+ *  two alike count twice; for a report and a count, never compared word for word. */
+export function downloads(text) {
+  const at = [OTHER_FETCHER, WINDOWS_FETCHER].flatMap((re) => [...text.matchAll(new RegExp(re.source, `${re.flags}g`))].filter((m) => DOWNLOADER.test(m[0])).map((m) => m.index + m[0].search(/\S/u)));
+  return [...new Set(at)].sort((a, b) => a - b).map((i) => {
+    let end = text.indexOf("\n", i);
+    while (end !== -1 && /[\\`]\r?$/u.test(text.slice(text.lastIndexOf("\n", end - 1) + 1, end))) end = text.indexOf("\n", end + 1);
+    return text.slice(text.lastIndexOf("\n", i - 1) + 1, end === -1 ? text.length : end).trim();
+  });
+}
 
 /**
  * What one command line fetches: { specs, unreadable, packs } where specs are the packages written for npx, npm exec,

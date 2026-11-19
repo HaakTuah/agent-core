@@ -75,7 +75,8 @@ export const sessionOf = body => [...String(body ?? "").matchAll(/claude\.ai\/co
 // out whole, as if it were not there: anyone can open one, name a session in it and write a line of any size, and
 // counted even as "no line" it would wipe that session's reading.
 export function readings(rows, repo, oldest) {
-  return rows.filter(([number, from]) => number >= oldest && String(from ?? "").toLowerCase() === repo.toLowerCase())
+  // (a number that is no whole number GitHub could give, text "12" or one past the safe integer, is read as none)
+  return rows.filter(([number, from]) => Number.isSafeInteger(number) && number > 0 && number >= oldest && String(from ?? "").toLowerCase() === repo.toLowerCase())
     .map(([number, , body]) => ({ number, session: sessionOf(body), reading: reading(body) }));
 }
 

@@ -78,6 +78,7 @@ PLANTED["15 November 2026, every step has its check"] = dir => Object.entries(PL
 
 // The steps no check reads that this case does not plant, each with why.
 export const UNPLANTED = {
+  "18 November 2026, another publisher's code named in a lock file": "it needs a project that ships or runs another publisher's code loaded otherwise than from a lock file (a content network's script), and this case's project is a private tool that loads none",
   "13 November 2026, MS-PL waits for the owner's yes": "it needs the licence check's report on an installed package under MS-PL, which a scratch project with no network cannot install",
   "13 November 2026, a game's previews share its origin": "it needs a game served by GitHub Pages with its previews, and this case's project is a private tool",
   "16 November 2026, what a screen is held to": "it needs a project people use through a screen, whose next pull request changing one writes the direction first, and this case's project is a private tool with no screen",
@@ -85,6 +86,7 @@ export const UNPLANTED = {
   "16 November 2026, what a game is for": "it needs a game, whose next pull request adding a feature writes its page first, and this case's project is a private tool that is no game",
   "16 November 2026, milestones named in order": "what it asks is the manifest's list taking a module, the act \"13 November 2026, the modules a project takes\" already plants; the milestones are a reading of what the project builds",
   "17 November 2026, a team's owners read from the host": "it needs a second person's account the host lets write, and the case's scratch repository holds its owner's alone",
+  "17 November 2026, held packages looked up again": "its outcome is what npm's or NuGet's registry answers on the day of a package the project holds, which no scratch project can plant without a package of its own, and what the session puts in a sync pull request's description is no file a script reads after",
 };
 
 export function set(dir, opts = {}) {

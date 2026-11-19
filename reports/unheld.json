@@ -1,11 +1,6 @@
 {
   "about": "The rules of the floor and the modules that scripts/holders.mjs counts as having no holder, each with its proposal (AGENTS.md, \"Rules are pruned by their numbers\"; #545), worst first: a rule read at a role's start before one read on need. \"mark\": \"check\" (a check that never guesses could hold it, a maintained linter's rule first where one reads the breach), \"case\" (only a staged case could), \"move\" (to a module read on need), \"goes\" (kept in the archive with its reason, free to return), or \"describes\" (it binds no one, and holders.json should say so). \"by\": the queued issue that builds the check or case, or \"project\" for a check a project of that kind keeps; a check or case with none has no issue filed yet, since its upkeep does not pay yet or the owner's answer comes first; the owner decides moves and removals, a few at a time. A floor rule is never proposed to go. Sorted first on 17 November 2026; each pruning's session brings it up to date.",
   "proposals": {
-    "floor/security.md: The owner's word": {
-      "mark": "case",
-      "by": "#550",
-      "why": "only what a session writes shows it: a case gives a session the owner's words to act on and reads its pull request for them word for word, and for no bare yes quoted"
-    },
     "floor/security.md: Nothing is reviewed twice": {
       "mark": "case",
       "by": "#550",
@@ -263,16 +258,6 @@
       "mark": "check",
       "by": "#556",
       "why": "a maintained linter's rules read its second half exactly, ESLint's no-eval, no-implied-eval and no-new-func; CodeQL's XSS and code-injection queries read markup built from untrusted data: name both, in part"
-    },
-    "floor/topics/weaknesses.md: 9. Security alerts and reported weaknesses": {
-      "mark": "case",
-      "by": "#550",
-      "why": "a case shows a session a weakness in merged code and reads that nothing of it lands in a file, PR, issue or comment"
-    },
-    "floor/topics/weaknesses.md: In merged code, if it reaches what the threat model protects": {
-      "mark": "case",
-      "by": "#550",
-      "why": "the same case as rule 9's: nothing public is written of the weakness"
     },
     "floor/topics/weaknesses.md: Any other weakness in merged code": {
       "mark": "case",
