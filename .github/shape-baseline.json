@@ -105,6 +105,7 @@
     "process: tests/licences-test.mjs -> node:child_process": true,
     "process: tests/lookup-test.mjs -> node:child_process": true,
     "process: tests/manifest-reads-test.mjs -> node:child_process": true,
+    "process: tests/merge-line-test.mjs -> node:child_process": true,
     "process: tests/mutate-test.mjs -> node:child_process": true,
     "process: tests/nuget-fetch-test.mjs -> node:child_process": true,
     "process: tests/nuget-gate-test.mjs -> node:child_process": true,
