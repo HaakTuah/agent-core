@@ -39,6 +39,12 @@ ok(["nothing", "a review", "checks", "#241"].every(w => waitsOn(`x\n\nWaits on: 
 ok(waitsOn("x") === null && waitsOn("Waits on: soon").kind === null && waitsOn("Waits on: the owner").kind === null && waitsOn("Waits on: the owner: why").kind === null,
   "no line is none; one in no form, or the owner without a question in one sentence ending in a question mark, is no form");
 ok(waitsOn("Waits on: the owner: a?\r\nWaits on: nothing").kind === "nothing" && waitsOn("  Waits on:   a review  ").said === "a review", "the last such line counts, trimmed");
+// (#750, point 4: the check fails what is missing, never phrasing)
+ok(waitsOn("Waits on: #724, then the orchestrator's word").kind === "item" && waitsOn("Waits on: Nothing").kind === "nothing" && waitsOn("Waits on: a review by Codex").kind === "a review"
+  && waitsOn("Waits on: checks.").kind === "checks" && waitsOn("Waits on: The owner: may it go? Then #3.").kind === "the owner",
+  "a line that begins with a form, in any case, is in it whatever follows");
+ok(["nothingness", "a reviewer", "checksum", "#12a", "the owner: why", "soon, nothing"].every(w => waitsOn(`Waits on: ${w}`).kind === null),
+  "  but a word that only starts like a form, the owner with no question, or a form that does not begin the line, is in none");
 ok(costMend("x\nSession so far: 1,204 answers (opus); tokens in 3, cache written 4, cache read 5, out 6.\n") === null && costMend(`x\r\n  ${NO_COST}\r\n`) === null,
   "the cost line, or the mark that the script printed none, on a line of its own, is enough");
 ok([costMend("x"), costMend(`see ${NO_COST}`), costMend("No cost line."), costMend(null)].every(m => /Mend: run `node core\/scripts\/session-cost\.mjs`/.test(m ?? "") && m.includes(NO_COST)),
@@ -46,8 +52,9 @@ ok([costMend("x"), costMend(`see ${NO_COST}`), costMend("No cost line."), costMe
 ok(numberMend("## What holds it\n\nNone\n") === null && numberMend("x") === null
   && numberMend("## What holds it\n- \"A rule\": held by its check.\n  Number: correction: misread; outcome: asked.\n## Readings taken\nNumber: x") === null,
   "the number is asked only where \"What holds it\" stands and holds more than None, and one line in its form is enough");
-ok(numberMend("## What holds it\n- Number: check fires; outcome: robust; rare harm.") === null && numberMend("## What holds it\n- Number: check fires; outcome: robust; rare") !== null,
-  "a number may say that its rule guards against rare and severe harm, in those words");
+ok(numberMend("## What holds it\n- Number: check fires; outcome: robust; rare harm.") === null && numberMend("## What holds it\n- Number: check fires; outcome: robust; rare") === null
+  && numberMend("## What holds it\n- Number: Check fires; outcome: fast (the statuses wait less)") === null,
+  "a number may say that its rule guards against rare and severe harm, and a line that begins in the form passes whatever follows, in any case (#750, point 4)");
 ok([numberMend("## What holds it\n- \"A rule\": held by its check.\n## Readings taken\nNumber: findings; outcome: robust"), numberMend("### What holds it\n- Number: findings; outcome: cost")].every(m => /Mend: under it, .*"Number: <findings \| check fires \| correction: <kind>>; outcome: <asked/.test(m ?? ""))
   && /it reads "findings; outcome: cost"/.test(numberMend("### What holds it\n- Number: findings; outcome: cost")),
   "a rule with no number under the heading, one under another heading, or one in no form, is to mend, the mend giving the form");
