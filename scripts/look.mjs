@@ -63,6 +63,7 @@ import { lateBody, lateOf, pullOf, repliersOf } from "./review-marks.mjs";
 import { codexFind } from "./review-record.mjs";
 import { ownerOf } from "./releases.mjs";
 import { copyOf, readCore } from "./core-path.mjs";
+import { parseBounded } from "./guards.mjs";
 import { fileAt, statesOf, unplaced } from "./queue.mjs";
 import { writersOf } from "./security-review.mjs";
 import { goesOn, handedOff, HOURS, NOTICE, openPulls, stalled, standingStill } from "./stalled.mjs";
@@ -297,8 +298,8 @@ export function stillFinding({ repo, manifest, owner, pulls, now = Date.now(), g
     if (wrong) return add(TITLES.still, null, `the progress file was not read: ${wrong.replace(/^FAIL: /u, "")}`);
     const queue = read(file);
     if (!queue.trim()) return add(TITLES.still, null);
-    const opened = JSON.parse(gh(`search/issues?q=${encodeURIComponent(`repo:${repo} is:issue is:open in:title "${NOTICE}"`)}`, "--jq", "[.items[] | {title, login: .user.login}]"));
-    const notices = noticesOf(opened, owner, login => JSON.parse(gh(`repos/${repo}/collaborators/${login}/permission`)));
+    const opened = parseBounded(gh(`search/issues?q=${encodeURIComponent(`repo:${repo} is:issue is:open in:title "${NOTICE}"`)}`, "--jq", "[.items[] | {title, login: .user.login}]"));
+    const notices = noticesOf(opened, owner, login => parseBounded(gh(`repos/${repo}/collaborators/${login}/permission`)));
     if (notices.some(t => t.startsWith(NOTICE))) return add(TITLES.still, null);
     const free = standingStill({ queue, closed: statesOf(repo, route => gh(route)), pulls, notices, now, latest });
     add(TITLES.still, free ? `The *progress file* (\`${file}\`) holds a line a session could take (${free.map(n => `#${n}`).join(", ")}, the first that waits on nothing open), no pull request of this repository's own was pushed in the last day, nothing reached the default branch in it, and no issue titled "${NOTICE}" from the owner's account is open. Where builders are held back for usage, the orchestrator opens that issue, saying what is left, when the window opens again, which lines wait and the words that change it (\`roles/orchestrator.md\`, "Never held back in silence"); otherwise start a builder on that line. Close this issue once work goes on.` : null);

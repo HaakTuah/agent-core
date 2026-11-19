@@ -44,7 +44,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository (the
      workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`, `scripts/releases.mjs`,
      `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`, `scripts/clean-merges.mjs`,
-     `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs` and `scripts/tools-offer.mjs`, and
+     `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs`, `scripts/tools-offer.mjs` and the
+     scheduled look's reader of the default branch's newest commit, read as a time alone (`scripts/look.mjs`), and
      an account's rights by the code-review wait (`scripts/code-review-wait.mjs`), the scheduled look
      (`scripts/look.mjs`) and the size check (`scripts/size.mjs`, from `size.yml`) through `security-review.mjs`'s
      reader; limits: 1 MB of an answer to `core-moved.mjs`, `releases.mjs` and `tools-offer.mjs`, 64 MB or 256 MB to the
