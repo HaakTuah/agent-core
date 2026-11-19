@@ -60,7 +60,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   anchors), remark-validate-links, markdown-link-check and linkinator, each kept for Markdown's own links and dropped,
   on fact, for the rest: none reads a backticked path, a quoted section, a bold lead or "point 6". *Bugs:* 0. **Try** a
   link checker, run offline, for the form `[text](path)` and a project's own documents (with #486's group 5); **keep**
-  the core's own forms: nothing fits, they are the core's.
+  the core's own forms: nothing fits, they are the core's. Its reading of Markdown runs on the package marked (#530,
+  item 7).
 - `scripts/reading-size.mjs`: fails a file every session reads that passes its mark. *Runs:* any session and the
   runners. *Else:* size-limit and bundlesize, dropped on fact: they weigh a built bundle, not a file read whole.
   *Bugs:* 2. **Keep:** nothing fits; what a session reads is the core's own list.
