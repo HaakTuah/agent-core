@@ -69,8 +69,8 @@ sessions.
   session per task, continued for its review fixes while its context is under an hour old and small; otherwise a fresh
   one.
 - **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can:
-  once its task merged, or it stopped with its work pushed and its note in its PR's description (for usage too: a fresh
-  builder, of any tool, picks up from the branch), its last message read and nothing scheduled bound to it.
+  once its task merged, or it stopped with its hand-off note written, its last message read and nothing scheduled
+  bound to it.
   - It first checks that the session cleaned up and does so for one that could not.
   - Never deleted; never one the owner works in or that waits only on the owner's yes.
 - **A new lane only where it merges sooner** (#702). By default each independent entry gets a lane, cleaning its share

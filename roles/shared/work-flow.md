@@ -30,8 +30,7 @@ Read at the start of every task.
 
 **The owner's stop switch:** the branch `agents-stop` on the project's own repository, which the
 owner creates from any device to stop its agents and deletes to let them go on.
-- Every session reads it at its start and before each commit (`git ls-remote origin refs/heads/agents-stop`; the
-  work-saved hook says so at the start).
+- Every session reads it at its start and before each commit (`git ls-remote origin refs/heads/agents-stop`).
 - Where it stands, no task starts, and a running one stops, saying so.
   - It never stops what the owner then asks a session for in person.
 - Where it cannot be read, the session says so.
