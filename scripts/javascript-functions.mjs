@@ -33,6 +33,7 @@ export const grammarOf = file => GRAMMAR[path.posix.extname(file)] ?? "javascrip
 /** The functions of `src`, the text of `file`: [{ name, line, lines, depth, branches }], in the order their bodies
  *  open; null where they cannot be told. Read in the parser's thread (read, below). */
 export function javascriptFunctions(file, src) {
+  if (src.length > LARGEST) return null;
   try { return inParser(import.meta.url, "read", grammarOf(file), src); } catch (e) {
     if (e?.kind === "read") return null;
     // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step: #719; tested apart
@@ -48,6 +49,10 @@ export function javascriptFunctions(file, src) {
 // in a few; its recovery from text that is no JavaScript grows faster than the text, a line of 300,000 "/[" past two
 // minutes. A file it cannot read within it has no functions told)
 const budgetOf = src => 1000 + src.length / 250;
+// (the largest file the grammar is given, in characters: its tree takes memory in step with its nodes, a 4 MB array
+// literal about 2.5 GB, and a file of code that size is data a script wrote, not code someone reads; one past it has no
+// functions told)
+export const LARGEST = 2_000_000;
 
 /** The functions of `src`, read with the parser's `parse` and the grammar named (in its thread: javascriptFunctions). */
 export function read(parse, grammar, src) {

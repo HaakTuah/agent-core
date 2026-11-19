@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { changedTogether, cycles, globals, imports, isModule, jsxIn, measure, tokens } from "../scripts/code-shape.mjs";
-import { javascriptFunctions } from "../scripts/javascript-functions.mjs";
+import { LARGEST, javascriptFunctions } from "../scripts/javascript-functions.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -54,6 +54,11 @@ ok(tokens(`x = ${"/[".repeat(300000)}\n`).length === 600002, "a large line is re
 const unclosed = functions(`function f() {\n${"x =(:\n".repeat(10000)}${"[\n".repeat(10000)}${"]".repeat(5000)}}\n`);
 const slashed = functions(`x = ${"/[".repeat(300000)}\n`);
 ok(unclosed === null && slashed === null, "a large file that is no JavaScript is lost, its functions not told, within the suite's time mark");
+// (one past the largest the grammar is given, valid or not, is lost unread: its tree's memory, not its time, is what a
+// generated file of data would cost; the fallback security review of #785)
+const words = n => `export const WORDS = [${Array.from({ length: n }, (_, k) => `"w${k}"`).join(", ")}];\nfunction f() {\n  return 1;\n}\n`;
+ok(words(LARGEST / 12).length <= LARGEST && same(fn(words(LARGEST / 12), "a.mjs"), ["f:2:3:0"]) && words(LARGEST / 8).length > LARGEST && functions(words(LARGEST / 8)) === null,
+  "a file past the largest the grammar is given is lost unread, and one under it is read whole");
 const many = functions(`function f(a) {\n${"  if (a) { a = a ?? 1; }\n".repeat(10000)}}\n`);
 ok(same(many?.map(f => `${f.name}:${f.lines}:${f.depth}:${f.branches}`), ["f:10002:1:20000"]), "a large file that is JavaScript is read whole", JSON.stringify(many));
 const branching = [
