@@ -295,10 +295,11 @@ adds this record.
   installed at set-up, and what a lock file gives (#652): the host's alerts and update proposals read what the core
   depends on, and replacing a package is a change to the lock file. What stands: the path, its steps and their order,
   and no fetch while a check runs. What gives way: step 3's folder and its list; each package is an entry of
-  `package-lock.json`, installed by the sync, at a session's start and in each job before a check
+  `.packages/package-lock.json`, installed by the sync, at a session's start and in each job before a check
   (`scripts/install.mjs`), and held by the core's own licence check and lookup, which read that lock file. The signs
   above that read the carried files read the install instead: a package that turns a project's check red or raises its
-  alerts, or an install that adds more than 30 s to a job.
+  alerts, or an install that adds more than 30 s to a job; "a hook's start passes 100 ms" reads the hook's own work,
+  not the install it makes once a checkout.
 - Reopens it: the suites' verdicts differ between the least Node and the pin, on Linux or Windows (the least
   goes); a hook's start passes 100 ms on Windows; a carried file turns a project's check red or raises its code
   scanning's alerts; a port's comparison differs beyond its definition's mend (that reader stays); the replay of fixed
@@ -326,9 +327,10 @@ adds this record.
 - Reopened on 18 November 2026 by the owner's decision (#654): other publishers' code is registered, never carried.
   What was not weighed when "nothing installed in a project" was argued: the registry's own lock file, installed at
   set-up, and what a lock file gives (#652). What stands: the scripts in JavaScript, run by the pinned Node from the
-  copy, and no fetch while a check runs. What gives way: "nothing installed": the core's packages are installed from
-  its `package-lock.json` into the copy's `node_modules/`, which git does not track, by the sync, at a session's start
-  and in each job before a check (`scripts/install.mjs`); a script loads them from there alone (`scripts/packages.mjs`).
+  copy, and no fetch while a check runs. What gives way: "nothing installed": the core's packages are installed from its
+  `.packages/package-lock.json` into the copy's `.packages/node_modules/`, which git does not track, by the sync, at a
+  session's start and in each job before a check (`scripts/install.mjs`); a script loads them from there alone
+  (`scripts/packages.mjs`).
 - Reopens it: a package the core needs cannot run on the pinned Node without a native build or an install script, or
   the install adds more than 30 s to a job on the host's runners.
 
@@ -430,9 +432,10 @@ counter and its commands are in the pull request that adds this record (#487).
 - **Reopened on 18 November 2026 by the owner's decision (#654):** other publishers' code is registered, never
   carried. What was not weighed: the registry's own lock file, installed at set-up (#652). What stands: tree-sitter as
   the parser, its runtime and each grammar at one exact version, and no fetch while a check runs. What gives way:
-  "carried in the copy": the runtime and each grammar are entries of the core's `package-lock.json`, installed as
-  every package is (`scripts/install.mjs`), their integrity the registry's, their licences read by the core's licence
-  check from the lock file; the list of SHA-256 and the carried notices go with the folder.
+  "carried in the copy": the runtime and each grammar are entries of the core's `.packages/package-lock.json`, installed
+  as every package is (`scripts/install.mjs`), their integrity the registry's, their licences read by the core's licence
+  check from the lock file; the list of SHA-256 and the carried notices go with the folder. The sign "the files carried
+  pass 20 MB" reads the installed packages instead.
 - **What is written by hand today** (#486, point 10). Counted on 16 November 2026: each stand-in's lines, and the
   issues labelled `bug` that name its script (of the 50 so labelled). In the order of what each is worth, each
   replaced by itself, with a trial of its own, at the dose, as cleaning is (`tasks/cleaning.md`), and each that brings

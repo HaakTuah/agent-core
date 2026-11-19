@@ -73,8 +73,9 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-test-"));
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
   for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
-  fs.cpSync(fileURLToPath(new URL("../node_modules", import.meta.url)), path.join(tmp, "core/node_modules"), { recursive: true });
-  fs.writeFileSync(path.join(tmp, "core/.gitignore"), "/node_modules/\n"); // (as the copy holds it)
+  // (the install with the lock file it is read against)
+  fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(tmp, "core/.packages"), { recursive: true });
+  fs.writeFileSync(path.join(tmp, "core/.gitignore"), "/.packages/node_modules/\n"); // (as the copy holds it)
   fs.mkdirSync(path.join(tmp, ".github/workflows"), { recursive: true });
   fs.writeFileSync(path.join(tmp, ".github/workflows/a.yml"), `on:\n${"  pull_request_target:\n".repeat(7)}`);
   fs.writeFileSync(path.join(tmp, ".github/workflows/b.yml"), Buffer.from("on: push\n", "utf16le"));
@@ -94,6 +95,13 @@ try {
   ok(kGood, `run against a base, a key twice the base held is noted and a new one fails, with its mend${kGood ? "" : `:\n${kOut}`}`);
   const kNone = keyRun([]), kCore = keyRun(["--core"], { WORKFLOWS_BASE: "HEAD" });
   ok(kNone.status === 0 && /0 failing, 2 noted$/m.test(kNone.stdout) && kCore.status === 1 && /2 failing\. Mend:/.test(kCore.stdout), "run with no base, each is noted and it passes; in the core's own repository each fails, whatever the base");
+  // (where the job's install could not reach the registry, the keys given twice did not run, said so; every other failure
+  // still fails, so no pull request turns the check green by making the install fail: #654, point 4)
+  fs.writeFileSync(path.join(tmp, ".github/workflows/d.yml"), "on:\n  pull_request_target:\n");
+  execFileSync("git", ["add", ".github/workflows/d.yml"], { cwd: tmp, stdio: "ignore" });
+  fs.rmSync(path.join(tmp, "core/.packages/node_modules"), { recursive: true, force: true });
+  const u = keyRun([], { CORE_PACKAGES_UNREACHED: "1" }), uOut = u.stdout + u.stderr;
+  ok(u.status === 1 && /^::warning::The check for a key given twice did not run/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && mended(uOut), `where the install could not reach the registry, the keys given twice did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 // ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
 // Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and

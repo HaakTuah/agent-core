@@ -173,8 +173,8 @@ function sync(tmp) {
   report(at, dir, kitsOf(old, tmp));
 }
 
-// The new copy's packages, installed from its lock file by its own install script, into its node_modules/, which git does
-// not track (#654); a copy from before it has none. One that fails twice leaves the copy written and says so, with the
+// The new copy's packages, installed from its lock file by its own install script, into its .packages/node_modules/,
+// which git does not track (#654); a copy from before it has none. One that fails twice leaves the copy written and says so, with the
 // command to run again: the sync's pull request holds the copy alone, and no registry's silence fails it.
 function install(dir) {
   const script = path.join(dir, "scripts", "install.mjs");

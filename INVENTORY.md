@@ -10,7 +10,7 @@ own, what the core lacks that a maintained tool gives at once, first a general l
 It decides nothing by itself. A **replace** or a **try** becomes a line of `QUEUE.md` only on the owner's word, each a
 pull request of its own that shows the comparison, old against new (#534, point 2); no tool or package arrives before
 #488's points 1, 3, 4 and 5 have merged; and the order is #534's, point 7: the tools that only run first, then the
-packages carried in the copy, then the form the rules are delivered in.
+packages installed from the core's lock file (#654), then the form the rules are delivered in.
 
 Weighed whole: 2026-11-17
 
@@ -128,7 +128,21 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   ScanCode, dropped on fact: Python and a large install. *Bugs:* 5, 1 and 1 (15 with the NuGet check's, the most of any
   group). **Replace** the reading underneath with `npm sbom` after the install the check already makes; **keep** the
   policy (the floor's list, the owner's yes, the scan of what no lock file holds) and the HTML reading, which goes with
-  #486's licence group.
+  #486's licence group. *Tried:* 18 November 2026 (#585), npm 11.20.0, on the 70 projects
+  `tests/licence-installed-test.mjs` makes and on a real install; the core's reading kept, on measure, since neither of
+  npm's own tools reads what is installed at its level. `npm sbom` merges the packages of one name and version, so a
+  GPL-3.0 copy of a locked ISC package bundled in another's folder went unread, and it stopped with nothing read wherever
+  a package.json had no name, a project's own root among them (15 of the 70 that pass). `npm query "*"` failed what the
+  old reading failed on all 70, but its review found four cases it reads worse, each reproduced: a plain file named
+  `@block` in a package's `node_modules` makes npm leave out every package in that folder with no word, so a bundled
+  GPL-3.0 package passed; a package.json that is itself a link out of the project passed; a valid local package with
+  no name and no version failed; and a folder named `..vendor` read as outside the project. The fallbacks were read, not
+  run (#649): license-checker-rseidelsohn walks the folders with the same `readdirScoped` npm uses, reads its failure as
+  nothing installed, and keys each package by name and version; licensee reads npm's own tree (`loadActual`); and
+  CycloneDX's npm tool runs `npm ls --long --all`: each would read the `@block` case as npm does. *Replayed:* #444 not
+  read (its cases, lock entries not written as npm writes one, lie in the lock file, which npm's reading of what is
+  installed never opens); #339, #364, #366, #386 and #447 not run (their cases lie in where the config stands, the
+  steps and the scan, which no tool tried here takes over).
 - `scripts/exact-versions.mjs`: fails a dependency of the project's own written as a range. *Runs:* any session and the
   runners. *Else:* npm's `save-exact`, dropped on fact: it writes exact versions and checks none already written.
   *Bugs:* 1. **Keep:** small and stable, a read of `package.json`.
@@ -156,7 +170,24 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   the packages; dotnet-project-licenses, dropped on fact: its last release on NuGet is 3.0.0-alpha.9 of 25 November
   2022, and none came in the year to 17 November 2026, where nuget-license published 25. *Bugs:* 7, 1, 0
   and 4. **Try** nuget-license and the SDK's own list for the reading; **keep** the fetch before the build, which is a
-  boundary of the floor's (what a build could write never decides a licence), and the policy.
+  boundary of the floor's (what a build could write never decides a licence), and the policy. *Tried:* 18 November
+  2026 (#586), nuget-license 4.0.18 (Apache-2.0) and `dotnet list package --include-transitive --format json` on .NET
+  SDK 10.0.404, on 25 projects built from the kinds of package the core's tests make, each restored from a local feed;
+  the core's reading kept, on measure, the check unchanged. Neither reads a licence before a restore has run the pull
+  request's project files: nuget-license takes only a project or solution and reads its packages from the assets file
+  a restore writes (with none, it stops), reading each licence from the `.nupkg` in the folder that restore filled,
+  hash unchecked, so a package swapped there after the restore read MIT for a GPL-3.0 one, and asking the project's
+  sources over the network for one that is missing; `dotnet list package` reads no licence at all, restores by itself
+  unless told not to, and missed a PackageDownload. Against the core, on the same 25: nuget-license read the same
+  licence in 17, read another in 5 and nothing in 3 (a crash on a non-breaking space, a package NuGet would not
+  restore, the PackageDownload), and passed 7 the core fails (a licence file and a licence address it guessed from,
+  an AND and OR without brackets, a WITH, two version ranges, the PackageDownload), failing none the core passes; it
+  holds no exact version, no owner's yes, no audit and no base. *Replayed:* #240, #274 and #280 read, after a restore
+  (MSBuild follows the Import that brings the GPL-3.0 package, though nuget-license holds no lock file, so #240's lock
+  file kept elsewhere goes unheld); #269 not read (a package folder the pull request names, its package altered to say
+  MIT, passes the locked restore and nuget-license alike); #373, #380, #366, #386 and #355 not run (a billed job, the
+  first look's choice to restore, the configs' paths, and a change of shape: none a reading of a package); #446 not
+  run (open, with no fix).
 - `.github/workflows/core.yml`, `scripts/copy-tree.mjs`, `scripts/core-path.mjs`, `scripts/core-address.mjs`: fail a
   project whose copy is not the core, whole, at the commit its manifest pins, or whose calls to the core's workflows are
   pinned elsewhere. *Runs:* the runners, where nothing of the project's runs before it; any session by hand. *Else:* the
@@ -276,9 +307,9 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   #519 weighed the template; `git archive`, which the sync already uses. *Bugs:* 2, 8 and 4. **Keep:** nothing fits;
   what a release asks is the core's.
 - `scripts/install.mjs`, `scripts/packages.mjs`: install the packages of other publishers the scripts run from the
-  core's lock file into `node_modules/` beside it, and load each from there alone, a missing one saying its mend
-  (#654). *Runs:* any session, at its start and at each sync, and on the host's runners before each check. *Else:*
-  npm's own `npm ci`, which does the install, kept; a folder of carried packages (#528), dropped on the owner's
+  core's lock file in `.packages/` into `.packages/node_modules/`, and load each from there alone, a missing one saying
+  its mend (#654). *Runs:* any session, at its start and at each sync, and on the host's runners before each check.
+  *Else:* npm's own `npm ci`, which does the install, kept; a folder of carried packages (#528), dropped on the owner's
   decision of 18 November 2026. *Bugs:* none. **Keep:** the install is npm's; the scripts run it once more after a
   failed fetch and say the mend.
 - **What the starter kit holds** (`setup/template/`, 32 files on 17 November 2026), weighed by the challenge: eight
@@ -377,7 +408,8 @@ as the trials above were, over the scripts on `main` that day (36,896 lines of J
   the sessions already keep.
 - **A scan of the packages for known faults.** *Else:* the host's Dependabot alerts, free on a private repository too,
   whose alerts the owner reads and passes on (floor rule 9); OSV-Scanner (Apache-2.0, one program). **Keep** without
-  one: the core carries no package yet, and the first comes only after #488's points 1, 3, 4 and 5; weighed again then.
+  one: the core's packages stand in its lock file since #654, which the host's Dependabot alerts read; #650 brings the
+  scan against a vulnerability database.
 - **A type checker.** **Keep** without it: #519's record weighed it on 33 fixed bugs and a writing trial, and found no
   fault it would have caught.
 - **A linter for Markdown.** *Else:* markdownlint-cli2 (MIT, 89 packages). **Keep** without it, on a measure the
@@ -446,5 +478,5 @@ points 1, 3, 4 and 5 have merged. What the challenge proposes is not among them 
    staged cases; and of what the core lacks, **try** a general linter for its scripts (oxlint, then Biome), ShellCheck
    with actionlint, and knip after the linter.
 2. The reading under the package checks: **replace** with `npm sbom`; **try** nuget-license and the SDK's own list.
-3. The packages carried in the copy: as #486's inventory and #519's path have them.
+3. The packages, installed from the core's lock file (#654): as #486's inventory and #519's path have them.
 4. The form the rules are delivered in: **try** the skill format (#534, point 8).
