@@ -198,7 +198,9 @@ ok(run("--raise").status === 1 && run("--raise", same).status === 1 && run("--ra
   ok(r.status === 0 && rights.length === 2 && whose({ login: "writer", type: "User" }) && !whose({ login: "reader", type: "User" }) && !whose({ login: "silent", type: "User" }) && whose({ login: "SomeOne", type: "User" })
     && r.stdout.includes("The host's rights of silent could not be read") && !/outsider|bad;name|someone\b/iu.test(r.stdout),
     "size.yml reads the rights of those who answered: a writer's counts, a reader's and one not answered do not, and the owner, an outsider and a login of any other form are not asked for", r.stdout + r.stderr);
-  ok(fs.readFileSync(path.join(runner, "raise", "head.mjs"), "utf8") === own && fs.readFileSync(path.join(runner, "raise", "base", "scripts", "size.mjs"), "utf8") === own,
+  // (git keeps a text file with LF where a Windows checkout has CRLF, so the two are read by their lines)
+  const lf = t => t.replaceAll("\r\n", "\n");
+  ok(lf(fs.readFileSync(path.join(runner, "raise", "head.mjs"), "utf8")) === lf(own) && lf(fs.readFileSync(path.join(runner, "raise", "base", "scripts", "size.mjs"), "utf8")) === lf(own),
     "  and puts by the head's script as text and the base's own scripts, for the base's to judge the raise");
 }
 
