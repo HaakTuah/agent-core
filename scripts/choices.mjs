@@ -227,17 +227,23 @@ export function argued(head, base) {
   return { failed: lacking.filter(r => !old(r)), listed: lacking.filter(old) };
 }
 
+// What the base reads as where it held a file as a link (#541): a case of its own, apart from no commit (undefined)
+// and no file (null).
+export const LINK = Symbol("a link");
+
 // A file's text at a commit, read from git, or null where the commit does not hold it as a file of at most MOST bytes;
-// undefined where `commit` is no commit here, or a name git would read as an option, or where the file is a link there.
+// undefined where `commit` is no commit here, or a name git would read as an option; LINK where the file, or a folder
+// on its way, is a link there.
 export function atCommit(commit, file, root = ".") {
   const git = args => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: MOST * 2 });
   // (a name that opens with "-" would be read by git as an option: it is no commit)
   if (String(commit).startsWith("-")) return undefined;
   try { git(["rev-parse", "--verify", "-q", `${commit}^{commit}`]); } catch { return undefined; }
   try {
-    // (a link at the base is no file the records were read from there, as records() reads none at the head: the base
-    // reads as unreadable, so the check fails nothing for it)
-    if (/^120000 /u.test(git(["ls-tree", commit, "--", file]))) return undefined;
+    // (a link at the base is no file the records were read from there, as records() reads none at the head, where a link
+    // on the file's way is read so too)
+    const parts = String(file).split("/");
+    for (let i = 1; i <= parts.length; i++) if (/^120000 /u.test(git(["ls-tree", commit, "--", parts.slice(0, i).join("/")]))) return LINK;
     if (git(["cat-file", "-t", `${commit}:${file}`]).trim() !== "blob" || Number(git(["cat-file", "-s", `${commit}:${file}`])) > MOST) return null;
     return git(["show", `${commit}:${file}`]);
   } catch { return null; }
@@ -245,11 +251,14 @@ export function atCommit(commit, file, root = ".") {
 
 // The records at the base, by the path the base's own rules name (its manifest's row, or the core's AGENTS.md), so a
 // pull request that moves them reads the records they held: their text, null where the base held none, undefined where
-// `base` is no commit here.
+// `base` is no commit here, and LINK where the records, or the manifest that names them, were a link there. The core's
+// AGENTS.md, read where the base holds no manifest, is read as naming none where it was a link, so the records are
+// read at the starter kit's path, as before (#541).
 export function baseRecords(base, root = ".") {
   const manifest = atCommit(base, "core-manifest.md", root);
-  if (manifest === undefined) return undefined;
-  const file = where(manifest ?? atCommit(base, "AGENTS.md", root) ?? "");
+  if (manifest === undefined || manifest === LINK) return manifest;
+  const rules = manifest ?? atCommit(base, "AGENTS.md", root);
+  const file = where(rules === LINK ? "" : rules ?? "");
   return file ? atCommit(base, file, root) : null;
 }
 
@@ -259,12 +268,16 @@ export function checkOf(got, base, root = ".") {
   const rule = 'core/tasks/choices.md, "A choice that is hard to undo gets a record"';
   const then = base ? baseRecords(base, root) : undefined;
   if (got.unread) {
-    const was = then !== undefined && then !== null;
+    const was = typeof then === "string";
     return [[was ? `FAIL: the choice records could not be read (${got.unread}), and the base held them as a file. ${MEND}name a regular file inside the project as the *choice records*, under ${MOST} bytes, as the base had it.`
       : `The choice records could not be read (${got.unread}), as at the base: nothing to check.`], was];
   }
   if (got.text === null) return [["No choice records here: nothing to check."], false];
-  if (then === undefined) return [[`No base to compare with${base ? ` (${base} is no commit here)` : ""}, so no record is read as one this change adds.`, ...argued(got.text, got.text).listed.map(r => `- listed, not failed: "${r.name}", argued on no line that opens ${r.lacks.map(l => `"${l}"`).join(", ")}`)], false];
+  // (a base that held the records as a link: what the link led to is not read, so each record is listed, as with no
+  // base, and none fails, since any of them may have stood there: AGENTS.md, "Nothing locks a project")
+  const unlisted = why => [[`${why}, so no record is read as one this change adds.`, ...argued(got.text, got.text).listed.map(r => `- listed, not failed: "${r.name}", argued on no line that opens ${r.lacks.map(l => `"${l}"`).join(", ")}`)], false];
+  if (then === undefined) return unlisted(`No base to compare with${base ? ` (${base} is no commit here)` : ""}`);
+  if (then === LINK) return unlisted(`The base held the records as a link, which is not read`);
   const { failed, listed } = argued(got.text, then);
   return [[...failed.map(r => `FAIL: \`${got.file}\`: the record "${r.name}", which this change adds, is argued on no line that opens ${r.lacks.map(l => `"${l}"`).join(", ")}. ${MEND}argue it as ${rule}, says, each on its own line in the record: "Looked for:", the challenger's search for options the list lacks, with the writer's answer to each; "The blind pick:", the pick of a fresh session given the problem and the criteria and never the record; "The judgment:", the decision of a fresh session that wrote no part of it. A record of a choice the project had already made, as a first audit writes it, takes instead a line that opens "Stood before:", saying when.`),
     ...listed.map(r => `- listed, not failed: "${r.name}" ${r.stood ? "records a choice already made" : "stood before this change"}, argued on no line that opens ${r.lacks.map(l => `"${l}"`).join(", ")}`),

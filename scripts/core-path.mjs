@@ -20,9 +20,6 @@ import { CORE, CORE_SOURCE } from "./core-address.mjs";
 import { started } from "./started.mjs";
 
 export const MANIFEST = "core-manifest.md", DEFAULT = "core/";
-// The folder of the core's that holds the packages of other publishers its scripts run (third-party.mjs, beside this
-// file), from the core's root: a check that reads a project's files by the project's own patterns leaves it out.
-export const THIRD_PARTY = "third-party/";
 // (a folder of the repository, from its root: plain names joined by "/", ending in "/"; none is "." or "..", nor .git,
 // nor node_modules, where an install writes and no checkout holds the files)
 const SEGMENT = "[A-Za-z0-9_][A-Za-z0-9._-]*";

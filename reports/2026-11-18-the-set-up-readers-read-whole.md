@@ -5,7 +5,8 @@ readers they call to read a project's files: `project()` (steps.mjs:63-100), `sc
 `scripts/check-configs.mjs`, `scripts/manifest-reads.mjs` (`modulesOf`), `scripts/agent-tools.mjs` (`readProject`),
 `scripts/yaml-keys.mjs` (`twice`), `scripts/workflow-run.mjs` (`parseYaml`, `pathsLetThrough`) and `scripts/nuget.mjs`
 (`importsOf`, `projectFilesByContent`, `readProject`; its own bugs are counted on the NuGet check's part, not here).
-Probes ran outside the repository; nothing was written into it.
+Probes ran outside the repository; nothing was written into it. Line numbers are those of commit 90d9031, the pull
+request's (#624) before it took in `main` again; `git show 90d9031:<path>` reads a file as they give it.
 
 ## 1. The part's bugs
 

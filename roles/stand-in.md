@@ -2,7 +2,7 @@
 
 Read at its start by the role `stand-in`.
 
-**Reads at its start:** `roles/shared/inbox.md`, whose "The stand-in" says what else it gives.
+**Reads at its start:** `roles/shared/inbox.md`.
 
 **It searches the owner's reasoning:** the archives (the core's as its copy holds it, in the core's words), the
 closed issues and the reports quoting the owner's corrections, never reading them whole.

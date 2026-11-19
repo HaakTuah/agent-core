@@ -100,6 +100,7 @@ if (process.platform !== "win32") {
   fs.mkdirSync(linked); fs.mkdirSync(outside);
   fs.symlinkSync(outside, path.join(linked, "vendor"));
   fs.writeFileSync(path.join(linked, "core-manifest.md"), copied("vendor/the-core/"));
+  spawnSync("git", ["init", "-q"], { cwd: linked }); // (a project is a git repository, whose files the sync reads: own-files.mjs)
   const r = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/sync.mjs", import.meta.url))], { cwd: linked, encoding: "utf8" });
   ok(r.status === 1 && /vendor, on the way to the copy's path vendor\/the-core\/, is a link/.test(r.stderr) && mended(r.stderr) && fs.readdirSync(outside).length === 0, "the sync refuses a path through a link, saying the mend, and writes nothing", r.stderr);
 } else console.log("note a link cannot be made here (Windows), so the sync's refusal of one is not tried");
@@ -170,7 +171,10 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
   // that carries its scripts)
   {
     const lib2 = path.join(tmp, "a-library-with-scripts"), consumer = path.join(tmp, "a-consumer");
-    for (const f of ["pointers.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) put(lib2, `core/scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(`./${f}`, new URL("../scripts/", import.meta.url))), "utf8"));
+    for (const f of ["pointers.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) put(lib2, `core/scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(`./${f}`, new URL("../scripts/", import.meta.url))), "utf8"));
+    // (and the package the check reads Markdown with, as the core's install leaves it: the lock file, npm's record of
+    // the install and the package)
+    for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/marked"]) fs.cpSync(fileURLToPath(new URL(`../.packages/${f}`, import.meta.url)), path.join(lib2, "core/.packages", f), { recursive: true });
     put(lib2, "core/floor/security.md", "# The floor\n\n**1. Nothing secret in the repository.**\n");
     put(lib2, "core-manifest.md", copied());
     put(lib2, "AGENTS.md", "# The library\n");

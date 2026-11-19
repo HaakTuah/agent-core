@@ -6,7 +6,7 @@
 //
 //   node tests/review-record-test.mjs
 import { fileURLToPath } from "node:url";
-import { blockingOf, broughtBy, bugs, codexFind, foundTwice, otherOf, perPull, postedKind, print, ruleOf, rulesIn, rulesNamed, secondFound, standing, tally } from "../scripts/review-record.mjs";
+import { blockingOf, broughtBy, bugs, codexFind, foundTwice, otherOf, perPull, postedKind, print, ruleOf, rulesIn, rulesNamed, secondFound, stanceOf, standing, tally } from "../scripts/review-record.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -90,6 +90,12 @@ ok(same(r.postedSecurity, { got: true, blocked: "yes", points: 1, other: 2, othe
   "a review in the form gives its blocking and its other points, each round added", JSON.stringify(r));
 
 // the tally and the second security review
+ok(stanceOf("Code review: a\nStance: adversarial.\nNo blocking finding.") === "adversarial" && stanceOf("Code review: a\n**Stance: regular.**") === "regular" && stanceOf("Code review: a\nNo blocking finding.") === null
+  && stanceOf("Code review: a\nStance: adversarial.\nStance: regular.") === null && stanceOf("Code review: a\n```\nStance: adversarial.\n```") === null,
+  "a posted code review's stance is read from its line alone; none, two that disagree, or one in a fenced block reads as none");
+r = perPull([posted("Code review: a\nStance: adversarial.\nBlocking findings: 2.\nOther findings: 1."), posted("Code review: b\nStance: regular.\nNo blocking finding.\nNo other finding."), posted("Code review: c\nNo blocking finding.\nNo other finding.")], [], OWNER);
+ok(same(r.postedAdversarial, { got: true, blocked: "yes", points: 2, other: 1, otherUnread: false }) && same(r.postedRegular, { got: true, blocked: "no", points: 0, other: 0, otherUnread: false }) && r.postedCode.points === 2,
+  "posted code reviews are counted again by their stance, one that says none in neither row");
 const pull = (number, kind, over = {}) => ({ number, kind, reviews: { ...perPull([], [], OWNER), ...over } });
 const rv = (blocked, points = 0, other = 0, otherUnread = false) => ({ got: true, blocked, points, other, otherUnread });
 const pulls = [pull(1, "own", { codexSecurity: rv("no"), postedSecurity: rv("yes", 2) }), pull(2, "own", { codexSecurity: rv("no"), postedSecurity: rv("unread", 0, 0, true) }), pull(3, "upkeep", { codexSecurity: rv("yes", 1), postedSecurity: rv("yes", 1) }),
