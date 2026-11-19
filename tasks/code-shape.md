@@ -147,8 +147,8 @@ one declared entrance.
 the audit's reader judges the others. The time a user waits on gets its own measure as its rule comes (#318).
 
 **What the check reads.** JavaScript and TypeScript, JSX among them, C# and Python, each by a reader of its own
-(`core/scripts/shape-readers.mjs`), the functions of each by the parser the core installs; in C# what a file
-takes from another is read from its using directives alone. Of scripts that share one global space (no import, no
+(`core/scripts/shape-readers.mjs`), the functions of each by the parser the core installs, and of Python all it
+reads; in C# what a file takes from another is read from its using directives alone. Of scripts that share one global space (no import, no
 export), it holds that each file adds at most one name there and no two declare the same. It never runs the code it
 reads, and never guesses: an import that leads nowhere it can tell and a file in another language are counted and said
 on every run, never failed; a file of JavaScript, TypeScript, C# or Python its grammar cannot read whole, and one of

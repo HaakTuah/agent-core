@@ -1,5 +1,6 @@
 // Tests the shape check's readers of C# and Python (scripts/shape-csharp.mjs and scripts/shape-python.mjs, their
-// functions on the parser: csharp-functions.mjs and python-functions.mjs) on files made for them: the functions each finds, with their lines, depth and branch points; what a brace or a keyword in a
+// functions on the parser: csharp-functions.mjs, and Python's functions, imports and tokens: python-tree.mjs) on files
+// made for them: the functions each finds, with their lines, depth and branch points; what a brace or a keyword in a
 // string or a comment is; what each file imports and where it leads; and the packages a project declares. The check's
 // own use of them, and of the readers of JSX and of the shared space: shape-test.mjs. Run by the core's tests workflow
 // (.github/workflows/tests.yml).
@@ -7,7 +8,7 @@
 //   node tests/shape-readers-test.mjs
 import { Worker } from "node:worker_threads";
 import { csTokens, csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "../scripts/shape-csharp.mjs";
-import { STDLIB, logicalLines, pythonPackages, readPython, resolvePython } from "../scripts/shape-python.mjs";
+import { STDLIB, pythonPackages, readPython, resolvePython } from "../scripts/shape-python.mjs";
 import { ParserFailed, inParser } from "../scripts/parser.mjs";
 import { LARGEST } from "../scripts/tree-walk.mjs";
 
@@ -113,7 +114,23 @@ ok(same(shown(py.functions), ["handler:8:14:3:10", "inner:18:1:0:1", "m:24:6:1:2
   "Python: each def is found, its lines to its body's last, its depth by its control blocks (a match is a case's one level), its branch points; none in a string, an f-string's text or a comment", shown(py.functions));
 ok(same(py.imports.map(i => `${".".repeat(i.level)}${i.module} [${i.names}]${i.dynamic ? " dynamic" : ""}${i.types ? " types" : ""}`), ["os []", "a.b []", ". [x,y]", "..pkg.mod [z,w]", "typing_t [T] types", "lazy [] dynamic"]),
   "Python: its imports are read, relative ones with their level; one in a def runs when it is called, one under TYPE_CHECKING takes types alone", JSON.stringify(py.imports));
-ok(same(logicalLines("a = (1,\n  2)\nb = 3 \\\n  + 4\n\n# c\n    \n").map(l => `${l.line}-${l.end}`), ["1-2", "3-4"]), "Python: lines in brackets and after a \\ are one logical line; blank and comment lines are none");
+// Python's imports and tokens on the parser (#530, item 6): as the lexer read them, across lines in brackets and after a
+// \, comments none.
+const pyLines = readPython("from a . b import (\n    c as d,  # e\n    f)\nimport \\\n  x.y as z, w\nn = (yield) == 2 ** 3 -> q\nif (m := time.sleep(1)): pass\n");
+ok(same(pyLines.imports.map(i => `${i.line}:${i.module} [${i.names}]`), ["1:a.b [c,f]", "4:x.y []", "4:w []"]) && same(pyLines.toks.slice(pyLines.toks.findIndex(t => t.v === "n")).map(t => t.v).join(" "), "n = ( yield ) = = 2 * * 3 - > q if ( m := time . sleep ( 1 ) ) : pass"),
+  "Python: an import across lines in brackets and after a \\ is read as one, a name taken by its own and not its alias; each sign but := its own token, a comment none", JSON.stringify(pyLines));
+const pyStrings = readPython("x = f\"{random.random()!r:{w}} {time.time()=}\" 'a' \"\"\"b\n# c\"\"\" rb'\\d'\n");
+ok(same(pyStrings.toks.map(t => `${t.t}:${t.v}`), ["id:x", "punct:=", "str:", "id:random", "punct:.", "id:random", "punct:(", "punct:)", "id:time", "punct:.", "id:time", "punct:(", "punct:)", "punct:=", "str:", "str:", "str:"]),
+  "Python: a string is one token, an f-string's code in its { } read after it and its conversion and format passed over, a # inside a string no comment", JSON.stringify(pyStrings.toks));
+// (where the lexer misread a token, as the trial old against new found: a number's exponent split from it; a hole after
+// \ in a raw f-string, where the \ escapes nothing, taken for text; a t-string's t taken for a name; and where the
+// grammar misreads, a format's fill of = taken for :=, mended to the code before it)
+const pyToks = readPython("a = 1e-6 + 2.5E+3\nb = rf\"\\{time.time()}\"\nc = t\"{0}\"\nd = f\"{msg:=^80}{e}\"\n").toks.map(t => `${t.t[0]}${t.v}`).join(" ");
+ok(pyToks === "ia p= n1e-6 p+ n2.5E+3 ib p= s itime p. itime p( p) ic p= s n0 id p= s imsg ie",
+  "Python: a number with its exponent is one token, a raw f-string's \\{ opens its code, a t-string is a string, and a format's fill of = is no code", pyToks);
+const pyBroken = readPython("import first\ndef f(:\n    import inside\nfrom later import (x,\n");
+ok(pyBroken.functions === null && same(pyBroken.imports.map(i => `${i.module}${i.dynamic ? " dynamic" : ""}`), ["first", "inside dynamic"]),
+  "Python: a file the grammar cannot read whole has its imports read where it read them whole, and none from what it could not", JSON.stringify(pyBroken.imports));
 ok(same(shown(readPython("def f():\n\tif a:\n\t\treturn '''x\nif y:\n  z'''\n\treturn 1\n").functions), ["f:1:6:1:1"]), "Python: a tab indents to the next multiple of 8, and a string's lines open no block");
 // Python's functions on the parser (#530, item 6): where the lexer misread, the grammar reads as the definition says.
 const pyMisread = "def a(x):\n    return x is ... or x\n\ndef b(value):\n    case = value[0]\n    if case:\n        return case.upper()\n";

@@ -1,15 +1,10 @@
-// The shape check's reader of Python (shape.mjs and shape-readers.mjs, beside this file; #354). It reads a file's
-// logical lines, as Python joins them inside brackets and after a \ at a line's end, with its strings (an f-string's
-// code in its { } read as code); from them, what each file imports, and its tokens, for the runs of the clock. Its
-// functions are read on the parser the core installs (python-functions.mjs, which says how each is measured; #530,
-// item 6). It never runs the code. Node's own modules, and the parser's installed packages.
-//
-// An import is read with where it stands: in a def, it runs when the function is called (as a dynamic import does in
-// JavaScript), and under `if TYPE_CHECKING:` it takes types alone; neither makes a cycle.
+// The shape check's reader of Python (shape.mjs and shape-readers.mjs, beside this file; #354): a file's functions, what
+// it imports and its tokens, for the runs of the clock, each read on the parser the core installs (python-tree.mjs,
+// which says how; #530, item 6); where each import leads among the project's files; and the packages the project
+// declares. It never runs the code. Node's own modules, and the parser's installed packages.
 import path from "node:path";
-import { NEST } from "./code-shape.mjs";
 import { unreachedFor } from "./parser.mjs";
-import { pythonFunctions } from "./python-functions.mjs";
+import { pythonTree } from "./python-tree.mjs";
 
 // The standard library's modules, which lead to no file of the project and no package: Python 3.13's, with those that
 // earlier versions still hold.
@@ -41,207 +36,14 @@ export const OWN = [
   { run: ["os", ".", "urandom"], what: "os.urandom" },
 ];
 
-const OPENS = "([{", CLOSES = ")]}";
-const PREFIX = /^[rRbBuUfF]{1,2}$/u;
-
-// The logical lines of a file's text: [{ indent, line, end, toks }], toks being { t: "id" | "num" | "str" | "punct",
-// v, line }; comments and blank lines dropped.
-export function logicalLines(src) {
-  const lex = new Lexer(src);
-  lex.code(false);
-  lex.close();
-  lex.lines.lost = lex.lost;
-  return lex.lines;
-}
-
-class Lexer {
-  constructor(src) { Object.assign(this, { src, n: src.length, i: 0, line: 1, depth: 0, indent: 0, start: true, current: null, lines: [], nest: 0, lost: false }); }
-
-  push(t, v, l = this.line) {
-    if (!this.current) this.current = { indent: this.indent, line: l, end: l, toks: [] };
-    this.current.toks.push({ t, v, line: l });
-  }
-
-  close() {
-    if (this.current) { this.current.end = this.line; this.lines.push(this.current); }
-    this.current = null;
-  }
-
-  // The code up to the end, or, `hole`, up to the } that closes an f-string's { (its format after a ! or : passed over).
-  code(hole) {
-    let depth = 0;
-    while (this.i < this.n) {
-      const c = this.src[this.i];
-      if (this.start) this.margin();
-      else if (this.blank(c) || this.literal(c)) continue;
-      else if (hole && depth === 0 && (c === "}" || c === ":" || (c === "!" && this.src[this.i + 1] !== "="))) { this.format(); return; }
-      else depth += this.sign(c);
-    }
-  }
-
-  // A physical line's indentation, a tab reaching the next multiple of 8.
-  margin() {
-    let col = 0;
-    for (; this.i < this.n && (this.src[this.i] === " " || this.src[this.i] === "\t"); this.i++) col = this.src[this.i] === "\t" ? (Math.floor(col / 8) + 1) * 8 : col + 1;
-    if (this.depth === 0 && !this.current) this.indent = col;
-    this.start = false;
-  }
-
-  blank(c) {
-    if (c === "\n") {
-      if (this.depth === 0) this.close();
-      this.line++; this.i++; this.start = true;
-      return true;
-    }
-    if (c === "\\" && this.src[this.i + 1] === "\n") { this.line++; this.i += 2; return true; } // (the line goes on)
-    if (c === "\\" && this.src.startsWith("\r\n", this.i + 1)) { this.line++; this.i += 3; return true; }
-    if (c === " " || c === "\t" || c === "\r" || c === "\f" || c === "﻿") { this.i++; return true; }
-    if (c !== "#") return false;
-    while (this.i < this.n && this.src[this.i] !== "\n") this.i++;
-    return true;
-  }
-
-  literal(c) {
-    if (c === "'" || c === '"') { this.string(""); return true; }
-    if (/[A-Za-z_\u0080-￿]/u.test(c)) { this.word(); return true; }
-    if (/[0-9]/u.test(c) || (c === "." && /[0-9]/u.test(this.src[this.i + 1] ?? ""))) {
-      let j = this.i + 1;
-      while (j < this.n && /[0-9A-Za-z_.]/u.test(this.src[j])) j++;
-      this.push("num", this.src.slice(this.i, j));
-      this.i = j;
-      return true;
-    }
-    return false;
-  }
-
-  // A name, or a string's prefix (f"", rb'') where a quote follows it.
-  word() {
-    let j = this.i + 1;
-    while (j < this.n && /[\w\u0080-￿]/u.test(this.src[j])) j++;
-    const w = this.src.slice(this.i, j);
-    this.i = j;
-    if (PREFIX.test(w) && (this.src[j] === "'" || this.src[j] === '"')) this.string(w.toLowerCase());
-    else this.push("id", w);
-  }
-
-  // A string from its quote, its prefix given: one "str" token, the code of an f-string's { } read after it.
-  string(prefix) {
-    const q = this.src[this.i], triple = this.src.startsWith(q.repeat(3), this.i), close = triple ? q.repeat(3) : q;
-    const from = this.line;
-    this.push("str", "", from);
-    this.i += close.length;
-    this.depth++; // (a line inside the string, or inside its code, ends no logical line)
-    while (this.i < this.n && !this.src.startsWith(close, this.i)) {
-      const c = this.src[this.i];
-      if (c === "\n" && !triple) break;
-      if (c === "\\") { if (this.src[this.i + 1] === "\n") this.line++; this.i += 2; continue; }
-      if (prefix.includes("f") && c === "{") { this.hole(); continue; }
-      if (c === "\n") this.line++;
-      this.i++;
-    }
-    this.depth--;
-    if (this.src.startsWith(close, this.i)) this.i += close.length;
-  }
-
-  // A { in an f-string: {{ a brace of its text, else the code up to its }.
-  hole() {
-    if (this.src[this.i + 1] === "{") { this.i += 2; return; }
-    this.i++;
-    if (this.nest >= NEST) { this.lost = true; this.i = this.n; return; } // (past it, the file is lost)
-    this.nest++;
-    this.code(true);
-    this.nest--;
-  }
-
-  // An f-string's format, after its ! or :, to the } that ends its { (a { } inside it passed over): nothing to read.
-  format() {
-    for (let depth = 0; this.i < this.n; this.i++) {
-      const c = this.src[this.i];
-      if (c === "\n") this.line++;
-      if (c === "{") depth++;
-      else if (c === "}" && depth-- === 0) { this.i++; return; }
-    }
-  }
-
-  // A sign, its own token (:= one, so that it opens no block); how far it moves the brackets' depth.
-  sign(c) {
-    if (this.src.startsWith(":=", this.i)) { this.push("punct", ":="); this.i += 2; return 0; }
-    this.push("punct", c);
-    this.i++;
-    const moves = OPENS.includes(c) ? 1 : CLOSES.includes(c) ? -1 : 0;
-    this.depth = Math.max(0, this.depth + moves);
-    return moves;
-  }
-}
-
-const isId = (tok, v) => tok?.t === "id" && tok.v === v;
-const isP = (tok, v) => tok?.t === "punct" && tok.v === v;
-// (the words that open a block, beside def, class and match)
-const CONTROL = new Set(["if", "elif", "else", "for", "while", "try", "except", "finally", "with", "case"]);
-
-// Where a compound statement's header ends: the index of its first : outside brackets; -1 where it has none.
-function headerColon(toks) {
-  let depth = 0;
-  for (let k = 0; k < toks.length; k++) {
-    if (toks[k].t !== "punct") continue;
-    const v = toks[k].v;
-    if (OPENS.includes(v)) depth++;
-    else if (CLOSES.includes(v)) depth--;
-    else if (v === ":" && depth === 0) return k;
-  }
-  return -1;
-}
-
-// The statement a logical line opens: { word, at, colon }, word the keyword that opens a block (def, class, a control
-// word, match), at its index (an async passed over), colon where its header ends; word null where it opens none.
-function statement(toks) {
-  const at = isId(toks[0], "async") ? 1 : 0, word = toks[at]?.t === "id" ? toks[at].v : null;
-  const colon = headerColon(toks), soft = word === "match" || word === "case";
-  const opens = colon > at && (word === "def" || word === "class" || CONTROL.has(word) || word === "match")
-    && !(soft && toks[at + 1]?.t === "punct" && ["=", ".", ",", ")", ":"].includes(toks[at + 1].v));
-  return { word: opens ? word : null, at, colon };
-}
-
-// What a logical line imports: [{ level, module, names, line }], level the count of its leading dots.
-function importsOf(toks) {
-  if (isId(toks[0], "import")) {
-    return split(toks.slice(1)).map(part => ({ level: 0, module: dotted(part), names: [], line: toks[0].line })).filter(i => i.module);
-  }
-  if (!isId(toks[0], "from")) return [];
-  let k = 1, level = 0;
-  for (; isP(toks[k], "."); k++) level++;
-  const at = toks.findIndex(t => isId(t, "import"));
-  if (at < 0) return [];
-  const names = split(toks.slice(at + 1).filter(t => !isP(t, "(") && !isP(t, ")"))).map(part => (isP(part[0], "*") ? "*" : part[0]?.v)).filter(Boolean);
-  return [{ level, module: dotted(toks.slice(k, at)), names, line: toks[0].line }];
-}
-const split = toks => toks.reduce((parts, t) => (isP(t, ",") ? parts.push([]) : parts.at(-1).push(t), parts), [[]]);
-// (a dotted name, up to its `as`)
-const dotted = toks => { const end = toks.findIndex(t => isId(t, "as")); return (end < 0 ? toks : toks.slice(0, end)).filter(t => t.t === "id").map(t => t.v).join("."); };
-
-// A file read: { functions: [{ name, line, lines, depth, branches }] (null where its code nests past NEST or the parser
-// cannot read it whole; none where the parser could not be installed), imports: [{ level, module, names, line, dynamic,
-// types }], toks }.
+// A file read (python-tree.mjs, which says how each part is read): { functions: [{ name, line, lines, depth, branches }]
+// (null where the parser cannot read the file whole; none where it could not be installed), imports: [{ level, module,
+// names, line, dynamic, types }] (null where they cannot be told: the parser could not be installed, or could not read
+// the file within its time), toks }.
 export function readPython(src) {
-  const lines = logicalLines(src), stack = [], imports = [];
-  for (const ln of lines) {
-    while (stack.length && stack.at(-1).indent >= ln.indent) stack.pop();
-    const st = statement(ln.toks);
-    const dynamic = st.word === "def" || stack.some(s => s.def), types = stack.some(s => s.types) || (st.word === "if" && isTypeChecking(ln.toks.slice(0, st.colon + 1)));
-    for (const part of statements(ln.toks, st)) for (const imp of importsOf(part)) imports.push({ ...imp, dynamic, types });
-    if (st.word) stack.push({ indent: ln.indent, def: st.word === "def", types: st.word === "if" && isTypeChecking(ln.toks) });
-  }
-  return { functions: lines.lost ? null : unreachedFor("python") ? [] : pythonFunctions(src), imports, toks: lines.flatMap(l => l.toks) };
+  if (unreachedFor("python")) return { functions: [], imports: null, toks: [] };
+  return pythonTree(src) ?? { functions: null, imports: null, toks: [] };
 }
-
-// A logical line's simple statements: those after `;`, and of a compound statement those after its header's colon
-// (`if x: import y`).
-function statements(toks, st) {
-  const body = st.word ? toks.slice(st.colon + 1) : toks;
-  return body.reduce((parts, t) => (isP(t, ";") ? parts.push([]) : parts.at(-1).push(t), parts), [[]]);
-}
-
-const isTypeChecking = toks => /^if (typing \. )?TYPE_CHECKING :$/u.test(toks.map(t => t.v).join(" "));
 
 // ---- where an import leads ----
 

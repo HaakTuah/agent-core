@@ -1,6 +1,6 @@
 // The walk over a parsed file's tree that the shape check's readers on the parser share (csharp-functions.mjs,
-// javascript-functions.mjs and python-functions.mjs, beside this file): each function found with its name, its body's line and lines, the
-// depth its control blocks reach and its branch points, by the reader's own parts. Node's own modules only: none.
+// javascript-functions.mjs and python-tree.mjs, beside this file): each function found with its name, its body's line
+// and lines, the depth its control blocks reach and its branch points, by the reader's own parts. Node's own modules only: none.
 
 /** The largest file a reader gives its grammar, in characters: a tree takes memory in step with its nodes, a 4 MB array
  *  literal of JavaScript about 2.5 GB, and a file of code that size is data a script wrote, not code someone reads. One
