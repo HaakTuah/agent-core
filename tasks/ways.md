@@ -39,11 +39,12 @@ what a way writes outside the project's files is read. Reason: a hook a way writ
 unlisted, or pass unseen. Held, in part, by `scripts/agent-tools.mjs`, which fails a line *Installs:* in no form it
 reads; that a line names all a way writes, by nothing yet.
 
-**The floor, said for each way** (#397). By default a session started through a way is one of "the sessions those
-start" of floor rules 8 and 18, each in a folder and a clone of its own, and the way is given no sign-in of another
-tool's; each part's line *Floor:* says so in plain words, and what else of the floor the way meets. Nothing changes it.
+**The floor, said for each way** (#397). By default a session started through a way is one started, at any depth,
+from a session the owner started (floor rules 3 and 18), each in a folder and a clone of its own, and the way is given
+no sign-in of another tool's. The trigger is a part written or changed: whoever writes it says so on its line
+*Floor:* in plain words, and what else of the floor the way meets. Nothing changes it.
 It does not mean a way loosens or adds to the floor. Reason: a way starts sessions that no agent tool's part covers,
-and floor rules 8 and 18 name only the sessions the owner starts and those they start. Held, in part, by the check of
+and floor rules 3 and 18 name only the sessions the owner starts and those started from them. Held, in part, by the check of
 the parts' form named above, as a line *Floor:* is one of the labels; what the way is given, by nothing yet.
 
 **A staged run through each way** (#397). By default the staged cases are run once through each way, with sessions
@@ -58,14 +59,15 @@ recorded; that the runs are made, by nothing yet.
 
 ## The cloud: `cloud`
 
-- *Task:* a session is started in the host's cloud with its brief as its first message, by the owner or by a session
+- *Task:* a session is started in an agent tool's cloud with its brief as its first message, by the owner or by a session
   through the cloud's own tools (such as one that creates a session and one that sends it a message), in a container
   of its own with the repository cloned.
 - *State:* the cloud reports each session's state (such as working, blocked, ready for review, completed or failed),
-  which the orchestrator gives `scripts/stalled.mjs` as working, blocked or waiting (above).
+  which the orchestrator gives `scripts/stalled.mjs` as working, blocked or waiting (above); a session completed or
+  failed is given none, so its lane, if its pull request stands open, is judged by its branch.
 - *Review:* a fresh session started there as a task is, given the review's brief, takes it; the order and each
   tool's way: `tasks/reviews.md`, point 1, and the tool's part.
-- *Installs:* none: read on 19 November 2026 in a cloud session's own container, where git showed nothing written into
+- *Installs:* none: read on 19 November 2026 in one agent tool's cloud, in a session's own container, where git showed nothing written into
   `.claude/`, `.codex/` or `.kiro/`, ignored files included.
 - *Floor:* each session it starts is started by the owner or from a session the owner started, in a container and a
   clone of its own; its environment holds no other tool's sign-in, and no key in its variables (floor rule 1).
@@ -90,5 +92,6 @@ recorded; that the runs are made, by nothing yet.
 - *Review:* through a plug-in in the session's tool or the host's app, as `tasks/reviews.md`, point 1, orders them;
   whether each takes a brief, its tool's part says.
 - *Installs:* none: a terminal writes nothing into a tool's folder.
-- *Floor:* floor rule 8 holds the session the owner starts there as any on the owner's computer, and one it starts
-  works in a folder and a clone of its own.
+- *Floor:* each session is started by the owner there, or from a session the owner started, in a folder and a clone
+  of its own, on whatever machine the terminal runs; it is given no sign-in of another tool's, each tool keeping its
+  own, and on the owner's computer floor rule 8's limits there hold.
