@@ -89,8 +89,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   where it quotes the owner's words, and equally where it sets out a design and says the owner agreed to it, since a
   bare yes is never quoted (#252). Such a record sets the design out in full, as what binds, and says plainly that the
   owner agreed to it, as the notes on #244 and #252 do; it covers what it sets out and nothing beyond, and a view of
-  the session's own, marked as not a decision, binds nothing. The builder relays the record word for word (floor rule
-  3), and the review reads the change against the design it sets out. A label or opening on another account's text
+  the session's own, marked as not a decision, binds nothing. The builder relays the record word for word, and the
+  review reads the change against the design it sets out. A label or opening on another account's text
   makes it no more than data. What any other session adds to an issue is that session's word.
 - **Who builds a line, the line says.** A bug, a test and a check for a rule that already stands go to any builder
   session. A new or changed rule goes to the design session or to a builder on Opus, as its line names. That builder
