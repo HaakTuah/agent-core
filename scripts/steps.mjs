@@ -30,6 +30,7 @@ import { progressOf } from "./done-when.mjs";
 import { leadsOut } from "./guards.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
 import { NOTES } from "./releases.mjs";
+import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { ruleFiles } from "./rule-files.mjs";
@@ -62,34 +63,7 @@ export const leads = text => [...String(text).matchAll(/^- \*\*([^*]+?)\.\*\*/gm
 // The project at `root`, as the checks read it: its files as git lists them (committed or not, ignored ones left out),
 // a file's text (null where it is not there), its manifest's slots and differences, and its workflows' YAML.
 export function project(root) {
-  const listed = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 })
-    .split("\0").filter(f => f && fs.existsSync(path.join(root, f)));
-  // (what is read is a regular file of the project's own, at most READ_MOST bytes, by a path that, every link on it
-  // followed, ends inside the project (#362, #423): a path or link that leads out, a device, a pipe or a folder reads as
-  // missing, and a file past the size as missing too, named in `unread`, so that no file the project holds stops the
-  // report; a link to a file of its own reads as that file, as the project's tools read it, and only to one git lists
-  // as the project's: never git's own folder nor a file it ignores, a person's or a machine's own)
-  const home = fs.realpathSync(root), unread = [], known = new Set(listed);
-  const within = to => { const rel = path.relative(home, to); return !!rel && rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel); };
-  const file = f => { // the regular file of the project's own a path leads to, as { real, size }, or null
-    const to = path.resolve(home, f);
-    if (!within(to)) return null;
-    try {
-      const real = fs.realpathSync(to), stat = fs.statSync(real);
-      return within(real) && known.has(path.relative(home, real).split(path.sep).join("/")) && stat.isFile() ? { real, size: stat.size } : null;
-    } catch { return null; }
-  };
-  const read = f => {
-    const at = file(f);
-    if (!at) return null;
-    if (at.size > READ_MOST) { if (!unread.includes(f)) unread.push(f); return null; }
-    try { return fs.readFileSync(at.real, "utf8").replace(/\r\n/g, "\n"); } catch { return null; }
-  };
-  // (whether another script may be given the path to read as this reader would: nothing there, or what it reads)
-  const safe = f => {
-    try { if (!fs.lstatSync(path.resolve(home, f), { throwIfNoEntry: false })) return true; } catch { return false; }
-    return (file(f)?.size ?? Infinity) <= READ_MOST;
-  };
+  const { listed, read, safe, unread } = ownFiles(root);
   const manifest = read("core-manifest.md") ?? "";
   const differences = (/^## Differences\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(manifest)?.[1] ?? "").split("\n").filter(l => l.trim());
   const workflows = Object.fromEntries(listed.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(f)).map(f => {
@@ -99,8 +73,6 @@ export function project(root) {
   }));
   return { root, files: listed, read, safe, unread, manifest, differences, workflows };
 }
-// The most a file the steps read may hold: past any rule file, config, workflow, audit or baseline a project writes.
-export const READ_MOST = 64 << 20;
 
 // Where the project's run of each check finds its config, and its calls to the core's workflows: check-configs.mjs,
 // beside this file, whose `Unread` a step throws where it cannot read what it needs.

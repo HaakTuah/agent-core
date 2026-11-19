@@ -16,7 +16,8 @@ import { NOTES } from "../scripts/releases.mjs";
 import { READERS } from "../scripts/shape-readers.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { parseYaml, pathsLetThrough } from "../scripts/workflow-run.mjs";
-import { COST, MOVED_GLOB, NEW_GLOBS, READ_MOST, STEPS, Unread, configs, leads, moved, notDone, plain, project, report, runsOwn } from "../scripts/steps.mjs";
+import { COST, MOVED_GLOB, NEW_GLOBS, STEPS, Unread, configs, leads, moved, notDone, plain, project, report, runsOwn } from "../scripts/steps.mjs";
+import { READ_MOST } from "../scripts/own-files.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };

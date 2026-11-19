@@ -172,7 +172,15 @@ The index, and how an item is written: `archive/instructions.md`.
      waiting for a turn, while what users get is built from a release that waits on a green default branch anyway. The
      owner agreed to the point as worded on the issue, and to its being a priority. It stands behind floor rule 12 and
      "Where users get a release, a pull request merges on its own green checks" in `tasks/hosts.md`.
-262. **19 November 2026**, #733, points 2 to 6. No test run on a draft; a pull request's run on one platform, the suites
+262. **17 November 2026**, #563. The audit's reader asks of a project's documents what it asks of its code: which of
+     its descriptions no longer say what the code does, each with the document and line and what it no longer
+     matches; each such find is a task of the cleaning lane, taken at the dose, and the audit mends nothing and adds
+     no job. "No description left untrue" is held by being read, so what a change misses stays untrue until someone
+     happens to read it. The owner agreed to it in a chat session, as the third of three ways to gain on what the
+     core already has. It stands behind "The audit's reader has a fixed brief and fixed questions" in
+     `tasks/cleaning.md`.
+
+263. **19 November 2026**, #733, points 2 to 6. No test run on a draft; a pull request's run on one platform, the suites
      its change reaches; the default branch tested at its newest commit, a run giving way to a newer merge's and a red
      one narrowed by its files' history and then by halving; the slow and platform suites run once per batch at the
      default branch's newest commit, as often as their cost allows, where the tests run and who pays read and never

@@ -332,7 +332,7 @@
     "roles/shared/review-guidelines.md: A mechanical move is read by its rule and a sample": [251],
     "tasks/cleaning.md": [226],
     "tasks/cleaning.md: No process number is a builder's goal": [244],
-    "tasks/cleaning.md: The audit's reader has a fixed brief and fixed questions": [257],
+    "tasks/cleaning.md: The audit's reader has a fixed brief and fixed questions": [257, 262],
     "tasks/cleaning.md: The state report leads with the outcomes": [244, 251],
     "tasks/code-shape.md": [226],
     "tasks/code-shape.md: A job a maintained package does is done by it": [255],
@@ -421,10 +421,10 @@
     "tasks/tests.md: A test asserts no time measured on a real clock": [257],
     "tasks/tests.md: A test reaches a real clock or another process only where it guards it": [260],
     "tasks/tests.md: A tree that passed is not run again": [257],
-    "tasks/tests.md: A time mark measures and never fails": [262],
-    "tasks/tests.md: No test run on a draft": [262],
-    "tasks/tests.md: The default branch is tested at its newest commit": [262],
-    "tasks/tests.md: The slow suites run once per batch, wherever they run": [262]
+    "tasks/tests.md: A time mark measures and never fails": [263],
+    "tasks/tests.md: No test run on a draft": [263],
+    "tasks/tests.md: The default branch is tested at its newest commit": [263],
+    "tasks/tests.md: The slow suites run once per batch, wherever they run": [263]
   },
   "numbers": {
     "tasks/code-shape.md: A job a maintained package does is done by it": "findings; outcome: robust",
@@ -450,6 +450,7 @@
     "tasks/choices.md: A trial of a maintained tool replays the part's past bugs": "correction: does not work; outcome: robust",
     "roles/shared/review-guidelines.md: A mechanical move is read by its rule and a sample": "findings; outcome: robust",
     "tasks/cleaning.md: The state report leads with the outcomes": "correction: does not work; outcome: robust",
+    "tasks/cleaning.md: The audit's reader has a fixed brief and fixed questions": "correction: looks wrong; outcome: readable",
     "floor/topics/dependencies.md: A new one is looked up in its registry": "check fires; outcome: robust; rare harm",
     "floor/topics/dependencies.md: A new one is taken in an order": "findings; outcome: robust",
     "floor/topics/dependencies.md: Code of another publisher is named in a lock file": "correction: rule missing; outcome: robust; rare harm",
