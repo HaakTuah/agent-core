@@ -48,8 +48,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      an answer to `core-moved.mjs`, `releases.mjs` and `tools-offer.mjs`, 64 MB or 256 MB to the others, 30 commits and
      30 s each for the green main of `releases.mjs`, 30 merged pull requests for the wait, 50 pages for the stalled
      look, 200 for the cost, 10 for the merge line, 20 s for the tools' offer, 30 s for the host's account, and for
-     `queue-only.mjs` 16 MB of an issue's answer, 12 issues, 90 s and a job of 3 minutes; hostile tests:
-     `tests/hostile-github-test.mjs`, and for the last `tests/queue-only-test.mjs`.
+     `queue-only.mjs` 16 MB of an issue's answer, 12 issues, 1 MB of the progress file, 240 characters of a line it
+     adds, 90 s and a job of 3 minutes; hostile tests: `tests/hostile-github-test.mjs`, and for the last
+     `tests/queue-only-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`), the sync and its steps
