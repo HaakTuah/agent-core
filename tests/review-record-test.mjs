@@ -211,8 +211,8 @@ ok(/Sonnet built 3 of the 20[^\n]*, 1 of them bug fixes/.test(trial) && /bug fix
   && !/answers (too|no|worse)/.test(trial) && /In neither group [^\n]*: #3/.test(trial),
   "the trial's printout gives each kind and group, what was read of each, a verdict kind by kind on what decides, and the pull requests in neither group", trial);
 const second = trialPrint("o/r", "2026-12-01", [row(1, "bug fix", "Sonnet at medium", 1), row(2, "bug fix", "Sonnet at high", 1)], "effort");
-ok(/second trial of #767, of effort alone/.test(second) && /Sonnet at medium built 1 /.test(second) && /bug fix, Sonnet at high\s+1/.test(second) && /Sonnet at medium against Sonnet at high/.test(second),
-  "with --effort the printout sets Sonnet at medium against Sonnet at high", second);
+ok(/second trial of #767, of effort alone/.test(second) && /Sonnet at medium and at high built 2 of the 20 /.test(second) && /bug fix, Sonnet at high\s+1/.test(second) && /Sonnet at medium against Sonnet at high/.test(second),
+  "with --effort the printout sets Sonnet at medium against Sonnet at high, and counts the twenty of both", second);
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);

@@ -100,8 +100,9 @@ export function print(repo, since, pulls, mode = "model") {
   const fmt = n => n === null ? "-" : Number.isInteger(n) ? String(n) : n.toFixed(1);
   const of = (kind, group) => pulls.filter(p => p.kind === kind && p.group === group);
   const values = (ps, key) => ps.map(p => p[key]).filter(v => v !== null);
-  const built = pulls.filter(p => p.group === first), unread = pulls.filter(p => p.group === null);
-  const out = [`The ${mode === "effort" ? "second trial of #767, of effort alone" : "trial of #767"} in ${repo}, from ${since}: bug fixes and reworks of tests, by who built them. ${first} built ${built.length} of the ${WANTED} the trial waits for, ${built.filter(p => p.kind === "bug fix").length} of them bug fixes.`,
+  // (the twenty the trial waits for: Sonnet's in the first, those of both efforts together in the second)
+  const built = pulls.filter(p => mode === "effort" ? p.group !== null : p.group === first), unread = pulls.filter(p => p.group === null);
+  const out = [`The ${mode === "effort" ? "second trial of #767, of effort alone" : "trial of #767"} in ${repo}, from ${since}: bug fixes and reworks of tests, by who built them. ${mode === "effort" ? `${first} and ${second.replace(/^Sonnet /u, "")}` : first} built ${built.length} of the ${WANTED} the trial waits for, ${built.filter(p => p.kind === "bug fix").length} of them bug fixes.`,
     "Each a mean per pull request, over those it was read for (how many: in brackets).", ""];
   out.push(grid([["", "pull requests", ...MEASURES.map(([, name]) => name)],
     ...KINDS.flatMap(kind => [first, second].map(group => { const ps = of(kind, group);
