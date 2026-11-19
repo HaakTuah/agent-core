@@ -220,10 +220,11 @@ export const broughtBy = body => { const all = [...lines(seen(body)).join("\n").
 // how many the owner's account filed, which of them are tied to a merged pull request (the newest "Brought in by" of the
 // bug's body and the owner's comments on it, naming a pull request that merged, `merged`: Map of number to
 // { when, kind }, before the bug was filed), by the kind of that pull request, how many of the rest have no such line
-// (`unlined`) and how many name no pull request read that merged before (`unmatched`), and how many other accounts filed.
+// (`unlined`) and how many name no pull request read that merged before (`unmatched`), and how many other accounts filed;
+// `byPull`, the bugs tied to each pull request, by its number.
 export function bugs(list, comments, merged, owner) {
   const same = login => String(login ?? "").toLowerCase() === owner.toLowerCase();
-  const out = { filed: 0, tied: 0, byKind: Object.fromEntries(KINDS.map(k => [k, 0])), unlined: 0, unmatched: 0, others: 0 };
+  const out = { filed: 0, tied: 0, byKind: Object.fromEntries(KINDS.map(k => [k, 0])), byPull: new Map(), unlined: 0, unmatched: 0, others: 0 };
   for (const b of list) {
     if (!same(b.login)) { out.others++; continue; }
     out.filed++;
@@ -232,7 +233,7 @@ export function bugs(list, comments, merged, owner) {
     if (!named) { out.unlined++; continue; }
     const pull = merged.get(named.n);
     if (!pull || !(Date.parse(pull.when) < Date.parse(b.at))) { out.unmatched++; continue; }
-    out.tied++; out.byKind[pull.kind]++;
+    out.tied++; out.byKind[pull.kind]++; out.byPull.set(named.n, (out.byPull.get(named.n) ?? 0) + 1);
   }
   return out;
 }
@@ -274,12 +275,10 @@ export function print(repo, since, pulls, t, bug, twice = [], known = null) {
   return out.join("\n");
 }
 
-function main(args) {
-  const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
-  const value = name => { const i = args.indexOf(name); return i < 0 ? null : args[i + 1]; };
-  const since = value("--since"), by = value("--owner");
-  if (args.includes("--since") && !DAY.test(since ?? "")) fail("--since takes a day, YYYY-MM-DD");
-  if (args.includes("--owner") && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(by ?? "")) fail("--owner needs the owner's account after it");
+// What the record reads, from the clone it is run in and from GitHub (gh): `all` the merged pull requests, `merged`
+// those from `since` on, the comments, the bugs filed from `since` on, `of` a pull request's comments and owner for
+// perPull and its kin, and `commitsOf` its commits (null where they cannot be read). `fail` is called with what went wrong.
+export function gather(since, by, fail) {
   let rules;
   try { process.chdir(execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim()); rules = rulesFor(repoOf()); } catch (e) { fail(`run it in a project that takes the core: ${e.message.split("\n")[0]}`); }
   let repo, all;
@@ -293,17 +292,27 @@ function main(args) {
     ".[] | {issue: (.issue_url | split(\"/\") | last | tonumber), created_at, at: .created_at, updated_at, login: .user.login, user: {login: .user.login, type: .user.type}, body} | @json");
   const inline = pages(`repos/${repo}/pulls/comments?sort=created&direction=asc`,
     ".[] | {pull: (.pull_request_url | split(\"/\") | last | tonumber), in_reply_to_id, at: .created_at, commit_id, original_commit_id, user: {login: .user.login, type: .user.type}, body} | @json");
-  const issues = pages(`repos/${repo}/issues?state=all&labels=bug`,
-    ".[] | {number, at: .created_at, login: .user.login, body, pull: (.pull_request != null)} | @json")
-    .filter(b => !b.pull && (!since || b.at >= `${since}T00:00:00Z`)); // (pull requests are taken out after paging, so that a page's length is still GitHub's own)
+  const labelled = pages(`repos/${repo}/issues?state=all&labels=bug`,
+    ".[] | {number, at: .created_at, login: .user.login, body, pull: (.pull_request != null)} | @json").filter(b => !b.pull); // (pull requests are taken out after paging, so that a page's length is still GitHub's own)
+  const issues = labelled.filter(b => !since || b.at >= `${since}T00:00:00Z`);
   const of = m => [issueComments.filter(c => c.issue === m.number), inline.filter(c => c.pull === m.number), owner];
+  const commitsOf = n => { try { return pages(`repos/${repo}/pulls/${n}/commits?`, ".[] | {sha, at: .commit.committer.date, parents: [.parents[] | {sha}]} | @json"); } catch { return null; } };
+  return { repo, all, merged, owner, issueComments, inline, issues, labelled, of, commitsOf };
+}
+
+function main(args) {
+  const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
+  const value = name => { const i = args.indexOf(name); return i < 0 ? null : args[i + 1]; };
+  const since = value("--since"), by = value("--owner");
+  if (args.includes("--since") && !DAY.test(since ?? "")) fail("--since takes a day, YYYY-MM-DD");
+  if (args.includes("--owner") && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(by ?? "")) fail("--owner needs the owner's account after it");
+  const { repo, all, merged, owner, issueComments, issues, of, commitsOf } = gather(since, by, fail);
   const named = new Map(all.map(m => [m.number, rulesNamed(...of(m))]));
   const pulls = merged.map(m => ({ number: m.number, kind: m.kind, reviews: perPull(...of(m)), rules: named.get(m.number) }));
   const t = tally(pulls);
   const bug = bugs(issues, issueComments, new Map(merged.map(m => [m.number, m])), owner);
   const twice = foundTwice(all.map(m => ({ number: m.number, when: m.when, rules: named.get(m.number) })), since);
   console.log(print(repo, since, pulls, t, bug, twice, standing()));
-  const commitsOf = n => { try { return pages(`repos/${repo}/pulls/${n}/commits?`, ".[] | {sha, at: .commit.committer.date, parents: [.parents[] | {sha}]} | @json"); } catch { return null; } };
   const want = wanted(merged, all, since);
   const rounds = new Map(all.filter(m => want.has(m.number)).map(m => { const commits = commitsOf(m.number); return [m.number, commits && roundsOf(reviewEvents(...of(m)), commits)]; }));
   console.log(`\n${roundsLines(merged, all, since, rounds)}`);

@@ -99,6 +99,27 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   item of its own, naming the issue as its source, and takes what it leaves open as `roles/shared/inbox.md` says of any
   open point. This is the second
   difference from that module, where only the design session writes rules from the owner's words.
+- **A bug fix and a rework of tests are built on Sonnet** (#767). By default, where "The builders" of
+  `roles/orchestrator.md` picks Claude for a line that fixes a bug or reworks tests, the orchestrator starts its builder
+  on Sonnet at high effort; a line that writes or changes a rule, touches security or reads a format another publisher
+  defines stays on Opus at high. Once Sonnet has built twenty pull requests of those two kinds, as `node
+  scripts/builder-trial.mjs` counts them beside the Opus builders' of the same kinds since 18 November 2026, the session
+  that finds it so, the orchestrator at a wake, gives what it prints on #767 in a note, numbers first, and builds the
+  result in a pull request of its own: where the bug fixes' verdicts on findings, rounds of review and bugs that reached
+  `main` each read "no worse within noise", Claude's part (`tools/claude.md`) gives its builder of a bug fix the middle
+  tier, Sonnet, beside the routine lanes the tier table of `tasks/roles.md` gives it; where one reads "worse", Claude's
+  part stays as it is, and the note says by how much; where one reads "too few to tell", the trial goes on. Then a
+  second trial changes the effort alone: from the day that pull request merges, the orchestrator starts the builder of
+  each such line on Sonnet at medium and at high in turn, its first line naming its effort ("on Sonnet at medium"); once
+  twenty have merged, the same script with `--effort --since` that day counting and reading them, the result is built
+  the same way, each kind's verdicts deciding its own lane: where medium reads no worse, Claude's part gives that lane
+  medium effort. It does not mean the order of "The builders" changes, so a line it gives another tool counts in no
+  trial; nor that a Sonnet builder decides what needs judgement (`tools/claude.md`, "Who to call"); nor that a result
+  reaches another tool's part; nor that a trial changes the model and the effort at once. Reason: on 19 November 2026
+  all eleven of the core's builders ran on Opus at high, three bug fixes among them, and the earlier rework of the tests
+  (#715) on Opus too, where the tier table gives routine work to the middle tier, Sonnet in Claude's map. Held, in part,
+  by `scripts/builder-trial.mjs`, which counts each kind by its builder from what `scripts/review-record.mjs` reads and
+  from the session-cost lines; which model and effort the orchestrator starts, by nothing yet.
 - **An orchestrator may work the file** (`roles/orchestrator.md`) while it holds a line a session can take. The
   owner starts it; once none is left that a session can take, it says so and stops, keeping no wake. Two steps of its
   wake are not this repository's: the sync of the core, since `scripts/core-moved.mjs` and `scripts/sync.mjs` run from
@@ -265,6 +286,17 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   the item. Held by `scripts/holders.mjs` with `scripts/archive.mjs`, which fail a key used twice, a key that names no
   issue (an item numbered past 262 among them), an item outside its own file, one of items 1 to 262 taken out, and a
   key under "behind" that is not in the archive.
+- **An item that changes an earlier one names it, and the earlier one is marked** (#756). By default an item of the
+  archive stands as written. Where a new item changes what an earlier one decided (corrects, narrows, widens, replaces
+  or overturns it), whoever writes the new one gives it a line "Changes: N." naming each such item by its key, and
+  gives each item it names one line "Changed by: M.", the keys joined by ", " where there are more; `scripts/reasons.mjs`
+  prints that line under the item, and the later items after it. Nothing changes it. It does not mean the earlier item
+  is rewritten: its text stays as it stands, the one line added; nor that an item that only cites an earlier one, or
+  leaves it as it was, names it. Reason: some items said in passing that they replaced an earlier one while nothing
+  linked the earlier one forward, so a session reading it could rely on a reason that no longer stood. Held by the
+  marks' check in `scripts/archive.mjs`, run by `scripts/holders.mjs`: a "Changes:" whose item is not marked back, a
+  "Changed by:" with no "Changes:" to match, a key in either that is no item, and a mark out of its form each fail;
+  that a new item that changes one says so, by none yet.
 - **Every rule says what holds it.** By default a rule of the floor or the modules is held by
   a check that fails where it is broken (a script, a workflow, a hook, or GitHub's setting that refuses it); where no
   check can read its breach exactly, by a staged case, the holder of last resort, or by the scheduled audit; and where

@@ -1,8 +1,9 @@
 # Cleaning, and the audit of how code is put together
 
 Read by a builder that takes a cleaning task, by the session that takes an audit's task or the state report and by its
-reader, and by the orchestrator when it hands out lanes: the kinds `cleaning` and `audit`. What the
-code is held to: `tasks/code-shape.md`.
+reader, by the orchestrator when it hands out lanes, and by whoever writes an issue that asks something of every or all
+of a kind, or builds what it asks (#593): the kinds `cleaning`, `audit` and `sweep`. What the code is held to:
+`tasks/code-shape.md`.
 
 - **The state of a codebase sets the dose.** By default a codebase is in one of three states, which
   `core/scripts/dose.mjs` reads from the shape check's baseline: the share of the functions and imports the check
@@ -87,6 +88,24 @@ code is held to: `tasks/code-shape.md`.
   code harder to change; and a description a change missed stays untrue until someone happens to read it. Held by the
   scheduled look, whose issue for an audit says this brief, and by the reviews of the pull request that holds the
   report, which read that each question is answered on the scale.
+- **A sweep's scope is read, not listed** (#593). By default an issue names what it covers. The one condition that
+  changes it: an issue asks something of every or all of a kind (an inventory, an audit, a sorting, a check of each
+  file), a *sweep*. The trigger is such an issue written: whoever writes it names the source a script counts that kind
+  from (the tracked files, a workflow's steps, the manifest's rows, `core/scripts/holders.json`), and whoever builds the
+  check that holds the sweep has it read its coverage from that source: each thing the source holds has its line in the
+  sweep, or lies under a path the sweep marks as left out, with the reason, and the check fails each that has neither,
+  saying the mend. It does not mean a sweep may leave nothing out: what it leaves out is said. Reason: a scope written
+  as a list is as complete as its writer's memory, and nothing reads what a list forgot. Held by each sweep's own check,
+  which reads from the source its issue names.
+- **An inventory or an audit is challenged once for what it missed** (#593). By default one session makes an inventory
+  or an audit. The trigger is its record written: the session that took its task then starts a fresh session that wrote
+  no part of it, which reads the whole once and asks what it lacks: a part not listed, a tool not weighed, a question
+  not put. Its finds are written into the record, with a line that opens `Challenged` and gives the day. It does not
+  mean the trials of a choice that is hard to undo (`tasks/choices.md`), which stay for such a choice, nor that the
+  audit's fixed questions change: the challenge asks what they did not. Reason: whoever builds a sweep builds what its
+  issue names, and nothing in the flow asks what the issue itself left out. Held, in part, where a check reads that the
+  line is there, as the core's does of its own inventory; whether the challenge was made, no check can read, and
+  `core/scripts/holders.mjs` counts it among the rules held in part.
 - **The state report leads with the outcomes** (#302). By default the monthly state report names the five outcomes the
   owner named, the product does what was asked, is fast, can be read and changed by a newcomer, can be used by a new
   user, does not break, each with its direct measure first or the words that it has none yet, every other number under
