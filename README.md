@@ -198,7 +198,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      those it names. At the audit, `test-record.mjs` reads each test's time, its failures and what it alone catches;
      each month the state report gives what a push waits on (`wait.mjs`) beside its mark. The shape check counts the
      tests that open a screen, reach a real clock or start another process, and the record the share of the tests' time
-     each takes; it holds the suites' and a push's time marks, and reads the selection's lists from its config.
+     each takes; it measures each suite against its time mark, a warning past it and never a failure, holds the marks
+     and a push's never worse, and reads the selection's lists from its config.
    - **The description check:** `pr-description.mjs`, which fails a pull request, once it is no draft, whose
      description lacks one of the headings `roles/shared/work-flow.md` names (or those the project gives it), the line that says
      what it waits on, or, on its line `Read for it:`, a file its changed paths call for (`reading.mjs`), or the cost
@@ -350,7 +351,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      missing, the hook stops nothing, and where Node is missing the work-saved hook says so in a line at the start,
      where it also names what the paths changed on the branch call for (`reading.mjs`, from the copy merged into `main`,
      by `main`'s own roles and modules). The
-     core's own tests run the scripts and both hooks there on every change (`.github/workflows/tests.yml`).
+     core's own tests run the scripts and both hooks there once an hour where `main` moved, and in full before each
+     release (`.github/workflows/tests.yml`; #733).
    - **Another tool's session** reads what `AGENTS.md` names through its own entry file, and runs the work-saved
      hook where its tool has the event (Kiro and Codex at a session's start and stop, from the hook files the starter
      kit writes); no rule rests on a hook alone (`tasks/tools.md`).
@@ -419,6 +421,7 @@ for (`scripts/manifest-reads.mjs` holds each mark to its parts). The starter kit
 | *pace* | the manifest's lines under "Pace", each a pace the owner sets, of the kinds `roles/orchestrator.md`, "The pace is the owner's", names | choice: left out, no pace but the default |
 | *users get* | `merges` or `releases`, in backticks: whether the project still publishes what its users get on each merge to its default branch (a site deployed on each push), or only from that branch's green newest commit or a release cut there (floor rule 12; `tasks/hosts.md`) | cannot be read: a deploy on each push and a release workflow each say it only in part; left out, `merges`, under which a pull request is brought up to date first, until the project's publishing waits on a green branch and its row says `releases` |
 | *merge queue* | `on`, `offered` or `none`, in backticks: whether the host offers the repository a merge queue and whether it is on (`tasks/hosts.md`, "The merge line follows the host") | read: from who holds the repository, whether it is private and its rules on the default branch (`scripts/merge-line.mjs`) |
+| *test runners* | `hosted`, `self-hosted` or `local`, in backticks: where the project's tests run, the host's runners, a runner of the owner's own, or a session's or the owner's computer alone (`tasks/tests.md`, "The slow suites run once per batch, wherever they run") | read: from the project's workflows, the jobs on a pull request or a push that start a suite through the shape check, and the runner each takes (`scripts/runners.mjs`) |
 | *billed minutes* | `yes` or `no`, in backticks: whether the host bills the repository's runner minutes (`tasks/hosts.md`, "The merge line follows the host") | read: whether the repository is private (`scripts/merge-line.mjs`) |
 | *other builders*, *code reviewers*, *security reviewer* | rows of the *tools* table, "Builder", "Code reviewer" and "Security reviewer"; one still standing among the slots is read as that row | read: as the *tools* (`scripts/tools-read.mjs`) |
 | *direction* | the file that holds what the project's screens are held to: who uses it, its main size, what each screen is for, its mood, its references, what it uses and never uses, and where its system's values and its reference screen stand (`tasks/screens.md`, points 1 and 2) | choice: left out, `docs/direction.md`, written before its first screen |
@@ -473,8 +476,8 @@ Not taken: <where it is a list: each module left out as `name.md` (its reason), 
   the commit it was cut on (core archive 195).
 - This repository's own `main`: a ruleset as each project's has, deletions restricted, force pushes blocked, a pull
   request required, and the checks `tests`, `size`, `own-description` and the Personal terms workflow's `check`
-  required, branches up to date (core archive 201) until the owner switches that off, as floor rule 12 lets where users
-  get a release (#733).
+  required, and branches not asked to be up to date, which floor rule 12 lets where users get a release, as the core's
+  do (#733, #738).
 - Each project's ruleset on its default branch: deletions restricted, force pushes blocked; a pull request required, no
   approvals (a team's project may ask some: `roles/shared/teams.md`); status checks required (the project's CI and `core / core`), branches up to date where every merge goes live (floor rule 12); where the repository has
   them, code scanning results required from CodeQL, blocking on security alerts High or higher and alerts Errors, code

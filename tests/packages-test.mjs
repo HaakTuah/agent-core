@@ -187,10 +187,10 @@ try {
   fs.writeFileSync(path.join(pp, "package.json"), JSON.stringify(parserList, null, 2));
   fs.writeFileSync(path.join(pp, "package-lock.json"), JSON.stringify({ name: parserList.name, lockfileVersion: 3, requires: true, packages: { "": { name: parserList.name, license: parserList.license, dependencies: parserList.dependencies }, "node_modules/is-number": staged } }, null, 2));
   // (each script that loads a package, by the call that loads it; a script that loads one and has no case here fails)
-  const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")`, "workflow-run.mjs": `parseYaml("a: 1\\n")`, "markdown.mjs": "markdownReader()" };
+  const CALLS = { "yaml-keys.mjs": `twice("a: 1\\n")`, "comment-only.mjs": `readYaml("a: 1\\n")`, "workflow-run.mjs": `parseYaml("a: 1\\n")`, "markdown.mjs": "markdownReader()", "runners.mjs": `workflowsIn(".github/workflows")`, "toml.mjs": `parseToml("a = 1\\n")` };
   // (parseYaml throws where the package is not installed, and each of its callers says so as a failure or an unread file:
   // here as a check would, so its words are read as one)
-  const callOf = f => (f === "workflow-run.mjs" ? `(() => { try { return m.${CALLS[f]}; } catch (e) { console.error(\`FAIL: \${e.message}\`); process.exit(1); } })()` : `m.${CALLS[f]}`);
+  const callOf = f => (["workflow-run.mjs", "runners.mjs"].includes(f) ? `(() => { try { return m.${CALLS[f]}; } catch (e) { console.error(\`FAIL: \${e.message}\`); process.exit(1); } })()` : `m.${CALLS[f]}`);
   const loads = fs.readdirSync(path.join(root, "scripts")).filter(f => f.endsWith(".mjs") && f !== "packages.mjs" && /\bload(?:Sync)?\("/u.test(fs.readFileSync(path.join(root, "scripts", f), "utf8")));
   ok(loads.length > 0 && loads.every(f => CALLS[f]), "each script that loads a package has its call here", loads.filter(f => !CALLS[f]).join(", "));
   const call = (f, expr) => spawnSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(pathToFileURL(path.join(copy, "scripts", f)).href)}); console.log(JSON.stringify(${expr}));`], { cwd: project, encoding: "utf8", timeout: 60000, env });
@@ -201,6 +201,23 @@ try {
   // (a script that imports one of them for what needs no package runs with nothing installed: the copies check)
   const plain = call("yaml-keys.mjs", `m.uncommented("a: 1 # b")`);
   ok(plain.status === 0 && plain.stdout.trim() === JSON.stringify("a: 1"), "what needs no package runs with nothing installed, so a project's own workflow that runs the copies check is not stopped", `${plain.stdout}${plain.stderr}`);
+  // (a project's Codex config, which the TOML package reads, with nothing installed: the agent-tools check did not run and
+  // says the install, and where the job's install could not reach the registry it says as a warning that it left that
+  // file unread: its entries are not failed as configured nowhere, and every other failure stands (#654, point 4)
+  fs.mkdirSync(path.join(project, ".codex"), { recursive: true });
+  fs.writeFileSync(path.join(project, ".codex/config.toml"), "[mcp_servers.docs]\ncommand = \"docs-server\"\n");
+  const entry = name => ({ kind: "server", name, publisher: "Example Tools", version: "2.0.0" });
+  fs.writeFileSync(path.join(project, "licences.json"), JSON.stringify({ agentTools: [entry("Codex docs")] }));
+  const tools = more => spawnSync(process.execPath, [path.join(copy, "scripts/agent-tools.mjs"), "licences.json"], { cwd: project, encoding: "utf8", timeout: 60000, env: { ...env, ...more } });
+  const absent = tools({}), skipped = tools({ CORE_PACKAGES_UNREACHED: "1" });
+  fs.writeFileSync(path.join(project, ".mcp.json"), JSON.stringify({ mcpServers: { files: { command: "files-server" } } }));
+  const others = tools({ CORE_PACKAGES_UNREACHED: "1" });
+  fs.rmSync(path.join(project, ".mcp.json"));
+  ok(absent.status === 1 && /did not run: the package smol-toml is not installed/u.test(absent.stderr) && mended(absent.stderr), "the agent-tools check with a Codex config and nothing installed did not run, and says the install", `${absent.status} ${absent.stdout}${absent.stderr}`);
+  ok(skipped.status === 0 && /^::warning::The agent-tools check did not read \.codex\/config\.toml: .*smol-toml.*Mend: run this job again/mu.test(skipped.stdout) && !/docs/u.test(skipped.stderr), "and where the registry did not answer, it says as a warning that it left the Codex config unread, failing none of its entries", `${skipped.status} ${skipped.stdout}${skipped.stderr}`);
+  ok(others.status === 1 && /server "files", configured in \.mcp\.json, is not listed/u.test(others.stderr) && !/docs/u.test(others.stderr), "while every other part of the check runs, and fails what it finds", `${others.status} ${others.stdout}${others.stderr}`);
+  fs.rmSync(path.join(project, ".codex"), { recursive: true, force: true });
+  fs.rmSync(path.join(project, "licences.json"));
   // (the shape check's reader of C#, which reads on the parser's files (installedFile), with nothing installed: it did
   // not run, saying the mend; where the job's install could not reach the registry, it reads no function of C#, says so
   // as a warning and fails nothing by that alone, and writes no baseline then (#654, point 4))

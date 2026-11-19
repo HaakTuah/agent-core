@@ -44,7 +44,7 @@ import { fill, oneJob, readyOnly } from "../scripts/init.mjs";
 import { scratchEnv } from "../scripts/scratch-core.mjs";
 import { where } from "../scripts/shape.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
-import { STEPS, callers, leads, project as read } from "../scripts/steps.mjs";
+import { STEPS, callers, leads, notDone, project as read, report } from "../scripts/steps.mjs";
 import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
 
 const STEP_LEADS = STEPS.map(s => s.lead);
@@ -103,6 +103,14 @@ Object.assign(env, { HOME: home, USERPROFILE: home, APPDATA: path.join(home, "Ap
 const named = new Map(); // (a project's folder, and the name git writes into each commit made in it)
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env: { ...env, ...named.get(dir) }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
 const node = (dir, ...args) => { const r = spawnSync(process.execPath, args, { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
+// The steps a release asks, read in this process as `node core/scripts/steps.mjs` reads them in the project at `dir`,
+// with the environment the program would be given: what it prints, and its status. The copy's program runs first on
+// each project; each reading after it is this one, whose readings of the same project's state are made once (#715).
+function stepsIn(dir) {
+  const was = { ...process.env }, set = to => { for (const k of Object.keys(process.env)) delete process.env[k]; Object.assign(process.env, to); };
+  set(env);
+  try { return { status: 0, out: `${report(notDone(dir))}\n` }; } catch (e) { return { status: 1, out: `FAIL: the steps could not be read here (${e.message})` }; } finally { set(was); }
+}
 
 let history = true;
 try { git(root, "rev-parse", "--verify", "-q", "HEAD^{commit}"); history = git(root, "rev-parse", "--is-shallow-repository") === "false"; } catch { history = false; }
@@ -375,6 +383,8 @@ function upgrade(p, from, ownChanges, expect) {
   // alone does not do: it is reported, it alone, and its mend as written, merged as the project's own pull request
   // would be, makes it done)
   let r = steps();
+  const here = stepsIn(p.dir);
+  ok(here.status === r.status && here.out === r.out, `${p.name}: the steps read in this process are as the copy's program reads them`, `${r.out}\n---\n${here.out}`);
   const asked = reported(r.out);
   ok(r.status === 0 && asked.every(lead => added.includes(lead) && STAGES[lead].asked), `${p.name}: after the sync, the steps not done are those the release adds that it asks of every project (${asked.length})`, r.out);
   const unmended = git(p.dir, "rev-parse", "HEAD");
@@ -386,14 +396,14 @@ function upgrade(p, from, ownChanges, expect) {
     const onMend = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: unmended, only: "copies.yml" });
     ok(!failures(onMend) && onMend.some(([, r]) => r.ran), `${p.name}: the pull request that makes those mends passes the copies workflow's checks, read against the project before it`, failures(onMend));
   }
-  r = steps();
+  r = stepsIn(p.dir);
   ok(r.status === 0 && r.out.includes("Every step a check reads is done"), `${p.name}: and with each such step mended as it words it, every step a check reads is done`, r.out);
   for (const lead of added) {
     STAGES[lead].stage(p.dir);
-    r = steps();
+    r = stepsIn(p.dir);
     ok(JSON.stringify(reported(r.out)) === JSON.stringify([lead]), `${p.name}: "${lead}", added since ${from.tag} and taken out, is reported`, r.out);
     STAGES[lead].mend(p.dir);
-    r = steps();
+    r = stepsIn(p.dir);
     ok(r.out.includes("Every step a check reads is done"), `${p.name}: and its mend as written makes it done`, r.out);
     clean();
   }
@@ -402,7 +412,7 @@ function upgrade(p, from, ownChanges, expect) {
   if (!out.length) out.push(Object.keys(STAGES)[0]);
   console.log(`note ${p.name}: the steps taken out at random: ${out.join("; ")}`);
   for (const lead of out) STAGES[lead].stage(p.dir);
-  r = steps();
+  r = stepsIn(p.dir);
   ok(JSON.stringify(reported(r.out)) === JSON.stringify(STEP_LEADS.filter(l => out.includes(l))), `${p.name}: steps taken out at random are reported, exactly those (${out.length})`, `${out.join("\n")}\n---\n${r.out}`);
   clean();
 
@@ -837,11 +847,11 @@ function preRelease(name, { windows }) {
   // the steps and the differences name the configs where the project holds them, and read no comment as a run
   git(dir, "checkout", "-q", "main");
   // (with nothing installed, as its own old sync script left it, the steps that read its workflows say so and go on;
-  // then installed, as a session's start installs, they read them)
+  // then installed, as the sync installs, the parser's packages with the rest, they read them)
   const bare = node(dir, "core/scripts/steps.mjs");
   ok(bare.status === 0 && /the core's packages are not installed, so \.github\/workflows\/\S+ could not be read: run `node core\/scripts\/install\.mjs`/u.test(bare.out),
     `${name}: with the core's packages not installed, the steps that read its workflows say so, with the install as the mend, and the rest go on`, bare.out);
-  const installed = node(dir, "core/scripts/install.mjs");
+  const installed = node(dir, "core/scripts/install.mjs", "all");
   const steps = node(dir, "core/scripts/steps.mjs"), fresh = node(dir, "core/scripts/fresh.mjs");
   const tools = steps.out.split("\n").find(l => l.startsWith("- 16 November 2026, an agent's own tools listed:")) ?? "";
   ok(installed.status === 0 && steps.status === 0 && tools.includes("`node core/scripts/agent-tools.mjs config/licences.json`") && !/checks\/(licences|copies)/.test(steps.out) && !/`(reads|takes)`/.test(steps.out),
