@@ -70,8 +70,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      of the pins (`scripts/sync.mjs`); limits: 64 MB of a file for the licence check (256 MB for NuGet's), 1 MB of an
      action and 5,000 steps of a workflow, 60 s for git's filters, 64 MB of a workflow for the move of the pins, past
      which it is reported unread, and none on a file for the reader of where the tests run, a project's own, read whole,
-     whose walk of a job's labels stops at 500 and 8 deep, and NuGet's lock file version 2, a newer refused (npm's lock
-     file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`.
+     whose walk of a job's labels stops at 500 and 8 deep, lists and mappings nested 128 deep at most for the workflow
+     check's two readers of a workflow (what is nested past it is said with its mend, and no list or mapping used as a
+     key is read), and NuGet's lock file version 2, a newer refused (npm's lock file's number is not read yet: #663);
+     hostile tests: `tests/hostile-build-files-test.mjs`.
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the

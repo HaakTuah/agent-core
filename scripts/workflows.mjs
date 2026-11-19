@@ -36,7 +36,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
-import { DEEPEST, twice } from "./yaml-keys.mjs";
+import { DEEPEST, pruned, twice } from "./yaml-keys.mjs";
 import { loadSync, unreached } from "./packages.mjs";
 import { projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
@@ -109,13 +109,24 @@ const CHECKS = /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nu
 // pull_request`, `on: [push, pull_request]`), as []; null where it has no such trigger.
 const typesOf = on => typeof on === "string" || Array.isArray(on) ? ([].concat(on).includes("pull_request") ? [] : null)
   : on && typeof on === "object" && "pull_request" in on ? [].concat(on.pull_request?.types ?? []).map(String) : null;
-// A workflow's text read as YAML by the package the core installs (as yaml-keys.mjs reads it; flow mappings and every
-// form GitHub reads), every scalar as text; null where it is no YAML, which GitHub's own reader refuses all the same.
+// A workflow's text read as YAML by the package the core installs (as yaml-keys.mjs reads it, its tokens pruned past
+// DEEPEST alike; flow mappings and every form GitHub reads), every scalar as text; null where it is no YAML, which
+// GitHub's own reader refuses all the same. A pair whose key is a list or a mapping is left out before the read, since
+// `toJS` writes such a key out as text, which takes ever longer the deeper it nests (a few hundred `? ` marks ran for
+// minutes: #837), and the keys read here are plain words.
 function yamlOf(text) {
-  const { parseDocument } = loadSync("yaml");
+  const { Composer, Parser, isScalar, visit } = loadSync("yaml");
   try {
-    const doc = parseDocument(String(text).replace(/^\ufeff/u, ""), { schema: "failsafe", uniqueKeys: false, prettyErrors: false });
-    return doc.errors.length ? null : doc.toJS({ maxAliasCount: 100 });
+    const composer = new Composer({ schema: "failsafe", uniqueKeys: false, prettyErrors: false }), docs = [];
+    for (const token of new Parser().parse(String(text).replace(/^\ufeff/u, ""))) {
+      const one = [token];
+      pruned(one);
+      docs.push(...composer.next(one[0]));
+    }
+    docs.push(...composer.end());
+    if (docs.length !== 1 || docs[0].errors.length) return null;
+    visit(docs[0], { Pair: (_, pair) => (isScalar(pair.key) ? undefined : visit.REMOVE) });
+    return docs[0].toJS({ maxAliasCount: 100 });
   } catch { return null; }
 }
 
