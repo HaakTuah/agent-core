@@ -1,4 +1,4 @@
-# The reasons behind the core: items 244 onward
+# The reasons behind the core: items 244 to 262
 
 The index, and how an item is written: `archive/instructions.md`.
 
