@@ -76,18 +76,19 @@ reviewers judge by: `roles/shared/review-guidelines.md`.
      one commit stood for later commits no one checked, and any collaborator's comment passed a pull request. Held by
      the `security-review` status, which waits where it is broken, in the core, and holds the merge once a ruleset
      requires it (#320).
-   - **What a posted review declares** (#299): by default a review posted in a comment that opens
-     "Security review:", "Code review:" or "Design check:" covers one kind of review, and declares what it found on two
-     lines of their own: "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other
-     finding.". Whoever posts it, session or reviewer, writes both. The one condition that changes it: a note that no
-     review is needed ("Security review: none needed") declares nothing. It does not mean that the lines change what
+   - **What a posted review declares** (#299): by default a review posted in a comment that opens "Security review:",
+     "Code review:" or "Design check:" covers one kind of review, and declares what it found on two lines of their own:
+     "Blocking findings: N." or "No blocking finding.", and "Other findings: M." or "No other finding.", and its score
+     ("Every reviewer" in `roles/shared/review-guidelines.md`) on a third: "Score: S of 10.", S a whole number from 1 to
+     10 (#710). Whoever posts it, session or reviewer, writes all three. The one condition that changes it: a note that
+     no review is needed ("Security review: none needed") declares nothing. It does not mean that the lines change what
      blocks or what a builder mends (point 5; #315), that they stand in for the findings written out, that Codex's own
      reviews, read by their badges, are asked anything, nor that a comment covering two kinds is read as both. Reason:
      run on 10 to 15 November 2026, the count of what the reviews find read 4 of 24 posted security reviews, their
      wording varying, and the findings that do not block are to be counted before #315 is decided. Held by the
-     `code-review` status, which waits while the newest posted review of a kind declares no line
-     (`core/scripts/review-marks.mjs`; #551); `core/scripts/review-record.mjs` counts one without its line as "not
-     read".
+     `code-review` status, which waits while the newest posted review of a kind declares no line, its score asked from
+     20 November (`core/scripts/review-marks.mjs`; #551); `core/scripts/review-record.mjs` counts one without its line
+     as "not read".
 4. **The design check:** once before the merge, a fresh reviewer judges the work against the design alone, and its
    "Readings taken" as the stand-in would.
    - **It goes down the lines** (#305). By default, where the pull request's entry has "Done when"

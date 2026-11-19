@@ -83,7 +83,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #707 | rule builder | |
 | #701 | builder | |
 | #716 | builder | |
-| #551 | builder; #710 adds a line to `tasks/reviews.md` | #642 |
 | #739 | rule builder; it changes the game module (`tasks/game-design.md`) | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 

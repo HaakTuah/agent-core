@@ -31,7 +31,7 @@
 // does not hold what a review says, that docs another provider built got their code review, nor, given no list of the
 // merges proved (a workflow older than this script), that a merge from `main` brought no change of its own: those stay
 // with the builder and the reviews. Once a review has run, it waits too on the marks reviews leave (review-marks.mjs,
-// beside this file; #551): the newest posted review of each kind declaring its two lines, and, in the core's own
+// beside this file; #551): the newest posted review of each kind declaring its lines and its score (#710), and, in the core's own
 // repository, a design-checked pull request's design check of its head; a review counts for these only as the
 // security-review status counts one (REVIEWERS, RIGHTS). It prints, as JSON, the commit to
 // mark and the status to give it, named "code-review", or {} for a pull request that is closed or a draft. While
@@ -66,7 +66,7 @@ export function judge(pull, comments, commits, files, rules = [], bound = true, 
   // (a summary whose state cannot be read is no review of Codex's, running or done: the check warns, and goes on)
   return read.unread ? { ...verdict, warning: UNREAD } : verdict;
 }
-// the marks reviews leave (review-marks.mjs; #551), once the review has run: a posted review's two lines, and, in the
+// the marks reviews leave (review-marks.mjs; #551), once the review has run: a posted review's lines and score, and, in the
 // core, a design-checked pull request's design check of the head; a review counts for them only as security-review.mjs
 // counts one (more: the accounts the project names, and the host's rights read for those who posted one), never by
 // GitHub's association alone, since in an organisation a member who may only read has it too
