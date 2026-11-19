@@ -3,7 +3,8 @@
 // what a branch could hold, as each case's shape allows: too long, the wrong type, markup, a file path, a number out of
 // range, and nothing at all; each refuses, taking nothing of it as a pass. The readers: pure-sync.mjs and
 // comment-only.mjs, run as a merger runs them in a scratch project whose core is reached by a git rewrite (no network);
-// select.mjs, run as the tests workflow runs it there; copy-tree.mjs, on trees made here; and pr-description.mjs's reader of
+// select.mjs, run as the tests workflow runs it there, and the shape check's readers on the parser that it reads code
+// through, on files at and just past the largest each takes (#844, #862); copy-tree.mjs, on trees made here; and pr-description.mjs's reader of
 // what a pull request adds under its manifest's "Differences" (#756), on commits made here; and reading.mjs's reader of the
 // checkout's rule files (#848), on a checkout made here. Test data is made up. Run
 // by the core's tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
@@ -16,6 +17,10 @@ import { CORE } from "../scripts/core-address.mjs";
 import { coreIsFolder, entries } from "../scripts/copy-tree.mjs";
 import { MANIFEST_MAX, UNREADABLE, differencesAdded, reasonsMend } from "../scripts/pr-description.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { readCsharp } from "../scripts/shape-csharp.mjs";
+import { readPython } from "../scripts/shape-python.mjs";
+import { javascriptFunctions } from "../scripts/javascript-functions.mjs";
+import { LARGEST } from "../scripts/tree-walk.mjs";
 import { scratchDir, scratchEnv, root } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
@@ -186,6 +191,31 @@ ok(r.status === 0 && said() === "RUN=all\n" && r.ms < 5000, `select: ${MANY} cha
 branch("sel-nothing", () => {});
 r = select();
 ok(r.status === 0 && said() === "RUN=  \n", "select: an empty diff selects no test");
+// (the slowest code found for each reader at the largest it takes: one long list, braces nested as deep as the grammar
+// goes, and statements C# holds no such thing as, which its grammar recovers from at about 50 s a megabyte; each read
+// as the job reads it, the process, its parser's thread and the grammar started, stopped at SECURITY.md's 5 s)
+const filled = (head, unit, tail, size) => `${head}${unit.repeat(Math.floor((size - head.length - tail.length) / unit.length))}${tail}`;
+const nested = size => { const d = Math.floor((size - 22) / 2); return `class C { void M() ${"{".repeat(d)}${"}".repeat(d)} }\n`; };
+const SLOWEST = {
+  "src/list.py": size => filled("x = [", "a,", "]\n", size),
+  "src/list.js": size => filled("x = [", "a,", "];\n", size),
+  "src/nested.cs": nested,
+  "src/bare.cs": size => filled("class C { void M() {", "x;", "} }\n", size),
+};
+const largestOf = file => LARGEST[{ ".py": "python", ".js": "javascript", ".cs": "csharp" }[path.extname(file)]];
+for (const [file, made] of Object.entries(SLOWEST)) {
+  const text = made(largestOf(file));
+  branch(`sel-${path.basename(file)}`, () => write(file, text));
+  fs.writeFileSync(envFile, "");
+  const timed = spawnSync(process.execPath, [path.join(root, "scripts", "select.mjs"), "--env", "RUN"], { cwd: p, env: { ...env, SELECT_BASE: MAIN, GITHUB_ENV: envFile }, encoding: "utf8", maxBuffer: 1 << 28, timeout: 5000 });
+  ok(timed.status === 0 && !raw(`${timed.stdout}${timed.stderr}`) && /^RUN=/u.test(said()), `select: ${file} of ${text.length} characters, the largest its reader takes, is read within 5 s and selects`, `${timed.signal ?? ""}${timed.stderr}`);
+}
+// (one character more and the reader gives its grammar nothing: no functions told, so the shape check counts it lost)
+const past = { "src/list.py": t => readPython(t).functions, "src/list.js": t => javascriptFunctions("src/list.js", t), "src/nested.cs": t => readCsharp(t).functions };
+for (const [file, functions] of Object.entries(past)) {
+  const text = SLOWEST[file](largestOf(file) + 2);
+  ok(text.length > largestOf(file) && functions(text) === null, `${file} of ${text.length} characters, past the largest its reader takes, has no functions told`);
+}
 for (const base of ["--output=/tmp/x", "main;touch x", "HEAD~99999"]) {
   r = select({ SELECT_BASE: base });
   ok(r.status === 1 && r.out.includes("Mend:") && said() === "" && !fs.existsSync(path.join(p, "x")), `select: SELECT_BASE ${JSON.stringify(base)} is refused with its mend, and nothing is written`);

@@ -28,8 +28,11 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`), and the rule files a
      checkout holds, the manifest too (`scripts/reading.mjs`); limits: 64 MB of git's answer (256 MB for the
      comments proof and the selection, 16 MB for the manifest, past which it is reported unread), none in count, since
-     every changed path is read, and of the rule files only a regular file of the checkout's own, a link, pipe or
-     device read as no file; hostile tests: `tests/hostile-pr-changes-test.mjs`.
+     every changed path is read, of each file of code the selection reads through the shape check's readers
+     (`scripts/shape-readers.mjs`) 500,000 characters of JavaScript, TypeScript or Python and 250,000 of C#, past which
+     its functions are not read, and 2 s for the parser on each (`scripts/tree-walk.mjs`), and of the rule files only a
+     regular file of the checkout's own, a link, pipe or device read as no file; hostile tests:
+     `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
      of the work standing still (`scripts/look.mjs`, through `queue.mjs`'s placing and reading), with the open issues
