@@ -246,9 +246,7 @@ ok(!coreIsFolder("--output=x", gitDir) && !fs.existsSync(path.join(p, "x")), "co
   ok(linked === UNREADABLE && mended(`FAIL ${reasonsMend("", linked)}`) && /a link/u.test(reasonsMend("", linked)), "pr-description: core-manifest.md made a link is unreadable and fails with its mend, naming a link");
   fs.writeFileSync(path.join(d, "docs", "m.md"), manifest("- a difference behind a link", "- another, only the target changed")); commit();
   ok(differencesAdded(d) === UNREADABLE, "pr-description: a link whose target alone changes is unreadable");
-  fs.rmSync(path.join(d, "core-manifest.md")); fs.rmSync(path.join(d, "docs"), { recursive: true });
-  // (the link is taken out of the index first: where git keeps no links, as on Windows, it keeps an entry that is one a link, whatever is written over it)
-  g("rm", "-q", "--cached", "core-manifest.md"); put(manifest("None.")); commit();
+  g("rm", "-q", "core-manifest.md"); fs.rmSync(path.join(d, "docs"), { recursive: true }); put(manifest("None.")); commit();
   // run from a folder below the checkout's root: the manifest at the root is still read
   put(manifest("- a difference read from below the root")); fs.mkdirSync(path.join(d, "sub")); fs.writeFileSync(path.join(d, "sub", "x"), "x\n"); commit();
   ok(differencesAdded(path.join(d, "sub")).join() === "- a difference read from below the root", "pr-description: run from a folder below the root, the root's manifest is read, never taken for absent");

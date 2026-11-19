@@ -55,6 +55,10 @@
       "mark": 61827,
       "why": "Its cases run on the one scratch project it writes from the starter kit; split, each file would write it again, adding to the suite's time (tasks/tests.md), and every case reads that setup."
     },
+    "tests/issue-terms-test.mjs": {
+      "mark": 25234,
+      "why": "One script's cases (issue-terms.mjs): its texts, edits and terms file, all on the one fake host it sets up; split, each file would set that host up again, and a session changing the script reads every case of it."
+    },
     "tests/look-test.mjs": {
       "mark": 37770,
       "why": "Split into the look's tests and the state report's in #852."
@@ -62,6 +66,10 @@
     "tests/reading-test.mjs": {
       "mark": 31106,
       "why": "Split by the part of reading.mjs each case tests in #852."
+    },
+    "tests/size-test.mjs": {
+      "mark": 28199,
+      "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
     }
   }
 }
