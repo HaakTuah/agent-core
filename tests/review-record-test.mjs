@@ -7,7 +7,7 @@
 //
 //   node tests/review-record-test.mjs
 import { fileURLToPath } from "node:url";
-import { builderOf, changedOf, kindOf, print as trialPrint, verdict } from "../scripts/builder-trial.mjs";
+import { blockingOf as trialBlocking, builderOf, changedOf, kindOf, print as trialPrint, verdict } from "../scripts/builder-trial.mjs";
 import { blockingOf, broughtBy, bugs, codexFind, foundTwice, otherOf, perPull, postedKind, print, ruleOf, rulesIn, rulesNamed, secondFound, standing, tally } from "../scripts/review-record.mjs";
 
 let failed = 0, count = 0;
@@ -188,6 +188,10 @@ ok(same(changedOf("3\t2\ttests/a-test.mjs\n4\t1\tscripts/a.mjs\n-\t-\ttests/b.pn
 ok(verdict([1, 2, 3], [1, 2, 3]) === "no worse within noise" && verdict([9, 10, 11], [1, 2, 3]) === "worse, by 8.00 a pull request" && verdict([2, 3, 4], [1, 2, 3]) === "no worse within noise"
   && verdict([1], [1, 2]) === "too few to tell" && verdict([2, 2], [1, 1]) === "worse, by 1.00 a pull request" && verdict([1, 1], [2, 2]) === "no worse within noise",
   "Sonnet is worse only where its mean is above Opus's by more than twice the standard error of the difference");
+const ran = (blocked, points) => ({ got: true, blocked, points, other: 0, otherUnread: false }), idle = { got: false, blocked: null, points: 0, other: 0, otherUnread: false };
+const five = (code, security) => ({ codexCode: code, postedCode: idle, codexSecurity: security, postedSecurity: idle, postedDesign: idle });
+ok(trialBlocking(five(ran("yes", 2), ran("no", 0))) === 2 && trialBlocking(five(ran("yes", 2), ran("unread", 0))) === null && trialBlocking(five(idle, idle)) === 0,
+  "the trial's blocking points are each review's, and unknown where one that ran was not read, never none");
 const trial = trialPrint("o/r", "2026-11-18", [
   { number: 1, kind: "bug fix", builder: "Sonnet", blocking: 1, rounds: 2, bugs: 0, answers: 10, out: 5, into: 100 },
   { number: 2, kind: "bug fix", builder: "Opus", blocking: 3, rounds: null, bugs: 1, answers: null, out: null, into: null },

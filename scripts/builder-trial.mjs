@@ -7,11 +7,12 @@
 //   builder   is the one of Sonnet and Opus its description's first line names (a Sonnet builder's says so:
 //             tools/claude.md, "Who to call"), else the one of them its session-cost line names alone; else not read.
 // For each kind and builder it prints the pull requests and the mean, per pull request, of the blocking points its
-// reviews raised (each of review-record.mjs's five; a review not read adds none), its rounds of review, the bugs tied to
-// it that reached `main` all the same, and what its session-cost line rose by (core-cost.mjs, priced: answers, output
-// and tokens carried in), each over the pull requests it could be read for; then, for each measure, whether Sonnet's
-// comes out worse than Opus's, of the first three alone: its mean above Opus's by more than twice the standard error of
-// the difference. It reads; it writes nothing. Git, gh and Node's own modules.
+// reviews raised (each of review-record.mjs's five; a pull request with a review that ran and was not read is left out
+// of it), its rounds of review, the bugs tied to it that reached `main` all the same, and what its session-cost line
+// rose by (core-cost.mjs, priced: answers, output and tokens carried in), each over the pull requests it could be read
+// for; then, for each measure, whether Sonnet's comes out worse than Opus's, of the first three alone: its mean above
+// Opus's by more than twice the standard error of the difference. It reads; it writes nothing. Git, gh and Node's own
+// modules.
 //
 //   node core/scripts/builder-trial.mjs [--since YYYY-MM-DD] [--owner login]
 import { execFileSync } from "node:child_process";
@@ -31,6 +32,10 @@ const lines = body => String(body ?? "").replaceAll("\r", "").split("\n");
 
 // The one of BUILDERS `text` names, or null where it names neither or both.
 const oneOf = text => { const said = BUILDERS.filter(b => new RegExp(`\\b${b}\\b`, "u").test(text)); return said.length === 1 ? said[0] : null; };
+
+// The blocking points of a pull request's reviews (review-record.mjs's perPull), or null where one that ran was not
+// read: an unknown is never counted as none.
+export const blockingOf = reviews => REVIEWS.some(([key]) => reviews[key].blocked === "unread") ? null : REVIEWS.reduce((s, [key]) => s + reviews[key].points, 0);
 
 // Who built a pull request, from its description: the first line's builder, else the cost line's, else null.
 export function builderOf(body) {
@@ -111,7 +116,7 @@ function main(args) {
     if (!kind) continue;
     const reviews = perPull(...of(m)), commits = commitsOf(m.number), cost = took.get(m.number) ?? null;
     pulls.push({ number: m.number, kind, builder: builderOf(body),
-      blocking: REVIEWS.reduce((s, [key]) => s + reviews[key].points, 0),
+      blocking: blockingOf(reviews),
       rounds: commits ? roundsOf(reviewEvents(...of(m)), commits).rounds : null,
       bugs: tied.get(m.number) ?? 0, answers: cost?.answers ?? null, out: cost?.out ?? null, into: cost?.into ?? null });
   }
