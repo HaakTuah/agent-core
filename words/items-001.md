@@ -2,12 +2,12 @@
 
 What these are and how they are kept: `words/README.md`.
 
-1. **20 October 2026** (Amarna Letters, item 4). The usage plan: "Usage plan: both of my Claude Code sessions share
-   the weekly limit, so check usage after every commit from now on."
+1. **20 October 2026** (Amarna Letters, item 4). The usage plan: "Usage plan: [the sessions share one limit], so
+   check usage after every commit from now on."
 
 2. **26 October 2026** (Amarna Letters, item 11; for both games), on a suggested stop: "I don't agree with that break.
    I want these 2 continually working until they reach about 90% usage, at that point I don't want them taking on any
-   bigger task, as I want the bulk of that remaining usage for myself."
+   bigger task, as [the rest is kept for the owner's own use]."
 
 3. **26 October 2026** (Amarna Letters, item 12), on the setup itself, the owner agreed to all of it, with a condition:
    "Just make sure you don't lose anything important along the way, or duplicate unessecarily, which creates drift!"
@@ -46,14 +46,14 @@ What these are and how they are kept: `words/README.md`.
     games?"
 
 13. **29 October 2026** (Amarna Letters, item 29), to five optimizations, among them builders settling settled questions
-    themselves: the owner agreed to 1-5, with a limit: "except codex since we don't have it yet."
+    themselves: the owner agreed to 1-5, with a limit: "except codex since [it is not set up yet]."
 
-14. **29 October 2026** (Amarna Letters, item 54), on a builder that stopped at the app's usage warning: "They
-    weren't supposed to stop before 90%. We're still at only 76%"
+14. **29 October 2026** (Amarna Letters, item 54), on a builder that stopped early: "They
+    weren't supposed to stop before 90%. […]"
 
 15. **31 October 2026** (Amarna Letters, item 84; for both games): "Have we informed them to push every single commit? I
-    see that they are now running out of their allocated usage for the next couple of hours. I don't want them to stop,
-    but I do hope they have pushed everything that they can." To "push after every commit", the owner agreed.
+    see that [they will be unavailable for a while]. I don't want them to stop, but I do hope they have pushed
+    everything that they can." To "push after every commit", the owner agreed.
 
 16. **31 October 2026** (Amarna Letters, item 86): "The README for both projects should probably also be queued to be
     updated?" To a standing rule that a change a player sees updates the README in the same PR, the owner agreed.
@@ -63,17 +63,17 @@ What these are and how they are kept: `words/README.md`.
     least tokens, without sacrifacing quality."
 
 18. **1 November 2026** (Amarna Letters, item 123; for both games), on Claude and Codex building together: "I want to
-    run them both togheter, so they collaborate, ideally. that way, they spread the usage, and can last about the full
-    week, hopefully?" Then: "(…) maybe they can review for one another, since they have different architectures and
-    possibly different blind spots?" "Well, they can continue communication over GitHub if something is unclear, or
-    further notes needs to be exchanged, no?" "Yes, this sounds like a good step to try first! But […], so Claude Code
-    orchestrator must be aware that there will be times where Codex isn't avaliable. I suggest it makes a habit of
+    run them both togheter, so they collaborate, ideally. that way, they [spread the load and can keep working
+    longer], hopefully?" Then: "(…) maybe they can review for one another, since they have different architectures
+    and possibly different blind spots?" "Well, they can continue communication over GitHub if something is unclear,
+    or further notes needs to be exchanged, no?" "Yes, this sounds like a good step to try first! But […], so Claude
+    Code orchestrator must be aware that there will be times where Codex isn't avaliable. I suggest it makes a habit of
     dividing the labor with Codex in mind, but awaits a response for a short time, and if it doesn't get it, it
-    assigns it to a builder session of its own? and it has to be aware that if Codex runs out of usage, it won't get an
-    alert, so it has to be ready to fall back in case that happes. Though should absolutely all tasks go to codex? some
-    presumably requires a bit more? (…)" "Some of the stuff you assigned Claude, it might be able to divide up further,
-    so Claude has made the important calls and criterias, then hand-off the grunt work to Codex?" "Yes, at least there
-    should be a Claude reviewer with a clear idea of what the final product should look like, so it can make Codex
+    assigns it to a builder session of its own? and it has to be aware that if [Codex becomes unavailable], it won't
+    get an alert, so it has to be ready to fall back in case that happes. Though should absolutely all tasks go to
+    codex? some presumably requires a bit more? (…)" "Some of the stuff you assigned Claude, it might be able to
+    divide up further, so Claude has made the important calls and criterias, then hand-off the grunt work to Codex?"
+    "Yes, at least there should be a Claude reviewer with a clear idea of what the final product should look like, so it can make Codex
     iterate until it reaches that vision. Should we also add a criteria that they have to judge each other's work on a
     scale of 1/10, and if it isn't a 10, it goes back? I saw someone mention that trick, and it supposedly is a pretty
     good quality control." On Codex's review trigger: "It has a "smart detect (exprimental feature) or on every push.
@@ -84,13 +84,12 @@ What these are and how they are kept: `words/README.md`.
     hours to a PR, the owner agreed.
 
 20. **1 November 2026** (Amarna Letters, item 127; for both games), on Codex reviewing Claude's PRs and building nothing
-    until he says, the owner agreed, and added: "Thought remember, it can run out of usage, even just reviewing. So we
-    should probably have some standard of waiting, then asking it if it is spending too long (which shouldn't be that
-    long a wait), and then handing it off to another reviewer if it dosen't answer quickly? also, will the codex
-    reviewer have our review criterias with the 1 to 10 score scale and all?"
+    until he says, the owner agreed, and added: "Thought remember, [it can become unavailable], even just
+    reviewing. So we should probably have some standard of waiting, then asking it if it is spending too long (which
+    shouldn't be that long a wait), and then handing it off to another reviewer if it dosen't answer quickly? also,
+    will the codex reviewer have our review criterias with the 1 to 10 score scale and all?"
 
-21. **1 November 2026** (Amarna Letters, item 129; for both games): "Hmm, i see there are setting where i can set
-    whether codex abides by my personal prefernce or repo rules." To a security policy for both repositories, Codex's
+21. **1 November 2026** (Amarna Letters, item 129; for both games): "[…]" To a security policy for both repositories, Codex's
     findings counted by priority and a scored design check on the big items: the owner agreed, with a condition: "taking
     account of all attack vector and security concerns".
 
@@ -109,7 +108,7 @@ What these are and how they are kept: `words/README.md`.
     a regular container codex imstance to review rather than naitve review when we get environments. Since reviewer we
     can't get proper feedback ans it can't run our project?" "Also, why does codex post as a bot while claude code posts
     under my name?" "does claude escelate a task to a agent/session with higher effort or fable if it can't manage it?
-    (…) Fable runs out of usage faster than the rest, so there must always be fallbacks" "should we become more lenient
+    (…) […], so there must always be fallbacks" "should we become more lenient
     about workflows and helpers? (…) Remember the goal, get as much done with qualitt output, with as efficient toke
     usage as we can. That does not mean we drag out time, simply to drag out time. I see AGENT.md prohitbits the use of
     subagents outright. I want productive use of them, i think, unless you disagree? My impression is that they are not
@@ -128,7 +127,7 @@ What these are and how they are kept: `words/README.md`.
     something in it doesn't then it needs to be somewhere else, if anywhere at all." To the answers: the owner agreed to
     absolutely all of these. His standing lines from 21 October, moved here from the rule files: "A question is a
     question. Answer it; don't act on it unless I say so." "Match effort to the task. Docs, READMEs, small fixes and
-    config: one pass, no subagents." "Usage is limited. Prefer the cheapest approach that does the job well." "Read only
+    config: one pass, no subagents." "[…] Prefer the cheapest approach that does the job well." "Read only
     the parts of large files the task needs." "Long simulations: run them in the background and wait for the completion
     notice. Don't poll, and don't keep agents alive just to wait for a run." "At each milestone, open a PR I can play,
     say in it what to try, and carry on with the next item without waiting for me to review or merge."
