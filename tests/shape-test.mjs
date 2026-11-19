@@ -480,5 +480,22 @@ ok([["--suite", "unnamed", "--", "x"], ["--suite", "quick"], ["--suite", "quick"
 const outside = file => { try { notLinked(file); return ""; } catch (e) { return `FAIL: ${e.message}`; } };
 ok(["../shape.json", "checks/../../shape.json", "/etc/shape.json", "C:/shape.json", "\\shape.json"].every(f => mended(outside(f)) && /lies outside the project/u.test(outside(f))) && outside("checks/shape.json") === "" && outside("./checks/shape.json") === "",
   "a config or baseline named outside the project is refused, with its mend; one inside it is read");
+// (with the core's packages not installed, as in a project's job of tests that selects with the config and installs
+// none, the config's shape goes unchecked: what the check reads is taken where it holds its form, its defaults else, the
+// check says so as a warning, and a config that names no baseline or no code still fails with its mend)
+{
+  const bare = fs.mkdtempSync(path.join(os.tmpdir(), "shape-bare-"));
+  fs.cpSync(path.join(path.dirname(script), "."), path.join(bare, "core/scripts"), { recursive: true });
+  fs.cpSync(path.join(path.dirname(script), "../setup/template"), path.join(bare, "core/setup/template"), { recursive: true });
+  const parse = text => spawnSync(process.execPath, ["--input-type=module", "-e", `import { parseConfig } from "./core/scripts/shape.mjs"; try { console.log(JSON.stringify(parseConfig(process.argv[1], "checks/shape.json"))); } catch (e) { console.log("FAIL: " + e.message); }`, text], { cwd: bare, encoding: "utf8" }).stdout;
+  const odd = parse(config({ marks: { lines: "x", depth: 2 }, tests: "test/", wiat: 3 })), none = parse(JSON.stringify({ baseline: "b.json" }));
+  ok(/"marks":\{"lines":60,"depth":2,"branches":15\}/.test(odd) && /"tests":\[\]/.test(odd) && mended(none) && /names no "baseline" and "code"/.test(none),
+    "with the core's packages not installed, the config's shape goes unchecked: what holds its form is read, the rest takes its default, and a config with no code still fails with its mend", `${odd}\n${none}`);
+  fs.writeFileSync(path.join(bare, "shape.json"), config({}));
+  for (const a of [["init", "-q"], ["add", "shape.json"]]) execFileSync("git", a, { cwd: bare });
+  const said = spawnSync(process.execPath, ["core/scripts/shape.mjs", "shape.json", "--first"], { cwd: bare, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } });
+  ok(said.status === 0 && /^::warning::The config's shape was not checked: the package ajv is not installed.*\. Mend: /m.test(said.stdout), "and the check says so as a warning, with its mend, and goes on", `${said.stdout}${said.stderr}`);
+  fs.rmSync(bare, { recursive: true, force: true });
+}
 console.log(`${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;
