@@ -26,10 +26,11 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
      a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`), and the rule files a
-     checkout holds, the manifest too (`scripts/reading.mjs`); limits: 64 MB of git's answer (256 MB for the
-     comments proof and the selection, 16 MB for the manifest, past which it is reported unread), none in count, since
-     every changed path is read, and of the rule files only a regular file of the checkout's own, a link, pipe or
-     device read as no file; hostile tests: `tests/hostile-pr-changes-test.mjs`.
+     checkout holds, the manifest too (`scripts/reading.mjs`, and `scripts/rules.mjs` for the rules in them); limits:
+     64 MB of git's answer (256 MB for the comments proof and the selection, 16 MB for the manifest, past which it is
+     reported unread), none in count, since every changed path is read, and of the rule files only a regular file in
+     real folders of the checkout's own, a pipe or device read as no file and a link at any depth refused with its
+     mend; hostile tests: `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
      of the work standing still (`scripts/look.mjs`, through `queue.mjs`'s placing and reading), with the open issues
