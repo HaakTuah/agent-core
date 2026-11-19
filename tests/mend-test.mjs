@@ -113,8 +113,9 @@ for (const [name, why] of Object.entries(NOT_CHECKS)) ok(fs.existsSync(path.join
 // the inventory, read whole (scripts/inventory.mjs; #750, point 1): a part's line is a bullet, its lines joined; the
 // files it names are the backticked ones before its first ": "
 const inventory = whole(root);
-const stray = fs.readdirSync(path.join(root, "inventory")).filter(d => !folders(root).includes(`inventory/${d}`));
-ok(stray.length === 0 && folders(root).every(f => partsIn(root, f).length > 0), `each folder of inventory/ is named in INVENTORY.md, and holds its parts${stray.length ? `: not so for ${stray.join(", ")}. Mend: name it under its heading in INVENTORY.md with the line "Its parts stand in \`inventory/<folder>/\`, a file each, read in the order of their names.", or move its files into a folder named there` : ""}`);
+const stray = [...fs.readdirSync(path.join(root, "inventory")).filter(d => !folders(root).includes(`inventory/${d}`)),
+  ...folders(root).flatMap(f => fs.readdirSync(path.join(root, f), { withFileTypes: true }).filter(e => !e.isFile() || !e.name.endsWith(".md")).map(e => `${f}/${e.name}`))];
+ok(stray.length === 0 && folders(root).every(f => partsIn(root, f).length > 0), `each folder of inventory/ is named in INVENTORY.md, and holds its parts, each a file of Markdown directly in it${stray.length ? `: not so for ${stray.join(", ")}. Mend: name a folder under its heading in INVENTORY.md with the line "Its parts stand in \`inventory/<folder>/\`, a file each, read in the order of their names.", and make each part a file NNN-<name>.md directly in a folder named there` : ""}`);
 const parts = new Set();
 for (const part of inventory.split(/\r?\n(?! )/u).filter(l => /^- /u.test(l))) {
   for (const m of part.replace(/\s*\r?\n\s*/gu, " ").split(": ")[0].matchAll(/`([^`]+)`/gu)) parts.add(m[1]);
