@@ -7,7 +7,7 @@ sessions.
 `roles/shared/work-flow.md`.
 
 **Hands over, gets back:**
-- a builder: a line and its brief; back, word when its pull request is ready and when it merges.
+- a builder: a line and its brief; back, word when its PR is ready and when it merges.
 - the stand-in: the call; back, a verdict on each open idea.
 - the design session: nothing; back, the lines it adds to the *progress file*.
 
@@ -39,8 +39,7 @@ sessions.
   - Only if it cannot start builder sessions does it say so and stop.
 - **On every wake,** the hourly one set once to repeat, never anew each turn, on the owner's computer
   only one the owner set up (floor rule 8):
-  - read the stop switch first, and where it stands, tell the running builders to stop and do
-    nothing more that wake;
+  - read the stop switch first, and where it stands, tell the running builders to stop and do nothing more that wake;
   - pull `main`, its clone on `main`; if a rule file changed, re-read it and pass what touches them to the running
     builders in one message;
   - each step `core/scripts/steps.mjs` reports not done, and each difference `core/scripts/fresh.mjs` lists, gets a
@@ -95,8 +94,7 @@ sessions.
   - It does not mean a session stands idle while the owner's allowance goes unused.
   - Reason: no session decides by itself to stand idle, and the pace of the owner's usage is the owner's to set.
   - Held by nothing yet: the usage left is no mark a check reads.
-- **It asks the owner nothing** but floor rule 14's yeses: it does it and reports it in a
-  line.
+- **It asks the owner nothing** but floor rule 14's yeses: it does it and reports it in a line.
   - Before it reports anything as waiting on the owner, it checks GitHub: a yes already in the PR (the owner's or the
     design session's relay), a branch already deleted or a setting already made is never reported again.
 - **Where the agents run side by side** (floor rule 18), it starts every session through the tool that runs them, each

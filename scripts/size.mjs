@@ -12,24 +12,31 @@
 // account the security-review check counts (security-review.mjs's counted: the repository's owner, or a person whose
 // rights the host gives as letting them write, read by the size workflow for those who posted one), and one that raises
 // it by more than one step. It holds that the comment is there, not what it says, when it was written or that a fresh session
-// wrote it: whether the session found too little room stays with the reviews, as does any change to this check itself,
-// which a pull request runs in its own version, and the first cap of a role that had none. A start or the queue past
-// its cap fails a pull request only where its own change grows it there, against the base; where the default branch
-// itself stands past one, since pull requests that each fitted merged together, it is a task, never a red: a warning
-// here, and an issue the scheduled look keeps (`due`, which look.mjs reads; #750, point 6). Run from this
-// repository's root by the size workflow (.github/workflows/size.yml); git and Node's own modules only.
+// wrote it: whether the session found too little room stays with the reviews, as does any change to this check itself
+// and the first cap of a role that had none. A start or the queue past its cap fails a pull request only where its own
+// change grows it there, against the base; where the default branch itself stands past one, since pull requests that
+// each fitted merged together, it is a task, never a red: a warning here, and an issue the scheduled look keeps (`due`,
+// which look.mjs reads; #750, point 6). The size workflow (.github/workflows/size.yml) runs the raise twice: the
+// default branch's version, from the base's own copy before any of the pull request's code runs, reads the head's file
+// as text alone, so that no change to this file decides whether the raise its text sets has its answer; and the pull
+// request's version, as itself, which holds that the caps its text sets are those it runs with. What caps the head's
+// code really holds the rules to, and its count of each role's start, stay its own and its reviews'. Run from this
+// repository's root by the size workflow; git and Node's own modules only.
 //
 //   node scripts/size.mjs [--base <revision>]              what each role reads at its start, against its cap, and
 //                                                          the queue against its own mark; with --base, the pull
 //                                                          request's base, a start or the queue that this change
 //                                                          grows past its cap fails, and one past it there already
 //                                                          that it does not grow is a warning, as with no base
-//   node scripts/size.mjs --raise <base> <comments> [<rights>]
+//   node scripts/size.mjs --raise <base> <comments> [<rights> [<head>]]
 //                                                          a raise has its leanness check: <base>, this file as the
 //                                                          pull request's base holds it; <comments>, the pull
 //                                                          request's comments as GitHub's API gives them; <rights>,
 //                                                          the host's answers on the rights of those who posted one;
-//                                                          OWNER, the repository's owner's login
+//                                                          <head>, this file as the pull request would merge it, read
+//                                                          as text, its caps those the text sets (left out, this
+//                                                          file itself, its caps those it runs with); OWNER, the
+//                                                          repository's owner's login
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -161,15 +168,17 @@ export function raised(base, head, comments, running = capsOf(head), whose = () 
   return null;
 }
 
-function raise(baseFile, commentsFile, rightsFile) {
-  let base = null, comments = null, rights = [];
+function raise(baseFile, commentsFile, rightsFile, headFile) {
+  let base = null, comments = null, rights = [], head = null;
   try { base = fs.readFileSync(baseFile, "utf8"); comments = JSON.parse(fs.readFileSync(commentsFile, "utf8")); } catch { /* (said below) */ }
   // (rights that cannot be read let no one write: the owner's answer still counts)
   try { if (rightsFile) rights = JSON.parse(fs.readFileSync(rightsFile, "utf8")); } catch { rights = []; }
-  if (comments === null) { console.error("FAIL: the base's size.mjs or the pull request's comments could not be read. Mend: name both, readable: node scripts/size.mjs --raise <base> <comments, as JSON>"); return 1; }
-  const wrong = raised(base, fs.readFileSync(fileURLToPath(import.meta.url), "utf8"), comments, CAPS, whoseOf(process.env.OWNER, rights));
+  try { head = fs.readFileSync(headFile ?? fileURLToPath(import.meta.url), "utf8"); } catch { /* (said below) */ }
+  if (comments === null || head === null) { console.error("FAIL: the base's size.mjs, the pull request's comments or the head's size.mjs could not be read. Mend: name them, readable: node scripts/size.mjs --raise <base> <comments, as JSON> [<rights> [<head>]]"); return 1; }
+  const running = headFile === undefined ? CAPS : capsOf(head);
+  const wrong = raised(base, head, comments, running, whoseOf(process.env.OWNER, rights));
   if (wrong) { console.error(`FAIL: ${wrong}`); return 1; }
-  const from = capsOf(base), up = Object.keys(CAPS).filter(r => from[r] !== undefined && from[r] < CAPS[r]);
+  const from = capsOf(base), up = Object.keys(running).filter(r => from[r] !== undefined && from[r] < running[r]);
   console.log(up.length ? `ok   the cap of ${up.join(", ")} rises one step, and the pull request holds a leanness check's answer` : "ok   no role's cap is raised");
   return 0;
 }
@@ -235,11 +244,11 @@ export function due({ manifest }) {
   return { title: DUE_TITLE, body: [`Pull requests that each fitted merged together and took the default branch past a cap (\`node scripts/size.mjs\`; AGENTS.md, "The size caps keep the rules lean and decide nothing else"). A task to trim, which fails no pull request: say the rules in fewer words and trim what is said twice, the role's cap raised one KB only as that rule says.`, "", ...task.map(t => `- ${t}.`)].join("\n") };
 }
 
-function main([flag, baseFile, commentsFile, rightsFile]) {
-  if (flag === "--raise") return raise(baseFile, commentsFile, rightsFile);
+function main([flag, baseFile, commentsFile, rightsFile, headFile]) {
+  if (flag === "--raise") return raise(baseFile, commentsFile, rightsFile, headFile);
   const roles = rolesAt();
   if (!roles.length || !fs.existsSync(QUEUE.file)) { console.error(`FAIL: what each role reads at its start cannot be counted: ${roles.length ? QUEUE.file : "roles/"} is not here. Mend: run it from the core's root, where roles/ and ${QUEUE.file} stand, or put back what was moved or taken out`); return 1; }
-  if (flag !== undefined && flag !== "--base") { console.error(`FAIL: ${flag} is no option of this check. Mend: run node scripts/size.mjs, with --base <the pull request's base> on a pull request, or --raise <base> <comments> [<rights>]`); return 1; }
+  if (flag !== undefined && flag !== "--base") { console.error(`FAIL: ${flag} is no option of this check. Mend: run node scripts/size.mjs, with --base <the pull request's base> on a pull request, or --raise <base> <comments> [<rights> [<head>]]`); return 1; }
   const base = flag === "--base" ? sizesAt(baseFile) : null;
   if (flag === "--base" && base === null) { console.error(`FAIL: git cannot read the base ${baseFile ?? "(none named)"}. Mend: name a revision git holds here (the workflow fetches the merge commit's parents: HEAD^1)`); return 1; }
   const wrong = [], { fail, task } = judged(measured(roles, wrong), base, base ? capsAt(baseFile) : {});

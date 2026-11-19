@@ -106,7 +106,8 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   (`scripts/csharp-functions.mjs`, #529), then JavaScript's and TypeScript's (`scripts/javascript-functions.mjs`).
   *Tried:* 19 November 2026 (#723), tree-sitter's JavaScript grammar 0.25.0 and TypeScript's 0.23.2, on the core's 204
   files of JavaScript and every case of the lexer's tests: the same where the lexer read by its definition, mended where
-  it misread. *Replayed:* none: no bug filed names the reader; the review findings its tests hold all read.
+  it misread. *Replayed:* none: no bug filed names the reader; the review findings its tests hold all read. Its config's
+  shape is held by a schema and ajv (`scripts/schemas/shape.json`; #530, item 7).
 - `scripts/choices.mjs`: fails a choice record a pull request adds without its lines, says when the pass is due, and
   reads each sign written in a measure. *Runs:* any session and the runners. *Else:* none found; the decision records'
   tools (adr-tools, log4brains) write records and check no form. *Bugs:* 1. **Keep:** nothing fits; the form is the
@@ -115,6 +116,12 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   the checks that need no secret, part by part, as the workflows do and as a session may by hand. *Runs:* any session
   and the runners. *Else:* a task runner (npm scripts, just, make), dropped on fact: a project in another stack has none
   of npm's, and the others are installs. *Bugs:* 2. **Keep:** small and stable glue.
+- `scripts/queue.mjs`: reads the *progress file* (`QUEUE.md` here) as its readers take it, a line of a closed issue
+  skipped and waited on no more, takes those lines out with `--clear`, and, run here by `own-description.yml`, fails a
+  ready pull request that changes the queue and leaves one, saying so of a draft (#750, point 1). *Runs:* any session
+  and the runners. *Else:* GitHub Projects, whose board hides a closed item by its own workflow, dropped on fact: the
+  queue is a file a pull request changes, the trust gate (`AGENTS.md`, "The queue"), and a board is no file of the
+  repository. *Bugs:* 0. **Keep:** small and stable.
 - `scripts/pr-description.mjs`, `.github/workflows/pr-description.yml`, `.github/workflows/own-description.yml`,
   `scripts/milestones.mjs`, `scripts/done-when.mjs`, `scripts/owner-yes.mjs`: fail a ready pull request whose
   description lacks a heading the project names, and, here, the lines the core asks, saying so of a draft. *Runs:* the
