@@ -1,7 +1,7 @@
 // The shape check's readers (shape.mjs, beside this file; tasks/code-shape.md, "What the check reads"; #354): which
 // files it reads, and each file as its reader reads it, in one form whatever its language. JavaScript and TypeScript,
 // JSX among them, by the readers of the measures (code-shape.mjs), their functions on the parser the core installs
-// (javascript-functions.mjs); C# by shape-csharp.mjs, its functions on the parser too (csharp-functions.mjs); Python by
+// (javascript-functions.mjs); C# by shape-csharp.mjs, all it reads on the parser too (csharp-tree.mjs); Python by
 // shape-python.mjs, its functions, imports and tokens on the parser too (python-tree.mjs); and the scripts that share
 // one global space, those of JavaScript or TypeScript with no import or export, by the names their top level declares.
 // None runs the code it reads. Node's own modules, and the parser's installed packages.
@@ -26,7 +26,7 @@ export const READERS = {
   // (C# as its functions were read by a lexer written here, until #529: no file is read so now, and a baseline that
   // names it stays one the check reads)
   csharp: "C#, its functions by the lexer",
-  "csharp-tree": "C#, its functions by the parser",
+  "csharp-tree": "C#, by the parser",
   // (Python as its functions were read by a lexer written here, until #530's item 6: no file is read so now, and a
   // baseline that names it stays one the check reads)
   python: "Python, its functions by the lexer",
@@ -47,7 +47,7 @@ const readersWhere = gone => Object.keys(ON_PARSER).filter(r => ON_PARSER[r].som
 export const unreachedReaders = () => readersWhere(unreachedFor);
 // (the readers that read all they find on the parser, imports and tokens too, so that none of a file's finds is read
 // where it could not run)
-export const WHOLE_ON_PARSER = ["python-tree"];
+export const WHOLE_ON_PARSER = ["csharp-tree", "python-tree"];
 export const unnamedReaders = () => readersWhere(unnamedFor);
 // The marks of a change in a comment (tasks/code-shape.md, "A comment says why the code is so, never what changed";
 // #458), each by its name, read of each line of a comment, a block's own * and a list's - before it aside: a change's

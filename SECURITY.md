@@ -25,9 +25,11 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
-     a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`); limits: 64 MB of git's
-     answer (256 MB for the comments proof and the selection, 16 MB for the manifest, past which it is reported
-     unread), and none in count, since every changed path is read; hostile tests: `tests/hostile-pr-changes-test.mjs`.
+     a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`), and the rule files a
+     checkout holds, the manifest too (`scripts/reading.mjs`); limits: 64 MB of git's answer (256 MB for the
+     comments proof and the selection, 16 MB for the manifest, past which it is reported unread), none in count, since
+     every changed path is read, and of the rule files only a regular file of the checkout's own, a link, pipe or
+     device read as no file; hostile tests: `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
      of the work standing still (`scripts/look.mjs`, through `queue.mjs`'s placing and reading), with the open issues
@@ -72,8 +74,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      of the pins (`scripts/sync.mjs`); limits: 64 MB of a file for the licence check (256 MB for NuGet's), 1 MB of an
      action and 5,000 steps of a workflow, 60 s for git's filters, 64 MB of a workflow for the move of the pins, past
      which it is reported unread, and none on a file for the reader of where the tests run, a project's own, read whole,
-     whose walk of a job's labels stops at 500 and 8 deep, and NuGet's lock file version 2, a newer refused (npm's lock
-     file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`.
+     whose walk of a job's labels stops at 500 and 8 deep, lists and mappings nested 128 deep at most for the workflow
+     check's two readers of a workflow (what is nested past it is said with its mend, and no list or mapping used as a
+     key is read), and NuGet's lock file version 2, a newer refused (npm's lock file's number is not read yet: #663);
+     hostile tests: `tests/hostile-build-files-test.mjs`.
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences
      (`scripts/licence-scan.mjs`, `scripts/licence-installed.mjs`), the NuGet fetch (`scripts/nuget-fetch.mjs`), the
