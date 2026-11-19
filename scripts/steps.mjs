@@ -288,14 +288,15 @@ function passedRuns(p) {
 // started, starts once the pull request is marked ready and skips a draft (tasks/tests.md, "No test run on a draft";
 // #733, point 7): its trigger's types hold opened, synchronize, reopened and ready_for_review, and its job's `if:` skips
 // a draft: a condition of parts joined by && alone, one of them `!github.event.pull_request.draft` or
-// `github.event.pull_request.draft == false`, the others any, a status function such as `!cancelled()` among them;
-// any other shape (an ||, a negation of more) is read as not done.
+// `github.event.pull_request.draft == false`, the others any, a status function such as `!cancelled()` among them,
+// its quoted strings read as one word each; any other shape (an ||, a negation of more, text outside its `${{ }}`,
+// which GitHub reads as a string and so as true) is read as not done.
 const SUITE_RUN = /shape\.mjs\b[^\n]*--suite\b/u;
 const READY_TYPES = ["opened", "synchronize", "reopened", "ready_for_review"];
 const DRAFT_PART = /^(?:!\s*github\.event\.pull_request\.draft|github\.event\.pull_request\.draft\s*==\s*false)$/u;
 const skipsDraft = cond => {
-  const inner = String(cond ?? "").trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1").replace(/!?\s*\b(?:always|success|cancelled|failure)\(\)/gu, "status");
-  return !/\|\||[()]/u.test(inner) && inner.split("&&").some(part => DRAFT_PART.test(part.trim()));
+  const inner = String(cond ?? "").trim().replace(/^\$\{\{([\s\S]*)\}\}$/u, "$1").replace(/'(?:[^']|'')*'/gu, "text").replace(/!?\s*\b(?:always|success|cancelled|failure)\(\)/gu, "status");
+  return !/\|\||[()'$]|\$\{\{|\}\}/u.test(inner) && inner.split("&&").some(part => DRAFT_PART.test(part.trim()));
 };
 function testsWhenReady(p) {
   readable(p, text => SUITE_RUN.test(text));

@@ -88,12 +88,14 @@ function after(flag, argv) {
 // a release waits on the tests' runs there that ran once an hour or were started by hand, which hold the Windows
 // suites: none unfinished, the newest passed. A reason it holds the release, or null.
 export const TESTS = ".github/workflows/tests.yml";
-// The newest of runs, by when each was made: the highest id, as tests.yml's hourly run reads them.
-const lastOf = runs => runs.reduce((a, b) => (Number(b?.id ?? 0) > Number(a?.id ?? 0) ? b : a));
+// The newest of runs, by when each last started (a re-run moves it), the higher id of two that started together, as
+// tests.yml's hourly run reads them.
+const startOf = r => (typeof r?.run_started_at === "string" ? Date.parse(r.run_started_at) || 0 : 0);
+const lastOf = runs => runs.reduce((a, b) => (startOf(b) > startOf(a) || (startOf(b) === startOf(a) && Number(b?.id ?? 0) > Number(a?.id ?? 0)) ? b : a));
 // The tests' runs in full on a commit: those once an hour or started by hand.
 const inFull = list => (Array.isArray(list?.workflow_runs) ? list.workflow_runs : []).filter(r => r?.path === TESTS && ["schedule", "workflow_dispatch"].includes(r?.event));
 // (it holds while any full run on the commit is unfinished, and reads the newest: an hourly run skips only where none
-// other is going and the newest passed, so a skipped one is the newest only where nothing was made after it)
+// other is going and the newest passed, so a skipped one is the newest only where nothing started after it)
 export function fullRun(list) {
   const runs = inFull(list);
   if (!runs.length) return "the tests have not run in full on it yet, the Windows suites with them: start the tests workflow on main by hand (its page under Actions), or wait for its hourly run, and start the release again once it has passed";
