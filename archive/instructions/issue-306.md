@@ -12,3 +12,4 @@ The index, and how an item is written: `archive/instructions.md`.
      does not prompt the models to avoid or detect. It stands behind "Sessions" in `roles/shared/work-flow.md`, "A
      change of tool loses nothing" in `tasks/tools.md`, "A stalled lane" and "A finished session is archived" in
      `roles/orchestrator.md`, the *quick check*, the start hook's line and `scripts/stalled.mjs`'s mark.
+     Changes: 143.

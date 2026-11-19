@@ -69,7 +69,7 @@ sessions.
   session per task, continued for its review fixes while its context is under an hour old and small; otherwise a fresh
   one.
 - **A finished session is archived** by the orchestrator, never by itself, where the tool that runs the sessions can:
-  once its task merged, or it stopped with its hand-off note written, its last message read and nothing scheduled
+  once its task merged, or it stopped with its hand-off note in its PR, its last message read and nothing scheduled
   bound to it.
   - It first checks that the session cleaned up and does so for one that could not.
   - Never deleted; never one the owner works in or that waits only on the owner's yes.
