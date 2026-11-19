@@ -164,3 +164,11 @@ The index, and how an item is written: `archive/instructions.md`.
      6% of tests that started a process took 66% of its time and the 21% that reached a real clock took 89%. The owner
      agreed to the issue's points, and asked on 19 November that #715's work, the count first, be a priority. It stands
      behind "A test reaches a real clock or another process only where it guards it" in `tasks/tests.md`.
+261. **19 November 2026**, #733, point 1. Where users get a release and not each merge, a pull request merges on its own
+     checks and reviews passed on its head, up to date or not; the default branch is tested at its newest commit, a red
+     one fixed before any other merge, and a release cut only from a green one; where every merge goes live, a pull
+     request is brought up to date first, as before. In 24 hours of the core's tests, 256 runs were started for 27
+     merges, about 70% of what the plan's jobs at once can run in a day, and a merge took 45.8 minutes, 19.7 of them
+     waiting for a turn, while what users get is built from a release that waits on a green default branch anyway. The
+     owner agreed to the point as worded on the issue, and to its being a priority. It stands behind floor rule 12 and
+     "Where users get a release, a pull request merges on its own green checks" in `tasks/hosts.md`.
