@@ -84,18 +84,18 @@ ok(escapedWords.includes("= DateTime . Now ;") && !escaped.toks.some(t => t.v ==
 // text of one is taken for a hole; the holes after escaped braces are read in time linear in the string, each on its line)
 const rawHoles = readCsharp("class C { void M() { var s = $$\"\"\"{y} {{Clock.Now}}\"\"\"; var t = $\"\"\"a{Task.Delay(1)}\"\"\"; } }\n");
 ok(!rawHoles.toks.some(t => ["y", "Clock", "Task"].includes(t.v)), "C#: a raw interpolated string's code is not read, and none of its text is taken for a hole", JSON.stringify(rawHoles.toks.map(t => t.v).filter(Boolean)));
-const holesStarted = Date.now(), manyHoles = readCsharp(`class C { string s = $@"${"\n{{{x}}}".repeat(40000)}"; }`), holesTook = Date.now() - holesStarted, xs = manyHoles.toks.filter(t => t.v === "x");
-ok(xs.length === 40000 && xs.at(-1).line === 40001 && holesTook < 5000, `C#: 40,000 holes after escaped braces, a line each, are read in time, each on its line (${holesTook} ms)`, JSON.stringify({ n: xs.length, last: xs.at(-1)?.line }));
+const holesStarted = Date.now(), manyHoles = readCsharp(`class C { string s = $@"${"\n{{{x}}}".repeat(24000)}"; }`), holesTook = Date.now() - holesStarted, xs = manyHoles.toks.filter(t => t.v === "x");
+ok(xs.length === 24000 && xs.at(-1).line === 24001 && holesTook < 5000, `C#: 24,000 holes after escaped braces, a line each, are read in time, each on its line (${holesTook} ms)`, JSON.stringify({ n: xs.length, last: xs.at(-1)?.line }));
 // (the fallback reviewer's cases at 63c974eb: a hole's unclosed quote, before many escaped quotes, is split in time
 // linear in the hole; and a raw string's $ signs are read whatever their count, so one of 70 has no hole misread)
-const quotesStarted = Date.now(), manyQuotes = readCsharp(`class C { string s = $"{{{${'\\"'.repeat(128000)}}}}"; }`), quotesTook = Date.now() - quotesStarted;
-ok(manyQuotes.toks.length > 0 && quotesTook < 5000, `C#: a hole after escaped braces holding 128,000 escaped quotes and no closing one is read in time (${quotesTook} ms)`, String(manyQuotes.toks.length));
+const quotesStarted = Date.now(), manyQuotes = readCsharp(`class C { string s = $"{{{${'\\"'.repeat(96000)}}}}"; }`), quotesTook = Date.now() - quotesStarted;
+ok(manyQuotes.toks.length > 0 && quotesTook < 5000, `C#: a hole after escaped braces holding 96,000 escaped quotes and no closing one is read in time (${quotesTook} ms)`, String(manyQuotes.toks.length));
 const manySigns = readCsharp(`class C { void M() { var s = ${"$".repeat(70)}"""{y} {{Clock.Now}}"""; } }\n`);
 ok(!manySigns.toks.some(t => ["y", "Clock"].includes(t.v)), "C#: a raw interpolated string of 70 $ signs is read as raw, none of its text taken for a hole", JSON.stringify(manySigns.toks.map(t => t.v).filter(Boolean)));
 const typeArg = readCsharp("using Alias = Game.Rules.Box<global::System.String>;\nusing B = global::M.N;\nclass C {}\n");
 ok(same(typeArg.usings.map(u => u.target), ["Game.Rules.Box"]), "C#: a global:: inside the target's type arguments leaves the target named; one that qualifies the target names nothing", JSON.stringify(typeArg.usings));
-const manyLines = readCsharp(`/*${"\n".repeat(600000)}*/ class C { void M() { } }\n`);
-ok(manyLines.functions?.length === 1 && manyLines.comments.length === 600001, "C#: a comment of 600,000 short lines is read whole, its lines passed one at a time", JSON.stringify({ functions: manyLines.functions?.length, comments: manyLines.comments.length }));
+const manyLines = readCsharp(`/*${"\n".repeat(190000)}*/ class C { void M() { } }\n`);
+ok(manyLines.functions?.length === 1 && manyLines.comments.length === 190001, "C#: a comment of 190,000 short lines is read whole, its lines passed one at a time", JSON.stringify({ functions: manyLines.functions?.length, comments: manyLines.comments.length }));
 const csBroken = readCsharp("using A.B;\nnamespace N;\nclass Kept { }\nclass Lost { void M() { return x is [.., 1]; } }\n");
 ok(csBroken.functions === null && same(csBroken.usings.map(u => u.target), ["A.B"]) && same(csBroken.namespaces, ["N"]) && csBroken.types.includes("N.Kept"),
   "C#: a file the grammar cannot read whole has no functions told, and its usings and declarations are those the grammar read whole", JSON.stringify(csBroken));
@@ -182,11 +182,11 @@ ok(same(shown(readPython(pyEdges).functions), ["f:2:3:1:3", "g:7:2:0:1"]),
   "Python: a decorator's and a default's branches count where the function stands, a comment after the body is none of its lines, and a format's fill of = (which the grammar reads as :=) leaves the functions told", shown(readPython(pyEdges).functions));
 ok(readPython("def f():\n    return f\"{t:=or 80}\"\n").functions === null && readPython("def f(:\n    pass\n").functions === null,
   "Python: a file the grammar cannot read whole, an error in an f-string's { } that holds a word among them, has no functions told");
-const pySized = n => `${"x = 1\n".repeat(n)}def f():\n    pass\n`, pyUnder = Math.floor(LARGEST / 7);
-ok(same(shown(readPython(pySized(pyUnder)).functions), [`f:${pyUnder + 1}:2:0:0`]) && readPython(pySized(LARGEST / 5)).functions === null,
+const pySized = n => `${"x = 1\n".repeat(n)}def f():\n    pass\n`, pyUnder = Math.floor(LARGEST.python / 7);
+ok(same(shown(readPython(pySized(pyUnder)).functions), [`f:${pyUnder + 1}:2:0:0`]) && readPython(pySized(LARGEST.python / 5)).functions === null,
   "Python: a file past the largest the grammar is given is lost unread, and one under it is read whole");
 const pyStarted = Date.now();
-const pyHostile = [`def f():\n    x = ${"([{".repeat(280000)}\n`, `def f():\n    ${"['".repeat(300000)}\n`].map(t => readPython(t).functions);
+const pyHostile = [`def f():\n    x = ${"([{".repeat(160000)}\n`, `def f():\n    ${"['".repeat(240000)}\n`].map(t => readPython(t).functions);
 ok(pyHostile.every(f => f === null) && Date.now() - pyStarted < 10000, `Python: brackets and strings that never close are lost within the grammar's budget (${Date.now() - pyStarted} ms)`);
 const inline = readPython("import a; import b\nif sys.platform == 'win32': import winreg\nif TYPE_CHECKING: from t import T\ndef f(): import lazy\n");
 ok(same(inline.imports.map(i => `${i.module}${i.dynamic ? " dynamic" : ""}${i.types ? " types" : ""}`), ["a", "b", "winreg", "t types", "lazy dynamic"]), "Python: imports after a ; and in a one-line suite are read, with where they stand", JSON.stringify(inline.imports));
@@ -520,7 +520,7 @@ const newer = `class A\n{\n    void Long()\n    {\n${"        x++;\n".repeat(100
 ok(readCsharp(newer).functions === null, "C#: a file the grammar cannot read whole has no functions told, so that the check counts it and says so");
 // (and one past the largest a reader gives its grammar, lost unread: its tree's memory is what a generated file costs)
 const sized = n => `class A { int[] W = { ${Array.from({ length: n }, (_, k) => k).join(", ")} }; void M() { } }\n`;
-ok(sized(LARGEST / 9).length <= LARGEST && same(shown(readCsharp(sized(LARGEST / 9)).functions), ["M:1:1:0:0"]) && sized(LARGEST / 6).length > LARGEST && readCsharp(sized(LARGEST / 6)).functions === null,
+ok(sized(LARGEST.csharp / 9).length <= LARGEST.csharp && same(shown(readCsharp(sized(LARGEST.csharp / 9)).functions), ["M:1:1:0:0"]) && sized(LARGEST.csharp / 6).length > LARGEST.csharp && readCsharp(sized(LARGEST.csharp / 6)).functions === null,
   "C#: a file past the largest the grammar is given is lost unread, and one under it is read whole");
 // The parser's thread: a call that fails there is told as the file's ("read"), and the next call gets its own answer,
 // never an earlier one's.
@@ -561,10 +561,10 @@ readCsharp(`class A {${"x; extension(".repeat(5000)}}`);
 readCsharp(`class A { int x = extension ${"+ a ".repeat(40000)}; }`);
 readCsharp(`class A { void M() { var f = (() => { })${" + a".repeat(40000)}; } }`);
 ok(deepIfs?.depth === 20000 && deepIfs.branches === 20000 && Date.now() - walked < 5000, `C#: code nested twenty thousand deep, headers that never end and the left ends of long chains are read on the parser in time linear in their length (${Date.now() - walked} ms)`, JSON.stringify(deepIfs));
-// (the security review's case: many lines of the preprocessor deep in nested namespaces, under 2 MB, read in time, each
+// (the security review's case: many lines of the preprocessor deep in nested namespaces, under the largest C# is given, read in time, each
 // # looked up among the file's strings and comments rather than by walking up from it)
-const ppStarted = Date.now(), deepDirectives = readCsharp(`${"namespace A{".repeat(2000)}\n${"#region x\n".repeat(100000)}${"}".repeat(2000)}\n`);
-ok(deepDirectives.functions !== null && Date.now() - ppStarted < 5000, `C#: 100,000 lines of the preprocessor two thousand namespaces deep are read in time (${Date.now() - ppStarted} ms)`);
+const ppStarted = Date.now(), deepDirectives = readCsharp(`${"namespace A{".repeat(2000)}\n${"#region x\n".repeat(15000)}${"}".repeat(2000)}\n`);
+ok(deepDirectives.functions !== null && Date.now() - ppStarted < 5000, `C#: 15,000 lines of the preprocessor two thousand namespaces deep are read in time (${Date.now() - ppStarted} ms)`);
 
 // (code run with --input-type=module, as a script started with node -e and that flag is, reads C# on the parser all the
 // same: the parser's thread is not handed that flag, which Node refuses for a module file, where the thread would die

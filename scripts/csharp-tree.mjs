@@ -37,13 +37,13 @@
 // it cannot read in time, has none told. Proven old against new by tests/shape-readers-test.mjs, and against counts taken by hand.
 import { commentLines } from "./code-shape.mjs";
 import { inParser } from "./parser.mjs";
-import { LARGEST, walkFunctions } from "./tree-walk.mjs";
+import { LARGEST, budgetOf, walkFunctions } from "./tree-walk.mjs";
 
 /** The file `src` read: { functions: [{ name, line, lines, depth, branches }] in the order their bodies open, null
  *  where they cannot be told; usings: [{ target, static, alias }]; namespaces; types; toks: [{ t, v, line }] }; null
  *  where the parser could not read it in time, or it is past LARGEST. Read in the parser's thread (read, below). */
 export function csharpTree(src) {
-  if (src.length > LARGEST) return null;
+  if (src.length > LARGEST.csharp) return null;
   try { return inParser(import.meta.url, "read", src); } catch (e) {
     if (e?.kind === "read") return null;
     // (the load's own mend where it gives one, packages.mjs's, which in a job names the install step: #719)
@@ -63,20 +63,25 @@ const WORD = /^@?[A-Za-z_\u0080-\uffff][\w\u0080-\uffff]*$/u;
 
 /** `src` read with the parser's `parse` (in its thread: csharpTree, above). */
 export function read(parse, src) {
-  let tree = parse("csharp", src), text = src;
+  // (one budget for the file, which its parses share: the plain one, and again with the directives blanked and with the
+  // headers of extension blocks read as types')
+  const until = performance.now() + budgetOf(src), parsed = text => parse("csharp", text, Math.max(until - performance.now(), 0));
+  let tree = parsed(src), text = src;
+  if (!tree) return null;
   try {
     const directives = preprocessor(src, tree.rootNode);
     if (directives.size) {
       const lines = src.split("\n");
       text = lines.map((l, k) => (directives.has(k) ? l.replace(/[^\r]/gu, " ") : l)).join("\n");
-      tree.delete(); tree = parse("csharp", text);
+      tree.delete(); tree = parsed(text);
+      if (!tree) return null;
     }
     const headers = /\bextension\s*[<(]/u.test(text) ? extensionHeaders(text, tree.rootNode) : [];
-    if (headers.length) { text = asTypes(text, headers); tree.delete(); tree = parse("csharp", text); }
+    if (headers.length) { text = asTypes(text, headers); tree.delete(); tree = parsed(text); if (!tree) return null; }
     const root = tree.rootNode, before = root.hasError ? null : leafBefore(root), comments = [], toks = tokensOf(root, text, comments);
     const functions = before ? walkFunctions(root, { functionBody, nameOf: node => nameOf(node, before), branches, isControl }) : null;
     return { functions, ...declarations(root, new Set(headers.map(([start]) => start))), toks, comments };
-  } finally { tree.delete(); }
+  } finally { tree?.delete(); }
 }
 
 // C# 14's extension blocks (`extension<T>(T x) where T : U { members }`), which the grammar installed predates and reads
