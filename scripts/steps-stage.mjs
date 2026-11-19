@@ -43,6 +43,10 @@ const TWICE = "name: twice-staged\n\non:\n  push:\n\npermissions:\n  contents: r
 // one's reading as it was.
 const PUSHED = "name: tests-pushed\n\non:\n  pull_request:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      checks: read\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 2\n      - run: node core/scripts/install.mjs\n      - run: node core/scripts/select.mjs --env RUNPASSED\n        env:\n          SELECT_PASSED: ${{ github.event_name == 'push' && github.run_attempt == 1 && 'tests' || '' }}\n          GH_TOKEN: ${{ github.event_name == 'push' && github.token || '' }}\n      - run: if [ \"$RUN\" = all ]; then node --test; elif [ \"$RUN\" != none ]; then node --test $RUN; fi\n";
 
+// A job of the project's own that starts a suite through the shape check (#733, point 7): TYPES, its trigger's types,
+// and IF, its job's condition, filled in by the stage and the mend.
+const READY = "name: suites-ready\n\non:\n  pull_request:TYPES\n\npermissions:\n  contents: read\n\njobs:\n  test:\nIF    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/install.mjs all\n      - run: node core/scripts/shape.mjs checks/shape.json --suite unit -- node --test\n";
+
 export const STAGES = {
   "16 November 2026, hostile tests for every named input": {
     // (rule 5 of SECURITY.md lists an input whose hostile tests are nowhere; the mend writes them where it names them)
@@ -339,6 +343,13 @@ export const STAGES = {
     after: dir => fs.rmSync(at(dir, ".github/workflows/scripts-staged.yml"), { force: true }),
     mend: dir => write(dir, ".github/workflows/scripts-staged.yml", SCRIPTS.replace("      - run: echo test\n", "      - run: if [ -f core/scripts/install.mjs ]; then node core/scripts/install.mjs; fi\n      - run: node core/scripts/steps.mjs\n")),
   },
+  "19 November 2026, the project's tests at the pace of a release": {
+    // (a job of the project's own that starts a suite through the shape check on every pull request, a draft's too)
+    stage: dir => write(dir, ".github/workflows/suites-ready.yml", READY.replace("TYPES", "").replace("IF", "")),
+    after: dir => fs.rmSync(at(dir, ".github/workflows/suites-ready.yml"), { force: true }),
+    mend: dir => write(dir, ".github/workflows/suites-ready.yml", READY.replace("TYPES", "\n    types: [opened, synchronize, reopened, ready_for_review]").replace("IF", "    if: ${{ !github.event.pull_request.draft }}\n")),
+  },
+
   "19 November 2026, the parser's packages installed where the shape check runs": {
     // (a job of the project's own that runs the shape check after an install that names no lock but the first; the mend
     // names every one, as the copies check's job does)
