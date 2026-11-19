@@ -75,6 +75,8 @@ const NOT_CHECKS = {
   "clean-merges.mjs": "it reads the pull request's merge commits, never a file of the tree",
   "core-moved.mjs": "it runs on the daily schedule (look.yml) and fails no pull request",
   "look.mjs": "it runs on the daily schedule (look.yml) and fails no pull request",
+  "issue-terms.mjs": "it runs on the daily schedule (look.yml), reads issues and comments, never a file of the tree, and fails no pull request",
+  "install.mjs": "it installs the core's packages from the copy's own lock files for the checks after it, and judges no file",
   "sync.mjs": "core.yml names it in a failure's mend; no check runs it",
   "copies.yml": "its one step runs checks.mjs copies, whose scripts are rows",
   "pr-description.yml": "its one step runs checks.mjs description, whose script is the row pr-description.mjs",
@@ -119,7 +121,12 @@ let n = 0;
 function project(files) {
   const dir = path.join(tmp, `p${++n}`);
   fs.cpSync(path.join(root, "scripts"), path.join(dir, "core/scripts"), { recursive: true });
-  fs.cpSync(path.join(root, "third-party"), path.join(dir, "core/third-party"), { recursive: true });
+  // (the core's packages beside the copy as install.mjs puts them: its lists copied, what they installed linked, never
+  // copied, since git leaves a link's target unread)
+  for (const at of [".packages", ".packages/parser"]) {
+    for (const f of ["package.json", "package-lock.json"]) fs.cpSync(path.join(root, at, f), path.join(dir, "core", at, f));
+    if (fs.existsSync(path.join(root, at, "node_modules"))) fs.symlinkSync(path.join(root, at, "node_modules"), path.join(dir, "core", at, "node_modules"), "junction");
+  }
   put(dir, { "core/setup/template/shape.json.tmpl": fs.readFileSync(path.join(root, "setup/template/shape.json.tmpl"), "utf8"), "README.md": "# A project\n", ...files });
   git(dir, "init", "-q", "-b", "main");
   const base = commit(dir, "base");
@@ -174,10 +181,15 @@ const PAIRS = {
       const r = spawnSync(process.execPath, [path.join(root, "scripts/agent-tools.mjs"), "checks/licences.json"], { cwd: dir, env, encoding: "utf8" });
       return { failed: r.status !== 0, out: `${r.stdout}${r.stderr}` };
     })],
-  "copies.mjs": ["the script, from the copy: a block of code twice under the copy's third-party/, and under the project's", () =>
-    inProject({ "checks/code.json": JSON.stringify({ baseline: "checks/code-baseline.json", code: ["*.js"], prose: [], proseFromSecurity: false }), "checks/code-baseline.json": JSON.stringify({ windows: {} }) },
-      { "core/third-party/a/one.js": BLOCK, "core/third-party/a/two.js": BLOCK }, { "third-party/a/one.js": BLOCK, "third-party/a/two.js": BLOCK },
-      ({ dir }) => node(dir, "copies.mjs", ["checks/code.json"], { COPIES_BASE: "" }))],
+  "copies.mjs": ["the script, from the copy, against the pull request's base: a file its config reads moved where the config reads it no more, in the copy and in the project", () => {
+    const config = JSON.stringify({ baseline: "checks/code-baseline.json", code: ["a/*.js", "core/a/*.js"], prose: [], proseFromSecurity: false });
+    const p = project({ "checks/code.json": config, "checks/code-baseline.json": JSON.stringify({ windows: {} }), "a/one.js": LONG, "core/a/one.js": LONG });
+    const moved = (from, to) => { git(p.dir, "mv", from, to); commit(p.dir, "the move"); return node(p.dir, "copies.mjs", ["checks/code.json"], { COPIES_BASE: p.base }); };
+    const a = moved("core/a/one.js", "core/one.js");
+    p.back();
+    const b = moved("a/one.js", "one.js");
+    return [a.failed, b.failed, `inside: ${a.out}\noutside: ${b.out}`];
+  }],
   "pointers.mjs": ["the script, from the copy: a pointer to a heading that is not there", () =>
     inProject(pointing, { "core/AGENTS.md": broken }, { "AGENTS.md": broken }, ({ dir }) => node(dir, "pointers.mjs", [], { POINTERS_BASE: "" }))],
   "reading-size.mjs": ["the script, from the copy: a file past the split mark changed, and a file under \"read\" past the total", () => {
@@ -208,8 +220,8 @@ const PAIRS = {
     const calls = p => calledByPaths(lib, ownOf([p], "core/")).length > 0;
     return [calls("core/.github/workflows/x.yml"), calls(".github/workflows/x.yml"), ""];
   }],
-  "checks.mjs signatures": ["the script, from the copy: a package.json changed under the copy's third-party/, and under the project's", () =>
-    inProject({}, { "core/third-party/a/package.json": "{}\n" }, { "third-party/a/package.json": "{}\n" },
+  "checks.mjs signatures": ["the script, from the copy: the copy's own package list changed in its .packages/, and a package list of the project's", () =>
+    inProject({}, { "core/.packages/package.json": "{}\n" }, { "a/package.json": "{}\n" },
       // (the install, where the look asks one, is given a folder that is not there, so nothing is installed)
       ({ dir, base }) => { const r = node(dir, "checks.mjs", ["signatures", "--signatures", "no-such-folder"], { BASE_SHA: base }); return { failed: /^== Install/mu.test(r.out), out: r.out }; })],
   "nuget.mjs": ["in-process, check(): a project file with no lock file", () => {

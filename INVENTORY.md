@@ -219,8 +219,9 @@ scripts off, nothing committed, as the owner allowed for #486's trial on 16 Nove
   run (a billed job, the first look's choice to restore, the configs' paths, and a change of shape: none a reading of a
   package); #446 not run (open, with no fix).
 - `.github/workflows/core.yml`, `scripts/copy-tree.mjs`, `scripts/core-path.mjs`, `scripts/core-address.mjs`,
-  `scripts/releases.mjs`, `.gitattributes`, `tests/core-yml-test.mjs`: fail a project whose copy is not the core, whole,
-  at the commit its manifest pins, or whose calls to the core's workflows are pinned elsewhere. *Runs:* the runners,
+  `scripts/releases.mjs`, `.gitattributes`, `tests/core-yml-test.mjs`, `tests/copy-left-out-test.mjs`: fail a project
+  whose copy is not the core, whole, at the commit its manifest pins, or whose calls to the core's workflows are pinned
+  elsewhere; and hold the README's list of what a project's checks leave out of the copy to what they do. *Runs:* the runners,
   where nothing of the project's runs before it; any session by hand. *Else:* the options of #519's record (a submodule,
   a subtree, a package, a fetched release, the host's reusable workflows, vendir), each weighed there. *Bugs:* 3 and 1.
   **Keep:** #519's record, judged on merit on 17 November.

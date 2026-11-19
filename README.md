@@ -403,8 +403,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
 Each check a project's pull requests run is listed here, with what it does with the copy of the core (#661). None of
 it is blind trust. The copy is the core at one pinned commit, and `core.yml`, which every project runs, proves it the
 same byte for byte. What a check leaves out of the copy in a project was held in the core before that commit could
-merge, by what the last column names. No check leaves another publisher's code out for anyone (#654). The core's
-`third-party/` is the one place still left out, in the rows that name it, until #654 removes it.
+merge, by what the last column names. No check leaves another publisher's code out for anyone (#654).
 
 Each row is for a copy at `core/`. Where the manifest names another path, the rows of `security-review.mjs`,
 `personal-terms.yml`, `workflows.mjs`, `shape.mjs` and `nuget.mjs` still read `core/` (#628). `tests/copy-left-out-test.mjs`
@@ -421,7 +420,7 @@ check a project runs that the list leaves out.
 | `agent-tools.mjs` | left out | It reads the tools' settings at the project's root alone. No tool loads the copy's own. The core's run with `--core` holds those. |
 | `personal-terms.yml` | read | The copy's `LICENSE` and `NOTICE` may hold a copyright holder's name, as the project's own may (floor rule 11). The same workflow runs on the core's pull requests. |
 | `codeql.yml` | read | The whole checkout, in the languages the project names. The core's own code scanning runs on its repository. |
-| `copies.mjs` | left out in part | It reads the copy's rule files' prose, as the starter kit's config names them. It leaves out the copy's `third-party/`, a rename inside the copy, and text moved into the copy, which a sync alone brings. The core's own copies check holds them. |
+| `copies.mjs` | left out in part | It reads the copy as the project's config names it: the starter kit's names the copy's rule files' prose. A file of the copy moved, or its text moved into another, counts as gone, never as the config reading less, since a sync alone moves those. The core's own copies check holds them. |
 | `pointers.mjs` | left out | The copy's files are only what a pointer leads to. The core's run with `--core` holds its own pointers. |
 | `reading-size.mjs` | left out in part | Each file of the copy under `"read"` is held to its own mark. The total and the split mark count the project's own files alone. The core's caps hold the copy (`scripts/size.mjs`), and the core has no split mark. |
 | `workflows.mjs` | left out | The core's run with `--core` holds the copy's workflows and actions (floor rule 2). |
@@ -429,7 +428,7 @@ check a project runs that the list leaves out.
 | `shape.mjs` | left out | The starter kit's config leaves the copy out (`setup/template/shape.json.tmpl`). The core holds its scripts to its own `.github/shape.json`. |
 | `choices.mjs` | left out | It reads the project's *choice records*. The core's run holds its own `CHOICES.md`. |
 | `pr-description.mjs` | left out in part | A changed path inside the copy calls for no file on the line `Read for it:`. The core's own description check reads every path. |
-| `checks.mjs signatures` | left out in part | Only the copy's `third-party/` is left out. The core checks each file of it against the registry's own (`tests/third-party-test.mjs`). |
+| `checks.mjs signatures` | left out in part | Only the copy's own package lists, lock files and `.npmrc` under `.packages/` are left out, which a sync alone changes. The core's own tests check the registry's signature on every package they install, on each of its pull requests (`.github/workflows/tests.yml`). |
 | `nuget.mjs` | left out | The copy holds no .NET file, so nothing in the core holds this ground. |
 
 ## Slots
