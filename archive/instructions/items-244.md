@@ -144,3 +144,23 @@ The index, and how an item is written: `archive/instructions.md`.
      reading what is depended on, a replacement a change to a lock file, and a failed fetch run again. It corrects
      what #601 brought in (Brought in by: #601; Correction: rule missing; #302). It stands behind "Code of another
      publisher is named in a lock file" in `floor/topics/dependencies.md`, and the dated entries of `CHOICES.md`.
+259. **18 and 19 November 2026**, #702. Ready pull requests merge in a line where the host asks an up-to-date branch:
+     only the first whose reviews answered with no finding open is brought up to date, one in a round of fixes letting
+     the next go first; where the host's merge queue is on, it keeps the line, and where one is offered and off, its
+     owner is advised once; whether a queue is offered and whether minutes are billed are read from the host; a new
+     lane starts only where it gets its work merged sooner; and where the front's run stands queued behind the host's
+     cap, the queued runs of pull requests not next in line are cancelled, none of the front's or the default branch's.
+     On 18 November about 180 runs of the core's tests were started while a handful of pull requests merged, each
+     merge making every other stale, and the front's run stood queued behind runs thrown away at the next merge; on 19
+     November seven of fourteen merges waited 15 to 63 minutes because the front was still being fixed. The owner asked
+     for what is most efficient for each kind of repository, so that no project makes a worse choice for what fits the
+     owner's, and agreed to the issue's points as worded, point 1 as reworded on 19 November. It stands behind "Ready
+     pull requests merge in a line" in `roles/shared/work-flow.md`, "A new lane only where it merges sooner" in
+     `roles/orchestrator.md`, and "The merge line follows the host" and "Where the front waits behind the cap, runs far
+     from their turn are cancelled" in `tasks/hosts.md`.
+260. **19 November 2026**, #457, point 1, built as #715 orders it. A test reaches a real clock or another process
+     only where the clock or the process is what it guards, counted by the shape check with the share of the tests'
+     time each takes, those that stood listed and a new one failing, since in another owner's suite counted for #426 the
+     6% of tests that started a process took 66% of its time and the 21% that reached a real clock took 89%. The owner
+     agreed to the issue's points, and asked on 19 November that #715's work, the count first, be a priority. It stands
+     behind "A test reaches a real clock or another process only where it guards it" in `tasks/tests.md`.

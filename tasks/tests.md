@@ -73,6 +73,17 @@ reads is the *shape check*'s config.
   thing beneath the screen, or lists the test with its reason under "grown". It does not mean that a project has no
   tests of its screens: they guard what only a screen shows. Reason: a desktop program's suite opened its window
   for test after test, each paying for a screen it did not test. Held by the shape check.
+- **A test reaches a real clock or another process only where it guards it** (#457). By default a test runs beneath
+  the clock and the process: the time is handed in, and the code a process would run is called from the test itself.
+  The one condition that changes it: where the clock or the process is itself what the test guards (a command's own
+  line, its exit code, what it prints; a program the test starts and waits for). The trigger is a test file that calls
+  or imports what reaches a real clock (a sleep, a timed wait, a read of the time) or starts another process: the shape
+  check counts each, by the names it knows for each language and those the config adds under "clocks" and
+  "processes", and the record gives the share of the tests' time each takes. What stood is held as the screens' is,
+  above; a new one fails, and its builder hands the time in or calls the code itself, or gives the test's reason under
+  "grown". It does not mean that such tests go, since they guard what only a running program shows, nor that what a
+  test's helpers reach is counted. Reason: in the counts of #426, 6% of a suite's tests started another process and
+  took 66% of its time, and 21% reached a real clock and took 89%. Held by the shape check.
 - **A test asserts no time measured on a real clock.** By default a test that needs time has it handed in, as the
   rules of a program do (`tasks/code-shape.md`), and asserts on that. The one exception is a measure of speed, which
   keeps room above its floor so that a slow machine fails nothing (#318). The trigger is a test that reads the time,
