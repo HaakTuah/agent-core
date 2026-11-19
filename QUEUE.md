@@ -11,6 +11,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #750 | rule builder; it changes floor rule 8 (point 2) | |
 | #810 | rule builder; it changes `tests.yml` and `tasks/tests.md` | |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | #715 |
+| #829 | rule builder; it changes what the builder, the design session and the orchestrator read at their start | |
 | #767 | rule builder; it changes `tools/claude.md`'s table | |
 | #704 | builder; `tests.yml` | #715 |
 | #770 | builder; `tests.yml` | #704 |
