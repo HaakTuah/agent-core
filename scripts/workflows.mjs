@@ -209,6 +209,9 @@ function yamlOf(text) {
   } catch { return null; }
 }
 
+// Whether a text, its line breaks read as a YAML 1.1 reader reads them, is YAML the package reads: what draftHoles() can tell of it (#876).
+export const readsFolded = text => String(text).length <= LONGEST && yamlOf(asLF(text).text) !== null;
+
 // The jobs of a workflow (its YAML read, `yaml`, or its text) that call one of the core's pull-request checks skipped on a
 // draft while the trigger never starts it once the pull request is marked ready: [] where none, or where the text is
 // no YAML (GitHub's own reader then refuses it).
