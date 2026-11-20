@@ -49,6 +49,15 @@ ok(r.code === 0 && /::warning::The pointer check did not run: the package marked
 // (a rule file nested deeper than the lexer follows fails, saying so, never in silence: the fallback reviewer's finding)
 r = run({ ...FILES, "docs/developing.md": `${FILES["docs/developing.md"]}${">".repeat(5000)} deep\n` });
 ok(r.code === 1 && mended(r.out) && /docs\/developing\.md could not be read as Markdown/.test(r.out), "a rule file nested deeper than the lexer can follow fails, naming the file, with its mend");
+// (lists nested a couple of thousand deep ran the lexer out of memory, which no try catches; a bound before it reads refuses them: #1032)
+const deepList = n => Array.from({ length: n }, (_, k) => `${"  ".repeat(k)}- x`).join("\n");
+const read = await markdownReader();
+let t = Date.now(), refused = "";
+try { read(deepList(2000)); } catch (e) { refused = e.message; }
+ok(/line 102 nests lists or quotes more than 100 levels deep/.test(refused) && Date.now() - t < 500, "the reader refuses a list nested 2000 deep before parsing it, in well under a second, naming the line");
+ok(read(deepList(90)).blocks.length === 90, "a list nested 90 deep is still read");
+r = run({ ...FILES, "docs/developing.md": `${FILES["docs/developing.md"]}\n${deepList(2000)}\n` });
+ok(r.code === 1 && mended(r.out) && /docs\/developing\.md could not be read as Markdown \(line \d+ nests lists or quotes more than 100 levels deep\)/.test(r.out), "a rule file whose lists nest 2000 deep fails the pointer check, naming the file and line, with its mend");
 r = run(crlf(FILES));
 ok(r.code === 0 && /^ok /m.test(r.out), "the same files with a Windows checkout's line endings pass");
 for (const [files, ending] of [[broken, "either"], [crlf(broken), "a Windows"]]) {
