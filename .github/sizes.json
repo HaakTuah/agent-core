@@ -195,6 +195,46 @@
       "mark": 32922,
       "why": "One module's cases (releases.mjs, and release.mjs that cuts one) on the one scratch core it sets up with its release tags; split, each file would set it up again, adding to the suite's time (tasks/tests.md), and a session changing the module reads every case."
     },
+    "tests/code-review-wait-test.mjs": {
+      "mark": 33431,
+      "why": "One script's cases (code-review-wait.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/comment-only-test.mjs": {
+      "mark": 32403,
+      "why": "One script's cases (comment-only.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/core-yml-test.mjs": {
+      "mark": 22488,
+      "why": "One script's cases (the core's workflow core.yml, run as GitHub runs it) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/hostile-build-files-test.mjs": {
+      "mark": 29844,
+      "why": "One script's cases (the hostile build, package and workflow files each reader is given) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/hostile-github-test.mjs": {
+      "mark": 22575,
+      "why": "One script's cases (the hostile answers of GitHub's API each script is given) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/hostile-pr-comments-test.mjs": {
+      "mark": 22109,
+      "why": "One script's cases (the hostile pull request comments each script is given) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/licence-scan-test.mjs": {
+      "mark": 46036,
+      "why": "One script's cases (licence-scan.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/licences-test.mjs": {
+      "mark": 24020,
+      "why": "One script's cases (licences.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/lookup-test.mjs": {
+      "mark": 63511,
+      "why": "One script's cases (lookup.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/merge-line-test.mjs": {
+      "mark": 23054,
+      "why": "One script's cases (merge-line.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
     "tests/size-test.mjs": {
       "mark": 28199,
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
