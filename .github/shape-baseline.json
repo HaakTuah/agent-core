@@ -30,7 +30,7 @@
     "process: tests/copy-left-out-test.mjs -> node:child_process": "It runs each check from a staged project's copy as the project's workflow runs it, and reads whether that run fails: the command's exit code, with the copy and git as they stand, is what the README's list says and the test guards (#661).",
     "process: tests/weakened-test.mjs -> node:child_process": "Its cases of testsChanged build git repositories and read what git gives for a merge commit against its first parent (a rename, a deletion, a file the base does not hold), which is what the description check reads (#307); git's own output is what the test guards, and no code of the core's stands beneath that process to call instead.",
     "process: tests/queue-only-test.mjs -> node:child_process": "The test guards the command's own exit code and usage line (no files named: status 2, \"usage:\" on stderr), which only starting scripts/queue-only.mjs as a process shows.",
-    "process: tests/rules-at-test.mjs -> node:child_process": "The process is what it guards: the rules of a commit are read from git (the `git ls-tree` and `git show` that rulesAt runs), so the test builds a repository of three commits with git and takes it away to show that a commit read once is not read again; its one reach of a process is that repository's own, for a function of a script that reads git alone (#812)."
+    "process: tests/rules-test.mjs -> node:child_process": "The process is what it guards: the rules of a commit are read from git (the `git ls-tree` and `git show` that rulesAt runs), so the test builds a repository of three commits with git and takes it away to show that a commit read once is not read again; its one reach of a process is that repository's own, for a function of a script that reads git alone (#812)."
   },
   "listed": {
     "function: scripts/licence-commands.mjs#atCommand": {
@@ -130,7 +130,7 @@
     "process: tests/reading-test.mjs -> node:child_process": true,
     "process: tests/reasons-test.mjs -> node:child_process": true,
     "process: tests/releases-test.mjs -> node:child_process": true,
-    "process: tests/rules-at-test.mjs -> node:child_process": true,
+    "process: tests/rules-test.mjs -> node:child_process": true,
     "process: tests/screens-test.mjs -> node:child_process": true,
     "process: tests/security-review-test.mjs -> node:child_process": true,
     "process: tests/select-test.mjs -> node:child_process": true,

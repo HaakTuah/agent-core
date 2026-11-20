@@ -3,7 +3,7 @@
 // a name that can move (HEAD, a branch) is read each time, and what a caller does with the rules it was given changes
 // none that is asked after. A repository of three commits of one rule file; git and Node's own modules.
 //
-//   node tests/rules-at-test.mjs
+//   node tests/rules-test.mjs
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -11,7 +11,7 @@ import { rulesAt } from "../scripts/rules.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
-const repo = path.join(scratchDir("rules-at-test-"), "repo");
+const repo = path.join(scratchDir("rules-test-"), "repo");
 fs.mkdirSync(repo);
 const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(repo, "none"), GIT_CONFIG_NOSYSTEM: "1" };
 const git = (...args) => execFileSync("git", args, { cwd: repo, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
