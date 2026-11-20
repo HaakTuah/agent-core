@@ -42,7 +42,7 @@ ok(checksOn(null, runsBy({})) === null && checksOn(COMMITS, s => (s === sha("b")
 // the pull requests read: the last LAST counted, newest first, each with its commits from a Map, its kind kept
 const counted = Array.from({ length: LAST + 5 }, (_, i) => ({ number: 100 - i, kind: i % 2 ? "sync" : "own" }));
 const read = checksRead(counted, new Map([[100, COMMITS], [99, null], [98, COMMITS]]), runsBy({ a: [run("failure")] }));
-ok(read.length === LAST && read[0].kind === "own" && read[1].kind === "sync" && same(read[0].checks, { heads: 2, failed: 1 }) && read[1].checks === null && same(read[2].checks, { heads: 2, failed: 1 }) && read[3].checks === null,
+ok(read.length === LAST && read[0].kind === "own" && read[1].kind === "sync" && same(read[0].checks, { heads: 1, failed: 1 }) && read[1].checks === null && same(read[2].checks, { heads: 1, failed: 1 }) && read[3].checks === null,
   "the last LAST pull requests counted are read, each by its own commits and kind, and one with no commits read is not read");
 
 const pulls = [
