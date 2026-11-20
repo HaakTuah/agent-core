@@ -151,9 +151,10 @@ const skipping = br => `# c${br}${call(TYPES, "copies.yml", NOT_DRAFT)}`;
 const readied = ["\u0085", "\u2028", "\u2029"].map(br => ({ yes: draftHoles(skipping(br)), fresh: unreadied(one(skipping(br)), () => null), same: unreadied(one(skipping(br)), () => skipping(br)) }));
 ok(readied.every(({ yes, fresh, same }) => yes.join() === "check" && fresh.fails.length === 1 && mended(fresh.fails[0]) && same.fails.length === 0 && same.notes.length === 1) && draftHoles(`# c\n${call(TYPES, "copies.yml", NOT_DRAFT)}`).join() === "check",
   "a call skipped on a draft without ready_for_review behind such a break is found, a new one failing and the base's own noted", readied.flatMap(r => [...r.fresh.fails, ...r.same.notes]).join("\n"));
-// (the sync's step for such a call names it behind a break too, reading the workflow's text, not the YAML the package gave)
+// (a call the package shows in a file with a break inside a quoted string, no YAML once folded, is found by the plain reading)
 ok(unreadied(one(`name: "x\u2028y"\n${call(TYPES, "copies.yml", NOT_DRAFT)}`), null).notes.length === 1 && draftHoles(`name: "x\u2028y"\n${call(TYPES, "copies.yml", NOT_DRAFT)}`).join() === "check",
   "a call a draft skips that the package shows in a file with a break inside a quoted string, which is no YAML once folded, is still found");
+// (the sync's step for such a call names it behind a break too, reading the workflow's text, not the YAML the package gave)
 const stepOf = text => readyOnlyHolds({ root: ".", files: [], workflows: { "a.yml": { text, yaml: (() => { try { return parseYaml(text); } catch { return null; } })() } } });
 ok(["\u0085", "\u2028", "\u2029"].every(br => /workflows\/a\.yml`/u.test(stepOf(skipping(br)) ?? "")) && stepOf(`# c\n${call(FULL, "copies.yml", NOT_DRAFT)}`) === null, "the step that names a call a draft skips names one behind such a break too", String(stepOf(skipping("\u2028"))));
 // (and says it could not read a workflow with such a break that is no YAML once the breaks are line feeds, as it says of any other)

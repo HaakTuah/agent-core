@@ -94,7 +94,7 @@ export const readable = text => !/[\0\ufffd]/u.test(text);
 export function foreignBreaks(text) {
   let line = 1, first = null, count = 0;
   for (const m of String(text).matchAll(/\r\n?|\n|[\u0085\u2028\u2029]/gu)) {
-    if (m[0].length > 1 || /[\r\n]/u.test(m[0])) { line++; continue; }
+    if (/[\r\n]/u.test(m[0])) { line++; continue; }
     count++;
     first ??= { line, code: `U+${m[0].codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}` };
   }
