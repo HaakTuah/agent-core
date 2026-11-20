@@ -10,7 +10,6 @@
 //   node tests/hostile-pr-comments-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { judge as codeJudge } from "../scripts/code-review-wait.mjs";
@@ -22,6 +21,7 @@ import { answered as answeredBy, capsOf, raised as raisedBy, whoseOf } from "../
 // (the size check counts an answer from the repository's owner, "someone" here, with no right read)
 const owner = whoseOf("someone", []), answered = (comments) => answeredBy(comments, owner), raised = (base, head, comments) => raisedBy(base, head, comments, capsOf(head), owner);
 import { NONE, said as toolsSaid, tally } from "../scripts/tools-read.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -160,7 +160,7 @@ ok(sec([said(right)]).done === true && lacks([]) && raised(base, sizeText, [lean
 
 // the review checks run on a scratch pull request and comments (none written where the text is null)
 function runReview(script, commentsText) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "hostile-pr-comments-test-"));
+  const tmp = scratchDir("hostile-pr-comments-test-");
   try {
     fs.writeFileSync(path.join(tmp, "pull.json"), "{}");
     if (commentsText !== null) fs.writeFileSync(path.join(tmp, "comments.json"), commentsText);
@@ -170,7 +170,7 @@ function runReview(script, commentsText) {
 
 // the size check run with --raise on a scratch base and comments: its base the one lower step, unless one is named
 function runSize(baseFile, commentsText) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "hostile-pr-comments-test-"));
+  const tmp = scratchDir("hostile-pr-comments-test-");
   try {
     fs.writeFileSync(path.join(tmp, "base.mjs"), base);
     fs.writeFileSync(path.join(tmp, "comments.json"), commentsText);

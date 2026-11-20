@@ -352,6 +352,12 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
   write("docs/choices.md", kitChoices);
   ok(choicesThere.length === 1 && choicesThere[0].mend.includes("`docs/decisions.md`") && !choicesAtKit.length,
     "a *choice records* row that names a file of its own: the step reads that file and its mend names it, and the kit's path is not read", `${report(choicesThere)}\n${report(choicesAtKit)}`);
+  // (records that stand a file each in a folder the file names, #870: the step reads them, the lacking one reported)
+  write("docs/decisions.md", "# Choices\n\nIts records stand in `docs/decisions/`, a file each, read in the order of their names.\n");
+  write("docs/decisions/010-the-database.md", "## Choice: the database\n\nWe picked one.\n");
+  const choicesInFolder = notDone(at, today);
+  fs.rmSync(path.join(at, "docs/decisions"), { recursive: true }); fs.rmSync(path.join(at, "docs/decisions.md"));
+  ok(choicesInFolder.length === 1 && choicesInFolder[0].mend.includes("`docs/decisions.md`"), "records in a folder the row's file names are read by the step, one that lacks its lines reported", report(choicesInFolder));
   // (the progress file: one past a quarter of the general mark, with no mark of its own, is reported by the row's path;
   // the kit's path, however long, is not read)
   const progress = only("15 November 2026, the progress file holds order only"), kitProgress = fs.readFileSync(path.join(at, "docs/PROGRESS.md"), "utf8");

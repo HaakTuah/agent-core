@@ -9,12 +9,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { checksOf, DIRECT, due, firedOf, generation, list, open, rare, readUnheld, said, stepsAt, stepsOf, without } from "../scripts/pruning.mjs";
+import { checksOf, list, rare, readUnheld, stepsOf, without } from "../scripts/pruning-list.mjs";
+import { firedOf, stepsAt } from "../scripts/pruning-read.mjs";
+import { DIRECT, due, generation, open, said } from "../scripts/pruning-record.mjs";
 import { rulesOf } from "../scripts/rules.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
+import * as facade from "../scripts/pruning.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
+
+// ---- the names pruning.mjs exported before its split (#888) ----
+ok(["DIRECT", "EARLY", "EVERY", "MARKS", "RECORD", "UNHELD", "checksOf", "counts", "due", "firedOf", "generation", "joinedIn", "list", "open", "rare", "readRecord", "readUnheld", "said", "stepsAt", "stepsOf", "unheldLines", "without"].every(n => n in facade), "pruning.mjs still exports each name it exported before its split");
 
 // ---- when a pruning is due ----
 const rec = (...ps) => ({ prunings: ps });

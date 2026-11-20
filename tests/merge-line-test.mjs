@@ -14,8 +14,8 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { cancel, coreOwn, facts, follows, line, main, measure, override } from "../scripts/merge-line.mjs";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -90,7 +90,7 @@ ok(f.newest.state === null && /read them before a merge/.test(follows(f)), "chec
 f = facts({ repo: "o/n", gh: host({ rules: [], newest: runsOf(["failure"]) }) });
 ok(f.users === "merges" && f.newest.state === "failed" && /published on a merge alone/.test(follows(f)) && /no pull request but its fix merges/.test(follows(f)) && /auto-merge off on every other open pull request/.test(follows(f)), "where users get each merge, a failed check on the newest commit stops every merge but the fix all the same", follows(f));
 // The core's own row, read from its AGENTS.md where no manifest stands.
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "merge-line-core-"));
+const root = scratchDir("merge-line-core-");
 fs.mkdirSync(path.join(root, "scripts"));
 fs.writeFileSync(path.join(root, "scripts", "merge-line.mjs"), "");
 fs.writeFileSync(path.join(root, "AGENTS.md"), "the *users get*:\n`releases`, its users taking the core from a release;\n");

@@ -7,7 +7,9 @@ would take a part's job: the kinds `choice`, `port` and `trial`.
 A choice is hard to undo where one pull request cannot reverse it: a language, an engine or framework, where data is
 kept, how the code is put together, a large dependency, a tool the work will lean on, and the platforms the code builds
 and tests on, apart from those the product ships for. Its record stands once, in the *choice records*, under a heading
-`## Choice: ` and what was chosen; `core/scripts/choices.mjs` lists them, says when their pass is due, reads each sign
+`## Choice: ` and what was chosen (they may stand a file each in a folder, as the core's do, the file naming it on the
+line "Its records stand in `<folder>/`, a file each, read in the order of their names."); `core/scripts/choices.mjs`
+lists them, says when their pass is due, reads each sign
 written in a measure, and checks the records a pull request adds ("Held by", below).
 
 - **A choice that is hard to undo gets a record.** By default a choice is made on the best reading and noted in a line

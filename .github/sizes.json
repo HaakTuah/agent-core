@@ -51,6 +51,14 @@
       "mark": 23922,
       "why": "#895: its section on the rules with no holder moves to a test of its own."
     },
+    "choices/010-the-core-s-foundations-judged-again-as-if.md": {
+      "mark": 29908,
+      "why": "#870: a choice record is one argued text, its criteria, long list and judgments read together; the foundations record was split from CHOICES.md, whole as it stood, and is read when the core's foundations are judged again."
+    },
+    "choices/030-one-parser-tree-sitter-carried-in-the-copy.md": {
+      "mark": 22196,
+      "why": "#870: a choice record is one argued text, its trial and its options read together; it was split from CHOICES.md, whole as it stood."
+    },
     "scripts/choices.mjs": {
       "mark": 27277,
       "why": "#912: the records' check a pull request runs apart from the signs the scheduled look reads."
@@ -67,18 +75,6 @@
       "mark": 25832,
       "why": "#884: the text the parser reads (the preprocessor, C# 14's extension headers) apart from the reading of the tree."
     },
-    "scripts/holders.mjs": {
-      "mark": 24459,
-      "why": "#888: the reader of a project's own list apart from the core's own list."
-    },
-    "scripts/pr-description.mjs": {
-      "mark": 27425,
-      "why": "#888: each line's check in a file of its own beside a short reader."
-    },
-    "scripts/pruning.mjs": {
-      "mark": 33545,
-      "why": "#888: the list it prints apart from what it reads from the host and its record."
-    },
     "tasks/game-design.md": {
       "mark": 25119,
       "why": "#441: the game rules split into a base and a file for each kind (#484, points 6 and 7)."
@@ -86,6 +82,10 @@
     "tests/steps-test.mjs": {
       "mark": 138318,
       "why": "#916: a file for each reader its sections test."
+    },
+    "tests/upgrade-test.mjs": {
+      "mark": 98773,
+      "why": "One flow over the projects it builds: each case takes a project as the one before left it (written, synced, merged, its own pull requests after), so a file of its own would build them again; and tests/ holds test files alone (#614), so no module beside it can hold a part. A session reads the case it changes, found by its section's heading."
     },
     "scripts/strength.mjs": {
       "mark": 39011,
@@ -121,31 +121,27 @@
     },
     "tests/outcomes-test.mjs": {
       "mark": 25803,
-      "why": "One script's cases (outcomes.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/packages-test.mjs": {
       "mark": 68081,
-      "why": "One script's cases (packages.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/pointers-test.mjs": {
       "mark": 23333,
-      "why": "One script's cases (pointers.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/pure-sync-test.mjs": {
       "mark": 23363,
-      "why": "One script's cases (pure-sync.mjs, and the workflow that runs it) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/strength-test.mjs": {
       "mark": 33014,
-      "why": "One script's cases (strength.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
-    },
-    "tests/upgrade-test.mjs": {
-      "mark": 83846,
-      "why": "One script's cases (the upgrade of a project written by each of the last two releases) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/work-saved-test.mjs": {
       "mark": 26522,
-      "why": "One script's cases (the work-saved hook, work-saved.sh) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/nuget-gate-test.mjs": {
       "mark": 20574,
@@ -223,6 +219,46 @@
       "mark": 32922,
       "why": "One module's cases (releases.mjs, and release.mjs that cuts one) on the one scratch core it sets up with its release tags; split, each file would set it up again, adding to the suite's time (tasks/tests.md), and a session changing the module reads every case."
     },
+    "tests/code-review-wait-test.mjs": {
+      "mark": 33431,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/comment-only-test.mjs": {
+      "mark": 32403,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/core-yml-test.mjs": {
+      "mark": 22488,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/hostile-build-files-test.mjs": {
+      "mark": 29868,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/hostile-github-test.mjs": {
+      "mark": 22575,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/hostile-pr-comments-test.mjs": {
+      "mark": 22109,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/licence-scan-test.mjs": {
+      "mark": 46036,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/licences-test.mjs": {
+      "mark": 24020,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/lookup-test.mjs": {
+      "mark": 63511,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/merge-line-test.mjs": {
+      "mark": 23054,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
     "tests/size-test.mjs": {
       "mark": 28199,
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
@@ -236,7 +272,7 @@
       "why": "#943: the selection's rules apart from those of the suites' time and of the run of a tree that passed."
     },
     "tests/select-test.mjs": {
-      "mark": 29583,
+      "mark": 38574,
       "why": "#943: split as its script is: the matcher's cases, the host question's cases and the selection's."
     },
     "scripts/step-checks.mjs": {

@@ -161,6 +161,10 @@ try {
   const root = path.join(path.dirname(SCRIPT), "..");
   const files = [...fs.readdirSync(path.join(root, "tests")).filter(f => f.endsWith(".mjs")).map(f => `tests/${f}`), "scripts/hostile.mjs"];
   const found = files.flatMap(f => leaks(fs.readFileSync(path.join(root, f), "utf8")).map(line => `${f}: ${line.trim().slice(0, 100)}`));
+  // (one exit listener serves all of a process's scratch folders: a test that makes one for each of its cases would pass Node's limit of ten)
+  const listeners = process.listenerCount("exit");
+  for (let i = 0; i < 12; i++) scratchDir("listeners-test-");
+  ok(process.listenerCount("exit") === listeners, "scratchDir adds no exit listener of its own for each folder");
   ok(found.length === 0, "no test, and not scripts/hostile.mjs, makes a folder under the temporary one with mkdtemp: they use scratchDir", `${found.slice(0, 5).join("\n")}\nMend: replace the call with scratchDir(prefix) from scripts/scratch-core.mjs, which removes the folder at the process's exit or, if the run was stopped, at the next test's start, and delete the exit handler that removed it.`);
 }
 

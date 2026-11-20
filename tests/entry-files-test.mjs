@@ -5,12 +5,12 @@
 //   node tests/entry-files-test.mjs
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ENTRY, lacking, verdict } from "../scripts/entry-files.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { ruleFiles } from "../scripts/rule-files.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what) => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}`); } };
@@ -60,7 +60,7 @@ const added = ENTRY.find(e => e.file === ".agents/rules/core.md").line("core/rol
 ok(lacking(reader({ "AGENTS.md": `${AGENTS}@core/roles/shared/git.md\n`, ".agents/rules/core.md": `${AG}${added}\n` })).length === 0, "the line a mend names is one the check then reads");
 
 // as it runs: in a scratch repository, a failure with its mend; against its base, a note and a pass
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "entry-files-"));
+const dir = scratchDir("entry-files-");
 const git = (...a) => execFileSync("git", a, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const write = (f, t) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), t); };
 const run = (env = {}) => {

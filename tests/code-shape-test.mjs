@@ -7,13 +7,13 @@
 //   node tests/code-shape-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { changedTogether, cycles, globals, imports, isModule, jsxIn, measure, tokens } from "../scripts/code-shape.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { javascriptFunctions } from "../scripts/javascript-functions.mjs";
 import { LARGEST, MOST_NODES } from "../scripts/tree-walk.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -222,8 +222,8 @@ ok(together.commits === 3 && same(together.pairs, [{ files: ["p", "q"], together
 ok(same(m.changedTogether.pairs, [{ files: ["engine/dice.mjs", "engine/rules.mjs"], together: 3, share: 1 }]) && m.changedTogether.mostChanged[0].file === "engine/rules.mjs", "a file outside the code read counts in no pair");
 
 // A whole run, in a project that holds the core's copy: its own code alone, its history and its suites.
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "code-shape-test-"));
-const outside = fs.mkdtempSync(path.join(os.tmpdir(), "code-shape-outside-")); // what a link leads to, beside the project
+const dir = scratchDir("code-shape-test-");
+const outside = scratchDir("code-shape-outside-"); // what a link leads to, beside the project
 try {
   const git = (...args) => execFileSync("git", args, { cwd: dir, stdio: "ignore" });
   git("init", "-q");
@@ -258,7 +258,7 @@ try {
   const o = outer.status === 0 ? JSON.parse(fs.readFileSync(out, "utf8")) : null;
   ok(o?.files.code === 2 && o?.changedTogether.commits === 3, `with --repo, another repository is measured, its copy of the core left out (${outer.stdout}${outer.stderr})`);
   // (another repository whose manifest names its copy of the core elsewhere: that copy is left out, not core/)
-  const vendored = fs.mkdtempSync(path.join(os.tmpdir(), "code-shape-vendored-"));
+  const vendored = scratchDir("code-shape-vendored-");
   try {
     const vgit = (...args) => execFileSync("git", args, { cwd: vendored, stdio: "ignore" });
     vgit("init", "-q"); vgit("config", "user.email", "test@example.invalid"); vgit("config", "user.name", "Test"); vgit("config", "commit.gpgsign", "false"); vgit("config", "core.hooksPath", path.join(vendored, ".no-hooks"));

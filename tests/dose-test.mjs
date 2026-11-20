@@ -6,11 +6,11 @@
 //   node tests/dose-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditDue, auditIsDue, auditOf, BATCH, cleaningDue, DAYS, DEBT, fileOf, MOVED, named, reading, STANDARD, stateOf, TITLES, worstFirst } from "../scripts/dose.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -43,8 +43,7 @@ ok(same(first.map(f => f.file), ["b.js", "a.js", "c.js", "d.js"]) && first[1].en
 
 // ---- whole runs, in a scratch repository ----
 const script = fileURLToPath(new URL("../scripts/dose.mjs", import.meta.url)), shape = fileURLToPath(new URL("../scripts/shape.mjs", import.meta.url));
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dose-test-"));
-process.on("exit", () => { try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+const dir = scratchDir("dose-test-");
 const git = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const put = (file, text) => { fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.writeFileSync(path.join(dir, file), text); };
 const run = (file, args = []) => { const r = spawnSync(process.execPath, [file, ...args], { cwd: dir, encoding: "utf8", env: { ...process.env, SHAPE_BASE: "" } }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };

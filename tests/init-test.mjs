@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { CORE, CORE_SOURCE } from "../scripts/core-address.mjs";
 import { COMMAND } from "../scripts/helper-call.mjs";
 import { FILES, files, fill, filtered, GAME_ROWS, licences, linked, modules, named, options, READ, READY_ONLY, sizes, startOf, TEMPLATES } from "../scripts/init.mjs";
-import { scratch } from "../scripts/scratch-core.mjs";
+import { scratch, scratchDir } from "../scripts/scratch-core.mjs";
 import { evaluate, parseYaml } from "../scripts/workflow-run.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { BLOB_MAX, readBlobs } from "../scripts/blobs.mjs";
@@ -213,7 +213,7 @@ if (p.status === 0) {
     return spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: p.dir, env, encoding: "utf8" });
   });
   // (a first baseline under a folder linked out of the project is refused, never written there; a junction on Windows)
-  const away = fs.mkdtempSync(path.join(os.tmpdir(), "copies-away-"));
+  const away = scratchDir("copies-away-");
   fs.symlinkSync(away, path.join(p.dir, "linked"), "junction");
   fs.writeFileSync(cfgP, JSON.stringify({ ...JSON.parse(cfgPWas), baseline: "linked/baseline.json" }));
   const linked = spawnSync(process.execPath, ["core/scripts/copies.mjs", "checks/copies.json", "--first"], { cwd: p.dir, env, encoding: "utf8" });

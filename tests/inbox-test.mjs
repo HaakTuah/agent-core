@@ -6,10 +6,10 @@
 //   node tests/inbox-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { FOLDER, answer, asked, items, repoOf, report, tried } from "../scripts/inbox.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -44,7 +44,7 @@ p = posts(valid, valid);
 ok(asked("o/n", on, p.post).yes && asked("o/n", { ...app, has_issues: false }, p.post).why.includes("switched off") && !p.sent.length, "a role that may write, or issues switched off: nothing more is asked");
 ok(tried(0) === "yes" && tried(1, "HTTP 422") === "yes" && tried(1, "HTTP 404") === "no" && tried(1, "HTTP 401") === null && tried(1, "HTTP 4031") === null, "what gh made of a write read exactly");
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "inbox-test-"));
+const dir = scratchDir("inbox-test-");
 try {
   ok(items(dir).length === 0, "no folder: no items");
   fs.mkdirSync(path.join(dir, FOLDER));
@@ -71,7 +71,7 @@ ok(/\(1 item\(s\), and 1 whose name is not plain: rename each/.test(report({ yes
 
 // the script itself, gh failing as GitHub does (a stand-in that is a shell script: not on Windows)
 if (process.platform !== "win32") {
-  const at = fs.mkdtempSync(path.join(os.tmpdir(), "inbox-run-")), bin = path.join(at, "bin"), repo = path.join(at, "repo");
+  const at = scratchDir("inbox-run-"), bin = path.join(at, "bin"), repo = path.join(at, "repo");
   try {
     fs.mkdirSync(bin); fs.mkdirSync(repo);
     const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, GIT_CONFIG_GLOBAL: path.join(at, "none"), GIT_CONFIG_NOSYSTEM: "1" };

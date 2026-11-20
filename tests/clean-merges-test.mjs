@@ -10,19 +10,17 @@
 //   node tests/clean-merges-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { proved } from "../scripts/clean-merges.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { checkoutStandIn, ghStandIn, scratchEnv } from "../scripts/scratch-core.mjs";
+import { checkoutStandIn, ghStandIn, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1600).replace(/\n/g, "\n     ")}`}`); } };
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "clean-merges-test-"));
-process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+const tmp = scratchDir("clean-merges-test-");
 const slash = (p) => p.replace(/\\/g, "/");
 const env = scratchEnv(tmp, tmp);
 // (the proof runs git with this process's own environment, as the workflow runs it: the same isolation here)

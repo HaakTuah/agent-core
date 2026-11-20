@@ -111,23 +111,24 @@ export const reachRuns = runsOf;
 // (files that are modules by their extension, whatever they hold; and types alone, which no page loads)
 const NEVER_SCRIPTS = [".mjs", ".cjs", ".mts", ".cts"];
 
-// A file of JavaScript or TypeScript: its functions on the parser (none where its packages are not installed), and its
-// tokens, read with JSX where it may hold it, for its imports and names; one whose JSX the lexer cannot follow to its end
-// is read without it.
-function javascript(file, text) {
+// A file of JavaScript or TypeScript: its functions on the parser (none where its packages are not installed, or where
+// they are not asked for), and its tokens, read with JSX where it may hold it, for its imports and names; one whose JSX
+// the lexer cannot follow to its end is read without it.
+function javascript(file, text, withFunctions) {
   const toks = tokens(text, jsxIn(file)), read = toks.lost ? tokens(text) : toks;
-  const functions = unreachedReaders().includes("javascript-tree") ? [] : javascriptFunctions(file, text);
+  const functions = !withFunctions || unreachedReaders().includes("javascript-tree") ? [] : javascriptFunctions(file, text);
   return { reader: "javascript-tree", toks: read, functions, imports: imports(read), own: JS_OWN, lang: "javascript", comments: toks.lost ? [] : toks.comments };
 }
 
 // Each file of code as its reader reads it: { reader, toks, functions (null where they cannot be told), imports (null
 // where they cannot be read), own, lang, comments: each line of its comments, { line, text } }, and of C# its namespaces
-// and types.
-export function reading(file, text) {
+// and types. `functions` false reads none of JavaScript's, its parser's work, which the selection of tests does not use
+// (select.mjs; #962): C#'s and Python's imports are read on their parser, so theirs are read all the same.
+export function reading(file, text, { functions = true } = {}) {
   const ext = path.posix.extname(file);
   if (ext === ".cs") { const r = readCsharp(text); return { ...r, reader: "csharp-tree", imports: r.usings, own: CS_OWN, lang: "csharp" }; }
   if (ext === ".py") return { ...readPython(text), reader: "python-tree", own: PY_OWN, lang: "python" };
-  return javascript(file, text);
+  return javascript(file, text, functions);
 }
 
 // What the project declares beside its code, for the readers that need it: where its C# declares each namespace and
