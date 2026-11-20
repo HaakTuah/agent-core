@@ -6,7 +6,8 @@
 //
 //   node <the core's main>/scripts/path-only.mjs [<the base, by default the merge base with origin/main>]
 //
-// A file the PR moves is one git finds renamed with its content whole (`-M100%`), and a folder it moves one whose
+// A file the PR moves is a regular file on both sides, no link, that git finds renamed with its content whole
+// (`-M100%`), and a folder it moves one whose
 // files all moved so: the old path stands no more at the head, the new one stood nowhere at the base, and the new one
 // holds what the old held. A file that asks the yes (owner-yes.mjs's asks) is proven where it is changed in place, a
 // regular file on both sides, and its two versions are the same text but where a path of such a move stands in the old
@@ -106,13 +107,14 @@ export function follows(before, after, pairs) {
 }
 
 // The verdict on each changed file that asks the yes. `changed`: [{ path, status ("M", "A", "D"...), before, after,
-// modes: [base's, head's] }]; `moves`: [{ from, to, folder }]; `self`: whether the pull request changes SELF.
+// modes: [base's, head's] }]; `moves`: [{ from, to, folder }]; `self`: the first file the pull request changes of
+// those that decide the proof (ownFiles, SETUP), or false.
 // Returns { proven: [path], refused: [{ path, why }] }.
 export function verdicts({ changed, moves, self = false }) {
   const pairs = spellings(moves), proven = [], refused = [];
   for (const f of changed) {
     if (!asks(f.path)) continue;
-    const why = self ? `the pull request changes the proof, the check that runs it or a file they import, so the proof that would run is not main's`
+    const why = self ? `the pull request changes ${self}, which decides the proof (the proof, the check that runs it, its workflow, what that sets up from, or a file they import), so the code that would run is not main's`
       : f.status !== "M" ? "it is added, deleted or moved, not changed in place"
       : f.modes?.[0] !== REGULAR || f.modes?.[1] !== REGULAR ? "it is not a regular file on both sides, its mode kept"
       : f.before === INVALID || f.after === INVALID ? "a side of it is no UTF-8 text"
@@ -129,16 +131,19 @@ export function foldersOf(from, to) {
   return out;
 }
 
+// Whether a line of `git diff --raw` (":<mode> <mode> <id> <id> <status>") is a regular file renamed whole.
+export const moved = line => { const [a, b, , , status] = line.replace(/^:/u, "").split(" "); return status === "R100" && /^100(?:644|755)$/u.test(a ?? "") && /^100(?:644|755)$/u.test(b ?? ""); };
 const run = (cwd, args) => { const r = spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 26 }); return r.status === 0 ? r.stdout : null; };
 const fields = out => (out === "" ? [] : out.replace(/\0$/u, "").split("\0"));
 
 // The moves from `base` to `head` in `cwd`: each file git finds renamed whole, and each folder (foldersOf) that stands
 // no more, whose new path stood nowhere and each of whose files moved whole beneath it; null where git cannot say.
 function movesOf(cwd, base, head) {
-  const renamed = run(cwd, ["diff", "--name-status", "-M100%", "--diff-filter=R", "-z", base, head]);
+  const renamed = run(cwd, ["diff", "--raw", "-M100%", "--diff-filter=R", "-z", base, head]);
   if (renamed === null) return null;
   const moves = [], r = fields(renamed);
-  for (let i = 0; i + 2 < r.length; i += 3) if (r[i] === "R100") moves.push({ from: r[i + 1], to: r[i + 2] });
+  // (a link's text kept is not what it points to kept, so a link, or anything but a regular file, moves nothing)
+  for (let i = 0; i + 2 < r.length; i += 3) if (moved(r[i])) moves.push({ from: r[i + 1], to: r[i + 2] });
   const files = new Set(moves.map(m => `${m.from}\0${m.to}`)), seen = new Set();
   const stands = (at, p) => run(cwd, ["cat-file", "-e", `${at}:${p}`]) !== null;
   // (both ways: each file of the old folder moved to the new, and each file of the new came from the old, none added)
@@ -173,7 +178,7 @@ export function read(cwd, base, head) {
   for (let i = 0; i + 1 < names.length; i += 2) changed.push(fileOf(cwd, base, head, names[i], names[i + 1]));
   if (changed.some(f => f.status === "M" && asks(f.path) && (f.before === null || f.after === null))) return null;
   const own = ownFiles(p => run(cwd, ["show", `${base}:${p}`]));
-  return { changed, moves, self: changed.some(f => decides(own, f.path)) };
+  return { changed, moves, self: changed.find(f => decides(own, f.path))?.path ?? false };
 }
 
 // The paths of `asked` (the files that ask the yes) that the change from base to head proves only follow moves: [] where

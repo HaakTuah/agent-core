@@ -3,7 +3,7 @@
 // change is refused, with its mend. Pure: it gives the proof what git would, and starts no process.
 //
 //   node tests/path-only-test.mjs
-import { INVALID, ROOTS, SETUP, WORKFLOW, decides, failure, foldersOf, follows, ownFiles, spellings, tokens, verdicts } from "../scripts/path-only.mjs";
+import { INVALID, ROOTS, SETUP, WORKFLOW, decides, failure, moved, foldersOf, follows, ownFiles, spellings, tokens, verdicts } from "../scripts/path-only.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0, count = 0;
@@ -24,7 +24,7 @@ ok(refused(one("Rule 3: `scripts/kit/a.mjs` proves it; see scripts/tools/ and sc
 ok(refused(verdicts({ changed: [{ path: FLOOR, status: "M", modes: ["100644", "100644"], before: "see `scripts/new.mjs`", after: "see `scripts/old.mjs`" }], moves }), /not where the pull request moves it/u), "a new path turned back to its old one is refused");
 ok(refused(one("Rule 3: `scripts/old.mjs` proves it; see scripts/kit/ and scripts/kit/a.mjs.\n", { status: "A" }), /added, deleted or moved/u), "a file that asks the yes and is added, deleted or moved itself is refused");
 ok(refused(one(before.replace("old", "new"), { modes: ["100644", "100755"] }), /not a regular file/u) && refused(one(before.replace("old", "new"), { modes: ["120000", "120000"] }), /not a regular file/u), "a mode changed, or a link, is refused");
-ok(refused(verdicts({ changed: [{ path: GUIDE, status: "M", modes: ["100644", "100644"], before, after: before.replace("old", "new") }, { path: "scripts/path-only.mjs", status: "M" }], moves, self: true }), /is not main.s/u), "where the pull request changes the proof or what it imports, nothing is proven");
+ok(refused(verdicts({ changed: [{ path: GUIDE, status: "M", modes: ["100644", "100644"], before, after: before.replace("old", "new") }, { path: "scripts/path-only.mjs", status: "M" }], moves, self: "scripts/path-only.mjs" }), /changes scripts\/path-only\.mjs, which decides the proof.*is not main.s/u), "where the pull request changes the proof or what it imports, nothing is proven");
 ok(verdicts({ changed: [{ path: "tasks/x.md", status: "M", before: "a", after: "b" }], moves }).refused.length === 0 && verdicts({ changed: [{ path: "tasks/x.md", status: "D" }], moves }).proven.length === 0, "a file that asks no yes is neither proven nor refused");
 
 const intoFloor = [{ from: "floor/topics/a.md", to: "tasks/a.md" }];
@@ -43,9 +43,10 @@ const graph = { "scripts/install.mjs": 'import { INSTALLS } from "./packages.mjs
 const own = ownFiles(p => graph[p] ?? null);
 ok(ROOTS.every(r => own.has(r)) && own.has(WORKFLOW) && ["scripts/owner-yes.mjs", "scripts/reading.mjs", "scripts/whole-output.mjs", "scripts/packages.mjs"].every(f => own.has(f)) && own.size === 8, "the code that decides the proof is the check, the installer its job runs first, its workflow, the proof and all they import, at any depth");
 ok([".node-version", ".packages/package.json", ".packages/package-lock.json", ".packages/.npmrc"].every(p => decides(own, p)) && !decides(own, ".packagesx") && !decides(own, "tasks/x.md") && SETUP.length === 2, "what the job sets up from before the check, Node's version and the core's packages, decides the proof too");
-ok(refused(verdicts({ changed: [{ path: FLOOR, status: "M", modes: ["100644", "100644"], before, after: before.replace("old", "new") }, { path: "scripts/reading.mjs", status: "M" }], moves, self: true }), /not main.s/u), "where the pull request changes a file the check imports, nothing is proven");
+ok(refused(verdicts({ changed: [{ path: FLOOR, status: "M", modes: ["100644", "100644"], before, after: before.replace("old", "new") }, { path: "scripts/reading.mjs", status: "M" }], moves, self: "scripts/reading.mjs" }), /changes scripts\/reading\.mjs.*not main.s/u), "where the pull request changes a file the check imports, nothing is proven");
 const named = [{ from: "scripts/a.mjs", to: "scripts/b.mjs", unique: true }, { from: "scripts/c.mjs", to: "scripts/d.mjs" }];
 ok(follows("see `a.mjs`", "see `b.mjs`", spellings(named)) === null && follows("see `c.mjs`", "see `d.mjs`", spellings(named)) !== null && follows("see a.mjs", "see b.mjs", spellings(named)) !== null, "a file's name alone follows its move between backticks, and only where no other file bears that name");
+ok(moved(":100644 100644 aaa aaa R100") && moved(":100755 100755 aaa aaa R100") && !moved(":120000 120000 aaa aaa R100") && !moved(":100644 120000 aaa bbb R100") && !moved(":160000 160000 aaa aaa R100") && !moved(":100644 100644 aaa bbb R090"), "only a regular file renamed whole is a move: a link keeps its text while what it points to changes");
 ok(mended(failure({ path: FLOOR, why: "it changes words" })), "a refusal says its mend");
 
 console.log(`${failed ? "FAIL" : "ok  "} ${count - failed} of ${count} passed`);
