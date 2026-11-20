@@ -77,7 +77,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   audit (#259) and a change to a rule that keeps its meaning (#886, point 2) join without the owner's word: the design
   check of the PR that builds such a change states it, as `roles/shared/review-guidelines.md` says of the floor ("A
   change that keeps the meaning is stated so"), and where it does not, that PR waits for the owner's yes, held for the
-  floor and the guidelines by `scripts/meaning-kept.mjs` and for any other rule by that design check alone. A bug waits for no
+  floor and the guidelines by `scripts/meaning-kept.mjs` and for any other rule by nothing yet. A bug waits for no
   line, as that module says. A line does not leave in the PR that closes its issue: the readers of the file skip the
   line of a closed issue, and the next PR that changes the file takes such lines out together (`node scripts/queue.mjs
   --clear`; #750, point 1), as that module says, since PRs merging side by side collided on it. Held here by `own-description.yml`, which fails a ready PR that changes the
