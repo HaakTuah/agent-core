@@ -10,7 +10,7 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #715 | rule builder; `tests.yml` steps one by one | |
 | #810 | the orchestrator, for its done-when: reads `main`'s runs, then closes it | a stretch of merges landing faster than a run; at the batch's end, if none came, the orchestrator reads `main`'s runs since #813 and closes #810 on that |
 | #812 | builder; on Sonnet (#767); `tests.yml` timing | #715 |
-| #767 | rule builder; it changes `tools/claude.md`'s table | |
+| #767 | rule builder; point 5, then the second trial's result (point 4) | the second trial's twenty, for point 4 |
 | #704 | builder; `tests.yml` | #715 |
 | #770 | builder; `tests.yml` | #704 |
 | #772 | builder; `tests.yml` | #770 |
@@ -79,11 +79,9 @@ They read and change no rule.
 | #557 | builder | #556 |
 | #558 | builder | #557 |
 | #895 | builder; a test split; `tests.yml` names the suite | #715 |
-| #900 | builder; `scripts/review-record.mjs` | |
 | #901 | builder; `scripts/tools-read.mjs` | |
 | #912 | builder | |
 | #916, with #922 | builder; one PR | #917 |
-| #920 | builder | |
 | #931 | builder | |
 | #892 | builder | |
 | #884 | builder | |
@@ -93,7 +91,6 @@ They read and change no rule.
 | #685 | builder | |
 | #937 | builder | |
 | #958 | builder | |
-| #973 | builder; a split, its meaning kept | |
 | #1009 | builder; a split, its meaning kept | #920 |
 | #1008 | builder; splits, each its meaning kept, one PR a file or a few | |
 | #919 | builder | #917 |
