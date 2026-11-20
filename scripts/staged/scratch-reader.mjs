@@ -10,7 +10,7 @@ import path from "node:path";
 
 // The environment the readers run the session's code in: no variable of the machine's but where programs are found,
 // so no sign-in or token reaches code the session wrote.
-export const BARE = { PATH: process.env.PATH ?? "", ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot ?? "" } : {}) };
+export const BARE = Object.freeze({ PATH: process.env.PATH ?? "", ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot ?? "" } : {}) });
 
 // The readers' git. The readers never run git in the session's repositories, whose config, attributes, hooks and
 // links the session could have written: they read the refs and reflogs there as plain files, refusing a link, and
