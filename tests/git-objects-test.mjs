@@ -88,7 +88,7 @@ git(named, "init", "-q", "-b", "main");
 fs.writeFileSync(path.join(named, "a"), "another repository\n");
 git(named, "add", "-A");
 git(named, "commit", "-q", "-m", "other");
-for (const variable of ["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY"]) {
+for (const variable of ["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_INDEX_FILE", "GIT_CEILING_DIRECTORIES"]) {
   const was = process.env[variable];
   process.env[variable] = variable === "GIT_DIR" ? path.join(named, ".git") : variable === "GIT_WORK_TREE" ? named : path.join(named, ".git", variable === "GIT_COMMON_DIR" ? "" : "objects");
   const took = textAt(dir, "HEAD", "a"), kind = objectAt(dir, "HEAD", "a");
@@ -161,6 +161,12 @@ process.env.GIT_OBJECTS_TEXT_MAX = "5";
 const past = fed([`${oid} blob 11\nhel`]);
 delete process.env.GIT_OBJECTS_TEXT_MAX;
 ok(past.replies.length === 1 && past.replies[0].body === undefined && past.replies[0].size === 11 && past.retired.length === 1, "a body past the bound is answered by its header and its process is closed");
+
+// A root given as a relative path is the same repository, and a caller started with flags a worker refuses (--eval, --input-type) still reads.
+ok(textAt(path.relative(process.cwd(), dir), "HEAD", "d/f") === "in a folder\n" && objectAt(path.relative(process.cwd(), dir), "HEAD", "a")?.type === "blob", "a root given as a relative path is read through the batch");
+const started = Date.now();
+const printed = execFileSync(process.execPath, ["--input-type=module", "-e", `import { textAt } from ${JSON.stringify(new URL("../scripts/git-objects.mjs", import.meta.url).href)}; console.log(JSON.stringify(textAt(${JSON.stringify(dir)}, "HEAD", "d/f")));`], { encoding: "utf8", env });
+ok(printed.trim() === JSON.stringify("in a folder\n") && Date.now() - started < 20000, "a caller started with --input-type and --eval reads, with no wait on its worker");
 
 // The paths the listing may answer for: written as git reads them.
 ok(["a", "d/f", ".claude/settings.json", "a b", "a\\b", "..a", "a..", ".x/y."].every(exactPath), "a path of plain steps is exact");

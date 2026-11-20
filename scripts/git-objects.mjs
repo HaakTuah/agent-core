@@ -75,7 +75,9 @@ function ask(key, args, line, batch) {
   if (channel === null) {
     try {
       const { port1, port2 } = new MessageChannel(), flag = new Int32Array(new SharedArrayBuffer(4));
-      const worker = new Worker(new URL(import.meta.url), { workerData: { gitObjects: true, port: port2, flag }, transferList: [port2], env: SHARE_ENV });
+      // (no flag of the caller's own, as --input-type or --eval, which a worker refuses; and a worker that fails later is given up, not thrown)
+      const worker = new Worker(new URL(import.meta.url), { workerData: { gitObjects: true, port: port2, flag }, transferList: [port2], env: SHARE_ENV, execArgv: [] });
+      worker.on("error", () => { channel = false; });
       worker.unref();
       port1.unref();
       channel = { port: port1, flag };
@@ -90,14 +92,16 @@ function ask(key, args, line, batch) {
   return receiveMessageOnPort(channel.port)?.message ?? { failed: true };
 }
 
+// (git's variables that name a place, some relative to the folder git runs in, which is not the root's here)
+const GIT_PLACES = ["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_INDEX_FILE", "GIT_CEILING_DIRECTORIES"];
 // The repository's own folder where the root holds it as `.git`, the one place git is asked without walking up from the
 // root (a folder git finds above it, a variable naming another, a checkout another user owns, which git's own check of
 // ownership refuses to read unless it is told so, and a name past a line are the single call's).
 function home(root) {
-  const own = path.join(root, ".git");
+  const own = path.resolve(root, ".git");
   let mine = false;
   try { mine = process.platform === "win32" || fs.statSync(own).uid === process.geteuid(); } catch { /* (no .git there) */ }
-  return mine && !["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY"].some(v => process.env[v] !== undefined) ? own : null;
+  return mine && !GIT_PLACES.some(v => process.env[v] !== undefined) ? own : null;
 }
 // Close the git processes, so that the next question reads the repository as it stands then (a run reads the commits as they stand when it starts).
 export function forget() { if (channel) channel.port.postMessage({ close: true }); }
