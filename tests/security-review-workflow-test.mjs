@@ -72,11 +72,12 @@ function runCase(fx, env, tmp, { files = [{ filename: "notes.txt" }], cut = 0, c
     body: `<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 ${JSON.stringify(state)} -->\n<details>the table</details>` };
   fs.writeFileSync(ghData, JSON.stringify({ "pulls/7$": pull, "issues/7/comments": [summary, ...comments], "pulls/7/comments": [], "pulls/7/commits": commits, "pulls/7/files": files, ...data }));
   fs.writeFileSync(ghLog, "");
-  // (a fresh clone where a script is taken out; otherwise the one repository, which the shell writes nothing into)
+  // (a copy, its history with it, where a script is taken out of the working tree; otherwise the one repository, which
+  // the shell writes nothing into)
   const workspace = () => {
     if (!missing.length) return fx.repo;
     const ws = fs.mkdtempSync(path.join(tmp, "ws-"));
-    execFileSync("git", ["clone", "-q", fx.repo, ws], { env, stdio: "ignore" });
+    fs.cpSync(fx.repo, ws, { recursive: true });
     for (const p of missing) fs.rmSync(path.join(ws, p));
     return ws;
   };
