@@ -97,7 +97,7 @@ export function run({ program, root, files, ...at }) {
 export function baseTree(sha, under) {
   const dir = fs.mkdtempSync(path.join(under, "links-base-")), git = (args, opts = {}) => spawnSync("git", args, { encoding: null, maxBuffer: 1 << 30, ...opts });
   const tar = git(["archive", "--format=tar", sha]);
-  if (tar.status !== 0 || spawnSync("tar", ["-x", "-C", dir], { input: tar.stdout, maxBuffer: 1 << 30 }).status !== 0) { fs.rmSync(dir, { recursive: true, force: true }); return null; }
+  if (tar.status !== 0 || spawnSync("tar", ["-x", "-f", "-", "-C", dir], { input: tar.stdout, maxBuffer: 1 << 30 }).status !== 0) { fs.rmSync(dir, { recursive: true, force: true }); return null; }
   const tracked = new Set(String(git(["ls-tree", "-r", "-z", "--name-only", sha]).stdout ?? "").split("\0").filter(Boolean));
   return { dir: fs.realpathSync(dir), tracked, folders: new Set([...tracked].flatMap(f => f.split("/").slice(0, -1).map((_, i, p) => `${p.slice(0, i + 1).join("/")}/`))) };
 }
