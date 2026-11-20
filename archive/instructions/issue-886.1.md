@@ -11,3 +11,4 @@ The index, and how an item is written: `archive/instructions.md`.
      followed a moved file, and the work waited on it. The owner agreed to the point as the issue sets it out, wanting a
      yes only for what means something. It stands behind "The owner's yes in the PR", of floor rule 3, in
      `floor/security.md`.
+     Changed by: #886.2.
