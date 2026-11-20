@@ -230,7 +230,7 @@ const together = (key, what, files) => {
 };
 // (and the linking of each file to the files whose names it holds, which grows with the count of files times their text)
 together("many-mid", "2300 files of 1,500 characters, under the limit in characters", Object.fromEntries(Array.from({ length: 2300 }, (_, n) => [`src/f${n}.js`, `export const v = "${" f1.j".repeat(300)}";\n`])));
-together("one-long", "2000 small files and one of 3.9 million characters", { ...Object.fromEntries(Array.from({ length: 2000 }, (_, n) => [`src/g${n}.js`, `export const v = ${n};\n`])), "src/long.js": `export const v = "${"a ".repeat(1_950_000)}";\n` });
+together("one-long", "4000 small files and one of 3.8 million characters", { ...Object.fromEntries(Array.from({ length: 4000 }, (_, n) => [`src/g${n}.js`, `export const v = ${n};\n`])), "src/long.js": `export const v = "${"a ".repeat(1_900_000)}";\n` });
 together("tests-naming", "700 test files that each name the 699 others", Object.fromEntries(Array.from({ length: 700 }, (_, n) => [`test/t${n}.js`, `export const v = "${Array.from({ length: 700 }, (_, k) => `t${k}.js`).join(" ")}";\n`])));
 together("csharp-three", "three files of C# at the largest its reader takes", Object.fromEntries([1, 2, 3].map(n => [`src/call${n}.cs`, SLOWEST["src/call.cs"](LARGEST.csharp)])));
 together("every-kind", "the densest file of each kind, all at once", Object.fromEntries(Object.entries(SLOWEST).map(([file, made]) => [file, made(largestOf(file))])));
