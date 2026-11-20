@@ -1,5 +1,5 @@
-// Tests the strength check (scripts/strength.mjs): the row that names the tool, the lines a pull request
-// changes and how the tool is told them, a fault's id, a report read and refused, the counts, what the baseline claims
+// Tests the strength check (scripts/strength.mjs, with strength-report.mjs and strength-verdict.mjs, which it runs):
+// the row that names the tool, the lines a pull request changes and how the tool is told them, a fault's id, a report read and refused, the counts, what the baseline claims
 // and what may join it, and whole runs in a scratch repository with a tool of its own: reported only before the
 // baseline, a survivor failed with its mend once it stands, one listed passing, a tool that cannot run, `none`, and
 // the whole run writing the baseline, and a cleaning task's run lowering it. Run by the core's tests workflow (.github/workflows/tests.yml).
@@ -11,7 +11,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { again, baselineOf, changedLines, counted, faultsOf, idOf, joinedUnsaid, kindOf, linesArg, lowered, needed, toolOf, undercut, unlisted, unsure, verdict, watched } from "../scripts/strength.mjs";
+import { baselineOf, changedLines, linesArg, toolOf } from "../scripts/strength.mjs";
+import { counted, faultsOf, idOf } from "../scripts/strength-report.mjs";
+import { again, joinedUnsaid, kindOf, lowered, needed, undercut, unlisted, unsure, verdict, watched } from "../scripts/strength-verdict.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;

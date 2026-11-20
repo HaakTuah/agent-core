@@ -56,7 +56,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #899 | builder; `tasks/tests.md`, a change that keeps the meaning, its design check stating it | |
 | #907 | rule builder; each other tool's part under `tools/`, completing #492's point 14 | |
 | #913 | builder; a split of `tasks/choices.md`, its meaning kept | |
-| #687 | builder; a trim, its design check stating the meaning kept | |
 | #870 | builder | #925 |
 | #943 | builder; a split, its meaning kept | #962 |
 | #974 | rule builder; `roles/adviser.md` | |
@@ -92,11 +91,11 @@ They read and change no rule.
 | #860 | builder | |
 | #857 | builder | |
 | #685 | builder | |
-| #946 | builder | |
 | #937 | builder | |
-| #938 | builder | |
 | #958 | builder | |
 | #973 | builder; a split, its meaning kept | |
+| #1009 | builder; a split, its meaning kept | #920 |
+| #1008 | builder; splits, each its meaning kept, one PR a file or a few | |
 | #919 | builder | #917 |
 
 ## Not taken up
