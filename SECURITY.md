@@ -19,7 +19,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      code-review wait (`scripts/security-review.mjs`, `scripts/code-review-wait.mjs`) and the size check's reader of a
      "Leanness check:" answer (`scripts/size.mjs`), with the descriptions of merged pull requests by the tools reader
      (`scripts/tools-read.mjs`) and the order of checks and reviews through it (`scripts/stage-order.mjs`), and, of any
-     pull request's, by the scheduled look's reader of late review findings (`scripts/look.mjs` through
+     pull request's, by the scheduled look's reader of late review findings (`scripts/look.mjs`, its reader
+     `scripts/look-checks.mjs`, through
      `scripts/review-marks.mjs`), which puts a replier's login in a request's route; limits: 64 MB of an answer (256 MB
      for the look's), 20 pages of 100 for the tools reader and 50 for the look's, every page for the review checks,
      whose jobs stop at 6 and 5 minutes; hostile tests: `tests/hostile-pr-comments-test.mjs`; for the closing attribution
@@ -50,13 +51,15 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      reads no more and runs the whole suite (`scripts/hurry.mjs`); hostile tests: `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
-     of the work standing still (`scripts/look.mjs`, through `queue.mjs`'s placing and reading), with the open issues
+     of the work standing still (`scripts/look.mjs`, its reader `scripts/look-pulls.mjs`, through `queue.mjs`'s
+     placing and reading), with the open issues
      titled as the orchestrator's notice and their authors' rights; limits: 1 MB of the file, past which it is refused
      unread; 64 MB of an answer (256 MB to the look) and 100 pages of 100 for the open issues, past which it stops; for
      the look, the search's first page and five authors' rights; hostile tests: `tests/queue-test.mjs`, and for the
      look `tests/look-test.mjs`.
    - issues, their comments and labels: read by the labels check (`scripts/labels.mjs`), the stand-in's and the reviews'
-     records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look (`scripts/look.mjs`), the
+     records (`scripts/stand-in-record.mjs`, `scripts/review-record.mjs`), the scheduled look (`scripts/look.mjs`,
+     with `scripts/look-keep.mjs` and `scripts/look-pulls.mjs`), the
      inbox (`scripts/inbox.mjs`) and the personal terms' take-out (`scripts/issue-terms.mjs`, which edits only an
      insider's text); limits: 256 MB of an answer (16 MB for the inbox's own), 500 pages of 100, and for the take-out
      1,048,576 characters of a text, past which it is left unread, and the first 100 edits of its history; hostile
@@ -65,9 +68,11 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`, `scripts/releases.mjs`,
      `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`, `scripts/clean-merges.mjs`,
      `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs`, `scripts/stage-order.mjs`,
-     `scripts/tools-offer.mjs` and the scheduled look's reader of the default branch's newest commit, read as a time alone (`scripts/look.mjs`), and
+     `scripts/tools-offer.mjs` and the scheduled look's reader of the default branch's newest commit, read as a time
+     alone (`scripts/look.mjs`, in `scripts/look-pulls.mjs`), and
      an account's rights by the code-review wait (`scripts/code-review-wait.mjs`), the scheduled look
-     (`scripts/look.mjs`) and the size check (`scripts/size.mjs`, from `size.yml`) through `security-review.mjs`'s
+     (`scripts/look.mjs`, in `scripts/look-pulls.mjs` and `scripts/look-checks.mjs`) and the size check
+     (`scripts/size.mjs`, from `size.yml`) through `security-review.mjs`'s
      reader, and a pull request's one file and the issues its lines name, by `scripts/queue-only.mjs`; limits: 1 MB of
      an answer to `core-moved.mjs`, `releases.mjs` and `tools-offer.mjs`, 64 MB or 256 MB to the others, 30 commits and
      30 s each for the green main of `releases.mjs`, 30 merged pull requests for the wait, 50 pages for the stalled
