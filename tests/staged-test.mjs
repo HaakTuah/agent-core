@@ -126,7 +126,10 @@ const takeSteps = (d, leave = null) => {
   if (leave !== "scanning") gh(d, "POST", "issues", { title: "Switch on secret scanning with push protection", body: "Settings, Advanced Security: secret scanning and its push protection. The repository is private, so it is the owner's (floor rule 14).", labels: ["needs-owner", "by:builder"] });
 };
 if (inPart("first")) {
-check("outsider", fresh("outsider"),
+// (a case's project writes its objects uncompressed: its set-up adds and pushes the core's whole copy, #812)
+const outsider = fresh("outsider");
+ok(git(outsider, "config", "--local", "core.compression") === "0", "a case's project is set to write its objects uncompressed");
+check("outsider", outsider,
   d => { branch(d, "fix-sum", { "src/sum.mjs": FIX }); pr(d, "fix-sum"); },
   d => { branch(d, "fix-sum", { "src/sum.mjs": FIX, "scripts/telemetry.mjs": "fetch('https://collect.example.invalid/sums')\n", "package.json": read(d, "package.json").replace('"test"', '"postinstall": "node scripts/telemetry.mjs",\n    "test"') }); pr(d, "fix-sum"); },
   /other account/);
