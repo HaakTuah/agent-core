@@ -713,7 +713,7 @@ const rootOf = (repo, here) => (repo ? "" : projectAt(here).root) || execFileSyn
 // What is read where none is named: the whole repository, but the core's copy where this script stands in one (the path
 // from the root to it as git itself says it, since a path worked out from two folders' names can differ in spelling,
 // as a short name of Windows' does from the long one git gives; core-path.mjs), and another repository's, at the path its
-// manifest names (core/ where it has none).
+// manifest names (core/ where it has none, or its line cannot be read).
 const specsOf = (repo, here, root) => {
   const copy = repo ? copyOf(root) : projectAt(here).prefix.replace(/scripts\/$/u, "");
   return copy ? [".", `:!${copy}`] : ["."];
