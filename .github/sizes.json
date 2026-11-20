@@ -67,10 +67,6 @@
       "mark": 25832,
       "why": "#884: the text the parser reads (the preprocessor, C# 14's extension headers) apart from the reading of the tree."
     },
-    "scripts/holders.mjs": {
-      "mark": 24459,
-      "why": "#888: the reader of a project's own list apart from the core's own list."
-    },
     "scripts/pr-description.mjs": {
       "mark": 27425,
       "why": "#888: each line's check in a file of its own beside a short reader."
