@@ -155,19 +155,19 @@ try {
 // ---- no test makes its own folder under the temporary one (#965) ----
 // A folder a test makes with mkdtemp there, removed only by its process's exit event, stays where the run was stopped;
 // scratchDir (scripts/scratch-core.mjs) records its owner, so the next test takes it away. A folder made inside one
-// scratchDir makes goes with it, and is no leak. Read from the text of each test and of scripts/hostile.mjs, a line at a time.
+// scratchDir makes goes with it, and is no leak. Read from the text of each test and of the two scripts the tests share that make folders (scripts/hostile.mjs, scripts/licence-scan-stage.mjs), a line at a time.
 {
   const leaks = text => text.split("\n").filter(line => !/^\s*\/\//.test(line) && /\bmkdtemp(?:Sync)?\(.*(?:tmpdir\(|TMPDIR|RUNNER_TEMP)/.test(line));
   const made = ["fs.mkdtemp", "Sync(path.join(os.tmp", "dir(), 'x-'))"].join(""), bare = ["mkdtemp", "Sync(join(tmp", "dir(), 'x-'))"].join(""), inside = ["fs.mkdtemp", "Sync(path.join(tmp, 'x-'))"].join("");
   ok(leaks(`const a = ${made};`).length === 1 && leaks(`  const b = ${bare};`).length === 1 && leaks(`const c = ${inside};\n// ${made}\nconst d = scratchDir("x-");`).length === 0, "a line that makes a folder under the temporary one with mkdtemp is a leak, one inside a scratch folder, a comment and scratchDir are not");
   const root = path.join(path.dirname(SCRIPT), "..");
-  const files = [...fs.readdirSync(path.join(root, "tests")).filter(f => f.endsWith(".mjs")).map(f => `tests/${f}`), "scripts/hostile.mjs"];
+  const files = [...fs.readdirSync(path.join(root, "tests")).filter(f => f.endsWith(".mjs")).map(f => `tests/${f}`), "scripts/hostile.mjs", "scripts/licence-scan-stage.mjs"];
   const found = files.flatMap(f => leaks(fs.readFileSync(path.join(root, f), "utf8")).map(line => `${f}: ${line.trim().slice(0, 100)}`));
   // (one exit listener serves all of a process's scratch folders: a test that makes one for each of its cases would pass Node's limit of ten)
   const listeners = process.listenerCount("exit");
   for (let i = 0; i < 12; i++) scratchDir("listeners-test-");
   ok(process.listenerCount("exit") === listeners, "scratchDir adds no exit listener of its own for each folder");
-  ok(found.length === 0, "no test, and not scripts/hostile.mjs, makes a folder under the temporary one with mkdtemp: they use scratchDir", `${found.slice(0, 5).join("\n")}\nMend: replace the call with scratchDir(prefix) from scripts/scratch-core.mjs, which removes the folder at the process's exit or, if the run was stopped, at the next test's start, and delete the exit handler that removed it.`);
+  ok(found.length === 0, "no test, and not scripts/hostile.mjs nor the staged project of the licence tests, makes a folder under the temporary one with mkdtemp: they use scratchDir", `${found.slice(0, 5).join("\n")}\nMend: replace the call with scratchDir(prefix) from scripts/scratch-core.mjs, which removes the folder at the process's exit or, if the run was stopped, at the next test's start, and delete the exit handler that removed it.`);
 }
 
 console.log(`\n${count - failed} of ${count} passed`);
