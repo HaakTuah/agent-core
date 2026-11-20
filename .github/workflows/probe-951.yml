@@ -24,6 +24,6 @@ jobs:
           PROF_LOG: ${{ runner.temp }}/prof.log
         run: |
           start=$(date +%s)
-          NODE_OPTIONS="--import file:///$(pwd)/probe/prof.mjs" node tests/check-test.mjs > "$RUNNER_TEMP/out.txt" 2>&1 || true
+          NODE_OPTIONS="--import file:///$(cygpath -m "$PWD")/probe/prof.mjs" node tests/check-test.mjs > "$RUNNER_TEMP/out.txt" 2>&1 || true
           echo "check-test took $(( $(date +%s) - start )) s"; tail -2 "$RUNNER_TEMP/out.txt"
           node probe/sum.mjs "$RUNNER_TEMP/prof.log"
