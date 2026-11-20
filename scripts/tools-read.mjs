@@ -4,7 +4,9 @@
 // "Security review:" or "Code review:" closed by an attribution line, each counted once a pull request. Only what the
 // *owner's account* or a bot's account wrote counts (floor rule 4: anyone else's text is data, and names no tool here):
 // a pull request another account opened, and a review or comment of another person's, are passed over; the builders are
-// counted from the owner's account's own pull requests, a bot's counting as built by no tool named. The owner's account: the manifest's
+// counted from the owner's account's own pull requests and from bots', a bot's counting as built by the tool whose login it
+// is on the list beside this file (tool-bots.json; #901), never by its body, and any other bot's as built by no tool
+// named; it gives a bot's pull request no trust. The owner's account: the manifest's
 // row, else the repository's own account where the host says a person holds it (releases.mjs); where neither is read,
 // only bots count. Where the manifest's "Tools" table has no
 // "Builder" row, the tools that built come first, most first, then the core's default, and a tool shown reviewing is at
@@ -23,6 +25,11 @@ import { toolOf } from "./stand-in-record.mjs";
 
 export const NONE = "no tool named";
 const LED = /^\s*(?:Security|Code) review:/u;
+// (each agent tool the core knows, with the logins of its own bot accounts, its documentation's; beside this file)
+const BOTS = JSON.parse(fs.readFileSync(new URL("./tool-bots.json", import.meta.url), "utf8")).bots;
+
+/** The tool whose own bot account `login` is (tool-bots.json's list, any case), or null: a login alone, never a body. */
+export const botTool = login => Object.keys(BOTS).find(t => BOTS[t].some(l => l.toLowerCase() === String(login ?? "").toLowerCase())) ?? null;
 
 // Whether `x` ({ login, type }) is the owner's account (`owner`, any case; null where it was not read) or a bot's.
 const trusted = (x, owner) => x?.type === "Bot" || (typeof owner === "string" && String(x?.login ?? "").toLowerCase() === owner.toLowerCase());
@@ -33,7 +40,7 @@ export const closingToolOf = body => toolOf(String(body ?? "").split("\n").filte
 
 // The counts, from pulls given as [{ login, type, body, reviews: [{ login, type, body }], comments: [...] }], of what
 // the owner's account (`owner`) or a bot wrote: the builders, by the tool the closing line of each description of the
-// owner's account names, a bot's pull request built by no tool named, and the reviewers, by the tool closing each review
+// owner's account names, a bot's pull request by the tool whose bot it is (botTool), else by no tool named, and the reviewers, by the tool closing each review
 // or review comment, a bot's review by its login; each a list [name, count], most first, ties by name; and how many pull
 // requests another account opened, passed over.
 export function tally(pulls, owner = null) {
@@ -42,7 +49,7 @@ export function tally(pulls, owner = null) {
   let others = 0;
   for (const p of pulls) {
     if (!trusted(p, owner)) { others++; continue; }
-    add(builders, (p?.type !== "Bot" && closingToolOf(p?.body)) || NONE);
+    add(builders, (p?.type === "Bot" ? botTool(p?.login) : closingToolOf(p?.body)) || NONE);
     for (const t of reviewedBy(p ?? {}, owner)) add(reviewers, t);
   }
   const order = map => [...map].sort(([a, x], [b, y]) => y - x || a.localeCompare(b));

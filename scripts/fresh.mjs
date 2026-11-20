@@ -22,7 +22,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { KIT as CHOICES, where } from "./choices.mjs";
+import { KIT as CHOICES, where } from "./choices-records.mjs";
 import { FILES, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { corePath, hooksAt, readCore } from "./core-path.mjs";
 import { MODULES } from "./reading.mjs";

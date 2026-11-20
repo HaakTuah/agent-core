@@ -201,8 +201,11 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      and `reading-size.mjs`, the pointer check and the reading-size check,
      the second with marks of its own (the *size marks*), whose total counts the project's own files alone (the core's
      copy is held to the core's own cap), and `workflows.mjs`, which needs no config and fails a workflow that names
-     `pull_request_target` (floor rule 2), gives a key twice in one mapping, which GitHub refuses, or calls one of the
-     core's checks that a draft skips while its trigger leaves out `ready_for_review`.
+     `pull_request_target` (floor rule 2) or calls one of the core's checks that a draft skips while its trigger leaves
+     out `ready_for_review`, and what zizmor and actionlint find in a workflow or an action, a key given twice in one
+     mapping, which GitHub refuses, among it: two maintained tools the job fetches at their pins in its set-up
+     (`workflow-tools.sh`), with the core's policy as their configs (`zizmor.yml`, `actionlint.yml`), a finding the
+     base held noted (#580).
    - **The shape check,** in the same job: `shape.mjs`, with a config of the project's own (the *shape check*: its
      systems, its marks and its suites' time marks) and a baseline of what stood before it, which only shrinks
      (`tasks/code-shape.md`, which says too how the check holds a project before its config is written). From its

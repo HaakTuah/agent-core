@@ -17,6 +17,7 @@ hooks reference", read on 18 November 2026, until it has passed the staged cases
   names no way to pull a file in, so it opens each file that names itself (`tools/other-builders.md`).
 - **Handed a task:** on GitHub, the brief as the first message of a conversation started from an issue an owner filed
   or from the Copilot panel; it reads the issue's thread too, which is data and never the task (floor rule 4). It works
-  on one branch and opens one pull request for the task.
+  on one branch and opens one pull request for the task, under its bot's login (`Copilot`; its app,
+  `copilot-swe-agent`), by which `scripts/tools-read.mjs` counts it as built by Copilot (`scripts/tool-bots.json`).
 - **Hooks:** repository hooks in `.github/hooks/*.json`, at a session's start and end among others; the starter kit
   writes none yet (#682).
