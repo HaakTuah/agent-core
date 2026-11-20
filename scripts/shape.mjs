@@ -441,9 +441,10 @@ function wrappedOnce(ctx) {
 // which the selection does not use (#962), so the marks on functions are not held in what it finds.
 export function survey(texts, config, tests = new Set(), watch = null) {
   const code = Object.keys(texts).filter(isCode).sort();
-  // (one file of JavaScript or TypeScript is lexed whole, whatever its size; one of Python or C# past `LARGEST` is read
-  // not at all, so it is held to no characters of its own)
-  watch?.size(texts, code.filter(file => CODE.includes(path.posix.extname(file))));
+  // (one file of JavaScript or TypeScript is lexed whole, whatever its size, and one of Python is read whole for its
+  // computed imports and the names it holds; one of C# past `LARGEST` is read not at all, so it is held to no characters
+  // of its own)
+  watch?.size(texts, code.filter(file => path.posix.extname(file) !== ".cs"));
   const read = { files: code.length, functions: 0, imports: 0, jsx: 0, nowhere: 0, unnamed: 0, systems: Object.keys(config.systems).length, noEntrance: Object.values(config.systems).filter(s => !s.entrance).length };
   const timed = (file, read) => (watch ? watch.timed(file, read) : read());
   const readOne = file => { const r = reading(file, texts[file], { functions: !watch }); r.marks = marksOf(config, r.comments); delete r.comments; return r; };

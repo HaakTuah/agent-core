@@ -117,10 +117,12 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
   ok(owned && /project's files of code.*past the -1 ms/u.test(owned), "the shape check's survey reads the project's own files under the whole run's budget and fails where it is past", owned);
   const one = lateness(() => survey(texts, config, tests, hurry({ files: new Set(), characters: 40 })));
   ok(one && /src\/lazy\.js, a file of code the pull request leaves as it was, holds 49 characters, past the 40/u.test(one), "the shape check's survey gives the watch its files of code, so one of the project's own past the characters stops it", one);
-  // (one of Python or C# past the largest its parser takes is read not at all, so it is held to no characters of its own)
+  // (one of C# past the largest its parser takes is read not at all, so it is held to no characters of its own; one of
+  // Python is read whole for its computed imports and the names it holds, so it is)
   const most = Math.max(...Object.keys(texts).map(f => texts[f].length)), big = "x = 1\n".repeat(most);
-  ok(lateness(() => survey({ ...texts, "src/data.py": big, "src/Data.cs": big }, config, tests, hurry({ files: new Set(), characters: most }))) === null,
-    "a file of Python or C# the pull request leaves as it was, past the characters, does not stop the reading: only JavaScript and TypeScript, which the lexer reads whole, are held to them");
+  ok(lateness(() => survey({ ...texts, "src/Data.cs": big }, config, tests, hurry({ files: new Set(), characters: most }))) === null
+    && /src\/data\.py, a file of code the pull request leaves as it was/u.test(lateness(() => survey({ ...texts, "src/data.py": big }, config, tests, hurry({ files: new Set(), characters: most }))) ?? ""),
+    "a file of C# the pull request leaves as it was, past the characters, does not stop the reading; one of Python, read whole, does");
   // (the selection reads the changed files first, so that one slow to read is read before the project's own spend the
   // time, and of JavaScript no functions, its parser's work, which it does not use; what it reaches is the same)
   const order = [], spy = { ...hurry({ files: new Set(["src/view.js", "test/view.test.js"]) }) };
