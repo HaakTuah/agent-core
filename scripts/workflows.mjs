@@ -223,7 +223,16 @@ export const readsFolded = text => String(text).length <= LONGEST && yamlOf(asLF
 // draft while the trigger never starts it once the pull request is marked ready: [] where none, or where the text is
 // no YAML (GitHub's own reader then refuses it).
 export function draftHoles(yaml) {
-  if (typeof yaml === "string") yaml = yaml.length > LONGEST ? null : yamlOf(asLF(yaml).text); // (a text past the length read is not given to the parser: #752; its breaks as a YAML 1.1 reader reads them: #876)
+  // (a text past the length read is not given to the parser: #752; one with a break the package does not read is read both
+  // as a YAML 1.1 reader reads it and as it stands, what either shows counting: #876)
+  if (typeof yaml === "string") {
+    if (yaml.length > LONGEST) return [];
+    const folded = asLF(yaml).text;
+    return [...new Set([...holesIn(yamlOf(folded)), ...(folded === yaml ? [] : holesIn(yamlOf(yaml)))])];
+  }
+  return holesIn(yaml);
+}
+function holesIn(yaml) {
   const types = typesOf(yaml?.on);
   if (types === null || types.includes("ready_for_review")) return [];
   const prefix = `${CORE}/`.toLowerCase();

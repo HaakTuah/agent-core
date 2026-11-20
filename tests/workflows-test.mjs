@@ -152,12 +152,13 @@ const readied = ["\u0085", "\u2028", "\u2029"].map(br => ({ yes: draftHoles(skip
 ok(readied.every(({ yes, fresh, same }) => yes.join() === "check" && fresh.fails.length === 1 && mended(fresh.fails[0]) && same.fails.length === 0 && same.notes.length === 1) && draftHoles(`# c\n${call(TYPES, "copies.yml", NOT_DRAFT)}`).join() === "check",
   "a call skipped on a draft without ready_for_review behind such a break is found, a new one failing and the base's own noted", readied.flatMap(r => [...r.fresh.fails, ...r.same.notes]).join("\n"));
 // (the sync's step for such a call names it behind a break too, reading the workflow's text, not the YAML the package gave)
+ok(unreadied(one(`name: "x\u2028y"\n${call(TYPES, "copies.yml", NOT_DRAFT)}`), null).notes.length === 1 && draftHoles(`name: "x\u2028y"\n${call(TYPES, "copies.yml", NOT_DRAFT)}`).join() === "check",
+  "a call a draft skips that the package shows in a file with a break inside a quoted string, which is no YAML once folded, is still found");
 const stepOf = text => readyOnlyHolds({ root: ".", files: [], workflows: { "a.yml": { text, yaml: (() => { try { return parseYaml(text); } catch { return null; } })() } } });
 ok(["\u0085", "\u2028", "\u2029"].every(br => /workflows\/a\.yml`/u.test(stepOf(skipping(br)) ?? "")) && stepOf(`# c\n${call(FULL, "copies.yml", NOT_DRAFT)}`) === null, "the step that names a call a draft skips names one behind such a break too", String(stepOf(skipping("\u2028"))));
 // (and says it could not read a workflow with such a break that is no YAML once the breaks are line feeds, as it says of any other)
 const unread = (() => { try { return stepOf(`${skipping("\u2028")}bad: [\n`); } catch (e) { return e; } })();
-const unreadToo = (() => { try { return stepOf(`${skipping("\u2028")}# c\u2028bad: [\n`); } catch (e) { return e; } })();
-ok(unread instanceof Unread && unreadToo instanceof Unread, "the step that names a call a draft skips says it could not read a workflow with such a break that is no YAML either", String(unread));
+ok(unread instanceof Unread && /workflows\/a\.yml`/u.test(stepOf(`${call(TYPES, "copies.yml", NOT_DRAFT)}# c\u2028bad: [\n`)), "the step that names a call a draft skips says it could not read a workflow with such a break that is no YAML either", String(unread));
 ok(draftHoles(call(TYPES, "copies.yml", NOT_DRAFT)).join() === "check" && draftHoles(call("  pull_request:\n", "personal-terms.yml", NOT_DRAFT)).length === 1
   && draftHoles(call(TYPES, "pr-description.yml")).length === 1 && draftHoles(call(TYPES, "core.yml", "    with:\n      description: true\n")).length === 1,
   "a call skipped on a draft, by its if: or by a check that skips one itself, whose trigger leaves out ready_for_review is found");

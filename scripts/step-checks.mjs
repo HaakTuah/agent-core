@@ -445,12 +445,10 @@ export function nugetPathsHold(p) {
 // passed. Each workflow where a call does so is named, as the workflow check reads it (workflows.mjs, draftHoles).
 export function readyOnlyHolds(p) {
   // (a workflow with a line break the YAML package does not read is read from its text, as a YAML 1.1 reader reads it, never from the
-  // YAML the package gave, which may be none; where that text is no YAML either, it is said unread as any other: #876)
+  // YAML the package gave, which may be none, and as it stands too; where neither reads, it is said unread as any other: #876)
   const mentions = text => /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget|pr-description)\.yml@/i.test(text);
   const odd = text => installed("yaml") && foreignBreaks(text ?? "") !== null;
-  const unread = Object.entries(p.workflows).filter(([, w]) => odd(w.text) && mentions(w.text) && !readsFolded(w.text)).map(([f]) => `.github/workflows/${f}`);
-  if (unread.length) throw new Unread(`the core's reader cannot read ${unread.join(", ")}, in a form it does not know`);
-  readable(p, text => !odd(text) && mentions(text));
+  readable(p, text => !(odd(text) && readsFolded(text)) && mentions(text));
   const wrong = Object.entries(p.workflows).filter(([, w]) => draftHoles(odd(w.text) ? w.text : w.yaml).length);
   return wrong.length ? `A call to the core's checks whose job is skipped on a draft never runs once the pull request is marked ready, since its trigger leaves that out: add \`ready_for_review\` to the \`types:\` under \`pull_request:\` (where it lists none, \`types: [opened, reopened, synchronize, ready_for_review]\`) in ${wrong.map(([f]) => `\`.github/workflows/${shown(f)}\``).join(", ")}.` : null;
 }
