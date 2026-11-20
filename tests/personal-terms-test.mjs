@@ -277,6 +277,7 @@ passes("a term only in the holder's line of LICENSE and NOTICE in the copy where
 passes("  and one at a path of three folders, with the manifest's line ending there", pull([[copied("a/b/core/")]], manifestOnMain("a/b/core/")));
 passes("  and the copy a library carries", pull([[copied("lib/core/")]], [[{ "core-manifest.md": `# Core manifest\n\nCore: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n` }, {}, "the manifest"]]));
 fails("  a copy's pair of files at another path than the manifest names", pull([[copied("vendor/core/")]], manifestOnMain("third_party/core/")));
+passes("  the copy where the manifest of the merge's own base names it, though the event names an older base that held none", pull([[copied("vendor/core/")]], manifestOnMain("vendor/core/")), { stale: true });
 fails("  the project's own core/ files where the manifest names the copy elsewhere", pull([[copied("core/")]], manifestOnMain("vendor/core/")));
 fails("  a path the pull request's own manifest names, the base's naming none", pull([[{ "core-manifest.md": line("vendor/core/"), ...copied("vendor/core/") }]]));
 fails("  a copy's files out of their shape, as at core/", pull([[{ "vendor/core/NOTICE": `A ${term} work\n${held(other)}\n` }]], manifestOnMain("vendor/core/")));

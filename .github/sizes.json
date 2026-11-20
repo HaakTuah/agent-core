@@ -95,6 +95,14 @@
       "mark": 84129,
       "why": "The NuGet check's readers of a project's build files, lock files and sources that all read one config and one tree through the one check(); a task that changes one reads how the others count against it, so a split would make it open each part."
     },
+    "scripts/lookup.mjs": {
+      "mark": 32467,
+      "why": "One check's readers of a new package's registry entry (npm's and NuGet's, the lock files each reads, the pool of answers and their records) that all read the same lists against the same base through packagesOf(); a task that changes one reads how the others count, so a split would make it open each part."
+    },
+    "scripts/nuget-fetch.mjs": {
+      "mark": 27143,
+      "why": "The NuGet fetch before the restore: the sources, the base's lists, each package's content hash and the tools' lock files, read through the one fetchAll(); a task that changes one reads how the others count against the base, so a split would make it open each part."
+    },
     "scripts/workflows.mjs": {
       "mark": 20964,
       "why": "One check's readers (the word, the keys given twice, the calls a draft skips) that all read the same texts against the same base through the one baseOf(); a task that changes one reads how the others count against the base, so a split would make it open each part."

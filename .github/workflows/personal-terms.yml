@@ -207,11 +207,14 @@ jobs:
           free='[^@/:[:cntrl:]]{1,100}'
           held="^Copyright( \\([cC]\\)| ©)? ([0-9]{4}([-,] ?[0-9]{4})*|\\[yyyy\\]|\\[year\\]|<year>|YEAR),? $free\$"
           known=" 3b95290255fb1e607a13999c5f76a81c6877ef3d092c01eb18ef72ee2ddc2dc4 "
-          # (and in the project's copy of the core, where the manifest the base holds names it, as core-path.mjs reads its one
-          # "Core:" line, in either form; never the pull request's own manifest, which could name a folder to leave unread;
-          # core/ where it names none or reads wrong, and the head's own on a push, which is the base's)
-          copy=$(git show "${BASE:-HEAD}:core-manifest.md" 2> /dev/null | tr -d '\r' | grep -E '^Core: ' | awk 'END { if (NR == 1) print }' \
-            | sed -nE 's#^Core: [^ ]+(, carried by ([A-Za-z0-9_][A-Za-z0-9._-]*/)+| at [0-9a-f]{40}, copied whole) under ((([A-Za-z0-9_][A-Za-z0-9._-]*)/)+)( .*)?$#\3#p')
+          # (and in the project's copy of the core, where the manifest the base holds, the merge's first parent, names it: its one
+          # "Core:" line, in either form, by the sed the called workflows use, which core-path-test.mjs holds to readCore on lines
+          # of the core's own address and shape; never the pull request's own manifest, which could name a folder to leave
+          # unread; core/ where it names none or two, and the head's own on a push, which is the base's)
+          ref=${BASE:-HEAD}; if [ -n "$BASE" ] && git rev-parse -q --verify 'HEAD^2' > /dev/null; then ref=HEAD^1; fi
+          copy=$(git show "$ref:core-manifest.md" 2> /dev/null | sed 's/\r$//' | grep -E '^Core: ' | awk 'END { if (NR == 1) print }' \
+            | sed -n -E 's#^Core: [^ ]+( at [0-9a-f]{40}, copied whole|, carried by (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)) under (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)( .*)?$#\4 \2#p' | head -n 1)
+          copy=${copy%% *}
           case "/$copy" in */node_modules/*) copy= ;; esac
           exempt="LICENSE NOTICE ${copy:-core/}LICENSE ${copy:-core/}NOTICE"
           # (a revision and a path: whether that file is of its shape there, read once for each of its contents, which

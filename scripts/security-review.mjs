@@ -42,7 +42,7 @@
 // its files are one Markdown file and nothing that runs by itself. Nothing
 // else on the pull request counts: not its description, not a comment of anyone else, not a review's own text.
 // Where the pull request changes what runs by itself (a file comment-only.mjs reads: under .github/ or .claude/, or an
-// action.yml; the copy under core/ aside, which only a sync changes), it asks floor rule 3's two security reviews:
+// action.yml; the copy of the core aside, under core/ or where the default branch's manifest names it, which only a sync changes), it asks floor rule 3's two security reviews:
 // Codex's and a posted one, or two posted. One is enough, as before, where each such file only moves pins (changed in
 // place, each changed line a `uses:` line whose whole SHA moved and that differs in nothing else but the note after it,
 // a version's word: an action's version, rule 17, or a sync's calls to the core's workflows), or where a posted review

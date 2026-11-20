@@ -11,6 +11,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { NOT_A_FILE, REGISTRY, check as checked, importPath, imported, importsOf, lockPackages, plainText, projectRooted, readProject, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "../scripts/nuget.mjs";
 import { CORE } from "../scripts/core-address.mjs";
+import { fetchAll } from "../scripts/nuget-fetch.mjs";
+import { packagesOf } from "../scripts/lookup.mjs";
 import { mended, unmended } from "../scripts/mend.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
 
@@ -46,6 +48,16 @@ try {
     "a source is no folder of the copy of the core, at core/ or at the path the manifest names, and a folder of the project's own that has the name core/ is one where the copy is elsewhere");
   ok(throws(() => sourcesOf({ nuget: { sources: ["vendor/core/packages/"] } }, vendorRoot)) && sourcesOf({ nuget: { sources: ["core/packages/"] } }, vendorRoot).length === 2 && throws(() => sourcesOf({ nuget: { sources: ["core/packages/"] } }, bareRoot)),
     "where a restore's sources are read, the copy is the one the project's manifest names");
+  // (the NuGet job's fetch and the lookup of a new package read the same config the same way: a source of the project's
+  // own named core/ is no fault where the copy is elsewhere, so neither stops on it)
+  const mixed = { nuget: { ships: ["src/App/packages.lock.json"], tools: [], sources: ["core/feed/"] } };
+  fs.mkdirSync(path.join(vendorRoot, "src/App"), { recursive: true });
+  fs.writeFileSync(path.join(vendorRoot, "src/App/packages.lock.json"), '{ "version": 1, "dependencies": {} }\n');
+  const bareFetch = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-copy-"));
+  try {
+    const got = await fetchAll(mixed, vendorRoot, ["src/App/packages.lock.json"], bareFetch, [], {}).then(() => "read", (e) => e.message);
+    ok(got === "read" && packagesOf(mixed, vendorRoot, null, true).head.length === 1, "the fetch before the restore and the lookup of a new package read a source of the project's own named core/ as the check does, the copy being elsewhere", String(got));
+  } finally { fs.rmSync(bareFetch, { recursive: true, force: true }); }
 } finally { fs.rmSync(vendorRoot, { recursive: true, force: true }); fs.rmSync(bareRoot, { recursive: true, force: true }); }
 ok(["http://pkgs.example.com/", "https://user:word@pkgs.example.com/", "https://pkgs.example.com/v3?key=1", "https://pkgs.example.com/a b", "https://-pkgs.example.com/", "https://169.254.169.254/", "https://localhost/", "https://pkgs..example.com/", "https://pkgs.example.com/a/../b", "../out/", "/abs/", "vendor", "./", "./vendor/", "vendor//x/", "vendor/../x/", ".git/", ".../", "core/", "Core/scripts/", "-x/", "--source/", REGISTRY, REGISTRY.toUpperCase(), 5, "vendor/\n--source\nhttps://pkgs.example.com/"]
   .every(s => throws(() => nugetConfig({ nuget: { sources: [s] } }))) && throws(() => nugetConfig({ nuget: { sources: "vendor/" } })) && throws(() => nugetConfig({ nuget: { sources: ["vendor/", "vendor/"] } })),
