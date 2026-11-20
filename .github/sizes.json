@@ -35,6 +35,14 @@
       "mark": 74465,
       "why": "Past the large file mark, it is read by the section a task needs, found by searching, never whole (roles/shared/how-to-work.md, \"Read little\"), so no split lets a session read less; GitHub shows it whole as the repository's front page, to people."
     },
+    "tests/licence-scan-test.mjs": {
+      "mark": 46175,
+      "why": "#946: its header names the readers the scan calls, so that the mutation tool still runs it on them as before the split; a split of its cases by what each checks is a cleaning task."
+    },
+    "tests/hostile-packages-test.mjs": {
+      "mark": 24130,
+      "why": "#946: its header names licence-pages.mjs, so that the mutation tool still runs it on the page reader as before the split; a split of its cases by the input each reads is a cleaning task."
+    },
     "tests/releases-test.mjs": {
       "mark": 32769,
       "why": "#958: the tests of cutting a release (release.mjs) apart from those of what a project follows (releases.mjs)."
