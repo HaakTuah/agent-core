@@ -77,12 +77,12 @@ import { RUNS } from "./comment-only.mjs";
 import { started } from "./started.mjs";
 
 export const CODEX = "chatgpt-codex-connector[bot]";
-const DEPENDABOT = "dependabot[bot]";
+export const DEPENDABOT = "dependabot[bot]";
 // the first two lines of the summary Codex's app keeps: the second is its state, as JSON (GitHub's API gives its braces
 // as they are; one written as &#123; or &#125;, as a delivery may show it, is read as one too)
 const SUMMARY = /^<!-- codex-pull-request-review-summary -->\r?\n<!-- codex-review-state:v1 ([^\r\n]{1,4000}) -->\r?\n/u;
 export const WRITERS = ["OWNER", "MEMBER", "COLLABORATOR"]; // GitHub's own word for who wrote a comment, not the comment's
-const POSTED = /^(?:\*\*)?Security review:/u;
+export const POSTED = /^(?:\*\*)?Security review:/u;
 export const FINDING = /^<!-- codex-security-review-finding:v1 -->/u; // how a finding of Codex's security review opens
 const SHA = /^[0-9a-f]{40}$/u;
 // who posts the review a waiting status asks for, and when, the actor first, since a commit status shows only a short
@@ -112,7 +112,7 @@ function mendsFor(read) {
 export const RUNNING = ["running", "queued", "pending", "in_progress"];
 export const CONTEXT = "security-review";
 
-const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry) => entry !== null && typeof entry === "object");
+export const flat = (pages) => (Array.isArray(pages) ? pages.flat() : []).filter((entry) => entry !== null && typeof entry === "object");
 export const codexs = (comment) => comment.user?.login === CODEX && comment.user.type === "Bot" && typeof comment.body === "string";
 const newest = (times) => times.reduce((latest, at) => (at > latest ? at : latest), -Infinity); // -Infinity: none
 
@@ -121,7 +121,7 @@ const newest = (times) => times.reduce((latest, at) => (at > latest ? at : lates
 // summary of Codex's is there but its state cannot be read, a form nobody documents having changed (core archive 201).
 // The app keeps one summary and edits it, so the first comment of its that opens as one is read, never a later
 // look-alike. scripts/code-review-wait.mjs reads its code review from it too.
-const OPENS = /^<!-- codex-pull-request-review-summary -->/u;
+export const OPENS = /^<!-- codex-pull-request-review-summary -->/u;
 export function codexState(comments) {
   for (const comment of flat(comments)) {
     if (!codexs(comment) || !OPENS.test(comment.body)) continue;
@@ -182,7 +182,7 @@ export function boundOf(held, pull, since) {
   return !(Number.isFinite(opened) && Number.isFinite(came) && opened < came);
 }
 // the posted reviews that count (all), and whether one that would count was edited since it was posted (edited)
-function postedBy(pull, list, bound, reviewers, rights) {
+export function postedBy(pull, list, bound, reviewers, rights) {
   const whose = counted(pull, reviewers, writersOf(rights));
   const writers = list.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association));
   // (a review counts only from an account counted, on every pull request; of one whose head does not hold this check
