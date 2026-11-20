@@ -11,11 +11,19 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readAt } from "./rule-files.mjs";
 
 export const TIMEOUT = 120000; // (ms lychee may take on the rule files: the core's take well under one second)
 
 // Whether lychee reads a file: one that is UTF-8 (it reads nothing of any other, and says so nowhere).
 export const readable = buffer => { try { new TextDecoder("utf-8", { fatal: true }).decode(buffer); return true; } catch { return false; } };
+// A file lychee reads as Markdown, by its name: any other it reads as HTML or plain text, where a link [text](path) is
+// none; and a name that holds no control character or a mark lychee could read as a pattern (* ? [ ] { }), so that each
+// input is one file (#582's review). Every other rule file is left to the core's own reading.
+export const MARKDOWN = /\.(md|markdown|mdx|mkd|mkdn|mdown|mdwn|mkdown)$/iu;
+export const lycheeReads = f => MARKDOWN.test(f) && !/[\u0000-\u001f\u007f*?[\]{}]/u.test(f);
+// The part after "#", as a heading's anchor is written, or as it stands where it is no escape a browser decodes.
+const decoded = hash => { try { return decodeURIComponent(hash); } catch { return hash; } };
 
 // A link lychee wrote (a file:// address), as the path from `root` it leads to, with "/" between its parts, or null where
 // it leads out of `root`; any other address (the web, mail) is undefined, and not the core's to read offline.
@@ -66,7 +74,7 @@ export function reported(checked, { root, text }) {
 // One error of lychee's on a heading, as a finding of the file `from`.
 function heading(e, from, root, text) {
   const url = String(e?.url ?? ""), to = target(url, root), hash = /#(.*)$/su.exec(url)?.[1] ?? "";
-  return { file: from, line: Number(e?.span?.line) || lineIn(text(from), hash), kind: "heading", to: `${to ?? url}#${decodeURIComponent(hash)}`, said: HEADING };
+  return { file: from, line: Number(e?.span?.line) || lineIn(text(from), hash), kind: "heading", to: `${to ?? url}#${decoded(hash)}`, said: HEADING };
 }
 
 // lychee on the rule files `files` of `root`, as { found, count } or, where it could not run or read them, { unread: why }.
@@ -84,38 +92,57 @@ export function run({ program, root, files, ...at }) {
       const got = listed(f, r.stdout, { root, ...at });
       found.push(...got.found); count += got.count;
     }
-    const list = path.join(away, "inputs.txt");
-    fs.writeFileSync(list, files.map(f => path.join(root, f)).join("\n") + "\n");
-    const r = go(["--include-fragments", "--format", "json", "--files-from", list]);
+    const r = go(["--include-fragments", "--format", "json", "--", ...files.map(f => path.join(root, f))]);
     if (r.status !== 0 && r.status !== 2) return { unread: why(r) };
     const headings = reported(r.stdout, { root, ...at });
     return headings ? { found: [...found, ...headings], count } : { unread: "its report was no JSON it writes" };
   } finally { fs.rmSync(away, { recursive: true, force: true }); }
 }
 
-// The base's tree (`sha`) in a folder of this run's own, and what git tracks there, for run() to read it as the head.
-export function baseTree(sha, under) {
-  const dir = fs.mkdtempSync(path.join(under, "links-base-")), git = (args, opts = {}) => spawnSync("git", args, { encoding: null, maxBuffer: 1 << 30, ...opts });
-  const tar = git(["archive", "--format=tar", sha]);
-  if (tar.status !== 0 || spawnSync("tar", ["-x", "-f", "-", "-C", dir], { input: tar.stdout, maxBuffer: 1 << 30 }).status !== 0) { fs.rmSync(dir, { recursive: true, force: true }); return null; }
-  const tracked = new Set(String(git(["ls-tree", "-r", "-z", "--name-only", sha]).stdout ?? "").split("\0").filter(Boolean));
-  return { dir: fs.realpathSync(dir), tracked, folders: new Set([...tracked].flatMap(f => f.split("/").slice(0, -1).map((_, i, p) => `${p.slice(0, i + 1).join("/")}/`))) };
+// The base's files (`sha`) that run() reads in a folder of this run's own, written from git's own blobs, so that no
+// attribute of the base's (export-ignore, export-subst) changes them and no link is followed out: each regular Markdown
+// file, which a link's heading may be looked for in, and each rule file of `rules`, through a link inside the project
+// as readAt() follows it; with what git tracks there. Null where git could not give them.
+export function baseTree(sha, under, rules) {
+  const git = (args, input) => spawnSync("git", args, { input, maxBuffer: 1 << 30 });
+  const ls = git(["ls-tree", "-r", "-z", sha]);
+  if (ls.status !== 0) return null;
+  const entries = String(ls.stdout).split("\0").map(e => /^(\d+) \S+ (\S+)\t([\s\S]+)$/u.exec(e)).filter(Boolean);
+  const tracked = new Set(entries.map(m => m[3])), want = entries.filter(m => /^100/u.test(m[1]) && (MARKDOWN.test(m[3]) || rules.includes(m[3])));
+  const blobs = git(["cat-file", "--batch"], want.map(m => m[2]).join("\n") + "\n");
+  if (blobs.status !== 0) return null;
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(under, "links-base-"))), put = (f, data) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), data); };
+  let at = 0;
+  for (const m of want) {
+    const head = /^\S+ blob (\d+)\n/u.exec(blobs.stdout.subarray(at, at + 200).toString("latin1"));
+    if (!head) { fs.rmSync(dir, { recursive: true, force: true }); return null; }
+    const from = at + head[0].length, size = Number(head[1]);
+    put(m[3], blobs.stdout.subarray(from, from + size));
+    at = from + size + 1;
+  }
+  const read = readAt(sha);
+  for (const f of rules.filter(r => tracked.has(r) && !fs.existsSync(path.join(dir, r)))) { const t = read(f); if (t !== null) put(f, t); }
+  return { dir, tracked, folders: new Set([...tracked].flatMap(f => f.split("/").slice(0, -1).map((_, i, p) => `${p.slice(0, i + 1).join("/")}/`))) };
 }
 
 // lychee on the rule files `rules` of the project in the working folder, as pointers.mjs runs it: { unread } where it
-// could not run, else { read, count, fails, notes }, `read` the files it read (the rest, no UTF-8, are left to the core's
-// own reading). In the core's run (`base` ""), each finding fails; in a project's, those the base (a commit's SHA) held
-// are noted, read the same way from its tree in a folder of this run's own; with no base (null), each is noted.
+// could not run, else { read, count, fails, notes }, `read` the files it read (the rest, no Markdown or no UTF-8, are
+// left to the core's own reading). In the core's run (`base` ""), each finding fails; in a project's, those the base (a
+// commit's SHA) held are noted, read the same way from its files in a folder of this run's own; with no base (null),
+// or one whose links could not be read, each is noted.
 export function checkRules({ program, rules, tracked, folders, text, base }) {
-  const read = rules.filter(f => readable(fs.readFileSync(f)));
+  const read = rules.filter(f => lycheeReads(f) && readable(fs.readFileSync(f)));
   const head = run({ program, root: fs.realpathSync("."), files: read, tracked, folders, text });
   if (head.unread || !head.found.length || !base) return { read, ...head, ...(head.unread ? {} : compared(head.found, base === "" ? [] : null)) };
-  const was = baseTree(base, process.env.RUNNER_TEMP || os.tmpdir());
+  const was = baseTree(base, process.env.RUNNER_TEMP || os.tmpdir(), read);
   try {
-    const there = was ? rules.filter(f => was.tracked.has(f) && readable(fs.readFileSync(path.join(was.dir, f)))) : [];
+    const file = f => fs.lstatSync(path.join(was.dir, f), { throwIfNoEntry: false });
+    const there = was ? read.filter(f => file(f)?.isFile() && readable(fs.readFileSync(path.join(was.dir, f)))) : [];
     const r = was && run({ program, root: was.dir, files: there, tracked: was.tracked, folders: was.folders, text: f => fs.readFileSync(path.join(was.dir, f), "utf8") });
-    if (!r || r.unread) return { read, count: head.count, notes: [], fails: [`the rule files' links at the pull request's base could not be read by lychee${r?.unread ? ` (${r.unread})` : ""}. Mend: run this job again; if it fails again, file it as a fault`] };
-    return { read, count: head.count, ...compared(head.found, r.found) };
+    if (r && !r.unread) return { read, count: head.count, ...compared(head.found, r.found) };
+    // (a base whose links could not be read decides nothing: each finding is noted, so that nothing locks a project)
+    const { notes } = compared(head.found, null);
+    return { read, count: head.count, fails: [], notes: [`the rule files' links at the pull request's base could not be read${r?.unread ? ` by lychee (${r.unread})` : ""}, so each broken link below is only noted. Mend: run this job again; if it says so again, file it as a fault`, ...notes] };
   } finally { if (was) fs.rmSync(was.dir, { recursive: true, force: true }); }
 }
 

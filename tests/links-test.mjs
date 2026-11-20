@@ -8,7 +8,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { compared, listed, readable, reported, target } from "../scripts/links.mjs";
+import { compared, listed, lycheeReads, readable, reported, run, target } from "../scripts/links.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -33,6 +33,10 @@ const report = JSON.stringify({ error_map: { [path.join(root, "a.md")]: [{ url: 
 const heads = reported(report, at);
 ok(heads?.length === 1 && heads[0].kind === "heading" && heads[0].file === "a.md" && heads[0].to === "b.md#gone" && heads[0].line === 3,
   "a heading not there is lychee's finding, at its line; a file it did not find is left to the core's reading of its list", JSON.stringify(heads));
+const bad = reported(JSON.stringify({ error_map: { [path.join(root, "a.md")]: [{ url: `${url("b.md")}#%E0%A4%A`, status: { text: "Cannot find fragment" } }] } }), at);
+ok(bad?.length === 1 && bad[0].to === "b.md#%E0%A4%A", "a heading written with an escape no browser decodes is a finding as it stands, never a crash (#582's review)", JSON.stringify(bad));
+ok(lycheeReads("AGENTS.md") && lycheeReads("docs/a b.mdx") && !lycheeReads(".kiro/agents/a.json") && !lycheeReads("docs/x.txt") && !lycheeReads(".kiro/steering/b\n/etc/hostname.md") && !lycheeReads("docs/[a].md") && !lycheeReads("docs/*.md"),
+  "lychee is given a Markdown file whose name holds no control character or pattern; any other is left to the core's own reading");
 ok(reported("{", at) === null && reported("null", at) === null, "a report that is no JSON lychee writes is no answer");
 
 // Against the base
@@ -55,7 +59,7 @@ const links = file => [...fs.readFileSync(file, "utf8").matchAll(/\\]\\(([^)\\s]
   .map(l => { const [p, h] = l.split("#"); const at = p === "" ? file : p.startsWith("/") ? path.join(root, p) : path.resolve(path.dirname(file), p); return { href: pathToFileURL(at).href + (h ? "#" + h : ""), at, h }; });
 if (a.includes("--dump")) { for (const l of links(a.at(-1))) console.log(l.href); process.exit(0); }
 const errors = {};
-for (const file of fs.readFileSync(a[a.indexOf("--files-from") + 1], "utf8").split("\\n").filter(Boolean))
+for (const file of a.slice(a.indexOf("--") + 1))
   for (const l of links(file)) if (l.h && fs.existsSync(l.at) && !fs.readFileSync(l.at, "utf8").split("\\n").some(x => /^#+ /.test(x) && x.replace(/^#+ /, "").toLowerCase().replace(/ /g, "-") === l.h)) (errors[file] ??= []).push({ url: l.href, status: { text: "Cannot find fragment" } });
 console.log(JSON.stringify({ error_map: errors })); process.exit(Object.keys(errors).length ? 2 : 0);
 `;
@@ -67,13 +71,13 @@ const carry = core => {
 const AGENTS = "# A project\n\n## Where things are\n\nIts rules: `SECURITY.md`, and [the developing notes](docs/developing.md#running-it).\n";
 const FILES = { "AGENTS.md": AGENTS, "SECURITY.md": "# Security\n\n**3. The protected files,** here, **the rule files:** `docs/developing.md`;\n", "docs/developing.md": "# Developing\n\n## Running it\n\nText.\n" };
 if (process.platform !== "win32") {
-  const dir = scratchDir("links-test-"), tools = scratchDir("links-fake-");
+  const dir = scratchDir("links-test-"), tools = scratchDir("links-fake-"), STANDIN = path.join(tools, "lychee");
+  fs.writeFileSync(path.join(tools, "fake.mjs"), FAKE);
+  fs.writeFileSync(STANDIN, `#!/bin/sh\nexec "${process.execPath}" "${path.join(tools, "fake.mjs")}" "$@"\n`, { mode: 0o755 });
   const g = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], { cwd: dir, stdio: "ignore" });
   const put = (f, t) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), t); };
   try {
-    fs.writeFileSync(path.join(tools, "fake.mjs"), FAKE);
-    const LYCHEE = path.join(tools, "lychee");
-    fs.writeFileSync(LYCHEE, `#!/bin/sh\nexec "${process.execPath}" "${path.join(tools, "fake.mjs")}" "$@"\n`, { mode: 0o755 });
+    const LYCHEE = STANDIN;
     const check = env => { const r = spawnSync(process.execPath, [path.join(dir, "core/scripts/pointers.mjs")], { cwd: dir, encoding: "utf8", env: { ...process.env, LYCHEE: "", POINTERS_BASE: "", ...env } }); return { code: r.status, out: r.stdout + r.stderr }; };
     for (const [f, t] of Object.entries(FILES)) put(f, t);
     carry(path.join(dir, "core"));
@@ -100,10 +104,38 @@ if (process.platform !== "win32") {
     r = check({ LYCHEE, POINTERS_BASE: "HEAD" });
     ok(r.code === 1 && /the link to notes\.md leads to no tracked file or folder/.test(r.out) && /the link to \.\.\/away\.md leads out of the project/.test(r.out) && mended(r.out),
       "a link to a file on the disk that git does not track fails, and one out of the project", r.out);
+    // (a rule file that is no Markdown is read the core's way, with lychee fetched: lychee reads no [text](path) in it)
+    put("SECURITY.md", FILES["SECURITY.md"].replace("`docs/developing.md`;", "`docs/developing.md`, `docs/agent.json`;"));
+    put("docs/agent.json", "{ \"prompt\": \"See [the gone notes](gone.md).\" }\n");
+    g("add", "-A");
+    r = check({ LYCHEE, POINTERS_BASE: "HEAD" });
+    ok(r.code === 1 && /docs\/agent\.json:1: the link to gone\.md leads to no tracked file or folder/.test(r.out), "a rule file that is no Markdown keeps the core's own reading of its links, with lychee fetched", r.out);
     fs.rmSync(path.join(path.dirname(dir), "away.md"));
     r = check({ FAKE_LYCHEE_FAIL: "1", LYCHEE, POINTERS_BASE: "HEAD" });
     ok(r.code === 1 && /::warning::The pointer check could not run lychee on the rule files \(it ended with status 1: it broke\)/.test(r.out) && /the link to \.\.\/away\.md leads to no tracked file or folder/.test(r.out),
       "where lychee could not run, the check says why, and the core's own reading stands in", r.out);
-  } finally { for (const d of [dir, tools]) fs.rmSync(d, { recursive: true, force: true }); }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  // (a base whose rule file git archive would leave out, by export-ignore, or that is a link: it is read from git's own
+  // blobs, so a broken link the base held is noted, never a crash; #582's review)
+  const two = scratchDir("links-test-attrs-"), g2 = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], { cwd: two, stdio: "ignore" });
+  try {
+    for (const [f, t] of Object.entries({ ...FILES, "AGENTS.md": AGENTS.replace("#running-it", "#gone"), ".gitattributes": "AGENTS.md export-ignore\nSECURITY.md export-subst\n" })) { fs.mkdirSync(path.dirname(path.join(two, f)), { recursive: true }); fs.writeFileSync(path.join(two, f), t); }
+    carry(path.join(two, "core"));
+    g2("init", "-q"); g2("add", "-A"); g2("commit", "-q", "-m", "base");
+    fs.appendFileSync(path.join(two, "SECURITY.md"), "\nMore.\n"); g2("add", "-A");
+    const r = spawnSync(process.execPath, [path.join(two, "core/scripts/pointers.mjs")], { cwd: two, encoding: "utf8", env: { ...process.env, LYCHEE: STANDIN, POINTERS_BASE: "HEAD" } });
+    ok(r.status === 0 && /note .*AGENTS\.md:5: the link to docs\/developing\.md#gone .*as on the base, so it fails nothing/.test(r.stdout + r.stderr), "a rule file the base's attributes leave out of an archive is read from git's own blobs: what the base held is noted", r.stdout + r.stderr);
+  } finally { for (const d of [two, tools]) fs.rmSync(d, { recursive: true, force: true }); }
+}
+// (lychee itself, where the job's set-up fetched it, never in a session: its command line and its report as the glue reads them)
+if (process.env.LYCHEE) {
+  const real = fs.realpathSync(scratchDir("links-test-real-"));
+  try {
+    fs.writeFileSync(path.join(real, "a.md"), "# A\n\nSee [b](b.md#gone), [c](c.md) and [h](b.md#here).\n");
+    fs.writeFileSync(path.join(real, "b.md"), "# B\n\n## Here\n");
+    const got = run({ program: process.env.LYCHEE, root: real, files: ["a.md"], tracked: new Set(["a.md", "b.md"]), folders: new Set(), text: f => fs.readFileSync(path.join(real, f), "utf8") });
+    ok(!got.unread && got.count === 3 && got.found.length === 2 && got.found.some(f => f.kind === "heading" && f.to === "b.md#gone" && f.line === 3) && got.found.some(f => f.kind === "file" && f.to === "c.md"),
+      "lychee itself reads a heading not there and a file not there, as the glue reads its list and its report", JSON.stringify(got));
+  } finally { fs.rmSync(real, { recursive: true, force: true }); }
 }
 if (failed) { console.log(`FAIL ${failed} of the link checker's cases`); process.exit(1); }
