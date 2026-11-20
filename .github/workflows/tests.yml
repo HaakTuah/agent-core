@@ -387,6 +387,9 @@ jobs:
       - name: The proof that a change to the floor or the review guidelines only follows files the pull request moves
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/path-only-test.mjs ')) }}
         run: node tests/path-only-test.mjs
+      - name: The design check's word that a change to the floor or the review guidelines keeps its meaning
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/meaning-kept-test.mjs ')) }}
+        run: node tests/meaning-kept-test.mjs
       - name: Whether a script was started by itself
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/started-test.mjs ')) }}
         run: node tests/started-test.mjs

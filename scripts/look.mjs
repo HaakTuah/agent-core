@@ -52,7 +52,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { look as choicesDue, signs } from "./choices.mjs";
 import { report as citedReport } from "./cited.mjs";
-import { mergedFiles, withoutYes } from "./meaning-kept.mjs";
 import { report as outcomesReport } from "./outcomes-read.mjs";
 import { CORE } from "./core-address.mjs";
 import { auditIsDue, cleaningDue } from "./dose.mjs";
@@ -439,7 +438,7 @@ function monthlyOf({ repo, owner, manifest, at, scripts }, reach, kept, stepsLef
     const overdue = [...kept.entries()].filter(([t, i]) => i.state === "open" && t !== RECORD && !t.startsWith(`${REPORT}, `) && hoursBetween(i.created_at, at) > 7 * 24)
       .map(([t, i]) => ({ number: i.number, title: t, since: reopenedSince(repo, i) })).filter(o => hoursBetween(o.since, at) > 7 * 24);
     const counts = manifest === null ? null : readCounts({ repo, manifest, month, steps: stepsLeft }), last = previous?.body ?? null;
-    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: last, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), outcomes: outcomesReport({ repo, month: monthBefore(month), manifest, previous: last, blind: blindLine(shareNow(repo, kept.get(BLIND), owner)) }), ...(manifest === null ? { withoutYes: withoutYes(mergedFiles({ repo, from: `${monthBefore(month)}-01T00:00:00Z`, to: `${month}-01T00:00:00Z` })) } : { holders: ownHeld(scripts) }), scripts });
+    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: last, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), outcomes: outcomesReport({ repo, month: monthBefore(month), manifest, previous: last, blind: blindLine(shareNow(repo, kept.get(BLIND), owner)) }), ...(manifest === null ? {} : { holders: ownHeld(scripts) }), scripts });
   }
   return { reportTitle, reportFile, monthly };
 }

@@ -10,13 +10,19 @@
 //     it imports, its workflow and what that sets up), so the code that reads the statement is `main`'s. What it does
 //     not read: whether the meaning is kept, and who wrote the comment, since builder and reviewer post under one login
 //     (tasks/reviews.md, point 3): the reviewer's word and the state report's list hold those.
-//   - withoutYes: for the core's monthly state report (look.mjs, beside this file), the pull requests merged in a month
-//     that changed a file that asks the yes and quote nothing under "The owner's word", so the owner can look them over.
+//   - withoutYes: for the core's monthly state report (state-report.mjs, beside this file), the pull requests merged in a
+//     month that changed a file that asks the yes and quote nothing under "The owner's word", so the owner can look them
+//     over; the session that takes the report runs it, in a clone of the core with its whole history:
+//
+//       node scripts/meaning-kept.mjs --month <YYYY-MM> [--repo <owner>/<name>]
+//
 // It never guesses: what it cannot read states nothing, and the yes is asked. gh, git and Node's own modules.
 import { spawnSync } from "node:child_process";
-import { mergedIn } from "./cited.mjs";
+import { after, mergedIn } from "./cited.mjs";
+import { CORE } from "./core-address.mjs";
 import { asks, countedOf, quoted } from "./owner-yes.mjs";
 import { read } from "./path-only.mjs";
+import { started } from "./started.mjs";
 
 export const LINE = "Meaning unchanged:";
 const DESIGN = /^Design check:[ \t]*([0-9a-f]{40})(?![0-9a-f])/u;
@@ -41,14 +47,16 @@ const ghJson = route => { const r = spawnSync("gh", ["api", route], { encoding: 
 const git = (cwd, args) => { const r = spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 26 }); return r.status === 0 ? r.stdout : null; };
 
 // The paths of `asked` the design check of pull request `number` of `repo` states keep their meaning, in `cwd` with the
-// merge commit checked out (HEAD^1 the base, HEAD^2 the head): [] where anything cannot be read.
-export function statedOf({ cwd, repo, number, asked, gh = ghJson }) {
+// merge commit checked out (HEAD^1 the base, HEAD^2 the head): [] where anything cannot be read. `gh`, `run` (git's
+// output for its arguments, null where it fails) and `change` (path-only.mjs's read) stand in for the host and git in
+// the tests.
+export function statedOf({ cwd, repo, number, asked, gh = ghJson, run = args => git(cwd, args), change = () => read(cwd, "HEAD^1", "HEAD") }) {
   if (!asked.length || !/^\d{1,7}$/u.test(String(number)) || !/^[\w.-]+\/[\w.-]+$/u.test(repo)) return [];
-  const change = read(cwd, "HEAD^1", "HEAD");
-  if (change === null || change.self) return [];
+  const got = change();
+  if (got === null || got.self) return [];
   const { notes } = countedOf(repo, [Number(number)], gh);
   const blob = (sha, p) => {
-    if (sha === null) return git(cwd, ["rev-parse", "--verify", "--quiet", `HEAD^2:${p}`])?.trim() || null;
+    if (sha === null) return run(["rev-parse", "--verify", "--quiet", `HEAD^2:${p}`])?.trim() || null;
     const got = gh(`repos/${repo}/contents/${p.split("/").map(encodeURIComponent).join("/")}?ref=${sha}`);
     return typeof got?.sha === "string" && got.type === "file" ? got.sha : null;
   };
@@ -66,18 +74,33 @@ export function withoutYes(pulls) {
   const unread = pulls.filter(p => p.files === null).length;
   return [
     ...(found.length ? found.map(p => `- #${p.number} ${p.title}: ${p.files.filter(asks).join(", ")}.`) : ["- None."]),
-    ...(unread ? [`- Not read: the files of ${unread} merged pull request${unread === 1 ? "" : "s"}, which git here could not give.`] : []),
+    ...(unread ? [`- Not read: the files of ${unread} merged pull request${unread === 1 ? "" : "s"}, which git here could not give (a shallow clone: git fetch --unshallow origin main, then run it again).`] : []),
   ];
 }
 
 // The pull requests of `repo` merged in `month` ("YYYY-MM") with the files each merge changed against its base, read
-// from git in `cwd` (the look's checkout holds the whole history), null where they could not be listed.
-export function mergedFiles({ repo, from, to, cwd = process.cwd(), list = mergedIn }) {
+// from git in `cwd` (`run` git's output for its arguments, null where it fails), null where they could not be listed.
+export function mergedFiles({ repo, from, to, cwd = process.cwd(), list = mergedIn, run = args => git(cwd, args) }) {
   try {
     return list(repo, from, to).map(p => {
       const sha = /^[0-9a-f]{40}$/u.test(String(p.merge_commit_sha)) ? p.merge_commit_sha : null;
-      const out = sha === null ? null : git(cwd, ["diff", "--name-only", "--no-renames", "-z", `${sha}^1`, sha]);
+      const out = sha === null ? null : run(["diff", "--name-only", "--no-renames", "-z", `${sha}^1`, sha]);
       return { number: p.number, title: p.title, body: p.body ?? "", files: out === null ? null : out.split("\0").filter(Boolean) };
     });
   } catch { return null; }
 }
+
+// The command's run: its exit code, what it printed through `say`.
+export function main(args, say = console.log) {
+  const at = name => { const i = args.indexOf(name); return i === -1 ? null : args[i + 1] ?? null; };
+  const month = at("--month"), repo = at("--repo") ?? CORE;
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/u.test(month ?? "") || !/^[\w.-]+\/[\w.-]+$/u.test(repo)) {
+    say("FAIL: the month or the repository is not given in its form. Mend: run node scripts/meaning-kept.mjs --month <YYYY-MM> [--repo <owner>/<name>]");
+    return 1;
+  }
+  const lines = withoutYes(mergedFiles({ repo, from: `${month}-01T00:00:00Z`, to: `${after(month)}-01T00:00:00Z` }));
+  say((lines ?? [`- Not read: the pull requests merged in ${month} could not be listed (gh).`]).join("\n"));
+  return 0;
+}
+
+if (started(import.meta.url)) process.exitCode = main(process.argv.slice(2));
