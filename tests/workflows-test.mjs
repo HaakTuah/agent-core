@@ -111,7 +111,7 @@ ok(behind.every(({ keys, same, grown, none, found }) => keys.fails.length === 1 
   && same.fails.length === 0 && same.notes.length === 1 && grown.fails.length === 0 && none.fails.length === 0 && none.notes.length === 1 && found.length === 1 && found[0].line === 3 && found[0].first === 2)
   && keysTwice("a: 1\r\n# c\u2028x: 1\rx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && keysTwice(hiding("\u2028")).map(k => `${k.line}<${k.first}`).join() === "1<1"
   && keysTwice("a: 1\r\u2028x: 1\nx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && foreignBreaks("a\rb\r\u2028c\n")?.line === 3
-  && keysTwice("a: 1\nb: 2\n").length === 0 && (() => { const t = Date.now(); const many = keysTwice(`${Array.from({ length: 10000 }, (_, i) => `k${i}: 1\nk${i}: 2\n`).join("")}# c\u2028\n`).length; return many === 10000 && Date.now() - t < 10000; })() && repeated(one('a: 1\nb: "x\\u2028y"\nb: 2\n'), () => 'a: 1\nb: "x\u2028y"\nb: 2\n').fails.length === 0 && keysTwice(`a: ${"\u2028".repeat(LONGEST)}\n`).map(k => `${k.line}:${k.size}`).join() === "1:true",
+  && keysTwice("a: 1\nb: 2\n").length === 0 && repeated(one('a: 1\nb: "x\\u2028y"\nb: 2\n'), () => 'a: 1\nb: "x\u2028y"\nb: 2\n').fails.length === 0 && keysTwice(`a: ${"\u2028".repeat(LONGEST)}\n`).map(k => `${k.line}:${k.size}`).join() === "1:true",
   "a key given twice behind a line break the package does not read is found, a new one failing, the base's own noted, and told on the line an editor counts", behind.flatMap(r => [...r.keys.fails, ...r.same.notes]).join("\n"));
 // (Codex's case: a call of a check skipped on a draft whose ready_for_review a same-length edit moves into a comment, in a
 // file past the length read, its words counted as often as before, fails)
@@ -151,6 +151,16 @@ const skipping = br => `# c${br}${call(TYPES, "copies.yml", NOT_DRAFT)}`;
 const readied = ["\u0085", "\u2028", "\u2029"].map(br => ({ yes: draftHoles(skipping(br)), fresh: unreadied(one(skipping(br)), () => null), same: unreadied(one(skipping(br)), () => skipping(br)) }));
 ok(readied.every(({ yes, fresh, same }) => yes.join() === "check" && fresh.fails.length === 1 && mended(fresh.fails[0]) && same.fails.length === 0 && same.notes.length === 1) && draftHoles(`# c\n${call(TYPES, "copies.yml", NOT_DRAFT)}`).join() === "check",
   "a call skipped on a draft without ready_for_review behind such a break is found, a new one failing and the base's own noted", readied.flatMap(r => [...r.fresh.fails, ...r.same.notes]).join("\n"));
+// (a base with a break inside a quoted string, no YAML to the package once folded, holds what stands behind a later break
+// in a comment unseen: a head that mends the breaks as step 770 asks shows it, and it is noted, not failed, #876)
+const quoted = `name: "x\u2028y"\n# c\u2028on:\n  pull_request:\n    types: [opened, synchronize]\njobs:\n  check:\n    if: \${{ !github.event.pull_request.draft }}\n    uses: ${CORE}/.github/workflows/copies.yml@${"a".repeat(40)}\n`;
+const mendedHead = quoted.replace("x\u2028y", "x\\u2028y").replace("# c\u2028on:", "# c\non:");
+const dupBase = 'jobs:\n  b:\n    name: "x\u2028y"\n    # c\u2028    a: 1\n    a: 2\n', dupHead = dupBase.replace("x\u2028y", "x\\u2028y").replace("# c\u2028", "# c\n");
+const unknownDup = repeated(one(dupHead), () => dupBase), unknownCall = unreadied(one(mendedHead), () => quoted), knownNew = unreadied(one(mendedHead), () => "on: push\n");
+ok(unknownDup.fails.length === 0 && unknownDup.notes.length === 1 && /the base being no YAML/u.test(unknownDup.notes[0]) && unknownCall.fails.length === 0 && unknownCall.notes.length === 1 && /the base being no YAML/u.test(unknownCall.notes[0])
+  && knownNew.fails.length === 1, "a key or a call the head shows behind breaks of a base that is no YAML once folded is noted, not failed, and a base that is read still fails what it did not hold", [...unknownDup.notes, ...unknownCall.notes, ...knownNew.fails].join("\n"));
+const t0 = Date.now(), manyKeys = keysTwice(`${Array.from({ length: 10000 }, (_, i) => `k${i}: 1\nk${i}: 2\n`).join("")}# c\u2028\n`).length;
+ok(manyKeys === 10000 && Date.now() - t0 < 10000, "ten thousand keys given twice behind a break are read in well under ten seconds, the two readings merged in one pass", `${manyKeys} in ${Date.now() - t0} ms`);
 // (a call the package shows in a file with a break inside a quoted string, no YAML once folded, is found by the plain reading)
 ok(unreadied(one(`name: "x\u2028y"\n${call(TYPES, "copies.yml", NOT_DRAFT)}`), null).notes.length === 1 && draftHoles(`name: "x\u2028y"\n${call(TYPES, "copies.yml", NOT_DRAFT)}`).join() === "check",
   "a call a draft skips that the package shows in a file with a break inside a quoted string, which is no YAML once folded, is still found");

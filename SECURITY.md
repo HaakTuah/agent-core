@@ -100,10 +100,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      with their mend, and are only noted in one unchanged from the base or where a project's run is told no base, what
      stands behind such a break being read as a YAML 1.1 reader reads it, and as it stands, whichever finds more, a key
      given twice or a call left without ready_for_review there found and failed or noted as any other, and each file
-     that holds one named at a sync; a base whose breaks, read so, are no YAML to the package (a break inside a
-     double-quoted string) shows no entry behind them, so a pull request that mends the break, as the sync asks, fails
-     for a key or call given twice behind it that the base held, its failure saying the mend; in the core's own run each
-     fails), and NuGet's lock file version 2, a newer refused (npm's
+     that holds one named at a sync; where a base's breaks, read so, leave it no YAML to the package (a break
+     inside a double-quoted string), what it held behind them cannot be told, and what the mended file then shows is
+     noted, not failed; in the core's own run each fails), and NuGet's lock file version 2, a newer refused (npm's
      lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`.
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its
      registry and GitHub answer of it: read by the licence scan and the installed licences

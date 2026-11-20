@@ -171,8 +171,12 @@ const heldAs = ({ key, size }) => (key === null ? (size ? 1 : 0) : `k:${key}`);
 // then shows, in that pull request.
 const baseOf = (before, file, text) => {
   const was = before ? before(file) ?? "" : null, long = was !== null && was.length > LONGEST;
-  return { read: was === null || long ? null : was, same: long && was === text };
+  // `unknown`: the base holds a break the package does not read and is no YAML to it once the breaks are line feeds, so what it
+  // held behind them cannot be told, and what the file now shows is noted, never failed (#876)
+  const read = was === null || long ? null : was;
+  return { read, same: long && was === text, unknown: read !== null && foreignBreaks(read) !== null && !readsFolded(read) };
 };
+const UNKNOWN = ", the base being no YAML to the package once its line breaks are read as YAML 1.1 reads them, so what it held is not known";
 
 // The keys given twice (yaml-keys.mjs) in files, each { file, text }, as { fails, notes }, each a line with its mend.
 // `before` gives a file's text on the base (null where it held none), or is null where there is no base to read
@@ -183,9 +187,9 @@ export function repeated(files, before) {
     const held = new Map(), base = baseOf(before, file, text);
     for (const found of base.read === null ? [] : keysTwice(base.read)) held.set(heldAs(found), (held.get(heldAs(found)) ?? 0) + 1);
     for (const { line, key, first, size } of keysTwice(text)) {
-      const id = heldAs({ key, size }), old = !before || base.same || held.get(id) > 0;
+      const id = heldAs({ key, size }), old = !before || base.same || base.unknown || held.get(id) > 0;
       held.set(id, (held.get(id) ?? 0) - 1);
-      const was = old ? (before ? ", as it did on the base" : "") : "";
+      const was = old ? (base.unknown ? UNKNOWN : before ? ", as it did on the base" : "") : "";
       (old ? notes : fails).push(key === null
         ? `${old ? "note" : "FAIL"} ${file}:${line}: ${NOT_READ[+Boolean(size)].said}${was}. Mend: ${NOT_READ[+Boolean(size)].mend}`
         : `${old ? "note" : "FAIL"} ${file}:${line}: the key ${JSON.stringify(key)} is given twice in one mapping (first on line ${first}), so GitHub refuses the whole file and runs none of its jobs${was}. Mend: keep one of the two keys, with what both said in it (two if: conditions joined by &&, two env: mappings as one)`);
@@ -264,8 +268,8 @@ export function unreadied(files, before) {
     }
     const held = new Set(base.read === null ? [] : draftHoles(base.read));
     for (const job of draftHoles(text)) {
-      const old = !before || held.has(job);
-      (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}: its job ${JSON.stringify(job)} calls one of the core's checks that is skipped on a draft, and its pull_request trigger leaves out ready_for_review, so once a pull request is marked ready the check runs on no head and the draft's skip reads as passed${old && before ? ", as on the base" : ""}. Mend: add ready_for_review to the types: under pull_request: (where it lists none, types: [opened, reopened, synchronize, ready_for_review])`);
+      const old = !before || base.unknown || held.has(job);
+      (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}: its job ${JSON.stringify(job)} calls one of the core's checks that is skipped on a draft, and its pull_request trigger leaves out ready_for_review, so once a pull request is marked ready the check runs on no head and the draft's skip reads as passed${old && base.unknown ? UNKNOWN : old && before ? ", as on the base" : ""}. Mend: add ready_for_review to the types: under pull_request: (where it lists none, types: [opened, reopened, synchronize, ready_for_review])`);
     }
   }
   return { fails, notes };
