@@ -9,15 +9,23 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { asked, calledFor, copyAtBase, costMend, differencesAdded, doneAsked, DONE_SINCE, heldAt, missing, NO_COST, numberMend, PARTS, reasonsMend, waitsMend, waitsOn } from "../scripts/pr-description.mjs";
+import { asked, copyAtBase, doneAsked, DONE_SINCE, missing, PARTS } from "../scripts/pr-description.mjs";
+import { costMend, NO_COST } from "../scripts/pr-cost.mjs";
+import { numberMend } from "../scripts/pr-number.mjs";
+import { calledFor } from "../scripts/pr-reads.mjs";
+import { differencesAdded, reasonsMend } from "../scripts/pr-reasons.mjs";
+import { heldAt, waitsMend, waitsOn } from "../scripts/pr-waits.mjs";
 import { lineMend } from "../scripts/reading.mjs";
 import { asking, coreAtBase, found, issuesOf, readable, textsOf, yesOf } from "../scripts/owner-yes.mjs";
 import { proven } from "../scripts/path-only.mjs";
+import * as facade from "../scripts/pr-description.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
 const whole = "The change.\n\n## What the owner can try\n\nOpen it.\n\n## Readings taken\n\nNone.\n";
 
+// the names pr-description.mjs exported before its split (#888)
+ok(["CHANGED_SINCE", "COST_SINCE", "DONE_SINCE", "HOLDS", "MANIFEST_MAX", "NO_COST", "NUMBER_SINCE", "PARTS", "PLAN_SINCE", "READS_SINCE", "REASONS", "REASONS_SINCE", "UNREADABLE", "WAITS", "WAITS_SINCE", "YES_SINCE", "asked", "calledFor", "copyAtBase", "costMend", "differencesAdded", "doneAsked", "heldAt", "missing", "numberMend", "planAsked", "reasonsMend", "waitsMend", "waitsOn"].every(n => n in facade), "pr-description.mjs still exports each name it exported before its split");
 ok(missing(whole).length === 0, "a description with both headings passes");
 ok(missing("### What the owner can try\nx\n###### readings TAKEN (the unsure first)\nx\n").length === 0, "any level of heading, any case, and words after the part's own");
 ok(missing("## What the owner can try: nothing yet\r\n## Readings taken, the unsure first\r\n").length === 0, "a mark after the part's words, and lines that end both ways");

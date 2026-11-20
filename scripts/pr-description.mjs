@@ -42,6 +42,10 @@
 // And, of one opened since the copy on its base held CHANGED_SINCE, each test file it leaves with fewer lines that
 // assert, or in which it skips a case, named on the line weakened.mjs, beside this file, asks, and each whose
 // assertions it only changes listed for the reviewer (#307).
+// Each line's check stands in a file beside this one (#888), read alone by whoever changes it, and is exported from here: the
+// line "Waits on:" in pr-waits.mjs, the cost line in pr-cost.mjs, the rule's number in pr-number.mjs, "Read for it:" in
+// pr-reads.mjs, "Reasons read:" in pr-reasons.mjs; this file holds the parts, the days from which each line is asked and
+// the run that asks them.
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
 //
@@ -50,23 +54,20 @@
 import { spawnSync } from "node:child_process";
 import { doneMends, ownerAt, queueAt, readItem, takesIt } from "./done-when.mjs";
 import { isPart, milestoneMends } from "./milestones.mjs";
-import { differencesOf } from "./manifest-reads.mjs";
-import { NUMBER } from "./outcomes.mjs";
 import { asking, coreAtBase, issuesOf, textsOf, yesOf } from "./owner-yes.mjs";
 import { numberOf, statedOf } from "./meaning-kept.mjs";
 import { proven } from "./path-only.mjs";
-import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, pathIn, taken, textOf } from "./reading.mjs";
+import { coreAt, lineMend, pathIn, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
 import { changedMend, plain, testsChanged } from "./weakened.mjs";
+import { NO_COST, costMend } from "./pr-cost.mjs";
+import { HOLDS, numberMend } from "./pr-number.mjs";
+import { calledFor } from "./pr-reads.mjs";
+import { MANIFEST_MAX, REASONS, UNREADABLE, differencesAdded, reasonsMend } from "./pr-reasons.mjs";
+import { WAITS, heldAt, waitsMend, waitsOn } from "./pr-waits.mjs";
 
-// The line a description ends with, saying what the pull request waits on: nothing (its builder goes on), a review, its
-// checks, another item ("#241"), or the owner, with the question in one sentence after a colon. A line that begins with
-// a form, in any case, is in it, whatever follows ("#724, then the orchestrator's word"): the check fails what is
-// missing, never phrasing (#750, point 4).
-export const WAITS = "Waits on:";
-const FORMS = [["nothing", /^nothing(?![\w-])/iu], ["a review", /^a review(?![\w-])/iu], ["checks", /^checks(?![\w-])/iu], ["item", /^#[1-9]\d{0,8}(?![\w-])/u], ["the owner", /^the owner: \S[^?]*\?/iu]];
-// a rule's number in its form at the start of a line, whatever follows it, in any case (#750, point 4)
-const NUMBER_FIRST = new RegExp(NUMBER.source.replace(/\$$/u, "(?![\\w-])"), "iu");
+// (what each line's check holds, exported from here as before they were split)
+export { HOLDS, calledFor, MANIFEST_MAX, NO_COST, REASONS, UNREADABLE, WAITS, costMend, differencesAdded, heldAt, numberMend, reasonsMend, waitsMend, waitsOn };
 export const WAITS_SINCE = "2026-11-16T00:00:00Z";
 // The day from which the line "Read for it:" is asked, of a pull request opened since the copy on its base held this.
 export const READS_SINCE = "2026-11-16T00:00:00Z";
@@ -75,11 +76,9 @@ export const DONE_SINCE = "2026-11-17T00:00:00Z";
 // The day from which a description is asked its cost line or the mark that says the script printed none ("An exemption
 // leaves a mark" in roles/shared/work-flow.md; #302), as the lines above are.
 export const COST_SINCE = "2026-11-17T00:00:00Z";
-export const NO_COST = "No cost line: the script printed none.";
 // The day from which the part "What holds it" is asked the number of each rule it names (AGENTS.md of the core, "Every
 // rule says what holds it"; #303), as the lines above are.
 export const NUMBER_SINCE = "2026-11-17T00:00:00Z";
-export const HOLDS = "What holds it";
 // The day from which a description names, on weakened.mjs's line, each test file the pull request leaves with fewer
 // lines that assert, or in which it skips a case (tasks/code-shape.md, "A test taken out or weakened is said"; #307), as
 // the lines above are.
@@ -87,112 +86,17 @@ export const CHANGED_SINCE = "2026-11-18T00:00:00Z";
 
 // The day from which a pull request that adds a difference is asked the line REASONS (#756), as the lines above are.
 export const REASONS_SINCE = "2026-11-19T00:00:00Z";
-export const REASONS = "Reasons read:";
-
-// The lines a pull request adds under the manifest's "Differences", in the checkout at `dir`, the merge commit against
-// its first parent, the base (every line where the base holds no manifest, as a project's first, or one git cannot give
-// whole): [] where the head holds none, UNREADABLE where it holds one git cannot give whole (a link, a folder, a
-// submodule, past MANIFEST_MAX bytes) or git fails, which fails rather than passes, and null where there is no base to
-// read against.
-export const UNREADABLE = "unreadable";
-export const MANIFEST_MAX = 1 << 24;
-export function differencesAdded(dir) {
-  const git = (...a) => spawnSync("git", a, { cwd: dir, encoding: "utf8", maxBuffer: MANIFEST_MAX });
-  if (git("rev-parse", "--verify", "--quiet", "HEAD^1").status !== 0) return null;
-  // (absent: ""; there, but no plain file git can give whole, or git failed: null)
-  const read = at => {
-    const entry = git("ls-tree", "-z", "--full-tree", at, "--", "core-manifest.md");
-    if (entry.status !== 0 || entry.error) return null;
-    if (entry.stdout === "") return "";
-    const [, mode, sha] = /^(\d+) blob ([0-9a-f]+)\tcore-manifest\.md\0$/u.exec(entry.stdout) ?? [];
-    const r = mode === "100644" || mode === "100755" ? git("cat-file", "blob", sha) : null;
-    return r && r.status === 0 && !r.error ? r.stdout : null;
-  };
-  const head = read("HEAD");
-  if (head === null) return UNREADABLE;
-  const was = new Set(differencesOf(read("HEAD^1") ?? "").map(l => l.trim()));
-  return differencesOf(head).map(l => l.trim()).filter(l => !was.has(l) && !/^None\.?$/iu.test(l));
-}
-
-// The mend where a pull request adds a difference and its description has no line REASONS with something after it;
-// null where it has one, or adds none. `at` is where the core's copy stands, as the manifest's "Core:" line puts it.
-export function reasonsMend(body, added, at = "core/") {
-  if (added === UNREADABLE) return `the pull request's core-manifest.md cannot be read whole (a link, a folder, a submodule, or past ${MANIFEST_MAX} bytes), so what it adds under "Differences" cannot be told. Mend: keep core-manifest.md a text file in the manifest's form, far under that size, and push again`;
-  if (!Array.isArray(added) || !added.length) return null;
-  // (blanks and invisible format characters after the label are nothing)
-  if (textOf(body).split(/\r\n|\r|\n/u).some(l => l.trim().startsWith(REASONS) && l.trim().slice(REASONS.length).replace(/[\s\p{Cf}]/gu, ""))) return null;
-  return `it adds ${added.length === 1 ? "a line" : `${added.length} lines`} under the manifest's "Differences" ("${added[0].replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, " ").slice(0, 80)}"), and the description has no line "${REASONS}". Mend: for each rule of the core it departs from, run \`node ${at}scripts/reasons.mjs "<the rule's file and lead>"\`, read the archive items and the issues it prints, and add a line "${REASONS} <those items and issues>, and which of their reasons does not hold for this project, and why"; where a line departs from no rule of the core (a step of the sync notes, a file the starter kit writes), say so on that line`;
-}
 
 // The day from which the owner's yes is asked of a pull request that changes the floor or the review guidelines
 // (owner-yes.mjs, beside this file; #549), as the lines above are.
 export const YES_SINCE = "2026-11-18T00:00:00Z";
 
-// The mend where the part HOLDS holds more than "None" and no line "Number: <the count>; outcome: <the outcome>" in
-// NUMBER's form; null where it does, or where the part is not there (missing() names that).
-export function numberMend(body) {
-  const lines = String(body ?? "").split(/\r\n|\r|\n/u), heading = l => /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(l)?.[1];
-  const at = lines.findIndex(l => heading(l) && isPart(heading(l), HOLDS));
-  if (at < 0) return null;
-  const end = lines.findIndex((l, i) => i > at && heading(l));
-  const part = lines.slice(at + 1, end < 0 ? undefined : end).map(l => l.trim()).filter(Boolean);
-  if (part.every(l => /^None\b/u.test(l))) return null;
-  const named = part.map(l => /(?:^|[\s*-])Number: (.*[^.\s])[.\s]*$/u.exec(l)?.[1]).filter(Boolean);
-  if (named.some(n => NUMBER_FIRST.test(n))) return null;
-  return `the part "${HOLDS}" names no rule's number${named.length ? ` in its form (it reads "${named[0]}")` : ""}. Mend: under it, for each rule this pull request adds or widens, add a line "Number: <findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for, with "; rare harm" at its end where the rule guards against rare and severe harm, as the rule's entry in scripts/holders/ keeps it under "number"; or write "None" alone under the heading where it adds no rule`;
-}
-
-// The mend where a description has neither the line session-cost.mjs prints ("Session so far: ...") nor the mark that
-// it printed none, each on a line of its own; null where it has one.
-export function costMend(body) {
-  const lines = String(body ?? "").split(/\r\n|\r|\n/u).map(l => l.trim());
-  if (lines.some(l => /^Session so far: [\d,]+ answers\b/u.test(l) || l === NO_COST)) return null;
-  return `the description has neither the line the cost script prints nor the mark that it printed none. Mend: run \`node core/scripts/session-cost.mjs\` (\`node scripts/session-cost.mjs\` in the core) and put the line it prints above the closing lines; where it prints nothing, put there instead, on a line of its own, "${NO_COST}"`;
-}
 // Whether it is asked of a pull request opened at `created` (as GitHub gives it), `then` the copy on its base when it
 // opened, or null where that could not be read: only where both are on or after the day it came.
 export const doneAsked = (created, then) => String(created) >= DONE_SINCE && Boolean(then?.includes("export const DONE_SINCE"));
 // The day from which the milestones are asked (tasks/planning.md; #322), in the same way.
 export const PLAN_SINCE = "2026-11-17T00:00:00Z";
 export const planAsked = (created, then) => String(created) >= PLAN_SINCE && Boolean(then?.includes("export const PLAN_SINCE"));
-
-// What a description says it waits on: its last line that starts with "Waits on:", as { said, kind }, kind null where
-// the line is in none of the forms; null where there is no such line.
-export function waitsOn(body) {
-  const line = textOf(body).split(/\r\n|\r|\n/u).map(l => l.trim()).filter(l => l.startsWith(WAITS)).at(-1);
-  if (line === undefined) return null;
-  const said = line.slice(WAITS.length).trim();
-  return { said, kind: FORMS.find(([, form]) => form.test(said))?.[0] ?? null };
-}
-
-// Whether the copy on the base held the line when the pull request opened at `created`: of the commits that changed
-// it there, newest first ([{ sha, date }]), the newest from before then, and `holds`, whether the file at a commit holds
-// the line. One file is read, however many syncs have changed it, so a run spends two of the repository's calls.
-export function heldAt(commits, created, holds) {
-  const then = commits.find(c => String(c.date) <= created);
-  return then ? holds(then.sha) : false;
-}
-
-// The mend where a description asked for the line lacks it or words it in none of the forms; null where it is right.
-export function waitsMend(body) {
-  const w = waitsOn(body);
-  if (w?.kind) return null;
-  return `${w ? `its line "${WAITS} ${w.said}" is in none of the forms` : `the description has no line "${WAITS}"`}. Mend: end it with one, above its closing lines, of these: "${WAITS} nothing", "${WAITS} a review", "${WAITS} checks", "${WAITS} #<the item it waits on>", or "${WAITS} the owner: <the question, in one sentence>?", with the label needs-owner on the pull request; edit it whenever what it waits on changes`;
-}
-
-// What the paths a pull request changes call for, [{ file, why }], in the checkout at `dir`, the merge commit against
-// its first parent, the base: each file by its path from the root (under core/ in a project). The kinds a project
-// gives its own paths, and the modules its manifest leaves out, are read as the base holds them, so that a pull request
-// does not set either for itself; the
-// modules' own lines are the copy's, which core.yml holds to the core's. Null where the change cannot be read.
-export function calledFor(dir) {
-  const git = (...args) => { const r = spawnSync("git", args, { cwd: dir, encoding: "utf8", maxBuffer: 1 << 26 }); return r.status === 0 ? r.stdout : null; };
-  const prefix = coreAt(dir), diff = prefix === null ? null : git("diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD");
-  if (diff === null) return null;
-  const own = prefix ? ownPaths(OWN.map(f => git("show", `HEAD^1:${f}`)).find(text => text !== null)) : [];
-  const lib = taken(library(dir, prefix), leftOut(prefix ? git("show", "HEAD^1:core-manifest.md") : ""));
-  return calledByPaths(lib, ownOf(diff.split("\0").filter(Boolean), prefix), own).map(c => ({ ...c, file: `${prefix}${c.file}` }));
-}
 
 // The path of the copy whose history says which lines a pull request is asked, in the checkout at `dir`, the merge commit
 // against its first parent, the base: where the base's manifest puts the core (its "Core:" line, read by pathIn), or the
