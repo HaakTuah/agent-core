@@ -27,6 +27,18 @@
       "mark": 23922,
       "why": "#895: its section on the rules with no holder moves to a test of its own."
     },
+    "scripts/choices.mjs": {
+      "mark": 27277,
+      "why": "#912: the records' check a pull request runs apart from the signs the scheduled look reads."
+    },
+    "tasks/choices.md": {
+      "mark": 22735,
+      "why": "#913: the rules of a move off what a project stands on apart from those of making a record."
+    },
+    "tests/choices-test.mjs": {
+      "mark": 30985,
+      "why": "#912: split as its script is, the records' check apart from the look's signs."
+    },
     "scripts/csharp-tree.mjs": {
       "mark": 25832,
       "why": "#884: the text the parser reads (the preprocessor, C# 14's extension headers) apart from the reading of the tree."
