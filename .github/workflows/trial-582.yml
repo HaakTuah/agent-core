@@ -1,0 +1,29 @@
+# TEMPORARY (#582): the trial of lychee against the pointer check's reading of Markdown's own links
+# (scripts/trial-582.mjs), on this pull request's runners alone; taken out before the pull request is marked ready.
+# Read-only, with no secret.
+name: trial-582
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  trial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: The core's packages
+        run: node scripts/install.mjs
+      - name: lychee, fetched at its pin
+        run: bash scripts/lychee.sh >> "$GITHUB_ENV"
+      - name: The trial
+        run: git config --global user.email t@example.invalid && git config --global user.name t && node scripts/trial-582.mjs
