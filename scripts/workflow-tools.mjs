@@ -51,25 +51,31 @@ const why = r => (r.error?.code === "ETIMEDOUT" ? `it ran past ${TIMEOUT / 1000}
 // where the job's set-up step fetched them; workflow-tools.sh), which then decide nothing.
 export function run(root, files, tools) {
   const found = [], unrun = [];
-  const go = (program, args) => spawnSync(program, args, { cwd: root, encoding: "utf8", maxBuffer: 1 << 28, timeout: TIMEOUT, windowsHide: true });
-  const zizmor = files.filter(f => isWorkflow(f) || isAction(f)), actionlint = files.filter(isWorkflow);
-  if (!tools.zizmor) { if (zizmor.length) unrun.push("zizmor"); }
-  else for (const f of zizmor) {
-    const r = go(tools.zizmor, ["--offline", "--no-progress", "--format", "json-v1", "--no-exit-codes", "--config", path.join(HERE, "zizmor.yml"), "--", f]);
-    const got = r.status === 0 ? zizmorFindings(r.stdout ?? "", f) : null;
-    // (status 3 is zizmor's "no inputs collected": it could not load the file as a workflow or an action. For a
-    // workflow actionlint says why, so it is not said twice; for an action it is said here, since nothing else reads it)
-    if (got) found.push(...got);
-    else if (r.status !== 3 || r.error || r.signal) found.push(unread(f, "zizmor", why(r)));
-    else if (!isWorkflow(f)) found.push(unread(f, "zizmor", "it is no action GitHub could run: a key given twice, a part GitHub asks for missing, or no YAML"));
-  }
-  if (!tools.actionlint) { if (actionlint.length) unrun.push("actionlint"); }
-  else for (const f of actionlint) {
-    const r = go(tools.actionlint, ["-format", "{{json .}}", "-shellcheck=", "-pyflakes=", "-no-color", "-config-file", path.join(HERE, "actionlint.yml"), "--", f]);
-    const got = r.status === 0 || r.status === 1 ? actionlintFindings(r.stdout ?? "", f) : null;
-    found.push(...(got ?? [unread(f, "actionlint", why(r))]));
+  for (const [name, read, each] of [["zizmor", files.filter(f => isWorkflow(f) || isAction(f)), zizmorOn], ["actionlint", files.filter(isWorkflow), actionlintOn]]) {
+    if (!read.length) continue;
+    if (!tools[name]) unrun.push(name);
+    else for (const f of read) found.push(...each(tools[name], root, f));
   }
   return { found, unrun };
+}
+const go = (program, root, args) => spawnSync(program, args, { cwd: root, encoding: "utf8", maxBuffer: 1 << 28, timeout: TIMEOUT, windowsHide: true });
+
+// zizmor on one file: its findings, or the word that it could not read it. Status 3 is zizmor's "no inputs collected":
+// it could not load the file as a workflow or an action. For a workflow actionlint says why, so it is not said twice;
+// for an action it is said here, since nothing else reads it.
+function zizmorOn(program, root, f) {
+  const r = go(program, root, ["--offline", "--no-progress", "--format", "json-v1", "--no-exit-codes", "--config", path.join(HERE, "zizmor.yml"), "--", f]);
+  const got = r.status === 0 ? zizmorFindings(r.stdout ?? "", f) : null;
+  if (got) return got;
+  if (r.status !== 3 || r.error || r.signal) return [unread(f, "zizmor", why(r))];
+  return isWorkflow(f) ? [] : [unread(f, "zizmor", "it is no action GitHub could run: a key given twice, a part GitHub asks for missing, or no YAML")];
+}
+
+// actionlint on one file: its findings (status 1 where it found some), or the word that it could not read it.
+function actionlintOn(program, root, f) {
+  const r = go(program, root, ["-format", "{{json .}}", "-shellcheck=", "-pyflakes=", "-no-color", "-config-file", path.join(HERE, "actionlint.yml"), "--", f]);
+  const got = r.status === 0 || r.status === 1 ? actionlintFindings(r.stdout ?? "", f) : null;
+  return got ?? [unread(f, "actionlint", why(r))];
 }
 
 // A finding's line, its lead FAIL or note, `was` what it adds of the base.

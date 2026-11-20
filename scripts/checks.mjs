@@ -47,7 +47,7 @@ export const COPIES = [
   ["No new copies", "copies.mjs", "copies", "COPIES_BASE"],
   ["Every pointer in the rule files leads somewhere", "pointers.mjs", null, "POINTERS_BASE"],
   ["The files every session reads keep to their marks", "reading-size.mjs", "sizes", "SIZES_BASE"],
-  ["No workflow names the forbidden trigger, and zizmor and actionlint find nothing new in one", "workflows.mjs", null, "WORKFLOWS_BASE"],
+  ["No workflow names the forbidden trigger or gives a key twice", "workflows.mjs", null, "WORKFLOWS_BASE"],
   ["Each agent tool's entry file pulls in every file AGENTS.md names", "entry-files.mjs", null, "ENTRY_BASE"],
   ["The manifest takes or leaves out each module and fills each slot they use (reports, never fails)", "manifest-reads.mjs", null, null],
   ["Nothing new in how the code is put together", "shape.mjs", null, "SHAPE_BASE"],
