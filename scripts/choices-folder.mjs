@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { MEND } from "./mend.mjs";
-import { MOST, POINTER, plain } from "./choices.mjs";
+import { MOST, POINTER, plain } from "./choices-records.mjs";
 
 // The form a records file takes where its records stand in a folder (#870), for the core's own, whose test runs it: the
 // file holds no record itself, and the folder it names holds a file for each record, named NNN-<name>.md, whose first

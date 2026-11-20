@@ -63,7 +63,7 @@ const CHECKS = {
   "scripts/reading.mjs": "tests/reading-test.mjs",
   "scripts/select.mjs": "tests/select-test.mjs",
   "scripts/shape.mjs": "tests/shape-test.mjs",
-  "scripts/choices.mjs": "tests/choices-test.mjs",
+  "scripts/choices.mjs": "tests/choices-check-test.mjs",
   "scripts/strength.mjs": "tests/strength-test.mjs",
   ".github/workflows/core.yml": "tests/core-yml-test.mjs",
   // (their own step that fails is the one that reads where the core's copy stands)

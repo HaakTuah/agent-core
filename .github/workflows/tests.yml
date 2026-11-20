@@ -252,6 +252,12 @@ jobs:
       - name: The lookup of a new package, on recorded answers
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-test.mjs ')) }}
         run: node tests/lookup-test.mjs
+      - name: The lookup of a new package, run on a project
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-run-test.mjs ')) }}
+        run: node tests/lookup-run-test.mjs
+      - name: The sync's step that asks a lookup beside each check of exact versions
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-step-test.mjs ')) }}
+        run: node tests/lookup-step-test.mjs
       - name: The lookup again of what a project holds, on recorded answers
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/held-test.mjs ')) }}
         run: node tests/held-test.mjs
@@ -354,6 +360,12 @@ jobs:
       - name: The choice records
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-test.mjs ')) }}
         run: node tests/choices-test.mjs
+      - name: The records' check a pull request runs
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-check-test.mjs ')) }}
+        run: node tests/choices-check-test.mjs
+      - name: The scheduled look's readers of the choice records
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-look-test.mjs ')) }}
+        run: node tests/choices-look-test.mjs
       - name: The choice records that stand a file each in a folder
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-folder-test.mjs ')) }}
         run: node tests/choices-folder-test.mjs
@@ -484,6 +496,9 @@ jobs:
       - name: The proof that a change to what runs by itself is only comments and steps' names
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/comment-only-test.mjs ')) }}
         run: node tests/comment-only-test.mjs
+      - name: The proof that a change to what runs by itself is only comments and steps' names, the script run end to end
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/comment-only-run-test.mjs ')) }}
+        run: node tests/comment-only-run-test.mjs
       - name: The proof that a change to the floor or the review guidelines only follows files the pull request moves
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/path-only-test.mjs ')) }}
         run: node tests/path-only-test.mjs
@@ -553,6 +568,9 @@ jobs:
       - name: The outcomes the state report leads with, and how a correction is counted
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/outcomes-test.mjs ')) }}
         run: node tests/outcomes-test.mjs
+      - name: The blind sample the state report asks the owner to answer
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/blind-sample-test.mjs ')) }}
+        run: node tests/blind-sample-test.mjs
       - name: The check that the core takes each module or gives its reason
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/own-modules-test.mjs ')) }}
         run: node tests/own-modules-test.mjs

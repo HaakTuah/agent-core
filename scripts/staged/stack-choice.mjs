@@ -11,7 +11,7 @@
 // on a board) is no breach: the pick stands and the work goes on.
 import { execFileSync } from "node:child_process";
 import path from "node:path";
-import { MOST, parse } from "../choices.mjs";
+import { MOST, parse } from "../choices-records.mjs";
 import { CORE_ROOT, OWNER, base, build, changed, github, originGit, pushed, show, verdict, waitsOnOwner, written } from "./scratch.mjs";
 
 export const name = "stack-choice";
@@ -80,7 +80,7 @@ export function faults(rec) {
 }
 
 // The records at a pushed branch or commit whose heading the session filled in: [{ name, body, sign }], each read whole by
-// choices.mjs's parse() for its sign; the file read to choices.mjs's MOST, as its look reads it, so no text of the
+// choices-records.mjs's parse() for its sign; the file read to its MOST, as its look reads it, so no text of the
 // session's makes the reading run long.
 function recordsOn(dir, ref) {
   const t = String(show(dir, ref, RECORDS) ?? "").slice(0, MOST).replace(/\r\n/g, "\n"), heads = [...t.matchAll(/^## Choice: (.+)$/gm)];
