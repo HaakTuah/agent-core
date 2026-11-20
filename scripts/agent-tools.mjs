@@ -35,7 +35,8 @@
 // `main`): a hook of any tool read here, and each setting by which a tool runs a command of its own (Claude Code's
 // apiKeyHelper, statusLine and the like; Codex's notify and its model providers' token commands), read as a hook, runs
 // its copy on main only where each command it may run, Codex's for Windows among them, is the starter kit's form
-// (hook-source.mjs), which fetches its script from main, and the file it fetches is no link; any other fails, since
+// (hook-source.mjs), which fetches its script from main, and the file it fetches is no link (for a core a library carries,
+// the file of the library's commit main pins, whose own path is no link either); any other fails, since
 // nothing shows it does not run the working tree's copy, which the branch it runs on can change. One that stood before
 // is listed in the baseline, its entry saying "from": "the working tree", and noted; the baseline only shrinks: a new
 // hook marked so fails, and so does a mark taken out while its hook stands, or a mark on a hook in the kit's form.
@@ -71,7 +72,7 @@ import { fileURLToPath } from "node:url";
 import { atCopy, corePath, hooksAt, manifestText, readCore } from "./core-path.mjs";
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
-import { fetchedBy } from "./hook-source.mjs";
+import { fetchedBy, libraryOf } from "./hook-source.mjs";
 import { baseOf, textAt } from "./licences.mjs";
 import { unreached } from "./packages.mjs";
 import { started } from "./started.mjs";
@@ -97,16 +98,17 @@ const show = value => JSON.stringify(value) ?? String(value);
 // reading them; `sources`, each hook that does not run its copy on main, with why (readSource()). `read(file)` gives a
 // file's text or null; `skills()` the names of the folders under .claude/skills/ that hold a SKILL.md; `files(dir)` the
 // names in a folder of the project (here .kiro/hooks); `linked(path)` whether the project, or main, holds a path as a
-// link.
-export function configured(read, skills, files = () => [], linked = () => false, markdown = () => []) {
+// link; `inLibrary(library, path)` what the commit that main pins of a library holds at a path of it: "file", "other"
+// (a link, a folder or a submodule's entry) or "unread" (its objects are not at hand), null where no library is pinned.
+export function configured(read, skills, files = () => [], linked = () => false, markdown = () => [], inLibrary = () => null) {
   // (each tool's name, as the list writes it, and what it is: for a hook its tool, event, matcher and the whole hook,
   // its type, command, timeout and all, which is what the kit's hooks and the base's are compared by)
   // (`texts`: each problem met reading a file, with that file's text, so one the base held as it stands can be told)
   // (`baselined`: those a project may hold, noted where there is no base to read against, as a pin is)
-  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map(), baselined = new Set(), unread = new Set();
+  const tools = new Map(), ids = new Map(), problems = [], sources = new Map(), servers = [], texts = new Map(), baselined = new Set(), unread = new Set(), notRead = new Set();
   const flag = (problem, file, text = read(file)) => { problems.push(problem); texts.set(problem, `${file}\0${text}`); };
   const add = (name, id) => ids.set(name, (ids.get(name) ?? new Set()).add(id));
-  const state = { tools, problems, texts, baselined, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, linked, unread };
+  const state = { tools, problems, texts, baselined, flag, add, shapes: new Map(), clashed: new Set(), sources, servers, linked, unread, notRead, inLibrary };
   const json = file => {
     const text = read(file);
     if (text === null) return null;
@@ -144,7 +146,7 @@ export function configured(read, skills, files = () => [], linked = () => false,
   for (const file of markdown()) { readFrontmatter(state, file, read(file)); if (/^\.claude\/commands\//iu.test(file.normalize("NFC"))) readShell(state, file, read(file)); }
   readKiro(state, json, files);
   readCodex(state, json, read);
-  return { tools, ids, problems, texts, baselined, sources, unread, pins: pinsOf(plugins, markets, servers) };
+  return { tools, ids, problems, texts, baselined, sources, unread, notRead, pins: pinsOf(plugins, markets, servers) };
 }
 
 const SERVERS = "each tool server's name to its settings";
@@ -384,7 +386,9 @@ function readCommands(state, file, settings) {
 
 // Each hook with a command that is not the starter kit's form, into `state.sources` as { why, how }, why nothing shows it
 // runs its copy on main (hook-source.mjs) and its mend; so too where the file the kit's form fetches the project holds as
-// a link (`linked`), whose target's name main gives in the script's place, a file the branch can change.
+// a link (`linked`), whose target's name main gives in the script's place, a file the branch can change, and where a
+// library's commit main pins holds the file it reads there as anything but a plain file (`inLibrary`: git prints a link's
+// target, which bash then runs). Where the library's objects are not at hand, the file is not read: said, never failed.
 function readSource(state, name, commands) {
   for (const command of commands) {
     const at = fetchedBy(command);
@@ -392,6 +396,10 @@ function readSource(state, name, commands) {
     if (at === null) return void state.sources.set(name, { why: "is not in the starter kit's form", how: HOW });
     // (the command in the kit's form already, its mend is the fetched file's)
     if (state.linked(at)) return void state.sources.set(name, { why: `fetches ${show(at)} from main, which the project holds as no plain file (a link, a folder or a submodule), so main gives no script but what git prints of it`, how: `make ${show(at)} a plain file committed in the project, the script itself in place of the link, folder or submodule, so main gives it` });
+    const from = libraryOf(command), held = from && state.inLibrary(from.library, from.rest);
+    if (held === "link") return void state.sources.set(name, { why: `reads ${show(from.rest)} from the library ${show(from.library)}, which this project commits as a link, so the folder it leads to is the branch's to choose, not the submodule main pins`, how: `commit ${show(from.library)} as the submodule that carries the core (git submodule add), never as a link` });
+    if (held === "other") return void state.sources.set(name, { why: `reads ${show(from.rest)} from the commit of ${show(from.library)} that main pins, which holds it as no plain file (a link, a folder or a submodule), so what runs is what git prints of it`, how: `make ${show(from.rest)} a plain file committed in ${show(from.library)}, the script itself in place of the link, folder or submodule, and pin that commit` });
+    if (held === "unread") state.notRead.add(`${name}: the file ${show(from.rest)} of the commit of ${show(from.library)} that main pins was not read, since the submodule's repository is not at hand here, so whether it is a plain file is not known. To mend: bring it in (git submodule update --init ${from.library})`);
   }
 }
 
@@ -596,7 +604,7 @@ function sourcesOf(head, list, file, problems) {
 // The project at `root`, at its working tree or at a commit `rev`: configured()'s answer. Nothing is read through a
 // link, at a commit (where git lists nothing below one) or in the working tree: each link where a tool reads its files
 // is a problem of its own (linkProblems()), so what it leads to is never read, and the head and the base read alike.
-export function readProject(root, rev = null, linkedOnMain = () => false, alias = f => f) {
+export function readProject(root, rev = null, linkedOnMain = () => false, alias = f => f, base = null) {
   const commit = rev ? commitReader(root, rev, alias) : null;
   // (in the working tree, a path with a link anywhere on its way is read as holding nothing: a link of the file system's,
   // or one git's HEAD holds, which a checkout with core.symlinks off writes as a plain file of the link's text)
@@ -627,7 +635,10 @@ export function readProject(root, rev = null, linkedOnMain = () => false, alias 
   const linked = at => own(at) || linkedOnMain(at);
   const commitRev = rev ?? "HEAD";
   // (with `alias`, each path read from another, as mendedIds() reads a link's files in its place: its Markdown files too)
-  const project = configured(read, skills, names, linked, () => [...agentMarkdown(root, commitRev), ...(alias.markdown ?? [])]);
+  // (the file a library's commit holds at a path, at this commit's pin and at the base's, which a hook reads until the pull
+  // request merges: anything but a plain file at either is the answer, then what could not be read)
+  const inLibrary = (library, rest) => { const held = [commitRev, ...(base ? [base] : [])].map(r => libraryHolds(root, r, library, rest)); return held.includes("link") ? "link" : held.includes("other") ? "other" : held.includes("unread") ? "unread" : held.includes("file") ? "file" : null; };
+  const project = configured(read, skills, names, linked, () => [...agentMarkdown(root, commitRev), ...(alias.markdown ?? [])], inLibrary);
   // (read at the commit, the working tree's at HEAD, the pull request's head: a file not committed, ignored or not, is
   // no file of the project's, and the base is read the same way)
   for (const [problem, text] of commitProblems(root, commitRev)) { project.problems.push(problem); project.texts.set(problem, text); project.baselined.add(problem); }
@@ -726,10 +737,10 @@ const notFile = (l, at) => l.linked.has(at) || l.dirs.has(at) || l.others.has(at
 // are not read, as the kit's form reads none; git asked once a path a commit, and a path it holds nothing at is no
 // script either way.
 const shown = new Map();
-function shownNotBlob(root, rev, at) {
-  const key = `${root}\0${rev}\0${at}`;
+function shownNotBlob(root, rev, at, gitDir = null) {
+  const key = `${root}\0${rev}\0${at}\0${gitDir}`;
   if (!shown.has(key)) {
-    const ask = (args, input = "") => { try { return execFileSync("git", ["--no-replace-objects", ...args], { cwd: root, encoding: "utf8", input, stdio: ["pipe", "pipe", "ignore"] }); } catch { return ""; } };
+    const ask = (args, input = "") => { try { return execFileSync("git", [...(gitDir ? ["--git-dir", gitDir] : []), "--no-replace-objects", ...args], { cwd: root, encoding: "utf8", input, stdio: ["pipe", "pipe", "ignore"] }); } catch { return ""; } };
     const [mode = "", , oid = ""] = ask(["ls-tree", "-z", rev, "--", at]).split("\0")[0].split("\t")[0].split(" ");
     // (the object git show resolves and its kind, asked in one process: "<object> <kind> <size>", or "<name> missing";
     // a path that holds a line's end could not be asked so, and is no plain file either)
@@ -739,6 +750,21 @@ function shownNotBlob(root, rev, at) {
     shown.set(key, resolved !== oid || (mode !== "" && mode !== "100644" && mode !== "100755") || (type !== "" && type !== "blob"));
   }
   return shown.get(key);
+}
+// What the commit that `rev` pins of the submodule `library` holds at `rest` there, read in the superproject's own
+// module repository (the one the hook's command names; never a folder of the working tree, which a branch commits): "file",
+// "other" (anything but a plain file: a link, a folder, a submodule's entry), "link" where `rev` holds the library's path
+// itself as a link, "unread" where that repository or the commit is not at hand, null where `rev` holds no submodule at
+// that path (the first path the hook reads is then main's own).
+function libraryHolds(root, rev, library, rest) {
+  const l = listing(root, rev), commit = l.gitlinks.get(library);
+  // (the library's own path committed as a link: the folder it stands in is the branch's to choose)
+  if (l.linked.has(library)) return "link";
+  if (commit === undefined) return null;
+  let dir;
+  try { dir = path.resolve(root, execFileSync("git", ["rev-parse", "--git-path", `modules/${library}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()); } catch { return "unread"; }
+  try { execFileSync("git", ["--git-dir", dir, "--no-replace-objects", "cat-file", "-e", `${commit}^{commit}`], { cwd: root, stdio: "ignore" }); } catch { return "unread"; }
+  return shownNotBlob(root, commit, rest, dir) ? "other" : "file";
 }
 // A name as a file system that folds case compares it: wholly, so a letter whose upper case is another's ("\u017f" and
 // "s") is the same, which lower case alone does not make it; and in one of Unicode's normal forms, NFC, as macOS's
@@ -1041,7 +1067,7 @@ export function run(root, file, { core = false, base = baseOf(root), ways = inst
   try { config = parseBounded(fs.readFileSync(path.resolve(root, file), "utf8")); } catch (e) {
     return { fail: [`${file} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`], notes: [] };
   }
-  const head = readProject(root, null, base ? at => notFile(listing(root, base), at) || shownNotBlob(root, base, at) : undefined);
+  const head = readProject(root, null, base ? at => notFile(listing(root, base), at) || shownNotBlob(root, base, at) : undefined, undefined, base);
   const atBase = name => textAt(root, base, path.relative(root, path.join(KIT_DIR, name)).split(path.sep).join("/"));
   const place = coreOf(manifestText(path.join(root, "core-manifest.md"))), kit = [...kitHooks(undefined, place), ...(base ? kitHooks(atBase, place) : [])];
   let list = listed(config, file);
@@ -1060,7 +1086,7 @@ export function run(root, file, { core = false, base = baseOf(root), ways = inst
   const unread = unreadOf(head, baseProject, core);
   const fail = [...head.problems, ...problems].filter(p => !stood.has(p) && !unread.has(p)).concat(ways.fail);
   const notes = [...[...stood].map(p => `as the base held it, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`), ...[...unread].map(p => `with no base to read against, nothing fails here: ${p.replace(". Mend: ", ". To mend: ")}`),
-    ...ways.notes, ...checked.installed.map(([k, way]) => `installed by the way \`${way}\` (tasks/ways.md), so listed by it: ${describe(k)}, configured in ${head.tools.get(k)}`)];
+    ...[...head.notRead].map(p => `not read: ${p}`), ...ways.notes, ...checked.installed.map(([k, way]) => `installed by the way \`${way}\` (tasks/ways.md), so listed by it: ${describe(k)}, configured in ${head.tools.get(k)}`)];
   sortPins(pins, { head, list, baseProject, baseList, core, mended }, fail, notes);
   sortSources(checked, { head, baseProject, baseList, core, file, mended }, fail, notes);
   if (base && !core) sortBehind(root, base, fail, notes);

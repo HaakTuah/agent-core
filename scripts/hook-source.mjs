@@ -4,9 +4,11 @@
 // running it, perhaps with plain words after it, which that script, main's, reads. Nothing else is read: no other
 // command shows where what it runs comes from, so none passes for it. Node's own modules only.
 //
-//   import { fetchedBy, kitForm } from "./hook-source.mjs";
+//   import { fetchedBy, kitForm, libraryOf } from "./hook-source.mjs";
 //   kitForm(command) -> whether it is one of the kit's forms, whole
 //   fetchedBy(command) -> the path of the project it fetches from main, or null where it is in neither form
+//   libraryOf(command) -> { library, rest } where it reads the script from the commit main pins of a library, at `rest`
+//                         there, or null
 
 // The starter kit's two forms of a hook's command, as setup/'s templates write them: its script fetched from main into
 // "$f" and run, perhaps with plain words after it, and nothing else, the second after one or more tests that a file is
@@ -19,22 +21,37 @@ const kitFetch = (dir, library = "") => `f=\\$\\(git -C "${dir}" --no-replace-ob
 // What core-path.mjs's hookCommands writes for a copy at another path than core/: the start's first test that the floor
 // can be read there, which stops a session that cannot, and, where a library carries the core, the script read from the
 // library's commit that main pins when main's own tree holds the library as a commit alone (never the working tree's: a
-// branch can commit files that form a bare repository where the library stands, which git, run in that folder, finds there
-// and reads objects and a config from; the command names the submodule's repository, its .git, which a branch cannot
-// commit, so the one git has there is the only one it opens, on every version of git).
+// branch can commit files that form a bare repository where the library stands, or the folder itself as a link, which git,
+// run in that folder or at its .git, finds there and reads objects and a config from; the command names the superproject's
+// own module repository, which git gives for the library's path (`--git-path modules/<library>`) and a branch cannot
+// commit, so the one git has there is the only one it opens, on every version of git; and the path it shows in the
+// library's commit is the one fetched first, below it: fetchedBy() reads the two as one).
 const FLOOR_TEST = `\\[ -f "\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}"/${KIT_PATH} \\] \\|\\| \\{ echo "[^"'$\`\\\\]*"; exit 0; \\}; `;
-const PIN_FALLBACK = ` \\|\\| \\{ s=\\$\\(git -C "\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}" --no-replace-objects rev-parse refs/remotes/origin/main:(?<library>${FETCHED}) 2>/dev/null\\) && git --git-dir="\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}"/\\k<library>/\\.git --no-replace-objects show "\\$s:${FETCHED}" 2>/dev/null; \\}`;
+const PIN_FALLBACK = ` \\|\\| \\{ s=\\$\\(git -C "\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}" --no-replace-objects rev-parse refs/remotes/origin/main:(?<library>${FETCHED}) 2>/dev/null\\) && m=\\$\\(git -C "\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}" rev-parse --git-path modules/\\k<library> 2>/dev/null\\) && git -C "\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}" --git-dir="\\$m" --no-replace-objects show "\\$s:(?<rest>${FETCHED})" 2>/dev/null; \\}`;
 const KIT_FORMS = [
   new RegExp(`^bash -c '(?:${FLOOR_TEST})?${kitFetch("\\$\\{CLAUDE_PROJECT_DIR:-\\.\\}", `(?:${PIN_FALLBACK})?`)} \\|\\| (?:exit 0|\\{ echo "[^"'$\`\\\\]*"; exit 0; \\}); (?:bash -c "\\$f"${KIT_ARGS}|node --input-type=module -e "\\$f"())'$`, "u"),
   new RegExp(`^bash -c 'r=\\$\\(git rev-parse --show-toplevel 2>/dev/null\\) \\|\\| exit 0; (?:\\[ (?:! )?-f "\\$r/${KIT_PATH}" \\] \\|\\| exit 0; )+${kitFetch("\\$r")} \\|\\| exit 0; CLAUDE_PROJECT_DIR="\\$r" bash -c "\\$f"${KIT_ARGS}'$`, "u"),
 ];
 
-// The path a command in one of the kit's forms fetches from main, or null where the command is in neither.
-export function fetchedBy(command) {
+// What a command in one of the kit's forms matched, its named groups, or null where it is in neither.
+function matched(command) {
   for (const form of KIT_FORMS) {
     const found = form.exec(String(command));
-    if (found) return found.groups.fetched;
+    if (found) return found.groups;
   }
   return null;
 }
+// The path a command in one of the kit's forms fetches from main, or null where the command is in neither, or reads, where
+// the library carries the core, another file of the library's commit than the one it fetched first: the two are one path,
+// the library's folder, a "/", then the path in the library.
+export function fetchedBy(command) {
+  const found = matched(command);
+  return found && (found.library === undefined || found.fetched === `${found.library}/${found.rest}`) ? found.fetched : null;
+}
 export const kitForm = command => fetchedBy(command) !== null;
+// Where the command in a kit's form reads the script from the library's commit main pins: { library, rest }, `rest` the
+// script's path in the library; null where it has no such fallback, or is in no form.
+export function libraryOf(command) {
+  const found = fetchedBy(command) === null ? null : matched(command);
+  return found?.library === undefined ? null : { library: found.library, rest: found.rest };
+}
