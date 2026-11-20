@@ -44,10 +44,10 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      and 200,000 of C#, past which the parser reads none of it (neither functions, imports nor tokens), 2 s for the
      parser on each and 250,000 nodes in the tree it gives, past which the parser reads none of it either
      (`scripts/tree-walk.mjs`), while of JavaScript and TypeScript it gives the parser nothing, reading their imports
-     without it; and of all the files a pull request changes together, 4,000,000 characters and 1.5 s of reading, of
-     any one file of code it leaves as it was, 4,000,000 characters, 1.5 s to link the files and follow the links from
-     each test, and 3 s for the whole of it, the project's own files read too, past which the selection reads no more
-     and runs the whole suite (`scripts/hurry.mjs`); hostile tests: `tests/hostile-pr-changes-test.mjs`.
+     without it; and of all the files a pull request changes together, 4,000,000 characters and 1.5 s of reading, of any
+     one file of JavaScript or TypeScript it leaves as it was, 4,000,000 characters, 1.5 s to link the files and follow
+     the links from each test, and 3 s for the whole of it, the project's own files read too, past which the selection
+     reads no more and runs the whole suite (`scripts/hurry.mjs`); hostile tests: `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
      of the work standing still (`scripts/look.mjs`, through `queue.mjs`'s placing and reading), with the open issues

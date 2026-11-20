@@ -5,10 +5,11 @@
 // more and the whole suite runs, its answer where it cannot tell a file's reach. Each reader holds one file to 2 s on
 // its own (tree-walk.mjs); these are the limits on all of them. Node's own modules: none.
 
-/** The most characters of changed code, all files together, the readers take, and of any one file of code the pull
- *  request leaves as it was; the lexer alone reads a file the parser is not given (past `LARGEST` in tree-walk.mjs, and
- *  any of JavaScript or TypeScript under the watch) at about 0.3 s for each million, so 4 million stay within about
- *  1.2 s, and no one read of the project's own carries the run far past `ALL_MS`. */
+/** The most characters of changed code, all files together, the readers take, and of any one file of JavaScript or
+ *  TypeScript the pull request leaves as it was (one of Python or C# past `LARGEST` in tree-walk.mjs is not read at
+ *  all); the lexer alone reads a file of JavaScript or TypeScript under the watch, and any past `LARGEST`, at about
+ *  0.3 s for each million, so 4 million stay within about 1.2 s, and no one read of the project's own carries the run
+ *  far past `ALL_MS`. */
 export const CHARACTERS = 4_000_000;
 /** The most time, in milliseconds, the readers take over the changed files together: a file read after the budget is
  *  passed can take about 3 s more, so this keeps the readers within about 4.5 s, and the run stops there (`Late`). The
@@ -35,7 +36,8 @@ export class Late extends Error {}
 
 /** A watch over one run's reading: `files` the paths the pull request changes. `size(texts, code)` fails at once where
  *  the changed files (of code, and the package files read beside it), as `texts` holds them, are past `characters`
- *  together, or one file of `code` the pull request leaves as it was is past it on its own;
+ *  together, or one file of `code` (those the lexer reads whole, whatever their size: JavaScript and TypeScript) the
+ *  pull request leaves as it was is past it on its own;
  *  `first(paths)` gives the changed ones first, in the order given, then the rest; `timed(file, read)` runs `read` and,
  *  where the changed files read so far have taken past `ms`, or the run since the watch began past `all`, fails. */
 export function hurry({ files, ms = SPENT_MS, characters = CHARACTERS, all = ALL_MS, now = Date.now }) {
