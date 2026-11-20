@@ -90,7 +90,9 @@ reads is the *shape check*'s config.
   the manifest's rows *test runners* and *billed minutes* only override them. The trigger is a workflow that runs the
   tests on a pull request: whoever writes or changes it moves the platform suites, and any it moves for their time, to
   that schedule. In the core, the Linux suites run after every merge and the Windows suites once an hour, with the tests
-  that reach the network on both (`.github/workflows/tests.yml`). It does not mean a public repository takes a runner on
+  that reach the network on both (`.github/workflows/tests.yml`); a builder whose change needs the Windows suites before
+  its merge starts that workflow by hand naming in its input `only` the parts and system its change reaches, and a
+  run in full only where its change reaches every part, a run so narrowed never read as a full one (#954). It does not mean a public repository takes a runner on
   a machine of the owner's, where a stranger's pull request would run its code (the script prints the advice: forks kept
   off that job at once, and one issue filed for the owner, labelled `needs-owner`), nor that a suite runs less than once
   before each release, nor that a project changes its workflow for this before its builders take it up. Reason: a full

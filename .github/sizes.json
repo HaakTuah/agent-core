@@ -59,6 +59,14 @@
       "mark": 25119,
       "why": "#441: the game rules split into a base and a file for each kind (#484, points 6 and 7)."
     },
+    "tasks/tests.md": {
+      "mark": 26094,
+      "why": "#943: along the readers it has."
+    },
+    "tests/workflows-test.mjs": {
+      "mark": 51121,
+      "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."
+    },
     "tests/steps-test.mjs": {
       "mark": 138318,
       "why": "#916: a file for each reader its sections test."

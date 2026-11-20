@@ -276,14 +276,22 @@ ok(/base=\$\(git rev-parse HEAD\)/u.test(proveRun) && !proveRun.includes(".base.
   if (process.platform !== "win32") {
     const gateRun = env => spawnSync("bash", ["-e", "-c", gateStep.run], { encoding: "utf8", env: { PATH: process.env.PATH, ...env } });
     const said = r => `${r.stdout}${r.stderr}`.replace(/::error::/g, "FAIL: ").replace(/" \\\n\s*"/g, " ");
-    const runs = [gateRun({ DRAFT: "yes", SUITES: "skipped", UPGRADE: "skipped" }), gateRun({ SUITES: "cancelled", UPGRADE: "success" }), gateRun({ SUITES: "success", UPGRADE: "failure" })];
+    const runs = [gateRun({ DRAFT: "yes", SUITES: "skipped", UPGRADE: "skipped" }), gateRun({ SUITES: "cancelled", UPGRADE: "success" }), gateRun({ SUITES: "success", UPGRADE: "failure" }),
+      gateRun({ SUITES: "skipped", UPGRADE: "success" })];
     const passes = gateRun({ SUITES: "success", UPGRADE: "success" });
-    ok(runs.every(r => r.status === 1 && mended(said(r))) && passes.status === 0, "the gate fails a draft, a cancelled job and a failed one, each with its mend, and passes where all passed", runs.map(said).join(" | "));
+    ok(runs.every(r => r.status === 1 && mended(said(r))) && passes.status === 0, "the gate fails a draft, a cancelled job, a failed one and a skipped one, each with its mend, and passes where all passed", runs.map(said).join(" | "));
+    // (#954: a start by hand that names parts passes where the jobs it picked passed, a group none of whose jobs it
+    // picked standing skipped, and fails where the pick failed or a group it picked jobs of was skipped)
+    const narrowed = [gateRun({ PICKED: "failure", SUITES: "skipped", UPGRADE: "skipped" }), gateRun({ PICKED: "success", NO_UPGRADE: "yes", SUITES: "skipped", UPGRADE: "skipped" }),
+      gateRun({ PICKED: "success", NO_UPGRADE: "yes", SUITES: "failure", UPGRADE: "skipped" })];
+    const narrowedPass = [gateRun({ PICKED: "success", NO_UPGRADE: "yes", SUITES: "success", UPGRADE: "skipped" }), gateRun({ PICKED: "success", NO_SUITES: "yes", SUITES: "skipped", UPGRADE: "success" })];
+    ok(narrowed.every(r => r.status === 1 && mended(said(r))) && narrowedPass.every(r => r.status === 0) && gateRun({ NO_UPGRADE: "yes", SUITES: "success", UPGRADE: "skipped" }).status === 1,
+      "a start by hand that names parts passes where the jobs it picked passed and the groups it picked none of stand skipped, and fails, saying its mend, where the pick failed or a picked job did not pass; no other run reads a group as unpicked", [...narrowed, ...narrowedPass].map(said).join(" | "));
   }
   // (each matrix is set whole for each event: GitHub adds back an entry of `include` that no combination left after
   // `exclude` matches, so the jobs are read from the lists the expression holds: a pull request's and a push's, the
-  // hourly run's, and all the others')
-  const lists = expr => { const m = /^\$\{\{ fromJSON\(\(github\.event_name == 'pull_request' \|\| github\.event_name == 'push'\) && '(\[[^']*\])' \|\| github\.event_name == 'schedule' && '(\[[^']*\])' \|\| '(\[[^']*\])'\) \}\}$/.exec(String(expr)); return m ? m.slice(1).map(x => JSON.parse(x)) : null; };
+  // hourly run's, and all the others', of which a start by hand that names parts runs those it picks: tests-parts-test.mjs)
+  const lists = expr => { const m = /^\$\{\{ fromJSON\(\(github\.event_name == 'pull_request' \|\| github\.event_name == 'push'\) && '(\[[^']*\])' \|\| github\.event_name == 'schedule' && '(\[[^']*\])' \|\| inputs\.only != '' && needs\.pick\.outputs\.(?:suites|upgrade) \|\| '(\[[^']*\])'\) \}\}$/.exec(String(expr)); return m ? m.slice(1).map(x => JSON.parse(x)) : null; };
   const suites = lists(tests.jobs.suites.strategy.matrix.include), upgrades = lists(tests.jobs.upgrade.strategy.matrix.include);
   const only = (l, os) => l.length > 0 && l.every(x => x.os === os);
   const NETWORK = "suites-network";
