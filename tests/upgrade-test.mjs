@@ -650,24 +650,19 @@ const lf = text => text.replace(/\r\n/g, "\n");
 // (a path from `home`, with "/", or null where it leads out of it)
 const within = (home, to) => { const rel = path.relative(home, to); return !rel || rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel) ? null : slash(rel); };
 
-/**
- * Each reader against its tool, on a clone of the synced project `p` ({ name, dir }) in `tmp`: `ok` takes each
- * comparison; `env` is the environment the test's programs are given, `sdk` whether the .NET SDK is here and `sdkEnv`
- * what it runs with.
- */
-function readersAgainstTools(p, { tmp, env, ok, sdk, sdkEnv }) {
-  const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
+// Each reader against its tool, on a clone of the synced project `p` in the test's folder.
+function readersAgainstTools(p) {
   const held = key => { try { return git(p.dir, "config", "--get", key); } catch { return ""; } };
   const dir = path.join(tmp, `${p.name}-kinds`);
   git(tmp, "clone", "-q", ...["core.autocrlf", "core.fileMode"].flatMap(k => held(k) ? ["-c", `${k}=${held(k)}`] : []), "--branch", "main", p.dir, dir);
   const dotnet = fs.existsSync(path.join(dir, "src/App/App.csproj"));
-  kinds(dir, git, tmp);
+  kinds(dir);
   ownWorkflow(dir);
   if (dotnet) buildFiles(dir);
   git(dir, "add", "-A");
-  againstGit(p, dir, git, ok);
-  againstBash(p, dir, { tmp, env, ok });
-  if (dotnet && sdk) againstSdk(p, dir, { tmp, env: { ...env, ...sdkEnv }, ok });
+  againstGit(p, dir);
+  againstBash(p, dir);
+  if (dotnet && sdk) againstSdk(p, dir);
   else if (dotnet) console.log(`note ${p.name}: no .NET SDK here, so its build files are not read against the SDK's`);
   fs.rmSync(dir, { recursive: true, force: true });
 }
@@ -677,7 +672,7 @@ function readersAgainstTools(p, { tmp, env, ok, sdk, sdkEnv }) {
 // A file of each kind git holds, beside the project's own: text with both line ends, a file to run, a link of each kind
 // (to a file of the project's, to a link, to a file git ignores, out of the project, by an absolute path inside it, to
 // nothing, to a folder), each written by git as it writes a link on this machine, and a submodule with a file of its own.
-function kinds(dir, git, tmp) {
+function kinds(dir) {
   write(dir, "kinds/text.txt", "a line\r\nanother\nthe last\r\n");
   write(dir, "kinds/run.sh", "#!/bin/sh\necho run\n");
   write(dir, "dist/ignored.txt", "a file git ignores\n");
@@ -705,7 +700,7 @@ function kinds(dir, git, tmp) {
 // gives it, its CRLF made LF; a link (120000) as its target's text where git lists the target inside the project, else
 // as missing, and as its own text where git wrote it as a file (core.symlinks false); a submodule (160000) as missing,
 // and the files in it too.
-function againstGit(p, dir, git, ok) {
+function againstGit(p, dir) {
   const entries = new Map(git(dir, "ls-files", "-s", "-z").split("\0").filter(Boolean).map(l => {
     const [, mode, oid, f] = /^(\d+) ([0-9a-f]+) \d+\t([\s\S]+)$/.exec(l);
     return [f, { mode, oid }];
@@ -765,7 +760,7 @@ const picked = (name, args) => name === "reading-size.mjs" ? args[0]
 
 // The workflow run by bash as GitHub runs it, with a `node` first on its PATH that logs the folder it runs in and its
 // arguments; each run of a check's script names, as the script picks it, the file configs() gives for that check.
-function againstBash(p, dir, { tmp, env, ok }) {
+function againstBash(p, dir) {
   const bin = path.join(tmp, `${p.name}-logging-node`), log = path.join(tmp, `${p.name}-node-log`);
   write(bin, "node", "#!/usr/bin/env bash\n{ pwd -W 2>/dev/null || pwd; for a in \"$@\"; do printf '%s\\n' \"$a\"; done; printf '\\036\\n'; } >> \"$NODE_LOG\"\n");
   fs.chmodSync(path.join(bin, "node"), 0o755);
@@ -803,12 +798,12 @@ function buildFiles(dir) {
 
 // The project's own files that `dotnet msbuild -pp` of each of its project files names (those git lists, outside the
 // copy), against those importsOf reads.
-function againstSdk(p, dir, { tmp, env, ok }) {
+function againstSdk(p, dir) {
   const reading = read(dir), copy = copyAt(reading), own = reading.files.filter(f => !f.startsWith(copy)), home = real(dir);
   const listed = new Set(own), named = new Set(), failed = [];
   for (const proj of own.filter(f => /\.(?:cs|fs|vb)proj$/i.test(f))) {
     const out = path.join(tmp, `${p.name}-pp.xml`);
-    const r = spawnSync("dotnet", ["msbuild", "-nologo", `-pp:${out}`, proj], { cwd: dir, env, encoding: "utf8" });
+    const r = spawnSync("dotnet", ["msbuild", "-nologo", `-pp:${out}`, proj], { cwd: dir, env: { ...env, ...sdkEnv }, encoding: "utf8" });
     if (r.status !== 0) { failed.push(`${proj}: ${r.stdout}${r.stderr}`); continue; }
     // (each file the build reads stands alone on a line of a comment, by its full path)
     for (const line of fs.readFileSync(out, "utf8").split(/\r?\n/)) {
@@ -845,7 +840,7 @@ for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newe
     ["touches its package list", dir => write(dir, "package.json", fs.readFileSync(path.join(dir, "package.json"), "utf8").replace('"private": true,', '"private": true,\n  "description": "a project",'))]],
   (results, what) => [[jobRan(results, "security-review.yml"), "a public repository's security-review check runs as before"],
     [ran(results, "signatures.yml", "Install from the lock file, from the registry alone, running no package's install script") === what.includes("package"), "the signature check installs only where the package list changed"]]);
-  readersAgainstTools(npmProject, { tmp, env, ok, sdk, sdkEnv }); // (the readers of its set-up against git and bash: #629)
+  readersAgainstTools(npmProject); // (the readers of its set-up against git and bash: #629)
 
   // the .NET project, private, held as Windows holds it
   const dotnetProject = project(`a-dotnet-project-from-${tag}`, from, { owner: "someone-else", kit: ["--nuget", ".", "--private"], isPrivate: true, windows: true, as: ownersName, files: dir => {
@@ -864,7 +859,7 @@ for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newe
     ["touches a project file", dir => write(dir, "src/App/App.csproj", fs.readFileSync(path.join(dir, "src/App/App.csproj"), "utf8").replace("</Project>", "  <!-- a note -->\r\n</Project>"))]],
   (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
     ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
-  readersAgainstTools(dotnetProject, { tmp, env, ok, sdk, sdkEnv }); // (and against the .NET SDK, held as Windows holds it)
+  readersAgainstTools(dotnetProject); // (and against the .NET SDK, held as Windows holds it)
   nugetInPrivate(dotnetProject);
   parserUnnamed(dotnetProject);
   if (tag === starts.at(-1)) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); } // (the kit's calls are the same from either release)
