@@ -12,7 +12,8 @@
 // - and in full before each release in every case;
 // and where every merge goes live (the manifest's *users get*, `merges` where no row says), on each pull request.
 // Where a public repository runs a job on a pull request or a push on a runner of its own, or on one it cannot read, it
-// prints the advice: keep forks off that job at once, and file one issue for the owner, labelled needs-owner, since a
+// prints the advice (where the folder could not be listed, that a job on such a runner may stand there, and how to have it
+// read): keep forks off that job at once, and file one issue for the owner, labelled needs-owner, since a
 // stranger's pull request would run its code on that machine (floor rule 18). It fails nothing ("Nothing locks a project").
 // gh, Node's own modules and the core's yaml package.
 //
@@ -194,15 +195,15 @@ function saidOf(s, priv, unread) {
   const whereBy = s.whereRow ? `, as the manifest's row *test runners* says (read: ${s.whereRead})` : "";
   const paidBy = s.billedRow ? ", as the manifest's row *billed minutes* says"
     : priv === null ? " (whether the repository is private was not read, so taken as billed)" : `, the repository being ${priv ? "private" : "public"}`;
-  return [`where the tests run: ${PLACES[s.where]}${whereBy}${s.unknown && !s.whereRow ? ` (${s.unlisted ? "the workflows folder could not be listed; mend: run it from the project's root, where .github/workflows is a folder" : "a job's runner, named by a label of its own or an expression, could not be read"}, so taken as the owner's own)` : ""}`, `who pays: ${s.billed ? "minutes billed" : "the host's free minutes"}${paidBy}`,
+  return [`where the tests run: ${PLACES[s.where]}${whereBy}${s.unknown && !s.whereRow ? ` (${s.unlisted ? "the workflows folder could not be listed" : "a job's runner, named by a label of its own or an expression, could not be read"}, so taken as the owner's own${s.unlisted ? "; mend: run this script from the project's root, and there make .github/workflows a folder that can be listed" : ""})` : ""}`, `who pays: ${s.billed ? "minutes billed" : "the host's free minutes"}${paidBy}`,
     ...unread.length ? [`workflows not read: ${unread.map(f => oneLine(f).slice(0, 60)).join(", ")}`] : []];
 }
 
 // The floor rule 18 advice for a public repository whose jobs may run on a runner of the owner's own, or null.
 function adviceOf(w, priv) {
-  const notListed = w.unlisted && !w.selfHosted && !w.unknown, job = notListed ? "any such job" : "that job";
+  const notListed = w.unlisted, job = notListed ? "any such job" : "that job";
   return (w.selfHosted || w.unknown || w.unlisted) && priv === false
-    ? `A public repository ${notListed ? "whose workflows folder could not be listed may run a job on a runner of the owner's own (run this from the project's root first, so that the folder is read)" : `runs a job on ${w.selfHosted ? "a runner of the owner's own" : "a runner that could not be read, perhaps the owner's own"}`}, where a stranger's pull request would run its code (floor rule 18): keep pull requests from forks off ${job} at once (an \`if:\` that its head repository is this one), and, where no open issue names it, file one for the owner, labelled needs-owner, to move ${job} to the host's runners or have every outside contributor's run approved first; nothing else waits on it.`
+    ? `A public repository ${notListed ? "whose workflows folder could not be listed may run a job on a runner of the owner's own (run this script from the project's root first, and there make .github/workflows a folder that can be listed, so that it is read)" : `runs a job on ${w.selfHosted ? "a runner of the owner's own" : "a runner that could not be read, perhaps the owner's own"}`}, where a stranger's pull request would run its code (floor rule 18): keep pull requests from forks off ${job} at once (an \`if:\` that its head repository is this one), and, where no open issue names it, file one for the owner, labelled needs-owner, to move ${job} to the host's runners or have every outside contributor's run approved first; nothing else waits on it.`
     : null;
 }
 
