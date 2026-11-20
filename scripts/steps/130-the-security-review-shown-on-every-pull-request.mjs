@@ -1,6 +1,6 @@
 // The step of setup/sync-notes/130-the-security-review-shown-on-every-pull-request.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { call } from "../check-configs.mjs";
+import { call } from "../workflow-calls.mjs";
 import { COST } from "../step-checks.mjs";
 
 export default { lead: "12 November 2026, the security review shown on every pull request", cost: COST.workflow,

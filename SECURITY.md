@@ -90,7 +90,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - a project's build, package and workflow files: read by the licence, exact-versions, NuGet, workflow and agent-tools
      checks and the reader of where the tests run (`scripts/licences.mjs`, `scripts/exact-versions.mjs`,
      `scripts/nuget.mjs`, `scripts/workflows.mjs`, `scripts/agent-tools.mjs`, `scripts/runners.mjs`), the reader of a
-     project's own workflows (`scripts/workflow-run.mjs`, for `check.mjs`, `check-configs.mjs` and `steps.mjs`) and the
+     project's own workflows (`scripts/workflow-run.mjs`, for `check.mjs`, `own-runs.mjs` and `steps.mjs`) and the
      sync's move of the pins (`scripts/sync.mjs`); limits: 64 MB of a file for the licence check (256 MB for NuGet's), 1
      MB of an action and 5,000 steps of a workflow, 256 K characters of a workflow for the readers of its YAML (past it,
      said unread with its mend, never given to the parser, and `parseYaml` throws it with its mend; such a file

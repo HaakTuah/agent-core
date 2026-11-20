@@ -11,7 +11,7 @@ import { mended } from "../scripts/mend.mjs";
 import { TEMPLATES } from "../scripts/init.mjs";
 import { holds, parseYaml } from "../scripts/workflow-run.mjs";
 import { draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, repeated, unlinked, unparsed, unreadied } from "../scripts/workflows.mjs";
-import { Unread } from "../scripts/check-configs.mjs";
+import { Unread } from "../scripts/workflow-calls.mjs";
 import { readyOnlyHolds } from "../scripts/step-checks-ready.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { keysOnce } from "../scripts/step-checks-workflow-text.mjs";

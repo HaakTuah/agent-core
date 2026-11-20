@@ -4,7 +4,8 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { READ_MOST } from "../own-files.mjs";
-import { Unread, copyAt, marksConfig } from "../check-configs.mjs";
+import { Unread, copyAt } from "../workflow-calls.mjs";
+import { marksConfig } from "../check-configs.mjs";
 import { COST, shown } from "../step-checks.mjs";
 
 export default { lead: "14 November 2026, the size marks' total counts the project's own files", cost: COST.line,

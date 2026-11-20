@@ -2,7 +2,9 @@
 // of their names.
 import { coreOf, kitHooks, listed, readProject, check as toolsCheck } from "../agent-tools.mjs";
 import { installed } from "../packages.mjs";
-import { calls, copyAt, licenceConfig, runFiles } from "../check-configs.mjs";
+import { calls, copyAt } from "../workflow-calls.mjs";
+import { licenceConfig } from "../check-configs.mjs";
+import { runFiles } from "../own-runs.mjs";
 import { COST } from "../step-checks.mjs";
 
 export default { lead: "16 November 2026, an agent's own tools listed", cost: COST.line,

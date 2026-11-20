@@ -3,7 +3,7 @@
 // takes the project as steps.mjs's `project` reads it and returns the mend, or null where the step is done; a step
 // names the ones it needs, none runs by itself. It reads only. Node's own modules and git only.
 import path from "node:path";
-import { commands, uncommented } from "./check-configs.mjs";
+import { commands, uncommented } from "./step-commands.mjs";
 import { parseYaml } from "./workflow-run.mjs";
 import { everyPush } from "./step-checks.mjs";
 
@@ -134,7 +134,7 @@ function stepOf(st, job, w, started) {
   return { cmds, counts, unconditioned: unconditioned(st), hidden: boxed || hides(st, env, job, w), plain: !boxed && typeof st?.uses === "string" && plainAction({ ...st, env }, job, w), dir: folderOf(st, job, w), uses: typeof st?.uses === "string" ? st.uses : null, env };
 }
 
-// Each job of a workflow: the commands its steps run (shell comments left out, as check-configs.mjs's reader reads
+// Each job of a workflow: the commands its steps run (shell comments left out, as step-commands.mjs's reader reads
 // them), all of them and step by step in order; for each step, whether a lookup there counts; and whether its checkout
 // holds the base beside the head (a fetch-depth of 0, or 2 or more, and no ref of another commit). A lookup counts only
 // as the one command of its step, in a workflow a pull request starts, where neither the step nor its job carries an
