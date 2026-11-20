@@ -122,6 +122,14 @@
     "tests/size-test.mjs": {
       "mark": 28199,
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
+    },
+    "scripts/staged/scratch.mjs": {
+      "mark": 43399,
+      "why": "#938: the sealed reader of what a session left apart from the set-up of a case and the readers' helpers."
+    },
+    "tests/staged-test.mjs": {
+      "mark": 122661,
+      "why": "#937: split into the three parts it already runs in, with the shared set-up in a module of its own."
     }
   }
 }
