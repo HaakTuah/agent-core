@@ -37,8 +37,8 @@ export function tally() {
 export const OWNER = ".scratch-owner";
 const owner = () => `${os.hostname()}:${process.pid}`;
 
-// (a process that exists but may not be signalled, EPERM, is alive)
-const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; } };
+// (only "no such process" is gone: one that may not be signalled, EPERM, or a pid no process holds in this form, is alive)
+const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code !== "ESRCH"; } };
 
 let swept = false;
 

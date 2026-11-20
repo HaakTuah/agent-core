@@ -11,6 +11,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { faults, report, testsOf } from "../scripts/mutate.mjs";
+import { OWNER } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -141,7 +142,7 @@ try {
   ok(!fs.existsSync(next.dir), "a test that ends takes away its own scratch folder as before");
   // (a folder another machine's process made, over a temporary folder shared between machines, is no business of this one's)
   const foreign = fs.mkdtempSync(path.join(os.tmpdir(), "stopped-test-"));
-  fs.writeFileSync(path.join(foreign, ".scratch-owner"), `${os.hostname()}-elsewhere:999999999`);
+  fs.writeFileSync(path.join(foreign, OWNER), `${os.hostname()}-elsewhere:999999999`);
   await ended((await start("end")).child);
   ok(fs.existsSync(foreign), "the scratch folder of a process on another machine is left where it is", foreign);
   running.child.kill("SIGKILL");
