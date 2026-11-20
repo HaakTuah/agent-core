@@ -28,6 +28,9 @@ export function target(url, root) {
   return rel.split(path.sep).join("/");
 }
 
+// Where a link out of `root` leads, from `root` (as "../x.md"), or as lychee wrote it where it names no path.
+const away = (url, root) => { try { return path.relative(root, fileURLToPath(new URL(url.replace(/[?#].*$/su, "")))).split(path.sep).join("/"); } catch { return url; } };
+
 // A link's line in its file: the first that holds the last part of where it leads, else the first.
 const lineIn = (text, to) => { const name = to.split("/").pop(); return (text ?? "").split(/\r\n?|\n/u).findIndex(l => name && l.includes(name)) + 1 || 1; };
 
@@ -40,7 +43,7 @@ export function listed(file, dump, { root, tracked, folders, text }) {
     const to = target(url, root);
     if (to === undefined) continue;
     count++;
-    const where = to ?? decodeURI(url.replace(/[?#].*$/su, "").replace(/^file:\/\/[^/]*/iu, ""));
+    const where = to ?? away(url, root);
     if (to === null) found.push({ file, line: lineIn(text(file), where), kind: "outside", to: where, said: "leads out of the project" });
     else if (to !== "" && !tracked.has(to) && !folders.has(`${to}/`)) found.push({ file, line: lineIn(text(file), to), kind: "file", to, said: "leads to no tracked file or folder" });
   }
@@ -120,10 +123,11 @@ export function checkRules({ program, rules, tracked, folders, text, base }) {
 export const words = f => `${f.file}:${f.line}: the link to ${f.to} ${f.said}${f.kind === "heading" ? ". Mend: point it at a heading that is there (its anchor as GitHub makes it), or take the \"#\" part out" : f.kind === "outside" ? ". Mend: point it at a file of the project's, or write the address on the web it means" : ". Mend: point it at the file or folder that holds what it means, or take it out where that is gone"}`;
 
 // The head's findings against the base's, as { fails, notes }: of each kind (the file, what it leads to and why, its
-// line aside, so that a link moved is no new finding), as many as the base held are noted and the rest fail; with no
-// base (`base` null), each is noted.
+// line aside, so that a link moved is no new finding; for a link out of the project, the file alone, since the base's
+// tree stands in another folder), as many as the base held are noted and the rest fail; with no base (`base` null),
+// each is noted.
 export function compared(head, base) {
-  const key = f => `${f.file}\0${f.kind}\0${f.to}`, held = new Map();
+  const key = f => `${f.file}\0${f.kind}\0${f.kind === "outside" ? "" : f.to}`, held = new Map();
   for (const f of base ?? []) held.set(key(f), (held.get(key(f)) ?? 0) + 1);
   const fails = [], notes = [];
   for (const f of head) {

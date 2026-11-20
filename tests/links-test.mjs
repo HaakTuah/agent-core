@@ -42,6 +42,9 @@ ok(held.fails.length === 1 && /b\.md#y/.test(held.fails[0]) && mended(`FAIL ${he
   "a finding the base held, moved to another line, is noted; a new one fails, saying its mend", JSON.stringify(held));
 ok(none.fails.length === 0 && /with no base to read against/.test(none.notes[0]) && core.fails.length === 1 && core.notes.length === 0, "with no base each is noted; against an empty base, as in the core's run, each fails");
 ok(compared([f(1, "b.md#x"), f(2, "b.md#x")], [f(1, "b.md#x")]).fails.length === 1, "of two alike where the base held one, one fails");
+const out = (to, file = "AGENTS.md") => ({ file, line: 2, kind: "outside", to, said: "leads out of the project" });
+ok(compared([out("../away.md")], [out("../../x/away.md")]).fails.length === 0 && compared([out("../away.md")], [out("../away.md", "SECURITY.md")]).fails.length === 1,
+  "a link out of the project the base held in the same file is noted, though the base's tree stands in another folder; one in another file fails");
 
 // The pointer check end to end, with a stand-in for lychee: it lists each [text](path) of a file as lychee's --dump does,
 // and reports each "#heading" whose file holds no such heading as lychee's --include-fragments does
@@ -95,7 +98,7 @@ if (process.platform !== "win32") {
     fs.writeFileSync(path.join(path.dirname(dir), "away.md"), "# Away\n");
     g("add", "AGENTS.md");
     r = check({ LYCHEE, POINTERS_BASE: "HEAD" });
-    ok(r.code === 1 && /the link to notes\.md leads to no tracked file or folder/.test(r.out) && /the link to .*away\.md leads out of the project/.test(r.out) && mended(r.out),
+    ok(r.code === 1 && /the link to notes\.md leads to no tracked file or folder/.test(r.out) && /the link to \.\.\/away\.md leads out of the project/.test(r.out) && mended(r.out),
       "a link to a file on the disk that git does not track fails, and one out of the project", r.out);
     fs.rmSync(path.join(path.dirname(dir), "away.md"));
     r = check({ FAKE_LYCHEE_FAIL: "1", LYCHEE, POINTERS_BASE: "HEAD" });
