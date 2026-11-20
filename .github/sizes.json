@@ -122,6 +122,18 @@
     "tests/size-test.mjs": {
       "mark": 28199,
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
+    },
+    "scripts/licence-commands.mjs": {
+      "mark": 36574,
+      "why": "#946: split along who reads which part: the fetcher patterns, npm's reading of a line, finding commands in a text."
+    },
+    "scripts/licence-scan.mjs": {
+      "mark": 29155,
+      "why": "#946: split so that the reading of pages and components stands apart from the scan of a project's files."
+    },
+    "tests/licence-fetch-test.mjs": {
+      "mark": 34107,
+      "why": "#946: split as the scan is, the table of npm forms, of other fetchers and of pages in a file each."
     }
   }
 }
