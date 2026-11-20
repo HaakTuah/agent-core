@@ -75,7 +75,7 @@ export function reported(checked, { root, text }) {
 // One error of lychee's on a heading, as a finding of the file `from`.
 function heading(e, from, root, text) {
   const url = String(e?.url ?? ""), to = target(url, root), hash = /#(.*)$/su.exec(url)?.[1] ?? "";
-  return { file: from, line: Number(e?.span?.line) || lineIn(text(from), hash), kind: "heading", to: `${to ?? url}#${decoded(hash)}`, said: HEADING };
+  return { file: from, line: Number(e?.span?.line) || lineIn(text(from), hash), kind: "heading", to: `${to ?? url}#${decoded(hash)}`, path: to ?? "", said: HEADING };
 }
 
 // lychee on the rule files `files` of `root`, as { found, count } or, where it could not run or read them, { unread: why }.
@@ -143,7 +143,7 @@ export function checkRules({ program, rules, tracked, folders, text, base }) {
   if (head.unread || !head.found.length || !base) return { read, ...head, ...(head.unread ? {} : compared(head.found, base === "" ? [] : null)) };
   let was = null;
   try {
-    was = baseTree(base, process.env.RUNNER_TEMP || os.tmpdir(), [...read, ...head.found.filter(f => f.kind !== "outside").map(f => f.to.replace(/#.*$/su, ""))]);
+    was = baseTree(base, process.env.RUNNER_TEMP || os.tmpdir(), [...read, ...head.found.filter(f => f.kind !== "outside").map(f => f.path ?? f.to)]);
     const file = f => fs.lstatSync(path.join(was.dir, f), { throwIfNoEntry: false });
     const there = was ? read.filter(f => file(f)?.isFile() && readable(fs.readFileSync(path.join(was.dir, f)))) : [];
     const r = was && run({ program, root: was.dir, files: there, tracked: was.tracked, folders: was.folders, text: f => fs.readFileSync(path.join(was.dir, f), "utf8") });

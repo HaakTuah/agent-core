@@ -34,6 +34,8 @@ const heads = reported(report, at);
 ok(heads?.length === 1 && heads[0].kind === "heading" && heads[0].file === "a.md" && heads[0].to === "b.md#gone" && heads[0].line === 3,
   "a heading not there is lychee's finding, at its line; a file it did not find is left to the core's reading of its list", JSON.stringify(heads));
 const bad = reported(JSON.stringify({ error_map: { [path.join(root, "a.md")]: [{ url: `${url("b.md")}#%E0%A4%A`, status: { text: "Cannot find fragment" } }] } }), at);
+ok(heads[0].path === "b.md" && reported(JSON.stringify({ error_map: { [path.join(root, "a.md")]: [{ url: `${url("a#b.md")}#gone`, status: { text: "Cannot find fragment" } }] } }), at)?.[0]?.path === "a#b.md",
+  "a heading's finding keeps the path it leads to apart from its \"#\" part, a \"#\" in a file's name kept (#582's review)");
 ok(bad?.length === 1 && bad[0].to === "b.md#%E0%A4%A", "a heading written with an escape no browser decodes is a finding as it stands, never a crash (#582's review)", JSON.stringify(bad));
 ok(lycheeReads("AGENTS.md") && lycheeReads("docs/a b.mdx") && !lycheeReads(".kiro/agents/a.json") && !lycheeReads("docs/x.txt") && !lycheeReads(".kiro/steering/b\n/etc/hostname.md") && !lycheeReads("docs/[a].md") && !lycheeReads("docs/*.md"),
   "lychee is given a Markdown file whose name holds no control character or pattern; any other is left to the core's own reading");
@@ -135,8 +137,10 @@ if (process.platform !== "win32") {
     ok(r.status === 0 && /note .*AGENTS\.md:5: the link to docs\/developing\.md#gone .*as on the base, so it fails nothing/.test(r.stdout + r.stderr), "a rule file the base's attributes leave out of an archive is read from git's own blobs: what the base held is noted", r.stdout + r.stderr);
   } finally { for (const d of [two, tools]) fs.rmSync(d, { recursive: true, force: true }); }
 }
-// (the base's files written from git's own blobs: a tree that names "..", a link inside the project and one out of it, and
-// a page; nothing is written out of the folder, the link inside is read through, the one out is not; #582's review)
+// (the base's files written from git's own blobs: a tree that names "..", a link inside the project and one out of it, a
+// linked folder and a page; nothing is written out of the folder, the links inside are read through, the one out is not;
+// #582's review. A path given that names "..", readAt() already refuses on its own: safe() on the paths guards a name
+// with a backslash, which only Windows, where this case does not run, reads as a separator)
 {
   const repo = scratchDir("links-test-tree-"), under = scratchDir("links-test-under-"), gi = (args, input) => execFileSync("git", args, { cwd: repo, input, encoding: "utf8" }).trim();
   try {
@@ -150,7 +154,7 @@ if (process.platform !== "win32") {
     const was = baseTree(sha, under, ["AGENTS.md", "link.md", "docs/README.md", "../escape.md"]);
     const at = f => fs.existsSync(path.join(was?.dir ?? "/nowhere", f));
     ok(was && at("AGENTS.md") && at("api.html") && at("link.md") && fs.readFileSync(path.join(was.dir, "link.md"), "utf8").includes("## Here") && !at("out.md") && at("docs/README.md") && fs.readFileSync(path.join(was.dir, "docs/README.md"), "utf8").includes("## There") && !fs.readdirSync(under).some(f => f === "evil.md") && !fs.existsSync(path.join(path.dirname(was.dir), "evil.md")) && was.tracked.has("AGENTS.md"),
-      "the base's files are written from git's blobs: a page, a link inside the project and a file under a linked folder read through, a link out of it not, and nothing out of the folder for a tree or a path that names \"..\"", JSON.stringify(was && fs.readdirSync(was.dir)));
+      "the base's files are written from git's blobs: a page, a link inside the project and a file under a linked folder read through, a link out of it not, and nothing out of the folder for a tree that names \"..\"", JSON.stringify(was && fs.readdirSync(was.dir)));
     if (was) fs.rmSync(was.dir, { recursive: true, force: true });
   } finally { process.chdir(path.dirname(fileURLToPath(import.meta.url))); for (const d of [repo, under]) fs.rmSync(d, { recursive: true, force: true }); }
 }
