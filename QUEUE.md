@@ -14,7 +14,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #704 | builder; `tests.yml` | #715 |
 | #770 | builder; `tests.yml` | #704 |
 | #772 | builder; `tests.yml` | #770 |
-| #629 | builder | #624 |
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #580 | builder | |
 | #582 | builder | |
@@ -31,7 +30,6 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #314 | rule builder | |
 | #457 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
-| #464 | rule builder | |
 | #441, with #484, points 6 and 7 | rule builder; the file stays whole where #469's measure finds no kind of task reads less | #469 |
 | #355 | builder | #530: the readers left go on the parser #529 brings |
 | #542, point 5 | rule builder | #457 |
@@ -89,7 +87,6 @@ They read and change no rule.
 | #920 | builder | |
 | #931 | builder | |
 | #892 | builder | |
-| #888 | builder | #925 |
 | #884 | builder | |
 | #852 | builder | |
 | #860 | builder | |
@@ -99,6 +96,7 @@ They read and change no rule.
 | #937 | builder | |
 | #938 | builder | |
 | #958 | builder | |
+| #973 | builder; a split, its meaning kept | |
 | #919 | builder | #917 |
 
 ## Not taken up
