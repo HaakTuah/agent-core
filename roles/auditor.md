@@ -20,7 +20,8 @@ reviews of the pull request that holds its report read it.
 
 **It proposes a check only for a finding seen twice** (#464, point 7). By default the auditor proposes no new check;
 where a finding came up at two readings of its kind, it proposes one in its answers. It does not mean that a reading's
-brief cannot widen it, as the audit's does (`tasks/cleaning.md`). Reason: checks piled on make code harder to change. Held by nothing yet: the reviews of the pull request that holds its report read it.
+brief cannot widen it, as the audit's does (`tasks/cleaning.md`). Reason: checks piled on make code harder to change.
+Held by nothing yet: whether two findings are one is a reading.
 
 **Only counts and conclusions leave the project** (#464, point 7). A weakness the auditor finds goes the way floor rule
 9 gives (`floor/topics/weaknesses.md`), never into its report; of the rest, only counts and conclusions leave the
