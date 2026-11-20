@@ -97,6 +97,16 @@ for (const variable of ["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_OBJEC
   if (variable === "GIT_DIR") ok(took === "another repository\n", "and the single call reads what git's own variable names");
 }
 
+// A checkout another user owns is left to the single call, which git's own check of ownership refuses (where the test may change an owner).
+if (process.platform !== "win32" && process.getuid?.() === 0) {
+  const theirs = fs.mkdtempSync(path.join(base, "theirs-"));
+  git(theirs, "init", "-q", "-b", "main");
+  fs.writeFileSync(path.join(theirs, "a"), "theirs\n");
+  git(theirs, "add", "-A");
+  git(theirs, "commit", "-q", "-m", "theirs");
+  execFileSync("chown", ["-R", "65534", path.join(theirs, ".git")]);
+  ok(objectAt(theirs, "HEAD", "a") === undefined && textAt(theirs, "HEAD", "a") === show(theirs, "HEAD:a"), "a checkout another user owns is read as git reads it, by the single call");
+}
 // A repository whose `.git` is a file (a working tree of another's): the batch asks it by that file.
 const tree2 = path.join(base, "second-tree");
 git(dir, "worktree", "add", "-q", "--detach", tree2, "HEAD");

@@ -96,11 +96,12 @@ function ask(key, args, line, batch) {
 const GIT_PLACES = ["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_INDEX_FILE", "GIT_CEILING_DIRECTORIES"];
 // The repository's own folder where the root holds it as `.git`, the one place git is asked without walking up from the
 // root (a folder git finds above it, a variable naming another, a checkout another user owns, which git's own check of
-// ownership refuses to read unless it is told so, and a name past a line are the single call's).
+// ownership refuses to read unless it is told so (read here on Linux and macOS, where the owner's number is at hand; on
+// Windows git's check is not repeated, the checkout there being the runner's own), and a name past a line are the single call's).
 function home(root) {
   const own = path.resolve(root, ".git");
   let mine = false;
-  try { mine = process.platform === "win32" || fs.statSync(own).uid === process.geteuid(); } catch { /* (no .git there) */ }
+  try { mine = fs.existsSync(own) && (process.platform === "win32" || fs.statSync(own).uid === process.geteuid()); } catch { /* (no .git there) */ }
   return mine && !GIT_PLACES.some(v => process.env[v] !== undefined) ? own : null;
 }
 // Close the git processes, so that the next question reads the repository as it stands then (a run reads the commits as they stand when it starts).
