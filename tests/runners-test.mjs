@@ -61,7 +61,7 @@ try {
   for (const target of [hostile, at("plain")]) {
     fs.rmSync(hostile, { force: true }); fs.symlinkSync(target, hostile);
     r = read({ repo: "o/n", dir: hostile, manifest: rel, gh: host(false) });
-    ok(workflowsIn(hostile).unlisted === true && r.where === "self-hosted" && /workflows not read: /.test(r.said.join("\n")) && /forks off that job/.test(r.advice ?? ""),
+    ok(workflowsIn(hostile).unlisted === true && r.where === "self-hosted" && /workflows not read: /.test(r.said.join("\n")) && /forks off any such job/.test(r.advice ?? "") && /from the project's root/.test(r.said[0]) && /from the project's root/.test(r.advice ?? ""),
       "a workflows path that is a link to itself, or to a plain file, in a checkout's root is not read, never read as no jobs, and a public repository is advised", r.said.join(" | "));
   }
   if (process.platform !== "win32" && process.getuid?.() !== 0) {
