@@ -34,7 +34,8 @@
 // "What holds it" is asked and holds more than "None", of a pull request opened since the copy on its base held
 // NUMBER_SINCE, a line under it that names a rule's number in its form ("Number: findings; outcome: robust";
 // outcomes.mjs's NUMBER; #303). And, since YES_SINCE, the owner's yes where the core's floor or review guidelines change
-// (owner-yes.mjs, beside this file; #549). And, of one opened since the copy on its base held REASONS_SINCE that adds a
+// (owner-yes.mjs, beside this file; #549), save of a file whose change only follows files it moves (path-only.mjs;
+// #886, point 1). And, of one opened since the copy on its base held REASONS_SINCE that adds a
 // line under the manifest's "Differences" (read from git, the merge commit against its base), the line "Reasons read:"
 // (tasks/updates.md, "A question or difference about a rule of the core starts from its reasons"; #756). A line asked
 // for passes where it begins in its form, whatever follows it (#750, point 4).
@@ -52,6 +53,7 @@ import { isPart, milestoneMends } from "./milestones.mjs";
 import { differencesOf } from "./manifest-reads.mjs";
 import { NUMBER } from "./outcomes.mjs";
 import { asking, coreAtBase, issuesOf, textsOf, yesOf } from "./owner-yes.mjs";
+import { proven } from "./path-only.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, pathIn, taken, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
 import { changedMend, plain, testsChanged } from "./weakened.mjs";
@@ -294,8 +296,11 @@ if (started(import.meta.url)) {
       const at = coreAtBase(process.cwd()), paths = diff.status === 0 && at !== null ? asking(diff.stdout.split("\0").filter(Boolean), at) : null;
       if (paths === null) console.log("ok   the owner's yes is not asked here: the change could not be read against its base");
       else {
-        const issues = issuesOf(process.env.PR_BODY), got = paths.length && issues.length ? textsOf(repo, issues) : { texts: [], read: true };
-        const yes = yesOf({ paths, body: process.env.PR_BODY, ...got });
+        // (a file whose change only follows files the pull request moves asks no yes: path-only.mjs; #886, point 1)
+        const follow = paths.length ? proven(process.cwd(), "HEAD^1", "HEAD", paths) : [], rest = paths.filter(p => !follow.includes(p));
+        if (follow.length) console.log(`ok   the owner's yes is not asked of ${follow.join(", ")}: only paths that follow files the pull request moves`);
+        const issues = issuesOf(process.env.PR_BODY), got = rest.length && issues.length ? textsOf(repo, issues) : { texts: [], read: true };
+        const yes = yesOf({ paths: rest, body: process.env.PR_BODY, ...got });
         if (yes.mend) mends.push(yes.mend); else console.log(`ok   ${yes.note}`);
       }
     } else console.log(`ok   the owner's yes is not asked here: ${why}`);

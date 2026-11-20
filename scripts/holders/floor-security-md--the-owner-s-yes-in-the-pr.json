@@ -1,5 +1,6 @@
 {
   "rule": "floor/security.md: The owner's yes in the PR",
-  "holder": "check: scripts/pr-description.mjs, in part",
-  "behind": [232]
+  "holder": ["check: scripts/pr-description.mjs, in part", "check: scripts/path-only.mjs, in part"],
+  "behind": [232, "#886.1"],
+  "number": "check fires; outcome: fast"
 }

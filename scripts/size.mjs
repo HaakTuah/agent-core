@@ -76,13 +76,18 @@ import { started } from "./started.mjs";
 // 1,073 over. The builder's and the orchestrator's, raised one step each on 19 November 2026 for #750, point 7, "A
 // builder hands over by its context": a ninth fresh leanness check found about 68 bytes of room in the builder's start,
 // for 282 over, and about 142 in the orchestrator's, for 69 over; of those, 57 rested on a misread, 74 cut a rule's
-// name and 11 a restatement it called marginal, so none was made, and the design check's fixes grew both starts.
+// name and 11 a restatement it called marginal, so none was made, and the design check's fixes grew both starts. The
+// adviser's and the reviewer's, raised one step each on 19 November 2026 for #886, point 1, floor rule 3's yes asked of
+// no path that follows a moved file: a tenth fresh leanness check found 22 bytes of room in the floor, 41 in the review
+// guidelines and 20 in the inbox, for 143 over in the adviser's and 140 in the reviewer's once the clause took its
+// reviewed words; the floor's and the guidelines' are changes the owner's yes on #886 does not cover, the inbox's cuts
+// the name of another rule ("Bugs don't wait"), so none was made, and neither start would fit all the same.
 export const CAPS = {
   builder: 32 * 1024,
   design: 33 * 1024,
   orchestrator: 49 * 1024,
-  adviser: 33 * 1024,
-  reviewer: 26 * 1024,
+  adviser: 34 * 1024,
+  reviewer: 27 * 1024,
   "stand-in": 20 * 1024,
 };
 // The core's *progress file*, read at every session's start here, held to a mark of its own, below the general mark a
