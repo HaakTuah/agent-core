@@ -28,6 +28,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "steps-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const PIN = "a".repeat(40);
+// (a test that reads one step's answer asks for that step alone: the others' checks, the agent tools' files among them, which run
+// the copies and pointers checks on the whole project, answer nothing it reads, and a Windows runner pays for each)
+const only = lead => STEPS.filter(s => s.lead === lead);
 // What a reader's "one pass" or its bound means is that its work grows in step with its text (or stops at
 // its bound), never a time of its own on a real clock, which a busy machine stretches: `read(n, k)` reads a text of
 // size n (its k-th, so that none is read from the reader's memory) and says whether it was read right, or does what
@@ -90,8 +93,9 @@ function kit(name, o, { held = true } = {}) {
   }
   fs.mkdirSync(path.join(dir, "checks"), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify(licences(o, () => false), null, 2)}\n`);
-  // (the copy of the core the project holds, as far as its checks read it, and the size marks the kit writes for it)
-  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", ".packages", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
+  // (the copy of the core the project holds, as far as its checks read it, its .gitignore too, which keeps the installed packages out of git as in a
+  // synced project, where staging them cost a Windows runner over a minute; and the size marks the kit writes for it)
+  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", ".packages", "setup", ".gitignore"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, f)).size]))), null, 2)}\n`);
   execFileSync("git", ["add", "-A"], { cwd: dir });
   // (the copies check's first baseline as the starter kit writes it, its two entry files' shared sentence listed)
@@ -155,7 +159,7 @@ const pairs = Object.fromEntries(Object.entries({ "a-private-npm-game": { packag
   fs.mkdirSync(path.dirname(test), { recursive: true });
   fs.writeFileSync(test, "export {};\n");
   execFileSync("git", ["add", "-A"], { cwd: dir });
-  const said = notDone(dir).find(s => s.lead === "16 November 2026, how strong the tests are");
+  const said = notDone(dir, only("16 November 2026, how strong the tests are")).find(s => s.lead === "16 November 2026, how strong the tests are");
   ok(said?.mend.includes("has tests now"), "the starter kit's mutation-tool row, none for no tests yet, is reported once the project's own code holds a test", JSON.stringify(said));
   execFileSync("git", ["rm", "-q", "--cached", "src/first.test.js"], { cwd: dir });
   fs.rmSync(test);
@@ -164,7 +168,7 @@ const pairs = Object.fromEntries(Object.entries({ "a-private-npm-game": { packag
   fs.writeFileSync(config, `${JSON.stringify({ ...JSON.parse(was), code: ["src"], tests: ["test"] }, null, 2)}\n`);
   fs.mkdirSync(path.dirname(apart), { recursive: true }); fs.writeFileSync(apart, "export {};\n");
   execFileSync("git", ["add", "-A"], { cwd: dir });
-  const beside = notDone(dir).find(s => s.lead === "16 November 2026, how strong the tests are");
+  const beside = notDone(dir, only("16 November 2026, how strong the tests are")).find(s => s.lead === "16 November 2026, how strong the tests are");
   ok(beside?.mend.includes("has tests now"), "and once a test stands in a folder of tests the config names apart from its code", JSON.stringify(beside));
   execFileSync("git", ["rm", "-q", "--cached", "test/a.js"], { cwd: dir });
   fs.rmSync(path.join(dir, "test"), { recursive: true }); fs.writeFileSync(config, was);
@@ -186,7 +190,7 @@ for (const step of STEPS.filter(s => s.check)) {
 {
   const PARSER_LEAD = "19 November 2026, the parser's packages installed where the shape check runs", file = path.join(dir, ".github/workflows/select-staged.yml");
   const flow = named => `name: select-staged\n\non:\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/install.mjs${named}\n      - run: node core/scripts/select.mjs --env RUN\n`;
-  const said = named => { fs.writeFileSync(file, flow(named)); execFileSync("git", ["add", "-A"], { cwd: dir }); const m = notDone(dir).find(x => x.lead === PARSER_LEAD); fs.rmSync(file); execFileSync("git", ["add", "-A"], { cwd: dir }); return m; };
+  const said = named => { fs.writeFileSync(file, flow(named)); execFileSync("git", ["add", "-A", "--", file], { cwd: dir }); const m = notDone(dir, only(PARSER_LEAD)).find(x => x.lead === PARSER_LEAD); fs.rmSync(file); execFileSync("git", ["add", "-A", "--", file], { cwd: dir }); return m; };
   const first = said("");
   ok(first && /`\.github\/workflows\/select-staged\.yml` that runs the shape check or the selection of tests/u.test(first.mend) && !said(" all") && !said(" parser"),
     "a job that selects the tests after the core's first install alone reads not done, its mend naming the workflow; one that installs the parser's too reads done", JSON.stringify(first));
@@ -196,7 +200,7 @@ for (const step of STEPS.filter(s => s.check)) {
 {
   const READY_LEAD = "19 November 2026, the project's tests at the pace of a release", file = path.join(dir, ".github/workflows/ready-exact.yml");
   const flow = (types, cond) => `name: ready-exact\n\non:\n  pull_request:\n    types: [${types}]\n\npermissions:\n  contents: read\n\njobs:\n  test:\n    if: \${{ ${cond} }}\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/install.mjs all\n      - run: node core/scripts/shape.mjs checks/shape.json --suite unit -- node --test\n`;
-  const reads = (types, cond) => { fs.writeFileSync(file, flow(types, cond)); execFileSync("git", ["add", "-A"], { cwd: dir }); const m = notDone(dir).some(x => x.lead === READY_LEAD); fs.rmSync(file); execFileSync("git", ["add", "-A"], { cwd: dir }); return m; };
+  const reads = (types, cond) => { fs.writeFileSync(file, flow(types, cond)); execFileSync("git", ["add", "-A", "--", file], { cwd: dir }); const m = notDone(dir, only(READY_LEAD)).some(x => x.lead === READY_LEAD); fs.rmSync(file); execFileSync("git", ["add", "-A", "--", file], { cwd: dir }); return m; };
   ok(reads("ready_for_review", "!github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "github.event.pull_request.draft") && !reads("opened, synchronize, reopened, ready_for_review", "github.event.pull_request.draft == false") && !reads("opened, synchronize, reopened, ready_for_review", "github.actor != 'x' && !github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "always() || !github.event.pull_request.draft") && !reads("opened, synchronize, reopened, ready_for_review", "!cancelled() && !github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "!cancelled() && !(github.event.pull_request.draft || x)") && reads("opened, synchronize, reopened, ready_for_review", "always() }} && !github.event.pull_request.draft && ${{ true") && reads("opened, synchronize, reopened, ready_for_review", "github.actor != ' && !github.event.pull_request.draft && '") && !reads("opened, synchronize, reopened, ready_for_review", "github.actor != 'it''s && x' && !github.event.pull_request.draft") && reads("opened, synchronize, reopened, ready_for_review", "github.event.pull_request.labels[github.actor && !github.event.pull_request.draft && 1]"),
     "a job that starts a suite reads done only with all four types and a condition of parts joined by && that skips a draft, a status function such as `!cancelled()` among them and a quoted string one word, not one that runs on drafts alone, an || that lets one through, text outside its ${{ }}, an index or a draft part inside a string");
 }
@@ -209,7 +213,7 @@ for (const step of STEPS.filter(s => s.check)) {
   const RUN = "  workflow_run:\n    workflows: [tests]\n    types: [completed]\n    branches: [main]";
   const job = (name, cond, needs, deploy) => `  ${name}:\n${cond === null ? "" : `    if: \${{ ${cond} }}\n`}${needs ? `    needs: ${needs}\n` : ""}    runs-on: ubuntu-latest\n    steps:\n      - ${deploy ? "uses: actions/deploy-pages@v4" : "run: npm run build"}\n`;
   const flow = (on, jobs) => `name: pages\n\non:\n${on}\n\npermissions:\n  contents: read\n\njobs:\n${jobs}`;
-  const said = (on, jobs = job("deploy", null, null, true)) => { fs.writeFileSync(file, flow(on, jobs)); execFileSync("git", ["add", "-A"], { cwd: dir }); const m = notDone(dir).find(x => x.lead === READY_LEAD); fs.rmSync(file); execFileSync("git", ["add", "-A"], { cwd: dir }); return m; };
+  const said = (on, jobs = job("deploy", null, null, true)) => { fs.writeFileSync(file, flow(on, jobs)); execFileSync("git", ["add", "-A", "--", file], { cwd: dir }); const m = notDone(dir, only(READY_LEAD)).find(x => x.lead === READY_LEAD); fs.rmSync(file); execFileSync("git", ["add", "-A", "--", file], { cwd: dir }); return m; };
   const onPush = said("  push:\n    branches: [main]");
   ok(onPush && /publishes what its users get otherwise than from a green default branch \(`\.github\/workflows\/pages\.yml`\)/.test(JSON.stringify(onPush)) && /workflow_run/.test(JSON.stringify(onPush)) && /users get\* to `releases`/.test(JSON.stringify(onPush)),
     "a workflow that publishes a site on a push alone reads not done, its mend making it wait on the checks' completed run and the row *users get* say releases", JSON.stringify(onPush));
@@ -246,7 +250,7 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
 {
   const pair = ["16 November 2026, the tests a change can reach", "18 November 2026, a tree that passed is not run again"];
   for (const lead of pair) STAGES[lead].stage(lockProject);
-  ok(pair.every(lead => notDone(lockProject).some(m => m.lead === lead)), "the tests a change can reach and a tree that passed, taken out together, are each reported", report(notDone(lockProject)));
+  ok(pair.every(lead => notDone(lockProject, only(lead)).some(m => m.lead === lead)), "the tests a change can reach and a tree that passed, taken out together, are each reported", report(notDone(lockProject)));
   for (const lead of Object.keys(STAGES).filter(l => pair.includes(l))) STAGES[lead].mend(lockProject);
   for (const lead of pair) STAGES[lead].after?.(lockProject);
 }
@@ -255,11 +259,10 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
 {
   const at = dirs["a-dotnet-project"], manifest = path.join(at, "core-manifest.md"), was = fs.readFileSync(manifest, "utf8");
   const slot = row => fs.writeFileSync(manifest, was.replace("| *large file* |", `${row}\n| *large file* |`));
-  const stepOf = lead => STEPS.filter(s => s.lead === lead);
   const write = (f, text) => { fs.mkdirSync(path.dirname(path.join(at, f)), { recursive: true }); fs.writeFileSync(path.join(at, f), text); };
   // (the shape check: its config at the row's path reads done; gone from there, it is reported by that path, though the
   // kit's path still holds one)
-  const shape = stepOf("16 November 2026, how code is put together"), kitShape = fs.readFileSync(path.join(at, "checks/shape.json"), "utf8");
+  const shape = only("16 November 2026, how code is put together"), kitShape = fs.readFileSync(path.join(at, "checks/shape.json"), "utf8");
   slot("| *shape check* | `core/scripts/shape.mjs` with `config/shape.json` |");
   write("config/shape.json", kitShape);
   const shapeThere = notDone(at, shape);
@@ -268,7 +271,7 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
   ok(!shapeThere.length && shapeGone.length === 1 && shapeGone[0].mend.includes("`config/shape.json`") && !shapeGone[0].mend.includes("checks/shape.json"),
     "a *shape check* row that names a config of its own: the step reads that config, and where it is gone says so by its path, never reading the kit's", `${report(shapeThere)}\n${report(shapeGone)}`);
   // (the choice records: a record that lacks its lines is read at the row's path, and one at the kit's path is not read)
-  const today = stepOf("17 November 2026, what the project would be built on today"), lacking = "# Choices\n\n## Choice: the database\n\nWe picked one.\n";
+  const today = only("17 November 2026, what the project would be built on today"), lacking = "# Choices\n\n## Choice: the database\n\nWe picked one.\n";
   slot("| *choice records* | `docs/decisions.md` |");
   write("docs/decisions.md", lacking);
   const choicesThere = notDone(at, today);
@@ -281,7 +284,7 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
     "a *choice records* row that names a file of its own: the step reads that file and its mend names it, and the kit's path is not read", `${report(choicesThere)}\n${report(choicesAtKit)}`);
   // (the progress file: one past a quarter of the general mark, with no mark of its own, is reported by the row's path;
   // the kit's path, however long, is not read)
-  const progress = stepOf("15 November 2026, the progress file holds order only"), kitProgress = fs.readFileSync(path.join(at, "docs/PROGRESS.md"), "utf8");
+  const progress = only("15 November 2026, the progress file holds order only"), kitProgress = fs.readFileSync(path.join(at, "docs/PROGRESS.md"), "utf8");
   fs.writeFileSync(manifest, was.replace("| *progress file* | `docs/PROGRESS.md` |", "| *progress file* | `PLAN.md` |"));
   write("PLAN.md", "- #1 a line\n".repeat(1000));
   const progressThere = notDone(at, progress);
@@ -299,7 +302,7 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
 // ---- a suite's path filter, read as GitHub reads one: `?` and `+` repeat the character before them (#379) ----
 const SUITE_LEAD = "12 November 2026, a sync and the project's own suites";
 const suiteFile = path.join(lockProject, ".github/workflows/suites-filtered.yml");
-const suiteBy = filter => { fs.writeFileSync(suiteFile, `name: s\non:\n  pull_request:\n${filter}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`); return notDone(lockProject).some(m => m.lead === SUITE_LEAD); };
+const suiteBy = filter => { fs.writeFileSync(suiteFile, `name: s\non:\n  pull_request:\n${filter}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`); return notDone(lockProject, only(SUITE_LEAD)).some(m => m.lead === SUITE_LEAD); };
 ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths: ['.github/workflows/co+re.yml']") && !suiteBy("    paths: ['.github/workflows/core\\?.yml']")
   && suiteBy("    paths-ignore: ['core/**']") && !suiteBy("    paths: ['src/**']"), "a suite whose filter starts on a call's file alone is reported, its `?` and `+` read as GitHub reads them");
 fs.rmSync(suiteFile);
@@ -321,10 +324,10 @@ ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.y
 // ---- a tree that passed (#457): a job that selects on a push alone ran nowhere else, and is not asked --passed ----
 {
   const PASSED_LEAD = "18 November 2026, a tree that passed is not run again", pushed = path.join(lockProject, ".github/workflows/pushed.yml");
-  const asked = on => { fs.writeFileSync(pushed, `name: p\non:\n${on}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/select.mjs --env RUN\n`); return notDone(lockProject).some(m => m.lead === PASSED_LEAD); };
+  const asked = on => { fs.writeFileSync(pushed, `name: p\non:\n${on}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/select.mjs --env RUN\n`); return notDone(lockProject, only(PASSED_LEAD)).some(m => m.lead === PASSED_LEAD); };
   ok(!asked("  push:\n    branches: [main]") && asked("  push:\n  pull_request:") && asked("  pull_request:\n  push:\n    branches: [main]"),
     "a job that selects on a push alone is not asked --passed, since its suite ran nowhere else; one a pull request runs too is");
-  const job = (select, runner) => { fs.writeFileSync(pushed, `name: p\non:\n  pull_request:\n  push:\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ${select}\n      - ${runner}\n`); return notDone(lockProject).some(m => m.lead === PASSED_LEAD); };
+  const job = (select, runner) => { fs.writeFileSync(pushed, `name: p\non:\n  pull_request:\n  push:\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ${select}\n      - ${runner}\n`); return notDone(lockProject, only(PASSED_LEAD)).some(m => m.lead === PASSED_LEAD); };
   const sel = 'node core/scripts/select.mjs --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}';
   ok(job(sel, 'run: if [ "$RUN" = all ]; then node --test; else node --test $RUN; fi') && !job(sel, 'run: if [ "$RUN" = all ]; then node --test; elif [ "$RUN" != none ]; then node --test $RUN; fi')
     && !job(sel, "if: env.RUN == 'all'\n        run: node --test") && !job(sel, "if: ${{ env.RUN == 'all' || contains(env.RUN, ' test/a.test.mjs ') }}\n        run: node --test test/a.test.mjs")
@@ -370,7 +373,7 @@ for (const [broken, what] of [["{ not json", "no JSON"], ['{"each": 1}', "the wr
 fs.writeFileSync(marksFile, marksAsKit);
 
 // ---- rule 5's inputs as SECURITY.md lists them: "None", items naming their tests, nested and wrapped lines ----
-const inputs = STEPS.filter(s => s.lead === "16 November 2026, hostile tests for every named input");
+const inputs = only("16 November 2026, hostile tests for every named input");
 const secFile = path.join(lockProject, "SECURITY.md"), secAsKit = fs.readFileSync(secFile, "utf8");
 const rule5 = body => { fs.writeFileSync(secFile, secAsKit.replace(/^(5\. .*\n)(?:(?!\d+\. |#).*\n)*/m, `$1${body}`)); return notDone(lockProject, inputs); };
 fs.mkdirSync(path.join(lockProject, "tests/hostile"), { recursive: true });
@@ -428,7 +431,7 @@ sec.mend(lockProject);
 // ---- the proof that a pull request is queue-only (#750): read whole, at the review's pin, its job kept running ----
 {
   const QUEUE_LEAD = "19 November 2026, a pull request of the progress file alone proved by a script", flow = path.join(lockProject, ".github/workflows/security-review.yml"), was = fs.readFileSync(flow, "utf8");
-  const queueAsked = change => { fs.writeFileSync(flow, change(was)); const said = notDone(lockProject).some(m => m.lead === QUEUE_LEAD); fs.writeFileSync(flow, was); return said; };
+  const queueAsked = change => { fs.writeFileSync(flow, change(was)); const said = notDone(lockProject, only(QUEUE_LEAD)).some(m => m.lead === QUEUE_LEAD); fs.writeFileSync(flow, was); return said; };
   ok(!queueAsked(t => t) && queueAsked(t => t.replace(/(queue-only\.yml@)\w+/, "$1main")) && queueAsked(t => t.replace("      issues: read\n", ""))
     && queueAsked(t => t.replace("    if: ${{ !cancelled() }}\n", "")) && queueAsked(t => t.replace("    needs: queue\n", "")) && queueAsked(t => t.replace("needs.queue.outputs.head", "needs.queue.outputs.other"))
     && !queueAsked(t => t.replace("if: ${{ !cancelled() }}", "if: ${{ always() && github.event_name != 'push' }}")),
