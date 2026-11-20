@@ -9,9 +9,15 @@
     "skip": [
       "scripts/licence-scan.mjs",
       "scripts/licence-commands.mjs",
+      "scripts/licence-fetchers.mjs",
+      "scripts/licence-npm.mjs",
+      "scripts/licence-pages.mjs",
       "scripts/licence-scan-stage.mjs",
       "tests/licence-scan-test.mjs",
       "tests/licence-fetch-test.mjs",
+      "tests/licence-fetch-places-test.mjs",
+      "tests/licence-fetch-other-test.mjs",
+      "tests/licence-fetch-pages-test.mjs",
       "scripts/agent-tools.mjs",
       "tests/agent-tools-test.mjs",
       "scripts/npm-once.mjs"

@@ -209,9 +209,18 @@ jobs:
       - name: The licence check on a whole project, and its scan
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-test.mjs ')) }}
         run: node tests/licence-scan-test.mjs
-      - name: The licence scan on every form of a fetch
+      - name: The licence scan on the forms of an npm command
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-test.mjs ')) }}
         run: node tests/licence-fetch-test.mjs
+      - name: The licence scan on each place a command is written
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-places-test.mjs ')) }}
+        run: node tests/licence-fetch-places-test.mjs
+      - name: The licence scan on the fetchers it cannot read
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-other-test.mjs ')) }}
+        run: node tests/licence-fetch-other-test.mjs
+      - name: The licence scan on pages and components
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-fetch-pages-test.mjs ')) }}
+        run: node tests/licence-fetch-pages-test.mjs
       - name: The licences read back from the installed packages
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-installed-test.mjs ')) }}
         run: node tests/licence-installed-test.mjs
