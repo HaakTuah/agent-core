@@ -30,7 +30,7 @@ import { CORE } from "./core-address.mjs";
 import { FOLDER, NOTICE } from "./sync-notes.mjs";
 import { NOTES, OWN, RELEASE, asksBetween, fetchCore, held, inBare, namedReleases, plainEnv, releasesIn } from "./releases.mjs";
 import { atRelease } from "./staged.mjs";
-import { FULL } from "./tests-parts.mjs";
+import { FULL, NARROWED } from "./tests-parts.mjs";
 import { started } from "./started.mjs";
 import { STEPS } from "./steps.mjs";
 
@@ -97,9 +97,11 @@ export const TESTS = ".github/workflows/tests.yml";
 const startOf = r => (typeof r?.run_started_at === "string" ? Date.parse(r.run_started_at) || 0 : 0);
 const lastOf = runs => runs.reduce((a, b) => (startOf(b) > startOf(a) || (startOf(b) === startOf(a) && Number(b?.id ?? 0) > Number(a?.id ?? 0)) ? b : a));
 // The tests' runs in full on a commit: those once an hour, and those started by hand that bear the workflow's own name,
-// never one that named the parts it ran, nor one whose name cannot be read (tests-parts.mjs, FULL; #954).
+// never one that named the parts it ran; one by hand whose name is neither counts only where it did not pass, so a name
+// GitHub gives otherwise can hold a release and never let one stand (tests-parts.mjs, FULL; #954).
+const byHand = r => r?.display_title === FULL || (r?.conclusion !== "success" && !String(r?.display_title ?? "").startsWith(NARROWED));
 const inFull = list => (Array.isArray(list?.workflow_runs) ? list.workflow_runs : []).filter(r => r?.path === TESTS
-  && (r?.event === "schedule" || (r?.event === "workflow_dispatch" && r?.display_title === FULL)));
+  && (r?.event === "schedule" || (r?.event === "workflow_dispatch" && byHand(r))));
 // (it holds while any full run on the commit is unfinished, and reads the newest: an hourly run skips only where none
 // other is going and the newest passed, so a skipped one is the newest only where nothing started after it)
 export function fullRun(list) {

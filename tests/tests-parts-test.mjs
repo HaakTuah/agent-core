@@ -92,15 +92,18 @@ ok(/have not run in full on it yet/.test(fullRun(listOf(narrowed("success", 10))
   && fullRun(listOf(runOf("schedule", "success", 9), narrowed("failure", 10), narrowed(null, 11, "in_progress"))) === null
   && fullRun(listOf(runOf("workflow_dispatch", "success", 10))) === null && /hand-started run\): failure/.test(fullRun(listOf(runOf("schedule", "success", 9), runOf("workflow_dispatch", "failure", 10)))),
   "a start by hand that named parts is never read as the tests in full: its pass lets no release stand, and its failure or its run still going holds none; one that named none, by the workflow's own name, is read as before");
-ok(["tests, only", "tests, only\nwindows kit", "Tests", "", null].every(t => /have not run in full on it yet/.test(fullRun(listOf(runOf("workflow_dispatch", "success", 10, "completed", t)))))
+const oddTitles = ["tests, only", "tests, only\nwindows kit", "Tests", "", null];
+ok(oddTitles.every(t => /have not run in full on it yet/.test(fullRun(listOf(runOf("workflow_dispatch", "success", 10, "completed", t)))))
+  && oddTitles.every(t => /hand-started run\): (failure|in_progress)/.test(fullRun(listOf(runOf("schedule", "success", 9), runOf("workflow_dispatch", "failure", 10, "completed", t), runOf("workflow_dispatch", null, 11, "in_progress", t)))))
   && fullRun(listOf(runOf("schedule", "success", 10, "completed", "anything"))) === null && text.includes(`\nname: ${FULL}\n`),
-  "a start by hand is read as full only by the workflow's own name, which the workflow bears: a name trimmed, cut, of another case or missing is not, so a run that cannot be read either way never lets a release stand; an hourly run is read by its event");
+  "a start by hand passes for the tests in full only by the workflow's own name, which the workflow bears: one whose name is trimmed, cut, of another case or missing never lets a release stand, and holds it where it failed or is still going, as one by that name would (the fallback security review's finding on c47b49c); an hourly run is read by its event");
 
 // ---- the workflow's own use of it ----
 const NAMED = "github.event_name == 'workflow_dispatch' && inputs.only != ''";
 ok(text.includes(`run-name: \${{ ${NAMED} && format('${NARROWED}{0}', inputs.only) || '' }}`),
   "a run that names parts is named so, the name a release and the hourly run read to tell it from a full one; any other keeps GitHub's own");
-ok(text.includes(`(.event == "schedule" or (.event == "workflow_dispatch" and .display_title == "${FULL}"))`), "the hourly run's skip on main reads a start by hand as full only by the workflow's own name, so no narrowed run");
+ok(text.includes(`(.event == "schedule" or (.event == "workflow_dispatch" and (.display_title == "${FULL}" or (.conclusion != "success" and ((.display_title // "") | startswith("${NARROWED}") | not)))))`),
+  "the hourly run's skip on main reads a start by hand as full as the release does: by the workflow's own name, never a narrowed run, and one of another name only where it did not pass");
 ok(text.includes(`    name: \${{ ${NAMED} && '${NARROWED}the parts named' || 'tests' }}\n    needs: [moved, pick, suites, upgrade]`),
   "its gate is named apart, so its pass never stands for the check \"tests\" a pull request's head or a push's selection reads; the gate of any other run keeps that name");
 ok(text.includes(`  pick:\n    if: \${{ ${NAMED} }}`) && /ONLY: \$\{\{ inputs\.only \}\}\n\s+run: node scripts\/tests-parts\.mjs "\$ONLY" --output "\$GITHUB_OUTPUT"/u.test(text),

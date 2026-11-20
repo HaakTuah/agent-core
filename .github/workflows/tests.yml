@@ -99,10 +99,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # (every page of them, so a re-run of an older one is read however many stand there; a page that cannot be
-          # read leaves the answer empty, and the run happens; a start by hand is a full run only by the workflow's own
-          # name, never one that named parts, #954)
+          # read leaves the answer empty, and the run happens; a start by hand is a full run by the workflow's own name,
+          # never one that named parts, and one by another name only where it did not pass, #954)
           list=$(mktemp) done=""
-          if gh api --paginate -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$GITHUB_SHA" -f branch=main -F per_page=100 --jq '.workflow_runs[] | select((.event == "schedule" or (.event == "workflow_dispatch" and .display_title == "tests")) and ((.id | tostring) != env.GITHUB_RUN_ID))' > "$list"; then
+          if gh api --paginate -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$GITHUB_SHA" -f branch=main -F per_page=100 --jq '.workflow_runs[] | select((.event == "schedule" or (.event == "workflow_dispatch" and (.display_title == "tests" or (.conclusion != "success" and ((.display_title // "") | startswith("tests, only ") | not))))) and ((.id | tostring) != env.GITHUB_RUN_ID))' > "$list"; then
             done=$(jq -rs 'if any(.[]; .status != "completed") then "running" else (sort_by([.run_started_at // "", .id]) | last | .conclusion // "none") end' "$list" || true)
           fi
           echo "the full runs on $GITHUB_SHA, hourly or by hand, but this one: ${done:-not read} (the newest, or running where one still is)"
