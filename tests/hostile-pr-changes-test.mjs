@@ -219,6 +219,24 @@ for (const [file, made] of Object.entries(SLOWEST)) {
   const timed = spawnSync(process.execPath, [path.join(root, "scripts", "select.mjs"), "--env", "RUN"], { cwd: p, env: { ...env, SELECT_BASE: MAIN, GITHUB_ENV: envFile }, encoding: "utf8", maxBuffer: 1 << 28, timeout: 5000 });
   ok(timed.status === 0 && !raw(`${timed.stdout}${timed.stderr}`) && /^RUN=/u.test(said()), `select: ${file} of ${text.length} characters, the largest its reader takes, is read within 5 s and selects`, `${timed.signal ?? ""}${timed.stderr}`);
 }
+// (the count is no limit of its own: several files each at the largest its reader takes, and one file past it that the
+// lexer alone reads, together take the selection past 5 s unless it stops reading and runs the whole suite; #881)
+const together = (key, what, files, whole = true) => {
+  branch(`sel-${key}`, () => { for (const [file, text] of Object.entries(files)) write(file, text); });
+  fs.writeFileSync(envFile, "");
+  const from = Date.now(), timed = spawnSync(process.execPath, [path.join(root, "scripts", "select.mjs"), "--env", "RUN"], { cwd: p, env: { ...env, SELECT_BASE: MAIN, GITHUB_ENV: envFile }, encoding: "utf8", maxBuffer: 1 << 28, timeout: 5000 });
+  console.log(`     ${key}: ${Date.now() - from} ms`);
+  ok(timed.status === 0 && !raw(`${timed.stdout}${timed.stderr}`) && (whole ? said() === "RUN=all\n" : /^RUN=/u.test(said())), `select: ${what} are read within 5 s${whole ? ", and the whole suite runs" : " and select"}`, `${timed.signal ?? ""}${timed.stderr}${said()}`);
+};
+// (and the linking of each file to the files whose names it holds, which took time in step with the count of files times their
+// text, and the search from each test: the answer is the whole suite where the pace is passed, else the tests it selects)
+together("many-mid", "2300 files of 1,500 characters, under the limit in characters", Object.fromEntries(Array.from({ length: 2300 }, (_, n) => [`src/f${n}.js`, `export const v = "${" f1.j".repeat(300)}";\n`])), false);
+together("one-long", "4000 small files and one of 3.8 million characters", { ...Object.fromEntries(Array.from({ length: 4000 }, (_, n) => [`src/g${n}.js`, `export const v = ${n};\n`])), "src/long.js": `export const v = "${"a ".repeat(1_900_000)}";\n` }, false);
+together("tests-naming", "700 test files that each name the 699 others", Object.fromEntries(Array.from({ length: 700 }, (_, n) => [`test/t${n}.js`, `export const v = "${Array.from({ length: 700 }, (_, k) => `t${k}.js`).join(" ")}";\n`])), false);
+together("long-name", "a file with a name of 254 characters and one of 3.8 million characters that starts it at every other one", { [`src/${"a,".repeat(125)}b.js`]: "export const v = 1;\n", "src/long.js": `export const v = "${"a,".repeat(1_900_000)}";\n` });
+together("csharp-three", "three files of C# at the largest its reader takes", Object.fromEntries([1, 2, 3].map(n => [`src/call${n}.cs`, SLOWEST["src/call.cs"](LARGEST.csharp)])));
+together("every-kind", "the densest file of each kind, all at once", Object.fromEntries(Object.entries(SLOWEST).map(([file, made]) => [file, made(largestOf(file))])));
+together("js-huge", "one file of JavaScript of 20 million characters", { "src/huge.js": SLOWEST["src/list.js"](20_000_000) });
 // (one character more and the reader gives its grammar nothing: no functions told, so the shape check counts it lost)
 const past = { "src/list.py": t => readPython(t).functions, "src/list.js": t => javascriptFunctions("src/list.js", t), "src/nested.cs": t => readCsharp(t).functions };
 for (const [file, functions] of Object.entries(past)) {

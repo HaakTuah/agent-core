@@ -50,7 +50,7 @@ holds() {
   done
   # (each project's own record of its restore, written just now inside the checkout and naming that project:
   # one that lies elsewhere, or is not there, is a doubt)
-  records=$(find . -path ./core -prune -o -name project.assets.json -newer "$stamp" -print0 \
+  records=$(find . -path "./${CORE_AT%/}" -prune -o -name project.assets.json -newer "$stamp" -print0 \
     | xargs -0 -r jq -r '.project.restore.projectPath // empty' | tr '\\' '/' | tr -d '\r')
   for project in "${projects[@]}"; do
     printf '%s\n' "$records" | while IFS= read -r r; do [[ "${r,,}" == *"/${project,,}" ]] && echo yes; done | grep -q yes \
@@ -59,7 +59,7 @@ holds() {
   while IFS= read -r -d '' assets; do
     jq -e --arg packs "$PACKS" '[.project.frameworks[]? | .downloadDependencies // [] | .[] | select(.name | test("^(" + $packs + ")$") | not)] | length == 0' "$assets" > /dev/null \
       || { echo "a project downloads a package beside its lock file"; return 1; }
-  done < <(find . -path ./core -prune -o -name project.assets.json -newer "$stamp" -print0)
+  done < <(find . -path "./${CORE_AT%/}" -prune -o -name project.assets.json -newer "$stamp" -print0)
 }
 run=true
 # (the config, its audit and each folder it names as a source, each by its exact name, and the caller)

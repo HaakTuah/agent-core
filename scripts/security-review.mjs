@@ -42,7 +42,7 @@
 // its files are one Markdown file and nothing that runs by itself. Nothing
 // else on the pull request counts: not its description, not a comment of anyone else, not a review's own text.
 // Where the pull request changes what runs by itself (a file comment-only.mjs reads: under .github/ or .claude/, or an
-// action.yml; the copy under core/ aside, which only a sync changes), it asks floor rule 3's two security reviews:
+// action.yml; the copy of the core aside, under core/ or where the default branch's manifest names it, which only a sync changes), it asks floor rule 3's two security reviews:
 // Codex's and a posted one, or two posted. One is enough, as before, where each such file only moves pins (changed in
 // place, each changed line a `uses:` line whose whole SHA moved and that differs in nothing else but the note after it,
 // a version's word: an action's version, rule 17, or a sync's calls to the core's workflows), or where a posted review
@@ -72,7 +72,8 @@
 //         the link the status carries; REVIEWERS for the accounts named; RIGHTS for a file of GitHub's answers on
 //         their rights (collaborators/<login>/permission, as a JSON list); PURE for the head pure-sync.mjs proved;
 //         QUEUE for the head the caller's queue-only.mjs proved (#750).
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { copyOf } from "./core-path.mjs";
 import { RUNS } from "./comment-only.mjs";
 import { started } from "./started.mjs";
 
@@ -161,10 +162,10 @@ export function judge(pull, comments, reviewComments, commits, files, bound = tr
   const { running, posted, changed } = sinceBegun(all, read);
   const { chain, stand, forHead, cut } = forTheHead(pull, commits, sha, more.merges, posted);
   // (a pull request proved queue-only by its caller, #750, counts as one only where its files show the one Markdown file)
-  const queue = more.queue === true && queueOnly(pull, files);
+  const queue = more.queue === true && queueOnly(pull, files, more.copy);
   let verdict = judgeWith({ sha, list, posted, forHead, stand, bind: chain !== undefined, review, pull, reviewComments, commits, changed, bound, pure: more.pure === true || queue, queue, cut, mends: mendsFor(read) });
   verdict = begunAfter(verdict, { sha, running, all, posted, bound });
-  verdict = floorTwo(verdict, { sha, pull, files, posted, review, bound, pure: more.pure === true || queue });
+  verdict = floorTwo(verdict, { sha, pull, files, posted, review, bound, pure: more.pure === true || queue, copy: more.copy });
   if (edited && all.length === 0 && !verdict.done) verdict = { ...verdict, why: EDITED };
   return warning ? { ...verdict, warning } : verdict;
 }
@@ -223,8 +224,8 @@ function begunAfter(verdict, { sha, running, all, posted, bound }) {
 }
 // floor rule 3's two, where what runs by itself changed beyond its pins and no proof of comments alone is posted (a
 // pure sync needs neither: floor rule 8)
-function floorTwo(verdict, { sha, pull, files, posted, review, bound, pure }) {
-  if (!(verdict.done && pure !== true && files !== undefined && (!whole(pull, files) || flat(files).some((file) => runs(file) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha)))) return verdict;
+function floorTwo(verdict, { sha, pull, files, posted, review, bound, pure, copy }) {
+  if (!(verdict.done && pure !== true && files !== undefined && (!whole(pull, files) || flat(files).some((file) => runs(file, copy) && !pinsAlone(file))) && !posted.some((comment) => commentsAlone(comment.body, sha)))) return verdict;
   const codexDone = review !== null && typeof review === "object" && review.status === "completed";
   if ((codexDone ? 1 : 0) + posted.length < 2) {
     const why = `floor rule 3 asks two. Mend: the fallback reviewer reviews, posts the second, or comment-only.mjs's printout for ${sha.slice(0, 7)}`;
@@ -287,13 +288,14 @@ export function unproved(pull, commits, head, merges) {
 
 // whether a pull request's files are those of a queue-only one, which its caller proved with queue-only.mjs (#750): the
 // list whole, one file, Markdown, none of what runs by itself; scripts/code-review-wait.mjs reads it too
-export const queueOnly = (pull, files) => files !== undefined && whole(pull, files) && flat(files).length === 1 && /\.md$/iu.test(String(flat(files)[0].filename)) && !runs(flat(files)[0]);
+export const queueOnly = (pull, files, copy) => files !== undefined && whole(pull, files) && flat(files).length === 1 && /\.md$/iu.test(String(flat(files)[0].filename)) && !runs(flat(files)[0], copy);
 // whether GitHub gave every file the pull request changes (it gives at most 3000): a list cut short is read as one
 // that changes what runs by itself, never as one that does not
 export const whole = (pull, files) => Number.isInteger(pull.changed_files) && pull.changed_files >= 0 && flat(files).length >= pull.changed_files;
-// what runs by itself, as comment-only.mjs reads it, the copy of the core under core/ aside (only a sync changes it,
-// and its code passed its reviews in the core's own pull request: floor rule 8); a file moved counts on either side
-const runs = (file) => [file.filename, file.previous_filename].some((name) => typeof name === "string" && !name.startsWith("core/") && RUNS.test(name));
+// what runs by itself, as comment-only.mjs reads it, the copy of the core aside (only a sync changes it, and its code
+// passed its reviews in the core's own pull request: floor rule 8), under core/ or the path the default branch's manifest
+// names (`copy`, core-path.mjs's copyOf, given by the script's caller); a file moved counts on either side
+const runs = (file, copy = "core/") => [file.filename, file.previous_filename].some((name) => typeof name === "string" && !name.startsWith(copy) && RUNS.test(name));
 // a `uses:` line pinned to a whole SHA, with the note after it if any: [the line with the pin and note set aside]
 const USES = /^(\s*(?:-\s+)?["']?uses["']?\s*:\s*["']?[^\s"'@#]+@)[0-9a-f]{40}(["']?)(?:\s+#\s*[\w.+-]*)?$/u;
 // whether a file, as GitHub's API gives it among a pull request's files, only moves pins: changed in place, and in
@@ -424,6 +426,7 @@ if (started(import.meta.url)) {
   const verdict = judge(pull, read(commentsFile), reviewCommentsFile ? read(reviewCommentsFile) : [], commitsFile ? read(commitsFile) : undefined, filesFile ? read(filesFile) : undefined, boundOf(process.env.BOUND, pull, process.env.SINCE),
     { reviewers: reviewersOf(process.env.REVIEWERS), rights: process.env.RIGHTS ? read(process.env.RIGHTS) : undefined, pure: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.PURE === pull.head.sha,
       queue: typeof pull?.head?.sha === "string" && SHA.test(pull.head.sha) && process.env.QUEUE === pull.head.sha,
-      merges: mergesFile ? read(mergesFile) : undefined });
+      merges: mergesFile ? read(mergesFile) : undefined,
+      copy: existsSync("core-manifest.md") ? copyOf(".") : undefined }); // (the copy at the path the default branch's manifest names, checked out here, as code-review-wait.mjs reads it)
   console.log(JSON.stringify(verdict === undefined ? {} : { sha: verdict.sha, status: status(verdict, process.env.ADVISORY !== "false", process.env.RUN_URL), ...(verdict.warning ? { warning: verdict.warning } : {}) }));
 }
