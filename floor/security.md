@@ -26,11 +26,11 @@ might attack: `floor/threat-model.md`.
   any folder, a GEMINI.md or REVIEW.md, a folder .agents or .agent); and the checks on the
   work (the copies and licence checks and their configs).
 - **The owner's yes in the PR** is needed only for a change to the floor or the review guidelines that alters what a
-  session must or may do, what protects the owner or who decides (one that keeps the meaning:
-  `roles/shared/review-guidelines.md`): the owner's word that asked for it, quoted there, is that yes for the change as
-  asked; one beyond it waits for a new yes.
+  session must or may do, what protects the owner or who decides (one that keeps the meaning, stated by a reviewer who
+  did not write it: `roles/shared/review-guidelines.md`): the owner's word that asked for it, quoted there, is that yes
+  for the change as asked; one beyond it waits for a new yes.
   Reason: the yes keeps a session from widening its own mandate, a floor change made to get some other task through
-  above all; it is never a second question about what the owner asked for, nor one of what means nothing.
+  above all; it is never a second question about what the owner asked for.
 - A change to what runs by itself or with credentials passes two security reviews instead, the security reviewer's and
   the fallback reviewer's, each by a session that did not write it, a fresh one of the same tool serving
   (`tasks/reviews.md`).

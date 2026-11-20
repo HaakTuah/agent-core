@@ -143,7 +143,7 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
     "**What is overdue**",
     ...(overdue.length ? overdue.map(o => `- #${o.number} ${o.title}: open since ${o.since.slice(0, 10)}.`) : ["- Nothing: no task the look keeps has stood open past a week."]),
   ];
-  if (core) lines.push("", `**Changes to the floor and the review guidelines merged in ${before(month)} without the owner's yes**`,
+  if (core) lines.push("", `**Changes to the floor and the review guidelines merged in ${before(month)}, and whether each quoted the owner's yes**`,
     `- Not read by GitHub's job. The session that takes this report adds, as a note, what \`node scripts/meaning-kept.mjs --month ${before(month)}\` prints, so the owner can look them over (#886, point 2).`);
   if (core) lines.push("", "**The projects that take the core**",
     "- Not read by GitHub's job, whose token reaches this repository alone. A session where gh answers for the owner's account runs `node scripts/state-report.mjs --projects` and adds what it prints here as a note; where its tool cannot reach a project, a session started in that project reads it and passes back counts and conclusions alone.");
