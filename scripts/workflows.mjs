@@ -177,7 +177,8 @@ const FOREIGN = /[\u0085\u2028\u2029]/u;
 // editor counts, and never fewer than the package reads in the text as it stands: of each key, whichever reading finds most
 // (a break inside a quoted string, folded, may change what the package can read of the rest; #876). A reading that is no YAML
 // to the package, once the breaks are folded or mended, where the text as it stands is, shows keys no reader has, so its
-// entries are left out; the text as it stands is read as ever (#970).
+// entries are left out; the text as it stands is read as ever (#970). Where the text as it stands is no YAML either, every
+// reading is kept, so a key that is not there may be named in a file that is refused all the same.
 export const keysTwice = remember(text => {
   if (!FOREIGN.test(String(text))) return twice(text);
   const by = ({ text: read, line }) => {
@@ -192,8 +193,8 @@ export const keysTwice = remember(text => {
   // (only where the text as it stands is YAML, so that the breaks are what spoil the reading: a file no YAML for another reason keeps them)
   const spoilt = r => yamlOf(plain.text) !== null && yamlOf(r.text) === null;
   const all = [folded, mended].filter(r => !seen.has(r.text) && seen.add(r.text) && !spoilt(r)).concat(plain).map(by);
-  return [...new Set(all.flatMap(groups => [...groups.keys()]))].flatMap(id => all.map(groups => groups.get(id) ?? []).reduce((best, now) => (now.length > best.length ? now : best)))
-    .sort((x, y) => x.line - y.line);
+  return Object.freeze([...new Set(all.flatMap(groups => [...groups.keys()]))].flatMap(id => all.map(groups => groups.get(id) ?? []).reduce((best, now) => (now.length > best.length ? now : best)))
+    .sort((x, y) => x.line - y.line).map(Object.freeze)); // (shared between the readers, so none can change it)
 });
 
 // Whether a text with such a break is YAML the package reads once the breaks are read as a YAML 1.1 reader reads them, as line

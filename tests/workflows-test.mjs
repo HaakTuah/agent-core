@@ -180,6 +180,8 @@ const flood = `${Array.from({ length: 3000 }, (_, i) => `k${i}: 1\nk${i}: 2\n`).
 ok(keysTwice(falseKeys).length === 0 && repeated(one(falseKeys), () => null).notes.length === 0 && repeated(one(falseKeys), () => 'a: 1\nb: "x\u2028c: 1\u2028"\n').fails.length === 0
   && flooded.notes.length === 26 && /^note w\.yml: and 2975 more keys/u.test(flooded.notes[25]) && floodedFails.fails.length === 26 && /^FAIL w\.yml: and 2975 more keys/u.test(floodedFails.fails[25]) && mended(floodedFails.fails[25]) && keysTwice(flood).length === 3000,
   "a reading that is no YAML to the package once the breaks are folded names no key given twice, and a file's lines of one kind are cut at twenty-five and the rest counted", `${keysTwice(falseKeys).length} ${flooded.notes.length} ${floodedFails.fails.length}`);
+const manyOld = keysOnce({ root: ".", files: [".github/workflows/w.yml"], read: () => flood });
+ok(/"k24"/u.test(manyOld ?? "") && !/"k25"/u.test(manyOld ?? "") && /and 2975 more, which show once/u.test(manyOld ?? "") && (manyOld ?? "").length < 5000, "the sync's step for a key given twice names at most twenty-five and counts the rest", String(manyOld).slice(0, 200));
 // (a file that is no YAML for another reason keeps the readings: here the aliases, more than the package expands, and a key
 // that only a YAML 1.1 reader sees twice)
 const aliased = `x: &a 1\n${Array.from({ length: 120 }, (_, i) => `y${i}: *a\n`).join("")}on: pull_request\n# c\u2028on: [push]\n`;
