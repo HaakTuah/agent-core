@@ -131,6 +131,7 @@
     "process: tests/reading-test.mjs -> node:child_process": true,
     "process: tests/reasons-test.mjs -> node:child_process": true,
     "process: tests/releases-test.mjs -> node:child_process": true,
+    "process: tests/rules-test.mjs -> node:child_process": true,
     "process: tests/screens-test.mjs -> node:child_process": true,
     "process: tests/security-review-test.mjs -> node:child_process": true,
     "process: tests/security-review-workflow-test.mjs -> node:child_process": true,
