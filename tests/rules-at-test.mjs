@@ -39,4 +39,11 @@ fs.renameSync(path.join(repo, ".git-away"), path.join(repo, ".git"));
 const three = commit("- **Rule three.** Last.\n");
 ok(leads(rulesAt(repo, "HEAD")) === "Rule three" && leads(rulesAt(repo, three)) === "Rule three" && leads(rulesAt(repo, "HEAD~1")) === "Rule one,Rule two",
   "a name that moves (HEAD) is read again each time, and gives the commit it names now");
+// (a name that holds a whole commit's id among other characters is still a name: a branch moved after it was read)
+for (const name of [`moves-${one}`, `${one}-moves`]) {
+  git("branch", "-f", name, one);
+  const before = leads(rulesAt(repo, name));
+  git("branch", "-f", name, three);
+  ok(before === "Rule one" && leads(rulesAt(repo, name)) === "Rule three", `a branch named ${name.replace(one, "<its id>")}, moved after it was read, is read again`);
+}
 done("what rulesAt reads once and what it reads each time");
