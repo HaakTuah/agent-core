@@ -231,6 +231,15 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
     ok(w.unknown && r.where === "self-hosted" && !r.said.join(" ").includes("<script>") && /could not be read/.test(r.advice ?? ""), "runners.mjs: a runner named in markup is not read, taken as the owner's own and advised on, and its name never printed");
     w = one("empty.yml", "");
     ok(!w.onHost && !w.unread.length, "runners.mjs: an empty file holds no workflow");
+    // (the folder itself is a path a pull request can write: a file, a link to nowhere or to itself is not a folder to list)
+    fs.mkdirSync(path.join(dir, "r", ".git"), { recursive: true }); fs.mkdirSync(path.join(dir, "r", ".github"));
+    fs.writeFileSync(path.join(dir, "r", "plain"), "on: push\n");
+    const flows = path.join(dir, "r", ".github", "workflows");
+    for (const make of [() => fs.writeFileSync(flows, "x"), () => fs.symlinkSync(path.join(dir, "r", "gone"), flows), () => fs.symlinkSync(flows, flows), () => fs.symlinkSync(path.join(dir, "r", "plain"), flows)]) {
+      fs.rmSync(flows, { force: true }); make();
+      const r = runnersRead({ repo: "o/n", dir: flows, gh: () => JSON.stringify({ private: false }) }), said = r.said.join(" ");
+      ok(workflowsIn(flows).unlisted === true && r.where === "self-hosted" && /workflows not read/.test(said), "runners.mjs: a workflows path that is a file, a link to nowhere or to itself is not read, never read as no jobs");
+    }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
