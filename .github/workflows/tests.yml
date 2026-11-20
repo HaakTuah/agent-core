@@ -5,8 +5,10 @@
 # waiting one giving way to the next merge's (#810); once an hour, on Windows, at main's newest commit where its full
 # run has not already passed there, with the tests that reach the network on both, which no pull request's run or push's
 # carries (tasks/tests.md, "A test that reaches the network runs once per batch"; #733, point 9); and in full on both,
-# on a start by hand. A release waits on the tests' full runs on its commit, hourly or by hand: none unfinished, the
-# newest passed (.github/workflows/release.yml,
+# on a start by hand that names no part, or, where it names parts and systems in its input "only", their jobs alone,
+# named "tests, only" and those words, its gate too, so it is never read as a full run nor as a pull request's check
+# (scripts/tests-parts.mjs; #954). A release waits on the tests' full runs on its commit, hourly or by hand: none
+# unfinished, the newest passed (.github/workflows/release.yml,
 # scripts/release.mjs). Every suite runs though another failed, so one run shows them all. This repository only; no project calls it. Reads only, with no secret; nothing is installed but the
 # core's own packages, below. The suites run on the core's one exact Node, the pin
 # (.node-version), and on the least long-term Node its scripts promise to run on (.node-least, which scripts/node.sh
@@ -45,6 +47,8 @@
 # that name each file against them (scripts/strength.mjs with scripts/stryker.mjs; tasks/code-shape.md, "How strong the
 # tests are"), in a working copy of its own, with no secret.
 name: tests
+# (a start by hand that names parts, by that name; any other run by GitHub's own, which an empty name leaves)
+run-name: ${{ github.event_name == 'workflow_dispatch' && inputs.only != '' && format('tests, only {0}', inputs.only) || '' }}
 
 on:
   pull_request:
@@ -54,6 +58,12 @@ on:
   schedule:
     - cron: '23 * * * *'
   workflow_dispatch:
+    inputs:
+      only:
+        description: "Empty: the tests in full, on both systems. Else the jobs to run alone, by words: a system (linux, windows) and parts (projects, sync, kit, steps, core, faults, places, terms, licences, tools, network, rest, upgrade, staged), such as: windows kit"
+        type: string
+        default: ''
+        required: false
 
 permissions:
   contents: read
@@ -89,13 +99,36 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # (every page of them, so a re-run of an older one is read however many stand there; a page that cannot be
-          # read leaves the answer empty, and the run happens)
+          # read leaves the answer empty, and the run happens; a start by hand is a full run by the workflow's own name,
+          # never one that named parts, and one by another name only where it did not pass, #954)
           list=$(mktemp) done=""
-          if gh api --paginate -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$GITHUB_SHA" -f branch=main -F per_page=100 --jq '.workflow_runs[] | select((.event == "schedule" or .event == "workflow_dispatch") and ((.id | tostring) != env.GITHUB_RUN_ID))' > "$list"; then
+          if gh api --paginate -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/tests.yml/runs" -f head_sha="$GITHUB_SHA" -f branch=main -F per_page=100 --jq '.workflow_runs[] | select((.event == "schedule" or (.event == "workflow_dispatch" and (.display_title == "tests" or (.conclusion != "success" and ((.display_title // "") | startswith("tests, only ") | not))))) and ((.id | tostring) != env.GITHUB_RUN_ID))' > "$list"; then
             done=$(jq -rs 'if any(.[]; .status != "completed") then "running" else (sort_by([.run_started_at // "", .id]) | last | .conclusion // "none") end' "$list" || true)
           fi
           echo "the full runs on $GITHUB_SHA, hourly or by hand, but this one: ${done:-not read} (the newest, or running where one still is)"
           if [ "$done" = success ]; then echo "run=false" >> "$GITHUB_OUTPUT"; else echo "run=true" >> "$GITHUB_OUTPUT"; fi
+
+  # (a start by hand that names parts: the jobs of the full run it picks, read from the last list of each job's matrix
+  # below, which a start by hand that names none runs whole; #954)
+  pick:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.only != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      suites: ${{ steps.pick.outputs.suites }}
+      upgrade: ${{ steps.pick.outputs.upgrade }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: The jobs the parts named take
+        id: pick
+        env:
+          ONLY: ${{ inputs.only }}
+        run: node scripts/tests-parts.mjs "$ONLY" --output "$GITHUB_OUTPUT"
 
   # (the suites are split in parts that run side by side, each under a time mark of its own: the core's checks from
   # plain git on whole scratch projects, and what they leave out for the copy, with the hostile tests of the core's
@@ -119,18 +152,19 @@ jobs:
   # longer; #387, #405, #411, #424, #425, #489, #504, #540)
   suites:
     name: suites (${{ matrix.os }}, ${{ matrix.parts }}${{ matrix.node == '.node-least' && ', the least Node' || '' }})
-    needs: moved
-    # (no run on a draft, #733, point 2; the hourly one only where main moved)
-    if: ${{ !cancelled() && !(github.event_name == 'pull_request' && github.event.pull_request.draft) && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}
+    needs: [moved, pick]
+    # (no run on a draft, #733, point 2; the hourly one only where main moved; a start by hand that names parts only
+    # where they were picked and take a job here, #954)
+    if: ${{ !cancelled() && !(github.event_name == 'pull_request' && github.event.pull_request.draft) && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') && (github.event_name != 'workflow_dispatch' || inputs.only == '' || needs.pick.result == 'success' && needs.pick.outputs.suites != '[]') }}
     strategy:
       fail-fast: false
       # (each job on the pin and on the least long-term Node, the file setup-node reads, #526; on a pull request and a
       # push to main the three on Linux alone, on the hourly run the eight on Windows and the network's on both, and on
-      # a start by hand all of them; #733, points 3, 6 and 9)
+      # a start by hand all of them, the last list, or those of it the parts named pick; #733, points 3, 6 and 9; #954)
       # (set whole for each event, since GitHub adds back an entry of `include` that matches no combination left after
       # `exclude`: each job named with its Node, its suite, its runner and its parts)
       matrix:
-        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"}]' || github.event_name == 'schedule' && '[{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-version","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-version","suite":"suites-network","os":"windows-latest","parts":"network"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-least","suite":"suites-network","os":"windows-latest","parts":"network"}]' || '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-version","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-version","suite":"suites-network","os":"windows-latest","parts":"network"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-least","suite":"suites-network","os":"windows-latest","parts":"network"}]') }}
+        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"}]' || github.event_name == 'schedule' && '[{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-version","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-version","suite":"suites-network","os":"windows-latest","parts":"network"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-least","suite":"suites-network","os":"windows-latest","parts":"network"}]' || inputs.only != '' && needs.pick.outputs.suites || '[{"node":".node-version","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-version","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-version","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-version","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-version","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-version","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-version","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-version","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-version","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-version","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-version","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-version","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-version","suite":"suites-network","os":"windows-latest","parts":"network"},{"node":".node-least","suite":"suites-kit-core-licences","os":"ubuntu-latest","parts":"kit core licences terms tools"},{"node":".node-least","suite":"suites","os":"ubuntu-latest","parts":"projects sync"},{"node":".node-least","suite":"suites-rest-steps","os":"ubuntu-latest","parts":"rest steps"},{"node":".node-least","suite":"suites-projects","os":"windows-latest","parts":"projects"},{"node":".node-least","suite":"suites-sync","os":"windows-latest","parts":"sync"},{"node":".node-least","suite":"suites-kit","os":"windows-latest","parts":"kit steps"},{"node":".node-least","suite":"suites-core","os":"windows-latest","parts":"core faults"},{"node":".node-least","suite":"suites-core-places","os":"windows-latest","parts":"core places terms"},{"node":".node-least","suite":"suites-licences","os":"windows-latest","parts":"licences"},{"node":".node-least","suite":"suites-rest","os":"windows-latest","parts":"rest"},{"node":".node-least","suite":"suites-tools","os":"windows-latest","parts":"tools"},{"node":".node-least","suite":"suites-network","os":"ubuntu-latest","parts":"network"},{"node":".node-least","suite":"suites-network","os":"windows-latest","parts":"network"}]') }}
     # (the run's token reads the checks too: the selection asks whether "tests" passed on the merged head, on a push)
     permissions:
       contents: read
@@ -384,6 +418,9 @@ jobs:
       - name: The core's releases, what a project follows, and cutting one
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/releases-test.mjs ')) }}
         run: node tests/releases-test.mjs
+      - name: The jobs a start by hand that names parts runs alone
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/tests-parts-test.mjs ')) }}
+        run: node tests/tests-parts-test.mjs
       - name: The core's address stands in one place, and is this repository's
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/core-address-test.mjs ')) }}
         run: node tests/core-address-test.mjs
@@ -580,14 +617,14 @@ jobs:
   # the mark, since after the upgrade test's parts they made those jobs the longest; #304, #508, #515, #715)
   upgrade:
     name: ${{ (matrix.os == 'windows-latest' || matrix.part == 'staged') && 'staged' || 'upgrade' }} (${{ matrix.os }}, ${{ matrix.part }})
-    needs: moved
-    if: ${{ !cancelled() && !(github.event_name == 'pull_request' && github.event.pull_request.draft) && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}
+    needs: [moved, pick]
+    if: ${{ !cancelled() && !(github.event_name == 'pull_request' && github.event.pull_request.draft) && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') && (github.event_name != 'workflow_dispatch' || inputs.only == '' || needs.pick.result == 'success' && needs.pick.outputs.upgrade != '[]') }}
     strategy:
       fail-fast: false
       # (as the suites: on a pull request and a push the three on Linux, on the hourly run the three on Windows, on a
-      # start by hand all six; #733, points 3 and 6)
+      # start by hand all six, or those of them the parts named pick; #733, points 3 and 6; #954)
       matrix:
-        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"os":"ubuntu-latest","part":"older"},{"os":"ubuntu-latest","part":"newer"},{"os":"ubuntu-latest","part":"staged"}]' || github.event_name == 'schedule' && '[{"os":"windows-latest","part":"older"},{"os":"windows-latest","part":"newer"},{"os":"windows-latest","part":"third"}]' || '[{"os":"ubuntu-latest","part":"older"},{"os":"ubuntu-latest","part":"newer"},{"os":"ubuntu-latest","part":"staged"},{"os":"windows-latest","part":"older"},{"os":"windows-latest","part":"newer"},{"os":"windows-latest","part":"third"}]') }}
+        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && '[{"os":"ubuntu-latest","part":"older"},{"os":"ubuntu-latest","part":"newer"},{"os":"ubuntu-latest","part":"staged"}]' || github.event_name == 'schedule' && '[{"os":"windows-latest","part":"older"},{"os":"windows-latest","part":"newer"},{"os":"windows-latest","part":"third"}]' || inputs.only != '' && needs.pick.outputs.upgrade || '[{"os":"ubuntu-latest","part":"older"},{"os":"ubuntu-latest","part":"newer"},{"os":"ubuntu-latest","part":"staged"},{"os":"windows-latest","part":"older"},{"os":"windows-latest","part":"newer"},{"os":"windows-latest","part":"third"}]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     defaults:
@@ -631,9 +668,12 @@ jobs:
   # hourly run where main did not move it is skipped, which only ever follows a full run that passed, so a release reads
   # it as that pass. Where a run of main, the hour or a hand is cancelled whole, it stands aside, so the commit reads
   # cancelled and never failed, #810; a pull request's always runs, since a skipped one would pass a run cancelled by
-  # hand or by merge-line.mjs --cancel)
+  # hand or by merge-line.mjs --cancel. A start by hand that names parts names its gate apart, so its pass never stands for
+  # the check the ruleset asks for, nor for the pass a push's selection reads on a merged head, #954; it passes where the
+  # jobs picked passed, a group none of whose jobs was picked standing skipped)
   tests:
-    needs: [moved, suites, upgrade]
+    name: ${{ github.event_name == 'workflow_dispatch' && inputs.only != '' && 'tests, only the parts named' || 'tests' }}
+    needs: [moved, pick, suites, upgrade]
     if: ${{ (github.event_name == 'pull_request' && always() || !cancelled()) && (github.event_name != 'schedule' || needs.moved.outputs.run == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -643,11 +683,23 @@ jobs:
           SUITES: ${{ needs.suites.result }}
           UPGRADE: ${{ needs.upgrade.result }}
           DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && 'yes' || '' }}
+          PICKED: ${{ github.event_name == 'workflow_dispatch' && inputs.only != '' && needs.pick.result || '' }}
+          NO_SUITES: ${{ needs.pick.outputs.suites == '[]' && 'yes' || '' }}
+          NO_UPGRADE: ${{ needs.pick.outputs.upgrade == '[]' && 'yes' || '' }}
         run: |
           if [ -n "$DRAFT" ]; then
             echo "::error::a draft is not tested here (#733, point 2), so this check stands failed on its head. Mend: run the" \
               "suites the change reaches in your own working copy, then mark the pull request ready, which starts this run again"
             exit 1
+          fi
+          if [ -n "$PICKED" ] && [ "$PICKED" != success ]; then
+            echo "::error::the parts this start by hand named were not picked ($PICKED), so no job ran. Mend: read the job pick," \
+              "whose failure says its own mend, and start the run again naming parts it lists"
+            exit 1
+          fi
+          if [ -n "$PICKED" ]; then
+            if [ -n "$NO_SUITES" ] && [ "$SUITES" = skipped ]; then SUITES=success; fi
+            if [ -n "$NO_UPGRADE" ] && [ "$UPGRADE" = skipped ]; then UPGRADE=success; fi
           fi
           echo "the suites: $SUITES; the upgrade test and the staged cases: $UPGRADE"
           if [ "$SUITES" = cancelled ] || [ "$UPGRADE" = cancelled ]; then
