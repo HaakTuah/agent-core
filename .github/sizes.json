@@ -267,10 +267,6 @@
       "mark": 25409,
       "why": "#919: its cases for a core a library carries, and for the commands its hooks run, move to a file of their own."
     },
-    "scripts/staged/scratch.mjs": {
-      "mark": 43378,
-      "why": "#938: the sealed reader of what a session left apart from the set-up of a case and the readers' helpers."
-    },
     "tests/staged-test.mjs": {
       "mark": 125729,
       "why": "#937: split into the three parts it already runs in, with the shared set-up in a module of its own."
