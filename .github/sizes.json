@@ -112,27 +112,27 @@
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
     },
     "scripts/step-checks.mjs": {
-      "mark": 74941,
+      "mark": 75102,
       "why": "#919: split by step, so the session that changes one step's check opens that step's file alone."
     },
     "scripts/check-configs.mjs": {
-      "mark": 40757,
+      "mark": 40791,
       "why": "#919: the reading of a workflow's runs apart from the reading of each check's config; the steps' readers, which import it, move first."
     },
     "scripts/agent-tools.mjs": {
-      "mark": 94260,
+      "mark": 94262,
       "why": "#919: the readers of each agent tool's configuration apart from the check that lists them."
     },
     "tests/steps-test.mjs": {
-      "mark": 137358,
+      "mark": 141435,
       "why": "#919: split by step, beside the readers it holds."
     },
     "tests/agent-tools-test.mjs": {
-      "mark": 112328,
+      "mark": 114587,
       "why": "#919: split with agent-tools.mjs, a file of cases for each tool's configuration."
     },
     "tests/core-path-test.mjs": {
-      "mark": 21664,
+      "mark": 25370,
       "why": "#919: past the mark by a few lines only; its cases for a core a library carries move to a file of their own."
     }
   }

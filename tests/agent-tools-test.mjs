@@ -107,7 +107,7 @@ passes(run(project()), "a project as the starter kit writes it, with no list, pa
   given.hooks.SessionStart[0].hooks[0].command = commands.start;
   given.hooks.PreToolUse[0].hooks[0].command = commands.helper;
   given.hooks.Stop[0].hooks[0].command = commands.stop;
-  passes(run(project({ "core-manifest.md": line, ".claude/settings.json": KIT.replaceAll("origin/main:core/", "origin/main:vendor/core/"), "checks/licences.json": empty })), "the kit's hooks with the copy's path written in, the manifest naming it, are the kit's own");
+  fails(run(project({ "core-manifest.md": line, ".claude/settings.json": KIT.replaceAll("origin/main:core/", "origin/main:vendor/core/"), "checks/licences.json": empty })), "the kit's hooks with the copy's path written in, the manifest naming it, are not the kit's own: a session would start without the floor", "is not listed");
   passes(run(project({ "core-manifest.md": line, ".claude/settings.json": given, "checks/licences.json": empty })), "the commands core-path.mjs gives for the copy's path are the kit's own");
   fails(run(project({ "core-manifest.md": line, "checks/licences.json": empty })), "the kit's hooks naming core/ where the manifest names another path are not the kit's own", "is not listed");
   // (the commands core-path.mjs gives for a path other than core/ are in the kit's form: they run main's copy, a library's at
@@ -117,11 +117,11 @@ passes(run(project()), "a project as the starter kit writes it, with no list, pa
   const start = hookCommands(readCore(`Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n`)).stop;
   ok(![start.replace('-C "${CLAUDE_PROJECT_DIR:-.}"/lib --no-replace-objects show "$s:', '-C "${CLAUDE_PROJECT_DIR:-.}"/other --no-replace-objects show "$s:'), start.replace(" 2>/dev/null; }) || exit 0", "; }) || exit 0; rm -rf x"), start.replace("refs/remotes/origin/main:lib", "HEAD:lib"), start.replace("-c safe.bareRepository=explicit ", "")].some(kitForm),
     "and a variation of them that reads the library's file from another folder or from the working tree, runs more, or lets git find a bare repository a branch committed in the library's place, is not");
-  // (a core a library carries: the commands for it alone, never the kit's own with the path written in)
+  // (a core a library carries: the same)
   const carried = `Core: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n`, forCarried = JSON.parse(KIT), commandsFor = hookCommands(readCore(carried));
   forCarried.hooks.SessionStart[0].hooks[0].command = commandsFor.start; forCarried.hooks.PreToolUse[0].hooks[0].command = commandsFor.helper; forCarried.hooks.Stop[0].hooks[0].command = commandsFor.stop;
   passes(run(project({ "core-manifest.md": carried, ".claude/settings.json": forCarried, "checks/licences.json": empty })), "for a core a library carries, the commands core-path.mjs gives for it are the kit's own");
-  fails(run(project({ "core-manifest.md": carried, ".claude/settings.json": KIT.replaceAll("origin/main:core/", "origin/main:lib/core/"), "checks/licences.json": empty })), "for a core a library carries, the kit's hooks with the path written in are not the kit's own: a session would start without the floor", "is not listed");
+  fails(run(project({ "core-manifest.md": carried, ".claude/settings.json": KIT.replaceAll("origin/main:core/", "origin/main:lib/core/"), "checks/licences.json": empty })), "for a core a library carries, the kit's hooks with the path written in are not the kit's own either", "is not listed");
 }
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } })), "and with an empty list");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } }), "--core"), "in the core's own repository too");

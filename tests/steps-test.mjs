@@ -1096,9 +1096,10 @@ ok(toolsMend.includes("runs `node core/scripts/agent-tools.mjs config/licences.j
   put("AGENTS.md", "# A project\n\n@vendor/core/modules/work-flow.md\n");
   put("config/copies.json", `{\n  "prose": [\n    "vendor/core/floor/*.md",\n    "vendor/core/modules/*.md"\n  ]\n}\n`);
   put("core/notes.md", "A file of the project's own, which names vendor/core/modules/how-to-work.md.\n");
+  put("core/AGENTS.md", "A rule file of the project's own, which names vendor/core/modules/inbox.md.\n");
   execFileSync("git", ["init", "-q"], { cwd: dir });
   const said = notDone(dir, [step])[0]?.mend ?? "";
-  ok(said.includes("`vendor/core/modules/work-flow.md` is now `vendor/core/roles/shared/work-flow.md` (in `AGENTS.md`)") && said.includes('after the pattern "vendor/core/modules/*.md" add the patterns "vendor/core/floor/topics/*.md", "vendor/core/roles/*.md"') && said.includes("`core/notes.md`") && !/(?<![\w/-])core\//.test(said.replace("`core/notes.md`", "")),
+  ok(said.includes("`vendor/core/modules/work-flow.md` is now `vendor/core/roles/shared/work-flow.md` (in `AGENTS.md`)") && said.includes('after the pattern "vendor/core/modules/*.md" add the patterns "vendor/core/floor/topics/*.md", "vendor/core/roles/*.md"') && said.includes("`core/notes.md`") && said.includes("`core/AGENTS.md`") && !/(?<![\w/-])core\//.test(said.replace("`core/notes.md`", "").replace("`core/AGENTS.md`", "")),
     "where the copy stands at another path, the step reads a copies config's patterns at it and names the files and patterns by it, and a file of the project's own that stands at core/ by its own name", said);
 }
 // the files that point from the paths the rules left: each names a file or a folder the core holds, and what one says

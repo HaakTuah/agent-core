@@ -136,6 +136,9 @@ ok(["vendor/core/", "packages/core/agent/", "packages/core/core/", "a.core/"].ev
   const mend = "see `core/scripts/x.mjs`, core/notes.md, src/core/a, vendor/core/b, `core/` and core/modules/x (in `core/notes.md`)";
   ok(mendAt(mend, "vendor/core/") === "see `vendor/core/scripts/x.mjs`, core/notes.md, src/core/a, vendor/core/b, `vendor/core/` and vendor/core/modules/x (in `core/notes.md`)" && mendAt(mend, "core/") === mend && mendAt(mendAt(mend, "packages/core/agent/"), "packages/core/agent/") === mendAt(mend, "packages/core/agent/"),
     "in a mend the core's own files are the copy's, and the project's own paths, core/notes.md and src/core/ among them, are not");
+  const mine = new Set(["core/AGENTS.md", "core/tests/a.test.mjs"]), own = at => [...mine].some(f => f === at || f.startsWith(`${at}/`));
+  ok(mendAt("`core/AGENTS.md`, `core/tests/a.test.mjs`, `core/tests/`, `core/scripts/x.mjs`, `core/floor/` and `core/`.", "vendor/core/", own) === "`core/AGENTS.md`, `core/tests/a.test.mjs`, `core/tests/`, `vendor/core/scripts/x.mjs`, `vendor/core/floor/` and `vendor/core/`.",
+    "a path the project holds as its own file or folder stays its own, though the core has one of the name");
 }
 ok(atCopy("refs/remotes/origin/main:vendor/core/a core/b", "vendor/core/") === "refs/remotes/origin/main:vendor/core/a vendor/core/b" && atCopy("core/a", "lib/the-core/") === "lib/the-core/a",
   "one already behind the copy's own folders is left as it stands");

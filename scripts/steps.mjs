@@ -64,6 +64,9 @@ export const declared = (p, step) => p.differences.some(l => l.includes(`"${step
 // done: it is reported, with what went wrong.
 export function notDone(root, steps = STEPS) {
   const p = project(root), copy = copyAt(p);
+  // (a path of the project's own files outside the copy, a file or a folder: what a mend names as the core's is the copy's
+  // and never that)
+  const mine = p.files.filter(f => !f.startsWith(copy)), own = at => mine.some(f => f === at || f.startsWith(`${at}/`));
   const out = [];
   for (const step of steps) {
     if (!step.check || declared(p, step)) continue;
@@ -71,7 +74,7 @@ export function notDone(root, steps = STEPS) {
     try { mend = step.check(p); } catch (e) { mend = `Its check could not read the project (${plain(e.message, root)}): read its entry in \`core/${NOTES_FOLDER}/\` against it.`; }
     // (the entries and the checks say core/, the starter kit's path for the copy; a project that keeps it elsewhere is
     // told its own: #628)
-    if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend: mendAt(mend, copy) });
+    if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend: mendAt(mend, copy, own) });
   }
   out.unread = p.unread;
   out.copy = copy;

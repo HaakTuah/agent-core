@@ -76,12 +76,17 @@ export const atCopy = (text, copy) => {
  *  core/, and the project's own paths, which the mend names too, are left as they are. A core/ is the copy's where it
  *  stands at the start of a path (no letter, digit, dot, dash or slash before it, so a path already at the copy's
  *  place, or one of the project's own like src/core/, is passed over), and a file or folder of the core follows it
- *  (scripts/, floor/, README.md...) or nothing does; the project's own core/notes.md is its own (#628). A second pass
- *  changes nothing. */
+ *  (scripts/, floor/, README.md...) or nothing does, and that the project does not hold a file or folder of its own at
+ *  (`own`): its core/notes.md and its core/AGENTS.md are its own (#628). A second pass changes nothing. */
 // (and modules/, which the core's files left and the entries of the notes still name)
 const TOP = new Set([...fs.readdirSync(new URL("..", import.meta.url)).filter(n => n !== ".git"), "modules"]);
-export const mendAt = (text, copy) => copy === "core/" ? text
-  : text.replace(/(?<![\w./-])core\/([\w.-]*)/gu, (hit, name) => !name || TOP.has(name) ? copy + hit.slice("core/".length) : hit);
+// `own(path)` says whether the project holds a file or folder of its own at a path (steps.mjs: its files outside the copy),
+// which is then its own whatever its name: a project that keeps the copy elsewhere often has its own core/ folder.
+export const mendAt = (text, copy, own = () => false) => copy === "core/" ? text
+  : text.replace(/(?<![\w./-])core\/([\w.-]*)([\w./-]*)/gu, (hit, name, rest) => {
+    const at = `core/${name}${rest}`.replace(/[.:,;)]+$/u, "").replace(/\/$/u, "");
+    return (!name || TOP.has(name)) && !(at !== "core" && own(at)) ? copy + hit.slice("core/".length) : hit;
+  });
 /** The copy's path as the pattern of a regular expression. */
 export const inCopy = copy => copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&");
 
