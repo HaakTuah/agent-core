@@ -27,6 +27,20 @@ process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const PIN = "a".repeat(40);
 // (a test that reads one step's answer asks for that step alone: the others' checks, the agent tools' files among them, which run
 // the copies and pointers checks on the whole project, answer nothing it reads, and a Windows runner pays for each)
+// TEMP-TIMING-START
+import cpT from "node:child_process";
+import { syncBuiltinESMExports } from "node:module";
+{
+  const tot = {};
+  const add = (k, ms) => { tot[k] = (tot[k] ?? 0) + ms; tot[k + "#"] = (tot[k + "#"] ?? 0) + 1; };
+  const wrap = (obj, name, key) => { const o = obj[name]; obj[name] = function (...a) { const t = performance.now(); try { return o.apply(this, a); } finally { add(key(a), performance.now() - t); } }; };
+  wrap(cpT, "spawnSync", a => "spawn " + String(a[1]?.[0]).split(/[\\/]/).pop());
+  wrap(cpT, "execFileSync", a => "execFile " + String(a[0]).split(/[\\/]/).pop() + " " + (String(a[1]?.[0]).split(/[\\/]/).pop()));
+  wrap(fs, "cpSync", a => "cpSync " + String(a[0]).split(/[\\/]/).pop());
+  syncBuiltinESMExports();
+  process.on("exit", () => { for (const [k, v] of Object.entries(tot).filter(([k]) => !k.endsWith("#")).sort((x, y) => y[1] - x[1]).slice(0, 14)) console.error(`TIMING ${(v / 1000).toFixed(1)}s ${tot[k + "#"]}x ${k}`); console.error(`TIMING total ${(process.uptime()).toFixed(0)}s`); });
+}
+// TEMP-TIMING-END
 const only = lead => STEPS.filter(s => s.lead === lead);
 // What a reader's "one pass" or its bound means is that its work grows in step with its text (or stops at
 // its bound), never a time of its own on a real clock, which a busy machine stretches: `read(n, k)` reads a text of
@@ -91,7 +105,7 @@ function kit(name, o, { held = true } = {}) {
   fs.mkdirSync(path.join(dir, "checks"), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify(licences(o, () => false), null, 2)}\n`);
   // (the copy of the core the project holds, as far as its checks read it, and the size marks the kit writes for it)
-  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", ".packages", "setup"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
+  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", ".packages", "setup", ".gitignore"]) fs.cpSync(path.join(root, part), path.join(dir, "core", part), { recursive: true });
   fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, f)).size]))), null, 2)}\n`);
   execFileSync("git", ["add", "-A"], { cwd: dir });
   // (the copies check's first baseline as the starter kit writes it, its two entry files' shared sentence listed)
