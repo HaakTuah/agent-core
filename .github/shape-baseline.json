@@ -19,6 +19,7 @@
     "changes"
   ],
   "grown": {
+    "process: tests/comment-only-run-test.mjs -> node:child_process": "Split from tests/comment-only-test.mjs (#1008), whose scratch clone it runs the script in through git: that the script reads a pull request's branch from git and refuses what it cannot is what it guards.",
     "process: tests/select-passed-test.mjs -> node:child_process": "Split from tests/select-test.mjs (#943), whose scratch repository it builds through git: a push that merges a pull request's head is read from git, and the selection's command asks the host as a program, which is what it guards.",
     "timed: tests/select-matcher-test.mjs -> Date.now": "Split from tests/select-test.mjs (#943): that a pathspec of many wildcards is matched in time that grows with the path's length is what the case guards, and only the clock shows it.",
     "process: tests/pr-description-reads-test.mjs -> node:child_process": "Split from tests/pr-description-test.mjs (#888), whose scratch projects it builds through git: what a change calls for is read from git against its base, which is what it guards.",
@@ -63,6 +64,7 @@
     "process: tests/code-review-wait-test.mjs -> node:child_process": true,
     "process: tests/code-scan-test.mjs -> node:child_process": true,
     "process: tests/code-shape-test.mjs -> node:child_process": true,
+    "process: tests/comment-only-run-test.mjs -> node:child_process": true,
     "process: tests/comment-only-test.mjs -> node:child_process": true,
     "process: tests/copies-tools-test.mjs -> node:child_process": true,
     "process: tests/copy-left-out-test.mjs -> node:child_process": true,
