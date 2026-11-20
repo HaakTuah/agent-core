@@ -65,7 +65,7 @@ export const verdictOf = (record, rights = record.rights) => judge(...atMerge(re
 // what differs between the status and the host's record of one pull request's reviews: a list of lines, empty where
 // nothing does
 export function compare(record) {
-  const n = `#${record.pull?.number}`;
+  const n = `#${record.pull.number}`;
   const summary = codexState(record.comments);
   if (!summary.state) return [`${n}: Codex's summary is ${summary.unread ? "there but cannot be read" : "not there"}, so nothing of its security review can be compared`];
   const reviews = securityReviews(record);
@@ -76,7 +76,7 @@ export function compare(record) {
 // where the summary says findings stand, the commit it names is that of Codex's newest security review, and where it
 // says none do, no security review of Codex's (each of which carries findings) is on that commit
 function commitDiffers(n, said, reviews) {
-  if (said === null || typeof said !== "object" || said.status !== "completed") return [];
+  if (said?.status !== "completed") return [];
   const newest = reviews.reduce((last, review) => (last === undefined || time(review.submitted_at) > time(last.submitted_at) ? review : last), undefined);
   if (said.has_any_findings === true && newest !== undefined && newest.commit_id !== said.commit_sha) return [`${n}: the summary names ${said.commit_sha} for Codex's security review, but its newest review in the host's list is on ${newest.commit_id}`];
   if (said.has_any_findings !== true && reviews.some((review) => review.commit_id === said.commit_sha)) return [`${n}: the summary says Codex's security review of ${said.commit_sha} found nothing, but the host lists a security review of Codex's on that commit`];
@@ -86,15 +86,14 @@ function commitDiffers(n, said, reviews) {
 // after that finding
 function threadsOpen(n, record) {
   if (!Array.isArray(record.threads)) return [];
-  const byId = new Map(flat(record.findings).map((comment) => [comment.id, comment]));
+  const [pull, comments, findings] = atMerge(record);
+  const byId = new Map(findings.map((comment) => [comment.id, comment]));
   const open = record.threads.filter((thread) => thread.resolved === false).map((thread) => byId.get(thread.first))
     .filter((comment) => comment !== undefined && codexs(comment) && FINDING.test(comment.body));
-  if (open.length === 0) return [];
   const verdict = verdictOf(record);
-  if (!verdict?.done) return [];
-  const [pull, comments] = atMerge(record);
+  if (!verdict.done) return [];
   const whose = counted(pull, [], writersOf(record.rights));
-  const posted = comments.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && whose(comment.user));
+  const posted = comments.filter((comment) => POSTED.test(comment.body) && whose(comment.user));
   return open.filter((finding) => !posted.some((comment) => time(comment.created_at) > time(finding.created_at)))
     .map((finding) => `${n}: Codex's security finding ${finding.id} is unresolved on the merged head, with no "Security review:" posted after it, yet the status passed: ${verdict.why}`);
 }
@@ -110,14 +109,14 @@ export function compareRights(rights) {
     if (writers.has(login)) continue;
     const answer = answers.find((each) => lower(each.user?.login) === login);
     if (answer === undefined) out.push(`${entry.login} is on the host's push list, but no rights answer of theirs is recorded`);
-    else if (!onPurpose(entry, answer)) out.push(`${entry.login} is on the host's push list, but writersOf() does not count them (role ${answer.role_name}, permission ${answer.permission})`);
+    else if (!onPurpose(answer)) out.push(`${entry.login} is on the host's push list, but writersOf() does not count them (role ${answer.role_name}, permission ${answer.permission})`);
   }
   for (const login of writers) if (!pushers.has(login)) out.push(`writersOf() counts ${login}, who is not on the host's push list`);
   return out;
 }
-// the two listed on purpose: an app's account, which writersOf() never counts, and a custom role, which counts for no
-// one (security-review.mjs, writersOf)
-const onPurpose = (entry, answer) => entry.type !== "User" || answer.user?.type !== "User" || !ROLES.includes(answer.role_name);
+// the two listed on purpose, as the host's answer gives them: an app's account, which writersOf() never counts, and a
+// custom role, which counts for no one (security-review.mjs, writersOf)
+const onPurpose = (answer) => answer.user?.type !== "User" || !ROLES.includes(answer.role_name);
 
 // --- the recording ---
 
@@ -136,30 +135,35 @@ export function standIns() {
     return given.get(lower(login));
   };
 }
-const userOf = (user, as) => (user && typeof user === "object" ? { login: as(user.login), type: user.type } : user);
-const firstLines = (body, upTo) => (typeof body === "string" ? body.split("\n").slice(0, upTo).join("\n") : body);
+// (an account the host cannot name, a commit's author whose address matches none, is null)
+const userOf = (user, as) => (user ? { login: as(user.login), type: user.type } : user);
+const firstLines = (body, upTo) => body.split("\n").slice(0, upTo).join("\n");
 
 // what is kept of each input: the fields judge() and the comparisons read
 export function keep(raw, as) {
-  return { pull: pullKept(raw.pull, as), comments: flat(raw.comments).filter(kept).map((c) => commentKept(c, as, postedBody(c.body))),
+  return { pull: pullKept(raw.pull, as), comments: flat(raw.comments).filter(kept).map((c) => commentKept(c, as, bodyKept(c.body))),
     findings: flat(raw.findings).filter((c) => codexs(c) && FINDING.test(c.body)).map((c) => commentKept(c, as, firstLines(c.body, 1))),
     commits: flat(raw.commits).map((c) => commitKept(c, as)), files: flat(raw.files).map(fileKept), reviews: flat(raw.reviews).filter(codexs).map((r) => reviewKept(r, as)),
     threads: raw.threads, rights: flat(raw.rights).map((answer) => rightOf(answer, as)), ...(raw.unread ? { unread: raw.unread } : {}) };
 }
 const pullKept = (p, as) => ({ number: p.number, state: p.state, draft: p.draft, merged_at: p.merged_at, created_at: p.created_at, commits: p.commits, changed_files: p.changed_files,
-  user: userOf(p.user, as), head: { sha: p.head?.sha, repo: { full_name: p.head?.repo?.full_name } }, base: { repo: { full_name: p.base?.repo?.full_name, owner: userOf(p.base?.repo?.owner, as) } } });
-// of the comments, Codex's summary and the posted "Security review:"
+  user: userOf(p.user, as), head: { sha: p.head.sha, repo: { full_name: p.head.repo?.full_name } }, base: { repo: { full_name: p.base.repo.full_name, owner: userOf(p.base.repo.owner, as) } } });
+// of the comments, Codex's summary and security findings, and the posted "Security review:"
 const SUMMARY_OPENS = /^<!-- codex-pull-request-review-summary -->/u;
-const kept = (c) => (codexs(c) && SUMMARY_OPENS.test(c.body)) || (typeof c.body === "string" && POSTED.test(c.body));
+const kept = (c) => (codexs(c) && (SUMMARY_OPENS.test(c.body) || FINDING.test(c.body))) || POSTED.test(c.body);
 const commentKept = (c, as, body) => ({ id: c.id, user: userOf(c.user, as), author_association: c.author_association, created_at: c.created_at, updated_at: c.updated_at, body });
-// of a posted review, the lines the status reads: its first, and each that names a commit or says what
-// comment-only.mjs printed (Codex's summary is kept whole)
+// what the status reads of a comment's body: Codex's summary whole, a finding's first line, and of a posted review its
+// first line and each that names a commit or says what comment-only.mjs printed
 const READ_LINES = /[0-9a-f]{40}|^\s*(?:comments and steps' names alone in \.github\/|nothing changed in \.github\/)/iu;
-const postedBody = (body) => (SUMMARY_OPENS.test(body) ? body : body.split("\n").filter((line, i) => i === 0 || READ_LINES.test(line)).join("\n"));
+function bodyKept(body) {
+  if (SUMMARY_OPENS.test(body)) return body;
+  if (FINDING.test(body)) return firstLines(body, 1);
+  return body.split("\n").filter((line, i) => i === 0 || READ_LINES.test(line)).join("\n");
+}
 const commitKept = (c, as) => ({ sha: c.sha, parents: flat(c.parents).map((parent) => ({ sha: parent.sha })), author: userOf(c.author, as), committer: userOf(c.committer, as),
-  commit: { verification: { verified: c.commit?.verification?.verified } } });
+  commit: { verification: { verified: c.commit.verification?.verified } } });
 // of the files, a patch only where the file runs by itself, as the status reads it
-const fileKept = (f) => ({ filename: f.filename, previous_filename: f.previous_filename, status: f.status, ...([f.filename, f.previous_filename].some((name) => typeof name === "string" && RUNS.test(name)) ? { patch: f.patch } : {}) });
+const fileKept = (f) => ({ filename: f.filename, previous_filename: f.previous_filename, status: f.status, ...([f.filename, f.previous_filename].some((name) => RUNS.test(name)) ? { patch: f.patch } : {}) });
 // of Codex's reviews, the body up to its heading, which says its kind
 const reviewKept = (r, as) => ({ id: r.id, user: userOf(r.user, as), commit_id: r.commit_id, submitted_at: r.submitted_at, body: firstLines(r.body, String(r.body).split("\n").findIndex((line) => line.startsWith("###")) + 1) });
 const rightOf = (answer, as) => ({ permission: answer.permission, role_name: answer.role_name, user: { ...userOf(answer.user, as), ...(answer.user?.permissions ? { permissions: { push: answer.user.permissions.push } } : {}) } });
@@ -259,7 +263,7 @@ export function main(args, { call = gh, folder = FOLDER, say = console.log, warn
     const found = recordings(folder).flatMap(({ record }) => compare(record));
     for (const line of found) say(line);
     say(found.length ? `${found.length} difference(s) from the host's record.` : "No difference from the host's record.");
-    return refused ? 1 : 0;
+    return refused > 0 ? 1 : 0;
   } catch (e) {
     warn(`FAIL: the host could not be read (${why(e)}). Mend: run it where gh answers for the owner's account, or run it again once the host answers`);
     return 1;
