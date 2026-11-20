@@ -1,6 +1,7 @@
-// What the tests of the steps stand on (steps-test.mjs, steps-checks-run-test.mjs, steps-files-test.mjs): the projects the
-// starter kit of this commit writes in a scratch folder, each a git repository with nothing committed, and the timing
-// of a reader's "one pass". Tests only: no project and no workflow of the core's uses it. Node's own modules and git only.
+// What the tests of the steps stand on (steps-test.mjs, steps-checks-run-test.mjs, steps-files-test.mjs, steps-tool-
+// files-test.mjs): the projects the starter kit of this commit writes in a scratch folder, each a git repository with
+// nothing committed, and the timing of a reader's "one pass". Tests only: no project and no workflow of the core's uses
+// it. Node's own modules and git only.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";

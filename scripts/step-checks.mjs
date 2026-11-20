@@ -52,7 +52,5 @@ export const everyPush = on => {
 
 export const onPullRequests = on => (typeof on === "string" ? on === "pull_request" : Array.isArray(on) ? on.includes("pull_request") : !!on && "pull_request" in on);
 
-// Each workflow of the project's own whose pull-request path filter starts it on a change to such a file alone, as
-// GitHub reads a filter (a path filter sees which files changed, never what changed in them); null where none does.
 // (a file's name as the mend shows it: a control character or a backtick, which would bend a description, as "?")
 export const shown = f => String(f).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029`]/gu, "?");

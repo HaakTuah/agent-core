@@ -102,6 +102,8 @@ const coreCall = job => typeof job?.uses === "string" && job.uses.toLowerCase().
 export const callers = p => (readable(p, text => text.toLowerCase().includes(`${CORE}/.github/workflows/`.toLowerCase())), Object.entries(p.workflows))
   .filter(([, w]) => { const jobs = Object.values(w.yaml?.jobs ?? {}); return jobs.length > 0 && jobs.every(coreCall); }).map(([f]) => `.github/workflows/${f}`);
 
+// Each workflow of the project's own whose pull-request path filter starts it on a change to such a file alone, as
+// GitHub reads a filter (a path filter sees which files changed, never what changed in them); null where none does.
 export function suitesOnPins(p) {
   const pins = callers(p);
   readable(p, text => /paths(-ignore)?\s*:/.test(text));

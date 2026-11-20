@@ -9,20 +9,17 @@ import path from "node:path";
 import { toolFilesRead, toolFilesState } from "../scripts/step-checks-tool-files.mjs";
 import { STEPS, Unread, project } from "../scripts/steps.mjs";
 import { READ_MOST } from "../scripts/own-files.mjs";
-import { STAGES } from "../scripts/steps-stage.mjs";
 import { kitIn } from "../scripts/steps-kit.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
-const tmp = scratchDir("steps-files-");
+const tmp = scratchDir("steps-tool-files-");
 const kit = kitIn(tmp);
 // (the starter kit's npm project, every step done as the kit writes it)
 const lockProject = kit("an-npm-project", { packages: "." });
 const dirs = { "an-npm-project": lockProject };
-// (the step of the agent tools' files taken out of it and mended, as the main test's loop over the steps leaves a project: its
-// copies check's baseline written, which the cases of that step read among the files whose change asks a new run)
-const tools = "16 November 2026, the agent tools' files read for copies and pointers";
-STAGES[tools].stage(lockProject); STAGES[tools].mend(lockProject); STAGES[tools].after?.(lockProject);
+// (the files the kit writes after its own `git add -A`, the copies check's baseline among them, tracked, as the cases that
+// read what git lists there expect)
 execFileSync("git", ["add", "-A"], { cwd: lockProject });
 const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at: "lib/core/", library: "lib/", submodule: true });
 

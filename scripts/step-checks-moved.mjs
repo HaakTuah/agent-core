@@ -64,9 +64,9 @@ const readsOldAlone = (p, f, copy) => f.endsWith(".json") && (p.read(f) ?? "").i
 // Where two old paths now lead to one file, the word that it is named once; and, where a file a tool takes its
 // instructions from by pulling files in (Kiro's steering, Antigravity's rules) still names an old path, that the step
 // comes before any other task, since such a session reads each rule on one line's word until then.
-export const once = (found, map) => [...found.keys()].filter(a => [...found.keys()].some(b => b < a && map[b] === map[a])).map(a => `a file that named \`core/${a}\` beside the other path that now leads to \`core/${map[a]}\` names that file once`);
+const once = (found, map) => [...found.keys()].filter(a => [...found.keys()].some(b => b < a && map[b] === map[a])).map(a => `a file that named \`core/${a}\` beside the other path that now leads to \`core/${map[a]}\` names that file once`);
 
-export const first = found => ([...found.values()].flat().some(f => /^\.(kiro|agents?)\//u.test(f)) ? "Before any other task, since a tool whose entry file pulls the core's files in follows no further import, and its sessions read each rule on one line's word until this is done: in" : "In");
+const first = found => ([...found.values()].flat().some(f => /^\.(kiro|agents?)\//u.test(f)) ? "Before any other task, since a tool whose entry file pulls the core's files in follows no further import, and its sessions read each rule on one line's word until this is done: in" : "In");
 
 // Where a project's own files still name an old path of the core's, a copies config of its own the old folder's pattern
 // alone, and its manifest's "Paths:" line the old folders: the mend, naming each file and each path's new one; null
