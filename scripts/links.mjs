@@ -102,17 +102,17 @@ export function run({ program, root, files, ...at }) {
 
 // The base's files (`sha`) that run() reads in a folder of this run's own, written from git's own blobs, so that no
 // attribute of the base's (export-ignore, export-subst) changes them: each Markdown or HTML file, in which a link's
-// heading may be looked for, and each rule file of `rules`, a link inside the project read through as readAt() reads it
-// and one leading out of it not written; a path that could lead out of the folder (a part empty, "." or "..", a
-// backslash) is never written. Returns { dir, tracked, folders }, or null where git could not give them or one could not
+// heading may be looked for, and each path of `paths` (the rule files, and where the head's findings lead) still
+// missing, through a link to a file or a folder inside the project as readAt() reads it, one leading out of it not
+// written; a path that could lead out of the folder (a part empty, "." or "..", a backslash) is never written. Returns { dir, tracked, folders }, or null where git could not give them or one could not
 // be written.
 const PAGE = /\.html?$/iu, safe = f => inProject(f) && !f.includes("\\") && f.split("/").every(p => p && p !== "." && p !== "..");
-export function baseTree(sha, under, rules) {
+export function baseTree(sha, under, paths) {
   const git = (args, input) => spawnSync("git", args, { input, maxBuffer: 1 << 30 });
   const ls = git(["ls-tree", "-r", "-z", sha]);
   if (ls.status !== 0) return null;
   const entries = String(ls.stdout).split("\0").map(e => /^(\d+) \S+ (\S+)\t([\s\S]+)$/u.exec(e)).filter(Boolean);
-  const tracked = new Set(entries.map(m => m[3])), wanted = m => safe(m[3]) && (MARKDOWN.test(m[3]) || PAGE.test(m[3]) || rules.includes(m[3]));
+  const tracked = new Set(entries.map(m => m[3])), wanted = m => safe(m[3]) && (MARKDOWN.test(m[3]) || PAGE.test(m[3]));
   const plain = entries.filter(m => /^100/u.test(m[1]) && wanted(m)), linked = entries.filter(m => m[1] === "120000" && wanted(m));
   const blobs = git(["cat-file", "--batch"], plain.map(m => m[2]).join("\n") + "\n");
   if (blobs.status !== 0) return null;
@@ -127,7 +127,7 @@ export function baseTree(sha, under, rules) {
       at = from + size + 1;
     }
     const read = readAt(sha);
-    for (const m of linked) { const t = read(m[3]); if (t !== null) put(m[3], t); }
+    for (const f of [...linked.map(m => m[3]), ...paths.filter(safe)]) { if (fs.existsSync(path.join(dir, f))) continue; const t = read(f); if (t !== null) put(f, t); }
   } catch { fs.rmSync(dir, { recursive: true, force: true }); return null; }
   return { dir, tracked, folders: new Set([...tracked].flatMap(f => f.split("/").slice(0, -1).map((_, i, p) => `${p.slice(0, i + 1).join("/")}/`))) };
 }
@@ -143,7 +143,7 @@ export function checkRules({ program, rules, tracked, folders, text, base }) {
   if (head.unread || !head.found.length || !base) return { read, ...head, ...(head.unread ? {} : compared(head.found, base === "" ? [] : null)) };
   let was = null;
   try {
-    was = baseTree(base, process.env.RUNNER_TEMP || os.tmpdir(), read);
+    was = baseTree(base, process.env.RUNNER_TEMP || os.tmpdir(), [...read, ...head.found.filter(f => f.kind !== "outside").map(f => f.to.replace(/#.*$/su, ""))]);
     const file = f => fs.lstatSync(path.join(was.dir, f), { throwIfNoEntry: false });
     const there = was ? read.filter(f => file(f)?.isFile() && readable(fs.readFileSync(path.join(was.dir, f)))) : [];
     const r = was && run({ program, root: was.dir, files: there, tracked: was.tracked, folders: was.folders, text: f => fs.readFileSync(path.join(was.dir, f), "utf8") });

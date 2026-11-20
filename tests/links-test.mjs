@@ -143,13 +143,14 @@ if (process.platform !== "win32") {
     gi(["init", "-q"]);
     const blob = t => gi(["hash-object", "-w", "--stdin"], t);
     const evil = gi(["mktree"], `100644 blob ${blob("# Evil\n")}\tevil.md\n`);
-    const tree = gi(["mktree"], [`040000 tree ${evil}\t..`, `100644 blob ${blob("# Agents\n\n## Here\n")}\tAGENTS.md`, `120000 blob ${blob("AGENTS.md")}\tlink.md`, `120000 blob ${blob("/etc/hostname")}\tout.md`, `100644 blob ${blob("<h2 id=\"x\">X</h2>\n")}\tapi.html`].join("\n") + "\n");
+    const guide = gi(["mktree"], `100644 blob ${blob("# Guide\n\n## There\n")}\tREADME.md\n`);
+    const tree = gi(["mktree"], [`040000 tree ${evil}\t..`, `040000 tree ${guide}\tguide`, `120000 blob ${blob("guide")}\tdocs`, `100644 blob ${blob("# Agents\n\n## Here\n")}\tAGENTS.md`, `120000 blob ${blob("AGENTS.md")}\tlink.md`, `120000 blob ${blob("/etc/hostname")}\tout.md`, `100644 blob ${blob("<h2 id=\"x\">X</h2>\n")}\tapi.html`].join("\n") + "\n");
     const sha = gi(["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit-tree", tree, "-m", "base"]);
     process.chdir(repo);
-    const was = baseTree(sha, under, ["AGENTS.md", "link.md"]);
+    const was = baseTree(sha, under, ["AGENTS.md", "link.md", "docs/README.md", "../escape.md"]);
     const at = f => fs.existsSync(path.join(was?.dir ?? "/nowhere", f));
-    ok(was && at("AGENTS.md") && at("api.html") && fs.readFileSync(path.join(was.dir, "link.md"), "utf8").includes("## Here") && !at("out.md") && !fs.readdirSync(under).some(f => f === "evil.md") && !fs.existsSync(path.join(path.dirname(was.dir), "evil.md")) && was.tracked.has("AGENTS.md"),
-      "the base's files are written from git's blobs: a page and a link inside the project read through, a link out of it not, and nothing out of the folder for a tree that names \"..\"", JSON.stringify(was && fs.readdirSync(was.dir)));
+    ok(was && at("AGENTS.md") && at("api.html") && at("link.md") && fs.readFileSync(path.join(was.dir, "link.md"), "utf8").includes("## Here") && !at("out.md") && at("docs/README.md") && fs.readFileSync(path.join(was.dir, "docs/README.md"), "utf8").includes("## There") && !fs.readdirSync(under).some(f => f === "evil.md") && !fs.existsSync(path.join(path.dirname(was.dir), "evil.md")) && was.tracked.has("AGENTS.md"),
+      "the base's files are written from git's blobs: a page, a link inside the project and a file under a linked folder read through, a link out of it not, and nothing out of the folder for a tree or a path that names \"..\"", JSON.stringify(was && fs.readdirSync(was.dir)));
     if (was) fs.rmSync(was.dir, { recursive: true, force: true });
   } finally { process.chdir(path.dirname(fileURLToPath(import.meta.url))); for (const d of [repo, under]) fs.rmSync(d, { recursive: true, force: true }); }
 }
