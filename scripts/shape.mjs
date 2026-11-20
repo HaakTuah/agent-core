@@ -544,8 +544,9 @@ const SAFE = ["-c", "core.fsmonitor=false"];
 const git = (args, opts = {}) => execFileSync("git", [...SAFE, ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["pipe", "pipe", "ignore"], ...opts });
 const lsFiles = (specs, root) => (specs.length ? git(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...specs], { cwd: root }).split("\0").filter(Boolean) : []);
 const readable = f => isCode(f) || isPackageFile(f);
-// A file the check reads in the working folder: one on disk that is no link, as standing() reads it.
-const onDisk = (f, root) => { try { return !fs.lstatSync(path.join(root, f)).isSymbolicLink(); } catch { return false; } };
+// A file the check reads in the working folder: a regular file on disk, never a link or a folder (a submodule, a nested
+// repository), as standing() reads it.
+const onDisk = (f, root) => { try { return fs.lstatSync(path.join(root, f)).isFile(); } catch { return false; } };
 // The files of code its readers know that the check reads under the config's "code" and "tests", in the working folder
 // (read-nothing.mjs counts them, so that the two lists cannot drift; #459).
 export const codeListed = (config, root = ".") => lsFiles([...config.code, ...config.tests], root).filter(f => isCode(f) && onDisk(f, root));

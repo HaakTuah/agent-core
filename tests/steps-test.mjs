@@ -992,8 +992,14 @@ ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks
   fs.rmSync(path.join(bare, "ln", "gone.js"));
   let linked = true;
   try { fs.symlinkSync(path.join(bare, "core-manifest.md"), path.join(bare, "ln", "a.js")); } catch { linked = false; }
+  // (and a nested repository named as a file of code, which git lists and the check cannot read)
+  fs.mkdirSync(path.join(bare, "ln", "nested.js"));
+  execFileSync("git", ["init", "-q"], { cwd: path.join(bare, "ln", "nested.js") });
+  fs.writeFileSync(path.join(bare, "ln", "nested.js", "x.txt"), "x\n");
+  execFileSync("git", ["-C", path.join(bare, "ln", "nested.js"), "add", "-A"]);
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-C", path.join(bare, "ln", "nested.js"), "commit", "-q", "-m", "x"]);
   ok(readNothing(bare, withTool, withConfig({ code: ["ln/"], tests: [] })).some(n => n.script === "scripts/shape.mjs"),
-    `the shape check is said to read nothing where its only files of code are ${linked ? "a link and " : ""}one gone from the disk, which it does not read`);
+    `the shape check is said to read nothing where its only files of code are ${linked ? "a link, " : ""}a nested repository and one gone from the disk, which it does not read`);
   fs.rmSync(path.join(bare, "ln"), { recursive: true, force: true });
   execFileSync("git", ["add", "-A"], { cwd: bare });
   // (where which checks read nothing cannot be read, the report says so, never that every check read something)
