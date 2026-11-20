@@ -59,6 +59,10 @@ ok(says(withSessions("- *Starts a session:* yes, by its command.\n\n- Another it
   "a line that says no day before its item ends fails, a day in a later item or paragraph not counting for it");
 ok(says(withSessions("A note that names *Starts a session:* in its prose, read on 20 November 2026.\n"), "holds no line *Starts a session:*"),
   "a mention of the label in prose, not at a line's or an item's start, does not count as the line");
+ok(says(withSessions("A note that names, as its prose wraps,\n*Starts a session:* in a line of its own, read on 20 November 2026.\n"), "holds no line *Starts a session:*")
+  && says(withSessions("- *Starts a session:* yes, by its command.\n## A heading\nRead on 20 November 2026.\n"), "holds no line *Starts a session:*")
+  && check(text, { read: f => (f === "tools/claude-sessions.md" ? "A paragraph.\n\n*Starts a session:* yes, read on 20 November 2026.\n" : fs.readFileSync(path.join(root, f), "utf8")) }).wrong.length === 0,
+  "the label counts only as a list item's lead or at a paragraph's start, and its item ends at a heading");
 // (Kiro's part as it stands, read through `read`, with its ways' lines written anew)
 const kiro = fs.readFileSync(path.join(root, "tools/kiro.md"), "utf8");
 const withKiro = to => check(text, { read: f => (f === "tools/kiro.md" ? to : fs.readFileSync(path.join(root, f), "utf8")) });
