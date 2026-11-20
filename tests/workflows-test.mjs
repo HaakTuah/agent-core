@@ -287,7 +287,7 @@ try {
   fs.writeFileSync(path.join(tmp, ".github/workflows/e.yml"), call(TYPES, "copies.yml", NOT_DRAFT));
   execFileSync("git", ["add", ".github/workflows/d.yml", ".github/workflows/e.yml"], { cwd: tmp, stdio: "ignore" });
   fs.rmSync(path.join(tmp, "core/.packages/node_modules"), { recursive: true, force: true });
-  const u = keyRun([], { CORE_PACKAGES_UNREACHED: "1" }), uOut = u.stdout + u.stderr;
+  const u = keyRun([], { CORE_PACKAGES_UNREACHED: "1", ZIZMOR: "", ACTIONLINT: "" }), uOut = u.stdout + u.stderr;
   ok(u.status === 1 && /^::warning::The check for a file that is no YAML did not run, nor the one for a call a draft skips/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && !/e\.yml|is not installed/.test(uOut) && mended(uOut), `where the install could not reach the registry, the calls a draft skips did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 // ---- a copy of the core at the path the manifest names (#918): the check leaves it out, and reads the project's own core/ ----
