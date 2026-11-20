@@ -17,7 +17,7 @@ export function ownFiles(root) {
     .split("\0").filter(f => f && fs.existsSync(path.join(root, f)));
   // (the files of the library that carries the core, where the manifest's line says it is a submodule, at their paths from
   // here, as git lists them with --recurse-submodules, which it gives for the committed files alone: that library brings
-  // the copy (core-path.mjs), and without this git lists it by its commit only. No other submodule is read; #628)
+  // the copy (core-path.mjs), and without this git lists it by its commit only. No submodule outside that library is read; #628)
   const text = manifestText(path.join(root, MANIFEST)), core = text === null ? null : readCore(text);
   if (core?.form === "carried" && fs.existsSync(path.join(root, ".gitmodules"))) {
     try {

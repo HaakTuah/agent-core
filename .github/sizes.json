@@ -151,10 +151,6 @@
       "mark": 94262,
       "why": "#919: the readers of each agent tool's configuration apart from the check that lists them."
     },
-    "tests/steps-test.mjs": {
-      "mark": 141435,
-      "why": "#919: split by step, beside the readers it holds."
-    },
     "tests/agent-tools-test.mjs": {
       "mark": 114595,
       "why": "#919: split with agent-tools.mjs, a file of cases for each tool's configuration."
