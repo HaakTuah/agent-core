@@ -247,6 +247,12 @@ jobs:
       - name: The lookup of a new package, on recorded answers
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-test.mjs ')) }}
         run: node tests/lookup-test.mjs
+      - name: The lookup of a new package, run on a project
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-run-test.mjs ')) }}
+        run: node tests/lookup-run-test.mjs
+      - name: The sync's step that asks a lookup beside each check of exact versions
+        if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/lookup-step-test.mjs ')) }}
+        run: node tests/lookup-step-test.mjs
       - name: The lookup again of what a project holds, on recorded answers
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/held-test.mjs ')) }}
         run: node tests/held-test.mjs

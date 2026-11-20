@@ -19,6 +19,9 @@
     "changes"
   ],
   "grown": {
+    "process: tests/lookup-run-test.mjs -> node:child_process": "Split from tests/lookup-test.mjs (#1008), whose scratch git repository it runs the check in: that a pull request's lock file is read against its base, from git, is what it guards.",
+    "process: tests/lookup-step-test.mjs -> node:child_process": "Split from tests/lookup-test.mjs (#1008): the sync's step reads a project through git (git ls-files), so the scratch project is one, which is what the step guards.",
+    "timed: tests/lookup-step-test.mjs -> Date.now": "Split from tests/lookup-test.mjs (#1008): that a workflow whose actions call each other ten times over, and an action past a megabyte, are read within a bound of time is what the case guards, and only the clock shows it.",
     "process: tests/select-passed-test.mjs -> node:child_process": "Split from tests/select-test.mjs (#943), whose scratch repository it builds through git: a push that merges a pull request's head is read from git, and the selection's command asks the host as a program, which is what it guards.",
     "timed: tests/select-matcher-test.mjs -> Date.now": "Split from tests/select-test.mjs (#943): that a pathspec of many wildcards is matched in time that grows with the path's length is what the case guards, and only the clock shows it.",
     "process: tests/pr-description-reads-test.mjs -> node:child_process": "Split from tests/pr-description-test.mjs (#888), whose scratch projects it builds through git: what a change calls for is read from git against its base, which is what it guards.",
@@ -98,6 +101,8 @@
     "process: tests/licence-scan-test.mjs -> node:child_process": true,
     "process: tests/licences-test.mjs -> node:child_process": true,
     "process: tests/lookup-test.mjs -> node:child_process": true,
+    "process: tests/lookup-run-test.mjs -> node:child_process": true,
+    "process: tests/lookup-step-test.mjs -> node:child_process": true,
     "process: tests/manifest-reads-test.mjs -> node:child_process": true,
     "process: tests/mend-test.mjs -> node:child_process": true,
     "process: tests/merge-line-test.mjs -> node:child_process": true,
@@ -159,6 +164,7 @@
     "timed: tests/licence-scan-test.mjs -> Date.now": true,
     "timed: tests/look-test.mjs -> Date.now": true,
     "timed: tests/lookup-test.mjs -> Date.now": true,
+    "timed: tests/lookup-step-test.mjs -> Date.now": true,
     "timed: tests/milestones-test.mjs -> Date.now": true,
     "timed: tests/nuget-test.mjs -> Date.now": true,
     "timed: tests/packages-test.mjs -> new Date()": true,

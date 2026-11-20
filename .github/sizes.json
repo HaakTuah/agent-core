@@ -248,8 +248,12 @@
       "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/lookup-test.mjs": {
-      "mark": 63511,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
+      "mark": 21844,
+      "why": "#1008: the check run on a project and the sync step's cases are split off; what stands is lookup.mjs's readers (a lock file, what is new, the lookup, an entry's integrity) on the one set of recorded answers, each reading how the others count, as the script's own line says, so a split would make a reader open each part."
+    },
+    "tests/lookup-step-test.mjs": {
+      "mark": 33252,
+      "why": "#1008: one step's cases (the sync step that asks a lookup beside each exact-versions check) on the workflows each writes into the one scratch project; split along its sections, each file would build the project again, adding to the suite's time (tasks/tests.md), and a session changing the step reads every case."
     },
     "tests/merge-line-test.mjs": {
       "mark": 23054,
