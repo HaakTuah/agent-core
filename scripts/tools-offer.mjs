@@ -4,7 +4,8 @@
 // "cannot: <the page of the tool's documentation>, read <day month year>", or "not yet", its issue the column's cell in the
 // table's last row ("Its issue for what is not yet carried"), or "not yet: #<its issue>" where it names its own. It fails an empty
 // cell or one in no such form, a file a cell names that is not there, a tool of the list with no column, a map of the
-// tiers whose part says no day it was read, and a file of a tool's own that no cell names: each part under tools/, each
+// tiers whose part says no day it was read, a carried cell of the row of a session of its own whose file holds no line
+// *Starts a session:* with its day (#492), and a file of a tool's own that no cell names: each part under tools/, each
 // template of the starter kit (init.mjs, beside this file) written into a tool's folder or as a tool's entry file, each
 // hook script (holders.mjs's HOOKS), and each file the core holds in a tool's folder, named by itself or by the template
 // that writes it; and a part a column's heading names that does not say how the tool is asked for a review by each way,
@@ -34,6 +35,13 @@ const DAY = String.raw`\d{1,2}\s+(?:January|February|March|April|May|June|July|A
 const FORMS = [/^carried: \S.*$/u, new RegExp(String.raw`^cannot: \S.*, read ${DAY}$`, "u"), /^not yet(?:: #\d+)?$/u];
 const ISSUES = /^Its issue for what is not yet carried$/u;
 const MAP = /^The map of the tiers/u;
+// The row of a session of its own (tasks/tools.md, "Each tool's part says whether it starts a session of its own";
+// #492): its file holds the line *Starts a session:*, as a list item's lead or at a paragraph's start, which says,
+// before the next item, paragraph or heading, the day its documentation was read.
+const STARTS = /^Starts a session of its own/u;
+const LABEL = "*Starts a session:*";
+const LEADS = [/^[ \t]*- \*Starts a session:\*/mu, /(?:^|\n[ \t]*\n)[ \t]*\*Starts a session:\*/u];
+const startsDated = text => { const at = Math.min(...LEADS.map(r => r.exec(text)?.index ?? Infinity)); return at < Infinity && new RegExp(`read on ${DAY}`, "u").test(text.slice(at).replace(/^\s+/u, "").split(/\n\s*\n|\n\s*- |\n[ \t]*#{1,6}[ \t]/u)[0]); };
 // The ways a review is asked, in the order a session takes them (tasks/reviews.md, point 1; #397): each a label in
 // italics in each tool's part, the project's own way named in tasks/reviews.md alone.
 export const WAYS = ["*Side by side:*", "*Through a plug-in:*", "*On the host:*"];
@@ -74,6 +82,18 @@ export function toolFiles(root, tracked) {
   return [...parts, ...templates.map(({ file, by }) => ({ file, by })), ...hooks, ...own];
 }
 
+// What is wrong with the files a cell that says "carried" names: one not there, a map whose part says no day, and a file
+// of a session of its own with no dated line *Starts a session:*.
+function carriedWrong({ root, what, cell, where, read }) {
+  const out = [];
+  for (const m of cell.matchAll(/`([^`]+\/[^`]+|[^`/]+\.(?:md|json|mjs|sh|tmpl))`/gu)) {
+    if (!fs.existsSync(path.join(root, m[1]))) out.push(`${where} names ${m[1]}, which is not there. Mend: name the file that carries it as it now stands`);
+    else if (MAP.test(what) && m[1].startsWith("tools/") && !new RegExp(`read on ${DAY}`, "u").test(fs.readFileSync(path.join(root, m[1]), "utf8"))) out.push(`${where}: its map, ${m[1]}, says no day its documentation was read. Mend: write in it "read on <the day>", the day the models were read from the tool's documentation`);
+    else if (STARTS.test(what) && !startsDated(read(m[1]))) out.push(`${where}: ${m[1]} holds no line ${LABEL} that says the day its documentation was read. Mend: write in it the line ${LABEL}, whether and how a session of the tool starts a session of its own and whether that one goes on once its starter is archived, from the tool's documentation, ending with its pages and "read on <the day>"`);
+  }
+  return out;
+}
+
 // What is wrong with the table at `root`, each a line with its mend. `tools`: the list; `tracked`: the files git holds;
 // `isOpen(n)`: whether issue n is open, null where it cannot be read (no --open: never asked).
 // `text`: the table's file as it stands, read from `root` where left out; `read(file)`: a tool's part, read from `root`
@@ -94,10 +114,7 @@ export function wrong({ root = ROOT, text = fs.readFileSync(path.join(root, TABL
     for (const m of cell.matchAll(/`([^`]+)`/gu)) named.add(m[1]);
     if (!cell) { out.push(`${where} is empty. Mend: write "carried: " and the file that carries it, "cannot: <the page of its documentation>, read <the day>", or "not yet: #<an open issue>"`); return; }
     if (!FORMS.some(f => f.test(cell))) { out.push(`${where} says "${cell}", in none of the three forms. Mend: write "carried: " and the file that carries it, "cannot: <the page of its documentation>, read <the day, as 18 November 2026>", or "not yet: #<an open issue>"`); return; }
-    if (cell.startsWith("carried")) for (const m of cell.matchAll(/`([^`]+\/[^`]+|[^`/]+\.(?:md|json|mjs|sh|tmpl))`/gu)) {
-      if (!fs.existsSync(path.join(root, m[1]))) out.push(`${where} names ${m[1]}, which is not there. Mend: name the file that carries it as it now stands`);
-      else if (MAP.test(r.what) && m[1].startsWith("tools/") && !new RegExp(`read on ${DAY}`, "u").test(fs.readFileSync(path.join(root, m[1]), "utf8"))) out.push(`${where}: its map, ${m[1]}, says no day its documentation was read. Mend: write in it "read on <the day>", the day the models were read from the tool's documentation`);
-    }
+    if (cell.startsWith("carried")) out.push(...carriedWrong({ root, what: r.what, cell, where, read }));
     let n = /^not yet: #(\d+)$/u.exec(cell)?.[1];
     if (cell === "not yet") {
       n = /^#(\d+)$/u.exec(t.tools[i].issue)?.[1];

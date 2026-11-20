@@ -74,6 +74,21 @@ more of a tool than the tool's documentation. Reason: a project with only that t
 reach it. Held, in part, by `scripts/tools-offer.mjs`, which fails a part with a way's label left out or the labels out
 of order.
 
+**Each tool's part says whether it starts a session of its own** (#492). By default each tool's part says, on a line
+*Starts a session:* in its file under `tools/` or in a file of its part read on need, whether a session of the tool
+starts another session of its own, one with its own context and no helper inside it, and if so how, and whether that
+session goes on once the one that started it is archived or ends, each from the tool's documentation, naming its pages
+and the day it was read ("read on <the day>"), and "not stated" for what they leave out; the table's row "Starts a
+session of its own" names the file that holds the line. The one condition that changes it: the tool cannot, as its
+documentation says; its cell then says `cannot`, and the adviser writes the brief and the owner starts the session
+(`roles/adviser.md`). The trigger is a part first written, a tool joining the list, or its documentation found to say
+otherwise: whoever writes the part, or finds it, writes the line in that pull request. It does not mean that a session
+starts one by its own choice (which session starts which: the roles' files), that a helper counts, or that the line
+repeats a way's *Task:* (`tasks/ways.md`). Reason: how a session is started differs from tool to tool, what holds for
+every one is what results, and the adviser keeps its own session until a part says one outlives its starter. Held, in
+part, by `scripts/tools-offer.mjs`, which fails a `carried` cell of that row whose file has no such line with its day;
+that the line says what the documentation says, by nothing yet.
+
 **What the core offers one tool, it offers each** (#467). By default nothing the core gives a session of one agent tool
 is given to that tool alone: each thing it offers is a row of the table below, and each tool of the list a column,
 Claude Code, Codex, Kiro, Antigravity and GitHub Copilot, the last as a builder too; the owner adds to the list
@@ -99,6 +114,6 @@ open, only where it is run with `--open` and gh answers.
 | How a task is handed over | carried: `roles/orchestrator.md`, a session or helper it starts | carried: `tools/codex.md`, its plug-in's subagent or its command line | carried: `tools/kiro.md`, its editor or `kiro-cli chat` | carried: `tools/antigravity.md`, a conversation in its editor | carried: `tools/copilot.md`, a conversation on GitHub |
 | How a review is asked | carried: `tasks/reviews.md`, the fallback reviewer | carried: `tools/codex.md`, its app on GitHub | carried: `tools/kiro.md`, a fresh session given the review's brief | carried: `tools/antigravity.md`, a fresh session of it with that brief | carried: `tools/copilot.md`, its code review |
 | The orchestrator | carried: `roles/orchestrator.md` | not yet | not yet | not yet | not yet |
-| Starts a session of its own, for the adviser (`roles/adviser.md`) | not yet: #492 | not yet | not yet | not yet | not yet |
+| Starts a session of its own, for the adviser (`roles/adviser.md`) | carried: `tools/claude-sessions.md` | not yet: #907 | not yet: #907 | not yet: #907 | not yet: #907 |
 | The staged run | carried: `scripts/staged.mjs`, every case passed | not yet | not yet: #400 | not yet | not yet |
 | Its issue for what is not yet carried | none | #679 | #680 | #681 | #682 |
