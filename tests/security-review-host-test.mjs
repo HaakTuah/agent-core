@@ -99,6 +99,8 @@ if (started(import.meta.url)) {
   ok(compare(record({ comments: [summary(cleared), { ...posted(HEAD, "2026-11-12T11:00:00Z"), body: `Code review: ${HEAD}` }] })).length === 1, "a posted code review does not settle a security finding");
   ok(compare(record({ comments: [summary(cleared), posted(HEAD, "2026-11-12T12:30:00Z")] })).length === 1, "nor one posted after the merge");
   ok(compare(record({ comments: [summary(cleared), posted(HEAD, "2026-11-12T11:00:00Z", OTHER, "COLLABORATOR")] })).length === 1, "nor one from an account the status does not count");
+  ok(compare(record({ comments: [summary(cleared), { ...posted(HEAD, "2026-11-12T11:00:00Z"), updated_at: "2026-11-12T11:05:00Z" }] })).length === 1, "nor one edited after it was posted, which the status does not count");
+  ok(compare(record({ comments: [summary(cleared), posted(HEAD, "2026-11-12T11:00:00Z", ME, "NONE")] })).length === 1, "nor one whose author the host does not call a writer");
   const writer = { permission: "write", role_name: "write", user: { ...OTHER, permissions: { push: true } } };
   ok(same(compare(record({ comments: [summary(cleared), posted(HEAD, "2026-11-12T11:00:00Z", OTHER, "COLLABORATOR")], rights: [writer] })), []), "but one from an account the recorded rights let write does");
   ok(same(compare(record({ comments: [summary(cleared)], threads: [{ resolved: true, first: 31 }] })), []), "a resolved thread is none");

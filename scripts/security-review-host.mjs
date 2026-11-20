@@ -16,7 +16,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { FINDING, codexState, codexs, counted, judge, writersOf } from "./security-review.mjs";
+import { FINDING, WRITERS, asPosted, codexState, codexs, counted, judge, writersOf } from "./security-review.mjs";
 
 export const FOLDER = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "reports", "security-review-host");
 // how a security review of Codex's opens in the host's list of reviews, its kind given by the heading after the receipt
@@ -61,7 +61,8 @@ function commitDiffers(n, said, reviews) {
   return [];
 }
 // an unresolved thread a Codex security finding opened, where the status passed with no "Security review:" posted
-// after that finding
+// after that finding that the status counts (security-review.mjs, postedBy: a writer's, by an account counted, never
+// edited since)
 function threadsOpen(n, record) {
   if (!Array.isArray(record.threads)) return [];
   const [pull, comments, findings] = atMerge(record);
@@ -71,7 +72,7 @@ function threadsOpen(n, record) {
   const verdict = verdictOf(record);
   if (!verdict.done) return [];
   const whose = counted(pull, undefined, writersOf(record.rights));
-  const posted = comments.filter((comment) => POSTED.test(comment.body) && whose(comment.user));
+  const posted = comments.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && whose(comment.user) && asPosted(comment));
   return open.filter((finding) => !posted.some((comment) => time(comment.created_at) > time(finding.created_at)))
     .map((finding) => `${n}: Codex's security finding ${finding.id} is unresolved on the merged head, with no "Security review:" posted after it, yet the status passed: ${verdict.why}`);
 }
