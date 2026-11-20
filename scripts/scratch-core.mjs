@@ -1,6 +1,6 @@
 // What the core's own tests stand on. For any test: the core's root, a tally of its assertions and a scratch folder
-// removed when it ends; and, for one that runs a workflow calling gh (clean-merges-test.mjs, pure-sync-test.mjs), a
-// stand-in for GitHub's API. For the starter kit's (init-test.mjs, init-dotnet-test.mjs): a scratch copy of the
+// removed when it ends, or by the next test's start where it was stopped; and, for one that runs a workflow calling gh
+// (clean-merges-test.mjs, pure-sync-test.mjs), a stand-in for GitHub's API. For the starter kit's (init-test.mjs, init-dotnet-test.mjs): a scratch copy of the
 // core as it stands here, committed in a repository of its own, and scratch projects beside it, all in one temporary
 // folder that is removed when the test ends. Every git call in it runs without the user's and the system's git
 // settings, and without git's own variables that point at another repository, so a test sees only what it sets itself.
@@ -33,9 +33,40 @@ export function tally() {
   };
 }
 
-/** A temporary folder named from `prefix`, removed when the test ends. */
+/** The file in a scratch folder that names the process it belongs to. */
+const OWNER = ".scratch-owner";
+
+const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; } };
+
+/** The scratch folders in the temporary folder whose process is gone (a test the mutation tool or a time-out stopped
+ *  with SIGKILL, which no handler sees) taken away; one whose process still runs is left, and so is anything that is
+ *  no real folder of this user's with the owner file of `scratchDir`. Done once for a process, as its first scratch
+ *  folder is made. */
+let swept = false;
+function sweep() {
+  if (swept) return;
+  swept = true;
+  const base = os.tmpdir(), me = process.getuid?.();
+  let names = [];
+  try { names = fs.readdirSync(base); } catch { /* (nothing to read) */ }
+  for (const name of names) {
+    const dir = path.join(base, name);
+    try {
+      const st = fs.lstatSync(dir);
+      if (!st.isDirectory() || (me !== undefined && st.uid !== me)) continue;
+      const pid = Number(fs.readFileSync(path.join(dir, OWNER), "utf8"));
+      if (!Number.isInteger(pid) || pid <= 0 || alive(pid)) continue;
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch { /* (not one of ours, already gone, or held a moment longer: left to the next start) */ }
+  }
+}
+
+/** A temporary folder named from `prefix`, removed when the test ends; one a stopped test left (its process gone) is
+ *  removed as the next test makes its own. */
 export function scratchDir(prefix) {
+  sweep();
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  fs.writeFileSync(path.join(tmp, OWNER), String(process.pid));
   // (a program a test started may hold a file a moment longer, on Windows: tried again, and never the test's failure)
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
   return tmp;
