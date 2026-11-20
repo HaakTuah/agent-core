@@ -122,6 +122,18 @@
     "tests/size-test.mjs": {
       "mark": 28199,
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
+    },
+    "scripts/select.mjs": {
+      "mark": 23258,
+      "why": "#943: the pathspec matcher and the question of whether a tree passed whole apart from the selection; its test and the tests module split likewise."
+    },
+    "tasks/tests.md": {
+      "mark": 25951,
+      "why": "#943: the pathspec matcher and the question of whether a tree passed whole apart from the selection; its test and the tests module split likewise."
+    },
+    "tests/select-test.mjs": {
+      "mark": 29583,
+      "why": "#943: the pathspec matcher and the question of whether a tree passed whole apart from the selection; its test and the tests module split likewise."
     }
   }
 }
