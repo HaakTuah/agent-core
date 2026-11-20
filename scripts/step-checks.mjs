@@ -107,7 +107,8 @@ export function keysOnce(p) {
   // it says so, with the install, and every other step is still told)
   if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`node ${copyAt(p)}scripts/install.mjs\`, then \`node ${copyAt(p)}scripts/steps.mjs\` again.`;
   const read = reads(p.files, copyAt(p)).map(f => [f, keysTwice(p.read(f) ?? "")]);
-  const found = read.flatMap(([f, keys]) => keys.filter(k => k.key !== null).map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
+  const all = read.flatMap(([f, keys]) => keys.filter(k => k.key !== null).map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
+  const found = all.length > 25 ? [...all.slice(0, 25), `and ${all.length - 25} more, which show once these are mended`] : all; // (a hostile file gives a key for each line: #970)
   const unread = by => read.filter(([, keys]) => keys.some(k => k.key === null && Boolean(k.size) === by)).map(([f]) => `\`${f}\``), deep = unread(false), long = unread(true);
   const said = [
     found.length ? `In one pull request, keep one of the two keys where a workflow or an action of the project's gives one twice in a mapping, with what both said in it (two \`if:\` conditions joined by \`&&\`, two \`env:\` mappings as one), since GitHub runs none of such a file's jobs: ${found.join("; ")}.` : "",
