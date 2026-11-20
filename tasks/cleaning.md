@@ -73,9 +73,9 @@ code is held to: `tasks/code-shape.md`.
        longer matches? Each it finds is a task of the cleaning lane, taken at the dose (#563).
     10. What here is a version built by hand of something maintained, free to use, that does its job (a package, a
        tool, a standard), each with what would replace it? Each it finds is an ordinary task of the project's, taken at
-       the dose, and a move among them passes "A move that pays is built in steps; one that must happen at once is
-       capped" and "Every move passes the same gates" (`tasks/choices.md`; #534). In the core's own repository the
-       inventory (`INVENTORY.md`) is that answer, and the reader names only what it lacks.
+       the dose, and a move among them is built in steps or capped, and gated, as `tasks/choices.md` says of any move
+       (#534). In the core's own repository the inventory (`INVENTORY.md`) is that answer, and the reader names only
+       what it lacks.
   - **In the core's own repository** the reader is also given what `scripts/read-total.mjs --candidates` prints: the
     files several kinds of task open, most read first. It says of each whether a part is all most of its readers need,
     as "A cut or a join lowers the total read" asks.
