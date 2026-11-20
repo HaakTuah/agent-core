@@ -10,7 +10,7 @@ import { Worker } from "node:worker_threads";
 import { csharpIndex, csharpPackages, readCsharp, resolveCsharp } from "../scripts/shape-csharp.mjs";
 import { STDLIB, pythonPackages, readPython, resolvePython } from "../scripts/shape-python.mjs";
 import { ParserFailed, inParser } from "../scripts/parser.mjs";
-import { LARGEST } from "../scripts/tree-walk.mjs";
+import { LARGEST, MOST_NODES } from "../scripts/tree-walk.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -182,9 +182,13 @@ ok(same(shown(readPython(pyEdges).functions), ["f:2:3:1:3", "g:7:2:0:1"]),
   "Python: a decorator's and a default's branches count where the function stands, a comment after the body is none of its lines, and a format's fill of = (which the grammar reads as :=) leaves the functions told", shown(readPython(pyEdges).functions));
 ok(readPython("def f():\n    return f\"{t:=or 80}\"\n").functions === null && readPython("def f(:\n    pass\n").functions === null,
   "Python: a file the grammar cannot read whole, an error in an f-string's { } that holds a word among them, has no functions told");
-const pySized = n => `${"x = 1\n".repeat(n)}def f():\n    pass\n`, pyUnder = Math.floor(LARGEST.python / 7);
+const pySized = n => `${"x = 1\n".repeat(n)}def f():\n    pass\n`, pyUnder = Math.floor(MOST_NODES / 6); // (a line of x = 1 is five nodes)
 ok(same(shown(readPython(pySized(pyUnder)).functions), [`f:${pyUnder + 1}:2:0:0`]) && readPython(pySized(LARGEST.python / 5)).functions === null,
   "Python: a file past the largest the grammar is given is lost unread, and one under it is read whole");
+// (and one within the largest size whose tree holds more nodes than the most a reader walks: #880)
+const pyNodes = n => `x = ${"a,".repeat(n)}\ndef f():\n    pass\n`;
+ok(pyNodes(MOST_NODES / 2 + 100).length <= LARGEST.python && readPython(pyNodes(MOST_NODES / 2 + 100)).functions === null && same(shown(readPython(pyNodes(MOST_NODES / 4)).functions), ["f:2:2:0:0"]),
+  "Python: a file within the largest size whose tree holds more nodes than the most a reader walks is lost unread, and one under it is read whole");
 const pyStarted = Date.now();
 const pyHostile = [`def f():\n    x = ${"([{".repeat(160000)}\n`, `def f():\n    ${"['".repeat(240000)}\n`].map(t => readPython(t).functions);
 ok(pyHostile.every(f => f === null) && Date.now() - pyStarted < 10000, `Python: brackets and strings that never close are lost within the grammar's budget (${Date.now() - pyStarted} ms)`);
@@ -522,6 +526,10 @@ ok(readCsharp(newer).functions === null, "C#: a file the grammar cannot read who
 const sized = n => `class A { int[] W = { ${Array.from({ length: n }, (_, k) => k).join(", ")} }; void M() { } }\n`;
 ok(sized(LARGEST.csharp / 9).length <= LARGEST.csharp && same(shown(readCsharp(sized(LARGEST.csharp / 9)).functions), ["M:1:1:0:0"]) && sized(LARGEST.csharp / 6).length > LARGEST.csharp && readCsharp(sized(LARGEST.csharp / 6)).functions === null,
   "C#: a file past the largest the grammar is given is lost unread, and one under it is read whole");
+// (and one within the largest size whose tree holds more nodes than the most a reader walks, lost unread: #880)
+const csNodes = n => `class A { void M() { F(a${",a".repeat(n)}); } }\n`;
+ok(csNodes(MOST_NODES / 3 + 100).length <= LARGEST.csharp && readCsharp(csNodes(MOST_NODES / 3 + 100)).functions === null && same(shown(readCsharp(csNodes(MOST_NODES / 6)).functions), ["M:1:1:0:0"]),
+  "C#: a file within the largest size whose tree holds more nodes than the most a reader walks is lost unread, and one under it is read whole");
 // The parser's thread: a call that fails there is told as the file's ("read"), and the next call gets its own answer,
 // never an earlier one's.
 let failedAs = null;

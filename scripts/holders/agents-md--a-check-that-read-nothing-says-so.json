@@ -1,0 +1,5 @@
+{
+  "rule": "AGENTS.md: A check that read nothing says so",
+  "behind": ["#459"],
+  "number": "findings; outcome: robust"
+}

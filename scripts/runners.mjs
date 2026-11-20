@@ -12,7 +12,8 @@
 // - and in full before each release in every case;
 // and where every merge goes live (the manifest's *users get*, `merges` where no row says), on each pull request.
 // Where a public repository runs a job on a pull request or a push on a runner of its own, or on one it cannot read, it
-// prints the advice: keep forks off that job at once, and file one issue for the owner, labelled needs-owner, since a
+// prints the advice (where the folder could not be listed, that a job on such a runner may stand there, and how to have it
+// read): keep forks off that job at once, and file one issue for the owner, labelled needs-owner, since a
 // stranger's pull request would run its code on that machine (floor rule 18). It fails nothing ("Nothing locks a project").
 // gh, Node's own modules and the core's yaml package.
 //
@@ -89,11 +90,13 @@ const startsSuite = job => (Array.isArray(job?.steps) ? job.steps : []).some(st 
 
 // What the workflows in `dir` say: { onHost (a job that starts a suite runs on a pull request or a push), where (that
 // job's runner, "own", "hosted" or null where it cannot be read), selfHosted (any job on a pull request or a push takes
-// a runner of the owner's own), unknown (one whose runner cannot be read), unread (the files that could not be read) }.
+// a runner of the owner's own), unknown (one whose runner cannot be read), unread (the files that could not be read, or
+// the folder itself, with unlisted true, where it cannot be listed) }.
 export function workflowsIn(dir, parse = loadSync("yaml").parse) {
   const out = { onHost: false, testRunners: [], testLabels: [], selfHosted: false, unknown: false, unread: [] };
-  let files = [];
-  try { files = fs.readdirSync(dir).filter(f => /\.ya?ml$/u.test(f)); } catch { return out; }
+  const names = listing(dir);
+  if (names === false) return { ...out, unread: [dir], unlisted: true };
+  const files = names.filter(f => /\.ya?ml$/u.test(f));
   const read = {};
   for (const f of files) {
     try { read[f] = parse(fs.readFileSync(path.join(dir, f), "utf8")); } catch { out.unread.push(f); }
@@ -116,6 +119,19 @@ export function workflowsIn(dir, parse = loadSync("yaml").parse) {
     }
   } catch { out.unread.push(...[...seen].filter(f => !out.unread.includes(f))); }
   return out;
+}
+
+// The names in the workflows folder `dir`, [] where it is not there and so holds none, or false where it is not read: a
+// path that is there and is no folder that can be listed (a file, a link leading nowhere, a folder whose rights stop its
+// listing), and one not there where it cannot be told that none stands: only where its parent is a real folder or not
+// there either, in a checkout's root, which holds .git, does a missing folder hold none. Listed once, here.
+function listing(dir) {
+  const at = p => { try { return fs.lstatSync(p); } catch (e) { return e?.code === "ENOENT" ? null : false; } };
+  const here = at(dir);
+  if (here === false) return false;
+  if (here) { try { return fs.statSync(dir).isDirectory() ? fs.readdirSync(dir) : false; } catch { return false; } }
+  const up = at(path.dirname(dir));
+  return up === false || (up && !up.isDirectory()) || !fs.existsSync(path.join(dir, "..", "..", ".git")) ? false : [];
 }
 
 // The workflows a pull request or a push starts, and those of this folder they call, `uses: ./.github/workflows/<f>`,
@@ -162,12 +178,13 @@ function privateOf(repo, gh) {
 function settled(w, priv, manifest) {
   // (where the tests run: the runners of the jobs that start a suite; one that cannot be read is taken as the owner's
   // own, the stricter reading, and said so)
-  const testsUnknown = w.testRunners.includes(null);
+  // (a folder that could not be listed is a runner not read as well: nothing of it is known)
+  const testsUnknown = w.testRunners.includes(null) || !!w.unlisted;
   const whereRead = w.testRunners.includes("own") || testsUnknown ? "self-hosted" : w.onHost ? "hosted" : "local";
   const whereRow = runnersRow(manifest), billedRow = override(manifest, "billed minutes", ["yes", "no"]);
   // (where whether it is private was not read: taken as billed, the cheaper way)
   const billed = billedRow ? billedRow === "yes" : priv !== false;
-  return { where: whereRow ?? whereRead, whereRead, whereRow, billed, billedRow, unknown: testsUnknown && !w.testRunners.includes("own") };
+  return { where: whereRow ?? whereRead, whereRead, whereRow, billed, billedRow, unknown: testsUnknown && !w.testRunners.includes("own"), unlisted: !!w.unlisted };
 }
 
 const PLACES = { hosted: "the host's runners", "self-hosted": "a runner of the owner's own", local: "a session's or the owner's computer alone, no job on a pull request or a push starting a suite through the shape check" };
@@ -178,8 +195,16 @@ function saidOf(s, priv, unread) {
   const whereBy = s.whereRow ? `, as the manifest's row *test runners* says (read: ${s.whereRead})` : "";
   const paidBy = s.billedRow ? ", as the manifest's row *billed minutes* says"
     : priv === null ? " (whether the repository is private was not read, so taken as billed)" : `, the repository being ${priv ? "private" : "public"}`;
-  return [`where the tests run: ${PLACES[s.where]}${whereBy}${s.unknown && !s.whereRow ? " (a job's runner, named by a label of its own or an expression, could not be read, so taken as the owner's own)" : ""}`, `who pays: ${s.billed ? "minutes billed" : "the host's free minutes"}${paidBy}`,
+  return [`where the tests run: ${PLACES[s.where]}${whereBy}${s.unknown && !s.whereRow ? ` (${s.unlisted ? "the workflows folder could not be listed" : "a job's runner, named by a label of its own or an expression, could not be read"}, so taken as the owner's own${s.unlisted ? "; mend: run this script from the project's root, and there make .github/workflows a folder that can be listed" : ""})` : ""}`, `who pays: ${s.billed ? "minutes billed" : "the host's free minutes"}${paidBy}`,
     ...unread.length ? [`workflows not read: ${unread.map(f => oneLine(f).slice(0, 60)).join(", ")}`] : []];
+}
+
+// The floor rule 18 advice for a public repository whose jobs may run on a runner of the owner's own, or null.
+function adviceOf(w, priv) {
+  const notListed = w.unlisted, job = notListed ? "any such job" : "that job";
+  return (w.selfHosted || w.unknown || w.unlisted) && priv === false
+    ? `A public repository ${notListed ? "whose workflows folder could not be listed may run a job on a runner of the owner's own (run this script from the project's root first, and there make .github/workflows a folder that can be listed, so that it is read)" : `runs a job on ${w.selfHosted ? "a runner of the owner's own" : "a runner that could not be read, perhaps the owner's own"}`}, where a stranger's pull request would run its code (floor rule 18): keep pull requests from forks off ${job} at once (an \`if:\` that its head repository is this one), and, where no open issue names it, file one for the owner, labelled needs-owner, to move ${job} to the host's runners or have every outside contributor's run approved first; nothing else waits on it.`
+    : null;
 }
 
 // Where the tests run, who pays and how often the slow suites run: { where, billed, cadence, said, when, advice }.
@@ -188,9 +213,7 @@ export function read({ repo, dir = ".github/workflows", manifest = null, gh = gh
   // (where every merge goes live, each merge is a release: the slow suites run before it, on its pull request)
   const users = override(manifest, "users get", ["merges", "releases"]) ?? "merges";
   const cadence = users === "merges" ? "merge" : s.where === "local" ? "release" : s.where === "self-hosted" || s.billed ? "nightly" : "hourly";
-  const advice = (w.selfHosted || w.unknown) && priv === false
-    ? `A public repository runs a job on ${w.selfHosted ? "a runner of the owner's own" : "a runner that could not be read, perhaps the owner's own"}, where a stranger's pull request would run its code (floor rule 18): keep pull requests from forks off that job at once (an \`if:\` that its head repository is this one), and, where no open issue names it, file one for the owner, labelled needs-owner, to move that job to the host's runners or have every outside contributor's run approved first; nothing else waits on it.`
-    : null;
+  const advice = adviceOf(w, priv);
   const usersSaid = `its users get: ${users === "releases" ? "a release" : "each merge"}${override(manifest, "users get", ["merges", "releases"]) ? ", as the manifest's row *users get* says" : ", as no row *users get* says otherwise (it cannot be read)"}`;
   return { where: s.where, billed: s.billed, cadence, said: [...saidOf(s, priv, w.unread), usersSaid], when: WHEN[cadence], advice };
 }

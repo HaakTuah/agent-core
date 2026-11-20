@@ -14,16 +14,12 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #704 | builder; `tests.yml` | #715 |
 | #770 | builder; `tests.yml` | #704 |
 | #772 | builder; `tests.yml` | #770 |
-| #625 | builder | #624 |
-| #626 | builder | #624 |
-| #627 | builder | #624 |
 | #628 | builder | |
 | #629 | builder | #624 |
 | #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #579 | builder | |
 | #580 | builder | |
 | #582 | builder | |
-| #583 | builder | |
 | #584 | rule builder | |
 | #589 | builder | |
 | #590 | builder | #580 |
@@ -37,7 +33,8 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #314 | rule builder | |
 | #457 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
-| #464 | rule builder | #459, whose rule list it reads |
+| #925 | builder; a check | |
+| #464 | rule builder | |
 | #441, with #484, points 6 and 7 | rule builder; the file stays whole where #469's measure finds no kind of task reads less | #469 |
 | #355 | builder | #530: the readers left go on the parser #529 brings |
 | #542, point 5 | rule builder | #457 |
@@ -64,6 +61,8 @@ points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or
 | #899 | builder; `tasks/tests.md`, a change that keeps the meaning, its design check stating it | |
 | #907 | rule builder; each other tool's part under `tools/`, completing #492's point 14 | |
 | #913 | builder; a split of `tasks/choices.md`, its meaning kept | |
+| #687 | builder; a trim, its design check stating the meaning kept | |
+| #870 | builder | #925 |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
@@ -72,6 +71,8 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
+| #732 | builder; a faster check | |
+| #711 | builder; `tests.yml` | #897 |
 | #550 | builder; a case a PR | |
 | #765 | builder | |
 | #809 | builder | |
@@ -85,8 +86,19 @@ They read and change no rule.
 | #895 | builder; a test split; `tests.yml` names the suite | #715 |
 | #900 | builder; `scripts/review-record.mjs` | |
 | #901 | builder; `scripts/tools-read.mjs` | |
-| #912 | builder; a split of `scripts/choices.mjs` and its test | |
-| #919 | builder; a split of the step readers and their tests | #917 |
+| #912 | builder | |
+| #916, with #922 | builder; one PR | #917 |
+| #920 | builder | |
+| #931 | builder | |
+| #892 | builder | |
+| #888 | builder | #925 |
+| #884 | builder | |
+| #852 | builder | |
+| #860 | builder | |
+| #857 | builder | |
+| #685 | builder | |
+| #946 | builder | |
+| #919 | builder | #917 |
 
 ## Not taken up
 

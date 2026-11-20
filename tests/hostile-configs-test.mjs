@@ -4,7 +4,8 @@
 // project, a number out of range, and nothing at all; each fails with its mend or reads the input as not there, and
 // reads and writes nothing outside the project. The readers: copies.mjs and reading-size.mjs, run from a scratch
 // project's copy of the core; shape.mjs's parseConfig and where; size.mjs's capsOf, answered and --raise;
-// manifest-reads.mjs's notes; licences.mjs's loadConfig; steps.mjs's notDone with the step for rule 5's inputs; and
+// manifest-reads.mjs's notes; licences.mjs's loadConfig; steps.mjs's notDone with the step for rule 5's inputs;
+// read-nothing.mjs's readNothing (#459); and
 // sync.mjs and look.mjs, run from the copy, on a manifest that is a link out of the project. Test
 // data is made up. Run by the core's tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
 //
@@ -21,6 +22,8 @@ import { answered, capsOf, whoseOf } from "../scripts/size.mjs";
 // (the size check counts an answer from the repository's owner, "someone" here, with no right read)
 const owner = whoseOf("someone", []), me = { login: "someone", type: "User" };
 import { STEPS, notDone } from "../scripts/steps.mjs";
+import { readNothing } from "../scripts/read-nothing.mjs";
+import { ownFiles } from "../scripts/own-files.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
 import { shapeFaults } from "../scripts/schemas.mjs";
 
@@ -144,6 +147,9 @@ const surveyed = survey({ "src/a.js": `${lines400}\n// a line that says (a|a)*b 
 ok(Date.now() - t0 < 5000 && surveyed.entries.get('change: src/a.js: "(a|a)*b"')?.n.count === 1, "shape.mjs: a project's marks are found as text, in time, whatever a comment holds", `${Date.now() - t0} ms`);
 for (const b of ["../x.json", "/etc/x.json", "C:\\x.json", "a/../../x.json", "<b>x</b>.json"]) ok(mended(shape({ ...SHAPE, baseline: b })), `shape.mjs: parseConfig refuses with its mend a baseline at ${b}`);
 ok(mended(shape({ ...SHAPE, aliases: { "@/": "../src/" } })) && mended(shape({ ...SHAPE, systems: { a: { paths: ["/etc/"] } } })), "shape.mjs: parseConfig refuses with its mend an alias or a system's path that leaves the project");
+// (a pathspec of "code" or "tests" that leaves the project, #924: git would refuse it with its own error and no mend)
+for (const key of ["code", "tests"]) for (const spec of ["../outside/", "/etc/", ":(top)../", "src/../../x", ":!../x", ":(exclude)/etc/", ":/../x", "C:\\x", "src\\..\\..\\x", ".."]) ok(mended(shape({ ...SHAPE, [key]: [spec] })), `shape.mjs: parseConfig refuses with its mend a pathspec of "${key}" that leaves the project: ${spec}`);
+ok(["src/", "src/../lib/", ":!src/gen/", ":(glob)**/*.test.*", ":/src/", ":(top,exclude)core/", ".", "..foo/"].every(spec => shape({ ...SHAPE, code: [spec], tests: [spec] }) === ""), "shape.mjs: parseConfig takes a pathspec that stays inside the project, magic and a \"..\" that climbs back in included");
 ok(mended(shape({ ...SHAPE, systems: { "<script>": { paths: ["src/"] } } })), "shape.mjs: parseConfig refuses with its mend a system named with markup");
 for (const [k, v] of [["marks", '{"lines":-1}'], ["marks", '{"depth":1e309}'], ["marks", '{"branches":1.5}'], ["long", "1e309"], ["wait", "-3"], ["suites", '{"x":0}']])
   ok(mended(shape(`{"baseline":"b.json","code":["src/"],"${k}":${v}}`)), `shape.mjs: parseConfig refuses with its mend "${k}" of ${v}, out of range`);
@@ -238,6 +244,38 @@ ok(unread(notDone(p, inputs)), "steps.mjs: a project with no SECURITY.md is repo
 fs.mkdirSync(path.join(p, "SECURITY.md"));
 ok(unread(notDone(p, inputs)), "steps.mjs: SECURITY.md that is a folder, the wrong type, is reported as not read");
 // (rule 5 is found by its number at a line's start: no number in it is read as a value, so none is out of range)
+
+// ---- read-nothing.mjs: the shape config and the manifest, read for the checks that read nothing (#459) ----
+// (a config whose pathspecs leave the project, reach its whole tree or run long, one of the wrong type, and a manifest
+// that names a config with markup or a path out: each is read in time as the shape check reads it, a config the check
+// cannot read naming no check, a config not there naming it with that why, and no file outside the project listed)
+{
+  // (read as the steps read the project: its own files alone, through own-files.mjs, listed afresh at each call)
+  const shapeAt = "checks/shape.json", readP = f => ownFiles(p).read(f);
+  const named = (config, manifest = "") => { if (config === null) fs.rmSync(path.join(p, shapeAt), { force: true }); else { write(shapeAt, typeof config === "string" ? config : JSON.stringify(config)); gitP("add", "-A"); } return readNothing(p, manifest, readP); };
+  const shapeSaid = l => l.find(n => n.script === "scripts/shape.mjs");
+  for (const [c, what] of [[{ ...SHAPE, code: ["../outside/"] }, "a path that leaves the project"], [{ ...SHAPE, code: [outside] }, "an absolute path outside"], [{ ...SHAPE, code: [":(top)../"] }, "a magic pathspec"],
+    [{ ...SHAPE, code: "src/" }, "code that is no list"], ["<b>", "markup"], ["", "nothing at all"]]) {
+    let thrownBy = null, said = null;
+    try { said = named(c); } catch (e) { thrownBy = e; }
+    ok(thrownBy === null && !(shapeSaid(said)?.why ?? "").includes("outside"), `read-nothing.mjs: a shape config with ${what} is read as the check reads it, no file outside the project listed and nothing thrown`);
+  }
+  [said, ms] = timed(() => named({ ...SHAPE, code: Array.from({ length: BIG }, (_, i) => `src/d${i}/`) }));
+  ok(ms < 5000, `read-nothing.mjs: a shape config of ${BIG} pathspecs is read in ${ms} ms`);
+  ok(/holds no `checks\/shape\.json`/u.test(shapeSaid(named(null))?.why ?? ""), "read-nothing.mjs: a project with no shape config is said to have none, never to name nothing");
+  // (a config outside the project, which would change the verdict were it read: the manifest that names it gets the
+  // verdict of no config at all)
+  fs.writeFileSync(path.join(outside, "x.json"), JSON.stringify({ ...SHAPE, code: ["."] }));
+  // (markup is no path, so the kit's config is read in its place; a path out is read as no config)
+  for (const [m, none] of [["| *shape check* | `<img src=x>.json` |", false], ["| *shape check* | `../outside/x.json` |", true]]) {
+    let thrownBy = null, said = null;
+    try { said = named(SHAPE, m); } catch (e) { thrownBy = e; }
+    ok(thrownBy === null && /holds no `/u.test(shapeSaid(said)?.why ?? "") === none, `read-nothing.mjs: a manifest that names the shape config as ${m.split("`")[1]} is read with nothing thrown and nothing outside read`);
+  }
+  fs.rmSync(path.join(outside, "x.json"));
+  fs.rmSync(path.join(p, shapeAt), { force: true });
+  gitP("add", "-A");
+}
 
 // ---- nothing written outside the project ----
 ok(fs.readdirSync(outside).join() === "tests,x" && fs.readdirSync(tmp).sort().join() === "outside,project,size-base.mjs,comments.json".split(",").sort().join(), "nothing was written outside the project");

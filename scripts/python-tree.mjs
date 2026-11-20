@@ -32,7 +32,7 @@
 // may import (shape.mjs, "unsure"). A file it cannot read within its time, or past LARGEST, has none of the three told.
 import { inParser } from "./parser.mjs";
 import { COMMENT_READ } from "./code-shape.mjs";
-import { LARGEST, budgetOf, walkFunctions } from "./tree-walk.mjs";
+import { LARGEST, budgetOf, parseWithin, walkFunctions } from "./tree-walk.mjs";
 
 /** The file `src` read: { functions: [{ name, line, lines, depth, branches }] in the order their bodies open, null where
  *  they cannot be told; imports: [{ level, module, names, line, dynamic, types }]; toks: [{ t, v, line }]; comments:
@@ -51,7 +51,7 @@ export function pythonTree(src) {
 
 /** `src` read with the parser's `parse` (in its thread: pythonTree, above). */
 export function read(parse, src) {
-  const tree = parse("python", src, budgetOf(src));
+  const tree = parseWithin(parse, "python", src, budgetOf(src));
   if (!tree) return null;
   try {
     const root = tree.rootNode, whole = !root.hasError || signsInFormats(root);
