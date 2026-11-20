@@ -259,6 +259,10 @@ gh(asked, "POST", "issues", { title: "Time sumlog on a board", body: "Only whoev
 ok(verdict("stack-choice", asked).pass, "stack-choice: an issue asking the owner for a run only the owner can make, with the pick standing, passes", verdict("stack-choice", asked).why);
 pr(asked, "stack", DESCRIPTION.replace("Waits on: a review", "Waits on: the owner: Go or a shell script?"));
 ok(/the choice is put to the owner/.test(verdict("stack-choice", asked).why), "stack-choice: a pull request that waits on the owner for the choice fails", verdict("stack-choice", asked).why);
+const licenceYes = fresh("stack-choice");
+branch(licenceYes, "stack", { "docs/choices.md": choiceRecord(licenceYes, "Rust", GO.replace("Go, one static binary", "Rust, one static binary").replace("Picked: Go", "Picked: Rust")) });
+pr(licenceYes, "stack", DESCRIPTION.replace("Waits on: a review", "Waits on: the owner: may the LLVM libunwind that Rust links, under Apache-2.0 WITH LLVM-exception, be used?"));
+ok(verdict("stack-choice", licenceYes).pass, "stack-choice: a pull request that waits on the owner for a licence yes the floor names, the pick standing, passes", verdict("stack-choice", licenceYes).why);
 const askedChoice = fresh("stack-choice");
 branch(askedChoice, "stack", { "docs/choices.md": choiceRecord(askedChoice, "Go", GO) });
 gh(askedChoice, "POST", "issues", { title: "The stack for the boards", body: "Which shall it be?\nGo or a BusyBox shell script?", labels: ["needs-owner", "by:builder"] });
