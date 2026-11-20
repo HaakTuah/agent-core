@@ -7,21 +7,19 @@
 // rule look held. A check that holds no rule of the modules the project takes is not named. It fails nothing (AGENTS.md
 // of the core, "Nothing locks a project"); the sync's report (steps.mjs) and a project's state report
 // (state-report.mjs) say it. Reads only; Node's own modules and git, through shape.mjs.
-import path from "node:path";
 import { copyOf } from "./core-path.mjs";
 import { holders } from "./holders.mjs";
-import { leftOut } from "./reading.mjs";
-import { ROOT } from "./rules.mjs";
+import { ROOT, takenRules } from "./rules.mjs";
 import { LANGUAGES } from "./shape-readers.mjs";
 import { codeListed, parseConfig, where } from "./shape.mjs";
 import { measuredCode, toolOf } from "./strength.mjs";
 
 // The rules each of the core's scripts holds, by its path under scripts/, as scripts/holders/ names them: those of the
-// modules a project takes alone (`out`, the names of those its manifest leaves out; the floor is never left out).
-function rulesHeldBy(out) {
+// modules a project takes alone, its manifest's text `manifest` (rules.mjs, takenRules).
+function rulesHeldBy(manifest) {
   const h = holders(ROOT), by = new Map();
-  const taken = new Set(h.rules.filter(r => r.file.startsWith("floor/") || !out.has(path.posix.basename(r.file))).map(r => r.key));
-  for (const [key, list] of h.by) if (taken.has(key)) for (const x of list) if (x.kind === "check") by.set(x.by, [...(by.get(x.by) ?? []), key]);
+  const takes = new Set(takenRules(h.rules, manifest).map(r => r.key));
+  for (const [key, list] of h.by) if (takes.has(key)) for (const x of list) if (x.kind === "check") by.set(x.by, [...(by.get(x.by) ?? []), key]);
   return by;
 }
 
@@ -44,7 +42,7 @@ export function readNothing(root, manifest, read) {
   else if (text === null) found.push({ script: "scripts/strength.mjs", why: `the measure waits for \`${at}\`, the shape check's config, whose files it measures` });
   else if (config && count(() => measuredCode(config, root)) === 0) found.push({ script: "scripts/strength.mjs", why: `\`${at}\` names under "code" no file it measures: none that is no test, in a language the core knows by its ending` });
   if (!found.length) return [];
-  const held = rulesHeldBy(leftOut(manifest)), copy = copyOf(root);
+  const held = rulesHeldBy(manifest), copy = copyOf(root);
   return found.map(f => ({ ...f, check: `${copy}${f.script}`, holds: held.get(f.script) ?? [] })).filter(f => f.holds.length);
 }
 

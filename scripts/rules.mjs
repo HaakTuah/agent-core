@@ -9,7 +9,7 @@
 import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import path from "node:path";
-import { realFiles, regular } from "./reading.mjs";
+import { leftOut, realFiles, regular } from "./reading.mjs";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -62,6 +62,13 @@ export function rules(root = ROOT, { agents = false } = {}) {
   if (own !== null) out.push(...rulesOf("AGENTS.md", own));
   for (const folder of FOLDERS) for (const f of realFiles(root, folder, new Set())) out.push(...rulesOf(`${folder}/${f}`, regular(root, `${folder}/${f}`) ?? ""));
   return out;
+}
+
+// Of `all`, the rules a project takes: the floor's, and those of each module its manifest's text `manifest` does not
+// leave out (reading.mjs, leftOut).
+export function takenRules(all, manifest) {
+  const out = leftOut(manifest);
+  return all.filter(r => r.file.startsWith("floor/") || !out.has(path.posix.basename(r.file)));
 }
 
 // The same rules as they stand in a commit of the git repository at `root`, read from git and never from its working

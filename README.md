@@ -46,7 +46,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
   module by its file's name, which stands once across the three folders. Until the second release after 16 November 2026
   a file at each path the rules left (`modules/`, `floor/topics.md`) points to where they stand.
 - **The roles** (`roles/`; core archive 234): one file for each role (the builder, the orchestrator, a reviewer, the
-  stand-in, the design session), read at that role's start with the shared files it names: `tasks/roles.md`, "A file
+  stand-in, the auditor, the design session), read at that role's start with the shared files it names: `tasks/roles.md`, "A file
   for each role".
 - **Reading by role and by task:** `scripts/reading.mjs` (under `core/` in a project) prints the files a session of a
   given role reads for a given task, for any agent tool that can run a command, and names what a pull request's changed

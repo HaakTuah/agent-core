@@ -29,7 +29,7 @@ import { readCore } from "./core-path.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { everyInstall } from "./packages.mjs";
 import { started } from "./started.mjs";
-import { NOTES, asksBetween, fetchCore, followsOf, greenMain, hostSaid, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
+import { NOTES, asksBetween, fetchCore, followsOf, greenMain, hostSaid, inBare, jumped, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
 import { FOLDER } from "./sync-notes.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
@@ -130,6 +130,8 @@ function sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp) {
     : asks.length
       ? `This sync asks more of the project than the copy (${at}${NOTES}). Not in this PR, a pure sync: do each in a PR of its own once this one is merged, or file it for the queue where it is large.\n${asks.join("\n")}`
       : `This sync asks nothing of the project beyond the copy (${at}${NOTES}).`);
+  // (a jump past two releases makes the next reading of the project against the core whole: #464)
+  if (jumped(old, tmp)) console.log(`This sync jumps from a copy older than the core's last two releases, so the project is read against the core whole again (${at}tasks/cleaning.md, "A project is read against the core once, then for what each release changes"): once this pull request is merged, take checks/core-reading.json out in a pull request of its own, and the step that reads it asks the whole reading.`);
 }
 
 // The folder of the earlier starter kits, each in a folder named for its commit.

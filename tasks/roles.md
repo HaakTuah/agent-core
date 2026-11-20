@@ -7,7 +7,7 @@ change): the kind `role`.
 (`roles/orchestrator.md`); a builder builds one line to its merge; the session that syncs the core moves the copy
 (`roles/shared/work-flow.md`, "Sessions"); the code reviewer and the security reviewer review a PR (`tasks/reviews.md`);
 the fallback reviewer takes a review no other gives; the design check, the stand-in and planning design judge or plan
-against the design and the owner's words.
+against the design and the owner's words; the auditor reads what stands, changing nothing (`roles/auditor.md`).
 
 **A file for each role** (#304). By default what a role reads at its start is the floor's `security.md`, its own file
 under `roles/` and the shared files that file names on its line "Reads at its start:". Whoever writes or changes a rule
@@ -29,7 +29,7 @@ where that tool is not at hand, to the next it names:
 | Code reviewer | a tool that cannot build here (Codex's app, then Copilot's), then a builder of a tool other than the builder's | the fallback reviewer |
 | Security reviewer | Codex's app, which starts by itself (floor rule 8) | the fallback reviewer |
 | Fallback reviewer | Claude | a fresh session of any tool at hand |
-| Design check, stand-in, planning design | Claude | the strongest tool at hand |
+| Design check, stand-in, auditor, planning design | Claude | the strongest tool at hand |
 
 - Where a project's manifest has a table under "Tools", each row it holds replaces the default's for that role; a row
   it lacks keeps the default's, save what the record is read for (#481): with no "Builder" row, the tools that built
@@ -52,7 +52,7 @@ its own intent instead of the diff. Held by nothing yet: builder and reviewer po
 
 | Tier | Its jobs | Effort |
 | --- | --- | --- |
-| Strongest | the main lane, design readings and the *hard work*, the orchestrator, the adviser, the fallback reviewer, the design and leanness checks, the stand-in, a choice's challenger, blind picker and judge, escalation's first step, a helper that needs design judgement | high |
+| Strongest | the main lane, design readings and the *hard work*, the orchestrator, the adviser, the fallback reviewer, the design and leanness checks, the stand-in, the auditor, a choice's challenger, blind picker and judge, escalation's first step, a helper that needs design judgement | high |
 | Middle | routine lanes (polish, docs, splits, tests) and parallel helpers (`tasks/helpers.md`) | high for a builder; a helper medium, high for the hard work |
 | Light | search | low |
 | Scarce top | planning design, escalation's last step, work the owner gives it by name | high |

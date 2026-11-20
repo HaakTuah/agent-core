@@ -32,7 +32,7 @@ Read when a task calls for it, each saying when in its opening line: the files o
 `floor/threat-model.md`, `tasks/roles.md`, `tasks/helpers.md`, `tasks/reviews.md`, `roles/shared/review-guidelines.md`,
 `tasks/tools.md`, `tasks/ways.md`, `tools/claude-sessions.md`, `tools/codex.md`, `tools/copilot.md`, `tools/kiro.md`,
 `tools/antigravity.md`, `tasks/github-calls.md`, `tasks/hosts.md`, `tasks/repositories.md`, `roles/shared/teams.md`,
-`roles/orchestrator.md`, `tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`,
+`roles/orchestrator.md`, `roles/auditor.md`, `tasks/updates.md`, `tasks/choices.md`, `tasks/code-shape.md`, `tasks/tests.md`,
 `tasks/cleaning.md`, `tasks/done-when.md`, `tasks/planning.md` and `roles/shared/records.md`.
 
 Not taken, each for its reason:
@@ -43,8 +43,8 @@ Not taken, each for its reason:
   checks has anything to act on here, and `scripts/screens.mjs` is held by its test alone.
 
 The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *milestone*: a batch and its release ("One batch,
-then one release"; #322), and of `tasks/planning.md` the point on a task's release has nothing to act on here, which
-holds no copy; the *report*: the PR's description (`reports/` keeps
+then one release"; #322), and of `tasks/planning.md` the point on a task's release and of `tasks/cleaning.md` the reading of a project
+against the core (#259 is that reading here) have nothing to act on here, which holds no copy; the *report*: the PR's description (`reports/` keeps
 those written before 12 November 2026, and the staged cases' record); the *audits*: `reports/`; the *choice records*:
 `CHOICES.md`; the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
 the *mutation tool*: `node scripts/stryker.mjs --tool tests/mutation --report {report} {lines}`, Stryker at the version
@@ -394,7 +394,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   the project's state report files, for each rule it lists with no holder, those read at a session's start first, a
   task at the project's pace: a check where one can read the breach exactly, the rule moved to where it is read on
   need, or a proposal that it goes, which is the owner's to decide. Of every rule of the project's own, held or not,
-  it answers whether it is about this project, its kind or every project, in the list's "about" (`this project`, `its
+  it answers, as an auditor reads (`roles/auditor.md`), whether it is about this project, its kind or every project, in the list's "about" (`this project`, `its
   kind: <the kind>` or `every project`), and files each about a kind or every project to the core as an idea where
   none is filed yet, naming the kind, written for the kind and holding nothing of the project (`README.md`,
   "Reporting to the core"; #484, point 9). The staged cases and the pruning stay the core's,

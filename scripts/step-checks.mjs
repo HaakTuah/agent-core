@@ -41,6 +41,7 @@ export const COST = {
   clean: "one cleanup lane of a builder's, once, its size set by how much of its owner's words the project holds: a pull request for its files, and its issues and comments edited on the host",
   split: "a read of which records the project's pull requests keep adding to, and one pull request of a builder's that splits each into a folder of one file per entry, its readers following",
   record: "a choice record argued in full: a session's long list and trial, three fresh sessions (the blind picker, the challenger, the judge), one pull request and one issue",
+  reading: "one long session of an auditor's on the strongest tier, once, and a pull request of its report and record; after that, at each release, a reading of the rules it added or changed alone",
 };
 
 // An error's words with no path of the machine's in them (the project's root, this copy's, the temporary folder, the
