@@ -3,7 +3,7 @@
 Read by a session of Claude Code in auto mode before it edits on the host text that someone wrote, and once that mode
 refuses such an edit: the kinds `cloud` and `host` (what a tool's part says: `tasks/tools.md`, "Each tool's part").
 
-**Auto mode may refuse**(#990). By default a session of Claude Code makes the calls its task needs. The one condition
+**Auto mode may refuse** (#990). By default a session of Claude Code makes the calls its task needs. The one condition
 that changes it: in auto mode a classifier reads each action before it runs and blocks what it takes for destructive,
 irreversible or aimed outside the session's environment, which by default it trusts only for the working directory and
 the repository's own remotes; an edit of an issue's or a comment's text on the host may be among them, and a call it
