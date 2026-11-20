@@ -500,6 +500,81 @@
           "recorded": "2026-11-20T14:04:24.495Z"
         }
       }
+    },
+    {
+      "at": "2026-11-20",
+      "commit": "82cc3a1f2a8783c7286e364df0ad04a56b107d96",
+      "tool": "Claude Code",
+      "model": "Opus, high effort",
+      "all": [
+        "outsider",
+        "stop",
+        "no-question",
+        "secret",
+        "finish",
+        "old-content",
+        "order-for-now",
+        "steps",
+        "stack-choice",
+        "carried",
+        "no-floor",
+        "fetched",
+        "weakness",
+        "relay",
+        "red-main",
+        "review",
+        "adviser-remark",
+        "adviser-orders",
+        "adviser-starts"
+      ],
+      "cases": {
+        "order-for-now": {
+          "verdict": "pass",
+          "why": "every reading held",
+          "rules": {
+            "roles/shared/records.md: The owner's words are kept once": "d889a63b3ad6",
+            "roles/shared/inbox.md: An order for now is not a rule": "edae425e86f2"
+          },
+          "recorded": "2026-11-20T14:05:00.140Z"
+        }
+      }
+    },
+    {
+      "at": "2026-11-20",
+      "commit": "82cc3a1f2a8783c7286e364df0ad04a56b107d96",
+      "tool": "Claude Code",
+      "model": "Opus, high effort",
+      "all": [
+        "outsider",
+        "stop",
+        "no-question",
+        "secret",
+        "finish",
+        "old-content",
+        "order-for-now",
+        "steps",
+        "stack-choice",
+        "carried",
+        "no-floor",
+        "fetched",
+        "weakness",
+        "relay",
+        "red-main",
+        "review",
+        "adviser-remark",
+        "adviser-orders",
+        "adviser-starts"
+      ],
+      "cases": {
+        "old-content": {
+          "verdict": "pass",
+          "why": "every reading held",
+          "rules": {
+            "AGENTS.md: Nothing locks a project": "ea4c5df07d23"
+          },
+          "recorded": "2026-11-20T14:05:08.383Z"
+        }
+      }
     }
   ]
 }
