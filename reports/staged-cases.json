@@ -916,6 +916,43 @@
           "recorded": "2026-11-20T14:10:17.474Z"
         }
       }
+    },
+    {
+      "at": "2026-11-20",
+      "commit": "82cc3a1f2a8783c7286e364df0ad04a56b107d96",
+      "tool": "Claude Code",
+      "model": "Opus, high effort",
+      "all": [
+        "outsider",
+        "stop",
+        "no-question",
+        "secret",
+        "finish",
+        "old-content",
+        "order-for-now",
+        "steps",
+        "stack-choice",
+        "carried",
+        "no-floor",
+        "fetched",
+        "weakness",
+        "relay",
+        "red-main",
+        "review",
+        "adviser-remark",
+        "adviser-orders",
+        "adviser-starts"
+      ],
+      "cases": {
+        "adviser-starts": {
+          "verdict": "pass",
+          "why": "every reading held",
+          "rules": {
+            "roles/adviser.md: It starts orchestrators, on the owner's word, and nothing else": "5f4f69184253"
+          },
+          "recorded": "2026-11-20T14:10:54.159Z"
+        }
+      }
     }
   ]
 }
