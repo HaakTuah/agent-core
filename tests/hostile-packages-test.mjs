@@ -1,7 +1,7 @@
 // Hostile tests for one input the core reads (floor topic 5, "Every named input has hostile tests"): what a package
 // brings, from a registry or installed, which its publisher writes: an npm package's own package.json and licence
 // files, installed or copied into a project, a NuGet package's file with its manifest (.nuspec) and content hash,
-// Node's own tarball, and what a registry or GitHub answers of a package, read by lookup.mjs from answers made here. Read by licence-installed.mjs, licence-scan.mjs, licences.mjs (licenceOk, on the licence npm
+// Node's own tarball, and what a registry or GitHub answers of a package, read by lookup.mjs from answers made here. Read by licence-installed.mjs, licence-scan.mjs (with licence-pages.mjs, which it reads a page by), licences.mjs (licenceOk, on the licence npm
 // copies from a package), nuget.mjs (manifestLicence), nuget-fetch.mjs (nuspecOf, contentHash, named, and fetchAll
 // from a folder source, so no network) and node.sh (its SHA-256 check, with a stand-in npm that hands it a tarball made
 // here). Each case is refused: a licence it cannot read is not allowed, a version it cannot read is no version, a path
