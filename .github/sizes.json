@@ -197,43 +197,43 @@
     },
     "tests/code-review-wait-test.mjs": {
       "mark": 33431,
-      "why": "One script's cases (code-review-wait.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/comment-only-test.mjs": {
       "mark": 32403,
-      "why": "One script's cases (comment-only.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/core-yml-test.mjs": {
       "mark": 22488,
-      "why": "One script's cases (the core's workflow core.yml, run as GitHub runs it) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/hostile-build-files-test.mjs": {
-      "mark": 29844,
-      "why": "One script's cases (the hostile build, package and workflow files each reader is given) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "mark": 29868,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/hostile-github-test.mjs": {
       "mark": 22575,
-      "why": "One script's cases (the hostile answers of GitHub's API each script is given) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/hostile-pr-comments-test.mjs": {
       "mark": 22109,
-      "why": "One script's cases (the hostile pull request comments each script is given) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/licence-scan-test.mjs": {
       "mark": 46036,
-      "why": "One script's cases (licence-scan.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/licences-test.mjs": {
       "mark": 24020,
-      "why": "One script's cases (licences.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/lookup-test.mjs": {
       "mark": 63511,
-      "why": "One script's cases (lookup.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/merge-line-test.mjs": {
       "mark": 23054,
-      "why": "One script's cases (merge-line.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
     },
     "tests/size-test.mjs": {
       "mark": 28199,

@@ -26,12 +26,10 @@ const KIT = template("claude-settings.json.tmpl"), KIRO = template("kiro-hook.js
 const LINKS = process.platform !== "win32";
 if (!LINKS) console.log("note the cases with links are run on Linux and macOS alone");
 let failed = 0, count = 0;
-const made = [];
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail ? `\n${detail}` : ""}`); } };
 // (git's own settings of this machine left out, as the core's other tests leave them: a file that is not there, since
 // Windows' git cannot open its null device as one, and line endings stored as written)
 const none = scratchDir("agent-tools-");
-made.push(none);
 const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_NOSYSTEM: "1",
   GIT_CONFIG_GLOBAL: path.join(none, "none"), GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "core.autocrlf", GIT_CONFIG_VALUE_0: "false" };
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8" }).trim();
@@ -45,7 +43,6 @@ const LINK = Symbol("link"), link = to => ({ [LINK]: to });
 // adds files; a null removes one.
 function project(files = {}) {
   const dir = scratchDir("agent-tools-");
-  made.push(dir);
   git(dir, "init", "-q", "-b", "main");
   write(dir, ".claude/settings.json", KIT);
   write(dir, "checks/licences.json", JSON.stringify({ lockfiles: [] }));
@@ -137,7 +134,6 @@ passes(run(project()), "a project as the starter kit writes it, with no list, pa
   const gitf = (dir, ...args) => execFileSync("git", ["-c", "protocol.file.allow=always", ...args], { cwd: dir, env, encoding: "utf8" }).trim();
   const library = () => {
     const lib = scratchDir("agent-tools-lib-");
-    made.push(lib);
     git(lib, "init", "-q", "-b", "main");
     const commit = files => { change(lib, files); git(lib, "add", "-A"); git(lib, "commit", "-q", "-m", "library"); return git(lib, "rev-parse", "HEAD"); };
     return { lib, commit };
@@ -251,7 +247,6 @@ fails(run(project({ "checks/licences.json": "{" })), "a config that is no JSON f
 if (LINKS) {
   const LINKED = "is a link where an agent tool reads its files, and this check follows no link";
   const away = scratchDir("agent-tools-");
-  made.push(away);
   fs.writeFileSync(path.join(away, "settings.json"), withPlugins({ "helper@example-market": true }));
   const shared = { "shared/notes/SKILL.md": "# notes\n", "shared/settings.json": withPlugins({ "helper@example-market": true }) };
   // (a link added by a pull request, at each kind of place a tool reads, to each kind of place: it fails as a link)
@@ -788,7 +783,7 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   fails(run(pr(project({ ...listing() }), { ".claude/skills/notes/Skill.md": "# notes\n" })), "and a skill whose SKILL.md is in another case", "Mend: rename it to .claude/skills/notes/SKILL.md");
   // (a skill's folder in another case is left out where the file system ignores case, as Windows' and macOS's do: there
   // the working tree gives the tool's own name what git's tree holds under another, so the skill reads as new)
-  const caseless = (() => { const d = scratchDir("agent-tools-"); made.push(d); fs.writeFileSync(path.join(d, "a"), ""); return fs.existsSync(path.join(d, "A")); })();
+  const caseless = (() => { const d = scratchDir("agent-tools-"); fs.writeFileSync(path.join(d, "a"), ""); return fs.existsSync(path.join(d, "A")); })();
   const deepStood = run(pr(project({ ".Kiro/Hooks/lint.json": "{}\n", ...(caseless ? {} : { ".Claude/Skills/notes/skill.md": "# notes\n" }), ...listing() }), { "README.md": "a change of its own\n" }));
   ok(deepStood.status === 0 && /\.Kiro is \.kiro in another case/.test(deepStood.out) && (caseless || /\.Claude is \.claude in another case/.test(deepStood.out)), "while what stands under it is noted, not failed", deepStood.out);
   // (#600's code review of 038f301: what the tool does not read under it changes nothing of what it reads, and a folder
@@ -947,6 +942,5 @@ fails(run(project({ ".claude/settings.json": withPlugins({ "helper@example-marke
   ok(r.status === 1 && !r.out.split(/\r?\n/u).some(l => l.startsWith("::")), "a command from the project is printed on its own line, no part of it starting another", r.out);
 }
 
-for (const dir of made) fs.rmSync(dir, { recursive: true, force: true });
 console.log(`${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

@@ -26,7 +26,7 @@ import { draftHoles, lines, readable, repeated } from "../scripts/workflows.mjs"
 import { twice } from "../scripts/yaml-keys.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
 import { read as runnersRead, workflowsIn } from "../scripts/runners.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { OWNER, scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -216,7 +216,7 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
 // ---- the reader of where the tests run (runners.mjs; #733): a workflow file that anyone's pull request writes ----
 {
   const dir = scratchDir("hostile-runners-");
-  const one = (name, body) => { for (const f of fs.readdirSync(dir)) fs.rmSync(path.join(dir, f)); fs.writeFileSync(path.join(dir, name), body); return workflowsIn(dir); };
+  const one = (name, body) => { for (const f of fs.readdirSync(dir)) if (f !== OWNER) fs.rmSync(path.join(dir, f)); fs.writeFileSync(path.join(dir, name), body); return workflowsIn(dir); };
   try {
     let w = one("loop.yml", "on: push\njobs:\n  t: &a\n    runs-on: [ubuntu-latest, *a]\n    steps: *a\n");
     ok(!w.selfHosted && !w.onHost, "runners.mjs: a job whose anchors refer to themselves is read as far as it goes, each object once, and nothing overflows");
