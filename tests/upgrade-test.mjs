@@ -647,8 +647,8 @@ function seed(p, eol) {
 // (a path by its full name, as Windows' own call gives it: its short names, as in the temporary folder, taken out)
 const real = f => fs.realpathSync.native(f);
 const lf = text => text.replace(/\r\n/g, "\n");
-// (a path from `home`, with "/", or null where it leads out of it)
-const within = (home, to) => { const rel = path.relative(home, to); return !rel || rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel) ? null : slash(rel); };
+// (a path from `top`, with "/", or null where it leads out of it)
+const within = (top, to) => { const rel = path.relative(top, to); return !rel || rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel) ? null : slash(rel); };
 
 // Each reader against its tool, on a clone of the synced project `p` in the test's folder.
 function readersAgainstTools(p) {
@@ -678,11 +678,11 @@ function kinds(dir) {
   write(dir, "dist/ignored.txt", "a file git ignores\n");
   const outside = path.join(tmp, "outside-the-project.txt");
   fs.writeFileSync(outside, "a file of no project's\n");
-  const home = real(dir);
+  const clone = real(dir);
   git(dir, "add", "kinds/text.txt", "kinds/run.sh");
   git(dir, "update-index", "--chmod=+x", "kinds/run.sh");
-  const links = { "kinds/to-text": "text.txt", "kinds/to-link": "to-text", "kinds/to-ignored": "../dist/ignored.txt", "kinds/to-outside": slash(path.relative(path.join(home, "kinds"), outside)),
-    "kinds/to-absolute": slash(path.join(home, "kinds/text.txt")), "kinds/to-nothing": "nothing-here.txt", "kinds/to-folder": "." };
+  const links = { "kinds/to-text": "text.txt", "kinds/to-link": "to-text", "kinds/to-ignored": "../dist/ignored.txt", "kinds/to-outside": slash(path.relative(path.join(clone, "kinds"), outside)),
+    "kinds/to-absolute": slash(path.join(clone, "kinds/text.txt")), "kinds/to-nothing": "nothing-here.txt", "kinds/to-folder": "." };
   for (const [link, target] of Object.entries(links)) {
     const oid = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: dir, env, input: target, encoding: "utf8" }).trim();
     git(dir, "update-index", "--add", "--cacheinfo", `120000,${oid},${link}`);
@@ -706,14 +706,14 @@ function againstGit(p, dir) {
     return [f, { mode, oid }];
   }));
   const blobs = blobTexts(dir, [...entries.values()].filter(e => e.mode !== "160000").map(e => e.oid));
-  const home = real(dir);
+  const clone = real(dir);
   const expected = (f, hops = 0) => {
     const e = entries.get(f);
     if (!e || e.mode === "160000") return null;
     if (e.mode !== "120000" || !fs.lstatSync(path.join(dir, f)).isSymbolicLink()) return lf(blobs.get(e.oid));
     if (hops > 40) return null;
     const target = blobs.get(e.oid);
-    return (at => at === null ? null : expected(at, hops + 1))(within(home, path.resolve(path.dirname(path.join(home, f)), target)));
+    return (at => at === null ? null : expected(at, hops + 1))(within(clone, path.resolve(path.dirname(path.join(clone, f)), target)));
   };
   const reading = read(dir);
   const wrong = [...entries.keys(), "third-party/library/inner.txt"].filter(f => reading.read(f) !== expected(f));
@@ -770,18 +770,18 @@ function againstBash(p, dir) {
     github: { event_name: "pull_request", repository: `someone-else/${p.name}`, workspace: dir }, base: { ...env, [key]: `${bin}${path.delimiter}${env[key]}`, NODE_LOG: log },
     workspace: () => dir, uses: {}, temp: tmp });
   const failedSteps = results.flatMap(r => r.steps.filter(s => !s.passed).map(s => `${s.name}: ${s.out}`));
-  const home = real(dir), copy = copyAt(read(dir));
-  const runs = (fs.existsSync(log) ? fs.readFileSync(log, "utf8") : "").split("\x1e\n").filter(Boolean).map(record => {
+  const clone = real(dir), copy = copyAt(read(dir));
+  const calls = (fs.existsSync(log) ? fs.readFileSync(log, "utf8") : "").split("\x1e\n").filter(Boolean).map(record => {
     const [cwd, ...args] = record.replace(/\n$/, "").split("\n");
-    const at = args.findIndex(a => !a.startsWith("-")), script = within(home, real(path.resolve(real(cwd), args[at])));
+    const at = args.findIndex(a => !a.startsWith("-")), script = within(clone, real(path.resolve(real(cwd), args[at])));
     const name = path.posix.basename(script ?? ""), config = picked(name, args.slice(at + 1));
-    return { script, name, config: config === undefined ? null : within(home, path.resolve(real(cwd), config)) };
+    return { script, name, config: config === undefined ? null : within(clone, path.resolve(real(cwd), config)) };
   });
-  const named = configs(read(dir));
-  const wrong = runs.filter(r => r.script !== `${copy}scripts/${r.name}` || !CHECKED[r.name] || named[CHECKED[r.name]] !== r.config);
-  ok(!failedSteps.length && runs.length === 6, `${p.name}: bash runs each of the 6 runs of a check its own workflow holds`, `${failedSteps.join("\n")}\n${JSON.stringify(runs)}`);
-  ok(!named.unread.length && !wrong.length, `${p.name}: configs() names, for each check, the file bash gives its script (${[...new Set(runs.map(r => r.name))].join(", ")})`,
-    `${named.unread.join("\n")}\n${wrong.map(r => `${r.script} ${r.config}: configs() gives ${named[CHECKED[r.name]]}`).join("\n")}`);
+  const byCheck = configs(read(dir));
+  const wrong = calls.filter(r => r.script !== `${copy}scripts/${r.name}` || !CHECKED[r.name] || byCheck[CHECKED[r.name]] !== r.config);
+  ok(!failedSteps.length && calls.length === 6, `${p.name}: bash runs each of the 6 runs of a check its own workflow holds`, `${failedSteps.join("\n")}\n${JSON.stringify(calls)}`);
+  ok(!byCheck.unread.length && !wrong.length, `${p.name}: configs() names, for each check, the file bash gives its script (${[...new Set(calls.map(r => r.name))].join(", ")})`,
+    `${byCheck.unread.join("\n")}\n${wrong.map(r => `${r.script} ${r.config}: configs() gives ${byCheck[CHECKED[r.name]]}`).join("\n")}`);
 }
 
 // ---- the .NET SDK: the build files a build of the project reads ----
@@ -799,23 +799,23 @@ function buildFiles(dir) {
 // The project's own files that `dotnet msbuild -pp` of each of its project files names (those git lists, outside the
 // copy), against those importsOf reads.
 function againstSdk(p, dir) {
-  const reading = read(dir), copy = copyAt(reading), own = reading.files.filter(f => !f.startsWith(copy)), home = real(dir);
-  const listed = new Set(own), named = new Set(), failed = [];
+  const reading = read(dir), copy = copyAt(reading), own = reading.files.filter(f => !f.startsWith(copy)), clone = real(dir);
+  const listed = new Set(own), sdkReads = new Set(), broken = [];
   for (const proj of own.filter(f => /\.(?:cs|fs|vb)proj$/i.test(f))) {
     const out = path.join(tmp, `${p.name}-pp.xml`);
     const r = spawnSync("dotnet", ["msbuild", "-nologo", `-pp:${out}`, proj], { cwd: dir, env: { ...env, ...sdkEnv }, encoding: "utf8" });
-    if (r.status !== 0) { failed.push(`${proj}: ${r.stdout}${r.stderr}`); continue; }
+    if (r.status !== 0) { broken.push(`${proj}: ${r.stdout}${r.stderr}`); continue; }
     // (each file the build reads stands alone on a line of a comment, by its full path)
     for (const line of fs.readFileSync(out, "utf8").split(/\r?\n/)) {
       if (!path.isAbsolute(line.trim()) || !fs.existsSync(line.trim())) continue;
-      const f = within(home, real(line.trim()));
-      if (f !== null && listed.has(f)) named.add(f);
+      const f = within(clone, real(line.trim()));
+      if (f !== null && listed.has(f)) sdkReads.add(f);
     }
   }
   const imports = importsOf(own, f => readProject(dir, f), projectFilesByContent(dir, own)), reader = new Set(imports.files.keys());
-  const differ = [...named].filter(f => !reader.has(f)).map(f => `the SDK reads ${f}, importsOf does not`).concat([...reader].filter(f => !named.has(f)).map(f => `importsOf reads ${f}, the SDK does not`),
+  const differ = [...sdkReads].filter(f => !reader.has(f)).map(f => `the SDK reads ${f}, importsOf does not`).concat([...reader].filter(f => !sdkReads.has(f)).map(f => `importsOf reads ${f}, the SDK does not`),
     imports.unread.map(u => `importsOf could not follow ${u.project} from ${u.from}`));
-  ok(!failed.length && named.size >= 5 && !differ.length, `${p.name}: importsOf reads the project's own build files that dotnet msbuild -pp names, and only those (${named.size})`, `${failed.join("\n")}${differ.join("\n")}`);
+  ok(!broken.length && sdkReads.size >= 5 && !differ.length, `${p.name}: importsOf reads the project's own build files that dotnet msbuild -pp names, and only those (${sdkReads.size})`, `${broken.join("\n")}${differ.join("\n")}`);
 }
 
 let synced = null; // (the npm project of the newest release started from, once synced)
