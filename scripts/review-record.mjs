@@ -27,7 +27,8 @@
 // guessed at. It lists each rule the findings of two pull requests or more name, on their line "Rule:" (rulesNamed,
 // review-comments.mjs). Last it counts the rounds of review each pull request took (#477; review-rounds.mjs, beside this file), from
 // the head each review was asked or posted on (reviewEvents, review-comments.mjs) and the pull request's commits, read for those it
-// counts, the last 30 merged and, given --since, the 30 merged before it. It reads; it writes nothing and changes
+// counts, the last 30 merged and, given --since, the 30 merged before it, and how often the host's checks failed on a
+// head of the last 30 counted that was then changed (#900; review-checks.mjs, beside this file). It reads; it writes nothing and changes
 // nothing. Git, gh and Node's own modules.
 //
 //   node core/scripts/review-record.mjs [--since YYYY-MM-DD] [--owner login]
@@ -36,6 +37,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DAY, grid, mergedPulls, repoOf, rulesFor } from "./core-cost.mjs";
 import { broughtBy, perPull, reviewEvents, ruleOf, rulesNamed } from "./review-comments.mjs";
+import { checksLines, checksRead, runsReader } from "./review-checks.mjs";
 import { roundsLines, roundsOf, wanted } from "./review-rounds.mjs";
 import { started } from "./started.mjs";
 import { ROOT, rules, rulesOf } from "./rules.mjs";
@@ -177,7 +179,8 @@ export function gather(since, by, fail) {
   const issues = labelled.filter(b => !since || b.at >= `${since}T00:00:00Z`);
   const of = m => [issueComments.filter(c => c.issue === m.number), inline.filter(c => c.pull === m.number), owner];
   const commitsOf = n => { try { return pages(`repos/${repo}/pulls/${n}/commits?`, ".[] | {sha, at: .commit.committer.date, parents: [.parents[] | {sha}]} | @json"); } catch { return null; } };
-  return { repo, all, merged, owner, issueComments, inline, issues, labelled, of, commitsOf };
+  const runsOf = runsReader(repo, pages);
+  return { repo, all, merged, owner, issueComments, inline, issues, labelled, of, commitsOf, runsOf };
 }
 
 function main(args) {
@@ -186,7 +189,7 @@ function main(args) {
   const since = value("--since"), by = value("--owner");
   if (args.includes("--since") && !DAY.test(since ?? "")) fail("--since takes a day, YYYY-MM-DD");
   if (args.includes("--owner") && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(by ?? "")) fail("--owner needs the owner's account after it");
-  const { repo, all, merged, owner, issueComments, issues, of, commitsOf } = gather(since, by, fail);
+  const { repo, all, merged, owner, issueComments, issues, of, commitsOf, runsOf } = gather(since, by, fail);
   const named = new Map(all.map(m => [m.number, rulesNamed(...of(m))]));
   const pulls = merged.map(m => ({ number: m.number, kind: m.kind, reviews: perPull(...of(m)), rules: named.get(m.number) }));
   const t = tally(pulls);
@@ -194,8 +197,10 @@ function main(args) {
   const twice = foundTwice(all.map(m => ({ number: m.number, when: m.when, rules: named.get(m.number) })), since);
   console.log(print(repo, since, pulls, t, bug, twice, standing()));
   const want = wanted(merged, all, since);
-  const rounds = new Map(all.filter(m => want.has(m.number)).map(m => { const commits = commitsOf(m.number); return [m.number, commits && roundsOf(reviewEvents(...of(m)), commits)]; }));
+  const commits = new Map(all.filter(m => want.has(m.number)).map(m => [m.number, commitsOf(m.number)]));
+  const rounds = new Map(all.filter(m => want.has(m.number)).map(m => [m.number, commits.get(m.number) && roundsOf(reviewEvents(...of(m)), commits.get(m.number))]));
   console.log(`\n${roundsLines(merged, all, since, rounds)}`);
+  console.log(checksLines(checksRead(merged, commits, runsOf), KINDS));
 }
 
 if (started(import.meta.url)) main(process.argv.slice(2));

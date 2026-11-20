@@ -326,6 +326,9 @@ jobs:
       - name: The count of the rounds of review
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/review-rounds-test.mjs ')) }}
         run: node tests/review-rounds-test.mjs
+      - name: The count of how often the host's checks sent the work back
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/review-checks-test.mjs ')) }}
+        run: node tests/review-checks-test.mjs
       - name: The stalled lanes
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/stalled-test.mjs ')) }}
         run: node tests/stalled-test.mjs
