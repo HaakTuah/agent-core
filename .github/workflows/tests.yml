@@ -217,7 +217,7 @@ jobs:
       - name: The licence check's owner's yes, on the staged project
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-yes-test.mjs ')) }}
         run: node tests/licence-yes-test.mjs
-      - name: What the licence scan reads: its paths held to the project, JSON of any depth
+      - name: What the licence scan reads, its paths held to the project and JSON of any depth
         if: ${{ !cancelled() && contains(matrix.parts, 'licences') && (env.RUN == 'all' || contains(env.RUN, ' tests/licence-scan-limits-test.mjs ')) }}
         run: node tests/licence-scan-limits-test.mjs
       - name: The licence scan on the programs a file downloads, pinned by version and checksum
