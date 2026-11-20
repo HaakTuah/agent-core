@@ -10,7 +10,8 @@ the repository's own remotes; an edit of an issue's or a comment's text on the h
 blocked, tried again, is read again and may be blocked again (its documentation, "Configure auto mode" and "Choose a
 permission mode", read on 20 November 2026). The trigger is such a refusal: the session neither tries the call again nor
 reaches the same end another way (another command, tool or helper); it files the step as a task labelled `needs-owner`,
-naming the step and each text by its link and quoting nothing it would have cut, and goes on with the rest of its task.
+naming the step and how many texts it left, never their links nor anything it would have cut, which go to the owner in
+its own chat alone, as step 700 says of what it edits, and goes on with the rest of its task.
 The owner allows the step in the owner's own settings, which that mode reads from the owner's user settings or the
 organisation's managed ones and never from the project's (`autoMode`, or a permission rule), or takes it in a session
 the owner starts. It does not mean that the session asks the owner in its chat and waits, that it writes such a setting
