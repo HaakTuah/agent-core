@@ -22,6 +22,7 @@
 // pull request is marked ready, the call runs on no head, and a ruleset counts the draft's skip as passed. As with a key
 // twice, a call the base's same file already held so is noted, each is noted with no base, and the sync's step "16
 // November 2026, checks once a pull request is ready" (steps.mjs, which reads it by draftHoles() below) names it.
+// In the core's own repository (`--core`) it also fails a file the core's own YAML reader cannot read at all (#994).
 // And a line break that YAML 1.1 reads and the YAML package does not (U+0085, U+2028, U+2029: #872): a key given twice,
 // or a call left without ready_for_review, placed after one is not found by the package's reader, while a YAML 1.1
 // reader (YamlDotNet) reads it as a line end, so such a file fails where it is new or changed, and is noted where it is
@@ -56,6 +57,7 @@ import { DEEPEST, LONGEST, pruned, twice } from "./yaml-keys.mjs";
 import { loadSync, unreached } from "./packages.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
+import { parseYaml } from "./workflow-run.mjs";
 
 const WORD = "pull_request_target";
 const BREAK = "\\r\\n|[\\r\\n\\u0085\\u2028\\u2029]"; // every line break YAML 1.1 or 1.2 knows
@@ -374,6 +376,23 @@ export function unreadied(files, before) {
   return { fails, notes };
 }
 
+// The files, each { file, text }, that the core's own reader (parseYaml) cannot read, as { fails } (#994): every other reader
+// takes such a file for one with no steps. Run on the core's own workflows alone (`--core`); a key given twice is left to
+// repeated(), but not where only the package joins the keys (true and True, 1 and 01, null and ~).
+export function unparsed(files) {
+  const fails = [], again = "then run `node scripts/workflows.mjs --core` again";
+  for (const { file, text } of files) {
+    try { parseYaml(text); } catch (e) {
+      if (e?.code === "DUPLICATE_KEY" && keysTwice(text).some(k => k.key !== null)) continue;
+      const at = e?.linePos?.[0], first = String(e?.message ?? e).split("\n")[0].replace(/ at line \d+, column \d+:?$/u, "");
+      const mend = { DUPLICATE_KEY: "rename one of the two keys that read as one value, or quote both", MULTIPLE_DOCS: "take out the \"---\" and the second document",
+        BLOCK_AS_IMPLICIT_KEY: "put the whole value in quotes, since a \": \" inside an unquoted value starts a mapping" }[e?.code] ?? `correct the YAML as the line says, ${again}`;
+      fails.push(`FAIL ${file}${at ? `:${at.line}:${at.col}` : ""}: the core's reader cannot read it as YAML, so every reader of workflows sees it with no steps (${e?.code ? `${e.code}: ` : ""}${first})${/Mend:/u.test(first) ? "" : `. Mend: ${mend}`}`);
+    }
+  }
+  return { fails };
+}
+
 if (started(import.meta.url)) {
   const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
@@ -402,12 +421,13 @@ if (started(import.meta.url)) {
   // calls a draft skips, which the YAML package reads, did not run, said as a warning; every failure above still fails:
   // #654, point 4)
   const skipped = unreached("yaml");
-  if (skipped) console.log("::warning::The check for a key given twice did not run, nor the one for a call a draft skips: the package yaml could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault");
+  if (skipped) console.log("::warning::The check for a key given twice did not run, nor the one for a file that is no YAML, nor the one for a call a draft skips: the package yaml could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault");
   const against = core ? () => null : base ? show : null;
   const keys = skipped ? { fails: [], notes: [] } : repeated(texts, against), ready = skipped ? { fails: [], notes: [] } : unreadied(texts, against);
+  const bad = core && !skipped ? unparsed(texts) : { fails: [] };
   const odd = foreignBroken(texts, against); // (no package is read for it, so it runs where the install did not)
-  for (const line of [...keys.notes, ...ready.notes, ...odd.notes, ...keys.fails, ...ready.fails, ...odd.fails]) console.log(logged(line));
-  failed += keys.fails.length + ready.fails.length + odd.fails.length;
+  for (const line of [...keys.notes, ...ready.notes, ...odd.notes, ...bad.fails, ...keys.fails, ...ready.fails, ...odd.fails]) console.log(logged(line));
+  failed += bad.fails.length + keys.fails.length + ready.fails.length + odd.fails.length;
   keys.notes.push(...ready.notes, ...odd.notes);
   console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} failing${keys.notes.length ? `, ${keys.notes.length} noted` : ""}${failed ? ". Mend: mend each line above as it says" : ""}`);
   process.exit(failed ? 1 : 0);

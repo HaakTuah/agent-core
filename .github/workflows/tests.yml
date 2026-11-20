@@ -278,6 +278,12 @@ jobs:
       - name: The selection of the tests a change can reach
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-test.mjs ')) }}
         run: node tests/select-test.mjs
+      - name: The pathspecs the selection matches a path against
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-matcher-test.mjs ')) }}
+        run: node tests/select-matcher-test.mjs
+      - name: A tree that passed is not run again
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/select-passed-test.mjs ')) }}
+        run: node tests/select-passed-test.mjs
       - name: What each test is worth, read from its runs and the faults it alone catches
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/test-record-test.mjs ')) }}
         run: node tests/test-record-test.mjs
@@ -332,6 +338,15 @@ jobs:
       - name: The description check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-test.mjs ')) }}
         run: node tests/pr-description-test.mjs
+      - name: 'The description check: the line "Read for it:"'
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-reads-test.mjs ')) }}
+        run: node tests/pr-description-reads-test.mjs
+      - name: 'The description check: the line "Reasons read:"'
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-reasons-test.mjs ')) }}
+        run: node tests/pr-description-reasons-test.mjs
+      - name: 'The description check: the owner''s yes'
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-yes-test.mjs ')) }}
+        run: node tests/pr-description-yes-test.mjs
       - name: The tests a pull request edits, which the description names
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/weakened-test.mjs ')) }}
         run: node tests/weakened-test.mjs
@@ -543,7 +558,7 @@ jobs:
       - name: Every module and role of the core says when it is read, in words the reading script matches
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/reading.mjs --check
-      - name: None of the core's own workflows names the forbidden trigger or gives a key twice
+      - name: None of the core's own workflows names the forbidden trigger, gives a key twice or is no YAML
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/workflows.mjs --core
       - name: What the core's own workflows and scripts use, each to its list

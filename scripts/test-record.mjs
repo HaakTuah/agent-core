@@ -21,7 +21,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ghApi } from "./labels.mjs";
-import { matcher } from "./select.mjs";
+import { matcher } from "./select-matcher.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 import { median } from "./wait.mjs";
