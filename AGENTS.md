@@ -46,7 +46,7 @@ The slots here: the *progress file*: `QUEUE.md` ("The queue"); the *milestone*: 
 then one release"; #322), and of `tasks/planning.md` the point on a task's release and of `tasks/cleaning.md` the reading of a project
 against the core (#259 is that reading here) have nothing to act on here, which holds no copy; the *report*: the PR's description (`reports/` keeps
 those written before 12 November 2026, and the staged cases' record); the *audits*: `reports/`; the *choice records*:
-`CHOICES.md`; the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
+`CHOICES.md`, a file each in `choices/` (#870); the *shape check*: `scripts/shape.mjs` with `.github/shape.json` (one system, the scripts, as `CHOICES.md` records);
 the *mutation tool*: `node scripts/stryker.mjs --tool tests/mutation --report {report} {lines}`, Stryker at the version
 `tests/mutation/`'s lock file pins (#581), in `tests.yml`;
 the archive is `archive/instructions.md`, the items behind each rule listed in `scripts/holders/`; the *settling references* and the *descriptions*:
@@ -543,9 +543,11 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   in a file of the same name under `scripts/steps/` and, where the step has a check, its stage for the tests under
   `scripts/stages/` (a stage whose mend reads what the others' mends write says `last`); and what holds each rule (its
   holder, the items behind it and its number), each rule's entry in a file under `scripts/holders/` that `entryFile` in
-  `scripts/holders.mjs` names from the rule's key. Each is read in the order of the files' names by the script that
+  `scripts/holders.mjs` names from the rule's key; and the choice records (`CHOICES.md`), each in a file under `choices/`.
+  Each is read in the order of the files' names by the script that
   reads it (`scripts/inventory.mjs`, `scripts/sync-notes.mjs`, `scripts/steps.mjs`, `scripts/steps-stage.mjs`,
-  `scripts/holders.mjs`), as each archive item stands already ("A new archive item is named by its issue"). Whoever adds
+  `scripts/holders.mjs`, `scripts/choices.mjs`), as each archive item stands already ("A new archive item is named by
+  its issue"). Whoever adds
   an entry adds its file. Nothing changes it, and what it does not mean stands there too. Reason: of 39 pull requests
   merged between 18 and 19 November 2026, 8 changed `INVENTORY.md`, 10 `setup/sync-notes.md`, 7 `scripts/steps.mjs` and
   6 `scripts/holders.json`, and under merge-on-green pull requests that add to one file merge side by side and collide.
@@ -553,7 +555,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   part's line written in `INVENTORY.md` itself; by `tests/steps-test.mjs`, which reads the notes whole, and fails an
   entry, a step or a stage without its pair of the same name and an entry written in `setup/sync-notes.md` itself; and
   by `tests/holders-test.mjs`, which with `scripts/holders.mjs` fails a file of the list not named from its rule, and
-  two rules whose entries would share a file.
+  two rules whose entries would share a file; and by `tests/choices-folder-test.mjs`, which fails a record written in
+  `CHOICES.md` itself and a file of `choices/` that is not one record.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;
   `tests/core-address-test.mjs` names what else here must follow, and a sync note tells each project to move its
