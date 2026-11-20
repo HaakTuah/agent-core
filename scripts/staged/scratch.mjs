@@ -256,9 +256,11 @@ export function build(dir, { core = CORE_ROOT, at = null, files = {}, loose = {}
 }
 
 // The starter kit, run in `project` from the core `core` at `at` with the kit's options `kit`; or, where a caller kept
-// the kits (keepKits) and one ran for the same core, commit and options, what it wrote copied in and staged as it
-// staged it. The kit writes the same files for the same commit and options, and its install of the core's packages is
-// most of what setting a case costs, on Windows above all (#715); a run of one case runs the kit as it always did.
+// the kits (keepKits) and one ran for the same core, commit and options, what it wrote copied in, left for the add that
+// build makes before its first commit, which stages the kit's files and the case's alike (#812); the files it listed
+// to fill and to arrange read the same either way, as `--cached --others` lists them. The kit writes the same files for
+// the same commit and options, and its install of the core's packages is most of what setting a case costs, on Windows
+// above all (#715); a run of one case runs the kit as it always did.
 const KITS = new Map();
 let kitsAt = null;
 export function keepKits(folder) { fs.mkdirSync(folder, { recursive: true }); kitsAt = folder; }
@@ -266,7 +268,7 @@ const copyBut = (from, to, but) => fs.cpSync(from, to, { recursive: true, verbat
 function starterKit(project, core, at, kit) {
   const key = kitsAt && JSON.stringify([path.resolve(core), at ?? git(core, "rev-parse", "HEAD"), kit]);
   const kept = key && KITS.get(key);
-  if (kept) { copyBut(kept, project, ".git"); git(project, "add", "-A"); return; }
+  if (kept) { copyBut(kept, project, ".git"); return; }
   const kitRun = spawnSync(process.execPath, [path.join(core, "scripts", "init.mjs"), "--owner", OWNER, "--name", REPO, ...(at ? ["--at", at] : []), ...kit], { cwd: project, encoding: "utf8", env: plainEnv() });
   if (kitRun.status !== 0) throw new Error(`the starter kit failed: ${kitRun.stdout}${kitRun.stderr}`);
   if (!key) return;
@@ -282,7 +284,9 @@ function repos(dir, project, origin) {
   git(project, "init", "-q", "-b", "main");
   fs.mkdirSync(path.join(dir, "no-hooks"));
   // (git's line endings as written, on every machine: Windows' own setting would show files the case wrote as changed)
-  for (const [k, v] of [["user.name", "a builder"], ["user.email", "builder@example.invalid"], ["commit.gpgsign", "false"], ["core.autocrlf", "false"], ["core.hooksPath", path.join(dir, "no-hooks")]]) git(project, "config", k, v);
+  for (const [k, v] of [["user.name", "a builder"], ["user.email", "builder@example.invalid"], ["commit.gpgsign", "false"], ["core.autocrlf", "false"], ["core.hooksPath", path.join(dir, "no-hooks")],
+    // (objects written and packed as they are: the project holds the core's whole copy and each case adds and pushes it, where deflating it was about half of what the add and the push of a case took; #812)
+    ["core.compression", "0"]]) git(project, "config", k, v);
   // (the origin reads as GitHub's, as the core's scripts expect, and is the bare repository beside the project)
   git(project, "config", `url.${origin.replace(/\\/g, "/")}.insteadOf`, URL);
   git(project, "remote", "add", "origin", URL);

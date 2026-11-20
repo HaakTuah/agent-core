@@ -65,8 +65,18 @@ export function rules(root = ROOT, { agents = false } = {}) {
 }
 
 // The same rules as they stand in a commit of the git repository at `root`, read from git and never from its working
-// folder: what a staged case set from that commit gave its session.
+// folder: what a staged case set from that commit gave its session. A commit named by its id never changes, so what
+// was read from it is kept, for each root, commit and `agents`, and read once however many cases are set from it
+// (#812); a name that can move (a branch, HEAD) is read each time.
+const AT = new Map();
 export function rulesAt(root, commit, { agents = false } = {}) {
+  const key = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(commit) ? JSON.stringify([path.resolve(root), commit, agents]) : null;
+  if (key && AT.has(key)) return AT.get(key).map(r => ({ ...r }));
+  const read = rulesAtRead(root, commit, agents);
+  if (key) AT.set(key, read);
+  return read.map(r => ({ ...r }));
+}
+function rulesAtRead(root, commit, agents) {
   const git = (...a) => execFileSync("git", ["-C", root, ...a], { encoding: "utf8", maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "pipe"] });
   const files = git("ls-tree", "-r", "--name-only", "--end-of-options", commit, "--", ...FOLDERS).split("\n")
     .filter(f => FOLDERS.includes(path.posix.dirname(f)) && f.endsWith(".md")).sort();

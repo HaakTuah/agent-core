@@ -16,7 +16,7 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
-import { rules } from "../scripts/rules.mjs";
+import { rules, rulesAt } from "../scripts/rules.mjs";
 import { scratch } from "../scripts/scratch-core.mjs";
 import { CASES, MONTHS, TOOL, brief, caseOf, dueIssue, due, fingerprints, forRelease, gate, latest, lost, setCase, toolNamed, tools, toolsSaid, unplaced, wayNames, wellFormed } from "../scripts/staged.mjs";
 import { BUG, LABELS, LIMITS, OWNER, PROGRAM, REPO, Unreadable, branchesOf, keepKits, originGit as readOrigin, changed, folderFit, inCommits, memoOf, testPasses, touched } from "../scripts/staged/scratch.mjs";
@@ -49,6 +49,19 @@ ok(unread.every(l => l in PLANTED || l in UNPLANTED) && Object.keys(PLANTED).eve
   "every step no check reads is planted by the steps case, or listed there with why not, and it plants no other",
   `neither: ${unread.filter(l => !(l in PLANTED) && !(l in UNPLANTED)).join("; ")}; planted but read by a check: ${Object.keys(PLANTED).filter(l => !unread.includes(l)).join("; ")}`);
 
+// ---- the rules of a commit are read once however many cases are set from it, and a name that moves is read each time (#812) ----
+{
+  const repo = s.fresh("rules-at"), keyOf = rs => rs.map(r => `${r.key}=${r.text}`).join("|");
+  const commit = text => { fs.mkdirSync(path.join(repo, "tasks"), { recursive: true }); fs.writeFileSync(path.join(repo, "tasks", "a.md"), text); s.git(repo, "add", "-A"); s.git(repo, "commit", "-q", "-m", "x"); return s.git(repo, "rev-parse", "HEAD"); };
+  const one = commit("- **Rule one.** Its text.\n"), first = rulesAt(repo, one);
+  const two = commit("- **Rule one.** Its text.\n- **Rule two.** More.\n");
+  ok(first.length === 1 && rulesAt(repo, two).length === 2 && rulesAt(repo, one).length === 1, "the rules of two commits of one repository are each its own, in either order they are asked");
+  rulesAt(repo, two).pop(); first[0].text = "changed by a caller";
+  ok(rulesAt(repo, two).length === 2 && rulesAt(repo, one)[0].text === "- **Rule one.** Its text.", "what a caller does with the rules it was given changes none that is asked after");
+  ok(rulesAt(repo, "HEAD").length === 2 && (commit("- **Rule three.** Last.\n"), rulesAt(repo, "HEAD").map(r => r.lead).join() === "Rule three"), "a name that moves (HEAD) is read again each time");
+  s.git(repo, "rm", "-q", "-r", "tasks"); s.git(repo, "commit", "-q", "-m", "none");
+  ok(rulesAt(repo, one).length === 1 && keyOf(rulesAt(repo, one)) === keyOf(rulesAt(repo, one)) && rulesAt(repo, one, { agents: true }).length === 1, "a commit's rules stand as they were after the folder is gone from the repository's head");
+}
 }
 // ---- each case, as set, kept and broken ----
 const env = { ...s.env };
