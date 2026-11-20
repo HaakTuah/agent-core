@@ -450,7 +450,7 @@ check a project runs that the list leaves out.
 | `pure-sync.mjs` | left out | A pull request that moves only the copy and its pins gets no review of its own (floor rule 8). The core's own pull request was reviewed. |
 | `security-review.mjs` | left out | A change under the copy never asks floor rule 3's two security reviews of what runs by itself: only a sync changes the copy, and `core.yml` fails any other change. Every file of the core is protected, so the core's own pull request had its two. |
 | `code-review-wait.mjs` | read | A change inside the copy counts as a rule file's, and waits for a code review. |
-| `licence-scan.mjs` | left out | The core's own scan holds it (`.github/licences.json`). That scan skips seven files of the scanner's own code and tests, which hold licence text as patterns. |
+| `licence-scan.mjs` | left out | The core's own scan holds it (`.github/licences.json`). That scan skips the files of the scanner's own code and tests, which hold licence text as patterns. |
 | `agent-tools.mjs` | left out | It reads the tools' settings at the project's root alone. No tool loads the copy's own. The core's run with `--core` holds those. |
 | `personal-terms.yml` | read | The copy's `LICENSE` and `NOTICE` may hold a copyright holder's name, as the project's own may (floor rule 11). The same workflow runs on the core's pull requests. |
 | `codeql.yml` | read | The whole checkout, in the languages the project names. The core's own code scanning runs on its repository. |

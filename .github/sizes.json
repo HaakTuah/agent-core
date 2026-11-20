@@ -27,21 +27,21 @@
       "mark": 52604,
       "why": "Its rules that only some tasks break move to modules read on need in #845."
     },
-    "scripts/licence-commands.mjs": {
-      "mark": 36574,
-      "why": "#946: split along who reads which part: the fetcher patterns, npm's reading of a line, finding commands in a text."
-    },
     "scripts/licence-scan.mjs": {
-      "mark": 29155,
-      "why": "#946: split so that the reading of pages and components stands apart from the scan of a project's files."
-    },
-    "tests/licence-fetch-test.mjs": {
-      "mark": 34107,
-      "why": "#946: split as the scan is, the table of npm forms, of other fetchers and of pages in a file each."
+      "mark": 23622,
+      "why": "#946: its reading of pages and components is split off; what stands is the scan of a project's files, its download pins and their base, which call each other's readers (readAs, codeOf, covers), so a split would make a cycle of imports."
     },
     "README.md": {
       "mark": 74465,
       "why": "Past the large file mark, it is read by the section a task needs, found by searching, never whole (roles/shared/how-to-work.md, \"Read little\"), so no split lets a session read less; GitHub shows it whole as the repository's front page, to people."
+    },
+    "tests/licence-scan-test.mjs": {
+      "mark": 46175,
+      "why": "#946: its header names the readers the scan calls, so that the mutation tool still runs it on them as before the split; a split of its cases by what each checks is a cleaning task."
+    },
+    "tests/hostile-packages-test.mjs": {
+      "mark": 24130,
+      "why": "#946: its header names licence-pages.mjs, so that the mutation tool still runs it on the page reader as before the split; a split of its cases by the input each reads is a cleaning task."
     },
     "tests/releases-test.mjs": {
       "mark": 32769,

@@ -1,6 +1,7 @@
-// Checks the licence check (scripts/licences.mjs) on a whole project, with its scan (licence-scan.mjs): the
+// Checks the licence check (scripts/licences.mjs) on a whole project, with its scan (licence-scan.mjs, and the readers
+// it calls: licence-commands.mjs, licence-npm.mjs, licence-fetchers.mjs and licence-pages.mjs): the
 // staged project (licence-scan-stage.mjs) passes as it is, passes each allowed form, and fails each form of something
-// off its list or left out of its audit but a fetch (licence-fetch-test.mjs has those), for the reason it names; and
+// off its list or left out of its audit but a fetch (licence-fetch-*-test.mjs have those), for the reason it names; and
 // the owner's yes (licence-yes.mjs), on a package and on an audit entry; every path the config names, and every file
 // the scan reads, held to the project; and JSON of any depth or length read without running out of stack. Run by the
 // core's tests workflow (.github/workflows/tests.yml).
