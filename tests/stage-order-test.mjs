@@ -24,6 +24,8 @@ ok(billedOf(true, { testRunners: [], unknown: true, unread: [] }) === null && bi
   "with no suite read on the host's runners, a workflow a job calls that is not read, or a file not read, leaves a private repository's proof not read, never not billed (Codex's finding on #898)");
 ok(isTool("chatgpt-codex-connector[bot]", "Codex") && isTool("Claude Code", "claude code") && !isTool("chatgpt-codex-connector[bot]", "Claude Code") && !isTool("code-helper[bot]", "Claude Code") && !isTool("Codex", "Codex Cloud") && !isTool("a-codex-fan", "Codex"),
   "a reviewer is a tool by the same name, or a bot whose login holds the tool's first word as a word of its own; a person's login, or another word of the name, matches nothing");
+ok(isTool("copilot-pull-request-reviewer[bot]", "GitHub Copilot") && !isTool("github-actions[bot]", "GitHub Copilot") && !isTool("github-advanced-security[bot]", "GitHub Copilot"),
+  "the host's own name is no tool's word: a bot of the host is not grouped with GitHub Copilot (the security review's finding on #898)");
 const bot = (login, body = "") => ({ login, type: "Bot", body }), person = (body, login = "o") => ({ login, type: "User", body });
 const pulls = [
   { number: 3, login: "o", reviews: [bot("asked-reviewer[bot]")], comments: [person("@asked-reviewer review")] },
@@ -115,6 +117,9 @@ try {
   ok(/the proof: not read: no workflows folder was found here/.test(out), "a workflows folder missing outside a checkout's root leaves a private repository's proof not read (the security review's finding on #898)", out);
   fs.mkdirSync(path.join(scratch, "root", ".git"), { recursive: true });
   ok(read({ repo: "o/r", dir: path.join(scratch, "root", ".github", "workflows"), ask: gh(true), local: false }).billed === false, "and a checkout's root with none is not billed");
+  fs.mkdirSync(path.join(scratch, "root", ".github"));
+  fs.symlinkSync(path.join(scratch, "gone"), path.join(scratch, "root", ".github", "workflows"));
+  ok(read({ repo: "o/r", dir: path.join(scratch, "root", ".github", "workflows"), ask: gh(true), local: false }).billed === null, "a dangling link for the folder leaves the proof not read, never not billed");
   const printed = [];
   main(["--repo", "X/Y"], { say: l => printed.push(l), here: "o/r", ask: a => { if (a.join(" ") === "api repos/X/Y") return JSON.stringify({ private: true }); throw new Error("no gh"); } });
   main(["--repo", "O/R"], { say: l => printed.push(l), here: "o/r", ask: a => { if (a.join(" ") === "api repos/O/R") return JSON.stringify({ private: true }); throw new Error("no gh"); } });

@@ -49,10 +49,10 @@ export function tally(pulls, owner = null) {
   return { builders: order(builders), reviewers: order(reviewers), others };
 }
 
-// The tools that reviewed one pull request, each once: the attribution line closing a review, else a bot's login; and a
-// comment led "Security review:" or "Code review:" the same way.
+// The tools that reviewed one pull request, each once: a bot's review by its login, another by the attribution line
+// closing it; and a comment led "Security review:" or "Code review:" the same way.
 function reviewedBy(p, owner) {
-  const tool = x => closingToolOf(x?.body) ?? (x?.type === "Bot" ? String(x.login ?? "") : null);
+  const tool = x => (x?.type === "Bot" ? String(x.login ?? "") || null : closingToolOf(x?.body));
   const led = (p.comments ?? []).filter(c => LED.test(String(c?.body ?? "")));
   return new Set([...(p.reviews ?? []), ...led].filter(x => trusted(x, owner)).map(tool).filter(Boolean));
 }

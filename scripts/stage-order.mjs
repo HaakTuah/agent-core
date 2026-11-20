@@ -64,14 +64,23 @@ export function billedOf(priv, w) {
 const ELSEWHERE = Object.freeze({ testRunners: [], testLabels: [], unknown: true, unread: [], elsewhere: true });
 const NOWHERE = Object.freeze({ testRunners: [], testLabels: [], unknown: true, unread: [], nowhere: true });
 const NONE_HERE = Object.freeze({ testRunners: [], testLabels: [], unknown: false, unread: [] });
-const workflowsAt = (dir, parse) => (dir === null ? ELSEWHERE : fs.existsSync(dir) ? workflowsIn(dir, parse) : fs.existsSync(path.join(dir, "..", "..", ".git")) ? NONE_HERE : NOWHERE);
+function workflowsAt(dir, parse) {
+  if (dir === null) return ELSEWHERE;
+  try { fs.statSync(dir); return workflowsIn(dir, parse); } catch (e) {
+    // (only a path that is not there at all, no dangling link, is no folder; any other failure leaves it not read)
+    let link = false;
+    try { fs.lstatSync(dir); link = true; } catch { /* (not there) */ }
+    return e?.code === "ENOENT" && !link && fs.existsSync(path.join(dir, "..", "..", ".git")) ? NONE_HERE : NOWHERE;
+  }
+}
 
 /** Whether a reviewer, a tool by its attribution line's name or a bot by its login, is the tool `tool`: the same name in
- *  any case, or a login one of whose words is the tool's first word ("codex" of "Codex" in "chatgpt-codex-connector"). */
+ *  any case, or a login one of whose words is the tool's first word other than the host's name ("codex" of "Codex" in
+ *  "chatgpt-codex-connector", "copilot" of "GitHub Copilot"). */
 export function isTool(reviewer, tool) {
   const r = String(reviewer).toLowerCase(), t = String(tool).toLowerCase();
   if (r === t) return true;
-  const first = t.split(/[^a-z0-9]+/u).find(Boolean);
+  const first = t.split(/[^a-z0-9]+/u).find(w => w && w !== "github");
   return !!first && /\[bot\]$/u.test(r) && r.split(/[^a-z0-9]+/u).includes(first);
 }
 
