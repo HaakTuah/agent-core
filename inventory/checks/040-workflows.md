@@ -1,5 +1,5 @@
 - `scripts/workflows.mjs`, `scripts/yaml-keys.mjs`: fails a workflow or action in which the word `pull_request_target`
-  stands, and, through `scripts/yaml-keys.mjs`, one that gives a key twice. *Runs:* any session and the runners. *Else:*
+  stands, and, through `scripts/yaml-keys.mjs`, one that gives a key twice, and, run with `--core`, one that is no YAML to the core's own reader. *Runs:* any session and the runners. *Else:*
   zizmor (MIT, a program for each system, its audit `dangerous-triggers` among some 30), kept, tried above; actionlint
   (MIT, Go, its syntax check refusing a key given twice, and, where shellcheck is installed, each step's script), kept;
   yamllint's `key-duplicates`, dropped on fact: Python, and actionlint holds it. *Bugs:* 1. **Replace** with zizmor and

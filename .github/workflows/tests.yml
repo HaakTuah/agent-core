@@ -552,7 +552,7 @@ jobs:
       - name: Every module and role of the core says when it is read, in words the reading script matches
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/reading.mjs --check
-      - name: None of the core's own workflows names the forbidden trigger or gives a key twice
+      - name: None of the core's own workflows names the forbidden trigger, gives a key twice or is no YAML
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/workflows.mjs --core
       - name: What the core's own workflows and scripts use, each to its list

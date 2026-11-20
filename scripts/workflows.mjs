@@ -22,6 +22,8 @@
 // pull request is marked ready, the call runs on no head, and a ruleset counts the draft's skip as passed. As with a key
 // twice, a call the base's same file already held so is noted, each is noted with no base, and the sync's step "16
 // November 2026, checks once a pull request is ready" (steps.mjs, which reads it by draftHoles() below) names it.
+// In the core's own repository (`--core`) it also fails a workflow or an action that the core's own reader cannot read as
+// YAML at all, with its line (#994), where every other reader of workflows takes such a file for one with no steps.
 // And a line break that YAML 1.1 reads and the YAML package does not (U+0085, U+2028, U+2029: #872): a key given twice,
 // or a call left without ready_for_review, placed after one is not found by the package's reader, while a YAML 1.1
 // reader (YamlDotNet) reads it as a line end, so such a file fails where it is new or changed, and is noted where it is
@@ -56,6 +58,7 @@ import { DEEPEST, LONGEST, pruned, twice } from "./yaml-keys.mjs";
 import { loadSync, unreached } from "./packages.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
+import { parseYaml } from "./workflow-run.mjs";
 
 const WORD = "pull_request_target";
 const BREAK = "\\r\\n|[\\r\\n\\u0085\\u2028\\u2029]"; // every line break YAML 1.1 or 1.2 knows
@@ -374,6 +377,24 @@ export function unreadied(files, before) {
   return { fails, notes };
 }
 
+// The files, each { file, text }, that the core's own reader (workflow-run.mjs, parseYaml) cannot read, as { fails }, each a
+// line naming the file, the line and column the reader gives and its mend (#994): every other reader of workflows treats such
+// a file as one with no steps, so nothing else failed when a ": " inside an unquoted step name broke a whole workflow. Run
+// on the core's own workflows alone (`--core`), where nothing stood before to hold a file back against.
+export function unparsed(files) {
+  const fails = [];
+  for (const { file, text } of files) {
+    try { parseYaml(text); } catch (e) {
+      if (e?.code === "DUPLICATE_KEY") continue; // (repeated() below says it, with the first line's number)
+      const at = e?.linePos?.[0], first = String(e?.message ?? e).split("\n")[0].replace(/ at line \d+, column \d+:?$/u, "");
+      const mend = e?.code === "BLOCK_AS_IMPLICIT_KEY" ? "put the whole value in quotes, since a \": \" inside an unquoted value starts a mapping (name: \"The check: the line\")"
+        : e?.linePos ? "correct the YAML at that place as the line says (a tab, a bad indent, an unclosed quote), then run `node scripts/workflows.mjs --core` again" : "";
+      fails.push(`FAIL ${file}${at ? `:${at.line}:${at.col}` : ""}: not valid YAML, so GitHub runs none of it and every reader of workflows sees it with no steps (${e?.code ? `${e.code}: ` : ""}${first})${/Mend:/u.test(first) ? "" : `. Mend: ${mend || "make the file readable as the line says, then run `node scripts/workflows.mjs --core` again"}`}`);
+    }
+  }
+  return { fails };
+}
+
 if (started(import.meta.url)) {
   const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
@@ -405,9 +426,10 @@ if (started(import.meta.url)) {
   if (skipped) console.log("::warning::The check for a key given twice did not run, nor the one for a call a draft skips: the package yaml could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault");
   const against = core ? () => null : base ? show : null;
   const keys = skipped ? { fails: [], notes: [] } : repeated(texts, against), ready = skipped ? { fails: [], notes: [] } : unreadied(texts, against);
+  const bad = core && !skipped ? unparsed(texts) : { fails: [] }; // (the core's own files alone: a project's unreadable file is noted by the checks that cannot read it)
   const odd = foreignBroken(texts, against); // (no package is read for it, so it runs where the install did not)
-  for (const line of [...keys.notes, ...ready.notes, ...odd.notes, ...keys.fails, ...ready.fails, ...odd.fails]) console.log(logged(line));
-  failed += keys.fails.length + ready.fails.length + odd.fails.length;
+  for (const line of [...keys.notes, ...ready.notes, ...odd.notes, ...bad.fails, ...keys.fails, ...ready.fails, ...odd.fails]) console.log(logged(line));
+  failed += bad.fails.length + keys.fails.length + ready.fails.length + odd.fails.length;
   keys.notes.push(...ready.notes, ...odd.notes);
   console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} failing${keys.notes.length ? `, ${keys.notes.length} noted` : ""}${failed ? ". Mend: mend each line above as it says" : ""}`);
   process.exit(failed ? 1 : 0);
