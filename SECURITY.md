@@ -91,10 +91,12 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      checks and the reader of where the tests run (`scripts/licences.mjs`, `scripts/exact-versions.mjs`,
      `scripts/nuget.mjs`, `scripts/workflows.mjs`, `scripts/agent-tools.mjs`, `scripts/runners.mjs`), the reader of a
      project's own workflows (`scripts/workflow-run.mjs`, for `check.mjs`, `check-configs.mjs` and `steps.mjs`) and the
-     sync's move of the pins (`scripts/sync.mjs`); limits: 64 MB of a file for the licence check (256 MB for NuGet's), 1
+     sync's move of the pins (`scripts/sync.mjs`); limits: 60 s for each of the workflow check's two tools on one file
+     (zizmor and actionlint, `scripts/workflow-tools.mjs`, each file run on its own, one a tool stops on or cannot load said
+     as a finding with its mend, and neither run in a session), 64 MB of a file for the licence check (256 MB for NuGet's), 1
      MB of an action and 5,000 steps of a workflow, 256 K characters of a workflow for the readers of its YAML (past it,
      said unread with its mend, never given to the parser, and `parseYaml` throws it with its mend; such a file
-     unchanged from the base is only noted, its own keys given twice and calls left without ready_for_review unread, and
+     unchanged from the base is only noted, its calls left without ready_for_review unread, and
      one a pull request changes fails, and is read as new once cut under it), 60 s for git's filters, 64 MB of a
      workflow for the move of the pins, past which it is reported unread, and 256 KB of a workflow for the reader of
      where the tests run, past which, through a link that leads out of the checkout, or where it is no file of bytes, it

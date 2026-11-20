@@ -11,6 +11,18 @@
     "tests/mutation/package-lock.json"
   ],
   "past": {
+    ".github/workflows/core.yml": {
+      "mark": 32543,
+      "why": "One job that each project calls pinned, holding the core's checks that need no secret as its steps (#376, #377): GitHub reads a job as one file, and a split into a second called workflow would start a second job, which bills a whole minute on a private repository's free plan"
+    },
+    "tests/copy-left-out-test.mjs": {
+      "mark": 27600,
+      "why": "One list's test: each check of the copy staged inside it and outside it on the scratch project they share; split by check, each file would write that project again and add to the suite's time"
+    },
+    "tests/mend-test.mjs": {
+      "mark": 20604,
+      "why": "One table of every check and the test that reads its failures, read whole against the workflows that name the scripts; split in two, a script could stand in neither half and go unread"
+    },
     ".github/workflows/personal-terms.yml": {
       "mark": 32432,
       "why": "One job that every project calls pinned, its step holding the secret: its shell stays inline so that nothing the pull request checks out runs beside the terms, and a local action or script would be the caller's checkout, not the core's. A session reads the part it changes by its comment, found by searching."
@@ -285,11 +297,11 @@
     },
     "scripts/workflows.mjs": {
       "mark": 26933,
-      "why": "One check's readers (the word, the keys given twice, the calls a draft skips, the line breaks) that all read the same texts against the same base through the one baseOf(); a task that changes one reads how the others count against the base, so a split would make it open each part."
+      "why": "One check's readers (the word, the calls a draft skips, the line breaks, the tools' findings against the base) that all read the same texts against the same base through the one baseOf(); a task that changes one reads how the others count against the base, so a split would make it open each part."
     },
     "tests/workflows-test.mjs": {
-      "mark": 57789,
-      "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."
+      "mark": 74117,
+      "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md). The cases of workflow-tools.mjs, a script of its own, are to move to a file of their own: #1017."
     }
   }
 }
