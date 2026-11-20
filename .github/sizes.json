@@ -11,6 +11,14 @@
     "tests/mutation/package-lock.json"
   ],
   "past": {
+    ".github/workflows/personal-terms.yml": {
+      "mark": 32432,
+      "why": "One job that every project calls pinned, its step holding the secret: its shell stays inline so that nothing the pull request checks out runs beside the terms, and a local action or script would be the caller's checkout, not the core's. A session reads the part it changes by its comment, found by searching."
+    },
+    "tests/personal-terms-test.mjs": {
+      "mark": 38816,
+      "why": "#929: the cases of how Betterleaks reads apart from what the check reads."
+    },
     ".github/workflows/tests.yml": {
       "mark": 55491,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
@@ -166,6 +174,10 @@
     "tests/core-path-test.mjs": {
       "mark": 25409,
       "why": "#919: its cases for a core a library carries, and for the commands its hooks run, move to a file of their own."
+    },
+    "scripts/staged/scratch.mjs": {
+      "mark": 43378,
+      "why": "#938: the sealed reader of what a session left apart from the set-up of a case and the readers' helpers."
     },
     "tests/staged-test.mjs": {
       "mark": 125729,

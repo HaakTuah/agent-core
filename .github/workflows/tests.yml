@@ -477,6 +477,9 @@ jobs:
       - name: What holds each rule of the floor and the modules, read
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/holders-test.mjs ')) }}
         run: node tests/holders-test.mjs
+      - name: The rules of a commit, read once for each case set from it
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/rules-test.mjs ')) }}
+        run: node tests/rules-test.mjs
       - name: A rule's reasons, printed in one step
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/reasons-test.mjs ')) }}
         run: node tests/reasons-test.mjs
