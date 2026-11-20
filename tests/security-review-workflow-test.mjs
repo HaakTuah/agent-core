@@ -12,6 +12,7 @@ import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { CORE } from "../scripts/core-address.mjs";
 import { checkoutStandIn, root, scratchDir, scratchEnv, tally } from "../scripts/scratch-core.mjs";
 import { parseYaml, runWorkflow } from "../scripts/workflow-run.mjs";
 
@@ -151,7 +152,7 @@ ok([changed, renamed, cut].every((r) => held(r) && !r.gets.some((g) => g.include
   "  and one that changes the script, renames it away, or whose list of files is cut short, without reading the head's copy", [changed, renamed, cut].map(show).join("\n"));
 
 // ---- the sync-shape filter (P5) ----
-const manifest = (p) => ({ filename: "core-manifest.md", patch: p ? `@@ -3 +3 @@\n-Core: HaakTuah/agent-core at ${sha("a")}, copied whole under ${p} by a sync\n+Core: HaakTuah/agent-core at ${sha("b")}, copied whole under ${p} by a sync` : "" });
+const manifest = (p) => ({ filename: "core-manifest.md", patch: p ? `@@ -3 +3 @@\n-Core: ${CORE} at ${sha("a")}, copied whole under ${p} by a sync\n+Core: ${CORE} at ${sha("b")}, copied whole under ${p} by a sync` : "" });
 const shaped = (r) => r.passed && /pure sync/u.test(r.out);
 const atCore = run({ files: [manifest(), { filename: "core/scripts/x.mjs" }, { filename: ".github/workflows/core.yml" }] });
 const atPath = run({ files: [manifest("vendor/core/"), { filename: "vendor/core/scripts/x.mjs" }] });
