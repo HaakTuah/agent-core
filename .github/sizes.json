@@ -215,10 +215,6 @@
       "mark": 33431,
       "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
-    "tests/comment-only-test.mjs": {
-      "mark": 32403,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
-    },
     "tests/core-yml-test.mjs": {
       "mark": 22488,
       "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
