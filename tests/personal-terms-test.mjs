@@ -23,9 +23,10 @@
 // over, a term beside its ignore and config files, a term holding a pattern's characters, matched as listed, a file
 // whose name puts a binary type's mark where it reads one, a term on any line of a long run or across a long line's
 // pieces, since it reads in chunks; a term in
-// base64 passes, as before; and where Betterleaks cannot be built (no Go, no sum for the machine's system), where a
-// build fails, or where a kept copy differs from its sum, the check fails saying the mend, that copy never run. The terms are invented, built from pieces as the test runs, so no file holds them. On Linux and on
-// Windows. Git, bash, Go and Node's own modules.
+// base64 passes, as before; and where Betterleaks was not fetched at its pin (no pin for the machine's system, a release
+// that cannot be downloaded), the check fails saying the mend, a kept copy that differs from its sum never run. The terms
+// are invented, built from pieces as the test runs, so no file holds them. On Linux and on Windows. Git, bash, curl and
+// Node's own modules, and the network to Betterleaks' releases on github.com, from which the check's own step fetches it.
 //
 //   node tests/personal-terms-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -52,7 +53,11 @@ const bash = (script, extra = {}) => spawnSync("bash", ["-c", script], { env: { 
 const signer = path.join(tmp, "signer"), stranger = path.join(tmp, "other-signer"), stubs = path.join(tmp, "stubs");
 const keyFile = path.join(tmp, "web-flow.gpg");
 fs.mkdirSync(stubs);
-fs.writeFileSync(path.join(stubs, "curl"), `#!/bin/sh\n[ -f "$STAND_IN_KEY" ] || exit 22\ncat "$STAND_IN_KEY"\n`, { mode: 0o755 });
+// (the stand-in serves GitHub's key alone, and hands any other fetch, Betterleaks' release, to the machine's own curl,
+// save where a case has it fail)
+const isFile = f => { try { return fs.statSync(f).isFile(); } catch { return false; } };
+const realCurl = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(Boolean).flatMap(d => ["curl", "curl.exe"].map(c => path.join(d, c))).find(isFile);
+fs.writeFileSync(path.join(stubs, "curl"), `#!/bin/sh\ncase "$*" in *web-flow.gpg*) [ -f "$STAND_IN_KEY" ] || exit 22; cat "$STAND_IN_KEY"; exit 0 ;; esac\n[ -z "$FETCH_FAILS" ] || exit 22\nexec '${(realCurl ?? "curl").replace(/\\/g, "/")}' "$@"\n`, { mode: 0o755 });
 const makeKey = (home, who) => { fs.mkdirSync(home, { mode: 0o700 }); return bash(`gpg -q --batch --pinentry-mode loopback --passphrase '' --quick-gen-key '${who}' ed25519 sign never`, { GNUPGHOME: home }).status === 0; };
 const signedBy = (home, key) => ({ GNUPGHOME: home, GIT_CONFIG_COUNT: "3", GIT_CONFIG_KEY_0: "commit.gpgSign", GIT_CONFIG_VALUE_0: "true", GIT_CONFIG_KEY_1: "gpg.program", GIT_CONFIG_VALUE_1: "gpg", GIT_CONFIG_KEY_2: "user.signingKey", GIT_CONFIG_VALUE_2: key });
 process.on("exit", () => { for (const home of [signer, stranger]) bash("gpgconf --kill all", { GNUPGHOME: home }); });
@@ -95,18 +100,16 @@ function pull(commits, onMain = []) {
 }
 // The check's verdict, with the pull request checked out as GitHub merges it into the base's tip; the event names
 // `eventBase`, the tip itself unless an older base is given.
-function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", branch = "change", stale = false, key = keyFile, isPrivate = false, opener = null, locale = null, go = null, store = null, noGo = false } = {}) {
+function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", branch = "change", stale = false, key = keyFile, isPrivate = false, opener = null, locale = null, store = null, fetchFails = false, more = null } = {}) {
   const tip = git(dir, ["rev-parse", "main"]);
   git(dir, ["checkout", "-q", "--detach", "main"]);
   git(dir, ["merge", "-q", "--no-ff", "--no-edit", "change"], { ...GITHUB, ...(opener ? { GIT_AUTHOR_NAME: opener } : {}) });
   const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, head: { ref: branch }, base: { sha: stale ? first : tip } }, repository: { private: isPrivate } } };
-  const PATH = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(d => !noGo || !goDirs.includes(d)).join(path.delimiter);
-  const base = { ...env, ...ME, ...(locale ? { LC_ALL: locale } : {}), ...(store ? { TMPDIR: store } : {}), STAND_IN_KEY: key, PATH: `${go ? `${go}${path.delimiter}` : ""}${stubs}${path.delimiter}${PATH}` };
-  const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {}, "actions/cache": () => {} }, temp: tmp });
+  const PATH = env.PATH ?? env.Path ?? "";
+  const base = { ...env, ...ME, ...(locale ? { LC_ALL: locale } : {}), ...(store ? { TMPDIR: store } : {}), ...(fetchFails ? { FETCH_FAILS: "1" } : {}), STAND_IN_KEY: key, PATH: `${more ? `${more}${path.delimiter}` : ""}${stubs}${path.delimiter}${PATH}` };
+  const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {} }, temp: tmp });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
-// (the folders of the PATH that hold Go, which a run with no Go leaves out)
-const goDirs = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(d => d && ["go", "go.exe"].some(g => fs.existsSync(path.join(d, g))));
 // (never printed in any case: GitHub's masking of the secret matches its case exactly)
 const fails = (what, repo, opts) => { const r = check(repo, opts); ok(!r.passed && mended(r.out) && ![term, other, wide].some(t => r.out.toLowerCase().includes(t.toLowerCase())), `${what} fails, and the term is never printed`, r.out); };
 const passes = (what, repo, opts) => { const r = check(repo, opts); ok(r.passed, `${what} passes`, r.out); };
@@ -317,28 +320,19 @@ const starts = [20000 - term.length + 1, 20000 - 2, 20000, step + 20000 - term.l
 const longLines = starts.map(st => `${"z".repeat(st - 1)}${term}${"z".repeat(60000 - st - term.length + 1)}`);
 const widest = check(pull([[{ "wide.txt": `${longLines.join("\n")}\n` }]]));
 ok(!widest.passed && starts.every((_, i) => new RegExp(`^wide\\.txt:${i + 1}$`, "mu").test(widest.out)), "a term across each edge of the pieces a line of 60,000 characters is cut in is named on its line", widest.out.split("\n").filter(l => l.startsWith("wide.")).join(" "));
-// Betterleaks at its pin: where it cannot be built (no Go, no sum for the machine's system), the check fails, saying the
-// mend, since it guards what may not leak; a build that fails, and a kept copy that differs from its sum, fail, and that copy never
-// runs (a go of the test's own stands in for Go)
-const goStub = (name, script) => { const d = path.join(tmp, `go-${name}`); fs.mkdirSync(d); fs.writeFileSync(path.join(d, "go"), `#!/bin/sh\n${script}\n`, { mode: 0o755 }); return d; };
-const unbuilt = (what, opts, words) => { const r = check(pull([[{ "b.md": `${term}\n` }]]), opts); ok(!r.passed && mended(r.out) && r.out.includes(words) && r.out.includes("so nothing was read") && !r.out.includes(term), `${what}: it fails, saying the mend, never passing unread (Codex's security finding on #656)`, r.out); };
-// (where a folder that holds Go holds git or bash too, no run can leave Go out alone, and the case is not tried)
-const besideGo = ["git", "git.exe", "bash", "bash.exe"];
-if (goDirs.some(d => besideGo.some(b => fs.existsSync(path.join(d, b))))) console.log("note Go stands beside git or bash here, so a run with no Go is not tried");
-else unbuilt("where no Go is at hand", { noGo: true }, "no Go is at hand");
-const mute = check(pull([[{ "b.md": `${term}\n` }]]), { go: goStub("mute", "exit 1") });
-ok(!mute.passed && mended(mute.out) && mute.out.includes("could not say the machine's system"), "where Go is there and cannot say the machine's system, the check fails saying the mend, never passing", mute.out);
-// a go.mod of the pull request's own that asks for a toolchain no one has changes nothing (Codex's finding on #656)
-fails("a term beside a go.mod that asks for a toolchain that does not exist", pull([[{ "go.mod": "module example.invalid/x\n\ngo 1.999.0\n", "b.md": `x ${term}\n` }]]));
-unbuilt("where no sum stands for the machine's system", { go: goStub("plan9", 'case "$1" in env) printf "plan9\\n386\\n" ;; *) exit 1 ;; esac') }, "no sum stands in this check for a build on plan9/386");
-const failing = goStub("failing", 'case "$1" in env) printf "linux\\namd64\\n" ;; *) echo "go: no network here" >&2; exit 1 ;; esac');
-const sum = /linux\/amd64\/\) sum=([0-9a-f]{64})/.exec(workflow)?.[1], version = /version=(\S+)/.exec(workflow)?.[1];
-const keptTool = path.join(tmp, "kept"), keptDir = path.join(keptTool, "agent-core-tools", `betterleaks-${version}-${sum}`), ran = path.join(tmp, "kept-ran");
+// Betterleaks at its pin: where it was not fetched (no pin for the machine's system, a release that cannot be
+// downloaded), the check fails, saying the mend, since it guards what may not leak (Codex's security finding on #656),
+// and a kept copy that differs from its sum never runs (a uname of the test's own stands in for another system)
+const unfetched = (what, opts, words, also = () => true) => { const r = check(pull([[{ "b.md": `${term}\n` }]]), opts); ok(!r.passed && mended(r.out) && r.out.includes(words) && r.out.includes("was not fetched at its pin") && r.out.includes("so nothing was read") && !r.out.includes(term) && also(), `${what}: it fails, saying the mend, never passing unread`, r.out); };
+const otherSystem = path.join(tmp, "plan9");
+fs.mkdirSync(otherSystem);
+fs.writeFileSync(path.join(otherSystem, "uname"), `#!/bin/sh\ncase "$1" in -s) echo Plan9 ;; -m) echo 386 ;; *) echo Plan9 ;; esac\n`, { mode: 0o755 });
+unfetched("where no pin stands for the machine's system", { more: otherSystem }, "no pin stands in this check for Plan9/386");
+const sum = /Linux\/x86_64\) file=\S+ archive=[0-9a-f]{64} sum=([0-9a-f]{64})/.exec(workflow)?.[1], version = /version=(\S+)/.exec(workflow)?.[1];
+const keptTool = path.join(tmp, "kept"), keptDir = path.join(keptTool, "agent-core-tools", `betterleaks-${version}`), ran = path.join(tmp, "kept-ran");
 fs.mkdirSync(keptDir, { recursive: true });
-fs.writeFileSync(path.join(keptDir, "betterleaks"), `#!/bin/sh\ntouch '${ran}'\n`, { mode: 0o755 });
-const notBuilt = check(pull([[{ "b.md": "x\n" }]]), { go: failing, store: keptTool });
-ok(sum && !notBuilt.passed && mended(notBuilt.out) && notBuilt.out.includes("could not be built here at its pin") && !fs.existsSync(ran),
-  "where Betterleaks cannot be built at its pin, the check fails saying the mend, and a kept copy that differs from its sum never runs", notBuilt.out);
+for (const name of ["betterleaks", "betterleaks.exe"]) fs.writeFileSync(path.join(keptDir, name), `#!/bin/sh\ntouch '${ran}'\n`, { mode: 0o755 });
+unfetched("where its release cannot be downloaded, a kept copy that differs from its sum beside it", { store: keptTool, fetchFails: true }, "could not be downloaded", () => sum && !fs.existsSync(ran));
 const tooLong = check(pull([[{ "b.md": "x\n" }]]), { terms: `${term}\n${"q".repeat(2001)}\n` });
 ok(!tooLong.passed && mended(tooLong.out) && tooLong.out.includes("longer than 2,000 bytes") && !tooLong.out.includes(term), "a term longer than the check can read whole fails, saying the mend, never hanging", tooLong.out);
 const none = check(pull([[{ "b.md": `${term}\n` }]]), { terms: "" });

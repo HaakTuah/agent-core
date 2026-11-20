@@ -226,7 +226,6 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
       } else if (w.ref) git(ws, "checkout", "-q", "--detach", git(ws, "rev-parse", `origin/${w.ref}`));
     },
     "actions/setup-node": () => {}, // (the Node this test runs on is the core's own, in CI)
-    "actions/cache": () => {}, // (the personal-terms check's Betterleaks, kept between runs: here the step builds it, or finds it kept)
     "actions/dependency-review-action": () => false,
     "github/codeql-action/init": () => false,
     "github/codeql-action/analyze": () => false,

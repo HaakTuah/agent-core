@@ -25,11 +25,11 @@
 # by chance and is no one's personal information, while the rest of the link and of its line is read (#261). Each failure says how the session takes the term out, one the project held before the
 # check read it too: of what a project held before a check read more, a listed term alone fails rather than being
 # reported (core archive 207). What is read is gathered by git and this file, and the terms are matched in it by
-# Betterleaks, a maintained scanner of text (MIT), at one exact version built from its source and checked by its sums
-# (floor rule 7), each term a rule of its own written as the job runs and removed with it, letter case aside, nothing of
-# the scanner's own rules, ignore files, inline marks, decoding or archives used (#579; INVENTORY.md); on a machine where
-# it cannot be built (no Go, or no sum below for its system; never GitHub's runners) the check fails, saying how to
-# mend it. Without the secret (a fork, Dependabot, a project that has not set it) it passes with a note that nothing
+# Betterleaks, a maintained scanner of text (MIT), at one exact version fetched from its releases at set-up and checked
+# by its sums (floor rule 7), each term a rule of its own written as the job runs and removed with it, letter case aside,
+# nothing of the scanner's own rules, ignore files, inline marks, decoding or archives used (#579; INVENTORY.md); where
+# it could not be fetched (no network to its releases, or no pin below for the machine's system) the check fails, saying
+# how to mend it. Without the secret (a fork, Dependabot, a project that has not set it) it passes with a note that nothing
 # was checked: the check is optional. It checks this repository, and every project that takes the core calls it (workflow_call), pinned to a full
 # commit SHA (README.md, point 5), passing only that secret: the caller's event, checkout and token are the caller's own.
 name: Personal terms
@@ -62,13 +62,54 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      # (Betterleaks as the step below builds it, kept between runs so that a run need not build it again: what is
-      # restored runs only once the step has checked it against its SHA-256, as it checks a build of its own; the key
-      # names the version and the toolchain the step pins, and moves with them)
-      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
-        with:
-          path: /tmp/agent-core-tools
-          key: betterleaks-1.10.1-go1.26.11-${{ runner.os }}-${{ runner.arch }}
+      # (Betterleaks, which matches the terms, fetched before any term is read, as its own program (AGENTS.md, "A tool
+      # that only runs is fetched at set-up"; #579): one exact version, the release archive for the machine's system
+      # from Betterleaks' own releases, the archive and the program in it each checked against the SHA-256 written here
+      # (the archive's as its checksums.txt publishes it), kept under the system's temporary folder, outside the
+      # repository, and checked again by the step after before it runs. Only where the terms are set; where it cannot be
+      # fetched, this step says why and the step after fails, never passing unread. A new pin moves the version and
+      # every sum at once)
+      - name: Fetch Betterleaks
+        id: betterleaks
+        env:
+          WANTED: ${{ secrets.PERSONAL_TERMS != '' }}
+        run: |
+          if [ "$WANTED" != true ]; then echo "PERSONAL_TERMS is not set here, so Betterleaks is not fetched."; exit 0; fi
+          version=1.10.1 exe=
+          case $(uname -s)/$(uname -m) in
+            Linux/x86_64) file=linux_x64.tar.gz archive=c174b42d7aa60caf58c0c3e555c0e4bed01fe6b0d99a412bce777b5af4ce913e sum=506082605cad984abd6ecf979a5f00fd6d701bc3ab2104a6029b1d068b3e320c ;;
+            Linux/aarch64 | Linux/arm64) file=linux_arm64.tar.gz archive=62a63199f9f61a6b5e5a6f58f048493db20fbc8c770014f4d903a4d97886e1bf sum=a83657a5747c35ed35e0ef9a8a3d60ded4b29713e27856c2fbe7c63a1b972cb0 ;;
+            Darwin/x86_64) file=darwin_x64.tar.gz archive=1ae2e3885d161918d8ad2e911e205e73f0d9ffba52c85b38126586c52d355ef4 sum=d09400141ae0a155666f22ab974cff27c409c2c968445f7f0fc5958c4c5de62b ;;
+            Darwin/arm64) file=darwin_arm64.tar.gz archive=ca91eb3b006f15478411f235b5e2712fb15cea74f6701ebadc2364efe0af1403 sum=13ac5109fa85a590c7ba6e7f130311e0c60a2bf582c3aac073176c93b46621a8 ;;
+            MINGW*/x86_64 | MSYS*/x86_64 | CYGWIN*/x86_64) file=windows_x64.zip exe=.exe archive=53d4b37635a999992fb8e1d79f8215279315cbb3b4139314289b69407e79143d sum=d9946b77870a30838f9a6a3591ea45c9c6530abfb0cf3890d2046b3d42816049 ;;
+            MINGW*/aarch64 | MINGW*/arm64 | MSYS*/aarch64 | MSYS*/arm64 | CYGWIN*/aarch64 | CYGWIN*/arm64) file=windows_arm64.zip exe=.exe archive=f93d26dfc7b939f967c74e3f908b44faec1b1cb6ffb29c75c0a1d7e713ab8f70 sum=ed9ee26a6f1a8d7f042712e524802911e23fd1b1cb0561ecb606b4faab5882d4 ;;
+            *) echo "Betterleaks $version is not fetched: no pin stands in this check for $(uname -s)/$(uname -m)."; exit 0 ;;
+          esac
+          digest() { { sha256sum -- "$1" 2> /dev/null || shasum -a 256 -- "$1" 2> /dev/null; } | cut -c1-64; }
+          store="${TMPDIR:-/tmp}/agent-core-tools/betterleaks-$version" bl="betterleaks$exe"
+          # (one kept from an earlier run is taken only where it holds its sum; otherwise it is fetched again, into a
+          # folder of this run's own, the archive and then the program checked before it is kept)
+          if [ "$(digest "$store/$bl")" != "$sum" ]; then
+            dir=$(mktemp -d) || { echo "Betterleaks $version is not fetched: no temporary folder could be made."; exit 0; }
+            if (cd "$dir" && curl -fsSL --proto =https --proto-redir =https --connect-timeout 30 --max-time 300 --retry 2 -o archive \
+                "https://github.com/betterleaks/betterleaks/releases/download/v$version/betterleaks_${version}_$file" \
+              && [ "$(digest archive)" = "$archive" ] \
+              && case $file in
+                   *.zip) if command -v unzip > /dev/null 2>&1; then unzip -q archive "$bl"
+                          else powershell -NoProfile -NonInteractive -Command "Expand-Archive -LiteralPath archive -DestinationPath out" && mv out/"$bl" .; fi ;;
+                   *) tar -xzf archive "$bl" ;;
+                 esac \
+              && [ "$(digest "$bl")" = "$sum" ] \
+              && mkdir -p "$store" && cp "$bl" "$store/new.$$" && chmod 755 "$store/new.$$" && mv -f "$store/new.$$" "$store/$bl") > "$dir/log" 2>&1; then :
+            else
+              echo "Betterleaks $version is not fetched: its release for $(uname -s)/$(uname -m) could not be downloaded, or differs from its sum here. Of the fetch:"
+              tail -n 5 "$dir/log" 2> /dev/null; echo "the archive's SHA-256: $(digest "$dir/archive")"
+              rm -rf "$dir"; exit 0
+            fi
+            rm -rf "$dir"
+          fi
+          echo "Betterleaks $version: $store/$bl, its SHA-256 $sum"
+          { echo "path=$store/$bl"; echo "sum=$sum"; } >> "$GITHUB_OUTPUT"
       - name: Look for personal terms
         env:
           TERMS: ${{ secrets.PERSONAL_TERMS }}
@@ -76,6 +117,8 @@ jobs:
           BODY: ${{ github.event.pull_request.body }}
           BRANCH: ${{ github.event.pull_request.head.ref }}
           BASE: ${{ github.event.pull_request.base.sha }}
+          BETTERLEAKS: ${{ steps.betterleaks.outputs.path }}
+          BETTERLEAKS_SUM: ${{ steps.betterleaks.outputs.sum }}
         run: |
           if [ -z "$TERMS" ]; then echo "::notice::PERSONAL_TERMS is not set here, so nothing was checked."; exit 0; fi
           # (a pipeline's last command in this shell, so that what it sets stays set)
@@ -86,59 +129,13 @@ jobs:
           printf '%s\n' "$TERMS" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' > "$list"
           if [ ! -s "$list" ]; then echo "::notice::PERSONAL_TERMS holds no term, so nothing was checked."; rm -rf "$work"; exit 0; fi
           found=0
-          # (Betterleaks, which matches the terms: one exact version, built by Go from its source on Go's own module
-          # proxy by the toolchain pinned here, the source checked against its sum here and both against Go's checksum
-          # database, and the build against the SHA-256 written here for the machine's system, which the same source
-          # and toolchain always give; kept between runs under the system's temporary folder, and checked each time it
-          # runs; where no Go is at hand, or no sum stands here for the machine's system, the check fails, saying so,
-          # since it guards what may not leak (floor rule 14). A new pin moves the version, the toolchain, every sum and the cache's key above at once)
-          version=1.10.1 module=github.com/betterleaks/betterleaks toolchain=go1.26.11
-          source='h1:w7AL/I3ygUzxoPTvTniTtMMWDAnZRTrIiBebc/L+E2o='
-          # (the machine's system, as Go names it, asked outside the checkout and of the machine's own Go alone, so that
-          # nothing the pull request holds, a go.mod asking for another toolchain among it, changes the answer; a Go that
-          # is there and cannot say fails the check, never passes it)
-          system=
-          if command -v go > /dev/null 2>&1; then
-            system=$(cd "$work/none" && GOTOOLCHAIN=local GOENV=off GOFLAGS= GOWORK=off go env GOHOSTOS GOHOSTARCH 2> /dev/null | tr -d '\r' | tr '\n' /)
-            case $system in */*/) ;; *)
-              echo "FAIL Go is here but could not say the machine's system, so Betterleaks, which matches the terms, was not built and nothing was read. Mend: run the check again; where it fails again, see what \"go env GOHOSTOS GOHOSTARCH\" says outside the checkout, and report it to the core (core/README.md, \"Reporting to the core\")."
-              rm -rf "$work"; exit 1 ;;
-            esac
-          fi
-          case $system in
-            linux/amd64/) sum=5fbada3035618b380df0d07e1b766f31b2692df2fb1fb9eabbbf1bed6e3ef0e9 ;;
-            linux/arm64/) sum=ea4f1d6bf2b89858dc8d6f0d8cfba172f7031559a67c0205258ea6fef4bcb485 ;;
-            windows/amd64/) sum=1572b357cb6b8d56f26f0fac81ba8b5d3eafec064f4fed6033d63c596867a6c6 ;;
-            darwin/arm64/) sum=eb8b28e0eaac1536bd1311c775dbc58d9d9bc2beb7a77fdeb5beefdeb89bf2ff ;;
-            *) sum= ;;
-          esac
-          if [ -z "$sum" ]; then
-            echo "FAIL Betterleaks, which matches the terms, is built here by Go, and ${system:+no sum stands in this check for a build on ${system%/}}${system:-no Go is at hand}, so nothing was read. Mend: run the check where Go 1.21 or later is at hand (go.dev/dl) on Linux, Windows or macOS on Apple silicon, as on GitHub's runners; the check guards what may not leak, so it never passes unread."
-            rm -rf "$work"; exit 1
-          fi
-          exe=; case $system in windows/*) exe=.exe ;; esac
-          store="${TMPDIR:-/tmp}/agent-core-tools/betterleaks-$version-$sum" bl="$work/betterleaks$exe"
+          # (Betterleaks, as the step before fetched it: copied into this run's own folder and run only where the copy
+          # holds the sum that step checked it by, so that one changed after that step never runs; where that step
+          # fetched none, the check fails, since it guards what may not leak (floor rule 14))
           digest() { { sha256sum -- "$1" 2> /dev/null || shasum -a 256 -- "$1" 2> /dev/null; } | cut -c1-64; }
-          # (the build, in a folder of this run's own, Go's settings all given here so that none of the machine's own
-          # changes what is fetched or built, put in the store only where its sum holds)
-          built() {
-            local go="$work/go" info
-            mkdir -p "$go" "$store" || return 1
-            local with=(GOPATH="$go/path" GOMODCACHE="$go/path/pkg/mod" GOCACHE="$go/cache" GOBIN="$go/bin" GOENV=off
-              GOTOOLCHAIN="$toolchain" GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org GONOSUMDB= GONOPROXY=
-              GOPRIVATE= GOINSECURE= GOFLAGS= GOWORK=off CGO_ENABLED=0 GOAMD64=v1 GOARM64=v8.0 GOEXPERIMENT=)
-            info=$(cd "$go" && env "${with[@]}" go mod download -json "$module@v$version" 2>> "$go/log") \
-              && printf '%s\n' "$info" | grep -q -F -e "\"Sum\": \"$source\"," \
-              && (cd "$go" && env "${with[@]}" go install -trimpath -ldflags='-s -w' "$module@v$version" 2>> "$go/log") \
-              && [ "$(digest "$go/bin/betterleaks$exe")" = "$sum" ] \
-              && cp "$go/bin/betterleaks$exe" "$store/new.$$" && mv -f "$store/new.$$" "$store/betterleaks$exe"
-            local ok=$?
-            [ "$ok" = 0 ] || { echo "Of the build:"; tail -n 5 "$go/log" 2> /dev/null; echo "the source's sum, as Go read it: $(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*"Sum": "\(.*\)",$/\1/p')"; echo "the build's SHA-256: $(digest "$go/bin/betterleaks$exe")"; }
-            chmod -R u+w "$go" 2> /dev/null; rm -rf "$go"
-            return "$ok"
-          }
-          if { [ "$(digest "$store/betterleaks$exe")" = "$sum" ] || built; } && cp "$store/betterleaks$exe" "$bl" && [ "$(digest "$bl")" = "$sum" ]; then :; else
-            echo "FAIL Betterleaks $version, which matches the terms, could not be built here at its pin, so nothing was read. Mend: run the check again; where it fails again, with Go's module proxy (proxy.golang.org) reached and a sum that differs from this check's, report it to the core (core/README.md, \"Reporting to the core\")."
+          bl="$work/${BETTERLEAKS##*/}"
+          if [ -z "$BETTERLEAKS" ] || [ -z "$BETTERLEAKS_SUM" ] || ! cp -- "$BETTERLEAKS" "$bl" 2> /dev/null || [ "$(digest "$bl")" != "$BETTERLEAKS_SUM" ]; then
+            echo "FAIL Betterleaks, which matches the terms, was not fetched at its pin (the step \"Fetch Betterleaks\" says why), so nothing was read. Mend: run the check again; where it fails again, run it where Betterleaks' releases on github.com can be reached, on Linux, macOS or Windows, on x64 or arm64, as on GitHub's runners; the check guards what may not leak, so it never passes unread."
             rm -rf "$work"; exit 1
           fi
           # (its rules: each term a rule of its own, matched as it is written, letter case aside (\Q to \E, a \E in a
