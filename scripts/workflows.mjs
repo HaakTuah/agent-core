@@ -25,7 +25,11 @@
 // And a line break that YAML 1.1 reads and the YAML package does not (U+0085, U+2028, U+2029: #872): a key given twice,
 // or a call left without ready_for_review, placed after one is not found by the package's reader, while a YAML 1.1
 // reader (YamlDotNet) reads it as a line end, so such a file fails where it is new or changed, and is noted where it is
-// unchanged from the base or no base is told, as a key given twice is (foreignBreaks() below).
+// unchanged from the base or no base is told, as a key given twice is (foreignBreaks() below), and the sync's step "20
+// November 2026, no workflow holds a line break the YAML package does not read" (steps.mjs) names each file with one.
+// What stands behind such a break is read as a YAML 1.1 reader reads it, in the file and in the base alike: each of the
+// three is read as an LF for the keys and the calls, so a key given twice or a call left without ready_for_review
+// behind one is found, noted where the base held it, and told on the line an editor counts (keysTwice() below; #876).
 // What it does not chase: a value given as binary (a YAML tag) holds a word no search can see, and a tag can itself be
 // spelled in more ways than a search can follow. GitHub's own workflow reader refuses a binary value where a trigger
 // belongs, so that is no way to write one; the reviews hold it, as they hold any odd tag in a workflow.
@@ -97,6 +101,24 @@ export function foreignBreaks(text) {
   return first && { ...first, count };
 }
 
+// A text as a YAML 1.1 reader reads it: each of the three breaks an LF, as { text, line }, with `line` telling a line of
+// that text as the line an editor counts, which the three do not end (#876). A text with none is itself.
+export function asLF(text) {
+  text = String(text);
+  if (!/[\u0085\u2028\u2029]/u.test(text)) return { text, line: n => n };
+  const at = [0, 1];
+  let editor = 1;
+  for (const m of text.matchAll(/\r\n?|\n|[\u0085\u2028\u2029]/gu)) { if (!/^[\u0085\u2028\u2029]$/u.test(m[0])) editor++; at.push(editor); }
+  return { text: text.replace(/[\u0085\u2028\u2029]/gu, "\n"), line: n => at[n] ?? n };
+}
+
+// The keys given twice in a text (yaml-keys.mjs, twice()) read as a YAML 1.1 reader reads its line breaks, each on the line an
+// editor counts (#876).
+export function keysTwice(text) {
+  const { text: folded, line } = asLF(text);
+  return twice(folded).map(found => ({ ...found, line: line(found.line), first: found.first === null ? null : line(found.first) }));
+}
+
 // The files, each { file, text }, that hold such a break, as { fails, notes } (as repeated() gives them): `before` gives
 // a file's text on the base, or is null where there is no base, when each is a note; a file the same as the base's is
 // noted, one changed or new fails, since a count cannot show a change made nothing worse (#752).
@@ -106,7 +128,7 @@ export function foreignBroken(files, before) {
     const found = foreignBreaks(text);
     if (!found) continue;
     const old = !before || before(file) === text;
-    (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}:${found.line}: the file holds the line break ${found.code}${found.count > 1 ? ` and ${found.count - 1} more` : ""}, which YAML 1.1 reads as a line end and the YAML package this check reads with does not, so a key given twice or a call left without ready_for_review after it would go unseen${old && before ? ", as on the base" : ""}. Mend: replace each with an ordinary line feed, or, inside a double-quoted string, with the escape of its own code (\\u0085, \\u2028 or \\u2029)`);
+    (old ? notes : fails).push(`${old ? "note" : "FAIL"} ${file}:${found.line}: the file holds the line break ${found.code}${found.count > 1 ? ` and ${found.count - 1} more` : ""}, which YAML 1.1 reads as a line end and the YAML package does not, so a reader of one kind sees the file otherwise than a reader of the other${old && before ? ", as on the base" : ""}. Mend: replace each with an ordinary line feed, or, inside a double-quoted string, with the escape of its own code (\\u0085, \\u2028 or \\u2029)`);
   }
   return { fails, notes };
 }
@@ -146,8 +168,8 @@ export function repeated(files, before) {
   const fails = [], notes = [];
   for (const { file, text } of files) {
     const held = new Map(), base = baseOf(before, file, text);
-    for (const found of base.read === null ? [] : twice(base.read)) held.set(heldAs(found), (held.get(heldAs(found)) ?? 0) + 1);
-    for (const { line, key, first, size } of twice(text)) {
+    for (const found of base.read === null ? [] : keysTwice(base.read)) held.set(heldAs(found), (held.get(heldAs(found)) ?? 0) + 1);
+    for (const { line, key, first, size } of keysTwice(text)) {
       const id = heldAs({ key, size }), old = !before || base.same || held.get(id) > 0;
       held.set(id, (held.get(id) ?? 0) - 1);
       const was = old ? (before ? ", as it did on the base" : "") : "";
@@ -190,7 +212,7 @@ function yamlOf(text) {
 // draft while the trigger never starts it once the pull request is marked ready: [] where none, or where the text is
 // no YAML (GitHub's own reader then refuses it).
 export function draftHoles(yaml) {
-  if (typeof yaml === "string") yaml = yaml.length > LONGEST ? null : yamlOf(yaml); // (a text past the length read is not given to the parser: #752)
+  if (typeof yaml === "string") yaml = yaml.length > LONGEST ? null : yamlOf(asLF(yaml).text); // (a text past the length read is not given to the parser: #752; its breaks as a YAML 1.1 reader reads them: #876)
   const types = typesOf(yaml?.on);
   if (types === null || types.includes("ready_for_review")) return [];
   const prefix = `${CORE}/`.toLowerCase();
