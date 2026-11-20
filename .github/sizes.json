@@ -107,10 +107,6 @@
       "mark": 98920,
       "why": "One script's cases (nuget.mjs) on the helpers and config they share; split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."
     },
-    "tests/personal-terms-test.mjs": {
-      "mark": 32506,
-      "why": "One check's cases (the personal-terms workflow) on the scratch pull requests and the stand-in for GitHub's key they share; split, each file would set them up again, adding to the suite's time (tasks/tests.md)."
-    },
     "tests/security-review-test.mjs": {
       "mark": 71102,
       "why": "One script's cases (security-review.mjs, judge() and its helpers) on the fixtures they share; split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."
