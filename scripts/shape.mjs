@@ -85,7 +85,7 @@ import { installed, unreached } from "./packages.mjs";
 import { shapeFaults } from "./schemas.mjs";
 import { CHANGE_MARKS, FIRST_READS, PACKAGE_FILES, REACH, READERS, WHOLE_ON_PARSER, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
-import { LARGEST } from "./tree-walk.mjs";
+import { LARGEST, MOST_NODES } from "./tree-walk.mjs";
 
 export const KIT = "checks/shape.json";
 const TEMPLATE = fileURLToPath(new URL("../setup/template/shape.json.tmpl", import.meta.url));
@@ -556,12 +556,18 @@ const SAFE = ["-c", "core.fsmonitor=false"];
 const git = (args, opts = {}) => execFileSync("git", [...SAFE, ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["pipe", "pipe", "ignore"], ...opts });
 const lsFiles = (specs, root) => (specs.length ? git(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...specs], { cwd: root }).split("\0").filter(Boolean) : []);
 const readable = f => isCode(f) || isPackageFile(f);
+// A file the check reads in the working folder: a regular file on disk, never a link or a folder (a submodule, a nested
+// repository), as standing() reads it.
+const onDisk = (f, root) => { try { return fs.lstatSync(path.join(root, f)).isFile(); } catch { return false; } };
+// The files of code its readers know that the check reads under the config's "code" and "tests", in the working folder
+// (read-nothing.mjs counts them, so that the two lists cannot drift; #459).
+export const codeListed = (config, root = ".") => lsFiles([...config.code, ...config.tests], root).filter(f => isCode(f) && onDisk(f, root));
 
 // The project's files as they stand in the working folder: { texts, tests }, never through a link.
 export function standing(config, root = ".") {
   const texts = {};
   for (const f of new Set([...lsFiles([...config.code, ...config.tests], root), ...lsFiles(PACKAGE_FILES, root)].filter(readable))) {
-    try { if (!fs.lstatSync(path.join(root, f)).isSymbolicLink()) texts[f] = fs.readFileSync(path.join(root, f), "utf8"); } catch { /* listed, not on disk */ }
+    try { if (onDisk(f, root)) texts[f] = fs.readFileSync(path.join(root, f), "utf8"); } catch { /* listed, not on disk */ }
   }
   return { texts, tests: new Set(lsFiles(config.tests, root)) };
 }
@@ -619,7 +625,7 @@ const SAID = {
   cycle: n => [`${plural(n, "import lies", "imports lie")} on a cycle between files that did not stand before`, "turn one import of the cycle round: move what both files need into a file that imports neither, or pass it in"],
   platform: n => [`${plural(n, "import binds", "imports bind")} code to one platform outside the system declared for that`, "move the code that needs it into the system of the domain \"platform\", and have the rest call what that system offers, so that the rest builds and tests wherever the project's checks run"],
   package: n => [`${plural(n, "import takes", "imports take")} a package the project ships with outside the one system that wraps it`, "import it in one system alone, named under that system's \"wraps\" in the config, and have the others use what that system offers"],
-  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (JavaScript, TypeScript, C# or Python the grammar the core installs cannot read whole, or within its time, a file of them past the largest its reader takes, ${LARGEST.javascript.toLocaleString("en")} characters of JavaScript or TypeScript, ${LARGEST.python.toLocaleString("en")} of Python and ${LARGEST.csharp.toLocaleString("en")} of C#, or C# or Python nested more than 200 levels deep), so ${n === 1 ? "its" : "their"} functions are not held`,
+  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (JavaScript, TypeScript, C# or Python the grammar the core installs cannot read whole, or within its time, a file of them past the largest its reader takes, ${LARGEST.javascript.toLocaleString("en")} characters of JavaScript or TypeScript, ${LARGEST.python.toLocaleString("en")} of Python and ${LARGEST.csharp.toLocaleString("en")} of C#, a tree of more than ${MOST_NODES.toLocaleString("en")} nodes, or C# or Python nested more than 200 levels deep), so ${n === 1 ? "its" : "their"} functions are not held`,
     "write it so that the reader can follow it: close each element of JSX, write a } or > in JSX's text as {'}'} or {'>'}, and nest less deep; where a script wrote it as data past that size, leave it out of the config's \"code\" (\"!\" before its pathspec); where it is code that builds, newer than the grammar reads, list the entry under \"grown\" with that reason, by its id, and tell the core which construct it is, never the project's code (the core's README.md, \"Reporting to the core\"); the check's failure on the file then names what it holds"],
   global: n => [`${plural(n, "name joins", "names join")} the global space that scripts with no import or export share: a second name of one file there, or a name another such file declares too`,
     "make the file a module that imports what it uses and exports what it offers; where the page cannot load it so, put what it adds under the one name the file declares there already (an object of its functions), and give a name that two files declare one home"],

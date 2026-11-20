@@ -25,7 +25,6 @@
 //   node core/scripts/stage-order.mjs [--repo <owner/name>] [--last <n, 30 where none is given>] [--warning <tool>]
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import path from "node:path";
 import { aRepository, logged } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { workflowsIn } from "./runners.mjs";
@@ -60,23 +59,10 @@ export function billedOf(priv, w) {
   return w.testRunners.includes(null) || w.unknown || w.unread?.length ? null : false;
 }
 
-// (the workflows of a repository other than the checkout, which are not read: only the checkout's own are; and those
-// at a path there that is no folder that can be listed, not read; and those of a folder not there, none only where its
-// parent is a real folder or not there either, in a checkout's root, and not read otherwise)
+// (the workflows of a repository other than the checkout, which are not read: only the checkout's own are; those of the
+// checkout are read by runners.mjs, which says where its folder is no folder that can be listed)
 const ELSEWHERE = Object.freeze({ testRunners: [], testLabels: [], unknown: true, unread: [], elsewhere: true });
-const NOWHERE = Object.freeze({ testRunners: [], testLabels: [], unknown: true, unread: [], nowhere: true });
-const NONE_HERE = Object.freeze({ testRunners: [], testLabels: [], unknown: false, unread: [] });
-function workflowsAt(dir, parse) {
-  if (dir === null) return ELSEWHERE;
-  // (a path that is there is read only where it is a folder that can be listed; any other leaves it not read)
-  const at = p => { try { return fs.lstatSync(p); } catch (e) { return e?.code === "ENOENT" ? null : false; } };
-  const here = at(dir);
-  if (here === false) return NOWHERE;
-  if (here) { try { if (!fs.statSync(dir).isDirectory()) return NOWHERE; fs.readdirSync(dir); } catch { return NOWHERE; } return workflowsIn(dir, parse); }
-  // (not there: none only where its parent is a real folder or not there either, in a checkout's root, which holds .git)
-  const up = at(path.dirname(dir));
-  return up === false || (up && !up.isDirectory()) || !fs.existsSync(path.join(dir, "..", "..", ".git")) ? NOWHERE : NONE_HERE;
-}
+const workflowsAt = (dir, parse) => (dir === null ? ELSEWHERE : workflowsIn(dir, parse));
 
 /** Whether a reviewer, a tool by its attribution line's name or a bot by its login, is the tool `tool`: the same name in
  *  any case, or a login one of whose words is the tool's first word other than the host's name ("codex" of "Codex" in
@@ -163,7 +149,7 @@ export function read({ repo, last = LAST, warning = null, dir = ".github/workflo
   const t = pulls ? tally(pulls, owner) : null;
   // (a name the core does not know, a tool's or a bot's, is passed over: a builder counts as no tool named)
   const builders = t ? [...t.builders.reduce((m, [n, k]) => { const name = known(n) ? n : NONE; return m.set(name, (m.get(name) ?? 0) + k); }, new Map())].sort(([a, x], [b, y]) => y - x || a.localeCompare(b)) : null;
-  return { priv, billed, rate, pulls, builders, reviewers: t ? t.reviewers.map(([name]) => name).filter(known) : null, themselves: pulls ? byThemselves(pulls, owner).filter(known) : [], warning, unread: w.unread, elsewhere: !!w.elsewhere, nowhere: !!w.nowhere };
+  return { priv, billed, rate, pulls, builders, reviewers: t ? t.reviewers.map(([name]) => name).filter(known) : null, themselves: pulls ? byThemselves(pulls, owner).filter(known) : [], warning, unread: w.unread, elsewhere: !!w.elsewhere, nowhere: !!w.unlisted };
 }
 
 /** The lines it prints: what was read, what is short, the order. */
