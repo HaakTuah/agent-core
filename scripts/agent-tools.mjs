@@ -9,6 +9,10 @@
 // beside this copy, read by ways.mjs; #397), printed as installed by that way, and a line in no form read fails. An
 // entry nothing configures fails too, so the list stays true.
 //
+// A hook the starter kit writes counts as the core's only where it is the kit's hook, of the same event and matcher and the
+// same in every field, in this copy or in the base's, so the sync that changes the kit's hooks fails nothing; a release that
+// changes them asks in its sync note that a project whose list is written lists the hooks it kept.
+//
 // Where each part is read: the files a tool configures and what each configures in agent-tools-configured.mjs (Claude
 // Code's), agent-tools-kiro.mjs and agent-tools-codex.mjs, one hook, tool server, skill or marketplace in
 // agent-tools-read.mjs, the pins in agent-tools-pins.mjs, the project at a commit in agent-tools-project.mjs, its files

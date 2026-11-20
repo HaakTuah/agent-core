@@ -5,10 +5,7 @@
 // `.mcp.json` that npx starts, by the version its package names in its arguments. There the list's version is the pin,
 // letter for letter, and a form that takes a pin but names none, or names a range or tag, fails as fetched at no fixed
 // version. Elsewhere (a marketplace the project does not declare, a hosted server, another command) whether the listed
-// version is the one run stays the review's. A hook the starter kit writes counts as the core's only where it is the
-// kit's hook, of the same event and matcher and the same in every field, in this copy or in the base's, so the sync that
-// changes the kit's hooks fails nothing; a release that changes them asks in its sync note that a project whose list is
-// written lists the hooks it kept.
+// version is the one run stays the review's.
 import { exact } from "./exact-versions.mjs";
 import { show } from "./agent-tools-entries.mjs";
 

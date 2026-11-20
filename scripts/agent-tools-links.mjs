@@ -2,12 +2,13 @@
 // 120000) where a tool reads its files, at a tool's file or folder, on the way to one or below a tool's folder, in
 // whatever case, fails where the pull request adds or changes it, whatever it leads to; one the base held, the same link
 // to the same target, is noted, and fails only where the pull request changes what stands at the path its text names,
-// read as a string (sortBehind(), in agent-tools-base.mjs), and one into what an install fills is reported; one replaced with the very files it
-// named is its mend, what they configure standing as the base's. A tool's file, or a folder on its way, in another
+// read as a string (sortBehind(), in agent-tools-base.mjs), and one into what an install fills is reported; one replaced
+// with the very files it named is its mend, what they configure standing as the base's. A tool's file, or a folder on its way, in another
 // letter case, as the commit holds it, fails, as the tool may read it, save one the base held while what the tool reads
 // through it stands; so does a submodule where a tool reads its files, save one the base held at that commit. So does a
-// variable a tool's settings set (Claude Code's "env", Codex's shell environment policy) but those KEPT lists, any other
-// of which may change how the programs a hook runs start, save one the base held while its entry stands.
+// variable a tool's settings set (Claude Code's "env", Codex's shell environment policy) but those KEPT lists, in
+// agent-tools-codex.mjs, any other of which may change how the programs a hook runs start, save one the base held while
+// its entry stands.
 import path from "node:path";
 import { corePath } from "./core-path.mjs";
 import { fold, show } from "./agent-tools-entries.mjs";
