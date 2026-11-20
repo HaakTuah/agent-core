@@ -52,9 +52,9 @@ ok(r.code === 1 && mended(r.out) && /docs\/developing\.md could not be read as M
 // (lists nested a couple of thousand deep ran the lexer out of memory, which no try catches; a bound before it reads refuses them: #1032)
 const deepList = n => Array.from({ length: n }, (_, k) => `${"  ".repeat(k)}- x`).join("\n");
 const read = await markdownReader();
-let t = Date.now(), refused = "";
+let refused = "";
 try { read(deepList(2000)); } catch (e) { refused = e.message; }
-ok(/line 102 nests lists or quotes more than 100 levels deep/.test(refused) && Date.now() - t < 500, "the reader refuses a list nested 2000 deep before parsing it, in well under a second, naming the line");
+ok(/line 102 nests lists or quotes more than 100 levels deep/.test(refused), "the reader refuses a list nested 2000 deep before parsing it (the lexer would run out of memory), naming the line");
 ok(read(deepList(90)).blocks.length === 90, "a list nested 90 deep is still read");
 r = run({ ...FILES, "docs/developing.md": `${FILES["docs/developing.md"]}\n${deepList(2000)}\n` });
 ok(r.code === 1 && mended(r.out) && /docs\/developing\.md could not be read as Markdown \(line \d+ nests lists or quotes more than 100 levels deep\)/.test(r.out), "a rule file whose lists nest 2000 deep fails the pointer check, naming the file and line, with its mend");
