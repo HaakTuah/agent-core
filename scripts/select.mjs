@@ -11,7 +11,8 @@
 // a changed file is no code the readers read and no test, a file that is gone, C# (whose types are reached by their
 // full names too, with no using directive), a script of the global space, or anything the config does not name
 // under "select.none" (the files no test reads), the whole suite runs, and so it does where no base is told (on main, on
-// a schedule, before a release) and where the shape check's config cannot be read. A fault the whole suite finds that
+// a schedule, before a release), where the shape check's config cannot be read and where the files the change holds are
+// more than the readers take in time (hurry.mjs). A fault the whole suite finds that
 // the selection left out is a fault of this map, mended at once.
 //
 // The config is the shape check's (shape.mjs, where()): its "code", "tests", "aliases" and "select" ({ "proof",
@@ -39,6 +40,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CODE } from "./code-shape.mjs";
 import { logged } from "./guards.mjs";
+import { Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
 import { isCode } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
@@ -276,6 +278,14 @@ async function askHost(sha, check) {
   } catch (e) { return `the host could not be asked: ${String(e?.message ?? e).slice(0, 80)}`; }
 }
 
+// What the change from `from` selects, or the whole suite where the files it changes are too many or too slow to read
+// within the time rule 5 of SECURITY.md allows (hurry.mjs; #881).
+function selectedFrom(from, { now, config, failed }) {
+  const changed = changedSince(from);
+  try { return selection({ changed, texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests, hurry({ files: new Set(changed) }))), unread: unreadConftests(now.texts), failed, config }); }
+  catch (e) { if (e instanceof Late) return { all: true, why: e.message, tests: [...now.tests].sort() }; throw e; }
+}
+
 // What a run takes, { all, why, tests }: the whole suite where the config cannot be read or no base is told, what the
 // change from the base selects, or, on a push given --passed (`passed`), nothing where the merged tree passed whole.
 async function chosen({ config, at, base, passed, select }) {
@@ -293,7 +303,7 @@ async function main(argv) {
   const rules = ["core-manifest.md", "AGENTS.md"].find(f => fs.existsSync(f));
   const at = named ?? where(rules ? fs.readFileSync(rules, "utf8") : ""), base = baseOf(), config = configOf(at);
   const now = config ? standing(config) : null, failed = readFailed(opts["--failed"]);
-  const s = await chosen({ config, at, base, passed: opts["--passed"], select: from => selection({ changed: changedSince(from), texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests)), unread: unreadConftests(now.texts), failed, config }) });
+  const s = await chosen({ config, at, base, passed: opts["--passed"], select: from => selectedFrom(from, { now, config, failed }) });
   // (a name the variable cannot hold as one word, a space or a line's end in it, runs the whole suite: no file's name
   // sets another variable for the steps after it)
   if (!s.all && s.tests.some(t => !PLAIN.test(t))) Object.assign(s, { all: true, why: "a test's file name holds what a list of names cannot (a space or a line's end)" });

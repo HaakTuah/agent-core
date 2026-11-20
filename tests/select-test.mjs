@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
+import { Late, hurry } from "../scripts/hurry.mjs";
 import { links, matcher, passedWhole, reached, selection } from "../scripts/select.mjs";
 import { parseConfig, survey } from "../scripts/shape.mjs";
 
@@ -63,6 +64,25 @@ ok(reaches.get("test/view.test.js").has("src/rules.js") && reaches.get("test/run
 ok(!linked.get("src/tool.js").has("src/view.js") && reaches.get("test/run.test.js").has("src/rules.js") && !reaches.get("test/rules.test.js").has("src/view.js"),
   "a name in a line that only a comment opens links nothing, one after the code links (more, never less), and an import points one way", JSON.stringify([...linked].map(([t, f]) => [t, [...f]])));
 ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, new Set(), new Map()).get("a.js").has("b.js"), "a generator's line that opens with * is code, not a comment");
+
+// ---- how much of what a pull request changes is read (hurry.mjs; #881) ----
+{
+  let clock = 0;
+  const lateness = f => { try { f(); return null; } catch (e) { return e instanceof Late ? e.message : `not Late: ${e}`; } };
+  const watch = () => hurry({ files: new Set(["src/rules.js", "src/view.js"]), ms: 100, characters: 50, now: () => clock });
+  const slow = at => () => { clock += at; return "read"; };
+  let w = watch();
+  ok(w.timed("src/rules.js", slow(60)) === "read" && w.timed("src/view.js", slow(40)) === "read" && w.timed("src/tool.js", slow(5000)) === "read",
+    "files read within the budget together, and a file the pull request leaves as it was, are read unwatched");
+  w = watch();
+  w.timed("src/rules.js", slow(60));
+  ok(/took 120 ms, past the 100 ms.*cannot be told in time/u.test(lateness(() => w.timed("src/view.js", slow(60)))), "changed files that take past the budget together stop the reading, saying why");
+  ok(lateness(() => watch().size({ "src/rules.js": "x".repeat(30), "src/view.js": "x".repeat(20), "src/tool.js": "x".repeat(9999) })) === null
+    && /hold 51 characters, past the 50/u.test(lateness(() => watch().size({ "src/rules.js": "x".repeat(30), "src/view.js": "x".repeat(21) }))), "changed files of more characters than the limit stop the reading before any is read; one the pull request leaves as it was counts for none");
+  clock = 0;
+  const late = lateness(() => survey(texts, config, tests, hurry({ files: new Set(Object.keys(texts)), ms: -1 })));
+  ok(late && /took \d+ ms, past the -1 ms/u.test(late), "the shape check's survey reads each changed file under the watch and fails where it is past", late);
+}
 
 // ---- what a pull request runs ----
 const pick = (changed, failed = []) => selection({ changed, texts, tests, reach, failed, config });

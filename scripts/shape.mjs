@@ -435,15 +435,18 @@ function wrappedOnce(ctx) {
 // file's imports of the project's own files, dynamic ones and those of types among them, and `scripts`, the files that
 // share the global space, which import nothing, and `unsure`, the files with an import whose target the readers cannot
 // follow, or whose imports they could not read (select.mjs). `tests` is the
-// set of the files that are tests: read for their imports, not held to the marks nor to the shared space.
-export function survey(texts, config, tests = new Set()) {
+// set of the files that are tests: read for their imports, not held to the marks nor to the shared space. `watch`, where
+// given, is hurry.mjs's: it fails the reading of the files a pull request changes where they are too many to read in time.
+export function survey(texts, config, tests = new Set(), watch = null) {
   const code = Object.keys(texts).filter(isCode).sort();
+  watch?.size(texts);
   const read = { files: code.length, functions: 0, imports: 0, jsx: 0, nowhere: 0, unnamed: 0, systems: Object.keys(config.systems).length, noEntrance: Object.values(config.systems).filter(s => !s.entrance).length };
-  const readings = code.map(file => { const r = reading(file, texts[file]); r.marks = marksOf(config, r.comments); delete r.comments; return [file, r]; });
+  const timed = (file, read) => (watch ? watch.timed(file, read) : read());
+  const readings = code.map(file => { const r = timed(file, () => reading(file, texts[file])); r.marks = marksOf(config, r.comments); delete r.comments; return [file, r]; });
   const idx = index(readings, texts), js = manifests(texts);
   const ctx = { config, tests, texts, unsure: new Set(), files: new Set(Object.keys(texts)), idx, packages: js.packages, ships: new Set([...js.ships, ...idx.ships]), declared: new Set([...js.declared, ...idx.declared]),
     entries: new Map(), graph: new Map(), reach: new Map(), usedBy: new Map(), unnamed: [], read, readers: new Map(), scripts: new Map(), reached: new Map() };
-  for (const [file, r] of readings) oneFile(ctx, file, r);
+  for (const [file, r] of readings) timed(file, () => oneFile(ctx, file, r));
   reachEntries(ctx);
   sharedSpace(ctx);
   onCycles(ctx);
