@@ -18,7 +18,7 @@
 # `git grep -I`, a diff's "Binary files differ"), pictures included, whatever a .gitattributes says, which the check
 # never reads. It prints only where a term was found (file and line, a file whose name holds a term by its line alone,
 # or the commit), never the term. Of all it reads, it leaves unread only LICENSE and NOTICE while they keep the shape
-# described below, at the root and in core/, which floor rule 11 lets hold a copyright holder's name (#257), and the
+# described below, at the root and in the copy of the core (core/, or where the manifest names it), which floor rule 11 lets hold a copyright holder's name (#257), and the
 # random id of a link to a Claude Code session (https://claude.ai/code/session_01 and 22 characters of base58, a whole link, a blank, the line's end or a
 # mark of punctuation after it), which a
 # tool writes at the end of every builder's commit message and description: such a run of characters holds a short term
@@ -90,7 +90,13 @@ jobs:
           free='[^@/:[:cntrl:]]{1,100}'
           held="^Copyright( \\([cC]\\)| ©)? ([0-9]{4}([-,] ?[0-9]{4})*|\\[yyyy\\]|\\[year\\]|<year>|YEAR),? $free\$"
           known=" 3b95290255fb1e607a13999c5f76a81c6877ef3d092c01eb18ef72ee2ddc2dc4 "
-          exempt="LICENSE NOTICE core/LICENSE core/NOTICE"
+          # (and in the project's copy of the core, where the manifest the base holds names it, as core-path.mjs reads its one
+          # "Core:" line, in either form; never the pull request's own manifest, which could name a folder to leave unread;
+          # core/ where it names none or reads wrong, and the head's own on a push, which is the base's)
+          copy=$(git show "${BASE:-HEAD}:core-manifest.md" 2> /dev/null | tr -d '\r' | grep -E '^Core: ' | awk 'END { if (NR == 1) print }' \
+            | sed -nE 's#^Core: [^ ]+(, carried by ([A-Za-z0-9_][A-Za-z0-9._-]*/)+| at [0-9a-f]{40}, copied whole) under ((([A-Za-z0-9_][A-Za-z0-9._-]*)/)+)( .*)?$#\3#p')
+          case "/$copy" in */node_modules/*) copy= ;; esac
+          exempt="LICENSE NOTICE ${copy:-core/}LICENSE ${copy:-core/}NOTICE"
           shaped() { # (a revision and a path: whether that file is of its shape there)
             local text flat
             case $(git ls-tree --format='%(objectmode)' "$1" -- "$2" 2> /dev/null) in 100644 | 100755) ;; *) return 1 ;; esac
@@ -131,7 +137,7 @@ jobs:
             case $line in '' | *[!0-9]*) line='?' ;; esac; printf '%s:%s\n' "$name" "$line"
           done < "$RUNNER_TEMP/hits")
           if [ -n "$hits" ]; then
-            echo "FAIL A personal term is in these files (file:line, below), held before this pull request or added by it. Mend: in this pull request, edit each of those lines, and rename or delete a file whose name holds the term; the check reads the files as they would merge, what main already held included. LICENSE and NOTICE, at the root or in core/, go unread only while they hold a known licence's standard text, or a work's name, and copyright lines alone (floor rule 11): bring one named here back to that."
+            echo "FAIL A personal term is in these files (file:line, below), held before this pull request or added by it. Mend: in this pull request, edit each of those lines, and rename or delete a file whose name holds the term; the check reads the files as they would merge, what main already held included. LICENSE and NOTICE, at the root or in the copy of the core, go unread only while they hold a known licence's standard text, or a work's name, and copyright lines alone (floor rule 11): bring one named here back to that."
             # (the names between GitHub's own marks that stop its runner reading workflow commands, under a token of
             # this run's alone, so that no name is read as one)
             token=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n'); echo "::stop-commands::$token"

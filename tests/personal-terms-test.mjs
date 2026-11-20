@@ -27,6 +27,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -255,6 +256,19 @@ const licence = holder => LICENCE.replace(/^( *)Copyright \[yyyy\] \[name of cop
 const notice = holder => NOTICE.replace(/^Copyright .*$/m, held(holder));
 ok(opening && licence(term) !== LICENCE && notice(term) !== NOTICE, "the core's LICENSE holds Apache's line for the holder, and its NOTICE a copyright line");
 passes("a term only in the holder's line of the core's LICENSE and NOTICE, at the root and in core/, one with Windows line ends", pull([[{ LICENSE: licence(`A ${term}`), NOTICE: notice(term), "core/LICENSE": licence(other).replace(/\n/g, "\r\n"), "core/NOTICE": notice(`${wide} AS`) }]]));
+// (the copy at the path the manifest on the base names, #918: the files there are of the copy as any at core/ is, the
+// manifest the pull request itself writes names none, and a project's own core/ folder is read where the copy is elsewhere)
+const line = place => `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${place} (never edited here).\n`;
+const copied = place => ({ [`${place}LICENSE`]: licence(`A ${term}`), [`${place}NOTICE`]: notice(term) });
+const manifestOnMain = place => [[{ "core-manifest.md": line(place) }, {}, "the manifest"]];
+passes("a term only in the holder's line of LICENSE and NOTICE in the copy where the base's manifest names it, at a path other than core/", pull([[copied("vendor/core/")]], manifestOnMain("vendor/core/")));
+passes("  and one at a path of three folders, with the manifest's line ending there", pull([[copied("a/b/core/")]], manifestOnMain("a/b/core/")));
+passes("  and the copy a library carries", pull([[copied("lib/core/")]], [[{ "core-manifest.md": `# Core manifest\n\nCore: ${CORE}, carried by lib/ under lib/core/ (never edited here).\n` }, {}, "the manifest"]]));
+fails("  a copy's pair of files at another path than the manifest names", pull([[copied("vendor/core/")]], manifestOnMain("third_party/core/")));
+fails("  the project's own core/ files where the manifest names the copy elsewhere", pull([[copied("core/")]], manifestOnMain("vendor/core/")));
+fails("  a path the pull request's own manifest names, the base's naming none", pull([[{ "core-manifest.md": line("vendor/core/"), ...copied("vendor/core/") }]]));
+fails("  a copy's files out of their shape, as at core/", pull([[{ "vendor/core/NOTICE": `A ${term} work\n${held(other)}\n` }]], manifestOnMain("vendor/core/")));
+passes("  with the base's manifest naming a path inside node_modules, the files at core/ keep their exemption", pull([[copied("core/")]], manifestOnMain("node_modules/core/")));
 passes("a NOTICE whose holder a later commit changes to a term (as the owner does by hand)", pull([[{ NOTICE: NOTICE }], [{ NOTICE: notice(term) }]]));
 passes("a LICENSE of copyright lines alone, each holding a term", pull([[{ LICENSE: `${held(term)}. All rights reserved.\n${held(other)}\n` }]]));
 mendedSays("a NOTICE with a line more than its name and copyright lines", pull([[{ NOTICE: `${notice(term)}Made by hand.\n` }]]), {}, "bring one named here back to that");

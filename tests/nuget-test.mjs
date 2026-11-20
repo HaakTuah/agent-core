@@ -10,6 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { NOT_A_FILE, REGISTRY, check as checked, importPath, imported, importsOf, lockPackages, plainText, projectRooted, readProject, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "../scripts/nuget.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { mended, unmended } from "../scripts/mend.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
 
@@ -36,6 +37,16 @@ ok(nugetConfig({ nuget: { accepted: [yes, { ...yes, package: "Other.Pkg@2.0.0", 
 // where packages come from
 ok(sourcesOf({ nuget: {} }, "/project").join() === REGISTRY && sourcesOf({ nuget: { sources: ["https://pkgs.example.com/feed/v3/index.json", "vendor/packages/"] } }, path.resolve("/project")).join() === `${REGISTRY},https://pkgs.example.com/feed/v3/index.json,${path.resolve("/project", "vendor/packages")}`,
   "a restore takes packages from NuGet's own registry, and from what the config names beside it: an address, a folder of the project's by its whole path");
+// (the copy of the core where the manifest names it, #918: its folder is no source, and the project's own core/ is one)
+const manifestAt = (place) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-copy-")); fs.writeFileSync(path.join(dir, "core-manifest.md"), `Core: ${CORE} at ${"a".repeat(40)}, copied whole under ${place} (never edited here).\n`); return dir; };
+const vendorRoot = manifestAt("vendor/core/"), bareRoot = fs.mkdtempSync(path.join(os.tmpdir(), "nuget-copy-"));
+try {
+  ok(throws(() => nugetConfig({ nuget: { sources: ["vendor/core/packages/"] } }, "vendor/core/")) && throws(() => nugetConfig({ nuget: { sources: ["Vendor/Core/"] } }, "vendor/core/"))
+    && nugetConfig({ nuget: { sources: ["core/packages/"] } }, "vendor/core/").sources.length === 1 && nugetConfig({ nuget: { sources: ["vendor/core/packages/"] } }).sources.length === 1 && throws(() => nugetConfig({ nuget: { sources: ["core/packages/"] } })),
+    "a source is no folder of the copy of the core, at core/ or at the path the manifest names, and a folder of the project's own that has the name core/ is one where the copy is elsewhere");
+  ok(throws(() => sourcesOf({ nuget: { sources: ["vendor/core/packages/"] } }, vendorRoot)) && sourcesOf({ nuget: { sources: ["core/packages/"] } }, vendorRoot).length === 2 && throws(() => sourcesOf({ nuget: { sources: ["core/packages/"] } }, bareRoot)),
+    "where a restore's sources are read, the copy is the one the project's manifest names");
+} finally { fs.rmSync(vendorRoot, { recursive: true, force: true }); fs.rmSync(bareRoot, { recursive: true, force: true }); }
 ok(["http://pkgs.example.com/", "https://user:word@pkgs.example.com/", "https://pkgs.example.com/v3?key=1", "https://pkgs.example.com/a b", "https://-pkgs.example.com/", "https://169.254.169.254/", "https://localhost/", "https://pkgs..example.com/", "https://pkgs.example.com/a/../b", "../out/", "/abs/", "vendor", "./", "./vendor/", "vendor//x/", "vendor/../x/", ".git/", ".../", "core/", "Core/scripts/", "-x/", "--source/", REGISTRY, REGISTRY.toUpperCase(), 5, "vendor/\n--source\nhttps://pkgs.example.com/"]
   .every(s => throws(() => nugetConfig({ nuget: { sources: [s] } }))) && throws(() => nugetConfig({ nuget: { sources: "vendor/" } })) && throws(() => nugetConfig({ nuget: { sources: ["vendor/", "vendor/"] } })),
   "a source is an https address of a named host, with no sign-in or question in it, or a folder inside the project that is not the core's copy or git's own; never the registry again, never one twice, never a word a restore could read as an option");
