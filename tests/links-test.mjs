@@ -8,7 +8,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { baseTree, compared, listed, lycheeReads, readable, reported, run, target } from "../scripts/links.mjs";
+import { baseTree, checkRules, compared, listed, lycheeReads, readable, reported, run, target } from "../scripts/links.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -135,6 +135,21 @@ if (process.platform !== "win32") {
     fs.appendFileSync(path.join(two, "SECURITY.md"), "\nMore.\n"); g2("add", "-A");
     const r = spawnSync(process.execPath, [path.join(two, "core/scripts/pointers.mjs")], { cwd: two, encoding: "utf8", env: { ...process.env, LYCHEE: STANDIN, POINTERS_BASE: "HEAD" } });
     ok(r.status === 0 && /note .*AGENTS\.md:5: the link to docs\/developing\.md#gone .*as on the base, so it fails nothing/.test(r.stdout + r.stderr), "a rule file the base's attributes leave out of an archive is read from git's own blobs: what the base held is noted", r.stdout + r.stderr);
+    // (a heading the base held in a file under a linked folder, which is no rule file: the finding's path, its "#" part
+    // apart, reaches the base's files, so it is noted, never failed as new; #582's review)
+    const three = fs.realpathSync(scratchDir("links-test-folder-")), g3 = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], { cwd: three, stdio: "ignore" });
+    const back = process.cwd();
+    try {
+      fs.mkdirSync(path.join(three, "guide"));
+      fs.writeFileSync(path.join(three, "guide/README.md"), "# Guide\n\n## There\n");
+      fs.symlinkSync("guide", path.join(three, "docs"));
+      fs.writeFileSync(path.join(three, "AGENTS.md"), "# A\n\nSee [it](docs/README.md#gone).\n");
+      g3("init", "-q"); g3("add", "-A"); g3("commit", "-q", "-m", "base");
+      process.chdir(three);
+      const tracked = new Set(["AGENTS.md", "docs", "guide/README.md", "docs/README.md"]), // (the path through the link counted as tracked, so the heading's own path alone can bring the file to the base)
+      got = checkRules({ program: STANDIN, rules: ["AGENTS.md"], tracked, folders: new Set(["guide/"]), text: f => fs.readFileSync(f, "utf8"), base: execFileSync("git", ["rev-parse", "HEAD"], { cwd: three, encoding: "utf8" }).trim() });
+      ok(!got.unread && got.fails.length === 0 && got.notes.some(n => /docs\/README\.md#gone .*as on the base/.test(n)), "a heading the base held, in a file under a linked folder that is no rule file, is noted, never failed as new", JSON.stringify(got));
+    } finally { process.chdir(back); fs.rmSync(three, { recursive: true, force: true }); }
   } finally { for (const d of [two, tools]) fs.rmSync(d, { recursive: true, force: true }); }
 }
 // (the base's files written from git's own blobs: a tree that names "..", a link inside the project and one out of it, a
