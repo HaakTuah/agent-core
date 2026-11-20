@@ -33,25 +33,22 @@ const KIT_FORMS = [
   new RegExp(`^bash -c 'r=\\$\\(git rev-parse --show-toplevel 2>/dev/null\\) \\|\\| exit 0; (?:\\[ (?:! )?-f "\\$r/${KIT_PATH}" \\] \\|\\| exit 0; )+${kitFetch("\\$r")} \\|\\| exit 0; CLAUDE_PROJECT_DIR="\\$r" bash -c "\\$f"${KIT_ARGS}'$`, "u"),
 ];
 
-// What a command in one of the kit's forms matched, its named groups, or null where it is in neither.
+// What a command in one of the kit's forms matched, its named groups, or null where it is in neither, or reads, where the
+// library carries the core, another file of the library's commit than the one it fetched first: the two are one path, the
+// library's folder, a "/", then the path in the library.
 function matched(command) {
   for (const form of KIT_FORMS) {
     const found = form.exec(String(command));
-    if (found) return found.groups;
+    if (found) return found.groups.library === undefined || found.groups.fetched === `${found.groups.library}/${found.groups.rest}` ? found.groups : null;
   }
   return null;
 }
-// The path a command in one of the kit's forms fetches from main, or null where the command is in neither, or reads, where
-// the library carries the core, another file of the library's commit than the one it fetched first: the two are one path,
-// the library's folder, a "/", then the path in the library.
-export function fetchedBy(command) {
-  const found = matched(command);
-  return found && (found.library === undefined || found.fetched === `${found.library}/${found.rest}`) ? found.fetched : null;
-}
+// The path a command in one of the kit's forms fetches from main, or null where the command is in neither.
+export const fetchedBy = command => matched(command)?.fetched ?? null;
 export const kitForm = command => fetchedBy(command) !== null;
 // Where the command in a kit's form reads the script from the library's commit main pins: { library, rest }, `rest` the
 // script's path in the library; null where it has no such fallback, or is in no form.
 export function libraryOf(command) {
-  const found = fetchedBy(command) === null ? null : matched(command);
+  const found = matched(command);
   return found?.library === undefined ? null : { library: found.library, rest: found.rest };
 }

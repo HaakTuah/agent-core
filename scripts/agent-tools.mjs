@@ -399,7 +399,7 @@ function readSource(state, name, commands) {
     const from = libraryOf(command), held = from && state.inLibrary(from.library, from.rest);
     if (held === "link") return void state.sources.set(name, { why: `reads ${show(from.rest)} from the library ${show(from.library)}, which this project commits as a link, so the folder it leads to is the branch's to choose, not the submodule main pins`, how: `commit ${show(from.library)} as the submodule that carries the core (git submodule add), never as a link` });
     if (held === "other") return void state.sources.set(name, { why: `reads ${show(from.rest)} from the commit of ${show(from.library)} that main pins, which holds it as no plain file (a link, a folder or a submodule), so what runs is what git prints of it`, how: `make ${show(from.rest)} a plain file committed in ${show(from.library)}, the script itself in place of the link, folder or submodule, and pin that commit` });
-    if (held === "unread") state.notRead.add(`${name}: the file ${show(from.rest)} of the commit of ${show(from.library)} that main pins was not read, since the submodule's repository is not at hand here, so whether it is a plain file is not known. To mend: bring it in (git submodule update --init ${from.library})`);
+    if (held === "unread") state.notRead.add(`${name}: the file ${show(from.rest)} of the commit of ${show(from.library)} that main pins was not read, since the submodule's repository is not at hand here, so whether it is a plain file is not known. To mend: bring it in (git submodule update --init ${from.library}), a submodule named as its path (git submodule add --name ${from.library}), which a hook reads it by`);
   }
 }
 
@@ -636,8 +636,8 @@ export function readProject(root, rev = null, linkedOnMain = () => false, alias 
   const commitRev = rev ?? "HEAD";
   // (with `alias`, each path read from another, as mendedIds() reads a link's files in its place: its Markdown files too)
   // (the file a library's commit holds at a path, at this commit's pin and at the base's, which a hook reads until the pull
-  // request merges: anything but a plain file at either is the answer, then what could not be read)
-  const inLibrary = (library, rest) => { const held = [commitRev, ...(base ? [base] : [])].map(r => libraryHolds(root, r, library, rest)); return held.includes("link") ? "link" : held.includes("other") ? "other" : held.includes("unread") ? "unread" : held.includes("file") ? "file" : null; };
+  // request merges: anything but a plain file at either is the answer, else what this commit's pin reads as)
+  const inLibrary = (library, rest) => { const held = [commitRev, ...(base ? [base] : [])].map(r => libraryHolds(root, r, library, rest)); return held.includes("link") ? "link" : held.includes("other") ? "other" : held[0]; };
   const project = configured(read, skills, names, linked, () => [...agentMarkdown(root, commitRev), ...(alias.markdown ?? [])], inLibrary);
   // (read at the commit, the working tree's at HEAD, the pull request's head: a file not committed, ignored or not, is
   // no file of the project's, and the base is read the same way)
