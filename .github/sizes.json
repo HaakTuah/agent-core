@@ -119,6 +119,10 @@
       "mark": 39696,
       "why": "#931: along what it reads, Codex's summary, who counts as a reviewer, what a review stands for, floor rule 3's count and the status posted."
     },
+    "scripts/pointers.mjs": {
+      "mark": 25913,
+      "why": "One check whose forms of a pointer are read from one parse of each rule file and joined into one pointer by one glue (atoms(), GLUE), so one who changes a form reads how the others join it; the Markdown links' reading with lychee stands apart in links.mjs (#582), which is what a split along a part that is read on its own gave."
+    },
     "scripts/nuget.mjs": {
       "mark": 84129,
       "why": "The NuGet check's readers of a project's build files, lock files and sources that all read one config and one tree through the one check(); a task that changes one reads how the others count against it, so a split would make it open each part."

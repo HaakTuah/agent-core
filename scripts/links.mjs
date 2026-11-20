@@ -1,0 +1,135 @@
+// The maintained link checker of the pointer check (pointers.mjs, beside this file; #582): lychee, run offline, reads
+// Markdown's own links in the rule files (a link, a reference, an image, an HTML link; none in code) as GitHub resolves
+// them, from the file's folder or, for one that starts with "/", from the project's root, and the heading each names
+// after "#". It is fetched at set-up as its own program (lychee.sh beside this file), never here. The tool finds, and the
+// core decides and words the failure: which file a link leads to is lychee's reading (its list, --dump), and whether
+// that file is one git tracks in the project is the core's, since lychee reads the disk, where a file git does not track,
+// or one outside the project, stands too; whether the heading is there is lychee's. A file that is no UTF-8 lychee reads
+// nothing of, so it is left to the core's own reading (pointers.mjs). Node's own modules only.
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+export const TIMEOUT = 120000; // (ms lychee may take on the rule files: the core's take well under one second)
+
+// Whether lychee reads a file: one that is UTF-8 (it reads nothing of any other, and says so nowhere).
+export const readable = buffer => { try { new TextDecoder("utf-8", { fatal: true }).decode(buffer); return true; } catch { return false; } };
+
+// A link lychee wrote (a file:// address), as the path from `root` it leads to, with "/" between its parts, or null where
+// it leads out of `root`; any other address (the web, mail) is undefined, and not the core's to read offline.
+export function target(url, root) {
+  if (!/^file:/iu.test(url)) return undefined;
+  let p;
+  try { p = fileURLToPath(new URL(url.replace(/[?#].*$/su, ""))); } catch { return null; }
+  const rel = path.relative(root, p);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
+  return rel.split(path.sep).join("/");
+}
+
+// A link's line in its file: the first that holds the last part of where it leads, else the first.
+const lineIn = (text, to) => { const name = to.split("/").pop(); return (text ?? "").split(/\r\n?|\n/u).findIndex(l => name && l.includes(name)) + 1 || 1; };
+
+// The core's findings from lychee's list of a file's links (its --dump output), as { found, count }: a link that leads to
+// no file or folder of `tracked` (each folder in `folders` as "a/b/"), or out of `root`; `count` the links to a file.
+export function listed(file, dump, { root, tracked, folders, text }) {
+  const found = [];
+  let count = 0;
+  for (const url of String(dump ?? "").split(/\r?\n/u).map(l => l.trim()).filter(Boolean)) {
+    const to = target(url, root);
+    if (to === undefined) continue;
+    count++;
+    const where = to ?? decodeURI(url.replace(/[?#].*$/su, "").replace(/^file:\/\/[^/]*/iu, ""));
+    if (to === null) found.push({ file, line: lineIn(text(file), where), kind: "outside", to: where, said: "leads out of the project" });
+    else if (to !== "" && !tracked.has(to) && !folders.has(`${to}/`)) found.push({ file, line: lineIn(text(file), to), kind: "file", to, said: "leads to no tracked file or folder" });
+  }
+  return { found, count };
+}
+
+// lychee's findings in its JSON report (--include-fragments) on files of `root`: each heading a link names that is not
+// there; a file not found is read by listed(), against what git tracks. Null where the report is no JSON lychee writes.
+const HEADING = "names a heading that is not there, as GitHub makes a heading's anchor (its words in small letters, each blank a \"-\", other marks left out, a second alike \"-1\")";
+export function reported(checked, { root, text }) {
+  let report;
+  try { report = JSON.parse(checked); } catch { return null; }
+  if (!report || typeof report !== "object") return null;
+  return Object.entries(report.error_map ?? {}).flatMap(([input, errors]) => {
+    const from = /^file:/iu.test(input) ? target(input, root) : path.relative(root, input).split(path.sep).join("/");
+    if (!from || from.startsWith("..") || !Array.isArray(errors)) return [];
+    return errors.filter(e => /fragment/iu.test(String(e?.status?.text ?? e?.status ?? ""))).map(e => heading(e, from, root, text));
+  });
+}
+// One error of lychee's on a heading, as a finding of the file `from`.
+function heading(e, from, root, text) {
+  const url = String(e?.url ?? ""), to = target(url, root), hash = /#(.*)$/su.exec(url)?.[1] ?? "";
+  return { file: from, line: Number(e?.span?.line) || lineIn(text(from), hash), kind: "heading", to: `${to ?? url}#${decodeURIComponent(hash)}`, said: HEADING };
+}
+
+// lychee on the rule files `files` of `root`, as { found, count } or, where it could not run or read them, { unread: why }.
+// Run from an empty folder of its own, so that no lychee.toml or .lycheeignore of the project's is read.
+export function run({ program, root, files, ...at }) {
+  const away = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "links-"));
+  try {
+    const go = args => spawnSync(program, ["--offline", "--no-progress", "--root-dir", root, ...args], { cwd: away, encoding: "utf8", maxBuffer: 1 << 28, timeout: TIMEOUT, windowsHide: true });
+    const why = r => (r.error?.code === "ETIMEDOUT" ? `it ran past ${TIMEOUT / 1000} s` : r.error ? r.error.code : r.signal ? `it stopped on ${r.signal}` : `it ended with status ${r.status}: ${(r.stderr || "").trim().split("\n").pop()?.slice(0, 200) ?? ""}`);
+    const found = [];
+    let count = 0;
+    for (const f of files) {
+      const r = go(["--dump", "--", path.join(root, f)]);
+      if (r.status !== 0) return { unread: why(r) };
+      const got = listed(f, r.stdout, { root, ...at });
+      found.push(...got.found); count += got.count;
+    }
+    const list = path.join(away, "inputs.txt");
+    fs.writeFileSync(list, files.map(f => path.join(root, f)).join("\n") + "\n");
+    const r = go(["--include-fragments", "--format", "json", "--files-from", list]);
+    if (r.status !== 0 && r.status !== 2) return { unread: why(r) };
+    const headings = reported(r.stdout, { root, ...at });
+    return headings ? { found: [...found, ...headings], count } : { unread: "its report was no JSON it writes" };
+  } finally { fs.rmSync(away, { recursive: true, force: true }); }
+}
+
+// The base's tree (`sha`) in a folder of this run's own, and what git tracks there, for run() to read it as the head.
+export function baseTree(sha, under) {
+  const dir = fs.mkdtempSync(path.join(under, "links-base-")), git = (args, opts = {}) => spawnSync("git", args, { encoding: null, maxBuffer: 1 << 30, ...opts });
+  const tar = git(["archive", "--format=tar", sha]);
+  if (tar.status !== 0 || spawnSync("tar", ["-x", "-C", dir], { input: tar.stdout, maxBuffer: 1 << 30 }).status !== 0) { fs.rmSync(dir, { recursive: true, force: true }); return null; }
+  const tracked = new Set(String(git(["ls-tree", "-r", "-z", "--name-only", sha]).stdout ?? "").split("\0").filter(Boolean));
+  return { dir: fs.realpathSync(dir), tracked, folders: new Set([...tracked].flatMap(f => f.split("/").slice(0, -1).map((_, i, p) => `${p.slice(0, i + 1).join("/")}/`))) };
+}
+
+// lychee on the rule files `rules` of the project in the working folder, as pointers.mjs runs it: { unread } where it
+// could not run, else { read, count, fails, notes }, `read` the files it read (the rest, no UTF-8, are left to the core's
+// own reading). In the core's run (`base` ""), each finding fails; in a project's, those the base (a commit's SHA) held
+// are noted, read the same way from its tree in a folder of this run's own; with no base (null), each is noted.
+export function checkRules({ program, rules, tracked, folders, text, base }) {
+  const read = rules.filter(f => readable(fs.readFileSync(f)));
+  const head = run({ program, root: fs.realpathSync("."), files: read, tracked, folders, text });
+  if (head.unread || !head.found.length || !base) return { read, ...head, ...(head.unread ? {} : compared(head.found, base === "" ? [] : null)) };
+  const was = baseTree(base, process.env.RUNNER_TEMP || os.tmpdir());
+  try {
+    const there = was ? rules.filter(f => was.tracked.has(f) && readable(fs.readFileSync(path.join(was.dir, f)))) : [];
+    const r = was && run({ program, root: was.dir, files: there, tracked: was.tracked, folders: was.folders, text: f => fs.readFileSync(path.join(was.dir, f), "utf8") });
+    if (!r || r.unread) return { read, count: head.count, notes: [], fails: [`the rule files' links at the pull request's base could not be read by lychee${r?.unread ? ` (${r.unread})` : ""}. Mend: run this job again; if it fails again, file it as a fault`] };
+    return { read, count: head.count, ...compared(head.found, r.found) };
+  } finally { if (was) fs.rmSync(was.dir, { recursive: true, force: true }); }
+}
+
+// A finding's words, the file, the line and the link, then the mend.
+export const words = f => `${f.file}:${f.line}: the link to ${f.to} ${f.said}${f.kind === "heading" ? ". Mend: point it at a heading that is there (its anchor as GitHub makes it), or take the \"#\" part out" : f.kind === "outside" ? ". Mend: point it at a file of the project's, or write the address on the web it means" : ". Mend: point it at the file or folder that holds what it means, or take it out where that is gone"}`;
+
+// The head's findings against the base's, as { fails, notes }: of each kind (the file, what it leads to and why, its
+// line aside, so that a link moved is no new finding), as many as the base held are noted and the rest fail; with no
+// base (`base` null), each is noted.
+export function compared(head, base) {
+  const key = f => `${f.file}\0${f.kind}\0${f.to}`, held = new Map();
+  for (const f of base ?? []) held.set(key(f), (held.get(key(f)) ?? 0) + 1);
+  const fails = [], notes = [];
+  for (const f of head) {
+    const n = held.get(key(f)) ?? 0;
+    if (base && n <= 0) fails.push(words(f));
+    else { notes.push(`${words(f).replace(/\. Mend: /u, base ? ", as on the base, so it fails nothing. Mend: " : ", with no base to read against, so it fails nothing. Mend: ")}`); held.set(key(f), n - 1); }
+  }
+  return { fails, notes };
+}

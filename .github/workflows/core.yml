@@ -345,6 +345,14 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
         run: if [ -f "${CORE_AT}scripts/workflow-tools.sh" ]; then bash "${CORE_AT}scripts/workflow-tools.sh" >> "$GITHUB_ENV"; fi
+      # (the link checker the pointer check runs, fetched at its pin into the runner's temporary folder, outside the
+      # repository, as its own program, from its maker's releases by the sums its script holds; where it cannot be fetched,
+      # the check says it did not run it and reads the links its own way; #582)
+      - name: lychee, which the pointer check runs, fetched at its pin (the core's scripts/lychee.sh)
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.copies != '' }}
+        timeout-minutes: 5
+        continue-on-error: true
+        run: if [ -f "${CORE_AT}scripts/lychee.sh" ]; then bash "${CORE_AT}scripts/lychee.sh" >> "$GITHUB_ENV"; fi
       - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.copies != '' }}
         timeout-minutes: 5

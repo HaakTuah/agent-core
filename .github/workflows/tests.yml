@@ -190,6 +190,11 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
         run: bash scripts/workflow-tools.sh >> "$GITHUB_ENV"
+      - name: lychee, which the pointer check runs, fetched at its pin outside the repository (scripts/lychee.sh; #582)
+        if: ${{ contains(matrix.parts, 'rest') }}
+        timeout-minutes: 5
+        continue-on-error: true
+        run: bash scripts/lychee.sh >> "$GITHUB_ENV"
       - name: The suites this change can reach (on main, and in a re-run, every one, but none where the merged head passed this tree whole)
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
@@ -509,10 +514,13 @@ jobs:
       - name: The pointer check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pointers-test.mjs ')) }}
         run: node tests/pointers-test.mjs
+      - name: The pointer check's link checker, lychee, read and decided against a base, with a stand-in for it (#582)
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/links-test.mjs ')) }}
+        run: node tests/links-test.mjs
       - name: The copies check on the agent tools' files, what stood there noted until it is listed
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/copies-tools-test.mjs ')) }}
         run: node tests/copies-tools-test.mjs
-      - name: The pointers in the core's own floor and modules lead somewhere
+      - name: The pointers in the core's own floor and modules lead somewhere, and their Markdown links and the headings they name, by lychee
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/pointers.mjs --core
       - name: What a release asks of a project, step by step, and a project beside a fresh start
