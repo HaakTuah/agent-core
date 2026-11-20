@@ -143,6 +143,10 @@
       "mark": 91943,
       "why": "#884: along its sections, in step with scripts/shape.mjs."
     },
+    "tests/releases-test.mjs": {
+      "mark": 32922,
+      "why": "One module's cases (releases.mjs, and release.mjs that cuts one) on the one scratch core it sets up with its release tags; split, each file would set it up again, adding to the suite's time (tasks/tests.md), and a session changing the module reads every case."
+    },
     "tests/size-test.mjs": {
       "mark": 28199,
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
