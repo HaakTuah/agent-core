@@ -83,13 +83,13 @@
       "mark": 138318,
       "why": "#916: a file for each reader its sections test."
     },
+    "tests/strength-test.mjs": {
+      "mark": 33149,
+      "why": "#1009: the verdict's cases apart from the run's, along the seam #920 split the script on."
+    },
     "tests/upgrade-test.mjs": {
       "mark": 98773,
       "why": "One flow over the projects it builds: each case takes a project as the one before left it (written, synced, merged, its own pull requests after), so a file of its own would build them again; and tests/ holds test files alone (#614), so no module beside it can hold a part. A session reads the case it changes, found by its section's heading."
-    },
-    "scripts/strength.mjs": {
-      "mark": 39011,
-      "why": "#920: the verdict on a run apart from the run on a project."
     },
     "scripts/read-total.mjs": {
       "mark": 20690,
