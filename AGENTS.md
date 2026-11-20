@@ -546,7 +546,8 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   `scripts/holders.mjs` names from the rule's key; and the choice records (`CHOICES.md`), each in a file under `choices/`.
   Each is read in the order of the files' names by the script that
   reads it (`scripts/inventory.mjs`, `scripts/sync-notes.mjs`, `scripts/steps.mjs`, `scripts/steps-stage.mjs`,
-  `scripts/holders.mjs`, `scripts/choices.mjs`), as each archive item stands already ("A new archive item is named by its issue"). Whoever adds
+  `scripts/holders.mjs`, `scripts/choices.mjs`), as each archive item stands already ("A new archive item is named by
+  its issue"). Whoever adds
   an entry adds its file. Nothing changes it, and what it does not mean stands there too. Reason: of 39 pull requests
   merged between 18 and 19 November 2026, 8 changed `INVENTORY.md`, 10 `setup/sync-notes.md`, 7 `scripts/steps.mjs` and
   6 `scripts/holders.json`, and under merge-on-green pull requests that add to one file merge side by side and collide.
@@ -554,7 +555,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   part's line written in `INVENTORY.md` itself; by `tests/steps-test.mjs`, which reads the notes whole, and fails an
   entry, a step or a stage without its pair of the same name and an entry written in `setup/sync-notes.md` itself; and
   by `tests/holders-test.mjs`, which with `scripts/holders.mjs` fails a file of the list not named from its rule, and
-  two rules whose entries would share a file; and by `tests/choices-test.mjs`, which fails a record written in
+  two rules whose entries would share a file; and by `tests/choices-folder-test.mjs`, which fails a record written in
   `CHOICES.md` itself and a file of `choices/` that is not one record.
 - **The core's address stands in one place** (`scripts/core-address.mjs`). Should the account or the
   repository be renamed, it changes there and in the `CORE` of `.github/workflows/core.yml`, in one PR;

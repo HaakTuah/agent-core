@@ -38,10 +38,14 @@ export const DAYS = 182;
 // (AGENTS.md, "A record pull requests add to is a folder of one file per entry"; #870): the folder is a plain path
 // from the project's root.
 export const POINTER = /^Its records stand in `([\w][\w.-]*(?:\/[\w][\w.-]*)*)\/`, a file each, read in the order of their names\.$/u;
-// The records file's text with each line POINTER reads replaced by the records `partsOf(folder)` gives (their texts, each
-// without its last line ending), a blank line between.
-export const wholeOf = (text, partsOf) => String(text).split("\n").map(line => { const m = POINTER.exec(line.replace(/\r$/u, "")); return m ? partsOf(m[1]).join("\n\n") : line; }).join("\n");
+// The records file's text with each line POINTER reads replaced by the records `partsOf(folder)` gives (their texts), a
+// blank line between; a folder a second line names again is read once.
+export const wholeOf = (text, partsOf) => { const seen = new Set(); return String(text).split("\n").map(line => { const m = POINTER.exec(line.replace(/\r$/u, "")); if (!m) return line; if (seen.has(m[1])) return ""; seen.add(m[1]); return partsOf(m[1]).join("\n\n"); }).join("\n"); };
 const trimmed = text => text.replace(/\r?\n$/u, "");
+// The records of one folder, in the order of the files' names: the texts `read(name)` gives of those of `names` that end
+// ".md", each without its last line ending (the one place the order and the trim stand, for the disk, a commit and a
+// project's files alike).
+export const inFolder = (names, read) => names.filter(n => n.endsWith(".md")).sort().map(n => trimmed(String(read(n) ?? "")));
 
 // The path a project's rules name for its *choice records* (the manifest's row, or a line of the core's AGENTS.md that
 // gives the slot), else KIT; null where the name is no plain path inside the project.
@@ -153,21 +157,23 @@ export function records(rules, root = ".") {
   }
   let text, unread = null, total = 0;
   try { text = fs.readFileSync(path.join(root, file), "utf8"); } catch { return { file, unread: `${file} could not be read` }; }
-  total = text.length;
+  total = Buffer.byteLength(text);
   text = wholeOf(text, folder => {
-    const names = [];
     const at = folder.split("/");
-    for (let i = 1; i <= at.length; i++) {
-      let stat;
-      try { stat = fs.lstatSync(path.join(root, ...at.slice(0, i))); } catch { return []; }
-      if (stat.isSymbolicLink() || (i === at.length && !stat.isDirectory())) { unread ??= `${folder}/ is no plain folder (a link, or no folder, stands on its way)`; return []; }
+    try {
+      for (let i = 1; i <= at.length; i++) {
+        const stat = fs.lstatSync(path.join(root, ...at.slice(0, i)));
+        if (stat.isSymbolicLink() || (i === at.length && !stat.isDirectory())) throw new Error("no plain folder");
+      }
+      const names = fs.readdirSync(path.join(root, folder), { withFileTypes: true }).filter(e => e.isFile()).map(e => e.name);
+      return inFolder(names, name => {
+        if ((total += fs.statSync(path.join(root, folder, name)).size) > MOST) throw new RangeError("past");
+        return fs.readFileSync(path.join(root, folder, name), "utf8");
+      });
+    } catch (e) {
+      unread ??= e instanceof RangeError ? `${file} with ${folder}/ is past ${MOST} bytes` : `${folder}/ is no plain folder, or could not be read (a link, or none, stands on its way)`;
+      return [];
     }
-    try { names.push(...fs.readdirSync(path.join(root, folder), { withFileTypes: true }).filter(e => e.isFile() && e.name.endsWith(".md")).map(e => e.name).sort()); } catch { unread ??= `${folder}/ could not be read`; return []; }
-    return names.map(name => {
-      const part = path.join(root, folder, name);
-      if ((total += fs.statSync(part).size) > MOST) { unread ??= `${file} with ${folder}/ is past ${MOST} bytes`; return ""; }
-      return unread ? "" : trimmed(fs.readFileSync(part, "utf8"));
-    });
   });
   return unread ? { file, unread } : { file, text };
 }
@@ -305,19 +311,21 @@ export function baseRecords(base, root = ".") {
   const text = file ? atCommit(base, file, root) : null;
   if (typeof text !== "string") return text;
   const git = args => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: MOST * 2 });
-  let link = false, total = text.length;
+  // (a folder the base held as a link, or that cannot be read there, or is past MOST with the file, reads as a link: its
+  // records are listed and none fails, as with no base to compare with, since any of them may have stood there)
+  let unreadable = false, total = Buffer.byteLength(text);
   const whole = wholeOf(text, folder => {
     const at = folder.split("/");
     try {
-      for (let i = 1; i <= at.length; i++) if (/^120000 /u.test(git(["ls-tree", base, "--", at.slice(0, i).join("/")]))) { link = true; return []; }
-      return git(["ls-tree", "-z", base, "--", `${folder}/`]).split("\0").filter(Boolean).map(l => /^100(?:644|755) blob (\w+)\t(.+)$/u.exec(l)).filter(m => m && m[2].endsWith(".md"))
-        .map(m => m[2]).sort().map(name => {
-          if ((total += Number(git(["cat-file", "-s", `${base}:${name}`]))) > MOST) { link = null; return ""; }
-          return trimmed(git(["show", `${base}:${name}`]));
-        });
-    } catch { return []; }
+      for (let i = 1; i <= at.length; i++) if (/^120000 /u.test(git(["ls-tree", base, "--", at.slice(0, i).join("/")]))) throw new Error("a link");
+      const entries = git(["ls-tree", "-z", base, "--", `${folder}/`]).split("\0").filter(Boolean).map(l => /^100(?:644|755) blob \w+\t(.+)$/u.exec(l)?.[1]).filter(Boolean);
+      return inFolder(entries, name => {
+        if ((total += Number(git(["cat-file", "-s", `${base}:${name}`]))) > MOST) throw new RangeError("past");
+        return git(["show", `${base}:${name}`]);
+      });
+    } catch { unreadable = true; return []; }
   });
-  return link ? LINK : link === null ? null : whole;
+  return unreadable ? LINK : whole;
 }
 
 // What the check prints and whether it failed: `got`, the records at the head (records()); `base`, the commit the

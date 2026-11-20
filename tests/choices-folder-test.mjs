@@ -7,7 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { LINK, PART, POINTER, baseRecords, checkOf, folderFaults, look, parse, records, wholeOf } from "../scripts/choices.mjs";
+import { LINK, MOST, PART, POINTER, baseRecords, checkOf, folderFaults, look, parse, records, wholeOf } from "../scripts/choices.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0, count = 0;
@@ -68,6 +68,22 @@ let link = true;
   // the command, as the copies check runs it, on the base as it stood
   const cmd = spawnSync(process.execPath, [path.join(here, "choices.mjs")], { cwd: dir, encoding: "utf8", env: { ...process.env, CHOICES_BASE: whole0 } });
   ok(cmd.status === 0 && /3 records|listed, not failed: "c"/.test(cmd.stdout), "the command reads the folder at the head and the file at the base", cmd.stdout + cmd.stderr);
+  // the folder gone while its line stays, a second line naming the same folder, a base too large to read: each safe
+  fs.renameSync(path.join(dir, "choices"), path.join(dir, "choices-away"));
+  const gone = records(rules, dir);
+  ok(/no plain folder, or could not be read/.test(gone.unread ?? "") && !("text" in gone), "a folder the file names that is not there reads as unreadable, never as no records", JSON.stringify(gone));
+  fs.renameSync(path.join(dir, "choices-away"), path.join(dir, "choices"));
+  write("CHOICES.md", `${head}${pointer}\n${pointer}\n`);
+  ok(parse(records(rules, dir).text).records.map(x => x.name).join() === "a,b,c", "a second line naming the same folder reads its records once");
+  write("choices/900-big.md", `${rec("big")}${"x".repeat(MOST)}\n`);
+  ok(/is past/.test(records(rules, dir).unread ?? ""), "a folder whose records pass the size limit reads as unreadable");
+  fs.rmSync(path.join(dir, "choices/900-big.md"));
+  write("CHOICES.md", `${head}${pointer}\n`);
+  g("add", "-A"); write("choices/900-big.md", `${rec("big")}${"x".repeat(MOST)}\n`); g("add", "-A"); g("commit", "-q", "-m", "a large record");
+  const bigAt = g("rev-parse", "HEAD").trim();
+  fs.rmSync(path.join(dir, "choices/900-big.md")); g("add", "-A"); g("commit", "-q", "-m", "without it");
+  const dropped = checkOf(records(rules, dir), bigAt, dir);
+  ok(baseRecords(bigAt, dir) === LINK && dropped[1] === false && /listed, not failed: "c"/.test(dropped[0].join("\n")), "a base whose records are too large to read lists the records and fails none, as for a link", dropped[0].join("\n"));
   // a folder that was a link at the base is not read there; one that is a link here is unreadable
   if (link) {
     fs.rmSync(path.join(dir, "choices"), { recursive: true }); write("elsewhere/010-a.md", rec("a")); fs.symlinkSync("elsewhere", path.join(dir, "choices")); g("add", "-A"); g("commit", "-q", "-m", "a linked folder");
