@@ -32,7 +32,7 @@
       "why": "#929: the cases of how Betterleaks reads apart from what the check reads."
     },
     ".github/workflows/tests.yml": {
-      "mark": 69417,
+      "mark": 72196,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {
@@ -247,13 +247,9 @@
       "mark": 32013,
       "why": "#943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
     },
-    "tests/agent-tools-test.mjs": {
-      "mark": 114595,
-      "why": "#919: split with agent-tools.mjs, a file of cases for each tool's configuration."
-    },
-    "tests/core-path-test.mjs": {
-      "mark": 25409,
-      "why": "#919: its cases for a core a library carries, and for the commands its hooks run, move to a file of their own."
+    ".github/shape-baseline.json": {
+      "mark": 21237,
+      "why": "A baseline the shape check reads and writes whole (--write), in the form every project's baseline takes; 'grown' gives the reason for some of the keys 'listed' holds, so a split along the two parts would make two files to keep in step, and none along who reads it was found."
     },
     "tests/staged-test.mjs": {
       "mark": 125729,

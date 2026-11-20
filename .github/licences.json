@@ -20,7 +20,10 @@
       "tests/licence-fetch-other-test.mjs",
       "tests/licence-fetch-pages-test.mjs",
       "scripts/agent-tools-pins.mjs",
-      "tests/agent-tools-test.mjs",
+      "tests/agent-tools-kiro-codex-test.mjs",
+      "tests/agent-tools-links-test.mjs",
+      "tests/agent-tools-pins-test.mjs",
+      "tests/agent-tools-source-test.mjs",
       "scripts/npm-once.mjs"
     ]
   },
