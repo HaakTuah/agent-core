@@ -15,6 +15,8 @@ import { importsOf, projectFilesByContent, readProject } from "../scripts/nuget.
 import { project } from "../scripts/steps.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 
+// (a path by its full name, as Windows' own call gives it: its short names, as in the temporary folder, taken out)
+const real = f => fs.realpathSync.native(f);
 const lf = text => text.replace(/\r\n/g, "\n");
 const slash = f => f.split(path.sep).join("/");
 const write = (dir, to, text) => { fs.mkdirSync(path.dirname(path.join(dir, to)), { recursive: true }); fs.writeFileSync(path.join(dir, to), text); };
@@ -54,7 +56,7 @@ function kinds(dir, git, tmp) {
   write(dir, "dist/ignored.txt", "a file git ignores\n");
   const outside = path.join(tmp, "outside-the-project.txt");
   fs.writeFileSync(outside, "a file of no project's\n");
-  const home = fs.realpathSync(dir);
+  const home = real(dir);
   git(dir, "add", "kinds/text.txt", "kinds/run.sh");
   git(dir, "update-index", "--chmod=+x", "kinds/run.sh");
   const links = { "kinds/to-text": "text.txt", "kinds/to-link": "to-text", "kinds/to-ignored": "../dist/ignored.txt", "kinds/to-outside": slash(path.relative(path.join(home, "kinds"), outside)),
@@ -82,7 +84,7 @@ function againstGit(p, dir, git, ok) {
     return [f, { mode, oid }];
   }));
   const blobs = blobTexts(dir, [...entries.values()].filter(e => e.mode !== "160000").map(e => e.oid));
-  const home = fs.realpathSync(dir);
+  const home = real(dir);
   const expected = (f, hops = 0) => {
     const e = entries.get(f);
     if (!e || e.mode === "160000") return null;
@@ -146,12 +148,12 @@ function againstBash(p, dir, { tmp, env, ok }) {
     github: { event_name: "pull_request", repository: `someone-else/${p.name}`, workspace: dir }, base: { ...env, [key]: `${bin}${path.delimiter}${env[key]}`, NODE_LOG: log },
     workspace: () => dir, uses: {}, temp: tmp });
   const failedSteps = results.flatMap(r => r.steps.filter(s => !s.passed).map(s => `${s.name}: ${s.out}`));
-  const home = fs.realpathSync(dir), copy = copyAt(project(dir));
+  const home = real(dir), copy = copyAt(project(dir));
   const runs = (fs.existsSync(log) ? fs.readFileSync(log, "utf8") : "").split("\x1e\n").filter(Boolean).map(record => {
     const [cwd, ...args] = record.replace(/\n$/, "").split("\n");
-    const at = args.findIndex(a => !a.startsWith("-")), script = within(home, fs.realpathSync(path.resolve(fs.realpathSync(cwd), args[at])));
+    const at = args.findIndex(a => !a.startsWith("-")), script = within(home, real(path.resolve(real(cwd), args[at])));
     const name = path.posix.basename(script ?? ""), config = picked(name, args.slice(at + 1));
-    return { script, name, config: config === undefined ? null : within(home, path.resolve(fs.realpathSync(cwd), config)) };
+    return { script, name, config: config === undefined ? null : within(home, path.resolve(real(cwd), config)) };
   });
   const read = configs(project(dir));
   const wrong = runs.filter(r => r.script !== `${copy}scripts/${r.name}` || !CHECKED[r.name] || read[CHECKED[r.name]] !== r.config);
@@ -175,7 +177,7 @@ function buildFiles(dir) {
 // The project's own files that `dotnet msbuild -pp` of each of its project files names (those git lists, outside the
 // copy), against those importsOf reads.
 function againstSdk(p, dir, { tmp, env, ok }) {
-  const read = project(dir), copy = copyAt(read), own = read.files.filter(f => !f.startsWith(copy)), home = fs.realpathSync(dir);
+  const read = project(dir), copy = copyAt(read), own = read.files.filter(f => !f.startsWith(copy)), home = real(dir);
   const listed = new Set(own), named = new Set(), failed = [];
   for (const proj of own.filter(f => /\.(?:cs|fs|vb)proj$/i.test(f))) {
     const out = path.join(tmp, `${p.name}-pp.xml`);
@@ -184,7 +186,7 @@ function againstSdk(p, dir, { tmp, env, ok }) {
     // (each file the build reads stands alone on a line of a comment, by its full path)
     for (const line of fs.readFileSync(out, "utf8").split(/\r?\n/)) {
       if (!path.isAbsolute(line.trim()) || !fs.existsSync(line.trim())) continue;
-      const f = within(home, fs.realpathSync(line.trim()));
+      const f = within(home, real(line.trim()));
       if (f !== null && listed.has(f)) named.add(f);
     }
   }
