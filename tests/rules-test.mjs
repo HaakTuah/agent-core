@@ -3,10 +3,18 @@
 // that moves (HEAD, a branch, one written like an id) is read again, as it names another commit; and what a caller does
 // with the rules it was given changes none that is asked after. The git it reads is handed in, a fake that answers
 // from a table of commits and counts what it was asked, so no repository is made; one case reads the core's own
-// repository with the git it runs by itself. Node's own modules.
+// repository with the git it runs by itself. And the rules a project takes (takenRules), as the reading of a project
+// against the core reads them against its record (core-reading.mjs; #464): a whole reading where no record stands or
+// it cannot be read, else each rule added or changed since, by its key. Node's own modules.
 //
 //   node tests/rules-test.mjs
-import { ROOT, rulesAt } from "../scripts/rules.mjs";
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { RECORD, due, record, said } from "../scripts/core-reading.mjs";
+import { ROOT, rulesAt, takenRules, rules } from "../scripts/rules.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -89,4 +97,40 @@ const commits = {
   ok(without.some(r => r.key === floor) && !without.some(r => r.file === "AGENTS.md") && within.some(r => r.key === floor) && within.some(r => r.file === "AGENTS.md"),
     "its own git reads the core's commit: the floor's rules, and those of AGENTS.md where asked");
 }
-done("what rulesAt reads once and what it reads each time");
+// the rules a project takes, and what a reading against the core finds due
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-reading-"));
+  const write = (f, t) => { fs.mkdirSync(path.dirname(path.join(tmp, f)), { recursive: true }); fs.writeFileSync(path.join(tmp, f), t); };
+  write("floor/security.md", "**1. Nothing secret.** None.\n");
+  write("tasks/a.md", "- **Rule one.** Its text.\n");
+  write("tasks/b.md", "- **Rule two.** Left out.\n");
+  const manifest = "Modules: `a.md`\nNot taken: `b.md` (none here)\n";
+  ok(takenRules(rules(tmp), manifest).map(r => r.key).join("|") === "floor/security.md: 1. Nothing secret|tasks/a.md: Rule one",
+    "a project takes the floor's rules and those of the modules its manifest does not leave out");
+  const whole = due(manifest, null, tmp), unreadable = due(manifest, "{\"day\": \"today\"}", tmp);
+  ok(whole.whole && /no reading/.test(whole.why) && unreadable.whole && /cannot be read/.test(unreadable.why), "with no record, or one in no form it reads, a whole reading is due");
+  const recorded = record(manifest, "2026-11-20", tmp);
+  ok(due(manifest, recorded, tmp) === null && said(null) === null, "once recorded, nothing is due");
+  write("tasks/a.md", "- **Rule one.** Its text, changed.\n- **Rule three.** New.\n");
+  write("tasks/b.md", "- **Rule two.** Left out, and changed.\n");
+  const after = due(manifest, recorded, tmp);
+  ok(!after.whole && after.day === "2026-11-20" && after.keys.join("|") === "tasks/a.md: Rule one|tasks/a.md: Rule three",
+    "after a release, each rule it takes that was added or changed is due, by its key, and none it leaves out", JSON.stringify(after));
+  ok(/^2 rules the project takes were added or changed since the reading of 2026-11-20/.test(said(after)) && said(after).includes("`tasks/a.md: Rule three`") && said(after).includes("core-reading.mjs --recorded") && said(whole, "lib/core/").includes("lib/core/roles/auditor.md"),
+    "what is due is said with each rule and the command that records the reading, in the copy's own path", said(after));
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+{
+  const here = fs.mkdtempSync(path.join(os.tmpdir(), "core-reading-cli-"));
+  const run = (...args) => spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/core-reading.mjs", import.meta.url)), ...args], { cwd: here, encoding: "utf8" });
+  ok(/takes no copy/.test(run().stdout), "where no manifest stands, as in the core's own repository, nothing is read");
+  fs.writeFileSync(path.join(here, "core-manifest.md"), "Modules: all\n");
+  ok(/A whole reading of the project against the core is due/.test(run().stdout), "a project with no record is asked a whole reading");
+  ok(run("--rules").stdout.split("\n").includes("floor/security.md: 1. Nothing secret in the repository"), "--rules lists every rule it takes, by its key");
+  const r = run("--recorded");
+  ok(r.status === 0 && fs.existsSync(path.join(here, RECORD)) && /No reading of the project against the core is due/.test(run().stdout), "--recorded writes the record, and then nothing is due", r.stderr);
+  const wrong = run("--all");
+  ok(wrong.status === 1 && /Mend: /.test(wrong.stderr), "an option it does not know fails, with its mend", wrong.stderr);
+  fs.rmSync(here, { recursive: true, force: true });
+}
+done("what rulesAt reads once and what it reads each time, and what a reading against the core finds due");

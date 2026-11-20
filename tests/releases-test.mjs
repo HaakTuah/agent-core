@@ -13,7 +13,7 @@ import { CORE, OWNER } from "../scripts/core-address.mjs";
 import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
 import { STEPS } from "../scripts/steps.mjs";
 import { FOLDER, NOTICE, POINTER, entries, notesAt } from "../scripts/sync-notes.mjs";
-import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
+import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, jumped, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -92,7 +92,7 @@ const c3 = commit(`${head}- **First.** Done when one.\n- **Second.** Done when t
 const fetched = () => { const dir = fs.mkdtempSync(path.join(tmp, "fetched-")); fetchCore(dir, core); return dir; };
 
 let dir = fetched();
-ok(releasesIn(dir).length === 0 && newestRelease(c1, dir) === null, "a core with no tag has no release");
+ok(releasesIn(dir).length === 0 && newestRelease(c1, dir) === null && !jumped(c1, dir), "a core with no tag has no release, and no copy is older than its last two");
 ok(next(dir).name === "release-1" && next(dir).sha === c4 && next(dir).before === null && next(dir).asks.length === 0, "the first release would stand on main's newest commit");
 ok(past(c1, c3, dir) && past(c3, c3, dir) && !past(c3, c1, dir) && !past("0".repeat(40), c3, dir) && !past("not-a-commit", c3, dir), "a commit is past the ones it came from, and itself; what is no commit there is past nothing");
 
@@ -107,6 +107,7 @@ ok(newestRelease(c1, dir).name === "release-2" && newestRelease(c1, dir).sha ===
 ok(!newestRelease(c3, dir).moved && !newestRelease(c4, dir).moved, "a pin at the newest release, or past it on main, has nothing to take");
 ok(!newestRelease(side, dir).moved && !newestRelease("f".repeat(40), dir).moved, "a pin that is no commit of main moves nowhere (core.yml fails such a project by itself)");
 ok(asksBetween(c1, c3, dir).join("|") === "- **First.** Done when one.|- **Second.** Done when two." && asksBetween(c3, c4, dir).length === 0, "a sync asks what the notes gained between the two commits");
+ok(jumped(c1, dir) && !jumped(c2, dir) && !jumped(c3, dir) && !jumped(c4, dir) && !jumped(side, dir) && !jumped("f".repeat(40), dir), "a copy from before the second newest release is older than the last two, and one at it or past it, or no commit of main, is not");
 ok(asksBetween("f".repeat(40), c3, dir) === null, "notes that cannot be read give no all-clear");
 {
   // (#750, point 1: the notes' entries move from the file into a folder, a file each; a sync across the move asks
