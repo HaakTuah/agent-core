@@ -91,7 +91,7 @@ const HERE = fileURLToPath(new URL("..", import.meta.url));
 fs.cpSync(path.join(HERE, "scripts"), path.join(synced, "core/scripts"), { recursive: true });
 fs.cpSync(path.join(HERE, ".packages"), path.join(synced, "core/.packages"), { recursive: true, filter: parserLeftOut });
 fs.cpSync(path.join(HERE, "setup/template"), path.join(synced, "core/setup/template"), { recursive: true });
-git(synced, "add", "-A"); 
+git(synced, "add", "-A");
 git(synced, "commit", "-q", "-m", "the copy");
 const newKit = JSON.parse(KIT);
 newKit.hooks.Stop[0].hooks[0].command = "a newer stop";

@@ -15,6 +15,7 @@ export const KIT = template("claude-settings.json.tmpl"), KIRO = template("kiro-
 // Links (and git storing them as links) are read on Linux and macOS, where GitHub's runners run the check in a project;
 // on Windows, where making one needs a right the runner may not give, those cases are left out and said so.
 export const LINKS = process.platform !== "win32";
+if (!LINKS) console.log("note the cases with links are run on Linux and macOS alone");
 // (git's own settings of this machine left out, as the core's other tests leave them: a file that is not there, since
 // Windows' git cannot open its null device as one, and line endings stored as written)
 const none = scratchDir("agent-tools-");

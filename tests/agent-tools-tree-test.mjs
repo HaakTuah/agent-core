@@ -84,10 +84,10 @@ fails(run(pr(mainDir, { "scripts/format.sh": "echo a file\n", ".claude/settings.
 const sub = project({ ...listing() });
 git(sub, "checkout", "-q", "-B", "change");
 change(sub, { ".claude/settings.json": withHook(KIT_HOOK), ...listing(entry(KIT_HOOK)) });
-git(sub, "add", "-A"); 
+git(sub, "add", "-A");
 git(sub, "update-index", "--add", "--cacheinfo", `160000,${git(sub, "rev-parse", "HEAD")},scripts/format.sh`);
-git(sub, "commit", "-q", "-m", "a submodule's entry"); 
-git(sub, "checkout", "-q", "main"); 
+git(sub, "commit", "-q", "-m", "a submodule's entry");
+git(sub, "checkout", "-q", "main");
 git(sub, "merge", "-q", "--no-ff", "-m", "merge", "change");
 fails(run(sub), "and one whose fetched path is a submodule's entry", NOT_FILE);
 // (#476's fallback security review of bf7b3b2: what git shows at the path is asked of git, whatever the listing says,

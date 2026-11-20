@@ -15,7 +15,6 @@ import { tally } from "../scripts/scratch-core.mjs";
 const { ok, done } = tally();
 const { passes, fails } = asserting(ok);
 
-if (!LINKS) console.log("note the cases with links are run on Linux and macOS alone");
 // ---- links where a tool reads its files: none is followed (git's mode 120000 says what a link is) ----
 // (each case one a past review found of the reading that followed links, #600 to #706: a new or changed link fails
 // whatever it leads to; one the base held is noted, and fails only where the pull request changes what its text names)
