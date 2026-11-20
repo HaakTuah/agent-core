@@ -146,7 +146,9 @@ export function body({ core, month, measures, shape: shaped = null, wait = null,
   if (core) lines.push("", `**Changes to the floor and the review guidelines merged in ${before(month)}, and whether each quoted the owner's yes**`,
     `- Not read by GitHub's job. The session that takes this report adds, as a note, what \`node scripts/meaning-kept.mjs --month ${before(month)}\` prints, so the owner can look them over (#886, point 2).`);
   if (core) lines.push("", "**The projects that take the core**",
-    "- Not read by GitHub's job, whose token reaches this repository alone. A session where gh answers for the owner's account runs `node scripts/state-report.mjs --projects` and adds what it prints here as a note; where its tool cannot reach a project, a session started in that project reads it and passes back counts and conclusions alone.");
+    "- Not read by GitHub's job, whose token reaches this repository alone. A session where gh answers for the owner's account runs `node scripts/state-report.mjs --projects` and adds what it prints here as a note; where its tool cannot reach a project, a session started in that project reads it and passes back counts and conclusions alone.",
+    "", "**The security-review status against the host's record**",
+    "- Not read by GitHub's job, whose token may not read the collaborators. A session where gh answers for the owner's account runs `node scripts/security-review-record.mjs`, commits what it records in a pull request of its own, and files each difference it prints as a bug (#626).");
   lines.push("", "**What the reviews found twice**",
     `- Not read by GitHub's job. The session that takes this report runs \`node ${scripts}/review-record.mjs --since ${before(month)}-01\` and, for each rule it lists under "Found twice" that no open issue takes, files an issue as \`${scripts.replace(/scripts$/u, "tasks")}/reviews.md\`, point 8, says.`,
     "", "**The rounds of review**",

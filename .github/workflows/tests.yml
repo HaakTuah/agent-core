@@ -308,6 +308,9 @@ jobs:
       - name: The recorder of the host's own record of the security review
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/security-review-record-test.mjs ')) }}
         run: node tests/security-review-record-test.mjs
+      - name: The recorder of the host's own record of the security review, on a host the test stands in for
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/security-review-record-run-test.mjs ')) }}
+        run: node tests/security-review-record-run-test.mjs
       - name: The code-review wait
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-review-wait-test.mjs ')) }}
         run: node tests/code-review-wait-test.mjs

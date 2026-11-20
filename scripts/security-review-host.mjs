@@ -16,23 +16,22 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { FINDING, WRITERS, asPosted, codexState, codexs, counted, judge, writersOf } from "./security-review.mjs";
+import { FINDING, codexState, codexs, flat, judge, postedBy, writersOf } from "./security-review.mjs";
 
 export const FOLDER = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "reports", "security-review-host");
 // how a security review of Codex's opens in the host's list of reviews, its kind given by the heading after the receipt
 export const SECURITY = /^<!-- codex-review-receipt:v1 -->\s*### 🛡️ Codex Security Review/u;
 // the roles GitHub defines; any other is a custom role (W6)
 const ROLES = ["read", "triage", "write", "maintain", "admin"];
-export const flat = (list) => (Array.isArray(list) ? list.flat() : []).filter((entry) => entry !== null && typeof entry === "object");
 export const time = (at) => Date.parse(at);
 export const lower = (login) => String(login).toLowerCase();
-// a posted security review, as security-review.mjs reads one (its POSTED)
-export const POSTED = /^(?:\*\*)?Security review:/u;
 
 // Codex's security reviews among the host's reviews of a pull request, submitted by its merge
 export const securityReviews = (record) => flat(record.reviews).filter((review) => codexs(review) && SECURITY.test(review.body) && time(review.submitted_at) <= time(record.pull.merged_at));
 // the pull request as it stood at its merge, as the workflow's last run read it: open and no draft, with what came by
-// then (a comment's time unreadable is kept, as the host gave it)
+// then (a comment's time unreadable is kept, as the host gave it). The verdict is read offline without what only the
+// run had: the merges clean-merges.mjs proved (every update from main is followed), a pure sync's or the queue's proof,
+// the reviewers the caller names, and the rights as they stood then (those recorded stand in for them)
 export function atMerge(record) {
   const by = (entry) => !(time(entry.created_at) > time(record.pull.merged_at));
   const pull = { ...record.pull, state: "open", draft: false };
@@ -61,8 +60,7 @@ function commitDiffers(n, said, reviews) {
   return [];
 }
 // an unresolved thread a Codex security finding opened, where the status passed with no "Security review:" posted
-// after that finding that the status counts (security-review.mjs, postedBy: a writer's, by an account counted, never
-// edited since)
+// after that finding that the status counts (security-review.mjs, postedBy)
 function threadsOpen(n, record) {
   if (!Array.isArray(record.threads)) return [];
   const [pull, comments, findings] = atMerge(record);
@@ -71,10 +69,9 @@ function threadsOpen(n, record) {
     .filter((comment) => comment !== undefined && codexs(comment) && FINDING.test(comment.body));
   const verdict = verdictOf(record);
   if (!verdict.done) return [];
-  const whose = counted(pull, undefined, writersOf(record.rights));
-  const posted = comments.filter((comment) => typeof comment.body === "string" && POSTED.test(comment.body) && WRITERS.includes(comment.author_association) && whose(comment.user) && asPosted(comment));
+  const posted = postedBy(pull, comments, true, undefined, record.rights).all;
   return open.filter((finding) => !posted.some((comment) => time(comment.created_at) > time(finding.created_at)))
-    .map((finding) => `${n}: Codex's security finding ${finding.id} is unresolved on the merged head, with no "Security review:" posted after it, yet the status passed: ${verdict.why}`);
+    .map((finding) => `${n}: Codex's security finding ${finding.id} is unresolved on the merged head, with no "Security review:" posted after it, yet the status, read without the run's proof of merges, passed: ${verdict.why}`);
 }
 
 // what differs between writersOf() and the host's push list: a list of lines, empty where nothing does

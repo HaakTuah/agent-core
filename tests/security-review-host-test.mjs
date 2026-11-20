@@ -91,7 +91,7 @@ if (started(import.meta.url)) {
   ok(same(compare(record({ reviews: [] })), []), "a summary with findings and no review in the host's list is none");
 
   const unseen = compare(record({ comments: [summary(cleared)] }));
-  ok(unseen.length === 1 && /^#7: Codex's security finding 31 is unresolved on the merged head, with no "Security review:" posted after it, yet the status passed: Codex's security review has run \(on aaaaaaa\)$/u.test(unseen[0]), "an open thread of a Codex security finding, where the status passed with no review after it, is a difference (F9)");
+  ok(unseen.length === 1 && /^#7: Codex's security finding 31 is unresolved on the merged head, with no "Security review:" posted after it, yet the status, read without the run's proof of merges, passed: Codex's security review has run \(on aaaaaaa\)$/u.test(unseen[0]), "an open thread of a Codex security finding, where the status passed with no review after it, is a difference (F9)");
   ok(same(compare(record({ comments: [summary(cleared), posted(HEAD, "2026-11-12T11:00:00Z")] })), []), "with a review posted after the finding, none");
   ok(compare(record({ comments: [summary(cleared), posted(HEAD, "2026-11-12T09:59:00Z")] })).length === 1, "a review posted before the finding does not settle it");
   ok(compare(record({ comments: [summary(cleared), posted(HEAD, "2026-11-12T10:00:00Z")] })).length === 1, "nor one posted the same second, as the status reads it");
@@ -140,8 +140,11 @@ if (started(import.meta.url)) {
     ok(securityReviews(one).length > 0 && Array.isArray(one.threads), `${file}: it holds a Codex security review in the host's list, and the threads`);
     const logins = [...JSON.stringify(one).matchAll(/"login":"([^"]*)"/gu)].map((m) => m[1]);
     ok(logins.every((login) => login === OWNER || login.endsWith("[bot]") || login === "web-flow" || /^someone-\d+$/u.test(login)), `${file}: no login but the owner's account, an app's, GitHub's own and stand-ins (floor rule 11)`);
+    const owners = [...JSON.stringify(one).matchAll(/"full_name":"([^"/]*)\//gu)].map((m) => m[1]);
+    ok(owners.every((owner) => owner === OWNER || /^someone-\d+$/u.test(owner)) && !/collaborators\/(?!<login>)/u.test(JSON.stringify(one)), `${file}: no repository's owner but the owner's account and stand-ins, and no login in a route`);
   }
   const rights = JSON.parse(fs.readFileSync(path.join(FOLDER, "rights.json"), "utf8"));
+  ok(!/collaborators\/(?!<login>)/u.test(JSON.stringify(rights)), "rights.json names no login in a route");
   if (rights.unread) console.log(`note who may write was not compared: the host's rights are not recorded (${rights.unread}); the recorder, run where gh answers for the owner's account, records them`);
   else ok(same(compareRights(rights), []), "writersOf() agrees with the host's push list");
 

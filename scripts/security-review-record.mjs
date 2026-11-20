@@ -12,10 +12,10 @@
 // core's own public pull requests, the owner's (#593, point 9): no other repository is read.
 //
 // It keeps only the fields the comparison reads (floor rule 11): of the comments, Codex's summary and findings and the
-// lines of a posted "Security review:" that the status reads; of the reviews, Codex's, each body cut after its heading;
+// lines of a writer's posted "Security review:" that the status reads; of the reviews, Codex's, each body cut after its heading;
 // of the files, a patch only where the status reads it as one that only moves pins; of the commits, who wrote and
 // signed them only on Dependabot's own pull request, the one place the status reads them. Any login but the owner's account, an app's and GitHub's own (web-flow) is given a stand-in,
-// the same within a pull request. It refuses to write a pull request whose judge() on what it keeps differs from
+// the same within a pull request, a fork's owner in a repository's name too, and why a call failed keeps no login. It refuses to write a pull request whose judge() on what it keeps differs from
 // judge() on what the host gave, so the cut drops nothing the status reads. A rights answer the host refuses (a cloud
 // session's proxy refuses the collaborators routes) is recorded as not read, with why, and a recording of them that
 // stands is kept.
@@ -25,8 +25,8 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { CORE, OWNER } from "./core-address.mjs";
-import { FINDING, codexState, codexs, pinsAlone } from "./security-review.mjs";
-import { FOLDER, POSTED, SECURITY, compare, flat, lower, recordings, time, verdictOf } from "./security-review-host.mjs";
+import { DEPENDABOT, FINDING, OPENS, POSTED, WRITERS, codexState, codexs, flat, pinsAlone } from "./security-review.mjs";
+import { FOLDER, SECURITY, compare, lower, recordings, time, verdictOf } from "./security-review-host.mjs";
 import { started } from "./started.mjs";
 
 // the host, through gh: a call is gh api's arguments, its answer the JSON gh prints (the test hands in its own)
@@ -34,6 +34,8 @@ export const gh = (args) => JSON.parse(execFileSync("gh", ["api", ...args], { en
 const pages = (call, route) => flat(call(["--paginate", "--slurp", `${route}${route.includes("?") ? "&" : "?"}per_page=100`]));
 // why a call failed, in the host's or gh's own words, one line
 export const why = (e) => String(e?.stderr || e?.message).trim().split("\n").at(-1).slice(0, 300);
+// why, as a recording keeps it: a login a route names (collaborators/<login>) left out (floor rule 11)
+export const unreadOf = (e) => why(e).replace(/(collaborators\/)[^/\s"'?]+/gu, "$1<login>");
 
 // a stand-in for each login but the owner's account, an app's and GitHub's own, the same within one recording
 export function standIns() {
@@ -56,16 +58,17 @@ export function keep(raw, as) {
     threads: raw.threads, rights: flat(raw.rights).map((answer) => rightOf(answer, as)), ...(raw.unread ? { unread: raw.unread } : {}) };
 }
 const pullKept = (p, as) => ({ number: p.number, state: p.state, draft: p.draft, merged_at: p.merged_at, created_at: p.created_at, commits: p.commits, changed_files: p.changed_files,
-  user: userOf(p.user, as), head: { sha: p.head.sha, repo: { full_name: p.head.repo?.full_name } }, base: { repo: { full_name: p.base.repo.full_name, owner: userOf(p.base.repo.owner, as) } } });
-// of the comments, Codex's summary and security findings, and the posted "Security review:"
-const SUMMARY_OPENS = /^<!-- codex-pull-request-review-summary -->/u;
-const kept = (c) => (codexs(c) && (SUMMARY_OPENS.test(c.body) || FINDING.test(c.body))) || POSTED.test(c.body);
+  user: userOf(p.user, as), head: { sha: p.head.sha, repo: { full_name: repoOf(p.head.repo?.full_name, as) } }, base: { repo: { full_name: repoOf(p.base.repo.full_name, as), owner: userOf(p.base.repo.owner, as) } } });
+// a repository's name, its owner a stand-in as any login is (a fork's owner is a stranger)
+const repoOf = (name, as) => (typeof name === "string" && name.includes("/") ? `${as(name.slice(0, name.indexOf("/")))}${name.slice(name.indexOf("/"))}` : name);
+// of the comments, Codex's summary and security findings, and the posted "Security review:" of a writer, as the host
+// calls one (the status reads no other's, and an outsider's text is kept out)
+const kept = (c) => (codexs(c) && (OPENS.test(c.body) || FINDING.test(c.body))) || (typeof c.body === "string" && POSTED.test(c.body) && WRITERS.includes(c.author_association));
 const commentKept = (c, as, body) => ({ id: c.id, user: userOf(c.user, as), author_association: c.author_association, created_at: c.created_at, updated_at: c.updated_at, body });
 // what the status reads of a comment's body: Codex's summary whole, and of any other its first line (a finding's
 // marker, a posted review's opening) and each line that names a commit or says what comment-only.mjs printed
 const READ_LINES = /[0-9a-f]{40}|^\s*(?:comments and steps' names alone in \.github\/|nothing changed in \.github\/)/iu;
-const bodyKept = (body) => (SUMMARY_OPENS.test(body) ? body : body.split("\n").filter((line, i) => i === 0 || READ_LINES.test(line)).join("\n"));
-const DEPENDABOT = "dependabot[bot]";
+const bodyKept = (body) => (OPENS.test(body) ? body : body.split("\n").filter((line, i) => i === 0 || READ_LINES.test(line)).join("\n"));
 const commitKept = (c, as, signed) => ({ sha: c.sha, parents: flat(c.parents).map((parent) => ({ sha: parent.sha })),
   ...(signed ? { author: userOf(c.author, as), committer: userOf(c.committer, as), commit: { verification: { verified: c.commit.verification?.verified } } } : {}) });
 // of the files, a patch only where the status reads it as one that only moves pins (any other it reads as none)
@@ -89,12 +92,12 @@ function threadsOf(call, n) {
 // the logins whose rights the workflow reads: each that posted a "Security review:", "Code review:" or "Design
 // check:" with a say in the repository, a person's account, but the owner (security-review.yml)
 const commenters = (comments) => [...new Set(flat(comments).filter((c) => /^(\*\*)?(Security review|Code review|Design check):/u.test(c.body)
-  && ["OWNER", "MEMBER", "COLLABORATOR"].includes(c.author_association) && c.user?.type === "User" && lower(c.user.login) !== lower(OWNER)).map((c) => c.user.login))];
+  && WRITERS.includes(c.author_association) && c.user?.type === "User" && lower(c.user.login) !== lower(OWNER)).map((c) => c.user.login))];
 
 function rightsOf(call, logins) {
   const rights = [];
   for (const login of logins) {
-    try { rights.push(call([`repos/${CORE}/collaborators/${login}/permission`])); } catch (e) { return { rights, unread: `the rights of a commenter: ${why(e)}` }; }
+    try { rights.push(call([`repos/${CORE}/collaborators/${login}/permission`])); } catch (e) { return { rights, unread: `the rights of a commenter: ${unreadOf(e)}` }; }
   }
   return { rights };
 }
@@ -108,12 +111,12 @@ export function fetchPull(call, n) {
 }
 // the record of one pull request, or a failure where Codex's summary changed after the merge (what the status read
 // then cannot be known) or where what it keeps would change the status's verdict
-export function recordOf(raw) {
+export function recordOf(raw, cut = keep) {
   const at = codexState(raw.comments).at;
   if (!(time(at) <= time(raw.pull.merged_at))) throw new Error(`FAIL: #${raw.pull.number}: Codex's summary ${at ? `last changed at ${at}, after the merge at ${raw.pull.merged_at}` : "is not there or cannot be read"}, so what the status read at the merge cannot be known. Mend: record another pull request (--pr N)`);
-  const record = keep(raw, standIns());
+  const record = cut(raw, standIns());
   const before = JSON.stringify(verdictOf(raw, raw.rights)), after = JSON.stringify(verdictOf(record));
-  if (before !== after) throw new Error(`FAIL: #${raw.pull.number}: the security-review status reads what the recorder leaves out (${before} against ${after}). Mend: keep the field it reads in keep() of scripts/security-review-host.mjs, and record it again`);
+  if (before !== after) throw new Error(`FAIL: #${raw.pull.number}: the security-review status reads what the recorder leaves out (${before} against ${after}). Mend: keep the field it reads in keep() of scripts/security-review-record.mjs, and record it again`);
   return record;
 }
 
@@ -135,7 +138,7 @@ function fetchRights(call) {
     const pushList = pages(call, `repos/${CORE}/collaborators?affiliation=all&permission=push`).map((entry) => ({ login: entry.login, type: entry.type, role_name: entry.role_name }));
     const answers = pushList.map((entry) => call([`repos/${CORE}/collaborators/${entry.login}/permission`]));
     return { pushList, answers };
-  } catch (e) { return { unread: why(e) }; }
+  } catch (e) { return { unread: unreadOf(e) }; }
 }
 // the rights, written to rights.json in the folder: a recording that stands is kept where the host refuses them now
 export function writeRights(call, folder, say) {
@@ -175,7 +178,12 @@ export function main(args, { call = gh, folder = FOLDER, say = console.log, warn
 function recordEach(call, numbers, folder, say, warn) {
   let refused = 0;
   for (const n of numbers) {
-    const raw = fetchPull(call, n);
+    let raw;
+    try { raw = fetchPull(call, n); } catch (e) {
+      warn(`FAIL: #${n}: the host could not give it (${why(e)}). Mend: record it again once the host answers, where gh answers for the owner's account`);
+      refused++;
+      continue;
+    }
     try {
       fs.writeFileSync(path.join(folder, `pr-${n}.json`), `${JSON.stringify(recordOf(raw))}\n`);
       say(`Recorded #${n}.`);
