@@ -85,6 +85,7 @@ import { installed, unreached } from "./packages.mjs";
 import { shapeFaults } from "./schemas.mjs";
 import { CHANGE_MARKS, FIRST_READS, PACKAGE_FILES, REACH, READERS, WHOLE_ON_PARSER, index, isCode, isPackageFile, linked, reachRuns, reading, shared, unnamedReaders, unreachedReaders } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
+import { LARGEST } from "./tree-walk.mjs";
 
 export const KIT = "checks/shape.json";
 const TEMPLATE = fileURLToPath(new URL("../setup/template/shape.json.tmpl", import.meta.url));
@@ -441,7 +442,7 @@ export function survey(texts, config, tests = new Set()) {
   read.unnamed = ctx.unnamed.length;
   read.tests = tests.size;
   for (const [k, kind] of [["screens", "screen"], ["timed", "timed"], ["processes", "process"]]) read[k] = new Set([...ctx.entries.keys()].filter(id => id.startsWith(`${kind}: `)).map(fileOf)).size;
-  return { entries: ctx.entries, read, unnamed: ctx.unnamed, readers: ctx.readers, reach: ctx.reach, scripts: new Set(ctx.scripts.keys()), unsure: ctx.unsure };
+  return { entries: ctx.entries, read, unnamed: ctx.unnamed, readers: ctx.readers, reach: ctx.reach, scripts: new Set(ctx.scripts.keys()), unsure: ctx.unsure, texts };
 }
 
 // ---- the baseline ----
@@ -606,8 +607,8 @@ const SAID = {
   cycle: n => [`${plural(n, "import lies", "imports lie")} on a cycle between files that did not stand before`, "turn one import of the cycle round: move what both files need into a file that imports neither, or pass it in"],
   platform: n => [`${plural(n, "import binds", "imports bind")} code to one platform outside the system declared for that`, "move the code that needs it into the system of the domain \"platform\", and have the rest call what that system offers, so that the rest builds and tests wherever the project's checks run"],
   package: n => [`${plural(n, "import takes", "imports take")} a package the project ships with outside the one system that wraps it`, "import it in one system alone, named under that system's \"wraps\" in the config, and have the others use what that system offers"],
-  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (JavaScript, TypeScript, C# or Python the grammar the core installs cannot read whole, or within its time, a file of them past 2 MB, or C# or Python nested more than 200 levels deep), so ${n === 1 ? "its" : "their"} functions are not held`,
-    "write it so that the reader can follow it: close each element of JSX, write a } or > in JSX's text as {'}'} or {'>'}, and nest less deep; where a script wrote it as data past 2 MB, leave it out of the config's \"code\" (\"!\" before its pathspec); where it is code that builds, newer than the grammar reads, list the entry under \"grown\" with that reason, by its id, and tell the core which construct it is, never the project's code (the core's README.md, \"Reporting to the core\"); the check's failure on the file then names what it holds"],
+  lost: n => [`${plural(n, "file", "files")} of code ${n === 1 ? "holds" : "hold"} what the reader cannot follow to its end (JavaScript, TypeScript, C# or Python the grammar the core installs cannot read whole, or within its time, a file of them past the largest its reader takes, ${LARGEST.javascript.toLocaleString("en")} characters of JavaScript or TypeScript, ${LARGEST.python.toLocaleString("en")} of Python and ${LARGEST.csharp.toLocaleString("en")} of C#, or C# or Python nested more than 200 levels deep), so ${n === 1 ? "its" : "their"} functions are not held`,
+    "write it so that the reader can follow it: close each element of JSX, write a } or > in JSX's text as {'}'} or {'>'}, and nest less deep; where a script wrote it as data past that size, leave it out of the config's \"code\" (\"!\" before its pathspec); where it is code that builds, newer than the grammar reads, list the entry under \"grown\" with that reason, by its id, and tell the core which construct it is, never the project's code (the core's README.md, \"Reporting to the core\"); the check's failure on the file then names what it holds"],
   global: n => [`${plural(n, "name joins", "names join")} the global space that scripts with no import or export share: a second name of one file there, or a name another such file declares too`,
     "make the file a module that imports what it uses and exports what it offers; where the page cannot load it so, put what it adds under the one name the file declares there already (an object of its functions), and give a name that two files declare one home"],
   screen: n => [`${plural(n, "test imports", "tests import")} what opens a screen, a window or a device, where no test of ${n === 1 ? "its" : "their"} file did before`,
@@ -630,17 +631,33 @@ const SAID = {
 // breach's place that covers itself. Of a reader the baseline does not list (`unread`), one the base held, or any where
 // no base is told, is `later`: reported, never failed, until --write lists it. The rest are new, each kind with its mend.
 function fresh({ config, at, self, found, current, base, news, unread }) {
-  const later = base ? [] : news.filter(unread);
-  if (!base) news = news.filter(id => !unread(id));
+  // (a file the readers cannot follow that the base held, its text as the base holds it, or any where no base is told,
+  // is said, never failed: a reader that comes to take less, a file past a smaller size or one a newer grammar reads
+  // otherwise, turns nothing that stood red, and only one a pull request adds or changes fails: tasks/code-shape.md,
+  // "What the check reads"; AGENTS.md, "Nothing locks a project". Its text is compared, since whether a file is lost can
+  // hang on the parser's time: a base read past its budget on one run excuses nothing a change brings to the file)
+  const lost = id => groupOf(id).kind === "lost" && !unread(id);
+  const unchanged = id => base.standing().texts[fileOf(id)] === found.texts[fileOf(id)];
+  const later = base ? [] : news.filter(unread), unfollowed = base ? [] : news.filter(lost);
+  if (!base) news = news.filter(id => !unread(id) && !lost(id));
   const fail = [];
   if (base && news.length) {
     const left = new Set(unclaimedOf(news, current, base.stood(), config.marks));
-    const readMore = news.filter(id => !left.has(id) && !unread(id));
+    const excused = id => lost(id) && unchanged(id);
+    unfollowed.push(...news.filter(id => !left.has(id) && excused(id)));
+    const readMore = news.filter(id => !left.has(id) && !unread(id) && !excused(id));
     later.push(...news.filter(id => !left.has(id) && unread(id)));
     news = news.filter(id => left.has(id));
     if (readMore.length) fail.push([`FAIL: ${plural(readMore.length, "breach", "breaches")} that ${base.name} held already ${readMore.length === 1 ? "is" : "are"} not in ${config.baseline}: the config reads more than it did, the baseline was lowered past what stands, or the entry is listed under another id, where a breach stands now. Mend: list them where they stand with SHAPE_BASE=${base.name} node ${self} ${at} --write, and commit the baseline`, ...some(readMore, current)]);
   }
-  return { fail: [...fail, ...byKind(news, found, current, config)], later };
+  return { fail: [...fail, ...byKind(news, found, current, config)], later, unfollowed };
+}
+
+// The files lost that stood before, said, never failed (fresh, above).
+function unfollowedNote({ config, at, self, base, unfollowed }) {
+  if (!unfollowed.length) return [];
+  const n = unfollowed.length, it = n === 1 ? "it" : "them";
+  return [`${SAID.lost(n, config)[0]}, and ${config.baseline} does not list ${it}: ${base ? `${base.name} held ${it} already` : "no base is told"}, so nothing fails over ${it}; SHAPE_BASE=${base?.name ?? "<the base branch>"} node ${self} ${at} --write lists ${it}: ${unfollowed.join("; ")}`];
 }
 
 // The failures of new breaches, one for each kind, with its mend and the breaches under it.
@@ -776,12 +793,12 @@ export function verdict({ config, at, self, found, baselineText, base }) {
   // (what a reader the baseline does not name finds claims after every other, so that it leaves no other without)
   const told = base ? thenOf(readAt(base, config), baseline, baselineText, config) : null;
   const news = unclaimed(new Map([...current].sort(([a], [b]) => unread(a) - unread(b))), told?.covers ?? baseline.listed, config.marks);
-  const { fail, later } = fresh({ config, at, self, found, current, base, news, unread });
+  const { fail, later, unfollowed } = fresh({ config, at, self, found, current, base, news, unread });
   const lowered = staleOf({ config, at, self, baseline, wrote: told?.wrote, gone });
   fail.push(...lowered.fail);
   if (told) fail.push(...againstBase({ config, at, self, baseline, base, found, ...told }));
   const reread = [...baseline.listed.keys()].filter(id => !current.has(id) && unread(id) && !kept(id)).length;
-  return { fail, notes: [...notesOf(found.read), ...lowered.notes, ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read, kept: [...baseline.listed.keys()].filter(kept).length };
+  return { fail, notes: [...notesOf(found.read), ...lowered.notes, ...unfollowedNote({ config, at, self, base, unfollowed }), ...unlisted({ config, at, self, reads, later, reread })], listed: baseline.listed.size, read: found.read, kept: [...baseline.listed.keys()].filter(kept).length };
 }
 
 // The entries a baseline lists that are gone or moved now (`gone`): { fail, notes }. One that only shrank passes as it

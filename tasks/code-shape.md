@@ -166,7 +166,7 @@ reads; in C# what a file takes from another is read from its using directives al
 export), it holds that each file adds at most one name there and no two declare the same. Of every file's comments, it counts the lines that mark a change. It never runs the code it
 reads, and never guesses: an import that leads nowhere it can tell and a file in another language are counted and said
 on every run, never failed; a file of JavaScript, TypeScript, C# or Python its grammar cannot read whole, and one of
-them past 2 MB, is counted and said too, and one a pull request adds fails, saying its mend; the audit's reader holds
+them past the size its reader takes (`LARGEST` in `core/scripts/tree-walk.mjs`), is counted and said too, and one a pull request adds fails, saying its mend; the audit's reader holds
 all that code to these rules. A baseline names the readers whose finds it lists, so a reader that comes later turns nothing red: what
 stood is said until `--write` lists it. A project that has not written its config yet is held to the starter kit's own,
 with each pull request's base as its baseline, from the sync that brings the check.

@@ -4,7 +4,7 @@
 // set from the core with the rules the case holds taken out, records the counts the rules' numbers read for the span
 // since the last pruning, and adds the list this prints. The list names each rule of the floor, the modules and the
 // core's AGENTS.md that:
-//   - names a number (holders.json, "numbers", in outcomes.mjs's form NUMBER) that did not move since the last pruning;
+//   - names a number (an entry of scripts/holders/, its "number", in outcomes.mjs's form NUMBER) that did not move since the last pruning;
 //   - stands in for an outcome (its number not one of the outcome's direct measures) and moved at two prunings in a row
 //     while those measures did not, each by the count outcomes.mjs's MEASURES give (DIRECT: a median left out; fast,
 //     readable and usable have none);
@@ -105,7 +105,7 @@ export function without(keys, all, read) {
 // name>", from `steps` ({ workflow: [{ name, run }] }).
 export const stepsOf = (by, steps) => Object.entries(steps).flatMap(([w, list]) => list.filter(st => (by.startsWith(".github/workflows/") ? w === by : String(st.run ?? "").includes(by))).map(st => `${w}#${st.name}`));
 
-// The checks a rule's holders name (holders.json's "holders"), each a script or workflow, or GitHub's setting.
+// The checks a rule's holders name (the "holder" of an entry of scripts/holders/), each a script or workflow, or GitHub's setting.
 export const checksOf = (key, named) => [named[key] ?? []].flat().map(h => /^check: (.+?)(?:, in part)?$/u.exec(String(h))?.[1]).filter(Boolean);
 
 // A rule's number as a pruning `x` counted it, or null.
@@ -200,7 +200,7 @@ export function unheldLines({ all, none, starts, toolStarts = new Set(), proposa
   ];
 }
 
-// The list's lines. `all`: the rules (rules.mjs's); `named`: holders.json's "holders"; `numbers`: its "numbers";
+// The list's lines. `all`: the rules (rules.mjs's); `named`: the entries' "holder"; `numbers`: their "number";
 // `record`; `cases`: the staged cases ({ name, holds }); `steps`: the workflows' steps, { path: [{ name, run }] };
 // `starts`: the keys of the rules a role reads at its start; `joined(r)`: how many merged pull requests came under the rule since it joined, or null;
 // `none`: the keys of the rules with no holder (holders.mjs), and `proposals`, UNHELD's, which lead the list, those of
@@ -251,7 +251,7 @@ export async function stepsAt(root = ROOT) {
   }
   return out;
 }
-const holdersAt = root => JSON.parse(fs.readFileSync(path.join(root, "scripts", "holders.json"), "utf8"));
+const holdersAt = async root => (await import("./holders.mjs")).named(root).json;
 
 // The pruning in progress: the newest whose counts are not yet recorded, made, dated today, where there is none; so a
 // pruning whose cases run past midnight stays one.
@@ -321,7 +321,7 @@ async function citedOf({ repo, from, to, gh, all }) {
 }
 
 // The counts of `repo` from `from` to `to` (ISO times), through `gh` (labels.mjs's ghApi form): { numbers, direct,
-// corrections, fired, cited }, each rule's number as `numbers` (holders.json's) names it: its findings, its check's
+// corrections, fired, cited }, each rule's number as `numbers` (an entry's) names it: its findings, its check's
 // fires (of the steps `stepsOfRule(key)` gives), or the corrections of a kind; the failed steps only of `known`.
 export async function counts({ repo, from, to, owner, gh, all, numbers, stepsOfRule, known }) {
   const span = { repo, from, to, owner, gh }, { ruleOf } = await import("./review-record.mjs");
@@ -392,7 +392,7 @@ async function recordCmd(get) {
   const record = readRecord(), last = ordered(record).filter(x => x.recorded).at(-1);
   const to = new Date().toISOString().replace(/\.\d{3}Z$/u, "Z"), from = last ? `${last.at}T00:00:00Z` : new Date(Date.now() - EVERY * 31 * 864e5).toISOString().replace(/\.\d{3}Z$/u, "Z");
   let c;
-  const h = holdersAt(ROOT), steps = await stepsAt(ROOT), stepsOfRule = key => checksOf(key, h.holders ?? {}).flatMap(by => stepsOf(by, steps));
+  const h = await holdersAt(ROOT), steps = await stepsAt(ROOT), stepsOfRule = key => checksOf(key, h.holders ?? {}).flatMap(by => stepsOf(by, steps));
   try { c = await counts({ repo, from, to, owner: get("--owner") ?? repo.split("/")[0], gh: ghApi, all: rules(ROOT, { agents: true }), numbers: h.numbers ?? {}, stepsOfRule, known: new Set(Object.entries(steps).flatMap(([w, list]) => list.map(x => `${w}#${x.name}`))) }); }
   catch (e) { return fail(`GitHub did not answer for ${repo}: ${String(e.message).split("\n")[0]}. Mend: run it where gh answers for the owner's account, or try again once GitHub does`); }
   Object.assign(open(record, get("--model")), { from, ...c, recorded: true });
@@ -409,7 +409,7 @@ async function main(argv) {
   const { startRules } = await import("./cited.mjs");
   const { CASES } = await import("./staged.mjs");
   // (the core's AGENTS.md, which every builder here reads at its start, with the floor and the modules)
-  const all = rules(ROOT, { agents: true }), h = holdersAt(ROOT), starts = new Set([...all.filter(r => r.file === "AGENTS.md").map(r => r.key), ...[...startRules(all).values()].flatMap(x => [...x])]);
+  const all = rules(ROOT, { agents: true }), h = await holdersAt(ROOT), starts = new Set([...all.filter(r => r.file === "AGENTS.md").map(r => r.key), ...[...startRules(all).values()].flatMap(x => [...x])]);
   const { counts: heldCounts, holders } = await import("./holders.mjs");
   console.log(list({ all, named: h.holders ?? {}, numbers: h.numbers ?? {}, record: readRecord(), cases: CASES, steps: await stepsAt(ROOT), starts, toolStarts: new Set(all.filter(r => r.file.startsWith("tools/")).map(r => r.key)), joined: r => joinedIn(r), none: heldCounts(holders()).none, ...readUnheld() }).join("\n"));
 }

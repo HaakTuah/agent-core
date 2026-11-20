@@ -1,0 +1,5 @@
+{
+  "rule": "AGENTS.md: An idea is built only from a line, and a line joins in a PR of its own",
+  "behind": [211, "#750.1"],
+  "number": "check fires; outcome: fast"
+}

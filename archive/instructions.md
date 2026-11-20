@@ -3,7 +3,7 @@
 Every core rule rests on something the owner decided. Each decision is an item here, keyed by its number or its issue,
 in the core's own words: its date and source, what was asked, what was decided and what it stands behind. "Core archive
 N" anywhere is item N here, and "core archive #N" or "#N.P" the item keyed by issue #N or one point of it, in the core
-and in a project's copy alike; the core's own rule files name no item, and `scripts/holders.json` lists under "behind"
+and in a project's copy alike; the core's own rule files name no item, and `scripts/holders/` lists under "behind"
 the items behind each rule (`AGENTS.md`, "The archive is pointed to from the list"). The record of the owner's word
 behind items 1 to 245 stays in the core's repository alone, in `words/` under the same numbers, which a project's copy
 leaves out; `scripts/holders.mjs` holds the two forms in step. Items 1 to 262 keep their numbers. A new item is keyed by

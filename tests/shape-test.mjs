@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { fileOf, groupOf, LONG, MARKS, notLinked, parseBaseline, parseConfig, readerOf, survey, unclaimed, verdict, where } from "../scripts/shape.mjs";
 import { READERS } from "../scripts/shape-readers.mjs";
+import { LARGEST } from "../scripts/tree-walk.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -83,7 +84,9 @@ const lostJsx = `const shown = <p>a } b</p>;\n${long("lost", 200)}`;
 let found = survey({ "src/a.js": long("tall", 61) + long("fine", 60) + branchy + deep, "src/a.test.js": long("inATest", 200), "src/b.jsx": `export const B = () => <p>{x}</p>;\n${long("inJsx", 200)}`, "src/c.tsx": lostJsx }, cfg({ tests: ["src/a.test.js"] }), new Set(["src/a.test.js"]));
 ok(same(ids(found), ["function: src/a.js#many", "function: src/a.js#nest", "function: src/a.js#tall", "function: src/b.jsx#inJsx", "lost: src/c.tsx"]) && found.entries.get("function: src/a.js#tall").n.lines === 61 && found.entries.get("function: src/a.js#many").n.branches === 16 && found.entries.get("function: src/a.js#nest").n.depth === 5 && found.read.jsx === 1 && found.read.functions === 5,
   "a function past a mark is found: its lines, its depth, its branch points, in a file with JSX too; one at the mark and a test's are not; a file whose JSX the reader cannot follow is found as such, its functions not", ids(found));
-const lostSaid = verdict({ config: cfg({}), at: "c.json", self: "s", found, baselineText: JSON.stringify({ reads: Object.keys(READERS), listed: {} }) }).fail.flat().join("\n");
+// (told a base that held none of it: with no base, or one that held the file, it is said, never failed, below)
+const lostBaseline = JSON.stringify({ reads: Object.keys(READERS), listed: {} });
+const lostSaid = verdict({ config: cfg({}), at: "c.json", self: "s", found, baselineText: lostBaseline, base: { name: "origin/main", baseline: lostBaseline, config: config({}), standing: () => ({ texts: {}, tests: new Set() }) } }).fail.flat().join("\n");
 ok(["src/a.js", "src/b.jsx", "src/c.tsx"].every(f => found.readers.get(f) === "javascript-tree") && mended(lostSaid) && /1 file of code holds what the reader cannot follow/.test(lostSaid) && /src\/c\.tsx/.test(lostSaid),
   "each file's reader is known, and a new file the reader cannot follow fails, with its mend, so that no line hides a file's functions", lostSaid);
 found = survey({ "src/a.js": long("same", 70) + long("same", 80) }, cfg({}));
@@ -137,13 +140,13 @@ ok(same(changes, ["change: src/a.js: \"Ticket:\\u0020ABC-\"", "change: src/a.js:
   && marked.entries.get("change: src/a.js: a change's heading").n.count === 2 && marked.entries.get("change: src/a.js: the task that changed it").n.count === 1 && marked.entries.get("change: src/a.js: a change's date").n.count === 1 && readerOf("change: src/a.js: a change's date", marked.readers) === "changes" && fileOf("change: src/a.js: what the code was") === "src/a.js"
   && groupOf("change: src/a.js: \"Ticket:\\u0020ABC-\"").group === "\"Ticket:\\u0020ABC-\"",
   "a comment line that marks a change is an entry of the reader \"changes\", counted by file and mark, in JavaScript, C# and Python, a mark of the config's too; a string, a line going on in small letters, a reason and a pointer to an issue are none", changes.join("\n"));
-// (a block comment of 300,000 lines in JavaScript, and of 150,000 in C#, whose parser reads no file past 2 MB, read
+// (a block comment of 300,000 lines in JavaScript, and of 19,000 in C#, under the largest its reader takes, read
 // whole and overflowing nothing; a file whose JSX the reader cannot follow gives no marks, since what it would take for
 // a comment may be the element's text)
 const tall = `/*\n * Changed: x\n${" * a line\n".repeat(300000)} */\nconst t = 1;\n`;
-const longMarked = survey({ "src/t.js": tall, "src/t.cs": `/*\n * Changed: x\n${" * a line\n".repeat(150000)} */\nclass T {}\n`, "src/l.jsx": "const cast = <T>(x: T) => x;\nconst p = <p>// Changed: the text</p>;\n" }, cfg({}));
+const longMarked = survey({ "src/t.js": tall, "src/t.cs": `/*\n * Changed: x\n${" * a line\n".repeat(19000)} */\nclass T {}\n`, "src/l.jsx": "const cast = <T>(x: T) => x;\nconst p = <p>// Changed: the text</p>;\n" }, cfg({}));
 ok(longMarked.entries.get("change: src/t.js: a change's heading")?.n.count === 1 && longMarked.entries.get("change: src/t.cs: a change's heading")?.n.count === 1 && !ids(longMarked).some(id => id.startsWith("change: src/l.jsx")),
-  "a block comment of 300,000 lines is read whole in JavaScript, and of 150,000 in C#, and a file whose JSX the reader cannot follow gives no marks", ids(longMarked).join("\n"));
+  "a block comment of 300,000 lines is read whole in JavaScript, and of 19,000 in C#, and a file whose JSX the reader cannot follow gives no marks", ids(longMarked).join("\n"));
 // (a minified file of 100,000 inline comments on one line, read in time: each comment's lines found within it alone)
 const minStart = Date.now(), minified = survey({ "src/min.js": `var a=${"/*#__PURE__*/f()+".repeat(100000)}1;\n` }, cfg({}));
 ok(Date.now() - minStart < 5000 && !ids(minified).some(id => id.startsWith("change: ")), "a minified file of 100,000 inline comments on one line is read in time", `${Date.now() - minStart} ms`);
@@ -231,7 +234,7 @@ const large = [
   // (C#'s grammar nests a dotted name a part a level, so one of 130,000 parts is past what its reader follows: the file is
   // counted as lost, and its usings as ones the readers cannot follow)
   [{ "src/a.cs": `using ${Array(130000).fill("a").join(".")};\n` }, f => f.unsure.has("src/a.cs") && ids(f).includes("lost: src/a.cs")],
-  [{ "src/a.cs": `${Array.from({ length: 50000 }, (_, i) => `using Z${i};`).join("\n")}\n${Array.from({ length: 50000 }, (_, i) => `namespace N${i} { }`).join("\n")}\n` }, f => f.read.nowhere === 50000],
+  [{ "src/a.cs": `${Array.from({ length: 6000 }, (_, i) => `using Z${i};`).join("\n")}\n${Array.from({ length: 6000 }, (_, i) => `namespace N${i} { }`).join("\n")}\n` }, f => f.read.nowhere === 6000],
   [{ "src/a.py": `from ${Array(32500).fill("a").join(".")} import ${Array(32500).fill("b").join(", ")}\n` }, f => f.read.nowhere === 1],
 ];
 ok(large.every(([texts, holds]) => holds(survey(texts, cfg({})))), "a large file of each kind of import is read in time, in step with its size, and what it holds still counted");
@@ -454,6 +457,17 @@ v = judge({ now: { ...csBig, "src/B.cs": `namespace N;\nclass B {\n${csLong("New
 ok(mended(said(v)) && v.fail.length === 1 && /1 function passes/.test(said(v)) && /B\.cs#New/.test(said(v)) && !/A\.cs/.test(said(v)), "and what is new of it fails, from the sync on", said(v));
 v = judge({ now: csBig, baseline: listed([]) });
 ok(v.fail.length === 0 && v.notes.some(n => /1 breach that stood before/.test(n)), "with no base told, what it finds is said, never failed", said(v));
+// (#862: a file a reader comes to take less of, as one past the smaller size it now takes, turns nothing red on the
+// sync that brings it, nor on main's push, where no base is told; a new one still fails)
+const lostLarge = { "src/Big.cs": `class Big { int[] W = { ${"1, ".repeat(LARGEST.csharp / 3)}1 }; void M() { } }\n`, "src/a.js": long("fine", 10) };
+const lostThen = [{ base: baseOf(lostBaseline, lostLarge) }, {}].map(b => judge({ now: lostLarge, baseline: lostBaseline, ...b }));
+v = judge({ now: { ...lostLarge, "src/New.cs": lostLarge["src/Big.cs"] }, baseline: lostBaseline, base: baseOf(lostBaseline, lostLarge) });
+// (the fallback security review of #879: a file the base held lost, whether by its size or by a parse past its budget
+// on that run, excuses nothing a change brings to it)
+const grownLost = judge({ now: { ...lostLarge, "src/Big.cs": lostLarge["src/Big.cs"].replace("void M() { }", `void M() {\n${"  x++;\n".repeat(400)}}`) }, baseline: lostBaseline, base: baseOf(lostBaseline, lostLarge) });
+ok(grownLost.fail.length === 1 && /held already/.test(said(grownLost)) && /src\/Big\.cs/.test(said(grownLost)) && mended(said(grownLost)), "a file lost that the base held, its text changed, fails as a breach the base held, with its mend", said(grownLost));
+ok(lostThen.every(t => t.fail.length === 0 && t.notes.some(n => /1 file of code holds what the reader cannot follow/.test(n) && /src\/Big\.cs/.test(n) && /--write/.test(n))) && v.fail.length === 1 && /src\/New\.cs/.test(said(v)) && !/Big\.cs/.test(said(v)),
+  "a file lost that the base held, or with no base told, is said, never failed, and one a pull request adds fails", JSON.stringify([...lostThen.map(t => t.notes), said(v)]));
 v = judge({ now: { "src/v.js": `export const V = () => <p>{x}</p>;\n${long("tall", 70)}` }, baseline: JSON.stringify({ listed: { "function: src/v.js#V": { lines: 90, depth: 0, branches: 0 } } }), base: baseOf(listed([]), {}) });
 ok(!v.fail.some(f => /gone or moved/.test(f[0])) && v.notes.some(n => /1 entry listed there reads otherwise now/.test(n)), "an entry listed of a file a new reader reads otherwise is said, not failed", said(v));
 v = judge({ now: csBig, baseline: JSON.stringify({ ...allReads, listed: {} }), base: baseOf(listed([]), csBig) });
