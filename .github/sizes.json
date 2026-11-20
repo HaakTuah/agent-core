@@ -119,6 +119,34 @@
       "mark": 27143,
       "why": "The NuGet fetch before the restore: the sources, the base's lists, each package's content hash and the tools' lock files, read through the one fetchAll(); a task that changes one reads how the others count against the base, so a split would make it open each part."
     },
+    "tests/outcomes-test.mjs": {
+      "mark": 25803,
+      "why": "One script's cases (outcomes.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/packages-test.mjs": {
+      "mark": 68081,
+      "why": "One script's cases (packages.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/pointers-test.mjs": {
+      "mark": 23333,
+      "why": "One script's cases (pointers.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/pure-sync-test.mjs": {
+      "mark": 23363,
+      "why": "One script's cases (pure-sync.mjs, and the workflow that runs it) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/strength-test.mjs": {
+      "mark": 33014,
+      "why": "One script's cases (strength.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/upgrade-test.mjs": {
+      "mark": 83846,
+      "why": "One script's cases (the upgrade of a project written by each of the last two releases) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
+    "tests/work-saved-test.mjs": {
+      "mark": 26522,
+      "why": "One script's cases (work-saved.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+    },
     "tests/nuget-gate-test.mjs": {
       "mark": 20574,
       "why": "The cases of the NuGet check's first look and its whole job, on the one scratch project they share; split, each file would write the project again, adding to the suite's time (tasks/tests.md)."
