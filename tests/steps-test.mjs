@@ -13,7 +13,10 @@ import { CORE } from "../scripts/core-address.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "../scripts/init.mjs";
 import { notes as manifestNotes } from "../scripts/manifest-reads.mjs";
 import { FOLDER, NOTES, NOTICE, POINTER, entries, notes as notesWhole } from "../scripts/sync-notes.mjs";
-import { READERS } from "../scripts/shape-readers.mjs";
+import { READERS, isCode } from "../scripts/shape-readers.mjs";
+import { leftOut } from "../scripts/reading.mjs";
+import { readNothing } from "../scripts/read-nothing.mjs";
+import { holders } from "../scripts/holders.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { parseYaml, pathsLetThrough } from "../scripts/workflow-run.mjs";
 import { COST, MOVED_GLOB, NEW_GLOBS, STEPS, Unread, configs, leads, moved, notDone, plain, project, report, runsOwn } from "../scripts/steps.mjs";
@@ -941,7 +944,84 @@ ok(givenEnv.right && givenEnv.linear,
   "a large env: given to many calls of an action is read once", givenEnv.shown);
 let missedOwn = notDone(ownDir);
 const nugetMend = missedOwn.find(m => m.lead === "13 November 2026, the NuGet check")?.mend ?? "";
-ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn)), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));
+ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks\//.test(report(missedOwn).split("\n\nChecks that read nothing")[0]), "the NuGet step's mend names the licence config the project holds, never the starter kit's path", report(missedOwn));
+// the checks that read nothing here (#459, point 2): the shape check where "code" names no file of its languages, the
+// strength where the manifest names no mutation tool, each with the rules scripts/holders/ says it holds; said in the
+// report, failing nothing
+{
+  const bare = path.join(tmp, "no-code");
+  fs.cpSync(dirs["an-npm-project"], bare, { recursive: true });
+  // (the kit's own files of code, a test among them, taken out: the project holds none the shape check's readers know)
+  const kitCode = execFileSync("git", ["ls-files", "-z", "--", ".", ":!core/"], { cwd: bare, encoding: "utf8" }).split("\0").filter(f => f && isCode(f));
+  if (kitCode.length) execFileSync("git", ["rm", "-q", "-f", "--", ...kitCode], { cwd: bare });
+  const before = notDone(bare), was = before.nothing.map(n => n.check);
+  const readBare = f => { try { return fs.readFileSync(path.join(bare, f), "utf8"); } catch { return null; } };
+  const names = [...new Set(holders().rules.map(r => path.posix.basename(r.file)))];
+  const manifestOf = but => readBare("core-manifest.md").replace(/^Not taken:.*$/gmu, "").replace(/\bModules:[^\n]*/u, `Modules: ${names.filter(m => m !== but).map(m => `\`${m}\``).join(", ")}.`) + (but ? `\nNot taken: \`${but}\` (the test's)\n` : "");
+  const all = readNothing(bare, manifestOf(""), readBare).find(n => n.check === "core/scripts/shape.mjs");
+  const without = readNothing(bare, manifestOf("repositories.md"), readBare).find(n => n.check === "core/scripts/shape.mjs");
+  // (the strength of the tests: named where the manifest's *mutation tool* is `none`, as the kit writes it; where it
+  // names a tool, named all the same where the shape check's config names no file it reads, or is not there, and the
+  // shape check then said to have no config; each with the script's path in the core beside the project's)
+  const withTool = manifestOf("").replace(/^\| \*mutation tool\* \|[^\n]*$/mu, "| *mutation tool* | `node core/scripts/mutate.mjs --report {report} {lines}` |");
+  const toolNoCode = readNothing(bare, withTool, readBare), noConfig = readNothing(bare, withTool, f => (f === "checks/shape.json" ? null : readBare(f)));
+  const strengthOf = l => l.find(n => n.script === "scripts/strength.mjs");
+  ok(/`none`/u.test(strengthOf(before.nothing)?.why ?? "") && strengthOf(before.nothing).check === "core/scripts/strength.mjs" && withTool !== manifestOf("")
+    && /names under "code" no file it measures/u.test(strengthOf(toolNoCode)?.why ?? "") && /waits for `checks\/shape\.json`/u.test(strengthOf(noConfig)?.why ?? "")
+    && /holds no `checks\/shape\.json`/u.test(noConfig.find(n => n.script === "scripts/shape.mjs")?.why ?? ""),
+    "the strength of the tests is said to read nothing where no mutation tool is named, or where the shape check's config names no file it reads or is not there, and a missing config is said as missing", JSON.stringify({ toolNoCode, noConfig }));
+  // (strength is decided by what it measures, never by the shape check's languages: a Go file under "code" is
+  // measured, so the strength read something there while the shape check did not; and code of none it measures, a
+  // JavaScript test beside it, leaves the strength with nothing while the shape check reads the test)
+  fs.mkdirSync(path.join(bare, "go"), { recursive: true });
+  fs.writeFileSync(path.join(bare, "go", "main.go"), "package main\n");
+  fs.mkdirSync(path.join(bare, "bin"), { recursive: true });
+  fs.writeFileSync(path.join(bare, "bin", "run.sh"), "echo\n");
+  fs.mkdirSync(path.join(bare, "t"), { recursive: true });
+  fs.writeFileSync(path.join(bare, "t", "a.test.js"), "export {};\n");
+  execFileSync("git", ["add", "-A"], { cwd: bare });
+  const withConfig = c => f => (f === "checks/shape.json" ? JSON.stringify({ baseline: "checks/shape-baseline.json", ...c }) : readBare(f));
+  const goSaid = readNothing(bare, withTool, withConfig({ code: ["go/"], tests: [] })), shSaid = readNothing(bare, withTool, withConfig({ code: ["bin/", "t/"], tests: ["t/"] }));
+  ok(!strengthOf(goSaid) && goSaid.some(n => n.script === "scripts/shape.mjs") && /names under "code" no file it measures/u.test(strengthOf(shSaid)?.why ?? "") && !shSaid.some(n => n.script === "scripts/shape.mjs"),
+    "the strength is said to read nothing by what it measures, a file of a language the shape check's readers do not know among it, never by the shape check's languages", JSON.stringify({ goSaid, shSaid }));
+  execFileSync("git", ["rm", "-q", "-r", "-f", "--", "go", "bin", "t"], { cwd: bare });
+  // (a file of code the shape check does not read, a link or one listed and gone from the disk, makes it read nothing)
+  fs.mkdirSync(path.join(bare, "ln"), { recursive: true });
+  fs.writeFileSync(path.join(bare, "ln", "gone.js"), "export {};\n");
+  execFileSync("git", ["add", "-A"], { cwd: bare });
+  fs.rmSync(path.join(bare, "ln", "gone.js"));
+  let linked = true;
+  try { fs.symlinkSync(path.join(bare, "core-manifest.md"), path.join(bare, "ln", "a.js")); } catch { linked = false; }
+  // (and a nested repository named as a file of code, which git lists and the check cannot read)
+  fs.mkdirSync(path.join(bare, "ln", "nested.js"));
+  execFileSync("git", ["init", "-q"], { cwd: path.join(bare, "ln", "nested.js") });
+  fs.writeFileSync(path.join(bare, "ln", "nested.js", "x.txt"), "x\n");
+  execFileSync("git", ["-C", path.join(bare, "ln", "nested.js"), "add", "-A"]);
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-C", path.join(bare, "ln", "nested.js"), "commit", "-q", "-m", "x"]);
+  ok(readNothing(bare, withTool, withConfig({ code: ["ln/"], tests: [] })).some(n => n.script === "scripts/shape.mjs"),
+    `the shape check is said to read nothing where its only files of code are ${linked ? "a link, " : ""}a nested repository and one gone from the disk, which it does not read`);
+  fs.rmSync(path.join(bare, "ln"), { recursive: true, force: true });
+  execFileSync("git", ["add", "-A"], { cwd: bare });
+  // (where which checks read nothing cannot be read, the report says so, never that every check read something)
+  const unreadNothing = Object.assign([], { nothing: null, nothingWhy: "a reason" });
+  ok(report(unreadNothing).includes("Which checks read nothing here could not be read (a reason)") && !report(Object.assign([], { nothing: [] })).includes("read nothing"),
+    "where the checks that read nothing could not be read, the sync's report says so", report(unreadNothing));
+  const codeAt = JSON.parse(fs.readFileSync(path.join(bare, "checks/shape.json"), "utf8")).code.find(c => !c.startsWith(":"));
+  fs.mkdirSync(path.join(bare, codeAt), { recursive: true });
+  fs.writeFileSync(path.join(bare, codeAt, "a.js"), "export const a = 1;\n");
+  execFileSync("git", ["add", "-A"], { cwd: bare });
+  const now = notDone(bare).nothing.map(n => n.check);
+  const out = leftOut(fs.readFileSync(path.join(bare, "core-manifest.md"), "utf8")), fileOf = new Map(holders().rules.map(r => [r.key, r.file]));
+  const listed = [...holders().by].filter(([k, l]) => l.some(h => h.kind === "check" && h.by === "scripts/shape.mjs") && !out.has(path.posix.basename(fileOf.get(k)))).map(([k]) => k);
+  const shape = before.nothing.find(n => n.check === "core/scripts/shape.mjs");
+  ok(listed.length && JSON.stringify(shape?.holds) === JSON.stringify(listed) && !was.includes("core/scripts/select.mjs") && report(before).includes("Checks that read nothing here") && before.nothing.every(n => n.holds.length && n.why.length > 20)
+    && !now.includes("core/scripts/shape.mjs"),
+    "a project whose code holds no file the shape check's readers know is said to have the shape check read nothing, with the rules holders.json says it holds; a file of code there makes it read", report(before));
+  // (a rule of a module the manifest leaves out is not named among those a check holds there)
+  ok(all?.holds.some(k => k.startsWith("tasks/repositories.md:")) && without && !without.holds.some(k => k.startsWith("tasks/repositories.md:")) && without.holds.length === all.holds.filter(k => !k.startsWith("tasks/repositories.md:")).length,
+    "a rule of a module the manifest leaves out is not named among those a check that read nothing holds", JSON.stringify({ all, without }));
+}
+
 ok(!missedOwn.some(m => m.lead === "16 November 2026, an agent's own tools listed"), "the agent-tools step reads the config the project passes, not the word after a comment that names the licence script", report(missedOwn));
 const foundOwn = differences(ownP, fresh(ownP));
 ok(!foundOwn.some(d => /^checks\//.test(d)) && JSON.stringify(foundOwn.filter(d => /^config\//.test(d))) === JSON.stringify(['config/licences.json: lacks the key "nuget"']),
