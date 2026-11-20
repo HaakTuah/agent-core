@@ -40,8 +40,36 @@ try {
   ok(r.where === "self-hosted" && /stranger's pull request would run its code/.test(r.advice ?? "") && /needs-owner/.test(r.advice ?? ""), "a public one on a runner of the owner's own: the owner is advised once, nothing waits", r.advice);
   r = read({ repo: "o/n", dir: flows({ "look.yml": nightly }), manifest: rel, gh: host(false) });
   ok(r.where === "local" && r.cadence === "release" && /computer alone/.test(r.said[0]), "no workflow on a pull request or a push: the tests run on a computer, the slow suites before each release", r.said[0]);
-  r = read({ repo: "o/n", dir: path.join(scratch, "none"), gh: host(false) });
-  ok(r.where === "local", "no workflows at all: a computer alone");
+  // (a checkout's root, which holds .git, with no .github: no workflows at all)
+  const root = path.join(scratch, "root"), at = (...p) => path.join(root, ...p);
+  fs.mkdirSync(at(".git"), { recursive: true });
+  r = read({ repo: "o/n", dir: at(".github", "workflows"), gh: host(false) });
+  ok(r.where === "local" && !r.said.some(l => /not read/.test(l)), "no workflows at all: a computer alone");
+  // A folder that cannot be listed is not read, and says so, where it was read as one with no jobs (#902).
+  fs.mkdirSync(at("file", ".github"), { recursive: true }); fs.writeFileSync(at("file", ".github", "workflows"), "x");
+  fs.mkdirSync(at("link", ".github"), { recursive: true }); fs.symlinkSync(at("gone"), at("link", ".github", "workflows"));
+  fs.mkdirSync(at("up"), { recursive: true }); fs.symlinkSync(at("gone"), at("up", ".github"));
+  for (const [d, what] of [["file", "a file where the folder stands"], ["link", "a link leading nowhere for the folder"], ["up", "a .github that leads nowhere"], ["gone", "no checkout's root, and no folder"]]) {
+    const dir = at(d, ".github", "workflows"), w = workflowsIn(dir);
+    r = read({ repo: "o/n", dir, manifest: rel, gh: host(false) });
+    ok(w.unlisted && w.unread.includes(dir) && r.where === "self-hosted" && /workflows not read: /.test(r.said.join("\n")) && /could not be listed/.test(r.said[0]), `${what}: not read, said so, and taken as the owner's own, never as no jobs`, r.said.join(" | "));
+  }
+  // (hostile: the path is one a pull request writes; a link to itself or to a plain file is no folder either, and a public
+  // repository whose folder is not read is advised as one whose runner is not read)
+  fs.mkdirSync(at("hostile", ".git"), { recursive: true }); fs.mkdirSync(at("hostile", ".github")); fs.writeFileSync(at("plain"), "on: push\n");
+  const hostile = at("hostile", ".github", "workflows");
+  for (const target of [hostile, at("plain")]) {
+    fs.rmSync(hostile, { force: true }); fs.symlinkSync(target, hostile);
+    r = read({ repo: "o/n", dir: hostile, manifest: rel, gh: host(false) });
+    ok(workflowsIn(hostile).unlisted === true && r.where === "self-hosted" && /workflows not read: /.test(r.said.join("\n")) && /forks off any such job/.test(r.advice ?? "") && /from the project's root/.test(r.said[0]) && /from the project's root/.test(r.advice ?? ""),
+      "a workflows path that is a link to itself, or to a plain file, in a checkout's root is not read, never read as no jobs, and a public repository is advised", r.said.join(" | "));
+  }
+  if (process.platform !== "win32" && process.getuid?.() !== 0) {
+    const shut = at("shut", ".github", "workflows");
+    fs.mkdirSync(shut, { recursive: true }); fs.chmodSync(shut, 0);
+    try { ok(workflowsIn(shut).unlisted === true, "a folder that is there but cannot be listed is not read"); } finally { fs.chmodSync(shut, 0o755); }
+  } else console.log("skip a folder that cannot be listed: run as root or on Windows, where a folder's rights do not stop its listing");
+  ok(workflowsIn(flows({})).unlisted === undefined && !workflowsIn(at(".github", "workflows")).unlisted, "an empty folder, and one missing in a checkout's root, are read, holding no workflow");
   r = read({ repo: "o/n", dir: flows({ "ci.yml": ci }), manifest: rel, gh: host(null) });
   ok(r.billed && r.cadence === "nightly" && /was not read, so taken as billed/.test(r.said[1]), "a host that does not say whether the repository is private: taken as billed, and said so", r.said[1]);
   const matrix = `on: push\njobs:\n  test:\n    strategy:\n      matrix:\n        os: [ubuntu-latest, self-hosted]\n    runs-on: \${{ matrix.os }}\n    steps:\n${suite}`;
