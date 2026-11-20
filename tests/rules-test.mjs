@@ -2,10 +2,11 @@
 // `agents`, since the staged cases set from one commit read it once for each case (staged.mjs, fingerprints); a name
 // that moves (HEAD, a branch, one written like an id) is read again, as it names another commit; and what a caller does
 // with the rules it was given changes none that is asked after. The git it reads is handed in, a fake that answers
-// from a table of commits and counts what it was asked, so no repository is made. Node's own modules.
+// from a table of commits and counts what it was asked, so no repository is made; one case reads the core's own
+// repository with the git it runs by itself. Node's own modules.
 //
 //   node tests/rules-test.mjs
-import { rulesAt } from "../scripts/rules.mjs";
+import { ROOT, rulesAt } from "../scripts/rules.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
@@ -80,5 +81,12 @@ const commits = {
   let thrown = null;
   try { rulesAt("/r6", "nothing-such", { git }); } catch (e) { thrown = e; }
   ok(thrown !== null, "a name that is no commit is no rules");
+}
+{
+  // (the git it runs by itself, on the core's own commit: the floor's first rule, and AGENTS.md's rules only where asked)
+  const floor = "floor/security.md: 1. Nothing secret in the repository";
+  const without = rulesAt(ROOT, "HEAD"), within = rulesAt(ROOT, "HEAD", { agents: true });
+  ok(without.some(r => r.key === floor) && !without.some(r => r.file === "AGENTS.md") && within.some(r => r.key === floor) && within.some(r => r.file === "AGENTS.md"),
+    "its own git reads the core's commit: the floor's rules, and those of AGENTS.md where asked");
 }
 done("what rulesAt reads once and what it reads each time");
