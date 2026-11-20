@@ -64,22 +64,34 @@ const LOCKFILE = /(^|\/)(package-lock|npm-shrinkwrap)\.json$/u;
  */
 const HTML_SPACE = /[\t\n\f\r ]/u; // (HTML's whitespace, ASCII only: a no-break space is part of a name or value)
 function attributesOf(text, at) {
-  const attributes = [];
-  let state = "before", name = "", value = "", quote = "";
-  const done = () => { if (name) attributes.push([name, value]); name = value = ""; };
-  for (let k = at; k < text.length; k++) {
-    const ch = text[k], space = HTML_SPACE.test(ch);
-    if (state === "quoted") { if (ch === quote) { state = "before"; done(); } else value += ch; continue; }
-    if (state === "unquoted") { if (space || ch === ">") { done(); state = "before"; if (ch === ">") return { attributes, end: k }; } else value += ch; continue; }
-    if (ch === ">") { done(); return { attributes, end: k }; }
-    if (state === "value") { if (ch === '"' || ch === "'") { quote = ch; state = "quoted"; } else if (!space) { value = ch; state = "unquoted"; } continue; }
-    if (state === "name") { if (ch === "=") state = "value"; else if (space) state = "after"; else if (ch === "/") { done(); state = "before"; } else name += ch; continue; }
-    if (state === "after") { if (ch === "=") { state = "value"; continue; } if (space) continue; done(); state = "before"; }
-    if (space || ch === "/") continue;
-    name = ch; state = "name"; // ("before": a name starts, "=" itself among what may start one)
-  }
-  return { attributes, end: -1 };
+  const s = { attributes: [], state: "before", name: "", value: "", quote: "" };
+  for (let k = at; k < text.length; k++) if (readAttributeChar(s, text[k])) return { attributes: s.attributes, end: k };
+  return { attributes: s.attributes, end: -1 };
 }
+const doneAttribute = (s) => { if (s.name) s.attributes.push([s.name, s.value]); s.name = s.value = ""; };
+/** One character of a tag's attributes, read into the states `s` holds; whether it is the ">" that ends the tag. */
+function readAttributeChar(s, ch) {
+  const space = HTML_SPACE.test(ch);
+  if (s.state === "quoted") { if (ch === s.quote) { s.state = "before"; doneAttribute(s); } else s.value += ch; return false; }
+  if (s.state === "unquoted" && !space && ch !== ">") { s.value += ch; return false; }
+  if (s.state === "unquoted" || ch === ">") { doneAttribute(s); s.state = "before"; return ch === ">"; }
+  ATTRIBUTE_STATES[s.state](s, ch, space);
+  return false;
+}
+// (the states that read one character each: "before", where a name starts, "=" itself among what may start one)
+const ATTRIBUTE_STATES = {
+  value: (s, ch, space) => { if (ch === '"' || ch === "'") { s.quote = ch; s.state = "quoted"; } else if (!space) { s.value = ch; s.state = "unquoted"; } },
+  name: (s, ch, space) => {
+    if (ch === "=") s.state = "value";
+    else if (space) s.state = "after";
+    else if (ch === "/") { doneAttribute(s); s.state = "before"; } else s.name += ch;
+  },
+  after: (s, ch, space) => {
+    if (ch === "=") s.state = "value";
+    else if (!space) { doneAttribute(s); s.state = "before"; ATTRIBUTE_STATES.before(s, ch, space); }
+  },
+  before: (s, ch, space) => { if (!space && ch !== "/") { s.name = ch; s.state = "name"; } },
+};
 
 /**
  * The parts of a page or component that run, read so as to fail closed rather than to match HTML's parser case by case:
@@ -92,8 +104,18 @@ function attributesOf(text, at) {
  * nothing, so a page showing a command in its text fetches nothing.
  */
 function executable(text, f) {
-  const lower = text.toLowerCase(), parts = [];
+  const parts = [];
   if (/\.astro$/iu.test(f)) { const front = /^\s*---\r?\n([\s\S]*?)(?:\r?\n---|$)/u.exec(text); if (front) parts.push(front[1]); }
+  scriptParts(text, parts);
+  for (const m of text.matchAll(/\s(?:on[\w-]+|@[\w.:-]+|:[\w.:-]+|v-[\w.:-]+|x-[\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/giu)) parts.push(m[1] ?? m[2] ?? m[3]);
+  for (const m of text.matchAll(/javascript:([^"'<>]*)/giu)) parts.push(m[1]);
+  if (!/\.html?$/iu.test(f)) bracedParts(text, parts);
+  return parts.join("\n");
+}
+
+/** Pushes to `parts` each script element's tag and body (see `executable`). */
+function scriptParts(text, parts) {
+  const lower = text.toLowerCase();
   const ends = (k, length) => !/[^\t\n\f\r />]/u.test(lower[k + length] ?? ">"); // (a tag's name ends there)
   const closes = [];
   for (let k = lower.indexOf("</script"); k >= 0; k = lower.indexOf("</script", k + 8)) if (ends(k, 8)) closes.push(k);
@@ -114,17 +136,16 @@ function executable(text, f) {
       covered = stop;
     }
   }
-  for (const m of text.matchAll(/\s(?:on[\w-]+|@[\w.:-]+|:[\w.:-]+|v-[\w.:-]+|x-[\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/giu)) parts.push(m[1] ?? m[2] ?? m[3]);
-  for (const m of text.matchAll(/javascript:([^"'<>]*)/giu)) parts.push(m[1]);
-  if (!/\.html?$/iu.test(f)) {
-    let depth = 0, start = 0;
-    for (let k = 0; k < text.length; k++) {
-      if (text[k] === "{" && depth++ === 0) start = k;
-      else if (text[k] === "}" && depth > 0 && --depth === 0) parts.push(text.slice(start, k + 1));
-    }
-    if (depth > 0) parts.push(text.slice(start));
+}
+
+/** Pushes to `parts` each outermost {...} of `text`, to its end where one is left open. */
+function bracedParts(text, parts) {
+  let depth = 0, start = 0;
+  for (let k = 0; k < text.length; k++) {
+    if (text[k] === "{" && depth++ === 0) start = k;
+    else if (text[k] === "}" && depth > 0 && --depth === 0) parts.push(text.slice(start, k + 1));
   }
-  return parts.join("\n");
+  if (depth > 0) parts.push(text.slice(start));
 }
 
 /** A tracked file's text, a link's that of the file it leads to, read as the link's own, where that lies inside the
