@@ -19,7 +19,7 @@ import { ruleFiles } from "./rule-files.mjs";
 import { toolOf } from "./strength.mjs";
 import { Unread, calls, commands, uncommented, copiesConfig, folded, given, licenceConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
-import { draftHoles, foreignBreaks, keysTwice, reads, readsFolded } from "./workflows.mjs";
+import { draftHoles, foreignBreaks, keysTwice, reads, reads11 } from "./workflows.mjs";
 import { DEEPEST, LONGEST } from "./yaml-keys.mjs";
 import { releaseAge, WAIT } from "./licences.mjs";
 import { codeOf, covers, pinFault, pinRead } from "./licence-scan.mjs";
@@ -448,7 +448,7 @@ export function readyOnlyHolds(p) {
   // YAML the package gave, which may be none, and as it stands too; where neither reads, it is said unread as any other: #876)
   const mentions = text => /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget|pr-description)\.yml@/i.test(text);
   const odd = text => installed("yaml") && foreignBreaks(text ?? "") !== null;
-  readable(p, text => !(odd(text) && readsFolded(text)) && mentions(text));
+  readable(p, text => !(odd(text) && reads11(text)) && mentions(text));
   const wrong = Object.entries(p.workflows).filter(([, w]) => draftHoles(odd(w.text) ? w.text : w.yaml).length);
   return wrong.length ? `A call to the core's checks whose job is skipped on a draft never runs once the pull request is marked ready, since its trigger leaves that out: add \`ready_for_review\` to the \`types:\` under \`pull_request:\` (where it lists none, \`types: [opened, reopened, synchronize, ready_for_review]\`) in ${wrong.map(([f]) => `\`.github/workflows/${shown(f)}\``).join(", ")}.` : null;
 }

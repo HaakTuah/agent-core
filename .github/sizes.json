@@ -124,15 +124,15 @@
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
     },
     "scripts/step-checks.mjs": {
-      "mark": 76082,
+      "mark": 76074,
       "why": "A session that changes a step reads the one check its step names, found by its name (grep, then its range), never the file whole; split by topic, the readers each check shares (the project's files, its workflows, its manifest) would be opened beside it every time, so no reader reads less."
     },
     "scripts/workflows.mjs": {
-      "mark": 24291,
+      "mark": 26187,
       "why": "One check's readers (the word, the keys given twice, the calls a draft skips, the line breaks) that all read the same texts against the same base through the one baseOf(); a task that changes one reads how the others count against the base, so a split would make it open each part."
     },
     "tests/workflows-test.mjs": {
-      "mark": 55652,
+      "mark": 56934,
       "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."
     }
   }
