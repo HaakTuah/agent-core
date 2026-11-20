@@ -1,0 +1,37 @@
+// Checks the line "Read for it:" (scripts/pr-reads.mjs, run by scripts/pr-description.mjs): what the paths a pull request changes call for. Split from pr-description-test.mjs (#888); run by the core's tests workflow (.github/workflows/tests.yml).
+//
+//   node tests/pr-description-reads-test.mjs
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { calledFor } from "../scripts/pr-reads.mjs";
+import { lineMend } from "../scripts/reading.mjs";
+
+let failed = 0;
+const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
+
+// what a pull request's changed paths call for, in a scratch project: the merge commit against its base, the kinds of
+// the project's own paths as the base holds them, the copy's own paths left out
+{
+  const root = path.dirname(path.dirname(fileURLToPath(import.meta.url))), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pr-description-test-")), project = path.join(tmp, "project");
+  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
+  const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
+  const git = (...args) => execFileSync("git", args, { cwd: project, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(project, f)), { recursive: true }); fs.writeFileSync(path.join(project, f), text); };
+  for (const part of ["floor", "tasks", "roles"]) fs.cpSync(path.join(root, part), path.join(project, "core", part), { recursive: true });
+  put("core-manifest.md", "# Core manifest\n\nFloor: whole. Modules: `screens.md`.\nNot taken: `game-design.md` (no game).\n"); put("checks/reading.json", `${JSON.stringify({ paths: { "src/screens/": "polish" } })}\n`); put("src/screens/a.js", "1\n");
+  git("init", "-q", "-b", "main"); git("add", "-A"); git("commit", "-q", "-m", "the base");
+  ok(calledFor(tmp) === null, "where no core stands, what a change calls for cannot be read");
+  put("src/screens/a.js", "2\n"); put("checks/reading.json", "{}\n"); put("core-manifest.md", "# Core manifest\n\nFloor: whole. Modules: `updates.md`.\nNot taken: `game-design.md` (no game), `screens.md` (none).\n"); put("core/CLAUDE.md", "x\n"); put(".github/workflows/caf\u00e9.yml", "on: push\n");
+  git("add", "-A"); git("commit", "-q", "-m", "a change that empties its own reading config");
+  const called = calledFor(project);
+  ok(JSON.stringify(called.map(c => c.file)) === JSON.stringify(["core/tasks/screens.md", "core/tasks/updates.md", "core/floor/topics/workflows.md"]) && /of the kind polish/.test(called[0].why) && /core-manifest\.md/.test(called[1].why),
+    "a pull request's changed paths call for their files by the reading config and the manifest its base holds, not those it carries (a changed manifest calling for tasks/updates.md, #756): a module the base's manifest leaves out is not asked, one the change itself leaves out still is; a path of the copy calls for nothing, and one outside ASCII is read as spelled", JSON.stringify(called));
+  ok(/does not list `core\/tasks\/screens\.md`/.test(lineMend("Read for it: `core/floor/topics/workflows.md`", called, "cmd")) && lineMend("Read for it: `core/floor/topics/workflows.md`, `core/tasks/screens.md`, `core/tasks/updates.md`", called, "cmd") === null, "and the line is held to them");
+  git("checkout", "-q", "--orphan", "alone"); git("commit", "-q", "-m", "no parent");
+  ok(calledFor(project) === null, "with no base to read against, nothing is asked");
+}
+process.exit(failed ? 1 : 0);

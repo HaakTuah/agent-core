@@ -6,9 +6,9 @@
 //
 //   node tests/guards-test.mjs
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { DEEPEST, aCommit, aRepository, inProject, leadsOut, logged, oneLine, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 600)}`}`); } };
@@ -16,7 +16,7 @@ const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   $
 ok(["a.json", "./a.json", "a/b/c.json", "a/../b.json", "a\\b.json", ".github/x.json"].every(inProject), "a path from the project's root, however written, stays inside it");
 ok(!["../a.json", "a/../../b.json", "..", "/etc/a.json", "\\a.json", "C:/a.json", "c:a.json", "..\\a.json", "", "a\0b", "a\nb.json", "a\rb", "a\u007fb", null, 5, ["a"]].some(inProject), "a rooted path, one with a \"..\" that leads above the root, one with a control character, and one that is no path stay out");
 
-const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "guards-test-")));
+const tmp = fs.realpathSync(scratchDir("guards-test-"));
 try {
   const project = path.join(tmp, "project"), elsewhere = path.join(tmp, "elsewhere");
   fs.mkdirSync(path.join(project, "inner"), { recursive: true });

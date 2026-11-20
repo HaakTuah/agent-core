@@ -1,45 +1,27 @@
-// Tests the selection (scripts/select.mjs): the pathspecs it reads, what a test reaches (its imports, and the
+// Tests the selection (scripts/select.mjs): what a test reaches (its imports, and the
 // files its code names outside a comment), and what a pull request runs: the tests a changed file can reach, a test it
 // adds or changes, one that failed last time, the project's proof, never selected out, a test that reaches every file,
 // the files no test reads, and the whole suite where a changed file's reach cannot be told or no base is told; then
 // whole runs in a scratch repository, with what it writes for the steps after it, and each refusal read for its mend
-// (mend.mjs). Run by the core's tests workflow (.github/workflows/tests.yml).
+// (mend.mjs). The pathspecs (select-matcher-test.mjs) and a tree that passed (select-passed-test.mjs) are tested
+// apart (#943). Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/select-test.mjs
-import { execFileSync, spawn, spawnSync } from "node:child_process";
-import http from "node:http";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { Late, hurry } from "../scripts/hurry.mjs";
+import { ALL_MS, Late, hurry } from "../scripts/hurry.mjs";
 import { WORDS, mentioned, nameTrie } from "../scripts/name-trie.mjs";
-import { links, matcher, passedWhole, reached, selection } from "../scripts/select.mjs";
+import { links, reached, selection } from "../scripts/select.mjs";
 import { parseConfig, survey } from "../scripts/shape.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
 const script = fileURLToPath(new URL("../scripts/select.mjs", import.meta.url));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-
-// ---- the pathspecs ----
-const m = matcher(["src", ":(glob)**/*.test.js", ":!src/gen/", "QUEUE.md"]);
-ok(m("src/a.js") && m("src/deep/b.js") && m("lib/x.test.js") && m("QUEUE.md") && !m("src/gen/c.js") && !m("srcs/a.js") && !m("docs/QUEUE.md"),
-  "a pathspec is a path or a folder above it, a glob, or one left out");
-ok(matcher(["test/*-test.mjs"])("test/a-test.mjs") && matcher(["test/*-test.mjs"])("test/deep/b-test.mjs") && !matcher(["test/*-test.mjs"])("test/a.mjs") && matcher(["t?st/"])("test/") && matcher(["scripts/*-test.mjs"])("scripts/select-test.mjs")
-  && matcher(["scripts/[ab]-test.mjs"])("scripts/a-test.mjs") && !matcher(["scripts/[ab]-test.mjs"])("scripts/c-test.mjs") && matcher(["scripts/[!ab]-test.mjs"])("scripts/c-test.mjs") && !matcher(["scripts/[!ab]-test.mjs"])("scripts/a-test.mjs"),
-  "a plain pathspec with a wildcard matches as git's default does, across folders too");
-ok(matcher(["."])("any/file.md") && !matcher([])("a.js") && matcher([":(glob)reports/*.md"])("reports/a.md") && !matcher([":(glob)reports/*.md"])("reports/deep/a.md"), "\".\" is every file, no pathspec none, and \"*\" stays within a folder");
-ok(matcher([":(glob)src/**/*.js"])("src/a.js") && matcher([":(glob)src/**/*.js"])("src/a/b/c.js") && !matcher([":(glob)src/**/*.js"])("srcx/a.js") && matcher([":(glob)**/x"])("x") && matcher([":(glob)**/x"])("a/x")
-  && matcher([":(glob)**/generated/**"])("src/generated/a.js") && matcher([":(glob)**/generated/**"])("generated/a.js") && !matcher([":(glob)**/generated/**"])("src/notgenerated/a.js") && !matcher([":(glob)a/**/b"])("a/xb")
-  && matcher([":(glob)a?[b]"])("a?[b]") && !matcher([":(glob)a?[b]"])("axb") && matcher(["a**b"])("a/c/b"), "a glob's \"**/\" is any whole folders or none, never part of a folder's name, and its \"?\" and \"[\" are themselves; runs of \"*\" are one");
-{
-  // (in time that grows with the path's length, whatever runs of wildcards the pathspec holds)
-  const from = Date.now();
-  const none = [matcher([`${"*".repeat(60)}b`])("a".repeat(5000)), matcher([`:(glob)${"**/".repeat(40)}${"*".repeat(40)}b`])("a/".repeat(2000)), matcher([`:(glob)${"a*".repeat(60)}b`])("a".repeat(5000)), matcher([`${"a*".repeat(60)}b`])("a".repeat(5000))];
-  ok(none.every(m => m === false) && Date.now() - from < 5000, "a pathspec of many wildcards is matched in time that grows with the path's length", `${none}, ${Date.now() - from} ms`);
-}
 
 // ---- what a test reaches ----
 const config = parseConfig(JSON.stringify({ baseline: "b.json", code: ["src", "test"], tests: ["test/"], select: { proof: ["test/replay.test.js"], whole: ["test/kit.test.js"], none: ["QUEUE.md", "docs/"] } }));
@@ -73,8 +55,24 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
   const watch = () => hurry({ files: new Set(["src/rules.js", "src/view.js"]), ms: 100, characters: 50, now: () => clock });
   const slow = at => () => { clock += at; return "read"; };
   let w = watch();
-  ok(w.timed("src/rules.js", slow(60)) === "read" && w.timed("src/view.js", slow(40)) === "read" && w.timed("src/tool.js", slow(5000)) === "read",
-    "files read within the budget together, and a file the pull request leaves as it was, are read unwatched");
+  ok(w.timed("src/rules.js", slow(60)) === "read" && w.timed("src/view.js", slow(40)) === "read" && w.timed("src/tool.js", slow(ALL_MS - 200)) === "read",
+    "files read within the budget together are read, and a file the pull request leaves as it was counts for none of the changed files' budget");
+  // (the project's own files count for the whole run's budget, from the watch's start: a project whose size alone is
+  // more than can be read in time runs the whole suite, as the linking does; #962)
+  w = watch();
+  ok(w.timed("src/tool.js", slow(ALL_MS)) === "read" && new RegExp(`project's files of code.*took ${ALL_MS + 1} ms, past the ${ALL_MS} ms.*cannot be told in time`, "u").test(lateness(() => w.timed("src/other.js", slow(1)))),
+    "the project's own files, which the pull request leaves as they were, are read within the whole run's budget and stop the reading past it, saying why");
+  w = watch();
+  const whole = w.pace(1e9);
+  clock += ALL_MS + 1;
+  ok(new RegExp(`took ${ALL_MS + 1} ms, past the ${ALL_MS} ms`, "u").test(lateness(whole)), "the linking stops too where the whole run, from the watch's start, has taken past its budget, though its own time is not spent");
+  // (one file of code the pull request leaves as it was is held to the characters the changed files share, so that no
+  // one read of the project's own carries the run far past the whole run's budget)
+  const own = { "src/rules.js": "x", "src/tool.js": "x".repeat(51), "docs/data.json": "x".repeat(99) };
+  ok(lateness(() => watch().size(own, ["src/rules.js"])) === null && lateness(() => watch().size({ ...own, "src/tool.js": "x".repeat(50) }, ["src/rules.js", "src/tool.js"])) === null
+    && /src\/tool\.js, a file of code the pull request leaves as it was, holds 51 characters, past the 50/u.test(lateness(() => watch().size(own, ["src/rules.js", "src/tool.js"]))),
+    "a file of code the pull request leaves as it was, past the characters on its own, stops the reading before any is read, saying which; one that is no code counts for none");
+  ok(same(watch().first(["src/a.js", "src/rules.js", "src/b.js", "src/view.js"]), ["src/rules.js", "src/view.js", "src/a.js", "src/b.js"]), "the changed files are given first, each part in the order given");
   w = watch();
   w.timed("src/rules.js", slow(60));
   ok(/took 120 ms, past the 100 ms.*cannot be told in time/u.test(lateness(() => w.timed("src/view.js", slow(60)))), "changed files that take past the budget together stop the reading, saying why");
@@ -97,6 +95,29 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
     "reached asks its pace once a test and every 256 files taken off a queue, and reaches as it did where none is given", `${asked} asks`);
   const late = lateness(() => survey(texts, config, tests, hurry({ files: new Set(Object.keys(texts)), ms: -1 })));
   ok(late && /took \d+ ms, past the -1 ms/u.test(late), "the shape check's survey reads each changed file under the watch and fails where it is past", late);
+  const owned = lateness(() => survey(texts, config, tests, hurry({ files: new Set(), all: -1 })));
+  ok(owned && /project's files of code.*past the -1 ms/u.test(owned), "the shape check's survey reads the project's own files under the whole run's budget and fails where it is past", owned);
+  const one = lateness(() => survey(texts, config, tests, hurry({ files: new Set(), characters: 40 })));
+  ok(one && /src\/lazy\.js, a file of code the pull request leaves as it was, holds 49 characters, past the 40/u.test(one), "the shape check's survey gives the watch its files of code, so one of the project's own past the characters stops it", one);
+  // (one of C# past the largest its parser takes is read not at all, so it is held to no characters of its own; one of
+  // Python is read whole for its computed imports and the names it holds, so it is)
+  const most = Math.max(...Object.keys(texts).map(f => texts[f].length)), big = "x = 1\n".repeat(most);
+  ok(lateness(() => survey({ ...texts, "src/Data.cs": big }, config, tests, hurry({ files: new Set(), characters: most }))) === null
+    && /src\/data\.py, a file of code the pull request leaves as it was/u.test(lateness(() => survey({ ...texts, "src/data.py": big }, config, tests, hurry({ files: new Set(), characters: most }))) ?? ""),
+    "a file of C# the pull request leaves as it was, past the characters, does not stop the reading; one of Python, read whole, does");
+  // (the selection reads the changed files first, so that one slow to read is read before the project's own spend the
+  // time, and of JavaScript no functions, its parser's work, which it does not use; what it reaches is the same)
+  const order = [], spy = { ...hurry({ files: new Set(["src/view.js", "test/view.test.js"]) }) };
+  const timedBy = spy.timed;
+  spy.timed = (file, read) => { order.push(file); return timedBy(file, read); };
+  const watched = survey({ ...texts, "src/tall.js": `export function tall() {\n${"  a();\n".repeat(80)}}\n` }, config, tests, spy);
+  const plain = survey({ ...texts, "src/tall.js": `export function tall() {\n${"  a();\n".repeat(80)}}\n` }, config, tests);
+  const asLists = m => JSON.stringify([...m].map(([f, to]) => [f, [...to].sort()]).sort());
+  const count = Object.keys(texts).filter(f => f.endsWith(".js")).length + 1, read = order.slice(0, count);
+  ok(same(read.slice(0, 2), ["src/view.js", "test/view.test.js"]) && new Set(read).size === count, "the survey under the watch reads the changed files first, then the project's own, each once", order.join(" "));
+  ok(asLists(watched.reach) === asLists(plain.reach) && same([...watched.unsure].sort(), [...plain.unsure].sort()) && same([...watched.scripts].sort(), [...plain.scripts].sort())
+    && [...plain.entries.keys()].some(id => id.startsWith("function: src/tall.js")) && ![...watched.entries.keys()].some(id => id.startsWith("function: ")) && watched.read.functions === 0,
+    "the survey under the watch reads no functions of JavaScript, and finds the same reach, unsure files and scripts as without it", [...plain.entries.keys()].join(" "));
 }
 
 {
@@ -253,73 +274,6 @@ for (const [args, env, what] of [
   [["--passed", "tests"], { SELECT_BASE: "HEAD^1" }, "--passed on a pull request's run, which is never skipped"],
   [["--passed", "tests;rm"], {}, "a check's name that is none"],
 ]) { r = run(args, env); ok(r.status === 1 && mended(r.out), `refused, with its mend: ${what}`, r.out); }
-
-// ---- a tree that passed is not run again (#457): a push that merges a pull request's head ----
-// (a branch off main that changes a file no reader reads, so its run selected the whole suite, merged with a merge
-// commit; `merged` makes it, `moved` moves main first, so the head is not up to date)
-const merged = ({ moved = false, file = "README.md" } = {}) => {
-  git("checkout", "-q", "-b", `pr${++n}`, "main");
-  put(file, `# changed ${n}\n`); git("add", "-A"); git("commit", "-q", "-m", `change ${n}`);
-  git("checkout", "-q", "main");
-  if (moved) { put(`docs/other${n}.md`, "moved\n"); git("add", "-A"); git("commit", "-q", "-m", `main moved ${n}`); }
-  git("merge", "-q", "--no-ff", "-m", `merge ${n}`, `pr${n}`);
-  return git("rev-parse", "HEAD^2").trim();
-};
-let n = 0;
-const passedHere = async (asked, selects = () => ({ all: true })) => { const was = process.cwd(); process.chdir(dir); try { return await passedWhole({ check: "tests", selects, asked }); } finally { process.chdir(was); } };
-const yes = async () => true;
-let head = merged();
-let p = await passedHere(async (sha, check) => sha === head && check === "tests");
-ok(p.none === true && p.why.includes(head.slice(0, 12)), "a merge whose tree is its head's, whose change selects the whole suite and whose check passed on that head selects nothing", JSON.stringify(p));
-p = await passedHere(async () => "a run of it did not pass");
-ok(p.all === true && /did not pass on the merged head .*a run of it did not pass/.test(p.why), "a check that did not pass on the head runs the whole suite, saying why", p.why);
-p = await passedHere(yes, () => ({ all: false, tests: ["test/run.test.js"] }));
-ok(p.all === true && /selected 1 tests, not the whole suite/.test(p.why), "a pull request whose run selected some tests only runs the whole suite here", p.why);
-merged({ moved: true });
-p = await passedHere(yes);
-ok(p.all === true && /held another tree: it was not up to date/.test(p.why), "a head that was not up to date with main runs the whole suite", p.why);
-put("CHANGES.md", "a commit straight on main\n"); git("add", "-A"); git("commit", "-q", "-m", "no merge");
-p = await passedHere(yes);
-ok(p.all === true && /merges no two commits/.test(p.why), "a commit that merges nothing, as a squash or a rebase makes, runs the whole suite", p.why);
-
-// (from the command line: the host asked with the token, a test server standing in for it)
-head = merged();
-const asks = [];
-const server = http.createServer((req, res) => {
-  asks.push({ url: req.url, auth: req.headers.authorization });
-  const ok2 = req.url.startsWith(`/repos/moss/bark/commits/${head}/check-runs?check_name=tests&`);
-  res.setHeader("content-type", "application/json");
-  res.end(JSON.stringify({ check_runs: ok2 ? [...before, { id: 9, name: "tests", status: "completed", conclusion: state, app: { slug: app }, started_at: "2026-11-19T10:00:00Z" }] : [] }));
-});
-// (`before`: an older run of the check on the same head, as a draft's gate leaves one; #733)
-let state = "success", app = "github-actions", before = [];
-await new Promise(done => server.listen(0, "127.0.0.1", done));
-const host = { GITHUB_API_URL: `http://127.0.0.1:${server.address().port}`, GITHUB_REPOSITORY: "moss/bark", GH_TOKEN: "pretend" };
-const runLive = (args, env) => new Promise(done => {
-  const c = spawn(process.execPath, [script, ...args], { cwd: dir, env: { ...process.env, SELECT_BASE: "", GITHUB_ENV: "", GITHUB_STEP_SUMMARY: "", ...env } });
-  let out = ""; c.stdout.on("data", d => { out += d; }); c.stderr.on("data", d => { out += d; }); c.on("close", status => done({ status, out }));
-});
-fs.writeFileSync(envFile, "");
-r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
-ok(r.status === 0 && /The selection: none of \d+ tests: the merged head/.test(r.out) && fs.readFileSync(envFile, "utf8") === "RUN=none\n" && asks.at(-1)?.auth === "Bearer pretend",
-  "on a push, given --passed, it asks the host with the token, and where the check passed on the merged head it writes \"none\" for the steps after it, never an empty list a runner would read as every test", `${r.out}\n${fs.readFileSync(envFile, "utf8")}`);
-app = "another-app"; fs.writeFileSync(envFile, "");
-r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
-ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /no run of it by GitHub Actions/.test(r.out), "a check of that name another app posted, passed or not, says nothing of the suite: the whole suite runs", r.out);
-app = "github-actions"; state = "failure"; fs.writeFileSync(envFile, "");
-r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
-ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /did not pass on the merged head/.test(r.out), "where the check failed there, the whole suite runs", r.out);
-state = "success"; before = [{ id: 3, name: "tests", status: "completed", conclusion: "failure", app: { slug: "github-actions" }, started_at: "2026-11-19T09:00:00Z" }]; fs.writeFileSync(envFile, "");
-r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
-ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=none\n", "a draft's failed gate before the run that passed on the same head is read as the older: its newest run decides (#733)", r.out);
-state = "failure"; before = [{ id: 3, name: "tests", status: "completed", conclusion: "success", app: { slug: "github-actions" }, started_at: "2026-11-19T09:00:00Z" }]; fs.writeFileSync(envFile, "");
-r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GITHUB_ENV: envFile });
-ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /its newest run did not pass/.test(r.out), "and a pass before a newer run that failed is no pass: the whole suite runs", r.out);
-before = []; state = "success";
-fs.writeFileSync(envFile, "");
-r = await runLive(["--env", "RUN", "--passed", "tests"], { ...host, GH_TOKEN: "", GITHUB_ENV: envFile });
-ok(r.status === 0 && fs.readFileSync(envFile, "utf8") === "RUN=all\n" && /no repository or token/.test(r.out), "with no token, the host is not asked and the whole suite runs", r.out);
-server.close();
 
 console.log(`${count - failed} of ${count} passed`);
 process.exitCode = failed ? 1 : 0;

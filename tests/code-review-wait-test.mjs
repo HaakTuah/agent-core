@@ -2,14 +2,14 @@
 // Tests for scripts/code-review-wait.mjs: a code review running on the head commit is waited for, a code review of that
 // commit, named by its whole SHA, posted by another reviewer ends the wait, and nothing else holds a pull request. Run by tests.yml.
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { UNREAD, status } from "../scripts/security-review.mjs";
 import { CONTEXT, judge } from "../scripts/code-review-wait.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -199,7 +199,7 @@ ok(is(queued([], [lineOf, { ...lineOf, filename: "README.md" }]), false, "no cod
 ok(is(queued([summary(running)], [lineOf]), false, "still running"), "a code review of Codex's running on the head is still waited for");
 
 // From the command line, as the workflow runs it.
-const dir = mkdtempSync(join(tmpdir(), "code-review-wait-"));
+const dir = scratchDir("code-review-wait-");
 try {
   const script = fileURLToPath(new URL("../scripts/code-review-wait.mjs", import.meta.url));
   const run = (p, c, env = {}, k = undefined, f = undefined) => {

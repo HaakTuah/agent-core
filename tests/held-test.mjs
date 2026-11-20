@@ -3,13 +3,13 @@
 // registry gives, trimmed to what it reads, and handed to it in place of the network (floor rule 8: no live call, no
 // real package). Run: node tests/held-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { GITHUB_MOST } from "../scripts/lookup.mjs";
 import { STALE, heldPackages, lookAgain, report } from "../scripts/held.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what, detail = "") => { if (!cond) { failed++; console.error(`FAIL ${what}${detail ? `\n     ${String(detail).slice(0, 1500)}` : ""}`); } };
@@ -77,7 +77,7 @@ r = await lookAgain([pkg("Invented.Moss.Old", { version: "1.0.0", nuget: true, l
 ok(r.stale.length === 1 && /^src\/packages\.lock\.json: Invented\.Moss\.Old@1\.0\.0: no release since/u.test(r.stale[0]) && r.unread.length === 0, "NuGet: a stale package is found, and one from a source the config names is not judged", r);
 
 // ---- What a project holds: every lock file the config names, each package once
-const dir = mkdtempSync(join(tmpdir(), "held-test-"));
+const dir = scratchDir("held-test-");
 try {
   execFileSync("git", ["init", "-q"], { cwd: dir });
   const lock = (packages) => JSON.stringify({ lockfileVersion: 3, packages: { "": { dependencies: Object.fromEntries(Object.keys(packages).filter((k) => !k.includes("/node_modules/")).map((k) => [k.slice(13), "1.1.0"])) }, ...packages } });
@@ -101,7 +101,7 @@ try {
   try { held = heldPackages(dir, [["absent.json", false]]); } finally { process.chdir(here); }
   ok(held.packages.length === 0 && held.unread.length === 1 && held.unread[0].startsWith("absent.json:"), "a config that cannot be read is said, never taken as holding nothing", JSON.stringify(held));
   // (a config the project makes a link out of itself is never opened, and nothing of what it holds is printed)
-  const outside = mkdtempSync(join(tmpdir(), "held-outside-"));
+  const outside = scratchDir("held-outside-");
   writeFileSync(join(outside, "secret.json"), JSON.stringify({ lockfiles: ["invented-outside-path"] }));
   symlinkSync(join(outside, "secret.json"), join(dir, "linked.json"));
   process.chdir(dir);
@@ -111,7 +111,7 @@ try {
 
 // ---- A config the workflows name only when they run is said unread, and the issue left as it stands (exit 3)
 {
-  const at = mkdtempSync(join(tmpdir(), "held-unnamed-"));
+  const at = scratchDir("held-unnamed-");
   try {
     execFileSync("git", ["init", "-q"], { cwd: at });
     mkdirSync(join(at, ".github/workflows"), { recursive: true });

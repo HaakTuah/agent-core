@@ -12,11 +12,11 @@
 //   node tests/mend-test.mjs
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { failures, mended, unmended } from "../scripts/mend.mjs";
 import { folders, partsIn, whole } from "../scripts/inventory.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what) => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}`); } };
@@ -163,7 +163,7 @@ const tracked = (() => {
 })();
 ok(tracked !== null && tracked.length > 0, `the tracked files are read${tracked ? "" : ". Mend: run the test in a clone of the repository, where git lists its files"}`);
 {
-  const at = fs.mkdtempSync(path.join(os.tmpdir(), "inventory-"));
+  const at = scratchDir("inventory-");
   fs.writeFileSync(path.join(at, "INVENTORY.md"), "# I\r\n\r\n## A\r\n\r\nIts parts stand in `inventory/a/`, a file each, read in the order of their names.\r\n\r\n## B\n\nIts parts stand in `inventory/b/`, a file each, read in the order of their names.\n\nEnd.\n");
   fs.mkdirSync(path.join(at, "inventory/a"), { recursive: true });
   fs.writeFileSync(path.join(at, "inventory/a/020-y.md"), "- `y`: two\n  lines.\n");

@@ -7,7 +7,6 @@
 //   node tests/holders-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { inStep as inStepAt, itemsIn, KEY, LAST_NUMBERED } from "../scripts/archive.mjs";
@@ -19,6 +18,7 @@ import { installed } from "../scripts/packages.mjs";
 import { leftOut } from "../scripts/reading.mjs";
 import { heldHere } from "../scripts/state-report.mjs";
 import { shapeFaults } from "../scripts/schemas.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 // (the file's form is read by ajv, which the core's install brings; without it the cases that read the form could only
 // fail on a message they never get, among the lines of the cases that ran, so the test stops and says what it lacks, #905)
@@ -27,8 +27,7 @@ if (!installed("ajv")) { console.error("FAIL: the core's packages are not instal
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "holders-test-"));
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("holders-test-");
 
 // ---- what counts as a rule ----
 const text = [
@@ -204,7 +203,7 @@ ok(own.status === 0 && !own.stderr, "the core's own entries in scripts/holders/ 
 const failing = project({ "tasks/x.md: Gone": "audit" });
 fs.mkdirSync(path.join(failing, "scripts", "staged"));
 fs.mkdirSync(path.join(failing, "scripts", "schemas"));
-for (const f of ["archive.mjs", "core-address.mjs", "core-path.mjs", "guards.mjs", "holders.mjs", "packages.mjs", "reading.mjs", "rule-files.mjs", "rules.mjs", "schemas.mjs", "schemas/holders.json", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
+for (const f of ["archive.mjs", "core-address.mjs", "core-path.mjs", "guards.mjs", "holder-form.mjs", "holders.mjs", "holders-own.mjs", "packages.mjs", "reading.mjs", "rule-files.mjs", "rules.mjs", "schemas.mjs", "schemas/holders.json", "started.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(failing, "scripts", f));
 fs.writeFileSync(path.join(failing, "scripts", "staged.mjs"), "export const CASES = [];\n");
 fs.writeFileSync(path.join(failing, "scripts", "outcomes.mjs"), "export const NUMBER = /^$/u;\n");
 const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.mjs")], { encoding: "utf8" });

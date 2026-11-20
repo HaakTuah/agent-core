@@ -6,7 +6,6 @@
 //   node tests/core-path-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
@@ -15,6 +14,7 @@ import { atCopy, carriedAt, corePath, floorCopy, floorCopyIn, hookCommands, mani
 import { mended } from "../scripts/mend.mjs";
 import { pathIn } from "../scripts/reading.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 // The workflows a project calls whose first step reads where the core's copy stands.
 const CALLED = ["copies.yml", "core-moved.yml", "licences.yml", "look.yml", "nuget.yml", "pr-description.yml", "signatures.yml", "versions.yml"];
@@ -85,8 +85,7 @@ for (const [what, line, lib] of [
 }
 
 // the script, from a project's root
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-path-test-"));
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("core-path-test-");
 const script = fileURLToPath(new URL("../scripts/core-path.mjs", import.meta.url));
 const run = text => { fs.writeFileSync(path.join(tmp, "core-manifest.md"), text); return spawnSync(process.execPath, [script], { cwd: tmp, encoding: "utf8" }); };
 let out = run(carried());

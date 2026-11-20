@@ -5,16 +5,15 @@
 //   node tests/licence-installed-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { check, leftOut, lockForm, plainVersion } from "../scripts/licence-installed.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "licence-installed-test-"));
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("licence-installed-test-");
 let n = 0;
 // A project: `locked` is the lock file's packages by path; `installed`, each package's own package.json by path (a
 // path left out is a package no install brought; a string is written as it stands).

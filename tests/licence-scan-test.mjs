@@ -8,11 +8,11 @@
 //   node tests/licence-scan-test.mjs
 import { LOCK, append, done, entry, handAudited, json, ok, run, write } from "../scripts/licence-scan-stage.mjs";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
 import { execFileSync } from "node:child_process";
 import { check as licenceCheck } from "../scripts/licences.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 // (each failure as the check prints it, one a config's fault throws too: each says its mend)
 const mendSaid = (failures) => mended(failures.map((m) => `FAIL: ${m.replace(/^threw: /u, "")}`).join("\n"));
@@ -193,7 +193,7 @@ for (const [what, change, why] of [
 
 // Every path the config names, and every file the scan reads, lies inside the project.
 {
-  const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), "licences-elsewhere-"));
+  const elsewhere = scratchDir("licences-elsewhere-");
   try {
     fs.writeFileSync(path.join(elsewhere, "audit.json"), JSON.stringify({ entries: [] }));
     fs.writeFileSync(path.join(elsewhere, "notice.js"), "/*! Copyright 2020 Mossgrip | GPL-3.0 */\n");
@@ -246,7 +246,7 @@ for (const [what, change, why] of [
 // A program a file downloads by its address is pinned by version and checksum (#488, point 5): read against the pull
 // request's base, a file that stood unpinned is reported, and one a pull request adds or unpins fails, saying the mend.
 {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "licence-scan-pins-"));
+  const dir = scratchDir("licence-scan-pins-");
   const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
   const git = (...args) => execFileSync("git", args, { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] });
   const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); git("add", "-A"); };

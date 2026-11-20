@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TEMPLATES } from "../scripts/init.mjs";
 import { holds, parseYaml } from "../scripts/workflow-run.mjs";
-import { draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
+import { draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, repeated, unlinked, unparsed, unreadied } from "../scripts/workflows.mjs";
 import { Unread } from "../scripts/check-configs.mjs";
 import { readyOnlyHolds } from "../scripts/step-checks.mjs";
 import { CORE } from "../scripts/core-address.mjs";
@@ -172,6 +172,36 @@ ok(heldDup.fails.length === 0 && heldDup.notes.length === 1 && /as it did on the
 // is not known, and what the head shows is noted)
 ok(hiddenDup.fails.length === 0 && hiddenDup.notes.length === 1 && /the base being no YAML/u.test(hiddenDup.notes[0]) && hiddenCall.fails.length === 0 && /the base being no YAML/u.test(hiddenCall.notes.join()),
   "a base no YAML to the package either way its breaks are read holds what stands behind them unknown: the head's findings are noted, not failed", [...hiddenDup.notes, ...hiddenCall.notes, ...hiddenDup.fails, ...hiddenCall.fails].join("\n"));
+// (#970, 1: a reading that is no YAML to the package once the breaks are folded shows keys no reader has: a double-quoted value
+// whose breaks, folded, put its continuation lines at the parent's indent gives no key, and a hostile file's many such lines
+// are not all printed)
+const falseKeys = 'a: 1\nb: "x\u2028c: 1\u2028c: 2"\n';
+const flood = `${Array.from({ length: 3000 }, (_, i) => `k${i}: 1\nk${i}: 2\n`).join("")}# c\u2028\n`, flooded = repeated(one(flood), null), floodedFails = repeated(one(flood), () => "a: 1\n");
+ok(keysTwice(falseKeys).length === 0 && repeated(one(falseKeys), () => null).notes.length === 0 && repeated(one(falseKeys), () => 'a: 1\nb: "x\u2028c: 1\u2028"\n').fails.length === 0
+  && flooded.notes.length === 26 && /^note w\.yml: and 2975 more keys/u.test(flooded.notes[25]) && floodedFails.fails.length === 26 && /^FAIL w\.yml: and 2975 more keys/u.test(floodedFails.fails[25]) && mended(floodedFails.fails[25]) && keysTwice(flood).length === 3000,
+  "a reading that is no YAML to the package once the breaks are folded names no key given twice, and a file's lines of one kind are cut at twenty-five and the rest counted", `${keysTwice(falseKeys).length} ${flooded.notes.length} ${floodedFails.fails.length}`);
+const manyOld = keysOnce({ root: ".", files: [".github/workflows/w.yml"], read: () => flood });
+ok(/"k24"/u.test(manyOld ?? "") && !/"k25"/u.test(manyOld ?? "") && /and 2975 more, which show once/u.test(manyOld ?? "") && (manyOld ?? "").length < 5000, "the sync's step for a key given twice names at most twenty-five and counts the rest", String(manyOld).slice(0, 200));
+// (a file that is no YAML for another reason keeps the readings: here the aliases, more than the package expands, and a key
+// that only a YAML 1.1 reader sees twice)
+const aliased = `x: &a 1\n${Array.from({ length: 120 }, (_, i) => `y${i}: *a\n`).join("")}on: pull_request\n# c\u2028on: [push]\n`;
+ok(keysTwice(aliased).map(k => k.key).join() === "on" && repeated(one(aliased), () => "").fails.length === 1, "a file that is no YAML to the package for a reason that is not its breaks keeps the readings, so a key given twice behind a break is found in it too");
+// (#970, 3: a base that is no YAML for a reason of its own, and holds a break, is read as it stands: a new key given twice fails
+// and a call left without ready_for_review, as the mending head holds it, fails, the base's own noted)
+const otherBase = 'x: 1\nx: 2\n# c\u2028\nbad: [\n';
+const ownError = repeated(one(`y: 1\ny: 2\n${otherBase}`), () => otherBase), otherCall = unreadied(one(`# c\u2028\n${call(TYPES, "copies.yml", NOT_DRAFT)}`), () => `# c\u2028\nbad: [\n`);
+ok(ownError.fails.length === 1 && /^FAIL w\.yml:2: the key "y"/u.test(ownError.fails[0]) && ownError.notes.length === 1 && !/the base being no YAML/u.test(ownError.notes[0]) && otherCall.fails.length === 1 && mended(otherCall.fails[0]),
+  "a base that is no YAML for a reason that is not its breaks is read as it stands: a new key given twice and a call left without ready_for_review fail", [...ownError.fails, ...ownError.notes, ...otherCall.fails, ...otherCall.notes].join("\n"));
+// (#970, 2: a file with such a break is lexed and parsed up to three ways, and was by each reader, for the head and the base: read
+// against the same file without the breaks, in the same run, the cost of both readers is a small multiple of it. The worst
+// shape: as many keys as fit, each a double-quoted string holding a break)
+const hostileKeys = (br, mark) => `${Array.from({ length: 65000 }, () => `k: "x${br}"\n`).join("").slice(0, LONGEST - 40)}# ${mark}\n`, spent = br => {
+  const files = one(hostileKeys(br, "head")), before = () => hostileKeys(br, "base"), t1 = Date.now();
+  repeated(files, before); unreadied(files, before); foreignBroken(files, before);
+  return Date.now() - t1;
+};
+const withBreaks = spent("\u2028"), without = spent("");
+ok(withBreaks < 5 * without + 300 && withBreaks < 60000, "a hostile file of the longest text read, a key given twice on every line behind a break in a double-quoted string, costs the two readers, head and base, a small multiple of the same file with no break", `${withBreaks} ms against ${without} ms`);
 // (only the reading as the mend leaves it finds the key given twice here, the folded text being no YAML: it is told on the line
 // an editor counts; and a text the escapes would take past the length read is read as line feeds, never as too long)
 const onlyMended = 'jobs:\n  b:\n    name: "x\u2028y"\n    # c\u2028    a: 1\n    a: 2\n';
@@ -208,11 +238,18 @@ const core = fileURLToPath(new URL("..", import.meta.url));
 const own = fs.readdirSync(`${core}.github/workflows`).filter(f => /\.ya?ml$/u.test(f));
 ok(own.length > 0 && own.every(f => !fails(fs.readFileSync(`${core}.github/workflows/${f}`, "utf8"))), "the core's own workflows pass");
 
+// ---- a workflow the core's reader cannot read as YAML fails, with its line and the mend (#994) ----
+const broken = `jobs:\n  a:\n    steps:\n      - name: The description check: the line "Read for it:"\n        run: x\n`;
+const noYaml = unparsed([{ file: "a.yml", text: broken }, { file: "b.yml", text: "jobs:\n  a:\n    steps:\n      - name: \"The description check: the line\"\n        run: x\n" }, { file: "c.yml", text: "a: 1\na: 2\n" }, { file: "d.yml", text: "a: \"x\n" }, { file: "e.yml", text: "on: push\njobs:\n  a:\n    env:\n      true: a\n      True: b\n" }, { file: "f.yml", text: "a: 1\n---\nb: 2\n" }]);
+ok(noYaml.fails.length === 4 && /^FAIL a\.yml:4:\d+: the core's reader cannot read it as YAML.*BLOCK_AS_IMPLICIT_KEY.*Mend: put the whole value in quotes/u.test(noYaml.fails[0]) && /^FAIL d\.yml:\d+:\d+: /u.test(noYaml.fails[1]) && /^FAIL e\.yml:6:.*Mend: rename one/u.test(noYaml.fails[2]) && /^FAIL f\.yml:.*Mend: take out the "---"/u.test(noYaml.fails[3]) && noYaml.fails.every(l => mended(l)),
+  "a file the core's reader throws on fails with its file, line and column and a mend (a \": \" in an unquoted step name says to quote it), a quoted name, which parses, does not, and a key given twice is left to repeated(), which says it, but two keys the package reads as one (true and True) are failed here", noYaml.fails.join("\n"));
+ok(unparsed([]).fails.length === 0 && own.every(f => unparsed([{ file: f, text: fs.readFileSync(`${core}.github/workflows/${f}`, "utf8") }]).fails.length === 0), "the core's own workflows each parse");
+
 // run on a scratch project: each failure says its mend
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-test-"));
 try {
   fs.mkdirSync(path.join(tmp, "core/scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
+  for (const f of ["workflows.mjs", "workflow-run.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(tmp, "core/scripts", f));
   // (the install with the lock file it is read against)
   fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(tmp, "core/.packages"), { recursive: true });
   fs.writeFileSync(path.join(tmp, "core/.gitignore"), "/.packages/node_modules/\n"); // (as the copy holds it)
@@ -235,6 +272,12 @@ try {
   ok(kGood, `run against a base, a key twice the base held is noted and a new one fails, with its mend${kGood ? "" : `:\n${kOut}`}`);
   const kNone = keyRun([]), kCore = keyRun(["--core"], { WORKFLOWS_BASE: "HEAD" });
   ok(kNone.status === 0 && /0 failing, 2 noted$/m.test(kNone.stdout) && kCore.status === 1 && /2 failing\. Mend:/.test(kCore.stdout), "run with no base, each is noted and it passes; in the core's own repository each fails, whatever the base");
+  fs.writeFileSync(path.join(tmp, ".github/workflows/f.yml"), broken);
+  execFileSync("git", ["add", ".github/workflows/f.yml"], { cwd: tmp, stdio: "ignore" });
+  const bCore = keyRun(["--core"]), bOut = bCore.stdout + bCore.stderr, bProject = keyRun([]);
+  ok(bCore.status === 1 && /^FAIL \.github\/workflows\/f\.yml:4:\d+: the core's reader cannot read it as YAML.*Mend: put the whole value in quotes/mu.test(bOut) && mended(bOut) && !/f\.yml.*the core's reader cannot read it as YAML/u.test(bProject.stdout), `run in the core's own repository, a workflow that is no YAML fails with its mend; a project's, which the core's reader may read otherwise than GitHub does, is not failed${bCore.status === 1 ? "" : `:\n${bOut}`}`);
+  fs.rmSync(path.join(tmp, ".github/workflows/f.yml"));
+  execFileSync("git", ["rm", "-q", "--cached", ".github/workflows/f.yml"], { cwd: tmp, stdio: "ignore" });
   // (where the job's install could not reach the registry, the keys given twice and the calls a draft skips did not run,
   // said so, and the package's absence fails nothing; every other failure still fails, so no pull request turns the check
   // green by making the install fail: #654, point 4)
@@ -243,14 +286,14 @@ try {
   execFileSync("git", ["add", ".github/workflows/d.yml", ".github/workflows/e.yml"], { cwd: tmp, stdio: "ignore" });
   fs.rmSync(path.join(tmp, "core/.packages/node_modules"), { recursive: true, force: true });
   const u = keyRun([], { CORE_PACKAGES_UNREACHED: "1" }), uOut = u.stdout + u.stderr;
-  ok(u.status === 1 && /^::warning::The check for a key given twice did not run, nor the one for a call a draft skips/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && !/e\.yml|is not installed/.test(uOut) && mended(uOut), `where the install could not reach the registry, the keys given twice and the calls a draft skips did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
+  ok(u.status === 1 && /^::warning::The check for a key given twice did not run, nor the one for a file that is no YAML, nor the one for a call a draft skips/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && !/e\.yml|is not installed/.test(uOut) && mended(uOut), `where the install could not reach the registry, the keys given twice and the calls a draft skips did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 // ---- a copy of the core at the path the manifest names (#918): the check leaves it out, and reads the project's own core/ ----
 const vend = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-vendored-"));
 try {
   const at = "vendor/core/", put = (f, text) => { fs.mkdirSync(path.dirname(path.join(vend, f)), { recursive: true }); fs.writeFileSync(path.join(vend, f), text); };
   fs.mkdirSync(path.join(vend, at, "scripts"), { recursive: true });
-  for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(vend, at, "scripts", f));
+  for (const f of ["workflows.mjs", "workflow-run.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(vend, at, "scripts", f));
   fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(vend, at, ".packages"), { recursive: true });
   put("core-manifest.md", `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${at} (never edited here).\n`);
   put(`${at}tools/action.yml`, "on:\n  pull_request_target:\n"); // (the copy's own, which the core's run holds)
