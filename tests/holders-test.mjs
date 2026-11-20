@@ -15,7 +15,12 @@ import { OWN, counts, entryFile, holders, named, ownHolders, ownReport, report }
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { fingerprint, rules, rulesOf } from "../scripts/rules.mjs";
+import { installed } from "../scripts/packages.mjs";
 import { shapeFaults } from "../scripts/schemas.mjs";
+
+// (the file's form is read by ajv, which the core's install brings; without it the cases that read the form could only
+// fail on a message they never get, among the lines of the cases that ran, so the test stops and says what it lacks, #905)
+if (!installed("ajv")) { console.error("FAIL: the core's packages are not installed, so the form of scripts/holders/ cannot be read (ajv). Mend: run `node scripts/install.mjs` first, then run this again"); process.exit(1); }
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
