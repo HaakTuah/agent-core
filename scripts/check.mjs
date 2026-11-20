@@ -19,10 +19,8 @@
 // part (tasks/hosts.md). The personal-terms list is read from the environment (PERSONAL_TERMS), never from a file, as
 // the host keeps it among its secrets, and each of its terms is printed as *** wherever a step prints it, in any case. It prints
 // each job, each step the host alone runs, and each failing step with what it printed; it exits 1 where one failed.
-// Git, bash and Node's own modules, gh where the manifest has no owner's row and no workflow's event says whose
-// account holds the repository (releases.mjs, hostAccount), and curl with the network to Betterleaks' releases on
-// github.com, from which the personal-terms check fetches its matcher where the list is given (without them that check
-// fails, saying so).
+// Git, bash and Node's own modules, and gh where the manifest has no owner's row and no workflow's event says whose
+// account holds the repository (releases.mjs, hostAccount).
 //
 //   node core/scripts/check.mjs [--base <commit>] [--title <the pull request's title>] [--description <a file>]
 //                               [--branch <the branch's name, where none is checked out>]
