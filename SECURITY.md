@@ -87,11 +87,12 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      the work tree and a pull request's base hold them: read by the copies and pointer checks (`scripts/copies.mjs`,
      `scripts/pointers.mjs`, through `scripts/rule-files.mjs`); limits: 1 MB of a file, past which it is not read, 40
      links followed from one path; hostile tests: `tests/copies-tools-test.mjs`.
-   - the Markdown links in the rule files, and the headings they name, as the work tree and a pull request's base hold
-     them: read for the pointer check by lychee (`scripts/links.mjs`, the tool fetched at set-up by `scripts/lychee.sh`
+   - the Markdown links in the rule files, and the headings they name, in the head and in its base's tree: read for the
+     pointer check by lychee (`scripts/links.mjs`, the tool fetched at set-up by `scripts/lychee.sh`
      and run on the runners alone, offline and from an empty folder, so that no config of the project's is read), the
      file a link leads to held by the check to what git tracks in the project, one out of it failing; limits: 120 s for
-     each of its runs, past which it is said unread and the core's own reading stands in; tests: `tests/links-test.mjs`.
+     each of its runs, past which it is said unread and the core's own reading stands in; hostile tests:
+     `tests/links-test.mjs`.
    - a project's build, package and workflow files: read by the licence, exact-versions, NuGet, workflow and agent-tools
      checks and the reader of where the tests run (`scripts/licences.mjs`, `scripts/exact-versions.mjs`,
      `scripts/nuget.mjs`, `scripts/workflows.mjs`, `scripts/agent-tools.mjs`, `scripts/runners.mjs`), the reader of a
