@@ -42,7 +42,7 @@ ok(verdictOf(record()).done === true && /a review is posted after its newest fin
 ok(atMerge(record())[0].state === "open" && atMerge(record())[0].draft === false && atMerge(record())[0].number === 7, "at its merge the pull request reads as open and no draft, the rest as recorded");
 ok(same(atMerge(record({ comments: [summary(found), posted(HEAD, "2026-11-12T12:00:00Z"), posted(SEEN, "2026-11-12T12:00:01Z")] }))[1].map((c) => c.created_at), ["2026-11-12T09:00:00Z", "2026-11-12T12:00:00Z"]), "what came at the merge is read with it, what came after is not");
 ok(same(atMerge(record({ findings: [finding(31, "2026-11-12T10:00:00Z"), finding(32, "2026-11-12T12:30:00Z")] }))[2].map((c) => c.id), [31]), "a finding after the merge is not read");
-ok(verdictOf(record({ comments: [summary(found)] })).done === false, "the status is judged as one held by the check, which waits where no review follows an open finding");
+ok(verdictOf(record({ comments: [summary({ ...cleared, commit_sha: SEEN })] })).done === false, "the status is judged as one held by the check, which waits where Codex saw another commit than the head");
 const writes = { permission: "write", role_name: "write", user: { ...OTHER, permissions: { push: true } } };
 const theirs = { comments: [summary(found), posted(HEAD, "2026-11-12T11:00:00Z", OTHER, "COLLABORATOR")] };
 ok(verdictOf(record({ ...theirs, rights: [writes] })).done === true && verdictOf(record(theirs)).done === false, "with the rights recorded: a review of an account the host lets write counts, as the workflow reads it");
@@ -106,6 +106,7 @@ ok(same(["triage", "write", "maintain", "admin"].map((role) => compareRights({ p
 ok(same(compareRights({ pushList: [listed("a", "write"), listed("b", "write")], answers: [answer("a", "read"), answer("b", "write")] }), ["a is on the host's push list, but writersOf() does not count them (role read, permission read)"]), "each login is read against its own answer");
 ok(same(compareRights({ pushList: [listed("b", "write")], answers: [{ permission: "none", role_name: "none", user: null }, answer("b", "read")] }).length, 1), "an answer with no account is no one's");
 ok(same(compareRights({ pushList: "x", answers: "y" }), []), "lists the host did not give are none");
+ok(same(compareRights({ pushList: [null, "w", listed("w", "write")], answers: [null, 3, answer("w", "write")] }), []), "and an entry that is no object is skipped");
 ok(same(compareRights({ pushList: [listed("w", "write")], answers: [answer("w", "write", "write", "User", false)] }), ["w is on the host's push list, but writersOf() does not count them (role write, permission write)"]), "so is a writer whose answer says it may not push");
 ok(same(compareRights({ pushList: [listed("w", "write")], answers: [] }), ["w is on the host's push list, but no rights answer of theirs is recorded"]), "one on the push list with no answer recorded is a difference");
 ok(same(compareRights({ pushList: [], answers: [answer("w", "write")] }), ["writersOf() counts w, who is not on the host's push list"]), "one writersOf() counts who is not on the push list is a difference");
@@ -118,7 +119,7 @@ ok(as("a-stranger") === "someone-1" && as("another") === "someone-2" && as("A-St
 const raw = record({
   comments: [summary(found), posted(HEAD, "2026-11-12T11:00:00Z"), { id: 3, user: OTHER, author_association: "NONE", created_at: "2026-11-12T11:10:00Z", updated_at: "2026-11-12T11:10:00Z", body: "A word from a stranger." },
     { ...posted(SEEN, "2026-11-12T11:20:00Z", OTHER, "CONTRIBUTOR"), body: `Security review: ${SEEN}\nprose\nchecked head ${HEAD}\ncomments and steps' names alone in .github/` }],
-  findings: [finding(31, "2026-11-12T10:00:00Z"), { ...finding(33, "2026-11-12T10:05:00Z"), user: OTHER, body: "A reply." }],
+  findings: [finding(31, "2026-11-12T10:00:00Z"), { ...finding(33, "2026-11-12T10:05:00Z"), user: OTHER, body: "A reply." }, { ...finding(34, "2026-11-12T10:06:00Z"), user: OTHER }],
   files: [{ filename: "scripts/a.mjs", status: "modified", patch: "x", additions: 1 }, { filename: ".github/workflows/a.yml", status: "modified", patch: "y" }, { filename: "b.md", previous_filename: ".claude/x.md", status: "renamed", patch: "z" }],
   reviews: [review(HEAD, "2026-11-12T10:00:00Z"), { ...review(HEAD, "2026-11-12T10:00:00Z"), user: OTHER }, { ...review(HEAD, "2026-11-12T10:00:00Z"), body: "<!-- codex-review-receipt:v1 -->\nno heading" }],
   commits: [{ ...commit, author: OTHER, node_id: "x" }], rights: [{ ...writer, user: { ...writer.user, id: 5 } }], threads: [{ resolved: false, first: 31 }] });
@@ -127,6 +128,8 @@ ok(same(kept.comments.map((c) => c.id), [1, 2, 2]) && kept.comments[0].body === 
 const among = keep(record({ comments: [{ ...finding(40, "2026-11-12T10:00:00Z") }, { ...finding(41, "x"), user: OTHER }, { ...summary(found), id: 42, user: OTHER }, { ...summary(found), id: 43, body: "Codex: <!-- codex-pull-request-review-summary -->" }, { ...posted(HEAD, "x"), id: 44, body: `Note. Security review: ${HEAD}` }] }), standIns()).comments;
 ok(same(among.map((c) => [c.id, c.body]), [[40, "<!-- codex-security-review-finding:v1 -->"]]), "a finding of Codex's among the comments is kept, its first line; a look-alike of anyone else's, a summary not at the start, and a review not opening so are not");
 ok(keep(record({ commits: [{ ...commit, author: null }] }), standIns()).commits[0].author === null, "a commit whose author the host cannot name keeps none");
+const lines = keep(record({ comments: [{ ...posted(HEAD, "x"), body: `Security review: none needed\nchecked head ${HEAD}\n  nothing changed in .github/\nprose: nothing changed in .github/\nXcomments and steps' names alone in .github/` }] }), standIns()).comments[0].body;
+ok(lines === `Security review: none needed\nchecked head ${HEAD}\n  nothing changed in .github/`, "a posted review keeps its opening line, though it names no commit, and comment-only.mjs's lines only where they open a line");
 ok(kept.comments[1].body === `Security review: ${HEAD}` && kept.comments[2].body === `Security review: ${SEEN}\nchecked head ${HEAD}\ncomments and steps' names alone in .github/`, "of a posted review, its first line and the lines that name a commit or what comment-only.mjs printed");
 ok(kept.comments[2].user.login === "someone-1" && kept.commits[0].author.login === "someone-1" && kept.rights[0].user.login === "someone-1", "a stranger's login is one stand-in throughout a recording");
 ok(same(kept.findings, [{ id: 31, user: CODEX, author_association: "NONE", created_at: "2026-11-12T10:00:00Z", updated_at: "2026-11-12T10:00:00Z", body: "<!-- codex-security-review-finding:v1 -->" }]), "of the review comments, Codex's security findings, each body cut to its first line");

@@ -60,7 +60,7 @@ export function atMerge(record) {
   const pull = { ...record.pull, state: "open", draft: false };
   return [pull, flat(record.comments).filter(by), flat(record.findings).filter(by), record.commits, record.files];
 }
-export const verdictOf = (record, rights = record.rights) => judge(...atMerge(record), true, { rights: Array.isArray(rights) ? rights : [] });
+export const verdictOf = (record, rights = record.rights) => judge(...atMerge(record), true, { rights });
 
 // what differs between the status and the host's record of one pull request's reviews: a list of lines, empty where
 // nothing does
@@ -92,7 +92,7 @@ function threadsOpen(n, record) {
     .filter((comment) => comment !== undefined && codexs(comment) && FINDING.test(comment.body));
   const verdict = verdictOf(record);
   if (!verdict.done) return [];
-  const whose = counted(pull, [], writersOf(record.rights));
+  const whose = counted(pull, undefined, writersOf(record.rights));
   const posted = comments.filter((comment) => POSTED.test(comment.body) && whose(comment.user));
   return open.filter((finding) => !posted.some((comment) => time(comment.created_at) > time(finding.created_at)))
     .map((finding) => `${n}: Codex's security finding ${finding.id} is unresolved on the merged head, with no "Security review:" posted after it, yet the status passed: ${verdict.why}`);
@@ -152,14 +152,10 @@ const pullKept = (p, as) => ({ number: p.number, state: p.state, draft: p.draft,
 const SUMMARY_OPENS = /^<!-- codex-pull-request-review-summary -->/u;
 const kept = (c) => (codexs(c) && (SUMMARY_OPENS.test(c.body) || FINDING.test(c.body))) || POSTED.test(c.body);
 const commentKept = (c, as, body) => ({ id: c.id, user: userOf(c.user, as), author_association: c.author_association, created_at: c.created_at, updated_at: c.updated_at, body });
-// what the status reads of a comment's body: Codex's summary whole, a finding's first line, and of a posted review its
-// first line and each that names a commit or says what comment-only.mjs printed
+// what the status reads of a comment's body: Codex's summary whole, and of any other its first line (a finding's
+// marker, a posted review's opening) and each line that names a commit or says what comment-only.mjs printed
 const READ_LINES = /[0-9a-f]{40}|^\s*(?:comments and steps' names alone in \.github\/|nothing changed in \.github\/)/iu;
-function bodyKept(body) {
-  if (SUMMARY_OPENS.test(body)) return body;
-  if (FINDING.test(body)) return firstLines(body, 1);
-  return body.split("\n").filter((line, i) => i === 0 || READ_LINES.test(line)).join("\n");
-}
+const bodyKept = (body) => (SUMMARY_OPENS.test(body) ? body : body.split("\n").filter((line, i) => i === 0 || READ_LINES.test(line)).join("\n"));
 const commitKept = (c, as) => ({ sha: c.sha, parents: flat(c.parents).map((parent) => ({ sha: parent.sha })), author: userOf(c.author, as), committer: userOf(c.committer, as),
   commit: { verification: { verified: c.commit.verification?.verified } } });
 // of the files, a patch only where the file runs by itself, as the status reads it
@@ -182,7 +178,7 @@ function threadsOf(call, n) {
 }
 // the logins whose rights the workflow reads: each that posted a "Security review:", "Code review:" or "Design
 // check:" with a say in the repository, a person's account, but the owner (security-review.yml)
-const commenters = (comments) => [...new Set(flat(comments).filter((c) => typeof c.body === "string" && /^(\*\*)?(Security review|Code review|Design check):/u.test(c.body)
+const commenters = (comments) => [...new Set(flat(comments).filter((c) => /^(\*\*)?(Security review|Code review|Design check):/u.test(c.body)
   && ["OWNER", "MEMBER", "COLLABORATOR"].includes(c.author_association) && c.user?.type === "User" && lower(c.user.login) !== lower(OWNER)).map((c) => c.user.login))];
 
 function rightsOf(call, logins) {
