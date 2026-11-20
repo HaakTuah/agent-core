@@ -96,12 +96,13 @@ code is held to: `tasks/code-shape.md`.
   scheduled look, whose issue for an audit says this brief, and by the reviews of the pull request that holds the
   report, which read that each question is answered on the scale.
 - **A project is read against the core once, then for what each release changes** (#464). By default a project is
-  read against the core whole once, from when it takes the core, and after that, at each release it syncs to, against
-  the rules that release added or changed alone. The one condition that changes it: a sync that jumps from a copy
+  read against the core whole once, from when it takes the core, and after that, at each sync that brings rules
+  changed since the last reading (a release, or `main`'s newest commit for a project that follows `main`), against
+  the rules added or changed alone. The one condition that changes it: a sync that jumps from a copy
   older than the core's last two releases; the sync says so (`core/scripts/sync.mjs`), and the session that syncs takes
   the record out in a pull request of its own, so that the next reading is whole. The trigger is the sync's step,
   which the scheduled look's issue of steps not done keeps: `core/scripts/core-reading.mjs` reads the record
-  `checks/core-reading.json`, a mark of each rule a reading covered, and asks a whole reading where it stands nowhere,
+  `checks/core-reading.json`, a mark of each rule of the copy at the last reading, those of modules not taken too, and asks a whole reading where it stands nowhere,
   else names each rule the project takes (the floor's and its modules', `--rules`) that no reading covered. The session
   that takes the task starts an auditor (`roles/auditor.md`) and, in one pull request, puts its answers in the
   *audits* as an audit's report is put there, files each gap as a task the project's agents take at the dose, a step
@@ -110,7 +111,8 @@ code is held to: `tasks/code-shape.md`.
     holds it in the project: a check, a test, the review, or nothing.
 
   It does not mean that anything fails, blocks or waits on the owner; that the reading runs at every sync; a second
-  audit of how the code is put together, a score that ranks projects, or that anything of the project's code or
+  audit of how the code is put together, a score that ranks projects, that a module taken after a reading is read
+  whole at its taking (its rules are read as they change, as the rest are), or that anything of the project's code or
   findings leaves it: the core gets counts alone, where the manifest shares them. Reason: the core tells a project what
   it lacks through checks and steps, each for one rule, and a reading of a whole project against the whole core found
   what none had: rules met only in part, many held by review or habit alone. Held by the sync's step

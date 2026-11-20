@@ -17,6 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { copyOf } from "./core-path.mjs";
+import { READ_MOST } from "./own-files.mjs";
 import { fingerprint, ROOT, rules, takenRules } from "./rules.mjs";
 import { started } from "./started.mjs";
 
@@ -58,15 +59,18 @@ export function record(day, root = ROOT) {
   return `${JSON.stringify({ day, read: marks }, null, 2)}\n`;
 }
 
-// The path of `file` under `cwd`, where neither it nor a folder on its way is a link: the record is read and written
-// only as a plain file of the project's own, never through a link to another file, in the project or outside it
-// (floor rule 13). It throws, with the mend, where one is.
+// The path of `file` under `cwd`, where neither it nor a folder on its way is a link and, where it stands, it is a plain
+// file no larger than READ_MOST: the record is read and written only as a plain file of the project's own, never
+// through a link to another file, in the project or outside it (floor rule 13), nor a folder, a pipe or a device, which
+// would fail or hang (#961's review). It throws, with the mend, where one is. Every link is refused, one that stays in
+// the project too, where own-files.mjs follows it to read: this writes, and a write through any link is refused.
 function plain(file, cwd) {
   const parts = file.split("/");
   for (let i = 1; i <= parts.length; i++) {
     let found;
     try { found = fs.lstatSync(path.join(cwd, ...parts.slice(0, i)), { throwIfNoEntry: false }); } catch { found = undefined; }
     if (found?.isSymbolicLink()) throw new Error(`${file} is reached through a link (${parts.slice(0, i).join("/")}), which is read and written through by nothing here. Mend: make it a plain file of the project's own, in a plain folder, or take the link out`);
+    if (i === parts.length && found && (!found.isFile() || found.size > READ_MOST)) throw new Error(`${file} is not a plain file of at most ${READ_MOST >> 20} MB, which is all that is read or written here. Mend: take out what stands at ${file}, then run it again`);
   }
   return path.join(cwd, file);
 }
@@ -79,7 +83,9 @@ export function main(args, cwd = process.cwd()) {
   if (args[0] === "--recorded") {
     const at = plain(RECORD, cwd);
     fs.mkdirSync(path.dirname(at), { recursive: true });
-    fs.writeFileSync(at, record(new Date().toISOString().slice(0, 10)));
+    // opened with no link followed, so a link put in its place after the check is not written through either
+    const fd = fs.openSync(at, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | (fs.constants.O_NOFOLLOW ?? 0));
+    try { fs.writeFileSync(fd, record(new Date().toISOString().slice(0, 10))); } finally { fs.closeSync(fd); }
     return `${RECORD}: the reading of today is recorded, marking every rule of the copy.`;
   }
   if (args[0] === "--rules") return takenRules(rules(), manifest).map(r => r.key).join("\n");
@@ -89,5 +95,8 @@ export function main(args, cwd = process.cwd()) {
 if (started(import.meta.url)) {
   const args = process.argv.slice(2);
   if (args.length > 1 || (args[0] && !["--rules", "--recorded"].includes(args[0]))) { console.error("FAIL: the reading against the core does not know that. Mend: run it with no option, with --rules or with --recorded"); process.exitCode = 1; }
-  else try { console.log(main(args)); } catch (e) { console.error(/Mend: /u.test(e.message) ? `FAIL: ${e.message}` : `FAIL: what is due could not be read here (${e.message}). Mend: run it from the project's root, beside core-manifest.md`); process.exitCode = 1; }
+  else try { console.log(main(args)); } catch (e) {
+    const message = e.message.split(process.cwd()).join("<the project>"); // no path of the machine's in a line a session may paste
+    console.error(/Mend: /u.test(message) ? `FAIL: ${message}` : `FAIL: what is due could not be read here (${message}). Mend: run it from the project's root, beside core-manifest.md`); process.exitCode = 1;
+  }
 }

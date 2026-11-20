@@ -15,9 +15,12 @@ intent, and one who mends it stops reading. Held by nothing yet: who started a r
 
 **Each answer has its evidence, on a fixed scale** (#464, point 7). By default the auditor gives each answer with its
 evidence (a file, a count, a pull request) and on the scale its brief names, the same at every reading of its kind,
-so that two readings can be set side by side; it proposes a new check only where a finding came up at two readings.
-Reason: what was judged had no standard, and checks piled on make code harder to change. Held by nothing yet: the
+so that two readings can be set side by side. Reason: what was judged had no standard. Held by nothing yet: the
 reviews of the pull request that holds its report read it.
+
+**It proposes a check only for a finding seen twice** (#464, point 7). By default the auditor proposes no new check;
+where a finding came up at two readings of its kind, it proposes one in its answers. Reason: checks piled on make code
+harder to change. Held by nothing yet: the reviews of the pull request that holds its report read it.
 
 **Only counts and conclusions leave the project** (#464, point 7). A weakness the auditor finds goes the way floor rule
 9 gives (`floor/topics/weaknesses.md`), never into its report; of the rest, only counts and conclusions leave the

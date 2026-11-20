@@ -148,8 +148,34 @@ const commits = {
   refused = "";
   try { main(["--recorded"], here); } catch (e) { refused = e.message; }
   ok(/reached through a link \(checks\)/.test(refused) && !fs.readdirSync(path.join(here, "elsewhere")).length, "and so is one whose folder is a link, writing nothing", refused);
+  // (nor read through: the record, or the manifest, a link when what is due is read)
+  fs.rmSync(path.join(here, "checks"));
+  fs.mkdirSync(path.join(here, "checks"));
+  fs.symlinkSync(outside, path.join(here, RECORD));
+  refused = "";
+  try { main([], here); } catch (e) { refused = e.message; }
+  ok(mended(`FAIL: ${refused}`) && /reached through a link/.test(refused), "a record that is a link is not read either, with its mend", refused);
+  fs.rmSync(path.join(here, RECORD));
+  fs.renameSync(path.join(here, "core-manifest.md"), path.join(here, "manifest-elsewhere.md"));
+  fs.symlinkSync(path.join(here, "manifest-elsewhere.md"), path.join(here, "core-manifest.md"));
+  refused = "";
+  try { main([], here); } catch (e) { refused = e.message; }
+  ok(/core-manifest\.md is reached through a link/.test(refused), "nor a manifest that is a link", refused);
+  fs.rmSync(path.join(here, "core-manifest.md"));
+  fs.renameSync(path.join(here, "manifest-elsewhere.md"), path.join(here, "core-manifest.md"));
   }
   fs.rmSync(outside, { force: true });
+  // (a folder where the record stands is neither read nor written, and the failure names no path of the machine's)
+  fs.rmSync(path.join(here, "checks"), { recursive: true, force: true });
+  fs.mkdirSync(path.join(here, RECORD), { recursive: true });
+  let folder = "";
+  try { main(["--recorded"], here); } catch (e) { folder = e.message; }
+  ok(mended(`FAIL: ${folder}`) && /is not a plain file/.test(folder) && fs.statSync(path.join(here, RECORD)).isDirectory(), "a folder where the record stands is refused, with its mend, and left as it was", folder);
+  fs.rmSync(path.join(here, "checks"), { recursive: true });
+  fs.writeFileSync(path.join(here, "checks"), "a file where the record's folder goes\n"); // the system's error names the whole path
+  const run = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/core-reading.mjs", import.meta.url)), "--recorded"], { cwd: here, encoding: "utf8" });
+  ok(run.status === 1 && mended(run.stderr.trim()) && /<the project>/.test(run.stderr) && !run.stderr.includes(fs.realpathSync(here)) && !run.stderr.includes(here), "the command's failure line names no path of the machine's", run.stderr);
+  fs.rmSync(path.join(here, "checks"));
   // (the command's own exit code and failure line, which only a process shows)
   const wrong = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/core-reading.mjs", import.meta.url)), "--all"], { cwd: here, encoding: "utf8" });
   ok(wrong.status === 1 && mended(wrong.stderr.trim()), "an option it does not know fails, with its mend", wrong.stderr);
