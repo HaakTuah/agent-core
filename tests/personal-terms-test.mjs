@@ -18,8 +18,15 @@
 // one written to look so (unsigned, signed by another key, or with a certificate made to look like GitHub's) fails, and so does every merge's author where the key
 // cannot be fetched; only in a commit of the base's, though the event
 // names an older base; a term only in the copyright lines of LICENSE and NOTICE of their shape, at the root and in the
-// core's copy (#257); and a repository without the secret. The terms are invented, built from pieces as the test
-// runs, so no file holds them. On Linux and on Windows. Git, bash and Node's own modules.
+// core's copy (#257); and a repository without the secret. What Betterleaks, which matches the terms (#579), would read
+// otherwise fails all the same: a file of text that begins as an archive or a PDF does, a line marked for it to pass
+// over, a term beside its ignore and config files, a term holding a pattern's characters, matched as listed, a file
+// whose name puts a binary type's mark where it reads one, a term on any line of a long run or across a long line's
+// pieces, since it reads in chunks; a term in
+// base64 passes, as before; and where Betterleaks was not fetched at its pin (no pin for the machine's system, a release
+// that cannot be downloaded), the check fails saying the mend, a kept copy that differs from its sum never run. The terms
+// are invented, built from pieces as the test runs, so no file holds them. On Linux and on Windows. Git, bash, curl and
+// Node's own modules, and the network to Betterleaks' releases on github.com, from which the check's own step fetches it.
 //
 //   node tests/personal-terms-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
@@ -47,7 +54,11 @@ const bash = (script, extra = {}) => spawnSync("bash", ["-c", script], { env: { 
 const signer = path.join(tmp, "signer"), stranger = path.join(tmp, "other-signer"), stubs = path.join(tmp, "stubs");
 const keyFile = path.join(tmp, "web-flow.gpg");
 fs.mkdirSync(stubs);
-fs.writeFileSync(path.join(stubs, "curl"), `#!/bin/sh\n[ -f "$STAND_IN_KEY" ] || exit 22\ncat "$STAND_IN_KEY"\n`, { mode: 0o755 });
+// (the stand-in serves GitHub's key alone, and hands any other fetch, Betterleaks' release, to the machine's own curl,
+// save where a case has it fail)
+const isFile = f => { try { return fs.statSync(f).isFile(); } catch { return false; } };
+const realCurl = (env.PATH ?? env.Path ?? "").split(path.delimiter).filter(Boolean).flatMap(d => ["curl", "curl.exe"].map(c => path.join(d, c))).find(isFile);
+fs.writeFileSync(path.join(stubs, "curl"), `#!/bin/sh\ncase "$*" in *web-flow.gpg*) [ -f "$STAND_IN_KEY" ] || exit 22; cat "$STAND_IN_KEY"; exit 0 ;; esac\n[ -z "$FETCH_FAILS" ] || exit 22\nexec '${(realCurl ?? "curl").replace(/\\/g, "/")}' "$@"\n`, { mode: 0o755 });
 const makeKey = (home, who) => { fs.mkdirSync(home, { mode: 0o700 }); return bash(`gpg -q --batch --pinentry-mode loopback --passphrase '' --quick-gen-key '${who}' ed25519 sign never`, { GNUPGHOME: home }).status === 0; };
 const signedBy = (home, key) => ({ GNUPGHOME: home, GIT_CONFIG_COUNT: "3", GIT_CONFIG_KEY_0: "commit.gpgSign", GIT_CONFIG_VALUE_0: "true", GIT_CONFIG_KEY_1: "gpg.program", GIT_CONFIG_VALUE_1: "gpg", GIT_CONFIG_KEY_2: "user.signingKey", GIT_CONFIG_VALUE_2: key });
 process.on("exit", () => { for (const home of [signer, stranger]) bash("gpgconf --kill all", { GNUPGHOME: home }); });
@@ -90,12 +101,13 @@ function pull(commits, onMain = []) {
 }
 // The check's verdict, with the pull request checked out as GitHub merges it into the base's tip; the event names
 // `eventBase`, the tip itself unless an older base is given.
-function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", branch = "change", stale = false, key = keyFile, isPrivate = false, opener = null, locale = null } = {}) {
+function check({ dir, first }, { terms = TERMS, title = "A change", body = "Words.", branch = "change", stale = false, key = keyFile, isPrivate = false, opener = null, locale = null, store = null, fetchFails = false, more = null } = {}) {
   const tip = git(dir, ["rev-parse", "main"]);
   git(dir, ["checkout", "-q", "--detach", "main"]);
   git(dir, ["merge", "-q", "--no-ff", "--no-edit", "change"], { ...GITHUB, ...(opener ? { GIT_AUTHOR_NAME: opener } : {}) });
   const github = { event_name: "pull_request", repository: "someone/project", ref: "refs/pull/1/merge", event: { pull_request: { title, body, head: { ref: branch }, base: { sha: stale ? first : tip } }, repository: { private: isPrivate } } };
-  const base = { ...env, ...ME, ...(locale ? { LC_ALL: locale } : {}), STAND_IN_KEY: key, PATH: `${stubs}${path.delimiter}${env.PATH ?? env.Path ?? ""}` };
+  const PATH = env.PATH ?? env.Path ?? "";
+  const base = { ...env, ...ME, ...(locale ? { LC_ALL: locale } : {}), ...(store ? { TMPDIR: store } : {}), ...(fetchFails ? { FETCH_FAILS: "1" } : {}), STAND_IN_KEY: key, PATH: `${more ? `${more}${path.delimiter}` : ""}${stubs}${path.delimiter}${PATH}` };
   const [job] = runWorkflow(workflow, { github, secrets: { PERSONAL_TERMS: terms }, base, workspace: () => dir, uses: { "actions/checkout": () => {} }, temp: tmp });
   return { passed: job.passed, out: job.steps.map(s => s.out).join("") };
 }
@@ -289,6 +301,63 @@ fails("a term in the message of a commit that edits NOTICE alone", pull([[{ NOTI
 fails("a term in a NOTICE out of its shape in one commit, brought to it in the next", pull([[{ NOTICE: `${notice(term)}more words\n` }], [{ NOTICE: notice(term) }]]));
 fails("a term in a commit dated before the rule, added and taken out again, its author too (a date is its maker's to write)", pull([[{ "b.md": `${term}\n` }, { GIT_AUTHOR_NAME: term, GIT_AUTHOR_DATE: "2026-10-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-10-01T00:00:00Z" }], [{ "b.md": "gone\n" }]]));
 passes("a term only in a commit of the base's, though the event names an older base", pull([[{ "b.md": "x\n" }]], [[{ "c.md": "y\n" }, { GIT_AUTHOR_NAME: term, ...GITHUB }, "squashed on main"]]), { stale: true });
+// what Betterleaks, which matches the terms, would read otherwise than the check means (#579): a file of text that
+// begins as an archive or a PDF does, a line marked for it to pass over, its ignore and config files in the pull
+// request, a term in base64 (not decoded, as before), and a term holding what a pattern would read otherwise
+fails("a term in a file of text that begins as a zip archive or a PDF does", pull([[{ "a.txt": `PK\u0003\u0004 ${term}\n`, "b.txt": `%PDF-1.4 ${other}\n` }]]));
+fails("a term on a line marked for a scanner to pass over (gitleaks:allow, betterleaks:allow)", pull([[{ "b.md": `${term} # gitleaks:allow\n${other} # betterleaks:allow\n` }]]));
+const ignored = Array.from({ length: 400 }, (_, i) => `:term-1:${i + 1}\n:term-2:${i + 1}`).join("\n");
+const allowAll = "[allowlist]\nregexes = ['''.*''']\n";
+// (the term in a file whose name comes before theirs, so that its line is among the first the scanner is given, and
+// that file named, whatever the commit's own lines say)
+const beside = check(pull([[{ ".betterleaksignore": `${ignored}\n`, ".gitleaksignore": `${ignored}\n`, ".gitleaks.toml": allowAll, ".betterleaks.toml": allowAll, "+notes.md": `x ${term}\n` }]]));
+ok(!beside.passed && /^\+notes\.md:1$/m.test(beside.out) && !beside.out.includes(term), "a term in a file beside the pull request's own ignore and config files for the scanner fails, the file named", beside.out);
+passes("a term only in base64, which the check does not decode", pull([[{ "b.md": `${Buffer.from(`a line with ${term} in it`).toString("base64")}\n` }]]));
+const oddTerm = ["a.", "\\E", '"c'].join("");
+fails("a term holding a dot, a backslash and E and a quote, written as listed", pull([[{ "b.md": `x ${oddTerm.toUpperCase()} y\n` }]]), { terms: `${oddTerm}\n` });
+passes("a term holding a dot, where only a pattern's dot would match it", pull([[{ "b.md": `x ${oddTerm.replace(".", "z")} y\n` }]]), { terms: `${oddTerm}\n` });
+// what Betterleaks reads in chunks never hides a term (the fallback security review of #656): a file's name that puts a
+// type's mark where it reads one (DICOM's at byte 128, tar's at byte 257), a term on any line of a long run with no
+// blank line, and one across any cut of a line longer than its chunks
+// (each name the first the check reads, so that its mark stands where Betterleaks reads one, had the input no lines
+// before it: DICOM's at byte 128, tar's at byte 257)
+fails("a term beside a file whose name puts DICOM's mark where Betterleaks reads one", pull([[{ [`${"!".repeat(127)}DICM`]: "x\n", "b.md": `x ${term}\n` }]]));
+fails("a term beside a file whose name puts tar's mark where Betterleaks reads one", pull([[{ [`${"!".repeat(200)}/${"!".repeat(55)}ustar`]: "x\n", "b.md": `x ${term}\n` }]]));
+// (every line the term alone, so that a chunk cut anywhere inside a line would lose that line)
+const lines40k = 40000, dense = check(pull([[{ "long.txt": `${term}\n`.repeat(lines40k) }]]));
+const namedLines = new Set([...dense.out.matchAll(/^long\.txt:(\d+)$/gmu)].map(m => Number(m[1])));
+ok(!dense.passed && namedLines.size === lines40k, "a term on every line of a run of 40,000 with no blank line is named on every line", `${namedLines.size} of ${lines40k} named`);
+// (the longest term's bytes, by which the pieces of a long line overlap: a term starting on each side of the end of
+// the first and the second piece of 20,000 bytes)
+const step = 20000 - Math.max(...[term, other, wide].map(t => Buffer.byteLength(t)));
+const starts = [20000 - term.length + 1, 20000 - 2, 20000, step + 20000 - term.length + 1, step + 20000 - 2, step + 20000];
+const longLines = starts.map(st => `${"z".repeat(st - 1)}${term}${"z".repeat(60000 - st - term.length + 1)}`);
+const widest = check(pull([[{ "wide.txt": `${longLines.join("\n")}\n` }]]));
+ok(!widest.passed && starts.every((_, i) => new RegExp(`^wide\\.txt:${i + 1}$`, "mu").test(widest.out)), "a term across each edge of the pieces a line of 60,000 characters is cut in is named on its line", widest.out.split("\n").filter(l => l.startsWith("wide.")).join(" "));
+// Betterleaks at its pin: where it was not fetched (no pin for the machine's system, a release that cannot be
+// downloaded), the check fails, saying the mend, since it guards what may not leak (Codex's security finding on #656),
+// and a kept copy that differs from its sum never runs (a uname of the test's own stands in for another system)
+const unfetched = (what, opts, words, also = () => true) => { const r = check(pull([[{ "b.md": `${term}\n` }]]), opts); ok(!r.passed && mended(r.out) && r.out.includes(words) && r.out.includes("was not fetched at its pin") && r.out.includes("so nothing was read") && !r.out.includes(term) && also(), `${what}: it fails, saying the mend, never passing unread`, r.out); };
+const otherSystem = path.join(tmp, "plan9");
+fs.mkdirSync(otherSystem);
+fs.writeFileSync(path.join(otherSystem, "uname"), `#!/bin/sh\ncase "$1" in -s) echo Plan9 ;; -m) echo 386 ;; *) echo Plan9 ;; esac\n`, { mode: 0o755 });
+unfetched("where no pin stands for the machine's system", { more: otherSystem }, "no pin stands in this check for Plan9/386");
+const sum = /Linux\/x86_64\) file=\S+ archive=[0-9a-f]{64} sum=([0-9a-f]{64})/.exec(workflow)?.[1], version = /version=(\S+)/.exec(workflow)?.[1];
+const keptTool = path.join(tmp, "kept"), keptDir = path.join(keptTool, "agent-core-tools", `betterleaks-${version}`), ran = path.join(tmp, "kept-ran");
+fs.mkdirSync(keptDir, { recursive: true });
+for (const name of ["betterleaks", "betterleaks.exe"]) fs.writeFileSync(path.join(keptDir, name), `#!/bin/sh\ntouch '${ran}'\n`, { mode: 0o755 });
+unfetched("where its release cannot be downloaded, a kept copy that differs from its sum beside it", { store: keptTool, fetchFails: true }, "could not be downloaded", () => sum && !fs.existsSync(ran));
+// (a store whose folder is a link, as another account could make at that name: nothing is written through it, and the
+// check fails, never running what stands there; the fallback security review of 20 November on #656)
+const linked = path.join(tmp, "linked"), elsewhere = path.join(tmp, "elsewhere");
+fs.mkdirSync(linked);
+fs.mkdirSync(elsewhere);
+if (process.platform !== "win32") {
+  fs.symlinkSync(elsewhere, path.join(linked, "agent-core-tools"));
+  unfetched("where the store's folder is a link", { store: linked }, "is not a folder of this user's own", () => fs.readdirSync(elsewhere).length === 0);
+}
+const tooLong = check(pull([[{ "b.md": "x\n" }]]), { terms: `${term}\n${"q".repeat(2001)}\n` });
+ok(!tooLong.passed && mended(tooLong.out) && tooLong.out.includes("longer than 2,000 bytes") && !tooLong.out.includes(term), "a term longer than the check can read whole fails, saying the mend, never hanging", tooLong.out);
 const none = check(pull([[{ "b.md": `${term}\n` }]]), { terms: "" });
 ok(none.passed && none.out.includes("PERSONAL_TERMS is not set"), "without the secret it passes with a note: the check stays optional", none.out);
 
