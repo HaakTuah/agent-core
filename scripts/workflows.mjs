@@ -362,7 +362,8 @@ export function unparsed(files) {
 export function twiceUnfetched(files) {
   const fails = [];
   for (const { file, text } of files) for (const k of keysTwice(text)) fails.push(k.key === null
-    ? `FAIL ${file}:${k.line}: a part is nested deeper than the core's reader reads, so a key given twice in it cannot be seen. Mend: write the part flatter, plain YAML nested no deeper than it needs`
+    ? (k.size ? `FAIL ${file}:${k.line}: the file is longer than ${LONGEST} characters, past what the core's reader reads, so a key given twice in it cannot be seen. Mend: cut the file to under ${LONGEST} characters, the steps it repeats moved to a script or a workflow of their own`
+      : `FAIL ${file}:${k.line}: the file nests its lists or mappings more than ${DEEPEST} deep, past what the core's reader reads, so a key given twice in that part cannot be seen. Mend: nest it no deeper than a workflow needs, a few levels`)
     : `FAIL ${file}:${k.line}: the key ${JSON.stringify(k.key)} is given twice in one mapping${k.first ? `, first on line ${k.first}` : ""}, and GitHub refuses the workflow or reads one value alone. Mend: rename one of the two keys, or take one out`);
   return { fails };
 }

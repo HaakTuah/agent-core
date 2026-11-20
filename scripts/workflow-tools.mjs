@@ -58,9 +58,9 @@ export function run(root, files, tools) {
     if (!tools[name]) unrun.push(name);
     else for (const f of read) found.push(...each(tools[name], root, f));
   }
-  // (a workflow zizmor could not load is left to actionlint's word on why, where actionlint ran and said something of it;
-  // otherwise zizmor's own word stands, so that no file passes unread by it)
-  const said = new Set(found.filter(f => f.tool === "actionlint").map(f => f.file));
+  // (a workflow zizmor could not load is left to actionlint's word on why, where actionlint ran and refused it, by its
+  // syntax check or as unread; otherwise zizmor's own word stands, so that no file passes unread by it)
+  const said = new Set(found.filter(f => f.tool === "actionlint" && (f.rule === "syntax-check" || f.rule === "unread")).map(f => f.file));
   return { found: found.filter(f => !f.quiet || !said.has(f.file)).map(({ quiet, ...f }) => f), unrun };
 }
 const go = (program, root, args) => spawnSync(program, args, { cwd: root, encoding: "utf8", maxBuffer: 1 << 28, timeout: TIMEOUT, windowsHide: true });

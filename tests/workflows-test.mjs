@@ -150,14 +150,16 @@ ok(zz.length === 1 && zz[0].line === 7 && zz[0].what === "High\0${{ github.event
 if (process.platform !== "win32") {
   const fake = fs.mkdtempSync(path.join(os.tmpdir(), "workflow-tools-")), tool = (name, body) => { fs.writeFileSync(path.join(fake, name), `#!/bin/sh\n${body}\n`, { mode: 0o755 }); return path.join(fake, name); };
   try {
-    const z = tool("zizmor", "exit 3"), quiet = tool("quiet", "echo '[]'"), loud = tool("loud", `echo '[{"kind":"syntax-check","message":"key \\"on\\" is duplicated","line":2}]'; exit 1`);
-    const alone = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: quiet }).found, both = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: loud }).found, unfetched = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: "" }).found;
-    ok(alone.length === 1 && alone[0].tool === "zizmor" && alone[0].rule === "unread" && !("quiet" in alone[0]) && both.length === 1 && both[0].tool === "actionlint" && unfetched.length === 1 && unfetched[0].rule === "unread",
-      "a workflow zizmor could not load is said by zizmor where actionlint said nothing of it or did not run, and left to actionlint where it said why", JSON.stringify({ alone, both, unfetched }));
+    const z = tool("zizmor", "exit 3"), quiet = tool("quiet", "echo '[]'"), loud = tool("loud", `echo '[{"kind":"syntax-check","message":"key \\"on\\" is duplicated","line":2}]'; exit 1`), other = tool("other", `echo '[{"kind":"expression","message":"x","line":2}]'; exit 1`);
+    const alone = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: quiet }).found, both = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: loud }).found, unfetched = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: "" }).found, beside = run(fake, [".github/workflows/w.yml"], { zizmor: z, actionlint: other }).found;
+    ok(alone.length === 1 && alone[0].tool === "zizmor" && alone[0].rule === "unread" && !("quiet" in alone[0]) && both.length === 1 && both[0].tool === "actionlint" && unfetched.length === 1 && unfetched[0].rule === "unread" && beside.some(f => f.tool === "zizmor" && f.rule === "unread"),
+      "a workflow zizmor could not load is said by zizmor where actionlint did not refuse it (said nothing, said only another kind, or did not run), and left to actionlint where it refused it", JSON.stringify({ alone, both, unfetched, beside }));
   } finally { fs.rmSync(fake, { recursive: true, force: true }); }
 }
 // (where actionlint did not run, the core's own reading of a key given twice stands in for it in the core's own files)
 const tw = twiceUnfetched([{ file: "a.yml", text: "on:\n  push:\n  push:\n" }, { file: "b.yml", text: "on: push\n" }]).fails;
+const twLong = twiceUnfetched([{ file: "l.yml", text: `on: push\n# ${"x".repeat(LONGEST)}\n` }]).fails;
+ok(twLong.length === 1 && /longer than .*Mend: cut the file/u.test(twLong[0]) && mended(twLong[0]), "where actionlint did not run, a file past the length read is told to be cut shorter", twLong.join("\n"));
 ok(tw.length === 1 && /^FAIL a\.yml:3: the key "push" is given twice in one mapping, first on line 2/u.test(tw[0]) && mended(tw[0]), "where actionlint did not run, a key given twice in the core's own file fails by the core's own reading, with its mend", tw.join("\n"));
 const unrun = run(".", [".github/workflows/a.yml", "tools/action.yml", ".github/actions/x/steps.yml"], { zizmor: "", actionlint: "" });
 ok(unrun.found.length === 0 && unrun.unrun.join() === "zizmor,actionlint" && run(".", [".github/actions/x/steps.yml"], {}).unrun.length === 0 && isWorkflow(".github/workflows/a.YML") && !isWorkflow("tools/action.yml") && isAction("tools/action.yml"),
