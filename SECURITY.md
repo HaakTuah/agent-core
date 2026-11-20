@@ -39,15 +39,15 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      comments proof, the selection and the total read, 16 MB for the manifest, past which it is reported unread), and
      none in count, since every changed path is read, save the total read's 1 MB of a file's text, past which its size
      alone is counted, and 8 MB of all their text, 200 rule files, 100 kinds of task, 300 names they give and 16
-     million steps of each tree's tries, past which it fails with its mend; and of each file of code the selection
-     reads through the shape check's readers (`scripts/shape-readers.mjs`), 500,000 characters of JavaScript,
-     TypeScript or Python and 200,000 of C#, past which the parser reads none of it (of Python and C#, neither
-     functions, imports nor tokens; of JavaScript and TypeScript, no functions, their imports read without it), 2 s
-     for the parser on each and 250,000 nodes in the tree it gives, past which the parser reads none of it either
-     (`scripts/tree-walk.mjs`), and of all the files a pull request changes together, 4,000,000 characters and 1.5 s of
-     reading, and 1.5 s to link the files and follow the links from each test, past which the selection reads no more
-     and runs the whole suite (`scripts/hurry.mjs`); hostile tests:
-     `tests/hostile-pr-changes-test.mjs`.
+     million steps of each tree's tries, past which it fails with its mend; and of each file of Python or C# the
+     selection reads through the shape check's readers (`scripts/shape-readers.mjs`), 500,000 characters of Python
+     and 200,000 of C#, past which the parser reads none of it (neither functions, imports nor tokens), 2 s for the
+     parser on each and 250,000 nodes in the tree it gives, past which the parser reads none of it either
+     (`scripts/tree-walk.mjs`), while of JavaScript and TypeScript it gives the parser nothing, reading their imports
+     without it; and of all the files a pull request changes together, 4,000,000 characters and 1.5 s of reading, of any
+     one file of JavaScript, TypeScript or Python it leaves as it was, 4,000,000 characters, 1.5 s to link the files and follow
+     the links from each test, and 3 s for the whole of it, the project's own files read too, past which the selection
+     reads no more and runs the whole suite (`scripts/hurry.mjs`); hostile tests: `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
      of the work standing still (`scripts/look.mjs`, through `queue.mjs`'s placing and reading), with the open issues
