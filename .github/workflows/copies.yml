@@ -4,8 +4,8 @@
 # rule files leads somewhere; in an agent tool's files, what the base already held noted and passed, as the copies
 # check notes a copy there its baseline does not list yet) and the reading-size check (the files every session reads
 # keep to their marks, and a file past the split mark is split before it is changed), with the marks the project names;
-# and checks that need no config: the workflow check (floor rule 2: no workflow names the trigger it forbids; nor gives a key twice in one
-# mapping, which GitHub refuses, what the base already held noted and passed), the entry-files check (each
+# and checks that need no config: the workflow check (floor rule 2: no workflow names the trigger it forbids; and zizmor's
+# and actionlint's findings, fetched at set-up, a key given twice among them, what the base already held noted and passed), the entry-files check (each
 # agent tool's entry file pulls in what AGENTS.md names, what the base already lacked noted and passed:
 # tasks/tools.md), and the manifest check, which
 # reports and never fails (every module the manifest's list neither takes nor leaves out, every slot a taken module uses
@@ -62,6 +62,13 @@ jobs:
           node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
       - name: The core's packages, installed from its lock files for the copies check, the parser's for the shape check (#654, #719)
         run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then if [ -f "${CORE_AT}.packages/parser/package.json" ]; then node "${CORE_AT}scripts/install.mjs" all; else node "${CORE_AT}scripts/install.mjs"; fi; fi
+      # (the two tools the workflow check runs, fetched at their pins outside the repository: the core's
+      # scripts/workflow-tools.sh; where one cannot be fetched, the check says it did not run it and decides nothing by it;
+      # #580)
+      - name: zizmor and actionlint, which the workflow check runs, fetched at their pins (the core's scripts/workflow-tools.sh)
+        timeout-minutes: 5
+        continue-on-error: true
+        run: if [ -f "${CORE_AT}scripts/workflow-tools.sh" ]; then bash "${CORE_AT}scripts/workflow-tools.sh" >> "$GITHUB_ENV"; fi
       - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks (each its own script's, run through scripts/checks.mjs, which holds their steps)
         env:
           BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
