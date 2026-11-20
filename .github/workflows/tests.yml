@@ -302,12 +302,24 @@ jobs:
       - name: The security-review check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/security-review-test.mjs ')) }}
         run: node tests/security-review-test.mjs
+      - name: The security-review status against the host's own record
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/security-review-host-test.mjs ')) }}
+        run: node tests/security-review-host-test.mjs
+      - name: The recorder of the host's own record of the security review
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/security-review-record-test.mjs ')) }}
+        run: node tests/security-review-record-test.mjs
+      - name: The recorder of the host's own record of the security review, on a host the test stands in for
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/security-review-record-run-test.mjs ')) }}
+        run: node tests/security-review-record-run-test.mjs
       - name: The code-review wait
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/code-review-wait-test.mjs ')) }}
         run: node tests/code-review-wait-test.mjs
       - name: The proof that an update from main is the merge git makes, and the review statuses' run on one
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/clean-merges-test.mjs ')) }}
         run: node tests/clean-merges-test.mjs
+      - name: The security-review workflow's shell, for each kind it branches on
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/security-review-workflow-test.mjs ')) }}
+        run: node tests/security-review-workflow-test.mjs
       - name: The proof that a pull request changes only the progress file's lines, each for an issue it may name
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/queue-only-test.mjs ')) }}
         run: node tests/queue-only-test.mjs
