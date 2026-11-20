@@ -11,6 +11,18 @@
     "tests/mutation/package-lock.json"
   ],
   "past": {
+    ".github/workflows/core.yml": {
+      "mark": 32543,
+      "why": "One job that each project calls pinned, holding the core's checks that need no secret as its steps (#376, #377): GitHub reads a job as one file, and a split into a second called workflow would start a second job, which bills a whole minute on a private repository's free plan"
+    },
+    "tests/copy-left-out-test.mjs": {
+      "mark": 27600,
+      "why": "One list's test: each check of the copy staged inside it and outside it on the scratch project they share; split by check, each file would write that project again and add to the suite's time"
+    },
+    "tests/mend-test.mjs": {
+      "mark": 20604,
+      "why": "One table of every check and the test that reads its failures, read whole against the workflows that name the scripts; split in two, a script could stand in neither half and go unread"
+    },
     ".github/workflows/personal-terms.yml": {
       "mark": 32432,
       "why": "One job that every project calls pinned, its step holding the secret: its shell stays inline so that nothing the pull request checks out runs beside the terms, and a local action or script would be the caller's checkout, not the core's. A session reads the part it changes by its comment, found by searching."
@@ -79,13 +91,13 @@
       "mark": 25119,
       "why": "#441: the game rules split into a base and a file for each kind (#484, points 6 and 7)."
     },
+    "tests/strength-test.mjs": {
+      "mark": 33179,
+      "why": "#1009: the verdict's cases apart from the run's, along the seam #920 split the script on."
+    },
     "tests/upgrade-test.mjs": {
       "mark": 98773,
       "why": "One flow over the projects it builds: each case takes a project as the one before left it (written, synced, merged, its own pull requests after), so a file of its own would build them again; and tests/ holds test files alone (#614), so no module beside it can hold a part. A session reads the case it changes, found by its section's heading."
-    },
-    "scripts/strength.mjs": {
-      "mark": 39011,
-      "why": "#920: the verdict on a run apart from the run on a project."
     },
     "scripts/read-total.mjs": {
       "mark": 20690,
@@ -129,10 +141,6 @@
     },
     "tests/pure-sync-test.mjs": {
       "mark": 23363,
-      "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
-    },
-    "tests/strength-test.mjs": {
-      "mark": 33014,
       "why": "A split of it is weighed in #1008; #965 changed only how its scratch folder is made, and its cases are unchanged in what they hold."
     },
     "tests/work-saved-test.mjs": {
@@ -285,11 +293,11 @@
     },
     "scripts/workflows.mjs": {
       "mark": 26933,
-      "why": "One check's readers (the word, the keys given twice, the calls a draft skips, the line breaks) that all read the same texts against the same base through the one baseOf(); a task that changes one reads how the others count against the base, so a split would make it open each part."
+      "why": "One check's readers (the word, the calls a draft skips, the line breaks, the tools' findings against the base) that all read the same texts against the same base through the one baseOf(); a task that changes one reads how the others count against the base, so a split would make it open each part."
     },
     "tests/workflows-test.mjs": {
-      "mark": 57789,
-      "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."
+      "mark": 74117,
+      "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md). The cases of workflow-tools.mjs, a script of its own, are to move to a file of their own: #1017."
     }
   }
 }

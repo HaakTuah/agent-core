@@ -29,7 +29,8 @@ jobs:
       group: delete-merged-branches-${{ github.repository }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # (its token kept for the git push below that deletes a merged branch; the job uploads nothing, so it leaves the run with nothing)
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 # zizmor: ignore[artipacked]
         with:
           fetch-depth: 0
           filter: blob:none

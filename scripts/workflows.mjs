@@ -7,20 +7,21 @@
 // UTF-8 text fails too: a link (and any link in .github, where a linked folder would hold workflows the check never
 // sees), and a file in another encoding, in which the word would stand unseen. A comment or a script that needs to
 // speak of the trigger calls it something else.
-// It fails, as well, a key given twice in one mapping of such a file (yaml-keys.mjs, beside this file), which GitHub's
-// reader refuses, running none of the file's jobs, so that a pull request's check stands waiting with nothing to say
-// why (#393). Nothing locks a project (AGENTS.md of the core): with WORKFLOWS_BASE set to the pull request's base (as
-// the copies workflow sets it), a key twice that the base already held in the same file is noted and fails nothing;
-// with no base, as on a push to main, each is noted; and the sync's step "16 November 2026, no workflow gives a key
-// twice" (steps.mjs) names each old one at every sync until it is gone. In the core's own repository (`--core`) each fails.
-// A text longer than LONGEST (yaml-keys.mjs) is never given to the parser, so a base that long lists nothing it held:
-// such a file unchanged is noted, and one a pull request changes is judged as new, failing where it is still that long
-// and for each breach it shows once cut under it (baseOf() below; #752).
+// It runs, as well, two maintained tools on each such file (workflow-tools.mjs, beside this file; #580): zizmor, which
+// audits it for the rest of rule 2 and more (untrusted text in a script, an action not pinned, a token kept past its
+// step), and actionlint, which reads it as GitHub does, refusing a key given twice in one mapping, which GitHub's reader
+// refuses, running none of the file's jobs (#393), whatever line break or spelling hides it, and an expression that
+// names what does not exist; each with the core's policy as its config, fetched at set-up and never in a session
+// (workflow-tools.sh), and where one was not fetched the check says it did not run and decides nothing by it. Nothing
+// locks a project (AGENTS.md of the core): with WORKFLOWS_BASE set to the pull request's base (as the copies workflow
+// sets it), the tools run on the base's files too, and of each kind of finding in a file as many as the base held are
+// noted and fail nothing; with no base, as on a push to main, each is noted. In the core's own repository (`--core`)
+// each fails.
 // It fails, too, a call to one of the core's pull-request checks that is skipped on a draft while its pull_request
 // trigger leaves out ready_for_review (floor rule 8, a weakened check; #375, #502): its job's if: names the draft, or the
 // check skips a draft by itself (the description check, called on its own or by core.yml's `description:`). Once such a
-// pull request is marked ready, the call runs on no head, and a ruleset counts the draft's skip as passed. As with a key
-// twice, a call the base's same file already held so is noted, each is noted with no base, and the sync's step "16
+// pull request is marked ready, the call runs on no head, and a ruleset counts the draft's skip as passed. As with the
+// tools' findings, a call the base's same file already held so is noted, each is noted with no base, and the sync's step "16
 // November 2026, checks once a pull request is ready" (steps.mjs, which reads it by draftHoles() below) names it.
 // In the core's own repository (`--core`) it also fails a file the core's own YAML reader cannot read at all (#994).
 // And a line break that YAML 1.1 reads and the YAML package does not (U+0085, U+2028, U+2029: #872): a key given twice,
@@ -39,17 +40,19 @@
 // What it does not chase: a value given as binary (a YAML tag) holds a word no search can see, and a tag can itself be
 // spelled in more ways than a search can follow. GitHub's own workflow reader refuses a binary value where a trigger
 // belongs, so that is no way to write one; the reviews hold it, as they hold any odd tag in a workflow.
-// The rest of rule 2 is held elsewhere: that every action is pinned to a full commit SHA by GitHub's own setting, which
-// reads a workflow as GitHub runs it (README.md, "Setting up"); workflow_run, the fewest permissions and untrusted text
-// in a script by the reviews, and by CodeQL where the repository has it. The copy of the core (core/, or where the manifest names it) is checked in the
+// Of the rest of rule 2, zizmor reads what it can; that every action is pinned is held as well by GitHub's own setting,
+// which reads a workflow as GitHub runs it (README.md, "Setting up"); that workflow_run checks the run's head repository,
+// by the reviews. The copy of the core (core/, or where the manifest names it) is checked in the
 // core, which runs this on itself. Reads only; git, Node's own modules and the YAML package the core installs
-// (packages.mjs). It checks the project it lies in, whatever the directory it is started from. Run by the copies workflow
-// (.github/workflows/copies.yml).
+// (packages.mjs), and the two tools. It checks the project it lies in, whatever the directory it is started from. Run by
+// the copies workflow (.github/workflows/copies.yml), after its step that fetches the tools.
 //
 //   node core/scripts/workflows.mjs           from a project's root, as the copies workflow runs it
 //   node scripts/workflows.mjs --core         in the core's own repository
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logged } from "./guards.mjs";
 import { started } from "./started.mjs";
@@ -58,6 +61,7 @@ import { loadSync, unreached } from "./packages.mjs";
 import { copyOf, projectAt } from "./core-path.mjs";
 import { CORE } from "./core-address.mjs";
 import { parseYaml } from "./workflow-run.mjs";
+import { compared, run } from "./workflow-tools.mjs";
 
 const WORD = "pull_request_target";
 const BREAK = "\\r\\n|[\\r\\n\\u0085\\u2028\\u2029]"; // every line break YAML 1.1 or 1.2 knows
@@ -203,7 +207,7 @@ export const keysTwice = remember(text => {
 // feeds or as the mend leaves them.
 export const reads11 = text => String(text).length <= LONGEST && [asLF(text), asMended(text)].some(r => yamlOf(r.text) !== null);
 
-// The files, each { file, text }, that hold such a break, as { fails, notes } (as repeated() gives them): `before` gives
+// The files, each { file, text }, that hold such a break, as { fails, notes } of lines with their mend: `before` gives
 // a file's text on the base, or is null where there is no base, when each is a note; a file the same as the base's is
 // noted, one changed or new fails, since a count cannot show a change made nothing worse (#752).
 export function foreignBroken(files, before) {
@@ -224,16 +228,6 @@ export const reads = (files, copy = "core/") => files.filter(f => !f.startsWith(
 // What may be no link, of those git tracks: what the check reads, and .github itself with everything in it.
 export const unlinked = (files, copy) => { const read = new Set(reads(files, copy)); return files.filter(f => read.has(f) || /^\.github(\/|$)/iu.test(f)); };
 
-// What a file past the depth or the length read is said to hold unseen, and its mend.
-const NOT_READ = [ // (by `size`: 0 for a part nested too deep, 1 for a text too long)
-  { said: `the file nests its lists or mappings more than ${DEEPEST} deep, past what this check reads, so a key given twice in that part would go unseen`, mend: "nest it no deeper than a workflow needs, a few levels" },
-  { said: `the file is longer than ${LONGEST} characters, past what this check reads, so a key given twice in it would go unseen`, mend: `cut the file to under ${LONGEST} characters, the steps it repeats moved to a script or a workflow of their own` },
-];
-
-// What the base's own entry is counted as: a key by its name, a part not read by its reason, so that a file nested too
-// deep on the base does not hold the entry of one that has grown too long (#752).
-const heldAs = ({ key, size }) => (key === null ? (size ? 1 : 0) : `k:${key}`);
-
 // A file's text on the base, for what the base held (#752): `read`, the text the readers take, where the base's text is
 // within the length read ("" where the base holds no such file); `same` where the base's text is past the length read
 // and the file's is that text unchanged. A text past the length read is never given to the parser, and no count of its
@@ -250,38 +244,6 @@ const baseOf = (before, file, text) => {
   return { read, same: long && was === text, unknown: read !== null && read !== text && foreignBreaks(read) !== null && !reads11(read) && breaksAlone(read) };
 };
 const UNKNOWN = ", the base being no YAML to the package once its line breaks are read as YAML 1.1 reads them, so what it held is not known";
-
-// The keys given twice (yaml-keys.mjs) in files, each { file, text }, as { fails, notes }, each a line with its mend.
-// `before` gives a file's text on the base (null where it held none), or is null where there is no base to read
-// against: then each is a note. Of each key in each file, as many as the base held twice are noted, and the rest fail.
-export function repeated(files, before) {
-  const fails = [], notes = [];
-  for (const { file, text } of files) {
-    const held = new Map(), base = baseOf(before, file, text), mine = { fails: [], notes: [] };
-    for (const found of base.read === null ? [] : keysTwice(base.read)) held.set(heldAs(found), (held.get(heldAs(found)) ?? 0) + 1);
-    for (const found of keysTwice(text)) {
-      const id = heldAs(found), old = !before || base.same || base.unknown || held.get(id) > 0;
-      held.set(id, (held.get(id) ?? 0) - 1);
-      mine[old ? "notes" : "fails"].push(keyLine(file, found, old, old ? (base.unknown ? UNKNOWN : before ? ", as it did on the base" : "") : ""));
-    }
-    fails.push(...shown(file, "FAIL", mine.fails));
-    notes.push(...shown(file, "note", mine.notes));
-  }
-  return { fails, notes };
-}
-// A file's lines of one kind, the first SHOWN of them and one line counting the rest (a hostile file gives a line for each of
-// tens of thousands of keys: #970).
-const shown = (file, lead, lines) => (lines.length <= SHOWN ? lines
-  : [...lines.slice(0, SHOWN), `${lead} ${file}: and ${lines.length - SHOWN} more keys or parts not read, of the same kind as the lines above. Mend: mend each of those as the lines above say; the rest show once these are mended`]);
-const SHOWN = 25; // the most lines of one kind that repeated() prints for one file
-
-// The line repeated() says of one key given twice (or of a part not read), `was` what it adds of the base.
-function keyLine(file, { line, key, first, size }, old, was) {
-  const lead = `${old ? "note" : "FAIL"} ${file}:${line}: `;
-  return key === null
-    ? `${lead}${NOT_READ[+Boolean(size)].said}${was}. Mend: ${NOT_READ[+Boolean(size)].mend}`
-    : `${lead}the key ${JSON.stringify(key)} is given twice in one mapping (first on line ${first}), so GitHub refuses the whole file and runs none of its jobs${was}. Mend: keep one of the two keys, with what both said in it (two if: conditions joined by &&, two env: mappings as one)`;
-}
 
 // The core's pull-request checks whose call may be skipped on a draft, and the two that skip a draft by themselves.
 const CHECKS = /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget|pr-description)\.yml@/i;
@@ -355,16 +317,17 @@ function holesIn(yaml) {
   }).map(([name]) => name);
 }
 
-// The calls draftHoles() finds in files, each { file, text }, as { fails, notes } (as repeated() gives them): `before`
+// The calls draftHoles() finds in files, each { file, text }, as { fails, notes } of lines with their mend: `before`
 // gives a file's text on the base, or is null where there is no base, when each is a note.
 export function unreadied(files, before) {
   const fails = [], notes = [];
   for (const { file, text } of files) {
     // (a text past the length read cannot be read for this: one that differs from the base fails, since a call may have
-    // lost ready_for_review behind the length; one unchanged, or read with no base, is noted by repeated(): #752)
+    // lost ready_for_review behind the length; one unchanged, or read with no base, is noted: #752)
     const base = baseOf(before, file, text);
     if (text.length > LONGEST) {
-      if (before && !base.same) fails.push(`FAIL ${file}: the file is longer than ${LONGEST} characters and differs from the base, so this check cannot tell whether a call of one of the core's checks that is skipped on a draft has ready_for_review among its types. Mend: cut the file to under ${LONGEST} characters, the steps it repeats moved to a script or a workflow of their own, and mend what this check then says of it`);
+      if (!before || base.same) notes.push(`note ${file}: the file is longer than ${LONGEST} characters, so whether a call of one of the core's checks that is skipped on a draft has ready_for_review among its types is not read${before ? ", as on the base" : ""}. Mend: cut the file to under ${LONGEST} characters, the steps it repeats moved to a script or a workflow of their own`);
+      else fails.push(`FAIL ${file}: the file is longer than ${LONGEST} characters and differs from the base, so this check cannot tell whether a call of one of the core's checks that is skipped on a draft has ready_for_review among its types. Mend: cut the file to under ${LONGEST} characters, the steps it repeats moved to a script or a workflow of their own, and mend what this check then says of it`);
       continue;
     }
     const held = new Set(base.read === null ? [] : draftHoles(base.read));
@@ -378,7 +341,7 @@ export function unreadied(files, before) {
 
 // The files, each { file, text }, that the core's own reader (parseYaml) cannot read, as { fails } (#994): every other reader
 // takes such a file for one with no steps. Run on the core's own workflows alone (`--core`); a key given twice is left to
-// repeated(), but not where only the package joins the keys (true and True, 1 and 01, null and ~).
+// actionlint (workflow-tools.mjs), but not where only the package joins the keys (true and True, 1 and 01, null and ~).
 export function unparsed(files) {
   const fails = [], again = "then run `node scripts/workflows.mjs --core` again";
   for (const { file, text } of files) {
@@ -391,6 +354,27 @@ export function unparsed(files) {
     }
   }
   return { fails };
+}
+
+// The keys given twice in the core's own workflows and actions, as { fails }, where actionlint did not run (#580): the
+// core's own reading (keysTwice()) stands in for it there, so that a key given twice never passes the core for want of a
+// fetch. Run on the core's own files alone (`--core`); a project's are left to actionlint, which decides there.
+export function twiceUnfetched(files) {
+  const fails = [];
+  for (const { file, text } of files) for (const k of keysTwice(text)) fails.push(k.key === null
+    ? (k.size ? `FAIL ${file}:${k.line}: the file is longer than ${LONGEST} characters, past what the core's reader reads, so a key given twice in it cannot be seen. Mend: cut the file to under ${LONGEST} characters, the steps it repeats moved to a script or a workflow of their own`
+      : `FAIL ${file}:${k.line}: the file nests its lists or mappings more than ${DEEPEST} deep, past what the core's reader reads, so a key given twice in that part cannot be seen. Mend: nest it no deeper than a workflow needs, a few levels`)
+    : `FAIL ${file}:${k.line}: the key ${JSON.stringify(k.key)} is given twice in one mapping${k.first ? `, first on line ${k.first}` : ""}, and GitHub refuses the workflow or reads one value alone. Mend: rename one of the two keys, or take one out`);
+  return { fails };
+}
+
+// A folder of this run's own for the base's texts, made a git repository (#580): actionlint reads a workflow with its
+// project (local reusable workflows, its own config's place) only inside one, so a base read outside one would lack
+// findings the head has, and a defect that stood would read as new.
+export function baseFolder(under) {
+  const dir = fs.mkdtempSync(path.join(under, "workflows-base-"));
+  try { execFileSync("git", ["init", "-q", dir], { stdio: "ignore" }); } catch { /* (no git: the base is read as it can be, and the head's run says what fails) */ }
+  return dir;
 }
 
 if (started(import.meta.url)) {
@@ -417,18 +401,32 @@ if (started(import.meta.url)) {
     for (const line of found.slice(0, 5)) console.log(`FAIL ${logged(file)}:${line}: ${WORD} runs a pull request with the repository's own token and secrets. Mend: take the word out, in a comment too, and trigger the workflow on pull_request, which runs one without them`);
     if (found.length > 5) console.log(`FAIL ${logged(file)}: and on ${found.length - 5} more lines. Mend: take the word out of each, as above`);
   }
-  // (where the job's install could not reach the registry, in a project's pull request, the keys given twice and the
-  // calls a draft skips, which the YAML package reads, did not run, said as a warning; every failure above still fails:
+  // (where the job's install could not reach the registry, in a project's pull request, the calls a draft skips, which
+  // the YAML package reads, did not run, said as a warning; every failure above still fails:
   // #654, point 4)
   const skipped = unreached("yaml");
-  if (skipped) console.log("::warning::The check for a key given twice did not run, nor the one for a file that is no YAML, nor the one for a call a draft skips: the package yaml could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault");
+  if (skipped) console.log("::warning::The check for a file that is no YAML did not run, nor the one for a call a draft skips: the package yaml could not be installed, the registry not answering. Mend: run this job again before the pull request merges; if it fails again, file it as a fault");
   const against = core ? () => null : base ? show : null;
-  const keys = skipped ? { fails: [], notes: [] } : repeated(texts, against), ready = skipped ? { fails: [], notes: [] } : unreadied(texts, against);
+  const ready = skipped ? { fails: [], notes: [] } : unreadied(texts, against);
   const bad = core && !skipped ? unparsed(texts) : { fails: [] };
   const odd = foreignBroken(texts, against); // (no package is read for it, so it runs where the install did not)
-  for (const line of [...keys.notes, ...ready.notes, ...odd.notes, ...bad.fails, ...keys.fails, ...ready.fails, ...odd.fails]) console.log(logged(line));
-  failed += bad.fails.length + keys.fails.length + ready.fails.length + odd.fails.length;
-  keys.notes.push(...ready.notes, ...odd.notes);
-  console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} failing${keys.notes.length ? `, ${keys.notes.length} noted` : ""}${failed ? ". Mend: mend each line above as it says" : ""}`);
+  // (the two tools, on the files the search could read, and on the base's text of each where a base is told, written to a
+  // folder of this run's own; where a tool was not fetched here, it did not run, and decides nothing: #580)
+  const tools = { zizmor: process.env.ZIZMOR || "", actionlint: process.env.ACTIONLINT || "" }, toRead = texts.filter(t => readable(t.text)).map(t => t.file);
+  const head = run(".", toRead, tools);
+  let held = core ? [] : null;
+  if (!core && base && head.unrun.length < 2) {
+    const dir = baseFolder(process.env.RUNNER_TEMP || os.tmpdir()), there = [];
+    try {
+      for (const file of toRead) { const was = show(file); if (was !== null) { fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.writeFileSync(path.join(dir, file), was); there.push(file); } }
+      held = run(dir, there, tools).found;
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  }
+  const found = compared(head.found, held), twice = core && !skipped && head.unrun.includes("actionlint") ? twiceUnfetched(texts) : { fails: [] };
+  for (const name of head.unrun) console.log(`::warning::The workflow check did not run ${name}: it was not fetched here, which only the job's set-up step does (core/scripts/workflow-tools.sh), so its findings decide nothing in this run. Mend: none in a session; the pull request's checks run it`);
+  for (const line of [...ready.notes, ...odd.notes, ...found.notes, ...bad.fails, ...ready.fails, ...odd.fails, ...found.fails, ...twice.fails]) console.log(logged(line));
+  failed += bad.fails.length + ready.fails.length + odd.fails.length + found.fails.length + twice.fails.length;
+  const noted = ready.notes.length + odd.notes.length + found.notes.length;
+  console.log(`${failed ? "FAIL" : "ok  "} ${files.length} workflows and actions of the project's own read: ${failed} failing${noted ? `, ${noted} noted` : ""}${failed ? ". Mend: mend each line above as it says" : ""}`);
   process.exit(failed ? 1 : 0);
 }

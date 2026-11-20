@@ -185,6 +185,11 @@ jobs:
       - name: The core's packages, installed from its lock files for the suites, the parser's among them (#654, #719)
         id: install
         run: node scripts/install.mjs all
+      - name: zizmor and actionlint, which the workflow check and its test run, fetched at their pins outside the repository (scripts/workflow-tools.sh; #580)
+        if: ${{ contains(matrix.parts, 'rest') }}
+        timeout-minutes: 5
+        continue-on-error: true
+        run: bash scripts/workflow-tools.sh >> "$GITHUB_ENV"
       - name: The suites this change can reach (on main, and in a re-run, every one, but none where the merged head passed this tree whole)
         env:
           SELECT_BASE: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 && 'HEAD^1' || '' }}
@@ -326,6 +331,9 @@ jobs:
       - name: The count of the rounds of review
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/review-rounds-test.mjs ')) }}
         run: node tests/review-rounds-test.mjs
+      - name: The count of how often the host's checks sent the work back
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/review-checks-test.mjs ')) }}
+        run: node tests/review-checks-test.mjs
       - name: The stalled lanes
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/stalled-test.mjs ')) }}
         run: node tests/stalled-test.mjs
@@ -603,7 +611,7 @@ jobs:
       - name: Every module and role of the core says when it is read, in words the reading script matches
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/reading.mjs --check
-      - name: None of the core's own workflows names the forbidden trigger, gives a key twice or is no YAML
+      - name: None of the core's own workflows names the forbidden trigger or is no YAML, and zizmor and actionlint find nothing in them
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') }}
         run: node scripts/workflows.mjs --core
       - name: What the core's own workflows and scripts use, each to its list
