@@ -1,6 +1,6 @@
 // The step of setup/sync-notes/710-issue-and-comment-text-read-for-the-personal.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { calls } from "../check-configs.mjs";
+import { calls } from "../workflow-calls.mjs";
 import { COST } from "../step-checks.mjs";
 
 export default { lead: "19 November 2026, issue and comment text read for the personal terms", cost: COST.workflow,

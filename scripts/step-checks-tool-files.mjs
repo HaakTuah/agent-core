@@ -9,7 +9,8 @@ import path from "node:path";
 import { leadsOut } from "./guards.mjs";
 import { READ_MOST } from "./own-files.mjs";
 import { FOLDERS, TOOL_FILES, ruleFiles } from "./rule-files.mjs";
-import { Unread, copyAt, copiesConfig } from "./check-configs.mjs";
+import { Unread, copyAt } from "./workflow-calls.mjs";
+import { copiesConfig } from "./check-configs.mjs";
 import { shown } from "./step-checks.mjs";
 
 // Whether what the copies and pointer checks hold against in an agent tool's files is listed (#405; AGENTS.md of the

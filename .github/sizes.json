@@ -247,10 +247,6 @@
       "mark": 32013,
       "why": "#943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
     },
-    "scripts/check-configs.mjs": {
-      "mark": 40791,
-      "why": "#919: the reading of a workflow's runs apart from the reading of each check's config; the steps' readers, which import it, move first."
-    },
     "tests/agent-tools-test.mjs": {
       "mark": 114595,
       "why": "#919: split with agent-tools.mjs, a file of cases for each tool's configuration."

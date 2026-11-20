@@ -1,7 +1,8 @@
 // The step of setup/sync-notes/300-the-progress-file-holds-order-only.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
 import { progressOf } from "../done-when.mjs";
-import { Unread, marksConfig } from "../check-configs.mjs";
+import { Unread } from "../workflow-calls.mjs";
+import { marksConfig } from "../check-configs.mjs";
 import { COST } from "../step-checks.mjs";
 
 export default { lead: "15 November 2026, the progress file holds order only", cost: COST.read,
