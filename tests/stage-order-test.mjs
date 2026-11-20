@@ -125,6 +125,11 @@ try {
   fs.mkdirSync(path.join(scratch, "root", ".github"));
   fs.symlinkSync(path.join(scratch, "gone"), path.join(scratch, "root", ".github", "workflows"));
   ok(read({ repo: "o/r", dir: path.join(scratch, "root", ".github", "workflows"), ask: gh(true), local: false }).billed === null, "a dangling link for the folder leaves the proof not read, never not billed");
+  if (process.platform !== "win32" && process.getuid?.() !== 0) {
+    const shut = path.join(scratch, "shut", ".github", "workflows");
+    fs.mkdirSync(shut, { recursive: true }); fs.mkdirSync(path.join(scratch, "shut", ".git")); fs.chmodSync(shut, 0);
+    try { ok(read({ repo: "o/r", dir: shut, ask: gh(true), local: false }).billed === null, "a folder that is there but cannot be listed leaves the proof not read, never not billed (the fallback security review's finding 1 on 5e6e651c)"); } finally { fs.chmodSync(shut, 0o755); }
+  }
   fs.mkdirSync(path.join(scratch, "file", ".github"), { recursive: true }); fs.mkdirSync(path.join(scratch, "file", ".git"));
   fs.writeFileSync(path.join(scratch, "file", ".github", "workflows"), "x");
   fs.mkdirSync(path.join(scratch, "link", ".git"), { recursive: true }); fs.symlinkSync(path.join(scratch, "gone"), path.join(scratch, "link", ".github"));
