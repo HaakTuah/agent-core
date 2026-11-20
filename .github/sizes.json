@@ -145,7 +145,7 @@
     },
     "tests/work-saved-test.mjs": {
       "mark": 26522,
-      "why": "One script's cases (work-saved.mjs) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
+      "why": "One script's cases (the work-saved hook, work-saved.sh) on the fixtures they share; split along the script's parts, each file would write them again, adding to the suite's time (tasks/tests.md); #965 changed only how its scratch folder is made."
     },
     "tests/nuget-gate-test.mjs": {
       "mark": 20574,
