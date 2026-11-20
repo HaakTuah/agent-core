@@ -119,9 +119,7 @@ Object.assign(env, { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid"
   GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "core.autocrlf", GIT_CONFIG_VALUE_0: "false" });
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const put = (dir, files) => { for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); } };
-// (`files` names what the commit adds, where that is less than all: staging the whole project, whose copy holds some 700
-// files, for the one file a fault writes is what a Windows runner paid for most in these commits)
-const commit = (dir, what, ...files) => { git(dir, "add", ...(files.length ? ["--", ...files] : ["-A"])); git(dir, "commit", "-q", "-m", what); return git(dir, "rev-parse", "HEAD"); };
+const commit = (dir, what) => { git(dir, "add", "-A"); git(dir, "commit", "-q", "-m", what); return git(dir, "rev-parse", "HEAD"); };
 let n = 0;
 // A project whose copy of the core holds the core's scripts as they stand here (and what they read beside them), its
 // base `files` committed on main; `change(fault)` commits the fault on it, and `back()` returns to the base.
@@ -137,7 +135,7 @@ function project(files) {
   put(dir, { "core/setup/template/shape.json.tmpl": fs.readFileSync(path.join(root, "setup/template/shape.json.tmpl"), "utf8"), "README.md": "# A project\n", ...files });
   git(dir, "init", "-q", "-b", "main");
   const base = commit(dir, "base");
-  return { dir, base, change: fault => { put(dir, fault); commit(dir, "the fault", ...Object.keys(fault)); }, back: () => { git(dir, "reset", "-q", "--hard", base); git(dir, "clean", "-qfdx"); } };
+  return { dir, base, change: fault => { put(dir, fault); commit(dir, "the fault"); }, back: () => { git(dir, "reset", "-q", "--hard", base); git(dir, "clean", "-qfdx"); } };
 }
 // The core's script run in the project as its workflow runs it, from the copy: whether it failed, and what it said.
 const node = (dir, script, args = [], extra = {}) => { const r = spawnSync(process.execPath, [`core/scripts/${script}`, ...args], { cwd: dir, env: { ...env, ...extra }, encoding: "utf8" }); return { failed: r.status !== 0, out: `${r.stdout}${r.stderr}` }; };
