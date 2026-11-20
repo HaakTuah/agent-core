@@ -68,6 +68,15 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
   floor rule 14 names: the record is how the reading is taken, not a question. Reason: fresh sessions advise what is
   most common, and both of the owner's first projects paid for an early choice, one with a rewrite into another
   language.
+- **A choice of stack ends with what the core cannot read in it** (#486). By default the record of a choice of stack,
+  its heading naming the stack, closes with one line that opens `The core cannot read:`, naming each of the core's
+  checks that cannot yet read the stack picked with the issue the session that writes the record files to the core for
+  it then ("Reporting to the core" in its README), or "none". It does not mean that what the core can read weighs in
+  the comparison: the stack is picked for the product, and the core follows; nor that the project's first code waits on
+  a reader. Reason: a project in a stack the core could not read found it out months later, from an evaluation. Held by
+  the records' check (`core/scripts/choices.mjs`), which fails a stack's record a pull request adds whose last line is
+  not that line, naming an issue or saying "none"; that each gap has its own issue, by the review, since no check reads
+  where one gap ends.
 - **The choices a project already made are recorded too.** At its first audit (in a project that stood before this rule,
   as the step its sync asks: `setup/sync-notes.md`), a project's auditing session records each standing choice that is
   hard to undo, a stated feature of its design that works as one included ("no build step"), each with what it was
@@ -203,7 +212,8 @@ written in a measure, and checks the records a pull request adds ("Held by", bel
   tool tried in their place reads those cases is the best evidence that the move pays.
 
 Held by: the records' check (`core/scripts/choices.mjs`, a step of the copies check), which fails a record a pull
-request adds without its lines `Looked for:`, `The blind pick:` and `The judgment:`, and lists, never fails, one that
+request adds without its lines `Looked for:`, `The blind pick:` and `The judgment:`, and a stack's without its line
+`The core cannot read:`, and lists, never fails, one that
 stood before; the sync's step of "What the project would be built on today" (`core/scripts/steps.mjs`), which reads done
 where a record so headed names its issue on its line `The suggestion:`; the starter kit, whose *choice records* ask for
 a new project's stack before its first code; the scheduled look, which keeps the pass's issue and that of a sign written
