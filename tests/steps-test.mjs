@@ -20,6 +20,7 @@ import { readNothing } from "../scripts/read-nothing.mjs";
 import { holders } from "../scripts/holders.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { parseYaml, pathsLetThrough } from "../scripts/workflow-run.mjs";
+import { toolFilesRead, toolFilesState } from "../scripts/step-checks.mjs";
 import { COST, MOVED_GLOB, NEW_GLOBS, STEPS, Unread, configs, leads, moved, notDone, plain, project, report, runsOwn } from "../scripts/steps.mjs";
 import { READ_MOST } from "../scripts/own-files.mjs";
 
@@ -1233,6 +1234,46 @@ ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Obj
     const linked = step.check(project(d));
     execFileSync("git", ["rm", "-q", "-f", "zero", "outside.json"], { cwd: d });
     ok(linked === null, "a tracked link to a device or to a file outside the project is never opened, and the step reads on", `${linked}`);
+  }
+  // (what the step's cache is keyed by, #812: the files the two checks read, and no other; a change to a file they read asks
+  // a new run, and one to a file they do not, in the work tree or staged, leaves the state as it was and the checks' words
+  // the same, run again to see it)
+  {
+    const state = () => toolFilesState(project(d)).key, said = () => { const p = project(d), { config } = toolFilesState(p); return toolFilesRead(p, config) ?? ""; };
+    const original = f => fs.readFileSync(path.join(d, f), "utf8"), put = (f, text) => { fs.mkdirSync(path.dirname(path.join(d, f)), { recursive: true }); fs.writeFileSync(path.join(d, f), text); };
+    const stage = f => execFileSync("git", ["add", "--", f], { cwd: d }), unstage = f => execFileSync("git", ["rm", "-q", "-f", "--cached", "--", f], { cwd: d });
+    const flows = fs.readdirSync(path.join(d, ".github/workflows")).filter(f => f.endsWith(".yml"));
+    const base = state(), words = said();
+    const changed = (f, text = `${original(f)}\n`) => { const was = original(f); put(f, text); const now = state(); put(f, was); return now !== base; };
+    const unread = [".claude/settings.json", "checks/licences.json", `.github/workflows/${flows[0]}`, "checks/sizes.json"];
+    ok(flows.length > 0 && unread.every(f => !changed(f)), "a change to a workflow, a setting or a config of another check, which neither check reads, leaves the state of the project as it was", unread.filter(f => changed(f)).join(", "));
+    const copies = unread.map(original);
+    unread.forEach(f => put(f, `${original(f)}\n`));
+    const staged = unread.map(f => { stage(f); return state() === base; });
+    unread.forEach((f, i) => { put(f, copies[i]); stage(f); });
+    ok(staged.every(Boolean) && state() === base && said() === words, "nor does the same change staged, and the checks run again say what they said", `${staged}`);
+    const reads = ["AGENTS.md", "core-manifest.md", "docs/PROGRESS.md", "core/scripts/guards.mjs", "checks/copies.json", "checks/copies-baseline.json", ".kiro/steering/core.md"];
+    ok(reads.every(f => changed(f)), "a change to a rule file, a Markdown file, a file of the copy of the core, the config or its baseline asks a new run", reads.filter(f => !changed(f)).join(", "));
+    // (what the config's "code" names is read, and what it leaves out is not)
+    const config = original("checks/copies.json"), spec = JSON.parse(config);
+    put("app/a.txt", "a\n"); put("app/b.txt", "b\n"); put("checks/copies.json", `${JSON.stringify({ ...spec, code: ["app/a.txt"] })}\n`);
+    ["app/a.txt", "app/b.txt"].forEach(stage); stage("checks/copies.json");
+    const named = state();
+    put("app/b.txt", "b\nb\n"); const leftOut = state() === named; put("app/b.txt", "b\n");
+    put("app/a.txt", "a\na\n"); const read = state() !== named; put("app/a.txt", "a\n");
+    const again = said() === words;
+    ["app/a.txt", "app/b.txt"].forEach(unstage); fs.rmSync(path.join(d, "app"), { recursive: true }); put("checks/copies.json", config); stage("checks/copies.json");
+    ok(leftOut && read && again, "a file the config's code names is read, one it does not name is not, and the checks say what they said", `${leftOut} ${read} ${again}`);
+    // (git's own files that change what a check lists)
+    const git = [".gitattributes", ".gitmodules"].map(f => { put(f, "\n"); stage(f); const was = state(); put(f, "# x\n"); const now = state(); unstage(f); fs.rmSync(path.join(d, f)); return was !== now; });
+    ok(git.every(Boolean), "a change to .gitattributes or .gitmodules asks a new run", `${git}`);
+    // (where the rule files cannot be read, no file is left out)
+    const security = original("SECURITY.md");
+    put("SECURITY.md", security.replace(/\*\*the rule files:\*\*/u, "**the files of rules:**"));
+    const whole = state(), flow = `.github/workflows/${flows[0]}`;
+    put(flow, `${original(flow)}\n`); const every = state() !== whole;
+    put(flow, copies[2]); put("SECURITY.md", security);
+    ok(every && state() === base, "where the project's rule files cannot be read, every file counts as read", `${every}`);
   }
 }
 
