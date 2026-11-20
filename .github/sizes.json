@@ -88,8 +88,8 @@
       "why": "#916: a file for each reader its sections test."
     },
     "tests/upgrade-test.mjs": {
-      "mark": 84526,
-      "why": "One flow over the projects it builds: each case takes a project as the one before left it (written, synced, merged, its own pull requests after), so a file of its own would build them again; a case that takes a synced project and leaves it as it was stands in a file of its own beside it, as upgrade-readers.mjs does (#629)."
+      "mark": 98773,
+      "why": "One flow over the projects it builds: each case takes a project as the one before left it (written, synced, merged, its own pull requests after), so a file of its own would build them again; and tests/ holds test files alone (#614), so no module beside it can hold a part. A session reads the case it changes, found by its section's heading."
     },
     "scripts/strength.mjs": {
       "mark": 39011,
