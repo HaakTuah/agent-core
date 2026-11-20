@@ -15,7 +15,7 @@ export const LABELS = ["queued", "by:look"];
 export const RECORD = "The scheduled look's record";
 export const OWNERS = "needs-owner";
 
-export const labelsFor = owner => (owner ? [OWNERS, ...LABELS.slice(1)] : LABELS);
+const labelsFor = owner => (owner ? [OWNERS, ...LABELS.slice(1)] : LABELS);
 
 // The labels an issue the look keeps should carry where its state label is not the one that fits: the others as they
 // stand, and needs-owner or queued; null where they fit already, and where a session gave it another state (later,
@@ -46,7 +46,7 @@ export const updating = (issue, body, requeue = null) => {
   return { body, ...(labels ? { labels } : {}) };
 };
 
-export function write(method, route, payload) {
+function write(method, route, payload) {
   const r = spawnSync("gh", ["api", "-X", method, route, "--input", "-"], { input: JSON.stringify(payload), encoding: "utf8", maxBuffer: 1 << 24 });
   if (r.status !== 0) throw new Error(`GitHub refused ${method} ${route.replace(/^repos\/[^/]+\/[^/]+\//, "")}`);
   return r.stdout ? JSON.parse(r.stdout) : {};
@@ -54,7 +54,7 @@ export function write(method, route, payload) {
 
 // The state label of an issue the look keeps and still holds open, kept to what its reader says of the owner: what
 // was done, as lines for the look's summary.
-export function relabel({ repo, issue, finding, dry }) {
+function relabel({ repo, issue, finding, dry }) {
   if (typeof finding.owner !== "boolean" || !issue || finding.what === null || finding.unread) return [];
   const labels = relabelled(issue.labels, finding.owner);
   if (!labels) return [];
@@ -99,12 +99,12 @@ export const inboxFile = (title, what, carrier) => `State: queued\nBy: look\n\n*
 export const slug = title => `look-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.md`;
 
 // A file of the inbox: written with --inbox (save with --dry), else printed.
-export function putFile({ toInbox, dry, say }, file, content) {
+function putFile({ toInbox, dry, say }, file, content) {
   if (toInbox && !dry) { fs.mkdirSync(FOLDER, { recursive: true }); fs.writeFileSync(file, content); } else if (!toInbox) say(content);
 }
 
 // One finding, where issues cannot be reached: not read, its file gone where nothing stands, or its file.
-export function inboxFinding(ctx, f) {
+function inboxFinding(ctx, f) {
   const { toInbox, dry, carrier, say } = ctx;
   const file = path.join(FOLDER, slug(f.title));
   if (f.unread) { say(`- ${f.title}: not read (${f.unread}).`); return; }
@@ -131,13 +131,13 @@ export function toFolder(ctx, reach, findings, { reportTitle, reportFile, monthl
 }
 
 // Closes an issue the look keeps, with a comment that says why.
-export function closeIssue(repo, number, why) {
+function closeIssue(repo, number, why) {
   write("POST", `repos/${repo}/issues/${number}/comments`, { body: `From the scheduled look: ${why}\n\n${SIGNED}` });
   write("PATCH", `repos/${repo}/issues/${number}`, { state: "closed", state_reason: "completed" });
 }
 
 // What is done with one kind's issue (plan()), said in `did` and, save with --dry, written.
-export function act({ repo, owner, dry }, did, title, body, issue, unread, { closes = true, labels = LABELS, requeue = null } = {}) {
+function act({ repo, owner, dry }, did, title, body, issue, unread, { closes = true, labels = LABELS, requeue = null } = {}) {
   const step = plan(body, issue, unread);
   const shown = step === "close" && !closes ? "nothing" : step;
   did.push(`${title}: ${unread ? `not read (${unread})` : shown}${issue ? ` (#${issue.number})` : ""}`);
@@ -152,7 +152,7 @@ export function act({ repo, owner, dry }, did, title, body, issue, unread, { clo
 }
 
 // The record, written last: a closed issue of its own.
-export function writeRecord({ repo, dry, carrier, at }, record, did) {
+function writeRecord({ repo, dry, carrier, at }, record, did) {
   const recordBody = `The scheduled look's own record (\`core/scripts/look.mjs\`): when it last ran, so that the next run says where one was missed. Nothing to do here; it stays closed.\n\nLast run: ${at} (${carrier}).\n`;
   if (!dry) {
     try {

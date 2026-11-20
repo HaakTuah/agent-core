@@ -76,7 +76,7 @@ import { keepIssues, lastRun, mine, RECORD, slug, toFolder } from "./look-keep.m
 // default branch's checks, the late review findings, the stale packages) and look-keep.mjs (how it keeps them: in
 // issues, or in the inbox's files). What they hold stands here too, where tests and scripts have always imported it from.
 export { TITLES } from "./look-kinds.mjs";
-export { checksOf, idleBody, noticesOf, stillFinding } from "./look-pulls.mjs";
+export { checksOf, idleBody, NOTICE_LOGINS, noticesOf, stillFinding } from "./look-pulls.mjs";
 export { FAILED, LATE_DAYS, LATE_PAGES, LATE_PULLS, lateFinding, redBody, staleFinding } from "./look-checks.mjs";
 export { BOT, inboxFile, LABELS, lastRun, mine, OWNERS, plan, RECORD, relabelled, reopening, slug, text, updating } from "./look-keep.mjs";
 

@@ -1,4 +1,4 @@
-// What the scheduled look's readers (look-pulls.mjs, look-checks.mjs) and its flow (look.mjs) share: the title of each
+// What the scheduled look's readers (look-pulls.mjs, look-checks.mjs), its keeping (look-keep.mjs) and its flow (look.mjs) share: the title of each
 // kind of issue it keeps, and an outsider's text made plain to quote (core archive 218).
 
 export const TITLES = {

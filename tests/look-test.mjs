@@ -4,6 +4,7 @@
 //
 //   node tests/look-test.mjs
 import { BOT, checksOf, noticesOf, stillFinding, DUE, dueNow, idleBody, inboxFile, LABELS, lastRun, mine, OWNERS, plan, relabelled, reopening, slug, staleFinding, lateFinding, LATE_PAGES, LATE_PULLS, text, TITLES, updating, FAILED, redBody } from "../scripts/look.mjs";
+import * as facade from "../scripts/look.mjs";
 import { parse } from "../scripts/choices-records.mjs";
 import { signKey, tripped, trippedBody } from "../scripts/choices-look.mjs";
 import { before, body, copies, countsFrom, reportOf, share, SHARES, shownAs } from "../scripts/state-report.mjs";
@@ -282,6 +283,9 @@ ok(stale(0, "Packages the project holds that have gone stale\n\n- a\n").what ===
   const blind = still({ gh: () => { throw new Error("HTTP 403"); } });
   ok(blind.what === null && /could not be read/.test(blind.unread ?? ""), "a call that fails leaves the issue as it stands, saying what could not be read", JSON.stringify(blind));
 }
+
+// ---- the names look.mjs exported before its split (#1033)
+ok(["BOT", "DUE", "FAILED", "LABELS", "LATE_DAYS", "LATE_PAGES", "LATE_PULLS", "MISSED", "NOTICE_LOGINS", "OWNERS", "RECORD", "SOON", "TITLES", "checksOf", "dueNow", "idleBody", "inboxFile", "lastRun", "lateFinding", "mine", "noticesOf", "plan", "redBody", "relabelled", "reopening", "slug", "staleFinding", "stillFinding", "text", "updating"].every(n => n in facade), "look.mjs still exports each name it exported before its split");
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);
