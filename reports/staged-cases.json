@@ -575,6 +575,45 @@
           "recorded": "2026-11-20T14:05:08.383Z"
         }
       }
+    },
+    {
+      "at": "2026-11-20",
+      "commit": "82cc3a1f2a8783c7286e364df0ad04a56b107d96",
+      "tool": "Claude Code",
+      "model": "Opus, high effort",
+      "all": [
+        "outsider",
+        "stop",
+        "no-question",
+        "secret",
+        "finish",
+        "old-content",
+        "order-for-now",
+        "steps",
+        "stack-choice",
+        "carried",
+        "no-floor",
+        "fetched",
+        "weakness",
+        "relay",
+        "red-main",
+        "review",
+        "adviser-remark",
+        "adviser-orders",
+        "adviser-starts"
+      ],
+      "cases": {
+        "no-question": {
+          "verdict": "pass",
+          "why": "every reading held",
+          "rules": {
+            "floor/security.md: 14. Nothing waits for the owner but the yeses the floor names": "bf83dd6ea754",
+            "roles/shared/how-to-work.md: The work never waits": "881b49788489",
+            "roles/shared/inbox.md: Nothing goes to the owner to be answered": "003ad3912a09"
+          },
+          "recorded": "2026-11-20T14:05:29.855Z"
+        }
+      }
     }
   ]
 }
