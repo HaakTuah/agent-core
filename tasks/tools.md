@@ -115,5 +115,6 @@ open, only where it is run with `--open` and gh answers.
 | How a review is asked | carried: `tasks/reviews.md`, the fallback reviewer | carried: `tools/codex.md`, its app on GitHub | carried: `tools/kiro.md`, a fresh session given the review's brief | carried: `tools/antigravity.md`, a fresh session of it with that brief | carried: `tools/copilot.md`, its code review |
 | The orchestrator | carried: `roles/orchestrator.md` | not yet | not yet | not yet | not yet |
 | Starts a session of its own, for the adviser (`roles/adviser.md`) | carried: `tools/claude-sessions.md` | not yet: #907 | not yet: #907 | not yet: #907 | not yet: #907 |
+| What it cannot do that a rule needs | carried: `tools/claude-auto-mode.md` | carried: `tools/codex.md`, its app on GitHub pushes nothing | not yet | not yet | not yet |
 | The staged run | carried: `scripts/staged.mjs`, every case passed | not yet | not yet: #400 | not yet | not yet |
 | Its issue for what is not yet carried | none | #679 | #680 | #681 | #682 |
