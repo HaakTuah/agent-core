@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { changedTogether, cycles, globals, imports, isModule, jsxIn, measure, tokens } from "../scripts/code-shape.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { javascriptFunctions } from "../scripts/javascript-functions.mjs";
 import { LARGEST, MOST_NODES } from "../scripts/tree-walk.mjs";
 
@@ -256,6 +257,20 @@ try {
   const outer = spawnSync(process.execPath, [path.join(here, "code-shape.mjs"), "--repo", path.join(dir, "src"), "--json", out], { cwd: here, encoding: "utf8" });
   const o = outer.status === 0 ? JSON.parse(fs.readFileSync(out, "utf8")) : null;
   ok(o?.files.code === 2 && o?.changedTogether.commits === 3, `with --repo, another repository is measured, its copy of the core left out (${outer.stdout}${outer.stderr})`);
+  // (another repository whose manifest names its copy of the core elsewhere: that copy is left out, not core/)
+  const vendored = fs.mkdtempSync(path.join(os.tmpdir(), "code-shape-vendored-"));
+  try {
+    const vgit = (...args) => execFileSync("git", args, { cwd: vendored, stdio: "ignore" });
+    vgit("init", "-q"); vgit("config", "user.email", "test@example.invalid"); vgit("config", "user.name", "Test"); vgit("config", "commit.gpgsign", "false"); vgit("config", "core.hooksPath", path.join(vendored, ".no-hooks"));
+    fs.writeFileSync(path.join(vendored, "core-manifest.md"), `Core: ${CORE} at ${"a".repeat(40)}, copied whole under vendor/core/ (never edited here).\n`);
+    fs.mkdirSync(path.join(vendored, "vendor/core/scripts"), { recursive: true });
+    fs.writeFileSync(path.join(vendored, "vendor/core/scripts/x.mjs"), "export const x = 1;\n");
+    fs.writeFileSync(path.join(vendored, "mine.mjs"), "export const mine = 1;\n");
+    vgit("add", "-A"); vgit("commit", "-q", "-m", "one");
+    const away = spawnSync(process.execPath, [path.join(here, "code-shape.mjs"), "--repo", vendored, "--json", out], { cwd: here, encoding: "utf8" });
+    const w = away.status === 0 ? JSON.parse(fs.readFileSync(out, "utf8")) : null;
+    ok(w?.files.code === 1, `with --repo, a copy of the core at the path its manifest names is left out (${away.stdout}${away.stderr})`);
+  } finally { fs.rmSync(vendored, { recursive: true, force: true }); }
   const bad = spawnSync(process.execPath, ["core/scripts/code-shape.mjs", "--depth", "two"], { cwd: dir, encoding: "utf8" });
   ok(bad.status === 1 && /FAIL: --depth takes a whole number/.test(bad.stderr), "an option of the wrong shape fails, saying which");
 } finally { fs.rmSync(dir, { recursive: true, force: true }); fs.rmSync(outside, { recursive: true, force: true }); }
