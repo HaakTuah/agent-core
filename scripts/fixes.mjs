@@ -53,10 +53,17 @@ export const fixesOf = (bugs, log) => log.filter(c => c.parent).flatMap(c => {
   return [...own, ...fixesOf(bugs, c.brought ?? [])];
 });
 
+// The day the command was given, or null where it was given none or one that is no day.
+export const sinceOf = argv => {
+  const since = argv[argv.indexOf("--since") + 1];
+  return argv.includes("--since") && DAY.test(since ?? "") ? since : null;
+};
+export const NO_DAY = "--since takes a day, YYYY-MM-DD: the day on the line \"Read whole:\" of CHOICES.md";
+
 function main(argv) {
   const fail = msg => { console.error(`FAIL: ${msg}`); process.exit(1); };
-  const since = argv[argv.indexOf("--since") + 1];
-  if (!argv.includes("--since") || !DAY.test(since ?? "")) fail("--since takes a day, YYYY-MM-DD: the day on the line \"Read whole:\" of CHOICES.md");
+  const since = sinceOf(argv);
+  if (!since) fail(NO_DAY);
   const git = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 });
   const repo = repoOf();
   if (!repo) fail("the repository is not known (GITHUB_REPOSITORY, or origin's address)");
