@@ -1,8 +1,8 @@
 # How code is put together
 
 Read when a system is designed, added or named, when code is ported or rewritten, when a pull
-request deletes a test or weakens one (#253), and before a session writes more than about 50 lines for one job (#486):
-the kinds `system`, `port` and `test`. How what already stands is brought
+request deletes a test or weakens one (#253), before a session writes more than about 50 lines for one job (#486),
+and when a bug is mended (#593): the kinds `system`, `port`, `test` and `bug`. How what already stands is brought
 to it: `tasks/cleaning.md`. What the tests cost, their time marks among it: `tasks/tests.md`.
 
 A **system** is a part of the code that someone can describe in a sentence: what it offers the others. A project names
@@ -13,7 +13,11 @@ one declared entrance.
 
 - **Never worse.** By default a pull request that adds a breach of a rule below fails, in every project, and its
   session mends it there. What stood before the check read it is listed in the check's baseline and never fails: a
-  listed function may shrink and may not grow, and a listed import may go. The baseline shrinks freely (`--write`). An
+  listed function may shrink and may not grow, and a listed import may go. The baseline shrinks freely
+  (`--write`): a pull request that only improves on it passes, never one that makes anything worse, the check
+  printing what the lowered baseline leaves out, which the next pull request that changes the baseline, or a
+  cleaning task, writes whole (#750, point 5), since improving pull requests that each rewrote the one baseline
+  collided; the cost is that, until it is written, a later change could slip back to the old level unseen. An
   entry joins it in two cases only: the check reads more than it did (a system named, a mark lowered, the first
   baseline), where the base branch held the breach already; or there was no other way, where the baseline gives the
   entry's reason under "grown", the pull request gives it too, and a fresh session says there that it found no other
@@ -113,28 +117,56 @@ one declared entrance.
   check, which counts each kind of fault a file holds against what the baseline lists of it and fails a survivor past
   it, an entry that joins with no reason, and one dropped while its fault survives, and by the reviews of that reason.
 - **A test taken out or weakened is said.** By default a pull request keeps its tests and what they assert. The
-  trigger is a pull request that deletes a test or weakens what one asserts (an assertion loosened or taken out, a
-  case skipped): its builder says so under "Readings taken", with why, and the reviewer checks that the reason holds.
-  It does not mean that a test which proves nothing must stay. Reason: a measure on changed lines cannot see a test
-  weakened elsewhere, and a test made to pass is the cheapest way to green. No check holds it yet, since none can
-  tell a weakened assertion without guessing: the reviews read it (`roles/shared/review-guidelines.md`), the strength check
-  names each test file a pull request deletes, and `core/scripts/holders.mjs` lists it until something holds it.
+  trigger is a pull request that leaves a test file with fewer lines that assert, deletes it, or skips a case in it:
+  its builder names that file on the description's line `Tests changed:`, with why, and the reviewer rules on it,
+  checking that the reason holds (#307). It does not mean that a test which proves nothing must stay, nor that an
+  assertion only changed is named: it may be made stricter, and the check lists it for the reviewer, who rules on it.
+  Reason: a measure on changed lines cannot see a test weakened elsewhere, and a test made to pass is the cheapest way
+  to green. Held, in part, by the description check (`core/scripts/weakened.mjs` lists the lines, in the test files the
+  *shape check*'s config names), which fails a description that leaves such a file off the line; an assertion loosened
+  in place, or on a line of a call spread over several, no check tells without guessing, and the reviews read it
+  (`roles/shared/review-guidelines.md`).
 - **Near-copies are reported.** By default code that only looks like other code fails nothing. The trigger is a run
   of code that matches another once names and numbers are set aside: the copies check lists it on every run, and the
   audit's reader judges whether one function should serve both. It does not mean that such code is joined by rule:
   "One fact, one place" forbids a second copy of a fact, and code joined too early is harder to change than two plain
   pieces. Reason: exact copies were held, and copies that differ only in their names were up to 2.5% of a codebase
   that nothing saw. Held by the copies check's report.
+- **A part whose gaps repeat is read for its whole input** (#593). By default a bug is mended at its cause (#308). The
+  trigger is the third bug filed against one part that was a kind of input, of project or of platform the part did not
+  read, counted from the issues labelled `bug` that name the part's files: the builder that mends it lists every kind
+  the part's job covers, from the source that defines them (the project's kinds and its manifest's slots, the platforms
+  it builds and tests on, a format a standard or the host defines), and gives each a test, in that pull request or,
+  where that is large, as a task it files, the pull request holding the list. Where an authority says the whole set (a
+  build tool for what a build brings in, git for a rename, the host for a pull request's reviews), in the core, that
+  builder or whoever writes such a part anew has the part's test run the part and the authority on the same inputs, the
+  projects its upgrade test builds, and fail on any difference, and whether the part gives way to it is weighed as for a
+  maintained package. Three is a first guess. It does not mean a bug waits for the list, that a part with three bugs is
+  replaced, that a kind no source names is guessed, nor a comparison where nothing defines the whole set or on another
+  owner's project. Reason: mended one case at a time, four of the core's parts took 22 bugs of the same kind by 17
+  November 2026, and kinds listed by hand are as complete as their writer's memory.
+- **A comment says why the code is so, never what changed** (#458). By default a comment explains what a reader cannot
+  see in the code: a reason, a limit, a pointer to where the reason is written; what changed, when and for which task is
+  git's to hold, in the commit's message and the pull request's description. The trigger is a line of a comment that
+  holds a mark of a change in the shape check's list (a change's heading such as "Changed:", what the code was, a
+  change's date, the task that changed it; `core/scripts/shape-readers.mjs`, and the config's "changes", plain text a
+  project adds), in a comment line's first 400 characters: the check counts them by file, those that stand are in its
+  baseline and are worked down at the dose (`tasks/cleaning.md`), and a pull request that adds one fails, its builder
+  moving the words to the commit or the pull request. It does not mean a pointer to an issue that gives the reason, a
+  comment a tool needs, a rule on how many comments code has, nor a rewrite of the comments that stand. Reason: agents
+  write such marks by habit and every later session pays to read them; one project held 13,461 such lines in 1,026
+  files. Held by the shape check, whose list loses, in the pull request that finds it, a pattern that proves to guess.
 
 **What has no mark here.** A hub, a file most others import: one that holds one small fact is as it should be, and
 the audit's reader judges the others. The time a user waits on gets its own measure as its rule comes (#318).
 
 **What the check reads.** JavaScript and TypeScript, JSX among them, C# and Python, each by a reader of its own
-(`core/scripts/shape-readers.mjs`); in C# what a file takes from another is read from its using directives alone. Of
-scripts that share one global space (no import, no export), it holds that each file adds at most one name there and
-no two declare the same. It never runs the code it reads, and never guesses: an import that leads nowhere it can tell,
-a file whose JSX its reader cannot follow and a file in another language are counted and said on every run, never
-failed, and the audit's reader holds that code to these rules. A baseline names the readers whose finds it lists, so
-a reader that comes later turns nothing red: what stood is said until `--write` lists it. A project that has not
-written its config yet is held to the starter kit's own, with each pull request's base as its baseline, from the sync
-that brings the check.
+(`core/scripts/shape-readers.mjs`), the functions of each by the parser the core installs, and of C# and Python all it
+reads; in C# what a file takes from another is read from its using directives alone. Of scripts that share one global space (no import, no
+export), it holds that each file adds at most one name there and no two declare the same. Of every file's comments, it counts the lines that mark a change. It never runs the code it
+reads, and never guesses: an import that leads nowhere it can tell and a file in another language are counted and said
+on every run, never failed; a file of JavaScript, TypeScript, C# or Python its grammar cannot read whole, and one of
+them past the size its reader takes (`LARGEST` in `core/scripts/tree-walk.mjs`), is counted and said too, and one a pull request adds fails, saying its mend; the audit's reader holds
+all that code to these rules. A baseline names the readers whose finds it lists, so a reader that comes later turns nothing red: what
+stood is said until `--write` lists it. A project that has not written its config yet is held to the starter kit's own,
+with each pull request's base as its baseline, from the sync that brings the check.

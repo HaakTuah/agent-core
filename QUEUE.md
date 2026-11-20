@@ -1,82 +1,73 @@
 # The core's queue
 
-The first line that waits on nothing is next.
-
-**Who:** *builder*, any builder session; *rule builder*, a builder on Opus; *the owner*, no session takes it up before
-the owner's own word. A line on points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or "Fixes" it if
-it merges last.
+**Who** (`AGENTS.md`, "The queue"): *rule builder*, one on Opus; *the owner*, none before the owner's word. A line on
+points of #460, #484, #486, #534 or #593 has its PR say "Part of" that issue, or "Fixes" it if it merges last.
 
 ## In order
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #563 | rule builder; it changes `tasks/cleaning.md`, with the owner's yes on the issue | |
-| #529, step 4 | builder | #528 |
-| #530, step 5 | builder; licence readers after #585 and #586 | #529 |
-| #593, points 1 to 3 | rule builder | |
-| #534, points 1 to 3, 5 to 7 and 9 to 12 | rule builder; point 12 changes `tasks/cleaning.md`, with the owner's yes on the issue | |
-| #593, points 8 and 9 | rule builder | #577 and #476 |
+| #715 | rule builder; `tests.yml` steps one by one | |
+| #853 | builder; a rework of tests; `scripts/holders.json`, `scripts/holders.mjs` and their readers | #841 |
+| #810 | the orchestrator, for its done-when: reads `main`'s runs, then closes it | a stretch of merges landing faster than a run; at the batch's end, if none came, the orchestrator reads `main`'s runs since #813 and closes #810 on that |
+| #812 | builder; on Sonnet (#767); `tests.yml` timing | #715 |
+| #767 | rule builder; it changes `tools/claude.md`'s table | |
+| #704 | builder; `tests.yml` | #715 |
+| #770 | builder; `tests.yml` | #704 |
+| #772 | builder; `tests.yml` | #770 |
+| #530, step 5 | builder; licence readers | |
+| #534, point 12 | rule builder; it changes `tasks/cleaning.md` | |
 | #625 | builder | #624 |
 | #626 | builder | #624 |
 | #627 | builder | #624 |
-| #628 | builder | #577 |
-| #629 | builder | #624 and #577 |
-| #593, points 6, 10 and 11 | rule builder | #593's points 1 to 3 |
+| #628 | builder | |
+| #629 | builder | #624 |
+| #593, points 6, 7 widened, 10 and 11 | rule builder | #593's points 1 to 3 |
 | #579 | builder | |
 | #580 | builder | |
-| #581 | rule builder; it changes `AGENTS.md`'s *mutation tool* | |
 | #582 | builder | |
 | #583 | builder | |
 | #584 | rule builder | |
 | #589 | builder | |
 | #590 | builder | #580 |
 | #591 | builder | #589 |
-| #585 | builder | |
-| #586 | builder | |
-| #546 | rule builder; two security reviews | |
 | #587 | rule builder; it may change the floor's topics and what every role reads at its start | #530 |
-| #306 | rule builder | |
-| #307 | rule builder | |
 | #308 | rule builder | |
 | #309 | rule builder | |
 | #318 | rule builder | |
 | #310 | rule builder | |
 | #325 | rule builder | |
 | #314 | rule builder | |
-| #456 | rule builder; it changes the floor (rules 5 and 10) | |
-| #457 | rule builder; point 1's reading of tests for a clock or process waits on #529 | |
-| #458 | rule builder | |
+| #457 | rule builder | |
 | #459, and #484, points 8 to 10 | rule builder | |
 | #464 | rule builder | #459, whose rule list it reads |
-| #361 | rule builder, points 1 and 2 only | |
-| #467 | rule builder | |
-| #469 | rule builder; it changes what every role reads at its start | |
-| #484, points 1 to 5 | rule builder | |
-| #441, with #484, points 6 and 7 | rule builder; a split of its own, behaviour proven unchanged; the file stays whole where #469's measure finds no kind of task reads less | #469 |
-| #471 | rule builder; it changes what the orchestrator reads at its start | |
+| #441, with #484, points 6 and 7 | rule builder; the file stays whole where #469's measure finds no kind of task reads less | #469 |
 | #355 | builder | #530: the readers left go on the parser #529 brings |
-| #391 | builder; it overlaps #355 | #530, as #355 |
-| #542 | rule builder; it changes what the orchestrator reads at its start | #457 |
-| #337 | builder | |
-| #426 | builder; a .NET reader it files waits on #529 | |
-| #404 | builder | |
-| #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | #467 and #407 |
-| #492 | rule builder; it changes floor rule 4, with the owner's yes on the issue, who may start the orchestrator, and what every role reads at its start | #397 and #467 |
+| #542, point 5 | rule builder | #457 |
+| #675 | builder | |
+| #397 | rule builder; it changes the review guidelines and what the reviewer and the orchestrator read at their start | |
+| #492 | rule builder; point 14 (each tool's part says whether and how it starts a session of its own) | #397 |
 | #485 | rule builder; it changes the floor (rules 7 and 10) | |
 | #486, point 5 | builder | the types record reopening |
-| #460, point 1 | builder | |
 | #460, point 2 (the author's address) | builder | |
 | #460, point 3 (a copy in a test) | builder | |
 | #460, point 4 (names in descriptions) | builder | |
 | #460, point 5 (a report's size) | builder | |
-| #460, point 6 (billed minutes) | builder | |
-| #502, case 1 | builder | |
 | #502, case 2 | rule builder; it changes what every role reads at its start | |
 | #593, points 4 and 12 | rule builder; it changes what a builder reads at its start | |
-| #594 | rule builder; it changes the README | |
-| #390 | builder | |
 | #204 | builder; it changes what a builder and the orchestrator read at their start | |
 | #416 | builder | #441, on the same files |
+| #650 | rule builder | |
+| #679 to #682 | rule builder; one PR each | |
+| #707 | rule builder | |
+| #701 | builder | |
+| #716 | builder | |
+| #739 | rule builder; it changes the game module (`tasks/game-design.md`) | |
+| #786 | rule builder; it changes the floor (the threat model) | |
+| #831 | rule builder; a page for owners beside the floor, with the rule and check that keep it in step; the floor's wording unchanged | |
+| #886, point 1 | rule builder; it changes the floor (rule 3) and adds a script beside `scripts/comment-only.mjs` | |
+| #886, point 2 | rule builder; it changes the floor (rules 3 and 14), `AGENTS.md`'s queue gate, the review guidelines and the state report | #886, point 1 |
+| #887 | rule builder; it changes `AGENTS.md`, the review guidelines and `scripts/pruning.mjs` | |
 | #259 | a builder that built none of the batch, on Fable at high for this batch | every line above it |
 
 ## Beside any line
@@ -85,11 +76,10 @@ They read and change no rule.
 
 | Issue | Who | Waits on |
 | --- | --- | --- |
-| #548 | builder | |
-| #549 | builder; a workflow, two security reviews | #548 |
 | #550 | builder; a case a PR | |
-| #551 | builder | #549 |
-| #552 | builder | #551 |
+| #765 | builder | |
+| #809 | builder | |
+| #552 | builder | |
 | #553 | builder | #552 |
 | #554 | builder | #553 |
 | #555 | builder | #534's tools, and #554 |

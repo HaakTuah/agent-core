@@ -12,13 +12,20 @@
 //     with no push for longer than stalled.mjs's hours: draft or ready, its checks, what its description says it waits
 //     on (pr-description.mjs) and for how long, a draft with green checks first; and one whose line and label
 //     needs-owner disagree.
+//   - Checks failed on the default branch's newest commit, as GitHub lists that commit's latest check runs, so that
+//     a failure no session saw is still shown (#542; tasks/tests.md, "A check that fails on the default branch has an
+//     owner").
+//   - Late review findings to answer (review-marks.mjs; tasks/reviews.md, "A late review is still read"): Codex's
+//     findings inline of the last LATE_DAYS days made after their pull request merged, with no reply from an account
+//     the host lets write.
 //   - Steps of a release not done (steps.mjs), in a project.
 //   - Labels and openers to mend (labels.mjs).
 //   - The scheduled look missed a run: where its record shows no run for longer than MISSED hours. The look never
 //     closes this one: a session closes it once it has found why.
 //   - What the dose makes due (dose.mjs; tasks/cleaning.md): cleaning, while the codebase is not in standard, and an
 //     audit by a reader, which the look labels needs-owner in place of queued where the project is in debt and its
-//     baseline no smaller than at the last audit; in the core alone, the staged cases due (staged.mjs); and of the
+//     baseline no smaller than at the last audit; in the core alone, the staged cases due (staged.mjs) and what a
+//     role reads at its start, or the queue, standing past its cap (size.mjs; #750, point 6); and of the
 //     choices that are hard to undo (choices.mjs), the pass over them twice a year, and a sign written in a measure the
 //     shape check keeps, while it holds.
 //   - Once a month, the state report (state-report.mjs, beside this file), opened once and not touched again; and, in a
@@ -52,11 +59,21 @@ import { asked, FOLDER, repoOf } from "./inbox.mjs";
 import { check, gather, ghApi, pagesOf, report as labelsReport, sinceHere } from "./labels.mjs";
 import { WAITS, waitsOn } from "./pr-description.mjs";
 import { pathIn } from "./reading.mjs";
+import { lateBody, lateOf, pullOf, repliersOf } from "./review-marks.mjs";
+import { codexFind } from "./review-record.mjs";
 import { ownerOf } from "./releases.mjs";
-import { HOURS, openPulls, stalled } from "./stalled.mjs";
+import { copyOf, readCore } from "./core-path.mjs";
+import { parseBounded } from "./guards.mjs";
+import { fileAt, statesOf, unplaced } from "./queue.mjs";
+import { writersOf } from "./security-review.mjs";
+import { goesOn, handedOff, HOURS, NOTICE, openPulls, stalled, standingStill } from "./stalled.mjs";
+import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { started } from "./started.mjs";
 import { timeOf } from "./moment.mjs";
+import { due as capPassed } from "./size.mjs";
 import { dueIssue as stagedCases } from "./staged.mjs";
+import { line as blindLine, reader as blindSample, shareNow, TITLE as BLIND } from "./blind-sample.mjs";
+import { ownReport } from "./holders.mjs";
 import { before as monthBefore, copies, monthOf, pushWait, readCounts, shape, body as stateReport, TITLE as REPORT } from "./state-report.mjs";
 import { notDone, report as stepsReport } from "./steps.mjs";
 
@@ -71,14 +88,25 @@ export const TITLES = {
   labels: "Labels and openers to mend",
   missed: "The scheduled look missed a run",
   stale: "Packages gone stale",
+  red: "Checks failed on the default branch",
+  late: "Late review findings to answer",
+  still: "The work stands still",
 };
+// A project's own rules by what holds them, as holders.mjs --own reads them (#662); null where it cannot.
+const ownHeld = scripts => { try { return ownReport(process.cwd(), scripts); } catch { return null; } };
+
+// How far back a late finding is read (tasks/reviews.md, "A late review is still read": the last week), the most pull
+// requests whose merge is read for it in one run, and the most pages of the week's review comments read for it.
+export const LATE_DAYS = 7, LATE_PULLS = 30, LATE_PAGES = 50;
 // The readers of what else is due, each (ctx) => { title, body, unread, owner } or null, a body of null closing the
-// issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs), in the core alone; the pass over
+// issue it keeps and `unread` leaving it as it stands: the staged cases (staged.mjs) and a cap passed (size.mjs), in
+// the core alone; the pass over
 // the choices that are hard to undo and a sign of theirs that has tripped (choices.mjs); and the cleaning and the audit
-// the dose makes due (dose.mjs). One that says `owner`, true or false, has its issue's state label kept to it:
+// the dose makes due (dose.mjs); and the blind sample (blind-sample.mjs), whose draw is laid out on the first run of
+// each month. One that says `owner`, true or false, has its issue's state label kept to it:
 // needs-owner where true, else queued; one that gives `requeue`, the key of a line of its lists, has it put back to
 // queued where an update brings a key the issue did not hold (`updating`).
-export const DUE = [stagedCases, choicesDue, signs, cleaningDue, auditIsDue];
+export const DUE = [stagedCases, capPassed, choicesDue, signs, cleaningDue, auditIsDue, blindSample];
 export const OWNERS = "needs-owner";
 export const dueNow = (ctx, readers = DUE) => readers.map(read => read(ctx)).filter(Boolean).map(d => ({ title: d.title, what: d.body, unread: d.unread ?? null, owner: d.owner, ...(typeof d.requeue === "function" ? { requeue: d.requeue } : {}) }));
 const labelsFor = owner => (owner ? [OWNERS, ...LABELS.slice(1)] : LABELS);
@@ -151,7 +179,8 @@ const plain = text => String(text ?? "").replace(/[\u0000-\u001f\u007f-\u009f]/g
 
 // The idle list: `lanes` as stalled() gives them, each with `checks`. Drafts with green checks first, then the rest,
 // longest idle first; each line says draft or ready, its checks, what it waits on and for how long, and where its
-// line and the label needs-owner disagree, that mend.
+// line and the label needs-owner disagree, that mend; and where its description holds no hand-off note
+// (tasks/tools.md, "A change of tool loses nothing"; #306), that it has none.
 export function idleBody(lanes, hours) {
   const first = l => (l.draft && l.checks === "green" ? 0 : 1);
   const sorted = [...lanes].sort((a, b) => first(a) - first(b) || b.waited - a.waited);
@@ -164,7 +193,7 @@ export function idleBody(lanes, hours) {
       const says = w ? (w.kind ? `waits on ${quoted(w.said)}` : `its line ${quoted(`${WAITS} ${w.said}`)} is in none of the forms`) : `says nothing of what it waits on`;
       const owner = w?.kind === "the owner", labelled = (l.labels ?? []).includes("needs-owner");
       const mend = owner && !labelled ? "; to label needs-owner" : !owner && labelled ? "; to take needs-owner off, or say the owner's question in its line" : "";
-      return `- #${l.number} (${l.draft ? "draft" : "ready"}, checks ${l.checks}): ${says}; ${l.waited.toFixed(1)} h since its last push${mend}.`;
+      return `- #${l.number} (${l.draft ? "draft" : "ready"}, checks ${l.checks}): ${says}; ${l.waited.toFixed(1)} h since its last push${handedOff(l.body) ? "" : "; no hand-off note"}${mend}.`;
     })].join("\n");
 }
 
@@ -213,14 +242,20 @@ function optionsOf(args) {
   return { dry: args.includes("--dry"), now: args.includes("--now"), toInbox: args.includes("--inbox") };
 }
 
+// The manifest, read as the steps read it (own-files.mjs): { manifest }, null in the core itself; or { refused }, the
+// line to fail with, where one is there but no file of the project's own.
+function manifestHere() {
+  const manifest = ownFiles(".").read("core-manifest.md", true);
+  if (manifest !== null || !fs.lstatSync("core-manifest.md", { throwIfNoEntry: false })) return { manifest };
+  return { refused: `FAIL: core-manifest.md is no regular file of the project's own of at most ${READ_MOST} bytes (a link that leads out of the project, a device, a folder, or a file too large), so nothing was looked at. Mend: make it the project's own manifest, a file tracked in git, as the starter kit writes it` };
+}
+
 // Where the look runs, with its options: GitHub's job or a session's run, the time, the manifest (null in the core),
 // the repository and its owner, the scripts' folder, and `say`, which prints a line and adds it to the job's summary.
-function settingOf(options) {
+function settingOf(options, manifest) {
   const job = process.env.GITHUB_ACTIONS === "true";
   const carrier = job ? "GitHub's daily job" : "a session's run";
   const at = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
-  let manifest = null;
-  try { manifest = fs.readFileSync("core-manifest.md", "utf8"); } catch { /* (the core itself) */ }
   const repo = job && /^[\w.-]+\/[\w.-]+$/.test(process.env.GITHUB_REPOSITORY ?? "") ? process.env.GITHUB_REPOSITORY
     : repoOf(spawnSync("git", ["config", "--get", "remote.origin.url"], { encoding: "utf8" }).stdout);
   const owner = ownerOf(manifest ?? "") ?? repo?.split("/")[0] ?? "";
@@ -237,11 +272,53 @@ function reachOf(repo) {
   return got && typeof got === "object" && got.permissions ? asked(repo, got) : refused ? { yes: false, why: "GitHub finds no such repository for this account" } : null;
 }
 
-// The idle pull requests, through `add`: each lane with its checks, or why the pull requests could not be read.
-function idleFinding(repo, add) {
+// The titles of the open notices that count, of `opened` ({ title, login }, as the search gives them): those the
+// owner's account opened, and in a team those of another owner, an account the host lets write (roles/shared/teams.md),
+// its right read through `right(login)` as the security-review check reads one (writersOf), at most NOTICE_LOGINS
+// accounts; a right not read counts as none, so the look errs toward reporting, never toward silence.
+export const NOTICE_LOGINS = 5;
+export function noticesOf(opened, owner, right) {
+  const mine = String(owner).toLowerCase(), rights = [];
+  const logins = [...new Set(opened.map(i => String(i?.login ?? "").toLowerCase()).filter(l => l && l !== mine && /^[a-z0-9-]{1,39}$/u.test(l)))];
+  for (const login of logins.slice(0, NOTICE_LOGINS)) { try { rights.push(right(login)); } catch { /* counted as none */ } }
+  const writers = writersOf(rights);
+  return opened.filter(i => { const l = String(i?.login ?? "").toLowerCase(); return l === mine || writers.has(l); }).map(i => String(i.title));
+}
+
+// The work standing still (stalled.mjs's standingStill; #471), through `add`. Read cheapest first, each costlier
+// reading only once the one before leaves the question open: the open pull requests' pushes, the default branch's
+// newest commit (a merge is work going on), the progress file the manifest's slot names (the core's QUEUE.md here),
+// placed and read as queue.mjs's own reader takes it, a plain Markdown file inside the project, no larger than it reads
+// (SECURITY.md, rule 5), then the open issues titled as the orchestrator's notice that `owner`'s account opened (anyone
+// may open an issue in a public repository, and only an owner's, as the orchestrator posts, says why work waits:
+// noticesOf),
+// and last which issues are open. `gh` as ghApi gives it; `read` the text of the file placed.
+export function stillFinding({ repo, manifest, owner, pulls, now = Date.now(), gh = ghApi, read = f => (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : "") }, add) {
+  try {
+    if (goesOn({ pulls, now })) return add(TITLES.still, null);
+    const latest = gh(`repos/${repo}/commits?per_page=1`, "--jq", ".[0].commit.committer.date").trim();
+    if (goesOn({ pulls, latest, now })) return add(TITLES.still, null);
+    const copy = manifest === null ? "" : copyOf(), file = fileAt(manifest, [], manifest === null ? "core/" : readCore(manifest).library ?? copy), wrong = unplaced(copy, file);
+    if (wrong) return add(TITLES.still, null, `the progress file was not read: ${wrong.replace(/^FAIL: /u, "")}`);
+    const queue = read(file);
+    if (!queue.trim()) return add(TITLES.still, null);
+    const opened = parseBounded(gh(`search/issues?q=${encodeURIComponent(`repo:${repo} is:issue is:open in:title "${NOTICE}"`)}`, "--jq", "[.items[] | {title, login: .user.login}]"));
+    const notices = noticesOf(opened, owner, login => parseBounded(gh(`repos/${repo}/collaborators/${login}/permission`)));
+    if (notices.some(t => t.startsWith(NOTICE))) return add(TITLES.still, null);
+    const free = standingStill({ queue, closed: statesOf(repo, route => gh(route)), pulls, notices, now, latest });
+    add(TITLES.still, free ? `The *progress file* (\`${file}\`) holds a line a session could take (${free.map(n => `#${n}`).join(", ")}, the first that waits on nothing open), no pull request of this repository's own was pushed in the last day, nothing reached the default branch in it, and no issue titled "${NOTICE}" from the owner's account is open. Where builders are held back for usage, the orchestrator opens that issue, saying what is left, when the window opens again, which lines wait and the words that change it (\`roles/orchestrator.md\`, "Never held back in silence"); otherwise start a builder on that line. Close this issue once work goes on.` : null);
+  } catch {
+    add(TITLES.still, null, "the default branch, the progress file or the open issues could not be read");
+  }
+}
+
+// The idle pull requests, through `add`: each lane with its checks, or why the pull requests could not be read; and
+// the work standing still, from the same pull requests.
+function idleFinding(repo, add, manifest = null, owner = "") {
   try {
     const api = (route, jq) => ghApi(route, "--jq", jq);
-    const lanes = stalled(openPulls(repo, api), Date.now(), HOURS);
+    const pulls = openPulls(repo, api), lanes = stalled(pulls, Date.now(), HOURS);
+    stillFinding({ repo, manifest, owner, pulls }, add);
     for (const l of lanes) {
       try { l.checks = checksOf(pagesOf(`repos/${repo}/commits/${l.sha}/check-runs`, (...a) => JSON.stringify(JSON.parse(ghApi(...a)).check_runs ?? [])), JSON.parse(ghApi(`repos/${repo}/commits/${l.sha}/status`))); }
       catch { l.checks = "not read (the token may not read checks and statuses)"; }
@@ -249,6 +326,36 @@ function idleFinding(repo, add) {
     add(TITLES.idle, lanes.length ? idleBody(lanes, HOURS) : null);
   } catch {
     add(TITLES.idle, null, `the open pull requests could not be read: the token here may not read them. A project's daily job reads them where it calls the core's \`look.yml\` with \`pull-requests: read\`, \`checks: read\` and \`statuses: read\`, as \`core/setup/template/workflows/look.yml.tmpl\` has it`);
+  }
+}
+
+// The conclusions of a check run that count as failed on the default branch. A cancelled run is left out: a newer merge
+// cancels there only a run still waiting, which ran nothing (tasks/tests.md, "The default branch is tested at its newest
+// commit"), and a job that ran out of its time fails the core's gate, which is counted; one cancelled by hand is not
+// counted yet (#817).
+export const FAILED = ["failure", "timed_out", "startup_failure", "action_required"];
+
+// The red issue's body, from the latest check runs of the default branch's newest commit (GitHub's "latest" filter, so
+// a job run again and passed counts as passed): each that failed, its name as data and its address where it is
+// GitHub's own; null where none failed.
+export function redBody(runs, branch) {
+  const red = runs.filter(r => r?.status === "completed" && FAILED.includes(r.conclusion));
+  if (!red.length) return null;
+  const sha = String(red[0].head_sha ?? "");
+  const at = /^[0-9a-f]{40}$/u.test(sha) ? `, \`${sha.slice(0, 7)}\`` : "";
+  const link = r => (/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(?:actions\/runs\/\d+\/job\/\d+|runs\/\d+)$/u.test(String(r.html_url ?? "")) ? ` (${r.html_url})` : "");
+  return [`Checks failed on the newest commit of \`${plain(branch).replace(/`/g, "'")}\`${at} (\`core/scripts/look.mjs\`). Each has an owner, who reads its mend and runs it again once where the mend says so, as \`core/tasks/tests.md\`, "A check that fails on the default branch has an owner", says. This closes once none of that branch's newest commit has failed.`,
+    "", ...red.map(r => `- \`${plain(r.name).replace(/`/g, "'")}\`: ${r.conclusion}${link(r)}.`)].join("\n");
+}
+
+// The checks failed on the default branch's newest commit, through `add`, or why they could not be read.
+function redFinding(repo, add) {
+  try {
+    const branch = JSON.parse(ghApi(`repos/${repo}`)).default_branch;
+    if (typeof branch !== "string" || !branch) throw new Error("no default branch");
+    add(TITLES.red, redBody(pagesOf(`repos/${repo}/commits/${encodeURIComponent(branch)}/check-runs`, (...a) => JSON.stringify(JSON.parse(ghApi(...a)).check_runs ?? [])), branch));
+  } catch {
+    add(TITLES.red, null, `the default branch's checks could not be read: the token here may not read them. A project's daily job reads them where it calls the core's \`look.yml\` with \`checks: read\`, as \`core/setup/template/workflows/look.yml.tmpl\` has it`);
   }
 }
 
@@ -260,13 +367,44 @@ export function staleFinding(run = () => spawnSync(process.execPath, [fileURLToP
   return { title: TITLES.stale, what: null, unread: "the packages the project holds could not be looked up in their registries this time" };
 }
 
+// The late findings, through `add` (review-marks.mjs; #551): Codex's findings of the last LATE_DAYS days made after
+// their pull request merged with no reply, or why they could not be read; `gh` in ghApi's form. Only the pull requests
+// that hold a finding of Codex's are looked up, the newest first, and what is past LATE_PULLS or LATE_PAGES is said to be
+// unread, never dropped: with nothing found, the issue is left as it stands. The comments are read newest first, so a
+// reply, always newer than its finding, is read before it past the cap. The rights of at most LATE_PULLS accounts that
+// replied are read; a reply of any other counts as none, and that too is said.
+export function lateFinding(repo, add, at, gh = ghApi) {
+  try {
+    const since = new Date(Date.parse(at) - LATE_DAYS * 86400000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    let pages = 0;
+    const inline = pagesOf(`repos/${repo}/pulls/comments?sort=created&direction=desc&since=${since}`, route => (++pages > LATE_PAGES ? "[]" : gh(route)));
+    const all = [...new Set(inline.filter(c => codexFind(c)).map(pullOf).filter(Number.isInteger))].sort((a, b) => b - a);
+    const merged = new Map(all.slice(0, LATE_PULLS).map(n => [n, JSON.parse(gh(`repos/${repo}/pulls/${n}`)).merged_at ?? null]).filter(([, m]) => typeof m === "string"));
+    const left = [pages > LATE_PAGES && `the review comments past the first ${LATE_PAGES * 100} of the week`, all.length > LATE_PULLS && `Codex's findings on ${all.length - LATE_PULLS} older pull requests`].filter(Boolean);
+    // a reply answers a finding only where the host says its author may write: a right not read, or past LATE_PULLS
+    // accounts, counts as none, so its finding stays listed, and is said
+    const repliers = repliersOf(inline), rights = [], unknown = repliers.slice(LATE_PULLS);
+    for (const login of repliers.slice(0, LATE_PULLS)) { try { rights.push(JSON.parse(gh(`repos/${repo}/collaborators/${login}/permission`))); } catch { unknown.push(login); } }
+    if (unknown.length) left.push(`the rights of ${unknown.length} account${unknown.length === 1 ? "" : "s"} that replied, whose replies are counted as none`);
+    const body = lateBody(lateOf(inline, merged, since, writersOf(rights)));
+    if (left.length === 0) return add(TITLES.late, body);
+    if (body === null) return add(TITLES.late, null, `${left.join(" and ")} could not be read this run`);
+    add(TITLES.late, `${body}\n\nNot read this run: ${left.join("; ")}.`);
+  } catch {
+    add(TITLES.late, null, "the review comments could not be read: the token here may not read pull requests");
+  }
+}
+
 // What the look finds, kind by kind, each { title, what, unread }; and `stepsLeft`, the count of a release's steps not
 // done (null where they were not read), for the state report.
 function findingsOf({ repo, manifest, owner, at }, reach, last) {
   const findings = [];
   const add = (title, what, unread = null) => findings.push({ title, what, unread });
-  // pull requests that stand idle
-  idleFinding(repo, add);
+  // pull requests that stand idle, the work standing still, and late review findings
+  idleFinding(repo, add, manifest, owner);
+  lateFinding(repo, add, at);
+  // checks failed on the default branch
+  redFinding(repo, add);
   // steps of a release not done, in a project
   let stepsLeft = null;
   if (manifest !== null) {
@@ -275,7 +413,7 @@ function findingsOf({ repo, manifest, owner, at }, reach, last) {
   }
   // labels and openers
   if (reach.yes) {
-    try { const since = sinceHere(), found = check({ ...gather(repo, since), owner, since }); add(TITLES.labels, found.length ? labelsReport(found, repo) : null); }
+    try { const since = sinceHere(), found = check({ ...gather(repo, since), owner, since, core: manifest === null }); add(TITLES.labels, found.length ? labelsReport(found, repo) : null); }
     catch { add(TITLES.labels, null, "the labels and openers could not be read"); }
   }
   // a missed run
@@ -289,7 +427,7 @@ function findingsOf({ repo, manifest, owner, at }, reach, last) {
 const reopenedSince = (repo, i) => { try { return pagesOf(`repos/${repo}/issues/${i.number}/events`).filter(e => e.event === "reopened").map(e => e.created_at).sort().at(-1) ?? i.created_at; } catch { return i.created_at; } };
 
 // The state report, once a month: its title, its file in the inbox, and `monthly`, its body where it is due, else null.
-function monthlyOf({ repo, manifest, at, scripts }, reach, kept, stepsLeft) {
+function monthlyOf({ repo, owner, manifest, at, scripts }, reach, kept, stepsLeft) {
   const month = monthOf(at), reportTitle = `${REPORT}, ${month}`;
   let monthly = null;
   // (in the inbox, a month's report is written once: while no commit has held its file)
@@ -300,7 +438,7 @@ function monthlyOf({ repo, manifest, at, scripts }, reach, kept, stepsLeft) {
     const overdue = [...kept.entries()].filter(([t, i]) => i.state === "open" && t !== RECORD && !t.startsWith(`${REPORT}, `) && hoursBetween(i.created_at, at) > 7 * 24)
       .map(([t, i]) => ({ number: i.number, title: t, since: reopenedSince(repo, i) })).filter(o => hoursBetween(o.since, at) > 7 * 24);
     const counts = manifest === null ? null : readCounts({ repo, manifest, month, steps: stepsLeft }), last = previous?.body ?? null;
-    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: last, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), outcomes: outcomesReport({ repo, month: monthBefore(month), manifest, previous: last }), scripts });
+    monthly = stateReport({ core: manifest === null, month, measures: copies(process.cwd(), manifest), shape: shape(process.cwd(), manifest), wait: pushWait(repo, process.cwd(), manifest), previous: last, overdue, counts, cited: citedReport({ repo, month: monthBefore(month) }), outcomes: outcomesReport({ repo, month: monthBefore(month), manifest, previous: last, blind: blindLine(shareNow(repo, kept.get(BLIND), owner)) }), ...(manifest === null ? {} : { holders: ownHeld(scripts) }), scripts });
   }
   return { reportTitle, reportFile, monthly };
 }
@@ -390,7 +528,9 @@ function main(args) {
   if (!options) return 1;
   const below = spawnSync("git", ["rev-parse", "--show-prefix"], { encoding: "utf8" });
   if (below.status !== 0 || below.stdout.trim() !== "") { console.error("FAIL: run it from the root of the project's git repository"); return 1; }
-  const ctx = settingOf(options);
+  const { manifest, refused } = manifestHere();
+  if (refused) { console.error(refused); return 1; }
+  const ctx = settingOf(options, manifest);
   const { job, now, at, repo, owner, scripts, say } = ctx;
 
   // whether issues can be read and written here, as inbox.mjs asks it: no answer, nothing is done

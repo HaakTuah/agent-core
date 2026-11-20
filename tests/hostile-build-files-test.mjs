@@ -3,9 +3,10 @@
 // "nuget" and "agentTools", .github/workflows/*.yml, an agent tool's settings), which anyone who opens a pull request
 // writes. Read by licences.mjs (its lock and config readers), exact-versions.mjs, nuget.mjs (its lock and config
 // readers; its build files' XML has its own hostile block in nuget-test.mjs, "const hostile", near line 223, not
-// repeated here), workflows.mjs with yaml-keys.mjs, and agent-tools.mjs (its links out of the checkout: agent-tools-test.mjs,
-// near line 119). Each case is refused: nothing of it is taken as a pass or a value, and a failure says its mend. Run
-// by the core's tests workflow (.github/workflows/tests.yml).
+// repeated here; its project readers' links out of the project), workflows.mjs with yaml-keys.mjs, workflow-run.mjs (parseYaml, #864), sync.mjs (the move
+// of the pins in the workflows), runners.mjs (#733), and agent-tools.mjs (its links out of the checkout:
+// agent-tools-test.mjs, near line 119). Each case is refused: nothing of it is taken as a pass or a value, and a failure
+// says its mend. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/hostile-build-files-test.mjs
 import { spawnSync } from "node:child_process";
@@ -17,9 +18,15 @@ import { check as exactCheck, exact } from "../scripts/exact-versions.mjs";
 import { check as licenceCheck, licenceOk, loadConfig, lockPathOk, workspacesIn } from "../scripts/licences.mjs";
 import { quick, said, scratch } from "../scripts/hostile.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { lockPackages, nugetConfig, plainText } from "../scripts/nuget.mjs";
-import { lines, readable, repeated } from "../scripts/workflows.mjs";
+import { CORE } from "../scripts/core-address.mjs";
+import { NOT_A_FILE, lockPackages, nugetConfig, plainText, projectFilesByContent, readProject as readBuildFile } from "../scripts/nuget.mjs";
+import { ownFiles } from "../scripts/own-files.mjs";
+import { moveCalls } from "../scripts/sync.mjs";
+import { draftHoles, lines, readable, repeated } from "../scripts/workflows.mjs";
 import { twice } from "../scripts/yaml-keys.mjs";
+import { parserLeftOut } from "../scripts/packages.mjs";
+import { read as runnersRead, workflowsIn } from "../scripts/runners.mjs";
+import os from "node:os";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -51,9 +58,19 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   ok(quick(() => !licenceOk(`${"MIT AND ".repeat(50000)}Moss-1.0`, ALLOW) && !licenceOk(`${"(".repeat(20000)}MIT${")".repeat(20000)}`, ALLOW)), "a licence of fifty thousand terms, one off the list, or nested twenty thousand deep, is not allowed");
   ok(quick(() => (r = licences(lockProject(each({ version: "1.0.0", license: "Moss-1.0" })))).failures.length === 30000 && said(r.failures)), "the licence check fails thirty thousand packages off its list, each with its mend, in a few seconds");
   ok(quick(() => (r = nuLock({ version: 1, dependencies: { net9: Object.fromEntries(many.map((m) => [m, { type: "Direct", resolved: "1.0.0", requested: "[1.0.0, 2.0.0)", contentHash: "x" }])) } })).failures.length === 30000 && said(r.failures)), "NuGet's lock reader fails thirty thousand packages asked for by a range, each with its mend");
-  ok(quick(() => twice(`on: push\njobs:\n${"  j:\n    runs-on: x\n".repeat(100000)}`).length === 99999 && lines("\\x70".repeat(1_000_000)).length === 0), "a workflow of megabytes is read for keys given twice and for the forbidden trigger in a few seconds");
+  ok(quick(() => twice(`on: push\njobs:\n${"  j:\n    runs-on: x\n".repeat(8000)}`).length === 7999 && JSON.stringify(twice(`on: push\njobs:\n${"  j:\n    runs-on: x\n".repeat(100000)}`)) === '[{"line":1,"key":null,"first":null,"size":true}]' && lines("\\x70".repeat(1_000_000)).length === 0), "a workflow of a few hundred kilobytes is read for keys given twice, one of megabytes is said unread, and the forbidden trigger is searched for in both, in a few seconds");
+  // (a text of three million `[`, about 3 MB, ran Node out of heap in the package's parser: #752; it is not given to it)
+  ok(quick(() => JSON.stringify(twice(`a: ${"[".repeat(3e6)}\n`)) === '[{"line":1,"key":null,"first":null,"size":true}]' && draftHoles(`a: ${"[".repeat(3e6)}\n`).length === 0), "a text of three million opening brackets is said unread at once, by both readers of a workflow, never given to the parser");
   ok(quick(() => twice("]".repeat(100000)).length === 0 && twice(`{${",".repeat(100000)}`).length === 0 && twice("!t ".repeat(50000)).length === 0), "a text of a hundred thousand closing brackets or commas, or of fifty thousand tags, each an error the package reads, is read in a few seconds");
-  ok(quick(() => twice(`a: ${"{b: ".repeat(50000)}`).length === 0 && twice(Array.from({ length: 5000 }, (_, i) => `${" ".repeat(i)}k:`).join("\n")).length === 0), "a flow value fifty thousand deep, or keys indented five thousand deep, are read without a throw");
+  ok(quick(() => [`a: ${"{b: ".repeat(50000)}`, Array.from({ length: 5000 }, (_, i) => `${" ".repeat(i)}k:`).join("\n")].every(t => JSON.stringify(twice(t).map(k => k.key)) === "[null]")), "a flow value fifty thousand deep, or keys indented five thousand deep, are read without a throw, and said to be read only in part");
+  // (the same text through parseYaml, which reads a project's own workflow for check.mjs, check-configs.mjs and steps.mjs: #864;
+  // it runs as its own process so that a reader that gave it to the package would end in the run's timeout or an exit
+  // with no mend, and no clock is read here)
+  const big = spawnSync(process.execPath, ["--input-type=module", "-e", `import { parseYaml } from ${JSON.stringify(new URL("../scripts/workflow-run.mjs", import.meta.url).href)};
+    const say = (t) => { try { parseYaml(t); return "read"; } catch (e) { return "FAIL: " + e.message; } };
+    console.log(say("a: " + "[".repeat(3e6) + "\\n")); console.log(say("# " + "x".repeat(262144) + "\\na: 1\\n")); console.log(say("# " + "x".repeat(262000) + "\\na: 1\\n"));`], { encoding: "utf8", timeout: 10000 });
+  const [huge, past, under] = big.stdout.split("\n");
+  ok(big.status === 0 && mended(huge) && /longer than 262144 characters/u.test(huge) && mended(past) && under === "read" && !/\n\s+at /u.test(big.stderr), "parseYaml refuses three million opening brackets, and a text one character past the length read, with its mend and never to the package, and reads one under it");
   ok(quick(() => settings(JSON.stringify({ hooks: { Stop: [{ hooks: many.map((m) => ({ type: "command", command: `echo ${m}` })) }] } })).tools.size === 30000), "thirty thousand agent hooks are read in a few seconds");
   ok(quick(() => (r = listed({ agentTools: many.map((m) => ({ kind: "plugin", name: m, publisher: "moss", version: "^1" })) }, "c.json")).problems.length === 30000 && said(r.problems)), "thirty thousand agentTools entries pinned to a range each fail with their mend");
 }
@@ -107,12 +124,62 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   const root = path.join(fresh({ "outside.yml": "on: push\n", "in/.github/workflows/b.yml": "on: push\n" }), "in");
   // (the whole of scripts/, as a project's copy holds it, so whatever the check imports is there)
   fs.cpSync(fileURLToPath(new URL("../scripts", import.meta.url)), path.join(root, "core/scripts"), { recursive: true });
-  fs.cpSync(fileURLToPath(new URL("../third-party", import.meta.url)), path.join(root, "core/third-party"), { recursive: true });
+  fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(root, "core/.packages"), { recursive: true, filter: parserLeftOut });
   fs.symlinkSync(path.join(root, "../outside.yml"), path.join(root, ".github/workflows/a.yml"));
   fs.writeFileSync(path.join(root, ".github/workflows/c.yml"), Buffer.from("\ufeffon: push\n", "utf16le"));
   for (const a of [["init", "-q"], ["add", "-A"]]) spawnSync("git", a, { cwd: root });
   const run = spawnSync(process.execPath, ["core/scripts/workflows.mjs"], { cwd: root, encoding: "utf8", timeout: 20000 });
   ok(run.status === 1 && mended(run.stdout) && /a\.yml: a link/u.test(run.stdout) && /c\.yml: not UTF-8/u.test(run.stdout) && !/\n\s+at /u.test(run.stderr), "the workflow check fails a workflow that is a link out of the project, unread, and one in UTF-16, each with its mend");
+  // a workflow nested far past what one holds, in the forms that ran for minutes in the second reader (#837): explicit-key
+  // marks, flow mappings, and a file of many keys just under the depth read; each is read within five seconds, and the
+  // two nested past it are said, with their mend (a note where no base is told, a failure on a pull request's own change: workflows-test.mjs), never silence
+  const deepRoot = path.join(fresh({ "in/.github/workflows/b.yml": "on: push\n" }), "in");
+  fs.cpSync(path.join(root, "core"), path.join(deepRoot, "core"), { recursive: true });
+  const nested = { "keys.yml": `${"? ".repeat(700)}a\n`, "flow.yml": `x: ${"{".repeat(700)}a: 1${"}".repeat(700)}\n`, "many.yml": `on: push\n${`${"? ".repeat(100)}b\n`.repeat(500)}` };
+  for (const [name, body] of Object.entries(nested)) fs.writeFileSync(path.join(deepRoot, ".github/workflows", name), body);
+  for (const a of [["init", "-q"], ["add", "-A"]]) spawnSync("git", a, { cwd: deepRoot });
+  // (the five seconds a hostile input may take are the run's own timeout: it is cut off, with no status, where it takes longer)
+  const deep = spawnSync(process.execPath, ["core/scripts/workflows.mjs"], { cwd: deepRoot, encoding: "utf8", timeout: 5000 });
+  ok(deep.status === 0 && /keys\.yml:\d+: the file nests.*Mend: /u.test(deep.stdout) && /flow\.yml:\d+: the file nests.*Mend: /u.test(deep.stdout) && !/many\.yml/u.test(deep.stdout) && !/\n\s+at /u.test(deep.stderr), "the workflow check reads explicit-key marks and flow mappings nested far past the depth read, and a file of many just under it, within five seconds, and says the first two with their mend");
+  // an oversized workflow that a pull request leaves as it is, where git writes line ends as CRLF on checkout, reads as the
+  // same text as its base, so it is only noted: the working tree's file and the base's blob differ in their bytes, never in the text (#752)
+  const crlfRoot = path.join(fresh({ "in/.github/workflows/big.yml": `on: push\n# ${"x".repeat(270000)}\n`, "in/.gitattributes": "*.yml text eol=crlf\n" }), "in");
+  fs.cpSync(path.join(root, "core"), path.join(crlfRoot, "core"), { recursive: true });
+  const gitAt = (...a) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...a], { cwd: crlfRoot, encoding: "utf8" });
+  gitAt("init", "-q"); gitAt("add", "-A"); gitAt("commit", "-q", "-m", "base");
+  fs.rmSync(path.join(crlfRoot, ".github/workflows/big.yml")); gitAt("checkout", "-q", "--", ".github/workflows/big.yml");
+  const crlf = spawnSync(process.execPath, ["core/scripts/workflows.mjs"], { cwd: crlfRoot, env: { ...process.env, WORKFLOWS_BASE: "HEAD" }, encoding: "utf8", timeout: 5000 });
+  ok(fs.readFileSync(path.join(crlfRoot, ".github/workflows/big.yml"), "utf8").includes("\r\n") && crlf.status === 0 && /big\.yml:1: the file is longer.*as it did on the base/u.test(crlf.stdout) && !/FAIL/u.test(crlf.stdout), "an oversized workflow left as it was, checked out with CRLF line ends, is only noted as on the base, never failed", crlf.stdout);
+  // a line break of YAML 1.1 that the package does not read (U+0085, U+2028, U+2029), hiding a key given twice or a call left
+  // without ready_for_review, in a file a pull request adds: each fails with its mend, a file of three million of them too,
+  // and the same files unchanged from the base are only noted (#872)
+  const brk = path.join(fresh({ "in/.github/workflows/b.yml": "on: push\n" }), "in");
+  fs.cpSync(path.join(root, "core"), path.join(brk, "core"), { recursive: true });
+  const gitBrk = (...a) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...a], { cwd: brk, encoding: "utf8" });
+  gitBrk("init", "-q"); gitBrk("add", "-A"); gitBrk("commit", "-q", "-m", "base");
+  const breaks = { "nel.yml": "\u0085", "ls.yml": "\u2028", "ps.yml": "\u2029" };
+  for (const [name, br] of Object.entries(breaks)) fs.writeFileSync(path.join(brk, ".github/workflows", name), `on: push\nx: 1${br}x: 2\n`);
+  fs.writeFileSync(path.join(brk, ".github/workflows/many.yml"), `on: push\n${"\u2028".repeat(3e6)}\n`);
+  gitBrk("add", "-A");
+  const brkRun = (base) => spawnSync(process.execPath, ["core/scripts/workflows.mjs"], { cwd: brk, env: { ...process.env, WORKFLOWS_BASE: base }, encoding: "utf8", timeout: 10000 });
+  const brkNew = brkRun("HEAD");
+  ok(brkNew.status === 1 && Object.entries(breaks).every(([name, br]) => new RegExp(`FAIL \\.github/workflows/${name}:2: the file holds the line break U\\+${br.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}.*Mend: replace each`, "u").test(brkNew.stdout)) && /many\.yml:2: the file holds the line break U\+2028 and 2999999 more/u.test(brkNew.stdout) && mended(brkNew.stdout) && !/\n\s+at /u.test(brkNew.stderr), "the workflow check fails a file a pull request adds that holds U+0085, U+2028 or U+2029, one of three million of them too, each with its mend");
+  gitBrk("commit", "-q", "-m", "held");
+  const brkOld = brkRun("HEAD");
+  ok(brkOld.status === 0 && !/FAIL/u.test(brkOld.stdout) && /note \.github\/workflows\/nel\.yml:2: .*as on the base/u.test(brkOld.stdout), "the same files unchanged from the base are only noted");
+  // the sync's move of the pins, and NuGet's readers, on a workflow and a build file that are links out (#446)
+  const call = `jobs:\n  a:\n    uses: ${CORE}/.github/workflows/x.yml@${"a".repeat(40)}\n`;
+  const away = path.join(fresh({ "outside.yml": call, "outside.props": "<Project></Project>\n", "in/.github/workflows/b.yml": "on: push\n" }), "in");
+  fs.symlinkSync(path.join(away, "../outside.yml"), path.join(away, ".github/workflows/a.yml"));
+  fs.mkdirSync(path.join(away, "build"));
+  fs.symlinkSync(path.join(away, "../outside.props"), path.join(away, "build/x.xml"));
+  for (const a of [["init", "-q"], ["add", "-A"]]) spawnSync("git", a, { cwd: away });
+  const here = process.cwd();
+  process.chdir(away);
+  let calls;
+  try { calls = moveCalls("b".repeat(40), path.join(away, "no-core"), ownFiles(away)); } finally { process.chdir(here); }
+  ok(calls.moved.length === 0 && calls.unread.join() === ".github/workflows/a.yml" && fs.readFileSync(path.join(away, "../outside.yml"), "utf8") === call, "the sync reads no workflow that is a link out of the project, names it unread, and writes nothing through it");
+  ok(readBuildFile(away, ".github/workflows/a.yml") === NOT_A_FILE && readBuildFile(away, "build/x.xml") === NOT_A_FILE && projectFilesByContent(away, ["build/x.xml"]).length === 0, "NuGet's readers read no file through a link out of the project, and take none for a project file");
 }
 
 // ---- a number out of range ----
@@ -144,6 +211,27 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   const keyTwice = repeated([{ file: "a.yml", text: "on: push\non: pull_request\n" }], () => null);
   ok(keyTwice.fails.length === 1 && mended(keyTwice.fails.join("\n")), "a key given twice fails with its mend where the base held none");
   ok(said(settings("").problems) && settings("{}").tools.size === 0 && listed({}, "c.json") === null && said(listed({ agentTools: [{}] }, "c.json").problems), "empty agent settings fail with their mend, an empty object configures nothing, and an empty entry is refused");
+}
+
+// ---- the reader of where the tests run (runners.mjs; #733): a workflow file that anyone's pull request writes ----
+{
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hostile-runners-"));
+  const one = (name, body) => { for (const f of fs.readdirSync(dir)) fs.rmSync(path.join(dir, f)); fs.writeFileSync(path.join(dir, name), body); return workflowsIn(dir); };
+  try {
+    let w = one("loop.yml", "on: push\njobs:\n  t: &a\n    runs-on: [ubuntu-latest, *a]\n    steps: *a\n");
+    ok(!w.selfHosted && !w.onHost, "runners.mjs: a job whose anchors refer to themselves is read as far as it goes, each object once, and nothing overflows");
+    w = one("deep.yml", `on: push\njobs:\n  t:\n    runs-on: ${"[".repeat(5000)}x${"]".repeat(5000)}\n`);
+    ok(w.unread.includes("deep.yml") || w.unknown, "runners.mjs: a runner nested thousands deep is not read, and the file is named or its runner said unread");
+    w = one("types.yml", "on: 5\njobs: x\n");
+    ok(!w.onHost && !w.selfHosted && !w.unknown && !w.unread.length, "runners.mjs: a trigger and jobs of the wrong type say nothing runs here");
+    w = one("list.yml", "- a\n- b\n");
+    ok(!w.onHost && !w.unread.length, "runners.mjs: a file that is a list holds no workflow");
+    w = one("markup.yml", "on: pull_request\njobs:\n  t:\n    runs-on: \"<script>alert(1)</script>\"\n    steps:\n      - run: node core/scripts/shape.mjs c.json --suite u -- x\n");
+    const r = runnersRead({ repo: "o/n", dir, gh: () => JSON.stringify({ private: false }) });
+    ok(w.unknown && r.where === "self-hosted" && !r.said.join(" ").includes("<script>") && /could not be read/.test(r.advice ?? ""), "runners.mjs: a runner named in markup is not read, taken as the owner's own and advised on, and its name never printed");
+    w = one("empty.yml", "");
+    ok(!w.onHost && !w.unread.length, "runners.mjs: an empty file holds no workflow");
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
 console.log(failed ? `${failed} failing` : "ok   every hostile build, package and workflow file is refused");

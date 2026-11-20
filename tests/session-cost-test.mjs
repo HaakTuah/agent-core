@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { cost, keep, keptIn, line, records, tallyOf } from "../scripts/session-cost.mjs";
+import { context, cost, keep, keptIn, line, ownRecord, records, tallyOf } from "../scripts/session-cost.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -39,7 +39,7 @@ ok(records(tmp, session).length === 2 && line(cost(records(tmp, session))) === l
 ok(records(tmp, "../../etc").length === 0 && records(tmp, undefined).length === 0 && records(path.join(tmp, "nowhere"), session).length === 0, "a session id of another shape, none, or no folder: no record");
 
 const script = fileURLToPath(new URL("../scripts/session-cost.mjs", import.meta.url));
-const run = (env) => spawnSync(process.execPath, [script], { encoding: "utf8", env: { PATH: process.env.PATH, ...env } });
+const run = (env, ...args) => spawnSync(process.execPath, [script, ...args], { encoding: "utf8", env: { PATH: process.env.PATH, ...env } });
 let r = run({ CLAUDE_CONFIG_DIR: tmp, CLAUDE_CODE_SESSION_ID: session });
 ok(r.status === 0 && r.stdout.trim() === line(c) && !r.stderr, "as a program: the line, and nothing else", `${r.status} ${r.stdout} ${r.stderr}`);
 r = run({ CLAUDE_CONFIG_DIR: tmp });
@@ -89,6 +89,13 @@ fs.writeFileSync(path.join(blocked, "projects", "-f", `${session}.jsonl`), own);
 fs.writeFileSync(path.join(blocked, "session-cost"), "a file where the tallies' folder would be");
 r = run({ CLAUDE_CONFIG_DIR: blocked, CLAUDE_CODE_SESSION_ID: session });
 ok(r.status === 0 && /^Session so far: 2 answers/.test(r.stdout) && !r.stderr, "where the tally cannot be written, the line all the same, and no word of it", `${r.status} ${r.stdout} ${r.stderr}`);
+
+ok(context(own) === 2001 && context(helper.split("\n")[0]) === 22 && context("") === 0, "the context: the newest answer's input, cache written and cache read; none, 0", `${context(own)}`);
+ok(ownRecord(blocked, session) === own && ownRecord(blocked, "not a session") === "", "a session's own record alone, none for an id of another shape");
+r = run({ CLAUDE_CONFIG_DIR: blocked, CLAUDE_CODE_SESSION_ID: session }, "--context");
+ok(r.status === 0 && r.stdout === "Context now: 2,001 tokens.\n", "--context prints the newest answer's context", `${r.status} ${r.stdout}`);
+r = run({ CLAUDE_CONFIG_DIR: blocked }, "--context");
+ok(r.status === 0 && r.stdout === "" && !r.stderr, "--context says nothing where it cannot tell", `${r.status} ${r.stdout}`);
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the session's cost line`);
 process.exitCode = failed ? 1 : 0;

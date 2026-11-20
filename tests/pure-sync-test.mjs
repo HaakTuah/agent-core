@@ -42,7 +42,6 @@ const read = (dir, f) => fs.readFileSync(path.join(dir, f), "utf8");
 fs.cpSync(root, theCore, { recursive: true, filter: src => !["/.git", "/node_modules"].some(x => slash(src).endsWith(x)) });
 git(theCore, "init", "-q", "-b", "main");
 const NOTE_LINE = "- **13 November 2026, a note for the test.** Done when nothing: an entry that B gains over A.\n";
-const notes = read(theCore, "setup/sync-notes.md");
 const terms = read(theCore, ".github/workflows/personal-terms.yml");
 const commit = (message) => { git(theCore, "add", "-A"); git(theCore, "commit", "-q", "--allow-empty", "-m", message); return git(theCore, "rev-parse", "HEAD"); };
 write(theCore, "z.md", "only in Z\n");
@@ -52,7 +51,7 @@ fs.rmSync(path.join(theCore, "z.md"));
 write(theCore, ".github/workflows/personal-terms.yml", `${terms}# A\n`);
 const A = commit("A");
 write(theCore, ".github/workflows/personal-terms.yml", terms);
-write(theCore, "setup/sync-notes.md", `${notes}${NOTE_LINE}`);
+write(theCore, "setup/sync-notes/999-a-note-for-the-test.md", NOTE_LINE); // (an entry is a file of the folder: #750, point 1)
 const B = commit("B");
 const SIDE = git(theCore, "commit-tree", `${B}^{tree}`, "-p", B, "-m", "off main");
 const SHA = sha => sha.slice(0, 7);
@@ -79,8 +78,17 @@ const base = git(p, "rev-parse", "HEAD");
 ok(entries(git(p, "rev-parse", "HEAD:core"), path.join(p, ".git")) === entries(copyTree(A, coreRepo), coreRepo), "  core/ is the core's tree at A, without the folder it keeps to itself");
 
 // ---- the sync ----
+// (a project that follows main takes its newest commit whose checks all passed, as the host lists the runs its push
+// started: a gh of the test's own says each passed; floor rule 12, #733. That stand-in is a script Windows does not
+// start by its name, so there the sync is given B's full SHA, which takes the same commit; the green reading itself is
+// core-moved-test.mjs's)
+const greenBin = path.join(tmp, "green-bin");
+fs.mkdirSync(greenBin);
+fs.writeFileSync(path.join(greenBin, "gh"), `#!/usr/bin/env node\nconst route = process.argv.slice(2).find(x => x.includes("actions/runs")) ?? "";\nif (!route) { console.error("gh: Not Found (HTTP 404)"); process.exit(1); }\nconsole.log(JSON.stringify({ total_count: 1, workflow_runs: [{ name: "tests", path: ".github/workflows/tests.yml", status: "completed", conclusion: "success" }] }));\n`, { mode: 0o755 });
+const PATHKEY = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
+const greenEnv = { ...env, [PATHKEY]: `${greenBin}${path.delimiter}${env[PATHKEY]}` };
 git(p, "checkout", "-q", "-b", "sync");
-const s = node(p, "core/scripts/sync.mjs");
+const s = (r => ({ status: r.status, out: `${r.stdout}${r.stderr}` }))(spawnSync(process.execPath, ["core/scripts/sync.mjs", ...process.platform === "win32" ? [B] : []], { cwd: p, env: greenEnv, encoding: "utf8" }));
 const calls = read(p, ".github/workflows/core.yml");
 ok(s.status === 0 && s.out.includes(`${SHA(A)} -> ${SHA(B)}`) && read(p, "core-manifest.md") === manifest(OWNER, B), "the sync takes a project that follows main to the core's newest commit, and moves the manifest's pin", s.out);
 ok(calls.includes(`personal-terms.yml@${B}`) && calls.includes(`core.yml@${A}`) && s.out.includes("personal-terms.yml"), "  it moves a call whose workflow changed, and leaves one whose workflow did not", calls);
@@ -210,7 +218,7 @@ ok(atOne.status === 0 && atOne.out.includes("release-1") && git(p, "status", "--
 git(theCore, "tag", "release-2", B);
 const atTwo = node(p, "core/scripts/sync.mjs");
 ok(atTwo.status === 0 && atTwo.out.includes(`${SHA(A)} -> ${SHA(B)} (release-2)`) && read(p, "core-manifest.md") === manifest("someone-else", B), "and once a newer release is cut, it takes that release", atTwo.out);
-git(p, "commit", "-q", "-am", "to release-2");
+git(p, "add", "-A"); git(p, "commit", "-q", "-m", "to release-2"); // (with what the sync added: a new entry is a file)
 const released = pure();
 ok(released.status === 0 && released.out.includes("a pure sync"), "  a sync to a release, in a project that follows the releases, is pure", released.out);
 // (it takes a commit of main that is no release only through review: the sync is made, and is no pure sync; core archive 201)
@@ -218,7 +226,7 @@ write(theCore, "c.md", "only in C\n");
 const C = commit("C");
 git(p, "checkout", "-q", "-B", "unreleased", other);
 const toC = node(p, "core/scripts/sync.mjs", C);
-git(p, "commit", "-q", "-am", "to C");
+git(p, "add", "-A"); git(p, "commit", "-q", "-m", "to C");
 const unreleased = pure();
 ok(toC.status === 0 && read(p, "core-manifest.md") === manifest("someone-else", C) && unreleased.status === 1 && unreleased.out.includes(`${C} is no release of the core: the sync is reviewed like any PR`) && unreleased.out.includes(`node core/scripts/sync.mjs ${B}\` (release-2, the newest)`),
   "a sync to a commit that is no release, in a project that follows the releases, is made, and is no pure sync: it is reviewed like any PR, or made again with the newest release's full SHA, which the refusal names", `${toC.out}\n${unreleased.out}`);
@@ -229,7 +237,7 @@ write(p, "core-manifest.md", `${manifest("someone-else")}| *follows* | \`main\` 
 git(p, "commit", "-q", "-am", "two rows");
 git(p, "push", "-q", "-f", "origin", "HEAD:main");
 const toCAgain = node(p, "core/scripts/sync.mjs", C);
-git(p, "commit", "-q", "-am", "to C");
+git(p, "add", "-A"); git(p, "commit", "-q", "-m", "to C");
 const unclear = pure();
 ok(unclear.status === 1 && unclear.out.includes(`does not say what it follows, and ${C} is no release of the core`), "a sync to a commit that is no release, in a project whose manifest does not say what it follows, is no pure sync either", `${toCAgain.out}\n${unclear.out}`);
 

@@ -4,7 +4,8 @@
 // project, a number out of range, and nothing at all; each fails with its mend or reads the input as not there, and
 // reads and writes nothing outside the project. The readers: copies.mjs and reading-size.mjs, run from a scratch
 // project's copy of the core; shape.mjs's parseConfig and where; size.mjs's capsOf, answered and --raise;
-// manifest-reads.mjs's notes; licences.mjs's loadConfig; steps.mjs's notDone with the step for rule 5's inputs. Test
+// manifest-reads.mjs's notes; licences.mjs's loadConfig; steps.mjs's notDone with the step for rule 5's inputs; and
+// sync.mjs and look.mjs, run from the copy, on a manifest that is a link out of the project. Test
 // data is made up. Run by the core's tests workflow (.github/workflows/tests.yml). Git and Node's own modules.
 //
 //   node tests/hostile-configs-test.mjs
@@ -15,9 +16,13 @@ import { loadConfig } from "../scripts/licences.mjs";
 import { notes } from "../scripts/manifest-reads.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir, root } from "../scripts/scratch-core.mjs";
-import { parseConfig, where, KIT } from "../scripts/shape.mjs";
-import { answered, capsOf } from "../scripts/size.mjs";
+import { parseConfig, survey, where, KIT } from "../scripts/shape.mjs";
+import { answered, capsOf, whoseOf } from "../scripts/size.mjs";
+// (the size check counts an answer from the repository's owner, "someone" here, with no right read)
+const owner = whoseOf("someone", []), me = { login: "someone", type: "User" };
 import { STEPS, notDone } from "../scripts/steps.mjs";
+import { parserLeftOut } from "../scripts/packages.mjs";
+import { shapeFaults } from "../scripts/schemas.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -41,7 +46,7 @@ const BIG = 50000;
 // ---- a project holding a copy of the core's scripts, floor and starter kit, a git repository ----
 fs.mkdirSync(p);
 gitP("init", "-q", "-b", "main");
-for (const part of ["scripts", "third-party", "floor", "setup"]) fs.cpSync(path.join(root, part), path.join(p, "core", part), { recursive: true });
+for (const part of ["scripts", ".packages", "floor", "setup"]) fs.cpSync(path.join(root, part), path.join(p, "core", part), { recursive: true, filter: parserLeftOut });
 write("a.md", "a file of the project's own\n");
 gitP("add", "-A");
 
@@ -52,6 +57,15 @@ for (const [text, what] of [["null", "null"], ["[]", "a list"], ["5", "a number"
   ['{"baseline":"b.json","code":"a.md"}', "a code that is no list"], ['{"baseline":"b.json","prose":["a.md"],"proseFromSecurity":"yes"}', "proseFromSecurity that is no boolean"],
   ['{"baseline":"b.json","prose":[1e309]}', "a path that is a number out of range"]]) ok(fails(copies(text)), `${MEND} a config of the wrong type: ${what}`);
 ok(fails(copies("")), `${MEND} an empty config`);
+// (its shape, by its schema: scripts/schemas/copies.json, through schemas.mjs; #530)
+{
+  const kit = JSON.parse(fs.readFileSync(path.join(root, "setup/template/copies.json.tmpl"), "utf8"));
+  const said = [null, [], { baseline: 5 }, { baseline: "b.json", code: "a.md" }, { baseline: "b.json", prose: [""] }, { baseline: "b.json", extra: true }, { baseline: "b.json", proseFromSecurity: "yes" }].map(c => shapeFaults("copies", c, "core/"));
+  const many = shapeFaults("copies", { baseline: "b.json", code: Array(5000).fill("") }, "core/");
+  ok(many.length === 21 && /holds 4980 more faults than those said\. Mend: \S/u.test(many[20]), `${MEND} its schema: a config of many bad items says the first 20 and a count of the rest`);
+  ok(JSON.stringify(shapeFaults("copies", kit, "core/")) === "[]" && said.every(f => f.length && f.every(l => /^the config(?:'s "[^"]+")?\b.* Mend: \S/u.test(l))) && said[5][0].includes('"extra"') && said[0][0].includes("core/setup/template/copies.json.tmpl"),
+    `${MEND} its schema: the starter kit's config holds, and each config of the wrong shape fails, naming where, with its mend`);
+}
 ok(fails(copies('{"baseline":"b.json"}')), `${MEND} a config that names nothing to check`);
 ok(fails(run("copies.mjs", "checks/none.json")) && fails(run("copies.mjs")), `${MEND} a config that is not there, or none named`);
 for (const spec of ["../outside", "/etc"]) ok(fails(copies(JSON.stringify({ baseline: "b.json", code: [spec] }))), `${MEND} a pathspec ${spec}, which leaves the project, and lists nothing there`);
@@ -78,6 +92,32 @@ for (const f of ["../outside/x", "/etc/passwd", "C:\\x", "<script>x</script>"]) 
   ok(fails(r) && r.out.includes("is no tracked file"), `reading-size.mjs: refuses with its mend a file read named ${f}, never counting it`);
 }
 ok(fails(sizes(marks({ past: { "../outside/x": 1 } }))), "reading-size.mjs: refuses with its mend a file past the split mark named outside the project");
+// (a line of "past" as { "mark", "why" } (#469): a mark out of range or missing, a why of the wrong type, each refused;
+// a why too long or of markup is text, printed by no failure, and the line is read as any other)
+for (const [line, what] of [[{ mark: 0, why: "x" }, "a mark of 0"], [{ mark: -1, why: "x" }, "a mark of -1"], [{ mark: 1.5, why: "x" }, "a mark of 1.5"], [{ why: "x" }, "no mark"],
+  [{ mark: "20000", why: "x" }, "a mark as a string"], [{ mark: 1, why: 7 }, "a why of a number"], [{ mark: 1, why: ["x"] }, "a why of a list"], [{ mark: 1, why: null }, "a why of null"], [[1, "x"], "a list"]])
+  ok(fails(sizes(marks({ past: { "a.md": line } }))), `reading-size.mjs: refuses with its mend a line of "past" with ${what}`);
+for (const why of ["w".repeat(1 << 20), "<script>alert(1)</script>\n::error::forged"]) {
+  r = sizes(marks({ past: { "../outside/x": { mark: 1, why } } }));
+  ok(fails(r) && !r.out.includes("<script>") && !r.out.includes("::error::forged") && r.out.length < 100000, "reading-size.mjs: a why too long or of markup is read as text and never printed");
+}
+// (a tracked file that is a link to a pipe, which never ends, or a folder, is refused before it is read: #446. A pipe,
+// not a device: where a fault the mutation tool puts in lets it be read, the read waits until the tool stops it, where
+// an endless device would fill the machine's memory)
+const pipe = at => process.platform !== "win32" && spawnSync("mkfifo", [at]).status === 0;
+if (pipe(path.join(outside, "pipe"))) {
+  fs.symlinkSync(path.join(outside, "pipe"), path.join(p, "zero.md"));
+  fs.symlinkSync(path.join(outside, "x"), path.join(p, "out.md"));
+  fs.mkdirSync(path.join(p, "folder.md"));
+  fs.writeFileSync(path.join(p, "folder.md/x"), "x\n");
+  gitP("add", "zero.md", "out.md", "folder.md/x");
+  for (const f of ["zero.md", "out.md", "folder.md"]) {
+    r = sizes(marks({ read: { "a.md": 20000, [f]: 5 } }));
+    ok(fails(r) && (f === "folder.md" ? r.out.includes("is no tracked file") || r.out.includes("is no regular file") : r.out.includes("is no regular file")) && r.ms < 5000, `reading-size.mjs: refuses with its mend a file read that is ${{ "zero.md": "a link to a pipe", "out.md": "a link to a file outside the project" }[f] ?? "a folder"}, never reading it, in ${r.ms} ms`);
+  }
+  gitP("rm", "-q", "--cached", "zero.md", "out.md", "folder.md/x");
+  fs.rmSync(path.join(p, "zero.md")); fs.rmSync(path.join(p, "out.md")); fs.rmSync(path.join(p, "folder.md"), { recursive: true });
+} else console.log("skip reading-size.mjs: a file read that is a link to a pipe: no pipe can be made here (Windows)");
 r = sizes(marks({ read: Object.fromEntries(Array.from({ length: BIG }, (_, i) => [`f${i}.md`, 5])) }));
 ok(fails(r) && r.ms < 5000, `reading-size.mjs: refuses with its mend ${BIG} files read that are not there, in ${r.ms} ms`);
 
@@ -87,6 +127,21 @@ const SHAPE = { baseline: "checks/shape-baseline.json", code: ["src/"] };
 for (const [c, what] of [["null", "null"], ["[]", "a list"], ["5", "a number"], ['"x"', "a string"], [{ ...SHAPE, code: "src/" }, "code that is no list"], [{ ...SHAPE, systems: [] }, "systems that is a list"],
   [{ ...SHAPE, select: { proof: "x" } }, "select.proof that is no list"]]) ok(mended(shape(c)), `shape.mjs: parseConfig refuses with its mend a config of the wrong type: ${what}`);
 ok(mended(shape("")) && mended(shape("{}")), "shape.mjs: parseConfig refuses with its mend an empty config, and one with no baseline");
+// (the marks of a change a project adds, #458: plain text, so that none can make the check slow, and none too long, too
+// many or holding a control character)
+for (const [changes, what] of [[["x".repeat(121)], "a mark too long"], [Array.from({ length: 21 }, (_, i) => `Mark${i}:`), "too many marks"], [["Changed:\u0000"], "a control character"], [["Changed:\n"], "a line break"], [[7], "a mark of the wrong type"], ["Changed:", "a mark that is no list"]])
+  ok(mended(shape({ ...SHAPE, changes })), `shape.mjs: parseConfig refuses with its mend the marks of a change with ${what}`);
+// (a mark's length counted in characters, as the schema counts them: one of 70 characters outside the Basic Multilingual
+// Plane, 140 of UTF-16's halves, is kept, and one of 121 refused)
+const wide = "\u{1F600}".repeat(70);
+ok(parseConfig(JSON.stringify({ ...SHAPE, changes: [wide] }), KIT).changes.some(([name]) => name === JSON.stringify(wide)) && mended(shape({ ...SHAPE, changes: ["\u{1F600}".repeat(121)] })),
+  "shape.mjs: a mark of a change is held to 120 characters, never to UTF-16's halves: one the schema takes is kept, one past it refused");
+const asText = ["^(a+)+$", "a*a*a*b", "(a|a)*b", "<b>Changed</b>:"];
+ok(!shape({ ...SHAPE, changes: asText }), "shape.mjs: parseConfig takes the marks of a change as plain text, a pattern's or markup's characters only text to match");
+const slowFor = parseConfig(JSON.stringify({ ...SHAPE, changes: asText }), KIT), t0 = Date.now();
+const lines400 = Array.from({ length: 200 }, () => `// ${"a".repeat(400)}!`).join("\n");
+const surveyed = survey({ "src/a.js": `${lines400}\n// a line that says (a|a)*b by name\n` }, slowFor);
+ok(Date.now() - t0 < 5000 && surveyed.entries.get('change: src/a.js: "(a|a)*b"')?.n.count === 1, "shape.mjs: a project's marks are found as text, in time, whatever a comment holds", `${Date.now() - t0} ms`);
 for (const b of ["../x.json", "/etc/x.json", "C:\\x.json", "a/../../x.json", "<b>x</b>.json"]) ok(mended(shape({ ...SHAPE, baseline: b })), `shape.mjs: parseConfig refuses with its mend a baseline at ${b}`);
 ok(mended(shape({ ...SHAPE, aliases: { "@/": "../src/" } })) && mended(shape({ ...SHAPE, systems: { a: { paths: ["/etc/"] } } })), "shape.mjs: parseConfig refuses with its mend an alias or a system's path that leaves the project");
 ok(mended(shape({ ...SHAPE, systems: { "<script>": { paths: ["src/"] } } })), "shape.mjs: parseConfig refuses with its mend a system named with markup");
@@ -109,9 +164,10 @@ ok([null, 5, {}, [], ""].every(t => capsOf(t) === null), "size.mjs: capsOf reads
 ok(caps("  <script>: 1 * 1024,") === null && caps('  "../x": 1 * 1024,') === null, "size.mjs: capsOf reads no cap of a role named with markup or a path");
 [said, ms] = timed(() => capsOf(`export const CAPS = {\n${"  builder: 1 * 1024,\n".repeat(BIG)}};\n`));
 ok(said === null && ms < 5000, `size.mjs: capsOf reads no cap from ${BIG} lines of one role, in ${ms} ms`);
-ok([null, 5, "Leanness check: yes", {}, [null, 5, "x", [{ author_association: "OWNER", body: 5 }], { author_association: "NONE", body: "Leanness check: yes" }]].every(c => !answered(c)),
+ok([null, 5, "Leanness check: yes", {}, [null, 5, "x", [{ author_association: "OWNER", body: 5, user: me }], { author_association: "NONE", body: "Leanness check: yes", user: me }]].every(c => !answered(c, owner))
+  && answered([{ author_association: "OWNER", body: "Leanness check: yes", user: me }], owner),
   "size.mjs: answered reads no answer from comments of the wrong type, nor one by a writer GitHub does not name");
-[said, ms] = timed(() => answered(Array.from({ length: BIG }, () => ({ author_association: "OWNER", body: `<b>${"x".repeat(100)}` }))));
+[said, ms] = timed(() => answered(Array.from({ length: BIG }, () => ({ author_association: "OWNER", body: `<b>${"x".repeat(100)}`, user: me })), owner));
 ok(said === false && ms < 5000, `size.mjs: answered reads no answer from ${BIG} comments that open with markup, in ${ms} ms`);
 const sizeBase = path.join(tmp, "size-base.mjs"), comments = path.join(tmp, "comments.json");
 fs.copyFileSync(path.join(root, "scripts/size.mjs"), sizeBase);
@@ -132,6 +188,24 @@ ok(read("Modules: <img src=x onerror=alert(1)>.\n").some(l => l.includes("cannot
 [said, ms] = timed(() => read(`Modules: ${Array.from({ length: BIG }, (_, i) => `\`m${i}.md\``).join(", ")}.\n${"*x ".repeat(1 << 20)}`));
 ok(said.length === BIG + 1 && ms < 5000, `manifest-reads.mjs: notes reads a manifest of ${BIG} names and 3 MB in ${ms} ms, each name no module`);
 // (a number has no place in the manifest's lines this reader reads: no case of one out of range applies)
+
+// ---- sync.mjs and look.mjs: core-manifest.md, read as the steps read it (own-files.mjs; #446) ----
+// (a manifest that is a link out of the project, to a file or a device, is no file of the project's own: each refuses
+// it before it fetches, asks or writes anything; a link cannot be made on Windows)
+if (process.platform !== "win32") {
+  const away = path.join(outside, "manifest.md"), was = "Core: the-core at 0000000000000000000000000000000000000000, copied whole under `core/`.\n";
+  fs.writeFileSync(away, was);
+  for (const [what, to] of [["a file outside the project", away], ...(fs.existsSync(path.join(outside, "pipe")) ? [["a pipe, which never ends", path.join(outside, "pipe")]] : [])]) {
+    fs.symlinkSync(to, path.join(p, "core-manifest.md"));
+    const synced = run("sync.mjs"), looked = run("look.mjs");
+    ok(synced.status === 1 && synced.out.includes("a regular file of the project's own") && !raw(synced.out) && synced.ms < 5000, `sync.mjs: a manifest that is a link to ${what} is refused before anything is fetched`);
+    ok(fails(looked) && looked.out.includes("no regular file of the project's own") && looked.ms < 5000, `look.mjs: a manifest that is a link to ${what} is refused with its mend, nothing looked at`);
+    fs.rmSync(path.join(p, "core-manifest.md"));
+  }
+  ok(fs.readFileSync(away, "utf8") === was, "sync.mjs: the manifest outside, which a link named, is left as it was");
+  fs.rmSync(away);
+  fs.rmSync(path.join(outside, "pipe"), { force: true });
+} else console.log("skip sync.mjs and look.mjs: a manifest that is a link out: Windows makes no link here");
 
 // ---- licences.mjs: loadConfig, checks/licences.json ----
 const lic = c => { write("checks/licences.json", typeof c === "string" ? c : JSON.stringify(c)); return thrown(() => loadConfig(path.join(p, "checks/licences.json"))); };

@@ -4,7 +4,7 @@
 // set from the core with the rules the case holds taken out, records the counts the rules' numbers read for the span
 // since the last pruning, and adds the list this prints. The list names each rule of the floor, the modules and the
 // core's AGENTS.md that:
-//   - names a number (holders.json, "numbers", in outcomes.mjs's form NUMBER) that did not move since the last pruning;
+//   - names a number (an entry of scripts/holders/, its "number", in outcomes.mjs's form NUMBER) that did not move since the last pruning;
 //   - stands in for an outcome (its number not one of the outcome's direct measures) and moved at two prunings in a row
 //     while those measures did not, each by the count outcomes.mjs's MEASURES give (DIRECT: a median left out; fast,
 //     readable and usable have none);
@@ -15,7 +15,8 @@
 // Ahead of those, the rules holders.mjs (beside this file) counts as having no holder, worst first, a rule read at a
 // role's start before one read on need, each with its proposal from UNHELD (#545): "check" or "case" (a check or a
 // staged case could hold it, "by" the issue queued to build it), "move" (to a module read on need), "goes", or
-// "describes"; one with none, or a rule that guards against rare and severe harm proposed anything but a holder, is said so, and a
+// "describes", and beside a case, a move or a removal the form of the rule a check could hold, or why none exists
+// (form(), #887); one with none, or a rule that guards against rare and severe harm proposed anything but a holder, is said so, and a
 // proposal whose rule now has a holder or no longer stands is named to be taken out.
 // Each listed with its step of the pruning: a rule read at a role's start (an AGENTS.md rule is, here) is at step 1, to
 // move to a module read on need; one read on need is at step 2, to go where nothing changed since it moved. A rule
@@ -83,7 +84,7 @@ export function due({ month, record, model = null }) {
 // The state report's lines on the pruning, for `month`.
 export function said({ month, record = readRecord() }) {
   const d = due({ month, record });
-  if (d.due) return [`- Due: ${d.why}. The session that takes this report prunes as the core's \`AGENTS.md\`, "Rules are pruned by their numbers", says: each staged case set with the rules it holds taken out (\`node scripts/pruning.mjs --set <case> <dir>\`), run in a fresh helper and read (\`--read\`), the counts recorded (\`--record --repo <this repository> --model <its model's id>\`), each rule with no holder given its proposal in \`${UNHELD}\` and its checks queued worst first, and the list \`node scripts/pruning.mjs\` prints added here as a note, \`${RECORD}\` in a pull request of its own.`];
+  if (d.due) return [`- Due: ${d.why}. The session that takes this report prunes as the core's \`AGENTS.md\`, "Rules are pruned by their numbers", says: each staged case set with the rules it holds taken out (\`node scripts/pruning.mjs --set <case> <dir>\`), run in a fresh helper and read (\`--read\`), the counts recorded (\`--record --repo <this repository> --model <its model's id>\`), each rule with no holder given its proposal in \`${UNHELD}\`, with a form of it a check could hold or why none exists, and its checks queued worst first, and the list \`node scripts/pruning.mjs\` prints added here as a note, \`${RECORD}\` in a pull request of its own.`];
   return [`- Not due: ${d.why}, or sooner where the session that takes a report runs on a newer generation of model than the last pruning's (\`node scripts/pruning.mjs --due --model <its id>\`).`];
 }
 
@@ -105,7 +106,7 @@ export function without(keys, all, read) {
 // name>", from `steps` ({ workflow: [{ name, run }] }).
 export const stepsOf = (by, steps) => Object.entries(steps).flatMap(([w, list]) => list.filter(st => (by.startsWith(".github/workflows/") ? w === by : String(st.run ?? "").includes(by))).map(st => `${w}#${st.name}`));
 
-// The checks a rule's holders name (holders.json's "holders"), each a script or workflow, or GitHub's setting.
+// The checks a rule's holders name (the "holder" of an entry of scripts/holders/), each a script or workflow, or GitHub's setting.
 export const checksOf = (key, named) => [named[key] ?? []].flat().map(h => /^check: (.+?)(?:, in part)?$/u.exec(String(h))?.[1]).filter(Boolean);
 
 // A rule's number as a pruning `x` counted it, or null.
@@ -162,7 +163,7 @@ function closing({ all, numbers, now, early, unread }) {
   ];
 }
 
-// The proposals for the rules with no holder (UNHELD's "proposals"): { proposals: { key: { mark, by, why } }, wrong },
+// The proposals for the rules with no holder (UNHELD's "proposals"): { proposals: { key: { mark, by, why, form, noForm } }, wrong },
 // `wrong` the line of why a file that is there cannot be read, with its mend; none where there is no file.
 export function readUnheld(root = ROOT) {
   const file = path.join(root, UNHELD);
@@ -170,12 +171,20 @@ export function readUnheld(root = ROOT) {
   try {
     const p = JSON.parse(fs.readFileSync(file, "utf8"))?.proposals;
     if (p && typeof p === "object" && !Array.isArray(p)) return { proposals: p, wrong: null };
-    return { proposals: {}, wrong: `\`${UNHELD}\` holds no object "proposals". Mend: write it as an object keyed by each rule's file and bold lead, each value { mark, by, why }` };
+    return { proposals: {}, wrong: `\`${UNHELD}\` holds no object "proposals". Mend: write it as an object keyed by each rule's file and bold lead, each value { mark, by, why } and, beside a case, a move or a removal, form or noForm` };
   } catch (e) { return { proposals: {}, wrong: `\`${UNHELD}\` cannot be read (${String(e.message).split("\n")[0]}). Mend: write it as JSON, its "proposals" an object keyed by each rule` }; }
 }
 
 // A value of the file as one line of plain text, so that no value can stand as a line of the list of its own.
 const flat = v => String(v ?? "").replace(/\s+/gu, " ").trim();
+
+// Beside a proposal, the form a check could hold (AGENTS.md, "A rule is written in the form a check can hold"; #887):
+// its "form", a slightly different form of the rule whose breach a check reads without guessing, or its "noForm", why
+// none exists. A proposal of a check, which holds the rule as worded, and one that it describes, which binds no one,
+// need neither, a check's form printed where one is given, as a rewording a check would hold.
+const FORM = `a form of the rule a check could hold (\`form\`), or why none exists (\`noForm\`)`;
+const form = x => flat(x.form) ? ` A form a check could hold: ${flat(x.form)}.` : ["check", "describes"].includes(x.mark) ? ""
+  : flat(x.noForm) ? ` No form a check could hold: ${flat(x.noForm)}.` : ` No form proposed yet: the session that takes the pruning gives ${FORM}.`;
 
 // The list's leading lines: each rule of `all` whose key `none` (holders.mjs's rules with no holder) names, those
 // `starts` or `toolStarts` (the rules of a tool's part, read at the start of that tool's sessions) names first, each with
@@ -188,9 +197,9 @@ export function unheldLines({ all, none, starts, toolStarts = new Set(), proposa
   const say = r => {
     const x = proposals[r.key], where = starts.has(r.key) ? "read at a role's start" : toolStarts.has(r.key) ? "read at its tool's start" : "read on need";
     const harm = rare(r, numbers[r.key]);
-    if (!x || !MARKS.includes(x.mark)) return `- ${r.key}: no holder, ${where}. No proposal yet: the session that takes the pruning gives it one in \`${UNHELD}\`, ${harm ? "a check or staged case that could hold it, since it guards against rare and severe harm" : "a check or staged case that could hold it, a move to a module read on need, or that it goes"}.`;
+    if (!x || !MARKS.includes(x.mark)) return `- ${r.key}: no holder, ${where}. No proposal yet: the session that takes the pruning gives it one in \`${UNHELD}\`, ${harm ? "a check or staged case that could hold it, since it guards against rare and severe harm" : "a check or staged case that could hold it, a move to a module read on need, or that it goes"}, and ${FORM}.`;
     const warn = !["check", "case"].includes(x.mark) && harm ? " It guards against rare and severe harm, so it is proposed a holder, a check or a staged case, and nothing else." : "";
-    return `- ${r.key}: no holder, ${where}. Its proposal: ${x.mark}${x.by ? ` (${flat(x.by)})` : x.mark === "check" || x.mark === "case" ? ", no issue filed yet: the session files one where its upkeep pays, which joins the queue as any check for a rule that stands does" : ""}, ${flat(x.why) || "with no reason given"}.${warn}`;
+    return `- ${r.key}: no holder, ${where}. Its proposal: ${x.mark}${x.by ? ` (${flat(x.by)})` : x.mark === "check" || x.mark === "case" ? ", no issue filed yet: the session files one where its upkeep pays, which joins the queue as any check for a rule that stands does" : ""}, ${flat(x.why) || "with no reason given"}.${form(x)}${warn}`;
   };
   return [
     `- No holder: ${keys.length} rule${keys.length === 1 ? "" : "s"} (\`scripts/holders.mjs\`), worst first, each with its proposal (\`${UNHELD}\`). Each check is filed as an issue, which joins the queue without a further word; the moves and removals are the owner's, a few at a time.`,
@@ -200,7 +209,7 @@ export function unheldLines({ all, none, starts, toolStarts = new Set(), proposa
   ];
 }
 
-// The list's lines. `all`: the rules (rules.mjs's); `named`: holders.json's "holders"; `numbers`: its "numbers";
+// The list's lines. `all`: the rules (rules.mjs's); `named`: the entries' "holder"; `numbers`: their "number";
 // `record`; `cases`: the staged cases ({ name, holds }); `steps`: the workflows' steps, { path: [{ name, run }] };
 // `starts`: the keys of the rules a role reads at its start; `joined(r)`: how many merged pull requests came under the rule since it joined, or null;
 // `none`: the keys of the rules with no holder (holders.mjs), and `proposals`, UNHELD's, which lead the list, those of
@@ -240,19 +249,18 @@ export function joinedIn(r, root = ROOT) {
   } catch { return null; }
 }
 
-// The workflows' named steps at `root`: { path: [{ name, run }] }, read by the core's own reader of YAML, each mapping
-// written on one line as a list's item (a matrix's, which holds no step) set aside first, since it reads none; a
-// workflow it cannot read has none.
+// The workflows' named steps at `root`: { path: [{ name, run }] }, read by the core's reader of YAML (workflow-run.mjs);
+// a workflow it cannot read has none.
 export async function stepsAt(root = ROOT) {
   const { parseYaml } = await import("./workflow-run.mjs"), dir = path.join(root, ".github", "workflows"), out = {};
   for (const f of fs.readdirSync(dir).filter(x => /\.ya?ml$/u.test(x))) {
     let yaml = {};
-    try { yaml = parseYaml(fs.readFileSync(path.join(dir, f), "utf8").replace(/^(\s*-[ \t]+)\{[^\n]*\}[ \t]*$/gmu, "$1(set aside)")); } catch { /* (none read) */ }
+    try { yaml = parseYaml(fs.readFileSync(path.join(dir, f), "utf8")); } catch { /* (none read) */ }
     out[`.github/workflows/${f}`] = Object.values(yaml.jobs ?? {}).flatMap(j => (Array.isArray(j?.steps) ? j.steps : [])).filter(st => typeof st?.name === "string").map(st => ({ name: st.name, run: st.run ?? "" }));
   }
   return out;
 }
-const holdersAt = root => JSON.parse(fs.readFileSync(path.join(root, "scripts", "holders.json"), "utf8"));
+const holdersAt = async root => (await import("./holders.mjs")).named(root).json;
 
 // The pruning in progress: the newest whose counts are not yet recorded, made, dated today, where there is none; so a
 // pruning whose cases run past midnight stays one.
@@ -322,7 +330,7 @@ async function citedOf({ repo, from, to, gh, all }) {
 }
 
 // The counts of `repo` from `from` to `to` (ISO times), through `gh` (labels.mjs's ghApi form): { numbers, direct,
-// corrections, fired, cited }, each rule's number as `numbers` (holders.json's) names it: its findings, its check's
+// corrections, fired, cited }, each rule's number as `numbers` (an entry's) names it: its findings, its check's
 // fires (of the steps `stepsOfRule(key)` gives), or the corrections of a kind; the failed steps only of `known`.
 export async function counts({ repo, from, to, owner, gh, all, numbers, stepsOfRule, known }) {
   const span = { repo, from, to, owner, gh }, { ruleOf } = await import("./review-record.mjs");
@@ -393,7 +401,7 @@ async function recordCmd(get) {
   const record = readRecord(), last = ordered(record).filter(x => x.recorded).at(-1);
   const to = new Date().toISOString().replace(/\.\d{3}Z$/u, "Z"), from = last ? `${last.at}T00:00:00Z` : new Date(Date.now() - EVERY * 31 * 864e5).toISOString().replace(/\.\d{3}Z$/u, "Z");
   let c;
-  const h = holdersAt(ROOT), steps = await stepsAt(ROOT), stepsOfRule = key => checksOf(key, h.holders ?? {}).flatMap(by => stepsOf(by, steps));
+  const h = await holdersAt(ROOT), steps = await stepsAt(ROOT), stepsOfRule = key => checksOf(key, h.holders ?? {}).flatMap(by => stepsOf(by, steps));
   try { c = await counts({ repo, from, to, owner: get("--owner") ?? repo.split("/")[0], gh: ghApi, all: rules(ROOT, { agents: true }), numbers: h.numbers ?? {}, stepsOfRule, known: new Set(Object.entries(steps).flatMap(([w, list]) => list.map(x => `${w}#${x.name}`))) }); }
   catch (e) { return fail(`GitHub did not answer for ${repo}: ${String(e.message).split("\n")[0]}. Mend: run it where gh answers for the owner's account, or try again once GitHub does`); }
   Object.assign(open(record, get("--model")), { from, ...c, recorded: true });
@@ -410,7 +418,7 @@ async function main(argv) {
   const { startRules } = await import("./cited.mjs");
   const { CASES } = await import("./staged.mjs");
   // (the core's AGENTS.md, which every builder here reads at its start, with the floor and the modules)
-  const all = rules(ROOT, { agents: true }), h = holdersAt(ROOT), starts = new Set([...all.filter(r => r.file === "AGENTS.md").map(r => r.key), ...[...startRules(all).values()].flatMap(x => [...x])]);
+  const all = rules(ROOT, { agents: true }), h = await holdersAt(ROOT), starts = new Set([...all.filter(r => r.file === "AGENTS.md").map(r => r.key), ...[...startRules(all).values()].flatMap(x => [...x])]);
   const { counts: heldCounts, holders } = await import("./holders.mjs");
   console.log(list({ all, named: h.holders ?? {}, numbers: h.numbers ?? {}, record: readRecord(), cases: CASES, steps: await stepsAt(ROOT), starts, toolStarts: new Set(all.filter(r => r.file.startsWith("tools/")).map(r => r.key)), joined: r => joinedIn(r), none: heldCounts(holders()).none, ...readUnheld() }).join("\n"));
 }

@@ -42,8 +42,10 @@ import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { fill, oneJob, readyOnly } from "../scripts/init.mjs";
 import { scratchEnv } from "../scripts/scratch-core.mjs";
+import { where } from "../scripts/shape.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
-import { STEPS, callers, leads, project as read } from "../scripts/steps.mjs";
+import { STEPS, callers, leads, notDone, project as read, report } from "../scripts/steps.mjs";
+import { FOLDER, NOTICE, notesAt } from "../scripts/sync-notes.mjs";
 import { evaluate, parseYaml, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
 
 const STEP_LEADS = STEPS.map(s => s.lead);
@@ -62,6 +64,21 @@ const inPart = part => PART === "all" || PART === part;
 const yaml = parseYaml("name: x # a comment\non:\n  workflow_call:\n    inputs:\n      a:\n        type: boolean\n        default: true\njobs:\n  j:\n    if: >-\n      ${{ a\n      && b }}\n    steps:\n      - uses: x@1 # v1\n        with:\n          k: 'it''s'\n      - name: run\n        run: |\n          one\n            two # kept\n\n          three\n      - run: echo \"#\" plain\n    types: [opened, edited]\n");
 ok(yaml.name === "x" && yaml.on.workflow_call.inputs.a.default === true && yaml.jobs.j.if === "${{ a && b }}" && yaml.jobs.j.steps[0].uses === "x@1" && yaml.jobs.j.steps[0].with.k === "it's"
   && yaml.jobs.j.steps[1].run === "one\n  two # kept\n\nthree\n" && yaml.jobs.j.steps[2].run === 'echo "#" plain' && yaml.jobs.j.types.join() === "opened,edited", "the runner reads the YAML the core's workflows are written in", JSON.stringify(yaml));
+// (on the YAML package, #530: a flow mapping and an anchor read as GitHub reads them, a key given twice refused, as
+// GitHub refuses it, a key __proto__ the mapping's own, and a text with no value an empty mapping)
+{
+  const flow = parseYaml("on: [push]\nenv: {A: '1', B: x}\nbase: &b {runs-on: ubuntu-latest}\njobs:\n  j: *b\n__proto__: p\n");
+  let twice = false;
+  try { parseYaml("a: 1\na: 2\n"); } catch { twice = true; }
+  // (a warning, as of an unknown tag, prints nothing: it would print the project's own line into a job's log)
+  const emit = process.emitWarning;
+  let warned = 0;
+  process.emitWarning = () => { warned++; };
+  try { parseYaml("a: !foo x\n"); } catch { /* (an error throws, for the caller) */ } finally { process.emitWarning = emit; }
+  ok(warned === 0, "the reader prints no warning of the package's, as of an unknown tag", `${warned} warnings`);
+  ok(flow.on[0] === "push" && flow.env.A === "1" && flow.env.B === "x" && flow.jobs.j["runs-on"] === "ubuntu-latest" && Object.hasOwn(flow, "__proto__") && Object.getPrototypeOf(flow) === Object.prototype
+    && twice && JSON.stringify(parseYaml("# only a comment\n")) === "{}", "the reader reads a flow mapping and an anchor, refuses a key given twice, keeps __proto__ a key, and reads no value as an empty mapping", JSON.stringify(flow));
+}
 const c = { github: { event_name: "pull_request", event: { pull_request: { draft: false, user: { login: "Dependabot[bot]" } }, issue: null } }, inputs: { private: false, advisory: true } };
 ok(evaluate("github.event_name == 'PULL_REQUEST' && !github.event.pull_request.draft", c) === true && evaluate("github.event.issue.pull_request || 'x'", c) === "x" && evaluate("github.event.pull_request.user.login != 'dependabot[bot]'", c) === false
   && evaluate("contains(fromJSON('[\"OWNER\",\"MEMBER\"]'), 'member') && startsWith('abc', 'A')", c) === true && evaluate("!inputs.private || !inputs.advisory", c) === true, "and evaluates GitHub's expressions as GitHub does: case-blind strings, || giving a value, a missing property null");
@@ -87,6 +104,14 @@ Object.assign(env, { HOME: home, USERPROFILE: home, APPDATA: path.join(home, "Ap
 const named = new Map(); // (a project's folder, and the name git writes into each commit made in it)
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env: { ...env, ...named.get(dir) }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
 const node = (dir, ...args) => { const r = spawnSync(process.execPath, args, { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
+// The steps a release asks, read in this process as `node core/scripts/steps.mjs` reads them in the project at `dir`,
+// with the environment the program would be given: what it prints, and its status. The copy's program runs first on
+// each project; each reading after it is this one, whose readings of the same project's state are made once (#715).
+function stepsIn(dir) {
+  const was = { ...process.env }, set = to => { for (const k of Object.keys(process.env)) delete process.env[k]; Object.assign(process.env, to); };
+  set(env);
+  try { return { status: 0, out: `${report(notDone(dir))}\n` }; } catch (e) { return { status: 1, out: `FAIL: the steps could not be read here (${e.message})` }; } finally { set(was); }
+}
 
 let history = true;
 try { git(root, "rev-parse", "--verify", "-q", "HEAD^{commit}"); history = git(root, "rev-parse", "--is-shallow-repository") === "false"; } catch { history = false; }
@@ -227,20 +252,27 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
       for (const r of runWorkflow(git(p.dir, "show", `${sha}:.github/workflows/${file}`), { github, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp })) out.push([`${file}/${r.job}`, { ...r, own: true }]);
       continue;
     }
+    // (each call's outputs, as its workflow's `workflow_call` names them from its jobs' own, empty where a job was
+    // skipped, for the calls that need it: the security review is handed the queue-only proof's head, #750)
+    const needs = {};
     for (const [id, job] of Object.entries(wf.jobs ?? {})) {
       const call = new RegExp(`^${CORE.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&")}/\\.github/workflows/([\\w.-]+)@([0-9a-f]{40})$`, "i").exec(job.uses ?? "");
       if (!call) { out.push([`${file}/${id}`, { job: id, ran: true, passed: true, steps: [], own: true }]); continue; }
       // (a call whose own condition is false starts no job, as a call skipped on a draft: #375)
-      if (job.if !== undefined && !evaluate(String(job.if).trim().replace(/^\$\{\{|\}\}$/g, ""), { github, inputs: {}, secrets: {}, vars: {} })) { out.push([`${file}/${id}`, { job: id, ran: false, passed: true, steps: [] }]); continue; }
+      if (job.if !== undefined && !evaluate(String(job.if).trim().replace(/^\$\{\{|\}\}$/g, ""), { github, inputs: {}, secrets: {}, vars: {}, needs })) { out.push([`${file}/${id}`, { job: id, ran: false, passed: true, steps: [] }]); continue; }
       // (the NuGet check as a step of core.yml's one job, #376: its input left out where there is no SDK, and said so)
       if (call[1] === "core.yml" && !sdk && job.with?.nuget) { job.with = { ...job.with }; delete job.with.nuget; console.log(`note ${p.name}: no .NET SDK here, so core.yml's NuGet step is not run`); }
       if (call[1] === "nuget.yml" && !sdk) { out.push([`${file}/${id}`, { job: id, ran: true, passed: true, steps: [] }]); console.log(`note ${p.name}: no .NET SDK here, so the NuGet check is not run`); continue; }
       const text = git(theCore, "show", `${call[2]}:.github/workflows/${call[1]}`);
-      const callerCtx = { github, inputs: {}, secrets: { PERSONAL_TERMS: terms }, vars: {} };
+      const callerCtx = { github, inputs: {}, secrets: { PERSONAL_TERMS: terms }, vars: {}, needs };
       const inputs = Object.fromEntries(Object.entries(job.with ?? {}).map(([k, v]) => [k, typeof v === "string" && v.includes("${{") ? evaluate(v.replace(/^\$\{\{|\}\}$/g, ""), callerCtx) : v]));
       const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, evaluate(String(v).replace(/^\$\{\{|\}\}$/g, ""), callerCtx)]));
       const caller = { ...github, workflow_ref: `${p.repo}/.github/workflows/${file}@${github.ref}` };
-      for (const r of runWorkflow(text, { inputs, secrets, github: caller, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp })) out.push([`${file}/${id}/${r.job}`, r]);
+      const called = parseYaml(text), ran = runWorkflow(text, { inputs, secrets, github: caller, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp });
+      for (const r of ran) out.push([`${file}/${id}/${r.job}`, r]);
+      const jobs = Object.fromEntries(ran.map(r => [r.job, { outputs: Object.fromEntries(Object.entries(called.jobs?.[r.job]?.outputs ?? {})
+        .map(([k, v]) => [k, evaluate(String(v).trim().replace(/^\$\{\{|\}\}$/g, ""), { steps: r.outputs ?? {} }) ?? ""])) }]));
+      needs[id] = { outputs: Object.fromEntries(Object.entries(called.on?.workflow_call?.outputs ?? {}).map(([k, o]) => [k, evaluate(String(o.value).trim().replace(/^\$\{\{|\}\}$/g, ""), { jobs }) ?? ""])) };
     }
   }
   return out;
@@ -263,8 +295,12 @@ function upgrade(p, from, ownChanges, expect) {
 
   // the sync, as the project's own copy of the release's sync.mjs makes it
   git(p.dir, "checkout", "-q", "-B", "sync", main0);
+  const hadFolder = fs.existsSync(path.join(p.dir, "core", FOLDER));
   const s = node(p.dir, "core/scripts/sync.mjs");
   ok(s.status === 0 && s.out.includes(carrying), `${p.name}: its own sync script takes the release that carries the change, ${carrying}`, s.out);
+  // (a copy that held no folder of the notes reads its asks from their file alone: across the move it prints the notice,
+  // which sends the session to the folder; #750, point 1)
+  ok(hadFolder || s.out.includes(NOTICE), `${p.name}: its own sync script, which reads the notes' file alone, prints the notice that sends the session to the notes' folder`, s.out);
   git(p.dir, "add", "-A");
   git(p.dir, "commit", "-q", "-m", `Sync the core to ${carrying}`);
   git(p.dir, "push", "-q", "origin", "sync");
@@ -353,12 +389,14 @@ function upgrade(p, from, ownChanges, expect) {
   const steps = () => node(p.dir, "core/scripts/steps.mjs");
   const reported = out => out.split("\n").filter(l => l.startsWith("- ")).map(l => STEP_LEADS.find(lead => l.startsWith(`- ${lead}:`) || l.startsWith(`- ${lead} (`))).filter(Boolean);
   const clean = () => { git(p.dir, "reset", "-q", "--hard"); git(p.dir, "clean", "-qfd"); };
-  const before = leads(git(theCore, "show", `${from.sha}:setup/sync-notes.md`));
+  const before = leads(notesAt(from.sha, args => git(theCore, ...args))); // (in the file, or in its folder: #750, point 1)
   const added = STEP_LEADS.filter(lead => !before.includes(lead) && STAGES[lead]);
   // (a step the commit under test adds that asks something of every project, a check's own list to write, the sync
   // alone does not do: it is reported, it alone, and its mend as written, merged as the project's own pull request
   // would be, makes it done)
   let r = steps();
+  const here = stepsIn(p.dir);
+  ok(here.status === r.status && here.out === r.out, `${p.name}: the steps read in this process are as the copy's program reads them`, `${r.out}\n---\n${here.out}`);
   const asked = reported(r.out);
   ok(r.status === 0 && asked.every(lead => added.includes(lead) && STAGES[lead].asked), `${p.name}: after the sync, the steps not done are those the release adds that it asks of every project (${asked.length})`, r.out);
   const unmended = git(p.dir, "rev-parse", "HEAD");
@@ -370,14 +408,14 @@ function upgrade(p, from, ownChanges, expect) {
     const onMend = checks(p, "pull_request", git(p.dir, "rev-parse", "HEAD"), { baseSha: unmended, only: "copies.yml" });
     ok(!failures(onMend) && onMend.some(([, r]) => r.ran), `${p.name}: the pull request that makes those mends passes the copies workflow's checks, read against the project before it`, failures(onMend));
   }
-  r = steps();
+  r = stepsIn(p.dir);
   ok(r.status === 0 && r.out.includes("Every step a check reads is done"), `${p.name}: and with each such step mended as it words it, every step a check reads is done`, r.out);
   for (const lead of added) {
     STAGES[lead].stage(p.dir);
-    r = steps();
+    r = stepsIn(p.dir);
     ok(JSON.stringify(reported(r.out)) === JSON.stringify([lead]), `${p.name}: "${lead}", added since ${from.tag} and taken out, is reported`, r.out);
     STAGES[lead].mend(p.dir);
-    r = steps();
+    r = stepsIn(p.dir);
     ok(r.out.includes("Every step a check reads is done"), `${p.name}: and its mend as written makes it done`, r.out);
     clean();
   }
@@ -386,7 +424,7 @@ function upgrade(p, from, ownChanges, expect) {
   if (!out.length) out.push(Object.keys(STAGES)[0]);
   console.log(`note ${p.name}: the steps taken out at random: ${out.join("; ")}`);
   for (const lead of out) STAGES[lead].stage(p.dir);
-  r = steps();
+  r = stepsIn(p.dir);
   ok(JSON.stringify(reported(r.out)) === JSON.stringify(STEP_LEADS.filter(l => out.includes(l))), `${p.name}: steps taken out at random are reported, exactly those (${out.length})`, `${out.join("\n")}\n---\n${r.out}`);
   clean();
 
@@ -394,6 +432,35 @@ function upgrade(p, from, ownChanges, expect) {
   // each in a pull request of its own and merged, with no check failing (core archive 216). On Linux alone, since the
   // script starts gh as a program, which a stand-in on Windows cannot be.
   if (process.platform !== "win32") inboxCase(p);
+}
+
+// A project with C# whose own job runs the shape check after the core's first install alone, as it stood before the
+// parser's packages had a lock of their own (#719): synced, its pull request passes, the shape check reading no function
+// of C# and saying so as a warning whose mend names every install; and with that mend, it reads them again, warning
+// nothing. Its config and baseline written as a session writes them, every install there.
+const PARSER_LEAD = "19 November 2026, the parser's packages installed where the shape check runs";
+function parserUnnamed(p) {
+  git(p.dir, "checkout", "-q", "main");
+  const at = where(fs.readFileSync(path.join(p.dir, "core-manifest.md"), "utf8"));
+  if (!fs.existsSync(path.join(p.dir, at))) write(p.dir, at, fs.readFileSync(path.join(p.dir, "core/setup/template/shape.json.tmpl"), "utf8"));
+  if (!fs.existsSync(path.join(p.dir, JSON.parse(fs.readFileSync(path.join(p.dir, at), "utf8")).baseline))) {
+    git(p.dir, "add", "-A");
+    const installed = node(p.dir, "core/scripts/install.mjs", "all"), first = node(p.dir, "core/scripts/shape.mjs", at, "--first");
+    ok(installed.status === 0 && first.status === 0, `${p.name}: its shape check's first baseline written, every install there`, `${installed.out}\n${first.out}`);
+    git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", "the shape check's config and baseline"); git(p.dir, "push", "-q", "origin", "main");
+  }
+  const main0 = git(p.dir, "rev-parse", "HEAD");
+  const pr = (from, what, change) => { git(p.dir, "checkout", "-q", "-B", "change", from); change(p.dir); git(p.dir, "add", "-A"); git(p.dir, "commit", "-q", "-m", what); return git(p.dir, "rev-parse", "HEAD"); };
+  const shapeOut = results => results.flatMap(([, r]) => r.steps.map(x => x.out ?? "")).join("\n");
+  const unnamed = pr(main0, "its own job that runs the shape check", dir => { STAGES[PARSER_LEAD].stage(dir); write(dir, "src/App/More.cs", "class More { void M(bool x) { if (x) { } } }\r\n"); });
+  const warned = checks(p, "pull_request", unnamed, { baseSha: main0, only: "shape-staged.yml", ownToo: true });
+  ok(!failures(warned) && warned.some(([, r]) => r.ran) && /^::warning::The shape check did not read (?:JavaScript and TypeScript, their functions by the parser \(the reader javascript-tree\), )?C#, by the parser \(the reader csharp-tree\): the parser's packages are not installed, this job's install step naming the core's first install alone.*Mend: make this job's install step node core[\\/]scripts[\\/]install\.mjs all/mu.test(shapeOut(warned)),
+    `${p.name}: its own job that runs the shape check after the first install alone passes, reading nothing of C# and saying so as a warning with the mend`, `${failures(warned)}\n${shapeOut(warned).slice(-1500)}`);
+  const mended = pr(unnamed, "the mend as the warning words it", dir => STAGES[PARSER_LEAD].mend(dir));
+  const read = checks(p, "pull_request", mended, { baseSha: main0, only: "shape-staged.yml", ownToo: true });
+  ok(!failures(read) && read.some(([, r]) => r.ran) && !/::warning::The shape check did not read/u.test(shapeOut(read)),
+    `${p.name}: and with its install step naming every install, as the mend says, it reads C#'s functions again, warning nothing`, `${failures(read)}\n${shapeOut(read).slice(-1500)}`);
+  git(p.dir, "checkout", "-q", "main"); git(p.dir, "branch", "-q", "-D", "change");
 }
 
 // A private repository's NuGet check bills no job a pull request cannot need (#373): its call with the starter kit's
@@ -606,7 +673,31 @@ for (const tag of starts.filter((t, i) => inPart(i === starts.length - 1 ? "newe
   (results, what) => [[!jobRan(results, "security-review.yml"), "a private repository's security-review check starts no job, so none is billed"],
     ...(sdk ? [[ran(results, "nuget.yml", "Restore each project file from its lock file alone") === what.includes("project file"), "the NuGet check restores only where something NuGet reads changed"]] : [])]);
   nugetInPrivate(dotnetProject);
+  parserUnnamed(dotnetProject);
   if (tag === starts.at(-1)) { readyInPrivate(dotnetProject); oneJobInPrivate(dotnetProject); } // (the kit's calls are the same from either release)
+}
+
+// A project's own workspaces that take in every folder take in none of the copy once synced (#654): the copy's package
+// list stands in the dot folder .packages/, which no pattern of npm's reaches, so the project's own npm ci, from a lock
+// npm wrote with no step taken first, passes, and npm finds no workspace; the same list in core/ itself it would take
+// in, and fail. In a folder of its own beside the synced project, with its copy, since the core's licence check asks a
+// project to name each workspace by its path.
+if (synced) {
+  const probe = path.join(tmp, "workspaces-probe");
+  fs.cpSync(path.join(synced.dir, "core"), path.join(probe, "core"), { recursive: true, filter: src => !slash(src).endsWith("/node_modules") });
+  const own = { name: "a-project", version: "1.0.0", private: true, workspaces: ["*", "**", "core/*"] };
+  write(probe, "package.json", `${JSON.stringify(own, null, 2)}\n`);
+  write(probe, "package-lock.json", `${JSON.stringify({ name: own.name, version: own.version, lockfileVersion: 3, requires: true, packages: { "": { name: own.name, version: own.version, workspaces: own.workspaces } } }, null, 2)}\n`);
+  const said = r => ({ status: r.status, out: `${r.stdout}${r.stderr}` }), at = { cwd: probe, env, encoding: "utf8", shell: process.platform === "win32" };
+  const ci = () => said(spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--offline"], at));
+  const clean = ci(), found = said(spawnSync("npm", ["pkg", "get", "name", "--workspaces"], at));
+  ok(fs.existsSync(path.join(probe, "core/.packages/package.json")) && clean.status === 0 && found.status !== 0 && /No workspaces found/u.test(found.out),
+    `${synced.name}: a project whose own workspaces are "*", "**" and "core/*" takes in nothing of its synced copy, and its own npm ci passes with no step taken`, `${clean.out}\n${found.out}`);
+  fs.copyFileSync(path.join(probe, "core/.packages/package.json"), path.join(probe, "core/package.json"));
+  fs.rmSync(path.join(probe, "node_modules"), { recursive: true, force: true });
+  const taken = ci();
+  ok(taken.status !== 0, "where the copy's package list stood in core/ itself, those workspaces would take it in, and the project's own npm ci would fail", taken.out);
+  fs.rmSync(probe, { recursive: true, force: true });
 }
 
 // A release that brings nothing a project takes asks no sync of it (#242, #342): with the copy it has just taken, the
@@ -767,9 +858,15 @@ function preRelease(name, { windows }) {
 
   // the steps and the differences name the configs where the project holds them, and read no comment as a run
   git(dir, "checkout", "-q", "main");
+  // (with nothing installed, as its own old sync script left it, the steps that read its workflows say so and go on;
+  // then installed, as the sync installs, the parser's packages with the rest, they read them)
+  const bare = node(dir, "core/scripts/steps.mjs");
+  ok(bare.status === 0 && /the core's packages are not installed, so \.github\/workflows\/\S+ could not be read: run `node core\/scripts\/install\.mjs`/u.test(bare.out),
+    `${name}: with the core's packages not installed, the steps that read its workflows say so, with the install as the mend, and the rest go on`, bare.out);
+  const installed = node(dir, "core/scripts/install.mjs", "all");
   const steps = node(dir, "core/scripts/steps.mjs"), fresh = node(dir, "core/scripts/fresh.mjs");
   const tools = steps.out.split("\n").find(l => l.startsWith("- 16 November 2026, an agent's own tools listed:")) ?? "";
-  ok(steps.status === 0 && tools.includes("`node core/scripts/agent-tools.mjs config/licences.json`") && !/checks\/(licences|copies)/.test(steps.out) && !/`(reads|takes)`/.test(steps.out),
+  ok(installed.status === 0 && steps.status === 0 && tools.includes("`node core/scripts/agent-tools.mjs config/licences.json`") && !/checks\/(licences|copies)/.test(steps.out) && !/`(reads|takes)`/.test(steps.out),
     `${name}: steps.mjs names the licence config the project's own workflow passes, never a comment's word or the starter kit's path`, steps.out);
   ok(fresh.status === 0 && !/^- checks\/(copies|copies-baseline|licences|licences-audit|sizes)\.json:/m.test(fresh.out) && !/^- config\/[\w-]+\.json: missing/m.test(fresh.out),
     `${name}: fresh.mjs compares the configs where the project holds them, and calls none at the starter kit's paths missing`, fresh.out);

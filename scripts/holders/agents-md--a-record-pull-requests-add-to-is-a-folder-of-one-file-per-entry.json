@@ -1,0 +1,5 @@
+{
+  "rule": "AGENTS.md: A record pull requests add to is a folder of one file per entry",
+  "behind": ["#750.1"],
+  "number": "check fires; outcome: fast"
+}

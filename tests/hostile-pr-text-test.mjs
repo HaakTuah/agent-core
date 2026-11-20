@@ -1,7 +1,8 @@
 // Hostile tests for one input the core reads (floor topic 5, "Every named input has hostile tests"): a pull request's
 // description, its body, which anyone who opens a pull request writes. It is read by the description check
-// (pr-description.mjs: missing, asked, waitsOn, waitsMend, and its run with PR_BODY in the env) and by the line
-// "Read for it:" (reading.mjs: listed, lineMend); the description workflows (.github/workflows/pr-description.yml and
+// (pr-description.mjs: missing, asked, waitsOn, waitsMend, reasonsMend, and its run with PR_BODY in the env) and by the line
+// "Read for it:" (reading.mjs: listed, lineMend) and the line "Never needed:" (read-total.mjs: neverNeeded, which the size
+// workflow hands it in PR_BODY); the description workflows (.github/workflows/pr-description.yml and
 // own-description.yml) hand it over in PR_BODY alone. Each case is refused: nothing of it is taken as a heading, a
 // line or a pass. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
@@ -9,8 +10,9 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { PARTS, missing, waitsMend, waitsOn } from "../scripts/pr-description.mjs";
+import { PARTS, missing, reasonsMend, waitsMend, waitsOn } from "../scripts/pr-description.mjs";
 import { lineMend, listed } from "../scripts/reading.mjs";
+import { neverNeeded } from "../scripts/read-total.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -65,7 +67,7 @@ const refused = (r) => r.status === 1 && mended(r.stdout) && !/\n\s+at /u.test(r
   ok(waitsOn("> Waits on: nothing") === null && waitsOn("<!-- Waits on: nothing -->") === null && waitsOn("**Waits on:** nothing") === null && waitsOn("`Waits on: nothing`") === null, "a waits line quoted with >, inside a comment on its line, bold or in code is no line");
   ok(waitsOn(`${whole}> Waits on: the owner: may it merge?\n`)?.kind === "nothing", "a quoted waits line after the real one does not stand in for it");
   ok(waitsOn("Waits on: <script>alert(1)</script>")?.kind === null && /in none of the forms/u.test(waitsMend("Waits on: <b>nothing</b>")), "markup in the waits line is in none of the forms");
-  ok(waitsOn("Waits on: nothing <!-- -->")?.kind === null && waitsOn("Waits on: #241 <img src=x>")?.kind === null, "markup after a right form spoils it");
+  ok(waitsOn("Waits on: nothing <!-- -->")?.kind === "nothing" && waitsOn("Waits on: #241 <img src=x>")?.said === "#241 <img src=x>", "markup after a right form is whatever follows it, kept as data (#750, point 4): the look quotes it in a code span");
   ok(listed("> Read for it: `core/floor/topics/input.md`") === null && /is missing/u.test(lineMend("<!-- Read for it: `core/floor/topics/input.md` -->", called, "cmd")), "a 'Read for it' line quoted or in a comment on its line lists nothing");
   ok(/does not list/u.test(lineMend("Read for it: <code>core/floor/topics/input.md</code>", called, "cmd")), "a file in a code tag, not backticks, is not listed");
   const r = run("<script>alert(1)</script>\n<h2>Readings taken</h2>\n");
@@ -85,7 +87,7 @@ const refused = (r) => r.status === 1 && mended(r.stdout) && !/\n\s+at /u.test(r
 
 // ---- a number out of range ----
 {
-  ok(["#-1", "#1.5", "#1e9", "#", "#0x10", "# 241", "#\u0661\u0662", "#0", "#007", "#1234567890"].every(w => waitsOn(`Waits on: ${w}`)?.kind === null), "an item that is negative, a fraction, an exponent, empty, hex, spaced, in other digits, nought, led by a nought or past nine digits is in none of the forms");
+  ok(["#-1", "#1e9", "#", "#0x10", "# 241", "#\u0661\u0662", "#0", "#007", "#1234567890", "#1-2"].every(w => waitsOn(`Waits on: ${w}`)?.kind === null), "an item that is negative, an exponent, empty, hex, spaced, in other digits, nought, led by a nought, past nine digits or a range is in none of the forms");
   ok(missing("####### What the owner can try\n####### Readings taken\n").length === 2, "seven # are no heading");
   ok(both(42e300) && both(-Infinity), "a body that is a huge or infinite number is no body");
   // (the commits' dates heldAt() reads are GitHub's, never the body's: no case of this input)
@@ -103,6 +105,34 @@ const refused = (r) => r.status === 1 && mended(r.stdout) && !/\n\s+at /u.test(r
     ok(refused(r) && /2 of 2 missing/u.test(r.stdout), `run with the body ${what}: it fails with its mend, no stack`);
   }
   ok(run(whole).status === 0, "and a right body passes, so the refusals above are the body's");
+}
+
+// the line "Reasons read:" asked of a pull request that adds a difference (#756): too long, the wrong type, markup,
+// nothing at all; none is taken for the line
+{
+  const added = ["- a difference"];
+  const slow = Date.now();
+  ok(reasonsMend(`${"Reasons read:\n".repeat(500000)}`, added) !== null && Date.now() - slow < 2000, "reasonsMend: half a million empty lines \"Reasons read:\" are none, read in no time");
+  ok([42, null, undefined, {}, [], { toString: () => "Reasons read: faked" }].every(body => mended(`FAIL ${reasonsMend(body, added)}`)), "reasonsMend: a body of the wrong type is no line, and fails with its mend");
+  ok(["**Reasons read:** x", "`Reasons read: x`", "> Reasons read: x", "<!-- Reasons read: x -->", "Reasons read:\u00a0\u200b"].every(body => reasonsMend(body, added) !== null), "reasonsMend: the label in markup, quoted, in a comment, or followed only by blanks is no line");
+  ok(reasonsMend("", added) !== null && reasonsMend("Reasons read: x", "not a list") === null && reasonsMend("", []) === null, "reasonsMend: nothing at all fails where a difference is added; with none added, nothing is asked");
+}
+
+// the line "Never needed:" the total read takes (read-total.mjs, #469): too long, the wrong type, markup, a path, nothing
+// at all; none names a file save a line of its own that says why, and none is read past its own line
+{
+  const why = "Never needed: `tasks/a.md`, since no task of that kind changes a screen.";
+  let slow = Date.now();
+  const blank = neverNeeded("\n".repeat(5 * 1024 * 1024)), spaces = neverNeeded(`${" ".repeat(5 * 1024 * 1024)}x`), many = neverNeeded(`${why}\n`.repeat(100000));
+  ok(blank.size === 0 && spaces.size === 0 && many.size === 1 && Date.now() - slow < 3000, "neverNeeded: five megabytes of blank lines or of spaces are none, and a line given a hundred thousand times is one, read in no time");
+  slow = Date.now();
+  ok(neverNeeded(`Never needed: ${"`x` ".repeat(500000)}why`).size === 1 && Date.now() - slow < 3000, "neverNeeded: a line of half a million names is read in no time");
+  ok([42, null, undefined, {}, [], { toString: () => why }].every(body => neverNeeded(body).size === 0), "neverNeeded: a body of the wrong type names nothing");
+  ok(["**Never needed:** `tasks/a.md` why", `> ${why}`, `<!-- ${why} -->`, `\`${why}\``, "Never needed: `tasks/a.md`", "Never needed: `tasks/a.md` `tasks/b.md`", "Never needed:\n`tasks/a.md` why it was never"].every(body => neverNeeded(body).size === 0),
+    "neverNeeded: the line in markup, quoted, in a comment or code, one that names files and says no why, and names on the line after are none");
+  const named = neverNeeded("Never needed: `../../etc/passwd`, `C:\\x`, `<script>`, which a polish task never opens.");
+  ok(named.size === 3 && named.has("../../etc/passwd") && named.has("<script>"), "neverNeeded: a path or markup in backticks is a name and no more, which only ever spares a file from the list of those lost");
+  ok(neverNeeded("").size === 0 && neverNeeded("Never needed:").size === 0, "neverNeeded: nothing at all names nothing");
 }
 
 process.exit(failed ? 1 : 0);

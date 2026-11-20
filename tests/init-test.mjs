@@ -60,12 +60,13 @@ const names = fs.readdirSync(path.join(root, ".github/workflows"));
 for (const [template] of FILES.filter(([t]) => t.startsWith("workflows/"))) {
   const text = fs.readFileSync(path.join(root, TEMPLATES, template), "utf8");
   const calls = [...text.matchAll(/^\s+uses: (\S+)$/gm)].map(m => m[1]);
-  const name = /^\{\{core\}\}\/\.github\/workflows\/([\w.-]+\.yml)@\{\{pin\}\}$/.exec(calls[0] ?? "")?.[1];
-  ok(calls.length === 1 && name && names.includes(name), `${template} makes one call, to a workflow of the core's, at the pin`, calls.join());
-  if (!name || !names.includes(name)) continue;
-  const called = fs.readFileSync(path.join(root, ".github/workflows", name), "utf8");
-  const required = [...called.matchAll(/^ {6}(\w+):\r?\n(?: {8}.*\r?\n)*? {8}required: true/gm)].map(m => m[1]);
-  ok(/^ {2}workflow_call:/m.test(called) && required.every(input => new RegExp(`^ {6}${input}: \\S`, "m").test(text)), `${template} calls a workflow that can be called, and gives it ${required.join(", ") || "nothing, as it requires nothing"}`);
+  const callees = calls.map(call => /^\{\{core\}\}\/\.github\/workflows\/([\w.-]+\.yml)@\{\{pin\}\}$/.exec(call)?.[1]);
+  ok(calls.length > 0 && callees.every(name => name && names.includes(name)), `${template} makes its calls each to a workflow of the core's, at the pin`, calls.join());
+  for (const name of callees.filter(name => name && names.includes(name))) {
+    const called = fs.readFileSync(path.join(root, ".github/workflows", name), "utf8");
+    const required = [...called.matchAll(/^ {6}(\w+):\r?\n(?: {8}.*\r?\n)*? {8}required: true/gm)].map(m => m[1]);
+    ok(/^ {2}workflow_call:/m.test(called) && required.every(input => new RegExp(`^ {6}${input}: \\S`, "m").test(text)), `${template} calls a workflow that can be called, and gives it ${required.join(", ") || "nothing, as it requires nothing"}`);
+  }
   ok(!/pull_request_target/.test(text) && /^permissions:\r?\n {2}contents: read\r?\n\r?\njobs:/m.test(text), `${template} gives the whole workflow contents: read and nothing more; what a job needs beyond it, the job asks for`);
 }
 // what the README leaves to the templates to say (its point 5 points here for them): each workflow's triggers and permissions
@@ -145,6 +146,39 @@ if (p.status === 0) {
   const ownGrew = sizeCheck();
   undo();
   ok(coreGrew.status === 0 && ownGrew.status === 1 && /project's own files every session reads total .*\. Mend: make them smaller/.test(ownGrew.stderr) && mended(ownGrew.stderr), "the core's copy grown by a sync fails no project's total; the project's own files grown past it do", `${coreGrew.stderr}${ownGrew.stdout}`);
+  // (a file past the split mark that a pull request changes asks the question: no line in "past", or one with no why
+  // or grown a quarter past its mark, fails with its mend; one whose line says why it stays whole passes, and one of a
+  // mark alone that stood before stands as it did; #469)
+  const marksAt = path.join(p.dir, "checks/sizes.json"), marksWas = fs.readFileSync(marksAt, "utf8");
+  const pastAs = past => { fs.writeFileSync(marksAt, JSON.stringify({ ...JSON.parse(marksWas), past })); return sizeCheck(); };
+  fs.writeFileSync(path.join(p.dir, "big.md"), `${"a line of a long record\n".repeat(2600)}`);
+  git(p.dir, "add", "big.md");
+  const big = fs.statSync(path.join(p.dir, "big.md")).size, why = "every reader of it reads it whole";
+  const [unlisted, bare, grown, kept, within, issue] = [pastAs({}), pastAs({ "big.md": big }), pastAs({ "big.md": { mark: Math.floor(big / 1.3), why } }),
+    pastAs({ "big.md": { mark: big, why } }), pastAs({ "big.md": { mark: Math.ceil(big / 1.2), why } }), pastAs({ "big.md": { mark: big, why: "#812" } })];
+  // (a line of a mark alone that stood on the base stands as before: noted while its file is within it, failed past it)
+  fs.writeFileSync(marksAt, JSON.stringify({ ...JSON.parse(marksWas), past: { "big.md": big } }));
+  git(p.dir, "commit", "-q", "-m", "a mark alone", "--", "checks/sizes.json");
+  const stood = sizeCheck();
+  fs.appendFileSync(path.join(p.dir, "big.md"), "a line more\n");
+  const stoodGrown = sizeCheck();
+  git(p.dir, "reset", "-q", "--soft", "HEAD~1");
+  // (a line that stood with its why, whose mark this pull request raises, is noted, the question asked again)
+  fs.writeFileSync(marksAt, JSON.stringify({ ...JSON.parse(marksWas), past: { "big.md": { mark: big - 100, why } } }));
+  git(p.dir, "commit", "-q", "-m", "a line with its why", "--", "checks/sizes.json");
+  const raised = pastAs({ "big.md": { mark: big + 1000, why } });
+  git(p.dir, "reset", "-q", "--soft", "HEAD~1");
+  git(p.dir, "rm", "-q", "-f", "--cached", "big.md");
+  fs.rmSync(path.join(p.dir, "big.md"));
+  fs.writeFileSync(marksAt, marksWas);
+  ok(unlisted.status === 1 && /big\.md is \d+ bytes, past the 51200-byte mark.*Mend: ask in what ways it could be split so that someone reads less/.test(unlisted.stderr) && mended(unlisted.stderr)
+    && bare.status === 1 && /big\.md is listed under "past" .* with no reason it stays whole/.test(bare.stderr) && mended(bare.stderr)
+    && grown.status === 1 && /grown more than a quarter past its mark/.test(grown.stderr) && mended(grown.stderr),
+    "a changed file past the split mark with no line, a line with no why, or one grown a quarter past its mark fails, saying its mend", `${unlisted.stderr}${bare.stderr}${grown.stderr}`);
+  ok(kept.status === 0 && within.status === 0 && issue.status === 0, "a line that says why the file stays whole, or names the split's issue, passes, its file grown less than a quarter past its mark too", `${kept.stderr}${within.stderr}${issue.stderr}`);
+  ok(stood.status === 0 && /big\.md is listed under "past" .* with a mark alone: when next you change its line/.test(stood.stdout + stood.stderr) && stoodGrown.status === 1 && /big\.md is \d+ bytes, past its mark of \d+/.test(stoodGrown.stderr) && mended(stoodGrown.stderr),
+    "a line of a mark alone that stood on the base passes while its file is within it, noted, and fails, as before, once the file grows past it", `${stood.stdout}${stood.stderr}${stoodGrown.stderr}`);
+  ok(raised.status === 0 && /big\.md: this PR raises its mark under "past" .* from \d+ to \d+, so the question is asked again/.test(raised.stdout + raised.stderr), "a mark this pull request raises on a line that stood is noted, so the reviews read its why again", `${raised.stdout}${raised.stderr}`);
   // (a copy the project adds fails the copies check, and each failure says its mend)
   undo = grow("AGENTS.md", 0);
   fs.appendFileSync(path.join(p.dir, "AGENTS.md"), `\n${fs.readFileSync(path.join(p.dir, "core/floor/security.md"), "utf8").split(/\r?\n/u).find(l => /^- It is never pushed to/u.test(l))}\n`);

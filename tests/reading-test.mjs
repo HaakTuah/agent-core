@@ -10,7 +10,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { FLOOR, FLOOR_WHEN, KINDS_BY_PATH, READ_LINE, START, asked, calledByPaths, coreAt, faults, gather, hookLine, kindsOf, leftOut, library, lineMend, listed, matches, opening, ownOf, ownPaths, reading, readsOf, taken, whenOf } from "../scripts/reading.mjs";
+import { FLOOR, FLOOR_WHEN, KINDS_BY_PATH, MAKE, PAST, READ_LINE, START, TRY, asked, budget, calledByPaths, coreAt, faults, gather, hookLine, kindsOf, leftOut, library, lineMend, listed, matches as matchesIn, opening, ownOf, ownPaths, reading, readsOf, taken, whenOf } from "../scripts/reading.mjs";
+// (each case its own reading, with a budget of its own, where it gives none)
+const matches = (pattern, file, within = budget()) => matchesIn(pattern, file, within);
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -37,6 +39,26 @@ ok(matches("CLAUDE.md", "CLAUDE.md") && matches("CLAUDE.md", "tools/CLAUDE.md") 
 ok(["Cargo.lock", "svc/yarn.lock", "bun.lockb", "packages.lock.json", "app/package-lock.json", "pnpm-lock.yaml", "npm-shrinkwrap.json", "svc/go.sum"].every(f => KINDS_BY_PATH.some(r => r.kind === "update" && matches(r.path, f))) && ["clock.json", "block.js", "padlock.md", "go.sum.txt", "package.json"].every(f => !KINDS_BY_PATH.some(r => r.kind === "update" && matches(r.path, f))),
   "a lock file of any kind is an update, and a file whose name only ends like one is not");
 ok(matches(".github/dependabot.yml", ".github/dependabot.yml") && !matches(".github/dependabot.yml", "x/.github/dependabot.yml") && matches("src/**/*.css", "src/a/b/c.css") && matches("src/*.css", "src/a.css") && !matches("src/*.css", "src/a/b.css") && !matches("a.b", "aXb") && matches("./a/", "a/b"), "a path with a folder is from the root, * within a folder and ** across them, and a dot is a dot");
+// (the matcher walks the path, never backtracking: "**/" may match nothing, the parts that stand between stars are
+// literal, and a pattern of many stars side by side that matches nothing answers at once; #673)
+const slowAt = Date.now();
+ok(matches("**/x", "x") && matches("**/x", "a/b/x") && matches("a*a", "aa") && !matches("a*a", "a") && matches("*b*", "abc") && !matches("x*", "abc") && matches("a?b", "a?b") && !matches("a?b", "axb") && matches("src/a.(x)", "src/a.(x)") && !matches(`${"*a".repeat(40)}b`, "a".repeat(200)) && !matches(`${"**/".repeat(40)}*z*z*z*q`, "a/".repeat(100)) && Date.now() - slowAt < 1000,
+  "a pattern's stars, ** across folders and literal parts match as before, and one of many stars side by side that matches nothing answers at once");
+const walkAt = Date.now();
+ok(matches("*a".repeat(200), "a".repeat(2000)) && matches(`x/${"*".repeat(100000)}y`, `x/${"z/".repeat(25000)}y`) && !matches("x/a*b", "x/a/zb") && matches("a**b", "a\nb") && !matches("x/a*b", "x/a\n/b") && Date.now() - walkAt < 2000,
+  "a pattern that passes the one-pass check is walked in time its parts times the path's length, a run of stars as one part, * never across a folder, and ** across a line's end too (where the old expression did not, so such a path calls for more, never less)");
+// (a reading's budget, #673: each try paid from it, a try past it matching, which calls for more reading, never less)
+const deep = `x/${"*a".repeat(100)}q`, near = `x/${"a/".repeat(200)}aq`;
+ok(!matches(deep, near) && matches(deep, near, budget(50000)), "a pattern whose walk would pass what is left of its reading's budget matches, calling for more reading, and one within it is walked");
+let seed = 1;
+const draw = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return Math.floor(seed / 65536) % n; };
+const pick = (from, n) => Array.from({ length: n }, () => from[draw(from.length)]).join("");
+const tries = Array.from({ length: 3000 }, () => [pick(["*", "**/", "/", "a", "b", "./"], 1 + draw(7)), pick(["/", "a", "b", "\\", "./"], draw(9)), MAKE + draw(1400)]);
+const cutShort = tries.filter(([p, f, n]) => matches(p, f, budget(n)) !== matches(p, f));
+ok(cutShort.length > 100 && cutShort.every(([p, f, n]) => matches(p, f, budget(n)) && !matches(p, f)), `whatever is left of its budget, a try answers as with all of it or matches, never less (${cutShort.length} of ${tries.length} tries cut short)`);
+const spent = budget(50000);
+ok(matches(deep, near, spent) && spent.over && spent.left === 0 && matches("a", "b", spent) && matches("x/", "y/z", spent) && !matches("a", "b") && !matches("x/", "y/z"),
+  "once a reading's budget is spent, every try after it in that reading matches, and a try with a budget of its own answers as before");
 
 // a small core
 const texts = {
@@ -82,6 +104,29 @@ ok(eq([...leftOut(listOf)], ["games.md"]) && eq([...leftOut("Floor: whole. Modul
   "a module is left out where the manifest's list does not name it and its \"Not taken:\" does; with \"all\", or a line that cannot be read, none is");
 ok(eq(files(reading(taken(lib, leftOut(listOf)), { role: "builder", kinds: ["polish"] })), ["tasks/screens.md"]) && eq(calledByPaths(taken(lib, leftOut(listOf)), ["a/site.css"], own).map(c => c.file), ["tasks/screens.md"]) && eq(reading(taken(lib, leftOut(listOf)), { role: "builder" }).start, reading(lib, { role: "builder" }).start),
   "so a kind or a path calls only the modules the project takes, and the start is the same");
+// (a reading's budget, #673: past it each kind and module whose patterns are left is called, saying so, never fewer;
+// every kind of try, and making a pattern ready, spends it, so a reading of many stops at it; a reading's own budget is
+// never another's)
+const changes = [".github/workflows/ci.yml", "README.md"], exactly = calledByPaths(lib, changes, own), cutOff = calledByPaths(lib, changes, own, budget(MAKE));
+ok(eq(exactly, [{ file: "floor/topics/workflows.md", why: "the path .github/workflows/ci.yml" }]) && exactly.every(c => cutOff.some(d => d.file === c.file)) && eq(cutOff.map(c => c.file).sort(), ["floor/topics/workflows.md", "tasks/games.md", "tasks/screens.md", "tasks/updates.md"]) && cutOff.every(c => c.why.startsWith(PAST)),
+  "a reading past its budget calls each module a path pattern or its kind names, the files it would call among them, each saying why", JSON.stringify(cutOff));
+const ofOne = paths => ({ roles: {}, modules: { "tasks/one.md": { start: false, kinds: [], paths, tools: [], others: [], roles: [] } } });
+const kindsOfTry = { "a folder": [i => `d${i}/`, j => `e${j}/x.js`], "a name exactly": [i => `n${i}.md`, j => `p/longer${j}.js`], "a pattern's ends": [i => `a${i}*z`, j => `b${j}`],
+  "its runs in order": [i => `*${i}q*z`, j => `b${j}z`], "a walk": [i => `x/*${i}*q`, j => `x/${j}/q`] };
+for (const [what, [pattern, file]] of Object.entries(kindsOfTry)) {
+  const patterns = Array.from({ length: 100 }, (_, i) => pattern(i)), within = budget(patterns.reduce((n, p) => n + MAKE + TRY * p.length, 0) + 100 * 100 * TRY / 2);
+  calledByPaths(ofOne(patterns), Array.from({ length: 100 }, (_, j) => file(j)), [], within);
+  ok(within.over, `ten thousand tries of ${what} run out a budget of half their own steps`);
+}
+const made = budget(5000 * MAKE);
+calledByPaths(ofOne(Array.from({ length: 10000 }, (_, i) => `m${i}.md`)), ["a.md"], [], made);
+ok(made.over, "making ten thousand patterns ready runs out a budget of half the steps they take");
+const hundred = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`tasks/m${i}.md`, { start: false, kinds: [], paths: Array.from({ length: 100 }, (_, j) => `q${i}x${j}/*.css`), tools: [], others: [], roles: [] }]));
+const within = budget(1 << 18), many = calledByPaths({ roles: {}, modules: hundred }, Array.from({ length: 10000 }, (_, j) => `src/p${j}/f.js`), [], within);
+ok(within.over && within.left === 0 && many.length === 100 && many.every(c => c.why === PAST), "a reading of ten thousand patterns on ten thousand paths, a hundred million tries, stops at its budget, each module then called at once");
+const before = calledByPaths(lib, [near, ...changes], own), wasted = budget(1 << 16);
+calledByPaths(ofOne(Array.from({ length: 4000 }, () => `x/${"*a".repeat(600)}q`)), [`x/${"a/".repeat(1000)}aq`], [], wasted);
+ok(wasted.over && eq(calledByPaths(lib, [near, ...changes], own), before) && !before.some(c => c.why.startsWith(PAST)), "a reading answers the same after another ran past its budget: each spends its own");
 ok(eq([...kindsOf(lib).keys()].filter(k => !Object.values(FLOOR_WHEN).some(f => f.kinds.includes(k))), ["polish", "review", "screen", "update", "workflow"]) && eq(kindsOf(lib).get("update"), ["tasks/updates.md", "floor/topics/workflows.md"]), "the kinds are those the modules name, each with its files");
 
 ok(["tasks/updates.md", "floor/topics/dependencies.md", "floor/topics/licences.md", "floor/topics/what-ships.md"].every(f => calledByPaths(library(root, ""), ["app/package-lock.json"]).some(c => c.file === f && c.why === "the path app/package-lock.json")) && calledByPaths(library(root, ""), ["a/clock.json"]).length === 0,
@@ -117,8 +162,8 @@ ok(eq(asked("**What it is**\nAn idea, `not this`.\n\n**What to read**\nThe kinds
 // the core's own files, and the script run
 const run = (cwd, ...args) => { const r = spawnSync(process.execPath, [file, ...args], { cwd, encoding: "utf8", env: { ...process.env, GITHUB_REPOSITORY: "" } }); return { status: r.status, out: r.stdout + r.stderr }; };
 const core = library(root, "");
-ok(coreAt(root) === "" && run(root, "--check").status === 0 && /each of the \d+ modules and 5 roles says when it is read/.test(run(root, "--check").out), "in the core, every module and role says when it is read", run(root, "--check").out);
-ok(["builder", "design", "orchestrator", "reviewer", "stand-in"].every(r => !reading(core, { role: r }).error) && [...kindsOf(core).values()].flat().every(f => fs.existsSync(path.join(root, f))), "the core has a file for each of its five roles, and every kind leads to files that stand");
+ok(coreAt(root) === "" && run(root, "--check").status === 0 && /each of the \d+ modules and 6 roles says when it is read/.test(run(root, "--check").out), "in the core, every module and role says when it is read", run(root, "--check").out);
+ok(["adviser", "builder", "design", "orchestrator", "reviewer", "stand-in"].every(r => !reading(core, { role: r }).error) && [...kindsOf(core).values()].flat().every(f => fs.existsSync(path.join(root, f))), "the core has a file for each of its six roles, and every kind leads to files that stand");
 let r = run(root, "builder", "--tool", "claude");
 ok(r.status === 0 && /^Read at the start, in the role builder \(each whole\):\n  floor\/security\.md\n  roles\/builder\.md\n/.test(r.out) && /  tools\/claude\.md\n/.test(r.out) && !/tools\/other-builders\.md/.test(r.out) && /Nothing more is called for by this task as given\./.test(r.out), "run for a builder, it prints the start, the tool's part in it", r.out);
 r = run(root, "reviewer", "--kind", "security-review", "--path", ".github/workflows/tests.yml", "--kind", "nonesuch");
@@ -133,7 +178,7 @@ process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
 const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
 const env = { ...outer, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
 const git = (...args) => execFileSync("git", args, { cwd: project, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-for (const part of ["floor", "tasks", "roles", "scripts", "third-party"]) fs.cpSync(path.join(root, part), path.join(project, "core", part), { recursive: true });
+for (const part of ["floor", "tasks", "roles", "scripts", ".packages"]) fs.cpSync(path.join(root, part), path.join(project, "core", part), { recursive: true });
 fs.writeFileSync(path.join(project, "core-manifest.md"), "# Core manifest\n\nFloor: whole. Modules: `screens.md`, `updates.md`, `choices.md`, `helpers.md`, `reviews.md`, `tools.md`.\nNot taken: `game-design.md` (no game).\n");
 fs.mkdirSync(path.join(project, "checks"));
 fs.writeFileSync(path.join(project, "checks", "reading.json"), `${JSON.stringify({ paths: { "src/screens/": "screen" } })}\n`);
@@ -194,6 +239,12 @@ if (process.platform !== "win32") {
 }
 const imported = spawnSync(process.execPath, ["--input-type=module", "-e", `import ${JSON.stringify(new URL("../scripts/reading.mjs", import.meta.url).href)}; console.log("imported")`, "builder"], { cwd: root, encoding: "utf8" });
 ok(imported.status === 0 && imported.stdout === "imported\n", "imported by a script named on node's command line, it runs nothing of its own", imported.stdout + imported.stderr);
+
+let unbudgeted = null;
+let handMade = null;
+try { matchesIn("*.md", "a.md"); } catch (e) { unbudgeted = e; }
+try { matchesIn("*.md", "a.md", { left: 5 }); } catch (e) { handMade = e; }
+ok(unbudgeted instanceof TypeError && /Mend:/u.test(unbudgeted.message) && handMade instanceof TypeError && /Mend:/u.test(handMade.message), "matches() given no reading's budget is refused, with its mend, so no try runs outside a reading's bound");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the reading script`);
 process.exit(failed ? 1 : 0);

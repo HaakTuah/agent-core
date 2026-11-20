@@ -4,9 +4,11 @@
 // What ships is held to floor rule 10's list, read from floor/topics/licences.md itself, so the list stands in one place; a tool
 // that only runs, to the tools' list: every licence the Open Source Initiative approves (OSI below), one on the same
 // terms, and everything what ships may be under. CC-BY is allowed only for what is named as data or assets, OFL only
-// for fonts, as the floor says. No licence, or an expression it cannot read, fails. Node's own modules only, so the
-// check needs no install. It checks the project it lies in (core/scripts/ there), whatever the directory it is started
-// from; the config's own path is read from that directory, the paths inside it from the project's root.
+// for fonts, as the floor says. No licence, or an expression it cannot read, fails. It needs no install: the config's
+// form is its schema's (scripts/schemas/licences.json, read by ajv; #530) where the core's packages are installed, and
+// its own checks' (configLists, configPaths and configScan) where they are not. It checks the project it lies in
+// (core/scripts/ there), whatever the directory it is started from; the config's own path is read from that directory,
+// the paths inside it from the project's root.
 //
 //   node core/scripts/licences.mjs <config>            the check
 //   node core/scripts/licences.mjs <config> --action   the dependency review's lists, as lines for $GITHUB_OUTPUT
@@ -37,6 +39,7 @@ import { fileURLToPath } from "node:url";
 import { inProject, leadsOut, logged, parseBounded } from "./guards.mjs";
 import { scan } from "./licence-scan.mjs";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
+import { shapeFaults } from "./schemas.mjs";
 import { started } from "./started.mjs";
 import { projectAt } from "./core-path.mjs";
 
@@ -205,10 +208,15 @@ export function licenceOk(expression, allow) {
   }
 }
 
-/** The package a registry tarball address names (`https://registry.npmjs.org/<name>/-/<file>.tgz`), or undefined. */
+/** The package a registry tarball address names (`https://registry.npmjs.org/<name>/-/<file>.tgz`), or undefined: only
+ *  an address in its one plain form, which a URL parser reads as it is written, and a name of the characters npm's
+ *  names are spelled in, never starting with a dot or an underscore, so the name read is the package the address
+ *  fetches. The pattern alone refuses every address a URL parser would rewrite; the parser's own reading is asked as
+ *  well, so that a change to the pattern cannot let one through. */
 export function registryName(resolved) {
-  const match = /^https:\/\/registry\.npmjs\.org\/((?:@[^/]+\/)?[^/@]+)\/-\/[^/]+\.tgz$/u.exec(resolved ?? "");
-  return match?.[1];
+  const match = /^https:\/\/registry\.npmjs\.org\/((?:@[A-Za-z0-9~-][\w.~-]*\/)?[A-Za-z0-9~-][\w.~-]*)\/-\/[A-Za-z0-9~-][\w.~+-]*\.tgz$/u.exec(resolved ?? "");
+  if (!match) return undefined;
+  try { return new URL(resolved).href === resolved ? match[1] : undefined; } catch { return undefined; }
 }
 
 /** The version a registry tarball address names (`.../-/<name>-<version>.tgz`, the name without its scope), or undefined. */
@@ -250,6 +258,13 @@ export function shippedPaths(packages, workspaces, manifest) {
   return seen;
 }
 
+// The lines of an `.npmrc` as npm reads them: split at each line feed and each carriage return, alone or together,
+// after a leading byte-order mark. A line that holds a line or paragraph separator reads otherwise to npm than to the
+// patterns below, so it is never one of the settings they vouch for: listed, and never counted as set. Every other
+// space npm trims as they do, so a line that holds neither separator nor a lone carriage return reads as before.
+const npmrcLines = (npmrc) => npmrc.replace(/^\uFEFF/u, "").split(/[\r\n]+/u);
+const plain = (line) => !/[\u2028\u2029]/u.test(line);
+
 /**
  * The lines of an `.npmrc` that are not one of a few settings known to leave where npm fetches from alone: npm reads
  * keys in many spellings (quoted, scoped, from variables), so anything else, a registry or `replace-registry-host` above
@@ -257,18 +272,18 @@ export function shippedPaths(packages, workspaces, manifest) {
  */
 export function registryOverrides(npmrc) {
   const harmless = /^((fund|audit|update-notifier|engine-strict|save-exact|progress|loglevel)\s*=\s*[\w.-]*|ignore-scripts\s*=\s*true|min-release-age\s*=\s*\d{1,5})$/u;
-  return npmrc.split(/\r?\n/u).map((l) => l.trim()).filter((l) => l && !/^[#;]/u.test(l) && !harmless.test(l));
+  return npmrcLines(npmrc).filter((l) => l.trim() && !/^[#;]/u.test(l.trim()) && !(plain(l) && harmless.test(l.trim()))).map((l) => l.trim());
 }
 
 /** Whether an `.npmrc` keeps packages' own install scripts off (floor rule 15): `ignore-scripts=true`, never undone. */
 export function scriptsOff(npmrc) {
-  return npmrc.split(/\r?\n/u).some((l) => /^ignore-scripts\s*=\s*true$/u.test(l.trim()));
+  return npmrcLines(npmrc).some((l) => plain(l) && /^ignore-scripts\s*=\s*true$/u.test(l.trim()));
 }
 
 /** The week's wait an `.npmrc` sets (floor rule 7: a new release is taken once it is WAIT days old): the days its last
  *  `min-release-age` line gives, which npm reads from version 11.10 on, or null where it gives none. */
 export function releaseAge(npmrc) {
-  const days = npmrc.split(/\r?\n/u).map((l) => /^min-release-age\s*=\s*(\d{1,5})$/u.exec(l.trim())?.[1]).filter(Boolean).at(-1);
+  const days = npmrcLines(npmrc).map((l) => (plain(l) ? /^min-release-age\s*=\s*(\d{1,5})$/u.exec(l.trim())?.[1] : undefined)).filter(Boolean).at(-1);
   return days === undefined ? null : Number(days);
 }
 export const WAIT = 7;
@@ -328,9 +343,7 @@ const ACCEPTED_NPM = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*@[0
 /** The config, read and checked: a key it does not know, or one of the wrong shape, would check less without a word. */
 export function loadConfig(path) {
   let config = configRead(path);
-  configLists(config);
-  configPaths(config);
-  if (config.scan !== undefined) configScan(config);
+  configShape(config);
   within(config);
   config = normalised(config);
   const beside = (config.lockfiles ?? []).map((f) => posix.join(posix.dirname(f), "package.json"));
@@ -352,6 +365,24 @@ function configRead(path) {
   return config;
 }
 
+const NOTHING = 'the config names nothing to check. Mend: name the lockfiles in "lockfiles", or the audit\'s file in "audit"';
+
+/** The config's form: its schema's, the first fault refused, where ajv is installed; else the checks below. Then, either
+ *  way, what a schema cannot say: that it names something to check, and that each path of its scan is written as git
+ *  lists it. */
+function configShape(config) {
+  const faults = shapeFaults("licences", config);
+  if (faults === null) {
+    configLists(config);
+    configPaths(config);
+    if (config.scan !== undefined) configScan(config);
+  } else if (faults.length) throw new Error(faults[0]);
+  if (!config.lockfiles?.length && !config.audit) throw new Error(NOTHING);
+  for (const key of ["served", "tools", "skip"]) {
+    if (!(config.scan?.[key] ?? []).every((p) => scanPathOk(key, p))) throw new Error(`the config's "scan.${key}" is not a list of paths in the project. Mend: list each as a path from the project's root`);
+  }
+}
+
 /** The config's keys, each one it knows, its lists each a list of names, and "ships" among them. */
 function configLists(config) {
   const lists = ["lockfiles", "ships", "data", "fonts", "ignoreScriptsIn"];
@@ -369,7 +400,7 @@ function configLists(config) {
 /** The config's "audit" and "notices", each a path where it stands, and something named to check. */
 function configPaths(config) {
   if (config.audit !== undefined && (typeof config.audit !== "string" || !config.audit)) throw new Error('the config\'s "audit" is not a path. Mend: name the audit\'s file, or take "audit" out');
-  if (!config.lockfiles?.length && !config.audit) throw new Error('the config names nothing to check. Mend: name the lockfiles in "lockfiles", or the audit\'s file in "audit"');
+  if (!config.lockfiles?.length && !config.audit) throw new Error(NOTHING);
   if (config.notices !== undefined && (typeof config.notices !== "string" || !config.notices || !config.audit)) throw new Error('the config\'s "notices" is not a path, or the config names no "audit" whose entries it holds. Mend: name the notices file by its path, beside an "audit", or take "notices" out');
 }
 

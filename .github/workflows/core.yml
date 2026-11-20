@@ -21,8 +21,11 @@
 # copies.yml's (copies, sizes), pr-description.yml's (description, parts), signatures.yml's (signatures) and nuget.yml's
 # (nuget, advisory), each through the copy's scripts/checks.mjs, which holds their steps and says what each holds, as
 # those workflows run it. They run only where every step of its own check passed, so a copy not proved the core runs
-# nothing here; then each runs even where one of them before it failed, so every failure is said; the package
-# checks go last, each in a step of its own, and the NuGet check, which runs the pull request's build files, after all.
+# nothing here; then each runs even where one of them before it failed, so every failure is said; the code scan of a
+# project the host's CodeQL does not scan follows them, with any of those inputs and none of its own, its engine
+# installed from the core's .packages/requirements.txt by its hashes in a step before it (scripts/code-scan.mjs; #546, #654); the
+# package checks go last, each in a step of its own, and the NuGet check, which runs the pull request's build files,
+# after all.
 # One job bills one runner's minutes where four or five did (#377); with no such input it runs its own check alone, as
 # before.
 name: core
@@ -72,8 +75,8 @@ permissions:
 jobs:
   core:
     runs-on: ubuntu-latest
-    # (each part's own: this check 5 minutes, those of the copy's scripts 5, each package check 10)
-    timeout-minutes: ${{ (inputs.signatures != '' && inputs.nuget != '') && 30 || (inputs.signatures != '' || inputs.nuget != '') && 20 || (inputs.copies != '' || inputs.description) && 10 || 5 }}
+    # (each part's own: this check 5 minutes, those of the copy's scripts 5, the code scan 5, each package check 10)
+    timeout-minutes: ${{ (inputs.signatures != '' && inputs.nuget != '') && 35 || (inputs.signatures != '' || inputs.nuget != '') && 25 || (inputs.copies != '' || inputs.description) && 15 || 5 }}
     # (a pull request's run gives way to a newer one for the same pull request, whose head it no longer is; a run on
     # main, a schedule or a start by hand is its own group and is never cancelled; #388)
     concurrency:
@@ -151,7 +154,7 @@ jobs:
               src=.lib-at-pin rev=$(git ls-tree HEAD -- "$lib" | cut -d ' ' -f 3 | cut -f 1)
               name=$(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null | awk -v p="$lib" '$2 == p { sub(/^submodule\./, "", $1); sub(/\.path$/, "", $1); print $1; exit }' || true)
               url=""; [ -z "$name" ] || url=$(git config -f .gitmodules --get "submodule.$name.url" 2>/dev/null || true)
-              if [[ ! "$url" =~ ^https://[A-Za-z0-9.-]+/[A-Za-z0-9._/-]+$ ]] || ! git init -q "$src" || ! git -C "$src" fetch -q --depth 1 --no-tags "$url" "$rev"; then
+              if [[ ! "$url" =~ ^https://[A-Za-z0-9.-]+/[A-Za-z0-9._/-]+$ ]] || ! git init -q "$src" || ! git -C "$src" fetch -q --no-auto-maintenance --depth 1 --no-tags "$url" "$rev"; then
                 echo "FAIL the library $lib, a submodule that carries the core, could not be fetched at the commit pinned here, $rev, from an https address .gitmodules names, so the core it carries cannot be checked. Mend: give the submodule an https address this check can fetch with no token, or commit the library's files in this repository."; exit 1
               fi
             elif [ "$kind" = "040000 tree" ]; then
@@ -194,6 +197,12 @@ jobs:
           [ -n "$copy" ] || copy="HEAD:${at%/}" # (where the copy is read: a repository's git folder, and a commit's folder)
           { echo "sha=$pin"; echo "at=$at"; echo "library=$library"; echo "floor=$floor"; echo "src=$src"; echo "copy=$copy"; } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # (its fetch of the core's whole history starts no upkeep of git's own, which would go on writing the folder behind
+        # the check and race the step that removes it; #802)
+        env:
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: maintenance.auto
+          GIT_CONFIG_VALUE_0: "false"
         with:
           repository: ${{ env.CORE }}
           ref: ${{ steps.pin.outputs.sha }}
@@ -237,7 +246,7 @@ jobs:
             diff <(printf '%s\n' "$want") <(printf '%s\n' "$have") | grep '^[<>]' | head -n 20 || true
             bad=1
           fi
-          if ! git -C .core-at-pin fetch -q --no-tags origin refs/heads/main \
+          if ! git -C .core-at-pin fetch -q --no-auto-maintenance --no-tags origin refs/heads/main \
             || ! git -C .core-at-pin merge-base --is-ancestor "$PIN" FETCH_HEAD; then
             echo "FAIL the pin $PIN is not a commit of the core's main. Mend: sync to a commit of the core's main (node ${AT}scripts/sync.mjs), which moves the pin and the copy together."; bad=1
           fi
@@ -269,7 +278,7 @@ jobs:
           # the agent tools they run in, read as data: each tool named there, and its last verdict of each of the two; a
           # tool that has never run them has not passed)
           record='{"runs":[]}' tools='{"tools":[]}'
-          if git -C .core-at-pin fetch -q --no-tags origin refs/heads/main; then
+          if git -C .core-at-pin fetch -q --no-auto-maintenance --no-tags origin refs/heads/main; then
             record=$(git -C .core-at-pin show FETCH_HEAD:reports/staged-cases.json 2>/dev/null || echo '{"runs":[]}')
             tools=$(git -C .core-at-pin show FETCH_HEAD:scripts/staged-tools.json 2>/dev/null || echo '{"tools":[]}')
           fi
@@ -313,6 +322,8 @@ jobs:
         # (only where every step of this check passed: a copy not proved the core runs nothing here)
         if: ${{ success() && (inputs.copies != '' || inputs.description || inputs.signatures != '' || inputs.nuget != '') }}
         run: |
+          # (each fetch into them starts no upkeep of git's own, which would go on writing there behind the step and race
+          # this removal; #802)
           rm -rf .core-at-pin .lib-at-pin # (this check's own fetches, which no check after it reads as the project's)
           at=$(sed -n -E 's#^Core: [^ ]+( at [0-9a-f]{40}, copied whole|, carried by (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)) under (([A-Za-z0-9_][A-Za-z0-9._-]*/)+)( .*)?$#\4 \2#p' core-manifest.md 2>/dev/null | head -n 1)
           set -- ${at:-core/}; [ -z "${2:-}" ] || [ -e "$1scripts" ] || git submodule update --init --depth 1 -- "${2%/}" || { echo "FAIL the library ${2%/}, a submodule that carries the core, could not be fetched here. Mend: commit the library's files in this repository, or make the submodule one this workflow can fetch with no token."; exit 1; }; echo "CORE_AT=$1" >> "$GITHUB_ENV"
@@ -320,6 +331,11 @@ jobs:
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' }}
         with:
           node-version-file: ${{ env.CORE_AT }}.node-version # the one exact Node ("Node" in the core's tasks/updates.md)
+      - name: The core's packages, installed from its lock file for the core's checks (#654), and the parser's where the copies checks run the shape check (#719)
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' }}
+        env:
+          COPIES: ${{ inputs.copies }}
+        run: if [ -f "${CORE_AT}scripts/install.mjs" ]; then if [ -n "$COPIES" ] && [ -f "${CORE_AT}.packages/parser/package.json" ]; then node "${CORE_AT}scripts/install.mjs" all; else node "${CORE_AT}scripts/install.mjs"; fi; fi
       - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.copies != '' }}
         timeout-minutes: 5
@@ -338,6 +354,27 @@ jobs:
           GH_TOKEN: ${{ github.token }} # (read only: the base's commits and copy, and the issues a pull request queues or closes)
           PARTS: ${{ inputs.parts }}
         run: node "$CORE_AT"scripts/checks.mjs description --parts "$PARTS"
+      # (the code scan of a private project, #546: where no workflow of the base calls the core's codeql.yml, Semgrep's
+      # engine is installed from the core's .packages/requirements.txt by its wheels' hashes, with the runner's pip, before the scan
+      # runs and only where the change adds or alters a file the scan reads (#654), and reads those files with the core's
+      # rules, failing a finding the base did not hold; an engine not installed fails the scan, saying how to install it)
+      - name: The code scan, which a call with no input does not run
+        if: ${{ success() && steps.core-at.outcome == 'skipped' }}
+        run: 'echo "code scan: not run: core.yml was called with none of its inputs, so the copy''s scripts do not run here; the one job of the core''s setup/sync-notes.md, \"17 November 2026, the checks as one job\", runs it"'
+      - name: The code scan's engine, installed from the core's lock file where the host's CodeQL does not scan the project
+        id: scan-engine
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' }}
+        timeout-minutes: 5
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
+        run: node "$CORE_AT"scripts/code-scan.mjs --install ${BASE:+--base "$BASE"}
+      - name: The code scan
+        if: ${{ !cancelled() && steps.core-at.outcome == 'success' && steps.scan-engine.outcome == 'success' }}
+        timeout-minutes: 5
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node "$CORE_AT"scripts/code-scan.mjs ${BASE:+--base "$BASE"}
       - name: The signature check
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.signatures != '' && github.event_name == 'pull_request' }}
         timeout-minutes: 10

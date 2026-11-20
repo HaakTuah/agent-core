@@ -8,7 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ARGUED, UNREAD, DAYS, KIT, LISTED, MEASURES, MOST, TITLE, TRIPPED, argued, atCommit, baseRecords, checkOf, due, look, parse, records, report, signs, tripped, trippedBody, where } from "../scripts/choices.mjs";
+import { ARGUED, UNREAD, DAYS, KIT, LINK, LISTED, MEASURES, MOST, TITLE, TRIPPED, argued, atCommit, baseRecords, checkOf, due, look, parse, records, report, signs, tripped, trippedBody, where } from "../scripts/choices.mjs";
 import { DUE } from "../scripts/look.mjs";
 import { mended } from "../scripts/mend.mjs";
 
@@ -66,6 +66,13 @@ ok(/`design\.md` holds 2/.test(look({ manifest: "| *choice records* | `design.md
 const core = project("core", { "AGENTS.md": "the *choice records*: `CHOICES.md`;", "CHOICES.md": file("2026-01-01") });
 const ofCore = look({ manifest: null, at: at("2027-06-01"), root: core }).body ?? "";
 ok(/`CHOICES\.md`/.test(ofCore) && /`node scripts\/choices\.mjs`/.test(ofCore) && /`tasks\/choices\.md`/.test(ofCore), "in the core, its AGENTS.md names the file and the paths are the core's own", ofCore);
+ok(!/INVENTORY\.md/.test(ofCore) && !/INVENTORY\.md/.test(body), "where no inventory stands, the pass asks nothing of one");
+fs.writeFileSync(path.join(kit, "INVENTORY.md"), "# A project's own list\n");
+ok(!/INVENTORY\.md/.test(look({ manifest: "", at: at("2027-06-01"), root: kit }).body ?? ""), "a project with a file of that name is asked nothing of it: the question is the core's own");
+fs.writeFileSync(path.join(core, "INVENTORY.md"), "# The core's parts\n\nWeighed whole: 2026-11-17\n");
+const withInventory = look({ manifest: null, at: at("2027-06-01"), root: core }).body ?? "";
+ok(/`INVENTORY\.md` marks keep or try/.test(withInventory) && /"Weighed whole:"/.test(withInventory) && /A part is asked again/.test(withInventory),
+  "in the core, where its inventory stands, the pass asks of each part kept or tried whether something maintained now does it");
 const linked = project("linked", { "real.md": file("2020-01-01") });
 fs.mkdirSync(path.join(linked, "docs"), { recursive: true });
 let link = true;
@@ -212,10 +219,38 @@ ok(baseRecords(slotted, hist) === `${old}\n${half}` && baseRecords(empty, hist) 
 // a records file that was a link at the base stays unread there, so nothing in it fails
 fs.writeFileSync(path.join(hist, "target.md"), half); fs.rmSync(path.join(hist, "records.md")); fs.symlinkSync("target.md", path.join(hist, "records.md"));
 h("add", "-A"); h("commit", "-q", "-m", "a link"); const linkedAt = h("rev-parse", "HEAD").trim();
-ok(atCommit(linkedAt, "records.md", hist) === undefined && atCommit(linkedAt, "target.md", hist) === half, "a file that is a link at a commit is not read there, and a file is");
-ok(checkOf({ file: "records.md", unread: "a link" }, linkedAt, hist)[1] === false && checkOf({ file: "records.md", text: half }, linkedAt, hist)[1] === false,
-  "records that were a link at the base fail nothing, still a link or made a file");
+ok(atCommit(linkedAt, "records.md", hist) === LINK && atCommit(linkedAt, "target.md", hist) === half && baseRecords(linkedAt, hist) === LINK, "a file that is a link at a commit is not read there, and reads as a link, apart from no commit, and a file is read (#541)");
+const madeFile = checkOf({ file: "records.md", text: half }, linkedAt, hist);
+ok(checkOf({ file: "records.md", unread: "a link" }, linkedAt, hist)[1] === false && madeFile[1] === false && /^The base held the records as a link, which is not read, so no record/.test(madeFile[0][0]) && !/no commit here/.test(madeFile[0].join("\n")) && /listed, not failed: "half"/.test(madeFile[0].join("\n")),
+  "records that were a link at the base fail nothing, still a link or made a file, each listed, and the line says the base held a link", madeFile[0].join("\n"));
+// the manifest a link at the base: where it put the records is not read, so they read as a link too
+fs.renameSync(path.join(hist, "core-manifest.md"), path.join(hist, "manifest-target.md")); fs.symlinkSync("manifest-target.md", path.join(hist, "core-manifest.md"));
+h("add", "-A"); h("commit", "-q", "-m", "a linked manifest"); const manifestLinked = h("rev-parse", "HEAD").trim();
+ok(baseRecords(manifestLinked, hist) === LINK && /^The base held the records as a link/.test(checkOf({ file: "records.md", text: half }, manifestLinked, hist)[0][0]), "and so do records named by a manifest that was a link at the base");
 fs.rmSync(hist, { recursive: true, force: true });
+// the two cases a link must not reach (#541's review): an AGENTS.md that is a link, where no manifest names the records,
+// still has them read at the kit's path, so an unargued record the change adds fails; and records under a folder that
+// was a link at the base read as a link, so the records that stood there are listed, not failed
+const repo = (files, links = {}) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "choices-link-"));
+  const g = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  g("init", "-q", "-b", "main");
+  for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
+  for (const [f, to] of Object.entries(links)) fs.symlinkSync(to, path.join(dir, f));
+  g("add", "-A"); g("commit", "-q", "-m", "base");
+  return { dir, at: g("rev-parse", "HEAD").trim() };
+};
+if (link) {
+  const agents = repo({ "CLAUDE.md": "# rules\n", "docs/choices.md": old }, { "AGENTS.md": "CLAUDE.md" });
+  const added = checkOf({ file: "docs/choices.md", text: `${old}\n${half}` }, agents.at, agents.dir);
+  ok(baseRecords(agents.at, agents.dir) === old && added[1] === true && /FAIL: `docs\/choices\.md`: the record "half", which this change adds/.test(added[0].join("\n")),
+    "an AGENTS.md that is a link at the base, with no manifest, leaves the records read at the kit's path, and an unargued record the change adds fails", added[0].join("\n"));
+  const folder = repo({ "real/choices.md": old }, { docs: "real" });
+  const moved = checkOf({ file: "docs/choices.md", text: old }, folder.at, folder.dir);
+  ok(atCommit(folder.at, "docs/choices.md", folder.dir) === LINK && moved[1] === false && /^The base held the records as a link/.test(moved[0][0]) && /listed, not failed: "old"/.test(moved[0].join("\n")),
+    "records under a folder that was a link at the base read as a link, and those that stood there are listed, not failed", moved[0].join("\n"));
+  for (const r of [agents, folder]) fs.rmSync(r.dir, { recursive: true, force: true });
+}
 
 fs.rmSync(tmp, { recursive: true, force: true });
 {

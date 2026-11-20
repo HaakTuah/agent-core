@@ -1,5 +1,6 @@
-// Checks the measures of how a codebase is put together (scripts/code-shape.mjs): its reader against
-// brackets in comments, strings, template literals, regular expressions and JSX, each measure on a few files made for it,
+// Checks the measures of how a codebase is put together (scripts/code-shape.mjs): its readers against
+// brackets in comments, strings, template literals, regular expressions and JSX, its functions on the parser
+// (scripts/javascript-functions.mjs) among them, with each case the lexer before it misread, each measure on a few files made for it,
 // and a whole run in a scratch project that holds the core's copy, with its history and its suites. Run by the core's
 // tests workflow (.github/workflows/tests.yml).
 //
@@ -9,13 +10,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { changedTogether, cycles, functions, globals, imports, isModule, jsxIn, measure, tokens } from "../scripts/code-shape.mjs";
+import { changedTogether, cycles, globals, imports, isModule, jsxIn, measure, tokens } from "../scripts/code-shape.mjs";
+import { javascriptFunctions } from "../scripts/javascript-functions.mjs";
+import { LARGEST } from "../scripts/tree-walk.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const here = fileURLToPath(new URL("../scripts/", import.meta.url));
-const fn = src => functions(tokens(src)).map(f => `${f.name}:${f.line}:${f.lines}:${f.depth}`);
+const functions = (src, file = "a.mjs") => javascriptFunctions(file, src);
+const fn = (src, file) => functions(src, file).map(f => `${f.name}:${f.line}:${f.lines}:${f.depth}`);
 
 // The reader: no bracket in a comment, string, template or regular expression is counted.
 const tricky = [
@@ -39,7 +43,25 @@ ok(same(fn("const q = (a) / 2 / (b) / 3;\nfunction e() {\n  return 1;\n}\n"), ["
 ok(same(fn("#!/usr/bin/env node\nexport default async function main() {\n  return 1;\n}\n"), ["main:2:3:0"]), "a hashbang is passed over");
 
 // Branch points: each if, loop, case and catch, and each and, or and choice within a line; a function within is its own.
-const br = src => functions(tokens(src)).map(f => `${f.name}:${f.branches}`);
+const br = (src, file) => functions(src, file).map(f => `${f.name}:${f.branches}`);
+// (a large file is read in time, in step with its size, well within the suite's time mark)
+const regexes = src => tokens(src).filter(t => t.t === "regex" || t.v === "/").map(t => t.v);
+ok(same(regexes("x = /[/]/g;\n"), ["/[/]/g"]) && same(regexes("x = /a\\/b/;\n"), ["/a\\/b/"]) && same(regexes("x = /a\\\nb/;\n"), ["/a\\\nb/"]) && same(regexes("x = /a[\\]/]b/i;\n"), ["/a[\\]/]b/i"]) && same(regexes("x = /a\ny/;\n"), ["/", "/"]),
+  "a regular expression ends at its first / outside a class and an escape, an escape carries past a line's end, and a line's end with no / is no regular expression");
+ok(tokens(`x = ${"/[".repeat(300000)}\n`).length === 600002, "a large line is read in time, in step with its size");
+// (a large file whose brackets do not pair is not JavaScript, so its functions cannot be told: the grammar's recovery
+// from it grows faster than its size, and its time is cut at the reader's budget; one of slashes, unbudgeted, took more
+// than two minutes, and one just under the largest the grammar is given is cut at the budget, not left out by its size)
+const unclosed = functions(`function f() {\n${"x =(:\n".repeat(10000)}${"[\n".repeat(10000)}${"]".repeat(5000)}}\n`);
+const slashed = functions(`x = ${"/[".repeat(LARGEST.javascript / 2 - 3)}\n`);
+ok(unclosed === null && slashed === null, "a large file that is no JavaScript is lost, its functions not told, within the suite's time mark");
+// (one past the largest the grammar is given, valid or not, is lost unread: its tree's memory, not its time, is what a
+// generated file of data would cost; the fallback security review of #785)
+const words = n => `export const WORDS = [${Array.from({ length: n }, (_, k) => `"w${k}"`).join(", ")}];\nfunction f() {\n  return 1;\n}\n`;
+ok(words(LARGEST.javascript / 12).length <= LARGEST.javascript && same(fn(words(LARGEST.javascript / 12), "a.mjs"), ["f:2:3:0"]) && words(LARGEST.javascript / 8).length > LARGEST.javascript && functions(words(LARGEST.javascript / 8)) === null,
+  "a file past the largest the grammar is given is lost unread, and one under it is read whole");
+const many = functions(`function f(a) {\n${"  if (a) { a = a ?? 1; }\n".repeat(10000)}}\n`);
+ok(same(many?.map(f => `${f.name}:${f.lines}:${f.depth}:${f.branches}`), ["f:10002:1:20000"]), "a large file that is JavaScript is read whole", JSON.stringify(many));
 const branching = [
   "function g(a, b) {",
   "  if (a && b || a?.c) { return a ? 1 : 2; } else if (b ?? a) { a ||= b; }",
@@ -53,7 +75,7 @@ const branching = [
 ].join("\n");
 ok(same(br(branching), ["g:13", "inner:2"]), `each if, loop, case and catch counts, and each and, or and choice; not a key, a member, a string, a regular expression or a single & or | (${br(branching)})`);
 const optional = "function h(a?: number, b?: string): void {\n  const c: A | B = a?.[0] ?? b!;\n  type T = { x?: number };\n  if (a) { use<T>(c); }\n}\n";
-ok(same(br(optional), ["h:2"]), `TypeScript's optional marks and unions are no branch points (${br(optional)})`);
+ok(same(br(optional, "a.ts"), ["h:2"]), `TypeScript's optional marks and unions are no branch points (${br(optional, "a.ts")})`);
 
 // Every form of a function, TypeScript's return types and type parameters among them.
 const forms = [
@@ -71,7 +93,34 @@ const forms = [
   "list.map(v => { return v; });",
   "label: { const inner = 1; }",
 ].join("\n");
-ok(same(fn(forms), ["method:2:1:0", "size:3:1:0", "key:5:1:0", "arrow:5:1:0", "typed:6:3:0", "f:9:3:0", "(anonymous):12:1:0"]), `every form of a function is found, and no other block (${fn(forms)})`);
+ok(same(fn(forms, "a.ts"), ["method:2:1:0", "size:3:1:0", "key:5:1:0", "arrow:5:1:0", "typed:6:3:0", "f:9:3:0", "(anonymous):12:1:0"]), `every form of a function is found, and no other block (${fn(forms, "a.ts")})`);
+// (a parameter's default is named by its parameter, in each grammar: TypeScript's writes it as a parameter with a value,
+// JavaScript's as an assignment pattern)
+const defaults = "function outer(cb = () => { return 1; }, h: H = function () { }) {}\n";
+ok(["a.ts", "a.tsx"].every(f => same(fn(defaults, f), ["cb:1:1:0", "h:1:1:0", "outer:1:1:0"])) && same(fn(defaults.replace(": H", ""), "a.js"), ["cb:1:1:0", "h:1:1:0", "outer:1:1:0"]),
+  `a function given as a parameter's default is named by its parameter (${fn(defaults, "a.ts")})`);
+
+// What the lexer before the parser misread, read as the definition says (#530, item 6; #723): a regular expression in a
+// template literal's code, which ran the lexer to the file's end and lost every function after it; a choice's : taken
+// for a key's or a return type's; a method named by a computed key or a string; an object's type as a return type; a
+// choice of types counted as a branch; a variable's type taken for its name; a call after extends taken for a function.
+const misread = [
+  ["export function a(e) {\n  return `x ${/ Mend: /u.test(e) ? `a` : `b`}`;\n}\nfunction b() {\n  if (x) { y(); }\n}\n", "a.mjs", ["a:1:3:0:1", "b:4:3:1:1"]],
+  ["function f(r) {\n  const read = rev ? commit.read\n    : g => {\n      return g;\n    };\n}\n", "a.mjs", ["f:1:6:0:1", "(anonymous):3:3:0:0"]],
+  ["function f() {\n  return got ? asked(repo, got) : refused ? { yes: false } : null;\n}\n", "a.mjs", ["f:1:3:0:2"]],
+  ["class A {\n  [Symbol.iterator]() {\n    return 1;\n  }\n  'quoted'() { return 2; }\n  #own() { return 3; }\n}\n", "a.mjs", ["(anonymous):2:3:0:0", "quoted:5:1:0:0", "#own:6:1:0:0"]],
+  ["function f(): { a: number } {\n  if (x) { return { a: 1 }; }\n  return { a: 2 };\n}\n", "a.ts", ["f:1:4:1:1"]],
+  ["function f<T>(x: T): T extends string ? 1 : 2 {\n  return x ? 1 : 2;\n}\n", "a.ts", ["f:1:3:0:1"]],
+  ["const handle: Handler = () => {\n  return 1;\n};\n", "a.ts", ["handle:1:3:0:0"]],
+  ["class A extends mixin(B) {\n  m() { return 1; }\n}\n", "a.mjs", ["m:2:1:0:0"]],
+  ["const f = <T>(x: T) => {\n  return x;\n};\n", "a.tsx", ["f:1:3:0:0"]],
+];
+const told = (src, file) => functions(src, file)?.map(f => `${f.name}:${f.line}:${f.lines}:${f.depth}:${f.branches}`) ?? null;
+ok(misread.every(([src, file, want]) => same(told(src, file), want)), "what the lexer misread is read as the definition says", JSON.stringify(misread.map(([src, file]) => told(src, file))));
+// TypeScript's words newer than its grammar (export type *, a type's parameter marked in or out) are errors of words
+// alone, which pair no block: the functions around them are told; an error of any other sign loses the file.
+ok(same(told("export type * from './t';\ninterface I<in out T> { x: T }\nfunction f() {\n  return 1;\n}\n", "a.ts"), ["f:3:3:0:0"]) && told("function f() {\n  return 1;\n}\nconst x = ];\n", "a.mjs") === null,
+  "a word the grammar does not know leaves the functions around it told; any other error loses the file");
 
 // What a file imports, and the names it takes.
 const imps = imports(tokens([
@@ -110,7 +159,7 @@ const app = [
   "  return (",
   "    <div className=\"app\" onClick={() => { if (x) go(); }}>",
   "      {/* don't { */}",
-  "      <h1>Don't {label} } {'{'}</h1>",
+  "      <h1>Don't {label} {'}'} {'{'}</h1>",
   "      {items.length > 0 && items.map(i => <Item key={i.id} {...i} />)}",
   "      <>",
   "        <List<string> data={[1, 2]} render={(v) => v < 2 ? <b>{v}</b> : null} />",
@@ -121,15 +170,19 @@ const app = [
   "const f = <T,>(x: T) => { return x; };",
   "function after(a) { return a < 3 && a > 1 && (a << 2) < 9 && a++ < 4; }",
 ].join("\n");
-const jsx = tokens(app, true);
-ok(!jsx.lost && same(functions(jsx).map(f => `${f.name}:${f.line}:${f.lines}:${f.depth}:${f.branches}`), ["App:2:13:0:3", "(anonymous):5:1:0:1", "(anonymous):15:1:0:0", "after:16:1:0:3"]) && same(imports(jsx).map(i => i.spec), ["react"]),
-  `a component's lines, depth and branch points are read through its JSX, the code in its braces as code, its text and quotes as text (${functions(jsx).map(f => `${f.name}:${f.line}:${f.lines}:${f.depth}:${f.branches}`)})`);
+const jsx = tokens(app, true), shown = (functions(app, "a.tsx") ?? []).map(f => `${f.name}:${f.line}:${f.lines}:${f.depth}:${f.branches}`);
+ok(!jsx.lost && same(shown, ["App:2:13:0:3", "(anonymous):5:1:0:1", "f:15:1:0:0", "after:16:1:0:3"]) && same(imports(jsx).map(i => i.spec), ["react"]),
+  `a component's lines, depth and branch points are read through its JSX, the code in its braces as code, its text and quotes as text, and an arrow after its type's parameters (<T,>) named as any other (${shown})`);
+ok(functions(app.replace("{'}'}", "}"), "a.tsx") === null && functions("const x = <div>\n  <p>open\n", "a.jsx") === null,
+  "JSX whose text holds a bare } (JSX's own rule: {'}'}), or an element that never closes, is lost, its functions not told");
 const shift = "let a = b << c, d = e++ < f, g = h < i;\nconst k = x => x < 1 ? <a/> : y;\n";
 ok(same(tokens(shift.split("\n")[0], true), tokens(shift.split("\n")[0])) && tokens(shift, true).some(t => t.t === "jsx"), "a shift, a comparison after x++ and one after a name stay signs; an element after ? is JSX");
 ok(tokens("const x = <div>\n  <p>open\n", true).lost && tokens("const f = <T>(x: T) => x;\n" + "function g() {}\n", true).lost && !tokens("const f = <T extends U>(x: T) => x;\n", true).lost,
   "an element that never closes is lost, as is a type's parameter taken for one (<T>), whose functions cannot be told; <T extends U> and <T,> are parameters");
 const deepTemplate = `const x = ${"`${".repeat(3000)}1${"}`".repeat(3000)};\n`, deepJsx = `const x = ${"<a>".repeat(3000)}${"</a>".repeat(3000)};\n`;
 ok(tokens(deepTemplate).lost && tokens(deepJsx, true).lost, "a template or an element nested past the reader's limit loses the file, and overflows no stack");
+ok(same(functions(deepTemplate), []) && same(functions(deepJsx, "a.jsx"), []) && functions(`function f() {${"if (a) {".repeat(20000)}${"}".repeat(20000)}}`)?.[0]?.depth === 20000,
+  "on the parser, a template, an element or blocks nested thousands deep are read, and overflow no stack");
 ok(jsxIn("a.jsx") && jsxIn("a.tsx") && jsxIn("a.js") && jsxIn("a.mjs") && !jsxIn("a.ts") && !jsxIn("a.mts"), "JSX is read in .jsx, .tsx and JavaScript's files, never in TypeScript's own, where <T>x is a cast");
 
 // Cycles, between files and folders.
@@ -173,10 +226,12 @@ try {
   git("config", "commit.gpgsign", "false"); // the machine's own git settings sign and hook nothing here
   git("config", "core.hooksPath", path.join(dir, ".no-hooks"));
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of ["code-shape.mjs", "started.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
+  for (const f of ["code-shape.mjs", "started.mjs", "core-path.mjs", "core-address.mjs", "javascript-functions.mjs", "tree-walk.mjs", "parser.mjs", "parser-worker.mjs", "packages.mjs"]) fs.copyFileSync(path.join(here, f), path.join(dir, "core/scripts", f));
+  // (the copy's packages, as the sync installs them: the core's own, linked)
+  fs.symlinkSync(path.join(here, "../.packages"), path.join(dir, "core/.packages"), "junction");
   fs.mkdirSync(path.join(dir, "src"));
   for (let k = 0; k < 3; k++) {
-    fs.writeFileSync(path.join(dir, "src/a.mjs"), `import { b } from './b.mjs';\nexport const a = ${k};\n`);
+    fs.writeFileSync(path.join(dir, "src/a.mjs"), `import { b } from './b.mjs';\nexport const a = ${k};\nexport function f() {\n  return b;\n}\n`);
     fs.writeFileSync(path.join(dir, "src/b.mjs"), `export const b = ${k};\n`);
     git("add", "-A");
     git("commit", "-q", "-m", `change ${k}`);
@@ -192,7 +247,7 @@ try {
   ok(j?.files.code === 2, `a project's own code is read, never the core's copy nor a link (${r.stdout}${r.stderr})`);
   ok(same(j?.changedTogether.pairs, [{ files: ["src/a.mjs", "src/b.mjs"], together: 3, share: 1 }]), "its history is read for what changes together");
   ok(same(j?.suites.map(s => s.passed), [true, false]) && j?.suites.every(s => typeof s.seconds === "number"), "each suite is run alone and timed, and whether it passed is said");
-  ok(/imports: 1, 0 crossing a folder/.test(r.stdout) && /suite: node -e process.exit\(3\): [0-9.]+ s, FAILED/.test(r.stdout), "the summary says what it measured");
+  ok(/imports: 1, 0 crossing a folder/.test(r.stdout) && /functions: 1; lines median 3/.test(r.stdout) && /suite: node -e process.exit\(3\): [0-9.]+ s, FAILED/.test(r.stdout), "the summary says what it measured");
   const outer = spawnSync(process.execPath, [path.join(here, "code-shape.mjs"), "--repo", path.join(dir, "src"), "--json", out], { cwd: here, encoding: "utf8" });
   const o = outer.status === 0 ? JSON.parse(fs.readFileSync(out, "utf8")) : null;
   ok(o?.files.code === 2 && o?.changedTogether.commits === 3, `with --repo, another repository is measured, its copy of the core left out (${outer.stdout}${outer.stderr})`);

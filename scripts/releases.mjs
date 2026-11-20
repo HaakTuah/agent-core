@@ -13,12 +13,13 @@ import { aRepository, logged } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { modulesOf } from "./manifest-reads.mjs";
 import { MODULES } from "./reading.mjs";
+import { entries, notesAt } from "./sync-notes.mjs";
 
 const SHA = /^[0-9a-f]{40}$/;
 // a release's name: the word and a whole number above zero, written without leading zeros
 export const RELEASE = /^release-([1-9][0-9]{0,8})$/;
-// the core's sync notes: what a sync asks of a project beyond the copy
-export const NOTES = "setup/sync-notes.md";
+// the core's sync notes: what a sync asks of a project beyond the copy (sync-notes.mjs, beside this file)
+export { NOTES } from "./sync-notes.mjs";
 // Git's own variables that point a command at another repository than the folder it is run in (a hook, or a shell
 // that set them, hands them on): left out of every call here and in release.mjs, so each lands in the folder it names
 // and nowhere else.
@@ -131,12 +132,52 @@ export function newestRelease(pin, dir) {
   return newest ? { ...newest, moved: newest.sha !== pin && past(pin, newest.sha, dir) } : null;
 }
 
-// What taking the core from `old` to `pin` asks of a project beyond the copy: the entries the sync notes gained between
-// the two (a commit from before the notes gives every entry), or null where they cannot be read: never an all-clear.
+// The newest commit of the core's main whose checks all passed, which a project that follows main takes (floor rule
+// 12: the core's users get a release, and main may be red until its fix merges; #733): of the last `depth` commits of
+// main's first line, newest first, the first that `held` lets stand, as the host lists the runs its push to main
+// started (`ask`, the route's answer as text). { sha, said }, `sha` null where none of them passed, or where the host
+// cannot be asked: nothing is taken that was not read to pass, and a full SHA still takes any commit (sync.mjs).
+export function greenMain(dir, ask = route => execFileSync("gh", ["api", route], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30000 }), depth = 30) {
+  const shas = git(["rev-list", "--first-parent", "-n", String(depth), "refs/heads/main"], dir).split("\n").filter(x => SHA.test(x));
+  for (const [i, sha] of shas.entries()) {
+    let list;
+    try { list = JSON.parse(ask(`repos/${CORE}/actions/runs?head_sha=${sha}&branch=main&event=push&per_page=100`)); }
+    catch { return { sha: null, said: `the host could not be asked for the checks of the core's main (gh signed in answers it), so no commit of it is taken` }; }
+    if (!held(list).length) return { sha, said: i === 0 ? `the core's main is at ${sha.slice(0, 7)}, its checks all passed` : `the core's main is at ${shas[0].slice(0, 7)}, whose checks have not all passed; the newest whose have is ${sha.slice(0, 7)}, ${i} commits back` };
+  }
+  return { sha: null, said: `none of the last ${shas.length} commits of the core's main has passed all its checks yet` };
+}
+
+// This repository's own release workflow: its runs on a commit are no check of that commit.
+export const OWN = ".github/workflows/release.yml";
+
+// Why a release may not stand on a commit yet, each reason a line, from GitHub's list of the workflow runs that the
+// push of that commit to main started (repos/<core>/actions/runs?head_sha=<sha>&branch=main&event=push); none where
+// it may. It may where every such run has finished and passed, and at least one did more than skip: a run still going,
+// one that failed or was cancelled, a list read only in part, and a commit no check has run on yet each hold it, so a
+// release never stands on a commit whose checks the core's own main has not passed. Nothing is guessed: a list in any
+// other form holds it too.
+export function held(list, own = OWN) {
+  const runs = list?.workflow_runs;
+  if (!Array.isArray(runs) || !Number.isSafeInteger(list.total_count)) return ["the list of the checks on it could not be read"];
+  if (list.total_count !== runs.length) return [`${list.total_count} runs stand on it and ${runs.length} were read`];
+  const checks = runs.filter(r => r?.path !== own);
+  const passed = r => r?.status === "completed" && ["success", "skipped", "neutral"].includes(r.conclusion);
+  const reasons = checks.filter(r => !passed(r)).map(r => `${r?.name ?? "a check"}: ${r?.status === "completed" ? r.conclusion : r?.status ?? "unreadable"}`);
+  if (!reasons.length && !checks.some(r => r.conclusion === "success")) reasons.push("no check has passed on it yet");
+  return reasons;
+}
+
+
+// What taking the core from `old` to `pin` asks of a project beyond the copy: the entries the sync notes hold at `pin`
+// and did not at `old`, each read whole, in a file or in the folder (a commit from before the notes gives every entry),
+// or null where either commit cannot be read: never an all-clear.
 export function asksBetween(old, pin, dir) {
   try {
-    return git(["diff", "--unified=0", "--no-color", "--no-ext-diff", "--no-textconv", old, pin, "--", NOTES], dir)
-      .split("\n").filter(l => l.startsWith("+- ")).map(l => l.slice(1));
+    for (const rev of [old, pin]) git(["rev-parse", "--verify", "--quiet", `${rev}^{commit}`], dir);
+    const at = rev => entries(notesAt(rev, args => inBare(dir, args)));
+    const before = new Set(at(old));
+    return at(pin).filter(l => !before.has(l));
   } catch { return null; }
 }
 

@@ -38,12 +38,14 @@ export const LABEL = "correction";
 // The number a rule names (AGENTS.md of the core, "Every rule says what holds it"; #303): the count it is meant to
 // lower, `findings` (the review findings that name it), `check fires` (the pull requests its check failed) or
 // `correction: <kind>`, the one of the five outcomes it stands for, and "; rare harm" where it guards against rare and
-// severe harm; held in holders.json's "numbers" and on a description's line "Number:" (pr-description.mjs), both beside
+// severe harm; held in the "number" of a rule's entry in scripts/holders/ and on a description's line "Number:" (pr-description.mjs), both beside
 // this file, in this one form.
 export const NUMBER = new RegExp(`^(findings|check fires|correction: (?:${KINDS.join("|")})); outcome: (${OUTCOMES.slice(0, 5).map(([k]) => k).join("|")})(; rare harm)?$`, "u");
 export const LEAST = 30, MONTHS = 3, SAMPLE = 60, SPLIT = 20 * 1024, DAYS = 14, HOUR = 3600e3;
 export const FIRST = "reports/outcomes-first-reading.json";
 export const HEADING = "The outcomes";
+// The line of the blind sample's share (blind-sample.mjs, beside this file; #594), which the report gives first.
+export const BLIND = "the share of the blind sample approved";
 const KIND = /^Correction: (misread|looks wrong|does not work|rule missing)[ \t]*$/u;
 export const same = (a, b) => String(a ?? "").toLowerCase() === String(b ?? "").toLowerCase();
 const ms = iso => Date.parse(iso);
@@ -153,8 +155,9 @@ export function growth(r, root = ".") {
 }
 
 // The report's lines: `rows` [{ key, outcome, label, text, months }] as `measure` gives them, `grown` as growth gives
-// it, `first`: the first reading's texts by key, or null, `previous`: the last report's text, or null.
-export function lines({ rows, grown, share = null, first = null, previous = null }) {
+// it, `first`: the first reading's texts by key, or null, `previous`: the last report's text, or null, `blind`: the blind
+// sample's line (blind-sample.mjs), which follows the five, or null where it was not read.
+export function lines({ rows, grown, share = null, first = null, previous = null, blind = null }) {
   const was = label => { const m = previous ? new RegExp(`^ *- ${label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}: ([^\n]*?)\\.(?: At the |$)`, "mu").exec(previous) : null; return m ? ` At the last report: ${m[1]}.` : ""; };
   const line = r => `- ${r.label}: ${r.text}${r.months > 1 ? `, over the last ${r.months} months${r.small ? `, still under ${LEAST}` : ""}` : ""}.${first?.[r.key] ? ` At the first reading: ${first[r.key]}.` : ""}${was(r.label)}`;
   const out = [`The five outcomes the owner named, each led by its direct measure or said to have none yet, then what stands for it; last what the work cost. A count stands with the range chance alone gives it (±), and where it is under ${LEAST} the months before are added. None is a target (\`scripts/outcomes.mjs\`; #302).`];
@@ -169,6 +172,7 @@ export function lines({ rows, grown, share = null, first = null, previous = null
     if (key === "robust") out.push("  - dropped errors: not measured yet (#309).");
     if (key === "cost") out.push(`  - the core's share of merged work: ${share ?? "in the core, all of it; in a project, as its counts for the core below give it"}.`);
   }
+  out.push("- **Approved if shown blind** (what the core is for: README.md)", `  ${blind ?? `- ${BLIND}: not read here.`}`);
   out.push(`- The first reading, from history for the two months to 15 November 2026, stands in the core's \`${FIRST}\` and its report beside it.`);
   return out;
 }
@@ -187,8 +191,8 @@ export function measure(data, month) {
 // The words a measure's value is written in, all that outcomesFrom lets through beside numbers and marks.
 const WORDS = new Set(("of merged for every ten none h days answers output tokens priced not corrected open hours the newest in pull requests a "
   + "review finding failed check neither measuring again or builder's own and bringing branch up to date kb files them over lines depth branches "
-  + "months last still under it read all").split(" "));
-const NAMES = new Set([...MEASURES.map(m => m.label), "the code's size", "functions over each mark"]);
+  + "months last still under it read all answered drawn from yet here").split(" "));
+const NAMES = new Set([...MEASURES.map(m => m.label), "the code's size", "functions over each mark", BLIND]);
 const VALUE = /^[\p{L}\d ±%().,;:'-]{1,300}$/u;
 
 // A project's outcomes, from its state report's text, as one part of the line the core's report carries: each line of

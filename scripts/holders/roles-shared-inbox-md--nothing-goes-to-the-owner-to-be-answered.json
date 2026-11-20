@@ -1,0 +1,5 @@
+{
+  "rule": "roles/shared/inbox.md: Nothing goes to the owner to be answered",
+  "behind": [134, 199, "#594"],
+  "number": "correction: misread; outcome: asked"
+}

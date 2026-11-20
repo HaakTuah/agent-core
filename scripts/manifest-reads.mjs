@@ -88,6 +88,10 @@ export function modulesOf(manifest) {
   return { taken, notTaken, line };
 }
 
+// The lines of the manifest's "Differences", each that holds more than space (steps.mjs and the description check,
+// beside this file, read them here).
+export const differencesOf = manifest => (/^## Differences\r?\n([\s\S]*?)(?=^## |(?![\s\S]))/mu.exec(String(manifest ?? ""))?.[1] ?? "").split(/\r?\n/u).filter(l => l.trim());
+
 // What a project's manifest lacks, one note each, with the mend: the modules of `moduleTexts` ({ name: text }) its list
 // neither takes nor leaves out.
 export function notes({ manifest, moduleTexts, where = {} }) {

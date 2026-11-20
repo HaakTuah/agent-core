@@ -1,6 +1,6 @@
 # Where agents hold sign-ins
 
-The owner's end goal (core archive 118): agents of every provider running side by side on a machine of his, each signed
+The owner's end goal (core archive 118): agents of every provider running side by side on one machine, each signed
 in, so Codex can build, push and be watched as it works, which its cloud tasks cannot. Floor rule 18 and the threat
 model say what such a machine may hold and run and how its agents treat their sign-ins, and keep its name and address
 out of every repository (core archive 119); `modules/orchestrating.md` and `modules/codex-building.md` say how sessions

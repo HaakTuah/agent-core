@@ -10,8 +10,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
-import { OWN, costed, held, inTheCore, next, older } from "../scripts/release.mjs";
+import { OWN, costed, fullRun, held, inTheCore, next, older } from "../scripts/release.mjs";
 import { STEPS } from "../scripts/steps.mjs";
+import { FOLDER, NOTICE, POINTER, entries, notesAt } from "../scripts/sync-notes.mjs";
 import { NOTES, OWN_FILES, RELEASE, asksBetween, elsewhere, fetchCore, followsOf, hostAccount, hostSaid, matters, namedReleases, newestRelease, ownerOf, past, releasesIn, staysAt, takenBetween } from "../scripts/releases.mjs";
 
 let failed = 0, count = 0;
@@ -107,6 +108,27 @@ ok(!newestRelease(c3, dir).moved && !newestRelease(c4, dir).moved, "a pin at the
 ok(!newestRelease(side, dir).moved && !newestRelease("f".repeat(40), dir).moved, "a pin that is no commit of main moves nowhere (core.yml fails such a project by itself)");
 ok(asksBetween(c1, c3, dir).join("|") === "- **First.** Done when one.|- **Second.** Done when two." && asksBetween(c3, c4, dir).length === 0, "a sync asks what the notes gained between the two commits");
 ok(asksBetween("f".repeat(40), c3, dir) === null, "notes that cannot be read give no all-clear");
+{
+  // (#750, point 1: the notes' entries move from the file into a folder, a file each; a sync across the move asks
+  // nothing it did not, and one past it asks what the folder gained, in the order of the files' names)
+  const notes = path.join(tmp, "notes"), at = (f, text) => { fs.mkdirSync(path.dirname(path.join(notes, f)), { recursive: true }); if (text === null) fs.rmSync(path.join(notes, f)); else fs.writeFileSync(path.join(notes, f), text); };
+  const save = (files) => { for (const [f, text] of Object.entries(files)) at(f, text); git(notes, "add", "-A"); git(notes, "commit", "-q", "--allow-empty", "-m", "notes"); return git(notes, "rev-parse", "HEAD"); };
+  fs.mkdirSync(notes); git(notes, "init", "-q", "-b", "main");
+  const one = "- **First.** Done when one.", two = "- **Second.** Done when two.", three = "- **Third.** Done when three.";
+  const filed = save({ [NOTES]: `${head}${one}\n${two}\n` });
+  const foldered = save({ [NOTES]: `${head}${POINTER}\n`, [`${FOLDER}/010-first.md`]: `${one}\n`, [`${FOLDER}/020-second.md`]: `${two}\n` });
+  const gained = save({ [`${FOLDER}/015-third.md`]: `${three}\n` });
+  const bare = fs.mkdtempSync(path.join(tmp, "notes-")); fetchCore(bare, notes);
+  ok(asksBetween(filed, foldered, bare).length === 0, "a sync across the notes' move into a folder asks nothing the file did not hold", asksBetween(filed, foldered, bare).join("\n"));
+  ok(asksBetween(filed, gained, bare).join("|") === three && asksBetween(foldered, gained, bare).join("|") === three, "an entry the folder gains is asked, from a commit before the move or after it");
+  ok(entries(notesAt(gained, args => git(notes, ...args))).join("|") === [one, three, two].join("|"), "the notes read whole at a commit hold the folder's entries in the order of the files' names");
+  // (a copy older than the folder syncs with its own script, whose reader took the lines a diff of the file alone
+  // added: across the move it reads the notice the core's file holds, which sends the session to the folder)
+  const notice = entries(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", NOTES), "utf8"));
+  const moved = save({ [NOTES]: `${head}${notice.join("\n")}\n\n${POINTER}\n` });
+  const oldReader = (a, b) => git(notes, "diff", "--unified=0", "--no-color", a, b, "--", NOTES).split("\n").filter(l => l.startsWith("+- ")).map(l => l.slice(1));
+  ok(notice.length === 1 && oldReader(filed, moved).join("|") === notice[0] && notice[0].includes("`core/setup/sync-notes/`"), "a sync from a copy older than the folder, by its own old reader, prints the notice that sends it to the folder", oldReader(filed, moved).join("\n"));
+}
 const coming = next(dir);
 ok(coming.name === "release-4" && coming.sha === c4 && coming.before.name === "release-2" && coming.asks.length === 0, "the next release stands on main's newest commit, numbered after every tag with a release's name, the one that is no release too, so its name is never taken");
 
@@ -143,12 +165,13 @@ ok(OWN_FILES.every(f => !matters(f, onlyA)) && !matters("QUEUE.md", onlyA) && !m
 ok(["tasks/a.md", "roles/shared/how-to-work.md", "scripts/x.mjs", "scripts/x-test-data.json", "scripts/sub/y-test.mjs", "floor/security.md", NOTES, ".github/workflows/core.yml", ".github/workflows/core-moved.yml", ".github/workflows/own-other.yml", "README.md", "queue.md", "archive/instructions.md"].every(f => matters(f, onlyA)), "everything else matters: a module it names, a script, the floor, the notes, a workflow a project calls or one not named, the rest of the copy");
 ok(matters("tasks/b.md", taking("all")) && matters("tasks/b.md", "# Core manifest\n") && matters("tasks/b.md", taking("<the list>")), "every module matters where the manifest takes all, or its list cannot be read");
 // (that a test of the core's own scripts never matters holds only while nothing a project runs names one: no script but
-// a test, no file of the starter kit and no workflow but the core's own tests.yml, outside its comments)
+// a test, no file of the starter kit and no workflow but those on OWN_FILES, which no project can call, tests.yml and
+// release.yml among them, which runs the upgrade test on Windows (#715), outside its comments)
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
 // (a test is passed over as matters() in releases.mjs passes it over: one of scripts/ itself, never a nested one)
 const runs = [...walk(path.join(repo, "scripts")).filter(f => !/^scripts\/[^/]+-test\.mjs$/.test(path.relative(repo, f).split(path.sep).join("/"))), ...walk(path.join(repo, "setup", "template")),
-  ...fs.readdirSync(path.join(repo, ".github", "workflows")).filter(f => f !== "tests.yml").map(f => path.join(repo, ".github", "workflows", f))];
+  ...fs.readdirSync(path.join(repo, ".github", "workflows")).filter(f => !OWN_FILES.includes(`.github/workflows/${f}`)).map(f => path.join(repo, ".github", "workflows", f))];
 const naming = runs.flatMap(f => fs.readFileSync(f, "utf8").split("\n").map((l, i) => [l, `${path.relative(repo, f)}:${i + 1}`]))
   .filter(([l]) => /-test\.mjs/.test(l) && !/^\s*(\/\/|#|\*)/.test(l)).map(([, at]) => at);
 ok(!naming.length, "nothing a project runs names a test of the core's own scripts, outside a comment", `${naming.join(", ")}\n     Mend: a project runs no test of the core's: move what it needs into a script without -test in its name, or take ${"`scripts/*-test.mjs`"} off the list of what never matters (matters in releases.mjs)`);
@@ -194,6 +217,15 @@ ok(!staysAt(r4, onlyA, dir), "a release whose notes ask something new asks a syn
 // the checks on the commit a release would stand on
 const run = (name, status, conclusion, path = `.github/workflows/${name}.yml`) => ({ name, path, status, conclusion });
 const list = (...runs) => ({ total_count: runs.length, workflow_runs: runs });
+// the core's tests in full on that commit (#733): of the tests' runs there once an hour or by hand, which hold the
+// Windows suites, none is unfinished and the newest, by when it last started (a re-run moves it), passed
+const full = (event, conclusion, id, status = "completed", at = `2026-11-19T10:${String(id).padStart(2, "0")}:00Z`) => ({ ...run("tests", status, conclusion), event, id, run_started_at: at });
+ok(/have not run in full on it yet/.test(fullRun(list({ ...run("tests", "completed", "success"), event: "push" }))), "a commit whose tests ran only on its push, on Linux, has not had them in full, and the release waits, saying how to start them");
+ok(fullRun(list(full("schedule", "success", 10))) === null && fullRun(list(full("workflow_dispatch", "success", 10))) === null, "an hourly or a hand-started run that passed lets the release stand");
+ok(fullRun(list(full("workflow_dispatch", "success", 10), full("schedule", "failure", 9))) === null && /hourly run\): failure/.test(fullRun(list(full("schedule", "failure", 10), full("workflow_dispatch", "success", 9)))), "the newest of them, by when it last started, decides, in whatever order GitHub lists them: a pass started after a failure lets it stand, a failure started after a pass holds it");
+ok(/hand-started run\): failure/.test(fullRun(list(full("schedule", "success", 20), full("workflow_dispatch", "failure", 10, "completed", "2026-11-19T11:00:00Z")))) && fullRun(list(full("schedule", "failure", 20, "completed", "2026-11-19T10:00:00Z"), full("schedule", "success", 10, "completed", "2026-11-19T10:00:00Z"))) !== null, "an older run started again by hand, which failed, holds it over a skipped run made before; two that started together, the one made last decides");
+ok(/hand-started run\): in_progress/.test(fullRun(list(full("schedule", "success", 11), full("workflow_dispatch", null, 10, "in_progress")))), "and a full run still going on the commit holds it, though a skipped hourly run was made after it");
+ok(/in_progress/.test(fullRun(list(full("schedule", null, 10, "in_progress")))) && /not run in full/.test(fullRun(list({ ...full("schedule", "success", 10), path: ".github/workflows/other.yml" }))), "one still going holds it, and another workflow's run is no run of the tests");
 ok(held(list(run("tests", "completed", "success"), run("size", "completed", "success"))).length === 0, "a commit whose every check has passed may carry a release");
 ok(held(list(run("tests", "completed", "success"), run("size", "completed", "skipped"), run("other", "completed", "neutral"))).length === 0, "a check that was skipped holds nothing where another passed");
 ok(held(list(run("tests", "in_progress", null), run("size", "completed", "success"))).join() === "tests: in_progress" && held(list(run("tests", "queued", null))).join() === "tests: queued", "a check still going holds it");
@@ -205,8 +237,8 @@ ok([null, undefined, {}, [], "text", { workflow_runs: [] }, { total_count: "1", 
 const handed = older("release-7", "b".repeat(40));
 ok(handed.includes(`node core/scripts/sync.mjs ${"b".repeat(40)}`) && handed.includes("older than release-1") && handed.includes("release-7"), "each release says how a copy older than release-1 takes it: once, with the release's full SHA (#365)", handed);
 // (asked of the script itself, in this repository: each stops before anything is fetched or pushed)
-const cutting = (...args) => { const r = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/release.mjs", import.meta.url)), "--cut", ...args], { encoding: "utf8" }); return r.status === 1 && /--cut needs --at <sha> and --runs <file>|needs a value/.test(r.stderr) && !r.stdout; };
-ok(cutting() && cutting("--at", "a".repeat(40)) && cutting("--runs", "runs.json") && cutting("--runs", "runs.json", "--at"), "a cut asked for without the commit it is for, or without the checks on it, is refused before anything is fetched");
+const cutting = (...args) => { const r = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/release.mjs", import.meta.url)), "--cut", ...args], { encoding: "utf8" }); return r.status === 1 && /--cut needs --at <sha>, --runs <file> and --full <file>|needs a value/.test(r.stderr) && !r.stdout; };
+ok(cutting() && cutting("--at", "a".repeat(40)) && cutting("--runs", "runs.json") && cutting("--runs", "runs.json", "--at") && cutting("--at", "a".repeat(40), "--runs", "runs.json"), "a cut asked for without the commit it is for, without the checks on it, or without the tests' runs there, is refused before anything is fetched");
 ok(held({ total_count: 2, workflow_runs: [null, run("tests", "completed", "success")] }).join() === "a check: unreadable" && held(list({ name: "tests", path: "p" })).join() === "tests: unreadable", "and a run in it that cannot be read");
 
 // git's own variables that point elsewhere: a project's repository is never touched, and the guard is not fooled
@@ -245,7 +277,7 @@ ok(!inTheCore(path.join(nested, "core", "scripts", "release.mjs")), "nor is a cl
 // what a release asks, each with roughly what it costs a project where it is not done yet (steps.mjs)
 const owners = STEPS.find(s => s.owner);
 ok(costed(`- **${STEPS[0].lead}.** Done when one.`).endsWith(`\n  Cost: ${STEPS[0].cost}.`) && costed(`- **${owners.lead}.** Done when two.`).includes("(the owner's)")
-  && costed("- **No such entry.** Done when three.").includes("unknown"), "each ask of a release says what it costs, the owner's marked so, and one with no step says so");
+  && costed("- **No such entry.** Done when three.").includes("unknown") && costed(`${NOTICE}: and so on.`).includes("each entry it sends the session to") && costed("- A line of no form.").includes("unknown"), "each ask of a release says what it costs, the owner's marked so, one with no step or of no form says so, and the notice costs what it sends to");
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the core's releases`);
 process.exitCode = failed ? 1 : 0;

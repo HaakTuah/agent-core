@@ -2,18 +2,16 @@
 
 The index, and how an item is written: `archive/instructions.md`.
 
-157. **12 November 2026** (the core, in the design chat). Asked: whether a product sold by another owner's project could
-     carry its seller's name somewhere, given that the floor lets no name into a repository but the GitHub account in
-     its address, so that the build would have to take the name from outside; allowing a company's name there was the
-     alternative put to the owner. Decided: that project's owner has a company name, so a company's name may stand
-     there. Behind: the second exception of floor rule 11, the company name a project is sold under, naming no person.
+157. **12 November 2026** (the core, in the design chat). Asked: whether a project of another owner could carry a
+     company's name somewhere, given that the floor lets no name into a repository but the GitHub account in its
+     address, so that the build would have to take the name from outside; allowing a company's name there was the
+     alternative put to the owner. Decided: a company's name may stand there. Behind: the second exception of floor rule
+     11, the company name a project is sold under, naming no person.
 
-158. **12 November 2026** (the core, in the design chat). Asked: the owner of the same project had installed a third
-     provider's tool on a computer, one whose terms keep it out of Claude Code, and might rely on it as a fallback for
-     further development when out of Claude Code usage; was the core, as it stood, permissive for development with other
-     tools? Decided: the core must not inhibit development with another tool or provider, while it keeps working the
-     same as it does now. Behind: the end of "Another provider builds" (`modules/roles.md`) and the two lines of
-     `modules/other-builders.md` on the brief and the pull request.
+158. **12 November 2026** (the core, in the design chat). Asked: was the core, as it stood, permissive for development
+     with other tools, such as one a project might fall back on? Decided: the core must not inhibit development with
+     another tool or provider, while it keeps working the same as it does now. Behind: the end of "Another provider
+     builds" (`modules/roles.md`) and the two lines of `modules/other-builders.md` on the brief and the pull request.
 
 159. **12 November 2026** (the core, in the design chat). Asked, first, how a project learns that the core has moved
      (whether a script triggered on GitHub should make the pull request for new core versions) and, second, whether the
@@ -21,16 +19,16 @@ The index, and how an item is written: `archive/instructions.md`.
      that the owner gets feedback on what does not work or could be improved, from sessions of other projects too.
      Advised against a workflow that opens the pull request (it would get no checks without a stored token, and would be
      the first workflow able to write code) and for one that only keeps an issue open while the core is ahead; and that
-     sessions of another owner's private project report through that project's own inbox, since the core's repository is
-     public. Decided: the owner agreed to the second point of that advice. On the first, the owner said most of those
-     reports would never arrive if reporting went through the project's own inbox, and saw no problem in another owner
-     commenting on the core's repository; the owner accepted the warning about sensitive details and proposed rigid
-     guidelines so that only bug reports, feature suggestions or questions that the light of day can take end up there,
-     anything else going into a secret report for the repository, with exploits reported through a different, private
-     route that others do not see; the owner asked for a view on this. The owner also asked whether it is clear to a
-     session what the core folder in a project is and that it comes from outside, and whether it should be. Behind: "The
-     core itself" in `modules/inbox.md`, "Reporting to the core" in `README.md` with the three issue forms, and the
-     core-moved workflow.
+     sessions of a project of another owner report through that project's own inbox, since the core's repository is
+     public and a project's details may not be. Decided: the owner agreed to the second point of that advice. On the
+     first, the owner said most of those reports would never arrive if reporting went through the project's own inbox,
+     and saw no problem in another owner commenting on the core's repository; the owner accepted the warning about
+     sensitive details and proposed rigid guidelines so that only bug reports, feature suggestions or questions that the
+     light of day can take end up there, anything else going into a secret report for the repository, with exploits
+     reported through a different, private route that others do not see; the owner asked for a view on this. The owner
+     also asked whether it is clear to a session what the core folder in a project is and that it comes from outside,
+     and whether it should be. Behind: "The core itself" in `modules/inbox.md`, "Reporting to the core" in `README.md`
+     with the three issue forms, and the core-moved workflow.
 
 160. **12 November 2026** (the core, in the design chat). Asked: the table of models gave the orchestrator Sonnet at
      high, but the owner thought the orchestrator should say Opus or Sonnet, since the owner runs it on Opus and it is
@@ -47,22 +45,23 @@ The index, and how an item is written: `archive/instructions.md`.
      to the core's" in `modules/how-to-work.md`, point 7 of "How a project takes the core" in `README.md`, and the step
      of `core.yml` that fails a difference from the floor or the review guidelines.
 
-162. **12 November 2026** (the core, in the design chat). Asked: the project of item 154 had used Codex almost wholly
-     (94% of its usage) for sessions Claude started before it took the core; the core had given another provider's
-     builder first what a check proves right without judgement, and left the rest with Claude's; would that project's
-     setup now use Codex more fully, and had those sessions only been reviews? Decided: the aim was to save Claude usage
-     by pushing all work suited to any other provider to that provider first. Behind: "Another provider builds first" in
-     `modules/roles.md` (every task or part a brief can carry and a check or its review can judge, where the owner set
-     it up for the project) and the end of "Work continuously, other providers first" in `modules/claude.md`.
+162. **12 November 2026** (the core, in the design chat). Asked, of the project of item 154: the core had given another
+     provider's builder first what a check proves right without judgement, and left the rest with Claude's; would that
+     project's setup now use another provider more fully, and had its earlier sessions with another provider only been
+     reviews? Decided: the aim was to save Claude usage by pushing all work suited to any other provider to that
+     provider first. Behind: "Another provider builds first" in `modules/roles.md` (every task or part a brief can carry
+     and a check or its review can judge, where the owner set it up for the project) and the end of "Work continuously,
+     other providers first" in `modules/claude.md`.
+     Changed by: 163.
 
 163. **12 November 2026** (the core, in the design chat). Raised, of "Another provider builds first" (item 162) and of
-     the project of item 154, whose owner pastes no further word of this chat into its sessions. Decided: the rule holds
-     only where Claude is the orchestrator and does not prohibit other kinds of work; the whole core is to be checked
-     thoroughly for other contradictions and for cohesion; the project will not be prompted again, so the owner hoped it
-     all gets fixed by new imports of the core. Behind: "Where Claude's sessions hand out work, another provider builds
-     first" in `modules/roles.md` and the orchestrator's own line of it in `modules/orchestrating.md`;
-     `setup/sync-notes.md`, what a sync asks of a project beyond the copy, which the sync script prints and an
-     orchestrator gives a lane; and the audit's fixes of the same pull request.
+     the project of item 154. Decided: the rule holds only where Claude is the orchestrator and does not prohibit other
+     kinds of work; the whole core is to be checked thoroughly for other contradictions and for cohesion; that project
+     will not be prompted again, so the owner hoped it all gets fixed by new imports of the core. Behind: "Where
+     Claude's sessions hand out work, another provider builds first" in `modules/roles.md` and the orchestrator's own
+     line of it in `modules/orchestrating.md`; `setup/sync-notes.md`, what a sync asks of a project beyond the copy,
+     which the sync script prints and an orchestrator gives a lane; and the audit's fixes of the same pull request.
+     Changes: 162.
 
 164. **12 November 2026** (the core, in the design chat). Asked: what the day's audit left for the owner. Put to the
      owner: four wordings of the floor (the owner's word passed on word for word against nothing personal in any brief;
@@ -76,6 +75,7 @@ The index, and how an item is written: `archive/instructions.md`.
      "Reporting a weakness" in `floor/topics.md`), the cap of 45 KB (`scripts/size.mjs`), the fixes of the same pull
      request, the last line of "Work from main" in `modules/git.md` with `scripts/session-cost.mjs`, and the owner's
      yes, now said, to floor rule 11's second exception.
+     Changed by: 169, 171.
 
 165. **12 November 2026** (the core, in the design chat). Asked: whether the core should be a package a project
      installs, and whether anything more would make it better. Advised: no package, since every reader of the rules
@@ -83,10 +83,10 @@ The index, and how an item is written: `archive/instructions.md`.
      installs nothing, and the hooks run the copy that was reviewed; instead a slimmer copy that leaves the dated
      reports in the core alone, syncs made once for several changes, a trimming pass over the modules since the cap was
      full, and the day's small leftovers (a clause in floor rule 14 for rule 3's case of a project with no trusted
-     builder, "where one answers", a pointer check on the core's own files); NuGet in the licence check and the queued
-     checks left until a project's real use reports back. Decided: the owner agreed to all of it, on the condition that
-     it is what the advice proposed. Behind: `/reports export-ignore` in `.gitattributes` with `core.yml` and
-     `scripts/pure-sync.mjs` comparing a copy without that folder, the trims of the same pull request, the clause on
+     builder, "where one answers", a pointer check on the core's own files); another installer in the licence check and
+     the queued checks left until a project's real use reports back. Decided: the owner agreed to all of it, on the
+     condition that it is what the advice proposed. Behind: `/reports export-ignore` in `.gitattributes` with `core.yml`
+     and `scripts/pure-sync.mjs` comparing a copy without that folder, the trims of the same pull request, the clause on
      what is left to the owner in floor rule 14, and `scripts/pointers.mjs --core` in the tests workflow.
 
 166. **12 November 2026** (the core, in the design chat). Asked: how the stand-in should treat the core's archive in a
@@ -124,43 +124,46 @@ The index, and how an item is written: `archive/instructions.md`.
      in `modules/orchestrating.md`, "On every wake", and "A verdict the stand-in is sure of decides one" in
      `modules/inbox.md`, which replaces item 142's hold. What the stand-in is never sure of stays as it was: a call of
      taste, and an answer resting only on the core's archive in a project of another owner.
+     Changes: 142.
 
 169. **12 November 2026** (the core, in the design chat). Asked, on being told that the core said who builds first but
      left each project to write down how a Claude session hands a task to another provider, and that neither game did.
-     The owner explained that handing off is possible only through a tool like herdr or a plug-in in Claude Code; that
-     handing off through GitHub had been tried, where a session can initiate but Codex in the legacy cloud cannot push,
-     so only review and security review are available through GitHub. The owner proposed a more general rule, to hand
-     off what can be handed off, which should produce what is done now when only GitHub is there, then to use the
-     plug-in if it is there, and to prefer herdr even more if the project is set up with it; and said this is the kind
-     of thing the core should solve for projects whose owners are not familiar with the options, asking whether more
-     holes like this are left open without good cause. Shown that rule as a table (the tool that runs agents side by
-     side, else the plug-in, else Claude's build) and six more places the core left to a project of another owner;
-     offered the owner's rule and four of them as one change (how a reviewer other than Codex is asked; a reviewer that
-     never answers; Codex's model and effort; which session is the design session in a project with none), the other two
-     left until that project reports (a licence check for another installer; setting up a local machine), with the cap's
-     room to be found or asked for. Decided: the owner agreed, and asked for a clear explanation of every change made to
-     the rules. The second security review asked two things of the change, both taken into it: who reviews when a
-     reviewer is not waited for, and that work built through the plug-in is pushed by its briefer, with no protected
-     file in it and its builder named. The owner asked meanwhile whether Copilot is always the last resort, and said it
-     should at least be preferred over Claude. Told that Copilot reviewed ahead of Claude's reviewer only where a
-     project named it, and built only under the tool that runs the agents side by side; offered it second in the default
-     order of reviewers, and its agent on GitHub as a third way to build, after Codex's plug-in, with what that costs
-     (its plan's requests), that GitHub marks the call a preview and that it was not yet run; and asked again whether
-     the cap may go to 46 KB. Decided: the owner agreed to all of it, on the condition that other tools are allowed for
-     too. Behind: "by the first way there is" in `modules/roles.md`, "The builders"; `modules/codex.md`, "Building";
-     `modules/copilot.md`; "asked and not waited for" in `modules/reviews.md`, point 2; "in a project with none" in
-     `modules/inbox.md`; and the default order of the *code reviewers* and "a way the project names" in
-     `modules/roles.md`. Copilot's building is not in the change: three rounds of review each found a step of it that
-     only a real run can settle (its own push before any check of its diff, and the approval its workflows wait for,
-     which asks a permission the sessions' sign-ins are set up without), so it is filed as an idea (issue 124) with what
-     a run must show, and a project that has Copilot's agent names it as its own way meanwhile. The cap of item 164 goes
-     from 45 to 46 KB on that agreement.
+     The owner explained that handing off is possible only through a tool that runs agents side by side or a plug-in in
+     Claude Code; that handing off through GitHub had been tried, where a session can initiate but Codex in the legacy
+     cloud cannot push, so only review and security review are available through GitHub. The owner proposed a more
+     general rule, to hand off what can be handed off, which should produce what is done now when only GitHub is there,
+     then to use the plug-in if it is there, and to prefer a tool that runs agents side by side even more if the project
+     is set up with it; and said this is the kind of thing the core should solve for projects whose owners are not
+     familiar with the options, asking whether more holes like this are left open without good cause. Shown that rule as
+     a table (the tool that runs agents side by side, else the plug-in, else Claude's build) and six more places the
+     core left to a project of another owner; offered the owner's rule and four of them as one change (how a reviewer
+     other than Codex is asked; a reviewer that never answers; Codex's model and effort; which session is the design
+     session in a project with none), the other two left until that project reports (a licence check for another
+     installer; setting up a local machine), with the cap's room to be found or asked for. Decided: the owner agreed,
+     and asked for a clear explanation of every change made to the rules. The second security review asked two things of
+     the change, both taken into it: who reviews when a reviewer is not waited for, and that work built through the
+     plug-in is pushed by its briefer, with no protected file in it and its builder named. The owner asked meanwhile
+     whether Copilot is always the last resort, and said it should at least be preferred over Claude. Told that Copilot
+     reviewed ahead of Claude's reviewer only where a project named it, and built only under the tool that runs the
+     agents side by side; offered it second in the default order of reviewers, and its agent on GitHub as a third way to
+     build, after Codex's plug-in, with what that costs, that GitHub marks the call a preview and that it was not yet
+     run; and asked again whether the cap may go to 46 KB. Decided: the owner agreed to all of it, on the condition that
+     other tools are allowed for too. Behind: "by the first way there is" in `modules/roles.md`, "The builders";
+     `modules/codex.md`, "Building"; `modules/copilot.md`; "asked and not waited for" in `modules/reviews.md`, point 2;
+     "in a project with none" in `modules/inbox.md`; and the default order of the *code reviewers* and "a way the
+     project names" in `modules/roles.md`. Copilot's building is not in the change: three rounds of review each found a
+     step of it that only a real run can settle (its own push before any check of its diff, and the approval its
+     workflows wait for, which asks a permission the sessions' sign-ins are set up without), so it is filed as an idea
+     (issue 124) with what a run must show, and a project that has Copilot's agent names it as its own way meanwhile.
+     The cap of item 164 goes from 45 to 46 KB on that agreement.
+     Changes: 164.
 
 170. **12 November 2026** (the core, in the design chat). Asked, on being told that the stand-in had given its verdict
      on nine of one project's fifteen open ideas and that the six newest had none, since its sweep took only the ideas
      that had waited a week. Decided: that was a glitch, and the sweep should take all ideas when it first runs. Behind:
      "every idea that lacks one" in `modules/orchestrating.md`: a week's wait still starts the sweep, and once it runs
      it takes every open idea without a verdict, so none is left for a call of its own.
+     Changed by: 172.
 
 171. **12 November 2026** (the core, in the design chat). Asked, after the change of item 169 was merged with the ways
      of handing work over in order but nothing on which provider builds where more than one can, whether all other
@@ -173,6 +176,7 @@ The index, and how an item is written: `archive/instructions.md`.
      accepted the layout as offered and agreed to everything, now and before. Behind: "Where more than one can build" in
      `modules/roles.md`, "The builders", and the *other builders* slot; the *security reviewer* slot's default, Codex of
      what its own provider built too, floor rule 3's two reviews standing; and the cap of item 164 at 47 KB.
+     Changes: 164.
 
 172. **12 November 2026** (the core, in the design chat). Asked, an hour after item 170, whose words were read as the
      weekly sweep alone, whether the stand-in is now told to do all when it steps forward; told that six ideas in one
@@ -187,6 +191,7 @@ The index, and how an item is written: `archive/instructions.md`.
      these points. Behind: "whenever it is called, its verdict on every open idea that lacks one" in `modules/inbox.md`:
      item 170's intent that the stand-in take all when it first runs meant any run of the stand-in, not the sweep's
      alone. The sweep of `modules/orchestrating.md` stays for a project where a week passes without a call.
+     Changes: 170.
 
 173. **12 November 2026** (the core, in the design chat). Asked, by the owner's agreement in item 172 to the advice on
      the three ideas the stand-in had given a sure yes; the first, filed when one game listed it as a difference from
@@ -200,36 +205,36 @@ The index, and how an item is written: `archive/instructions.md`.
      its security review, once, when it opens, was what GitHub's trigger can do, written as if it were the rule; that a
      security review of a sync had found what the core's own had passed; and that one of Dependabot's updates had merged
      with none. The owner suggested that the projects state only the ideal narrower use, for when the session itself
-     controls the review through a plug-in or herdr or the like, but still wait for the review if it triggers anyhow, as
-     it does for GitHub triggers. On widening Codex's automatic security review to every pull request so that
-     Dependabot's were covered, the owner asked what doing it on all adds, and why review a Dependabot change. Told that
-     it adds next to nothing there (the diff is version numbers and checksums; floor rules 17 and 7 and the checks are
-     what guard an update), and that running it with every code review costs more than it finds. Decided: back to just
-     team PRs and on open PRs; where a GitHub trigger starts the review, it waits for what is triggered, while for
-     manually triggered reviews it is done only where it adds something worthwhile; a setup with the Codex plug-in
-     should use reviews and security reviews optimally, not limited to what GitHub's triggers achieve. Offered that as
-     the floor's line and the review rule, with a few plain lines for an owner on what setting a machine up for agents
-     buys (item 149 left the setup to the owner), and asked whether Copilot's agent should be turned on for a trial of
-     its building. The owner agreed to the recommendations on the first two points; on the third, the owner thought it
-     should not be, since having Copilot defined as the preferred reviewer before Claude Code, if available, suffices;
-     and said it could all be merged at once so that another project gets these updates when it pulls the next day,
-     unless there is good reason not to. Behind: floor rule 8's line that a PR that touches one merges only after its
-     security review has run (Dependabot's own: rule 17), point 3 of `modules/reviews.md` (a security review the session
-     calls, once on the finished work and aimed; one that starts by itself waited for on every PR, a pure sync's too)
-     and the plug-in's security review in `modules/codex.md`. Copilot stays the second code reviewer (item 169); its
-     agent's building is not taken up.
+     controls the review through a plug-in or a tool that runs agents side by side, but still wait for the review if it
+     triggers anyhow, as it does for GitHub triggers. On widening Codex's automatic security review to every pull
+     request so that Dependabot's were covered, the owner asked what doing it on all adds, and why review a Dependabot
+     change. Told that it adds next to nothing there (the diff is version numbers and checksums; floor rules 17 and 7
+     and the checks are what guard an update), and that running it with every code review costs more than it finds.
+     Decided: back to just team PRs and on open PRs; where a GitHub trigger starts the review, it waits for what is
+     triggered, while for manually triggered reviews it is done only where it adds something worthwhile; a setup with
+     the Codex plug-in should use reviews and security reviews optimally, not limited to what GitHub's triggers achieve.
+     Offered that as the floor's line and the review rule, with a few plain lines for an owner on what setting a machine
+     up for agents buys (item 149 left the setup to the owner), and asked whether Copilot's agent should be turned on
+     for a trial of its building. The owner agreed to the recommendations on the first two points; on the third, the
+     owner thought it should not be, since having Copilot defined as the preferred reviewer before Claude Code, if
+     available, suffices; and said it could all be merged at once so that the projects get these updates at their next
+     sync, unless there is good reason not to. Behind: floor rule 8's line that a PR that touches one merges only after
+     its security review has run (Dependabot's own: rule 17), point 3 of `modules/reviews.md` (a security review the
+     session calls, once on the finished work and aimed; one that starts by itself waited for on every PR, a pure sync's
+     too) and the plug-in's security review in `modules/codex.md`. Copilot stays the second code reviewer (item 169);
+     its agent's building is not taken up.
 
 175. **13 November 2026** (the core, in the design chat). Asked, on being told that a third tool reviewed only where a
-     project named it, whether a tool such as antigravity in herdr is also preferred; the aim is to make the rules
-     general where practical, so that any setup works without specification, and to save Claude usage as a general rule.
-     The owner asked whether Copilot should review first where available, since that is the only thing it would be set
-     up for anyway and any caps are defined there, which leaves more building usage for Codex and any other provider;
-     then another provider; then Claude last. Offered the owner's reason as the rule, in place of naming Copilot first
-     (where Codex cannot build, as on GitHub alone, reviewing is the best use of it, and it has proved itself there):
-     first a reviewer that cannot build here, Codex's before Copilot's, then another builder's, last Claude's. Decided:
-     the owner agreed. The same message asked whether another project's agents should send the core pull requests as
-     well as issues; answered no, and the README's "Reporting to the core" says so: one from another account is data
-     (floor rule 4). Behind: the order of the *code reviewers* in `modules/roles.md`.
+     project named it, whether a tool such as antigravity, run beside the others, is also preferred; the aim is to make
+     the rules general where practical, so that any setup works without specification, and to save Claude usage as a
+     general rule. The owner asked whether Copilot should review first where available, since that is the only thing it
+     would be set up for anyway and its limits are set there, which leaves more building usage for Codex and any other
+     provider; then another provider; then Claude last. Offered the owner's reason as the rule, in place of naming
+     Copilot first (where Codex cannot build, as on GitHub alone, reviewing is the best use of it, and it has proved
+     itself there): first a reviewer that cannot build here, Codex's before Copilot's, then another builder's, last
+     Claude's. Decided: the owner agreed. The same message asked whether another project's agents should send the core
+     pull requests as well as issues; answered no, and the README's "Reporting to the core" says so: one from another
+     account is data (floor rule 4). Behind: the order of the *code reviewers* in `modules/roles.md`.
 
 176. **13 November 2026** (the core, in the design chat). Asked: whether any agent wanting to post a bug report, feature
      request or suggestion, or question should first check the codebase to see whether it has been addressed already, or
@@ -317,6 +322,7 @@ The index, and how an item is written: `archive/instructions.md`.
      that this touches the review guidelines every project takes, so needs the owner's yes. Decided: the owner agreed to
      all of it. Behind: "A mark on what every session reads" in `modules/review-guidelines.md`, which the core's own cap
      now follows too (`AGENTS.md`).
+     Changed by: #469.
 
 183. **13 November 2026** (the core, in the design chat). Asked, on being told what a fresh session's read of all the
      rules for room had found in the floor: six wordings another floor sentence already says. Recommended: yes to three
@@ -381,12 +387,12 @@ The index, and how an item is written: `archive/instructions.md`.
      false positives like this. Told: the test already rules that trim out, but a second statement did not say what
      makes two statements the same; offered that a second statement counts only if it covers every case the removed
      words do, with the same force, and that whoever proposes a trim names the other statement and what it covers; and
-     that the nineteen trims merged that night had been gone over again, scope against scope, and held. The owner
+     that the nineteen trims merged that day had been gone over again, scope against scope, and held. The owner
      agreed. Behind: "one that covers every case the removed words do, with the same force" in
      `modules/review-guidelines.md`.
 
 189. **13 November 2026** (the core, in the design chat). Raised: the owner is referred to by a gendered pronoun
-     everywhere in the core, which makes the repositories less general purpose, and this is the last thing for the night
+     everywhere in the core, which makes the repositories less general purpose, and this is the last thing for the day
      that would benefit from being changed to something that could work for any owner. Asked also how the owner's game
      repositories know that the archive holds the owner's decisions, while another owner's project will know it is not
      that owner's archive, when the stand-in uses it to make calls. Told: every such word in the core's rules would be
@@ -399,7 +405,7 @@ The index, and how an item is written: `archive/instructions.md`.
      account*" in `modules/inbox.md`.
 
 190. **13 November 2026** (the core, in the design chat). Asked: whether another project's repository will implement all
-     modules, whether it did so on the initial implementation with the brief, and whether it will implement new ones
+     modules, whether it did so on its first import, and whether it will implement new ones
      during daily syncs. Told: a project's copy of the core always holds every module, and each sync brings its newest
      text; which modules apply is the manifest's line, all or a list; changes inside a module a project takes arrive by
      themselves, but a list does not gain a new module by itself and nothing told a project so. Decided: built at once
@@ -407,8 +413,8 @@ The index, and how an item is written: `archive/instructions.md`.
      Behind: "A list of modules does not grow by itself" in `README.md` and the note "the modules a project takes" in
      `setup/sync-notes.md`.
 
-191. **13 November 2026** (the core, in the design chat). Asked: whether a full audit should be done again while the
-     owner sleeps. Told: yes, by a fresh reader of the whole core as it then stood, with the imports replayed and every
+191. **13 November 2026** (the core, in the design chat). Asked: whether a full audit should be done again while no one
+     waits on it. Told: yes, by a fresh reader of the whole core as it then stood, with the imports replayed and every
      suite run; plain faults mended at once, each reviewed, and whatever would change what a rule asks listed for the
      owner. Decided: the owner agreed. The reader found nine faults and some doubts. Mended: a late security finding
      that holds was to be filed as a bug, which floor rule 9 forbids of a weakness; the call for late findings read only
@@ -428,10 +434,10 @@ The index, and how an item is written: `archive/instructions.md`.
      anchored to the owner. Told: in that file the name is a banned word, which keeps it out of the rules; that the
      account stands in about ten places outside the archive, each an address or the one anchor of whose word counts,
      which is stated on purpose and never inferred; that GitHub needs it written out in a workflow's call to another
-     repository and in an issue template's assignee; and that the scripts could share one place for it, a change for the
-     daytime. Decided: the owner agreed fully; it must be one place at least, so it only needs changing once, if there
+     repository and in an issue template's assignee; and that the scripts could share one place for it, a change for
+     later. Decided: the owner agreed fully; it must be one place at least, so it only needs changing once, if there
      is no better way to attach it to the account name so that it changes dynamically; and all that had been agreed was
-     to be finished that night. Behind: `scripts/core-address.mjs`, which every script that names the core reads; the
+     to be finished that day. Behind: `scripts/core-address.mjs`, which every script that names the core reads; the
      one `CORE` of `.github/workflows/core.yml`, which may not read it from the copy it checks; the words check banning
      the account's login from there, the list no longer holding it; and `scripts/core-address-test.mjs`, which holds
      each place GitHub needs it written out to the one, and fails in the core's own repository where that is not the one
@@ -453,4 +459,4 @@ The index, and how an item is written: `archive/instructions.md`.
      too. Advised: the floor stays as it is and the module says so, since waiting on a broken reviewer costs minutes and
      skipping the review that starts by itself costs more. Decided: the owner agreed to all that was advised. Behind:
      the opening of `floor/topics.md`, and "A security review that starts by itself is still waited for" in
-     `modules/reviews.md`. The owner with two accounts was filed as an idea.
+     `modules/reviews.md`. A further point on accounts was filed as an idea.

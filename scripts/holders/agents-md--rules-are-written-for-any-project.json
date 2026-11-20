@@ -1,0 +1,4 @@
+{
+  "rule": "AGENTS.md: Rules are written for any project",
+  "behind": [150, 201]
+}

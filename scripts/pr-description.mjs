@@ -33,7 +33,15 @@
 // be told from one forgotten ("An exemption leaves a mark" in roles/shared/work-flow.md; #302). And where the part
 // "What holds it" is asked and holds more than "None", of a pull request opened since the copy on its base held
 // NUMBER_SINCE, a line under it that names a rule's number in its form ("Number: findings; outcome: robust";
-// outcomes.mjs's NUMBER; #303).
+// outcomes.mjs's NUMBER; #303). And, since YES_SINCE, the owner's yes where the core's floor or review guidelines change
+// (owner-yes.mjs, beside this file; #549), save of a file whose change only follows files it moves (path-only.mjs;
+// #886, point 1) or that the design check states keeps its meaning (meaning-kept.mjs; #886, point 2). And, of one opened since the copy on its base held REASONS_SINCE that adds a
+// line under the manifest's "Differences" (read from git, the merge commit against its base), the line "Reasons read:"
+// (tasks/updates.md, "A question or difference about a rule of the core starts from its reasons"; #756). A line asked
+// for passes where it begins in its form, whatever follows it (#750, point 4).
+// And, of one opened since the copy on its base held CHANGED_SINCE, each test file it leaves with fewer lines that
+// assert, or in which it skips a case, named on the line weakened.mjs, beside this file, asks, and each whose
+// assertions it only changes listed for the reviewer (#307).
 // Reads only: the description comes in PR_BODY, never on the command line; gh, git and Node's own modules. Run by the
 // description workflow (.github/workflows/pr-description.yml).
 //
@@ -42,14 +50,23 @@
 import { spawnSync } from "node:child_process";
 import { doneMends, ownerAt, queueAt, readItem, takesIt } from "./done-when.mjs";
 import { isPart, milestoneMends } from "./milestones.mjs";
+import { differencesOf } from "./manifest-reads.mjs";
 import { NUMBER } from "./outcomes.mjs";
+import { asking, coreAtBase, issuesOf, textsOf, yesOf } from "./owner-yes.mjs";
+import { numberOf, statedOf } from "./meaning-kept.mjs";
+import { proven } from "./path-only.mjs";
 import { OWN, calledByPaths, coreAt, leftOut, library, lineMend, ownOf, ownPaths, pathIn, taken, textOf } from "./reading.mjs";
 import { started } from "./started.mjs";
+import { changedMend, plain, testsChanged } from "./weakened.mjs";
 
 // The line a description ends with, saying what the pull request waits on: nothing (its builder goes on), a review, its
-// checks, another item ("#241"), or the owner, with the question in one sentence after a colon.
+// checks, another item ("#241"), or the owner, with the question in one sentence after a colon. A line that begins with
+// a form, in any case, is in it, whatever follows ("#724, then the orchestrator's word"): the check fails what is
+// missing, never phrasing (#750, point 4).
 export const WAITS = "Waits on:";
-const FORMS = [["nothing", /^nothing$/], ["a review", /^a review$/], ["checks", /^checks$/], ["item", /^#[1-9]\d{0,8}$/], ["the owner", /^the owner: \S.*\?$/]];
+const FORMS = [["nothing", /^nothing(?![\w-])/iu], ["a review", /^a review(?![\w-])/iu], ["checks", /^checks(?![\w-])/iu], ["item", /^#[1-9]\d{0,8}(?![\w-])/u], ["the owner", /^the owner: \S[^?]*\?/iu]];
+// a rule's number in its form at the start of a line, whatever follows it, in any case (#750, point 4)
+const NUMBER_FIRST = new RegExp(NUMBER.source.replace(/\$$/u, "(?![\\w-])"), "iu");
 export const WAITS_SINCE = "2026-11-16T00:00:00Z";
 // The day from which the line "Read for it:" is asked, of a pull request opened since the copy on its base held this.
 export const READS_SINCE = "2026-11-16T00:00:00Z";
@@ -63,6 +80,53 @@ export const NO_COST = "No cost line: the script printed none.";
 // rule says what holds it"; #303), as the lines above are.
 export const NUMBER_SINCE = "2026-11-17T00:00:00Z";
 export const HOLDS = "What holds it";
+// The day from which a description names, on weakened.mjs's line, each test file the pull request leaves with fewer
+// lines that assert, or in which it skips a case (tasks/code-shape.md, "A test taken out or weakened is said"; #307), as
+// the lines above are.
+export const CHANGED_SINCE = "2026-11-18T00:00:00Z";
+
+// The day from which a pull request that adds a difference is asked the line REASONS (#756), as the lines above are.
+export const REASONS_SINCE = "2026-11-19T00:00:00Z";
+export const REASONS = "Reasons read:";
+
+// The lines a pull request adds under the manifest's "Differences", in the checkout at `dir`, the merge commit against
+// its first parent, the base (every line where the base holds no manifest, as a project's first, or one git cannot give
+// whole): [] where the head holds none, UNREADABLE where it holds one git cannot give whole (a link, a folder, a
+// submodule, past MANIFEST_MAX bytes) or git fails, which fails rather than passes, and null where there is no base to
+// read against.
+export const UNREADABLE = "unreadable";
+export const MANIFEST_MAX = 1 << 24;
+export function differencesAdded(dir) {
+  const git = (...a) => spawnSync("git", a, { cwd: dir, encoding: "utf8", maxBuffer: MANIFEST_MAX });
+  if (git("rev-parse", "--verify", "--quiet", "HEAD^1").status !== 0) return null;
+  // (absent: ""; there, but no plain file git can give whole, or git failed: null)
+  const read = at => {
+    const entry = git("ls-tree", "-z", "--full-tree", at, "--", "core-manifest.md");
+    if (entry.status !== 0 || entry.error) return null;
+    if (entry.stdout === "") return "";
+    const [, mode, sha] = /^(\d+) blob ([0-9a-f]+)\tcore-manifest\.md\0$/u.exec(entry.stdout) ?? [];
+    const r = mode === "100644" || mode === "100755" ? git("cat-file", "blob", sha) : null;
+    return r && r.status === 0 && !r.error ? r.stdout : null;
+  };
+  const head = read("HEAD");
+  if (head === null) return UNREADABLE;
+  const was = new Set(differencesOf(read("HEAD^1") ?? "").map(l => l.trim()));
+  return differencesOf(head).map(l => l.trim()).filter(l => !was.has(l) && !/^None\.?$/iu.test(l));
+}
+
+// The mend where a pull request adds a difference and its description has no line REASONS with something after it;
+// null where it has one, or adds none. `at` is where the core's copy stands, as the manifest's "Core:" line puts it.
+export function reasonsMend(body, added, at = "core/") {
+  if (added === UNREADABLE) return `the pull request's core-manifest.md cannot be read whole (a link, a folder, a submodule, or past ${MANIFEST_MAX} bytes), so what it adds under "Differences" cannot be told. Mend: keep core-manifest.md a text file in the manifest's form, far under that size, and push again`;
+  if (!Array.isArray(added) || !added.length) return null;
+  // (blanks and invisible format characters after the label are nothing)
+  if (textOf(body).split(/\r\n|\r|\n/u).some(l => l.trim().startsWith(REASONS) && l.trim().slice(REASONS.length).replace(/[\s\p{Cf}]/gu, ""))) return null;
+  return `it adds ${added.length === 1 ? "a line" : `${added.length} lines`} under the manifest's "Differences" ("${added[0].replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu, " ").slice(0, 80)}"), and the description has no line "${REASONS}". Mend: for each rule of the core it departs from, run \`node ${at}scripts/reasons.mjs "<the rule's file and lead>"\`, read the archive items and the issues it prints, and add a line "${REASONS} <those items and issues>, and which of their reasons does not hold for this project, and why"; where a line departs from no rule of the core (a step of the sync notes, a file the starter kit writes), say so on that line`;
+}
+
+// The day from which the owner's yes is asked of a pull request that changes the floor or the review guidelines
+// (owner-yes.mjs, beside this file; #549), as the lines above are.
+export const YES_SINCE = "2026-11-18T00:00:00Z";
 
 // The mend where the part HOLDS holds more than "None" and no line "Number: <the count>; outcome: <the outcome>" in
 // NUMBER's form; null where it does, or where the part is not there (missing() names that).
@@ -74,8 +138,8 @@ export function numberMend(body) {
   const part = lines.slice(at + 1, end < 0 ? undefined : end).map(l => l.trim()).filter(Boolean);
   if (part.every(l => /^None\b/u.test(l))) return null;
   const named = part.map(l => /(?:^|[\s*-])Number: (.*[^.\s])[.\s]*$/u.exec(l)?.[1]).filter(Boolean);
-  if (named.some(n => NUMBER.test(n))) return null;
-  return `the part "${HOLDS}" names no rule's number${named.length ? ` in its form (it reads "${named[0]}")` : ""}. Mend: under it, for each rule this pull request adds or widens, add a line "Number: <findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for, with "; rare harm" at its end where the rule guards against rare and severe harm, as scripts/holders.json keeps it under "numbers"; or write "None" alone under the heading where it adds no rule`;
+  if (named.some(n => NUMBER_FIRST.test(n))) return null;
+  return `the part "${HOLDS}" names no rule's number${named.length ? ` in its form (it reads "${named[0]}")` : ""}. Mend: under it, for each rule this pull request adds or widens, add a line "Number: <findings | check fires | correction: <kind>>; outcome: <asked | fast | readable | usable | robust>", the count the rule is meant to lower and the outcome it stands for, with "; rare harm" at its end where the rule guards against rare and severe harm, as the rule's entry in scripts/holders/ keeps it under "number"; or write "None" alone under the heading where it adds no rule`;
 }
 
 // The mend where a description has neither the line session-cost.mjs prints ("Session so far: ...") nor the mark that
@@ -209,9 +273,41 @@ if (started(import.meta.url)) {
     } else console.log(`ok   the milestones are not asked here: ${planAsked(created, then) ? "the change could not be read against its base" : why}`);
     if (created >= COST_SINCE && then?.includes("export const COST_SINCE")) { const mend = costMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log("ok   the description has its cost line, or the mark that the script printed none"); }
     else console.log(`ok   the cost line or its mark is not asked here: ${why}`);
+    if (created >= CHANGED_SINCE && then?.includes("export const CHANGED_SINCE")) {
+      const found = testsChanged(process.cwd());
+      if (found === null) console.log("ok   the tests this pull request edits are not asked here: the change, or the shape check's config at its base, could not be read, or that config names no tests");
+      else {
+        // (each file whose assertions are only changed is listed for the reviewer, and asks nothing: one made stricter is no worse)
+        for (const f of found.filter(f => !f.weaker)) console.log(`ok   for the reviewer: ${plain(f.file)} has ${f.asserts.length} line${f.asserts.length === 1 ? "" : "s"} that assert changed, none fewer`);
+        const mend = changedMend(process.env.PR_BODY, found, `node ${coreAt(process.cwd()) ?? ""}scripts/weakened.mjs`);
+        if (mend) mends.push(mend); else console.log(`ok   the description names each test file this pull request leaves with fewer lines that assert, or in which it skips a case (${found.filter(f => f.weaker).length})`);
+      }
+    } else console.log(`ok   the tests this pull request edits are not asked here: ${why}`);
     // (asked only where the part is, which is where the rules change)
     if (parts.includes(HOLDS) && created >= NUMBER_SINCE && then?.includes("export const NUMBER_SINCE")) { const mend = numberMend(process.env.PR_BODY); if (mend) mends.push(mend); else console.log(`ok   the part "${HOLDS}" names a rule's number, or "None"`); }
     else if (parts.includes(HOLDS)) console.log(`ok   the number under "${HOLDS}" is not asked here: ${why}`);
+    if (created >= REASONS_SINCE && then?.includes("export const REASONS_SINCE")) {
+      const added = differencesAdded(process.cwd()), mend = added === null ? null : reasonsMend(process.env.PR_BODY, added, coreAt(process.cwd()) ?? "core/");
+      if (mend) mends.push(mend);
+      else console.log(added === null ? `ok   the line "${REASONS}" is not asked here: the change could not be read against its base` : added.length ? `ok   the description says the reasons read for the difference it adds` : `ok   the line "${REASONS}" is not asked here: no line is added under the manifest's "Differences"`);
+    } else console.log(`ok   the line "${REASONS}" is not asked here: ${why}`);
+    if (created >= YES_SINCE && then?.includes("export const YES_SINCE")) {
+      const diff = spawnSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8", maxBuffer: 1 << 26 });
+      // (where the core lies is read from the base's manifest, never the head's, which the pull request could bring)
+      const at = coreAtBase(process.cwd()), paths = diff.status === 0 && at !== null ? asking(diff.stdout.split("\0").filter(Boolean), at) : null;
+      if (paths === null) console.log("ok   the owner's yes is not asked here: the change could not be read against its base");
+      else {
+        // (a file whose change only follows files the pull request moves asks no yes: path-only.mjs; #886, point 1)
+        const follow = paths.length ? proven(process.cwd(), "HEAD^1", "HEAD", paths) : [], left = paths.filter(p => !follow.includes(p));
+        if (follow.length) console.log(`ok   the owner's yes is not asked of ${follow.join(", ")}: only paths that follow files the pull request moves`);
+        // (nor one the design check states keeps its meaning, at the head's text: meaning-kept.mjs; #886, point 2)
+        const kept = statedOf({ cwd: process.cwd(), repo, number: numberOf(process.env.GITHUB_REF), asked: left }), rest = left.filter(p => !kept.includes(p));
+        if (kept.length) console.log(`ok   the owner's yes is not asked of ${kept.join(", ")}: the design check states that its meaning is unchanged`);
+        const issues = issuesOf(process.env.PR_BODY), got = rest.length && issues.length ? textsOf(repo, issues) : { texts: [], read: true };
+        const yes = yesOf({ paths: rest, body: process.env.PR_BODY, ...got });
+        if (yes.mend) mends.push(yes.mend); else console.log(`ok   ${yes.note}`);
+      }
+    } else console.log(`ok   the owner's yes is not asked here: ${why}`);
   }
   for (const mend of mends) console.log(`FAIL ${mend}`);
   process.exit(absent.length || mends.length ? 1 : 0);

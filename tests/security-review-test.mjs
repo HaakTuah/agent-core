@@ -63,6 +63,11 @@ for (const [what, body] of [
   ok(v.warning === UNREAD && v.done === false && v.why.includes("no security review"), `a summary of Codex's with ${what}: the check warns, and waits as with no summary`, JSON.stringify(v));
 }
 ok(judge(pull, [real(REAL_CLEAN.replace("codex-review-state:v1", "codex-review-state:v2")), said("Security review: checked")]).done === true && judge(pull, [real("A comment of Codex's that is no summary.")]).warning === undefined, "a posted review still settles it, and a comment of Codex's that is no summary brings no warning");
+// a receipt Codex's app really posted on this repository's pull requests when its code review found nothing, byte for
+// byte as GitHub's API gives it (its issue comments): no summary, and no finding
+const REAL_RECEIPT = "<!-- codex-review-receipt:v1 -->\n\nCodex Review: Didn't find any major issues. Breezy!\n\n**Reviewed commit:** `ea27e8d89a`\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\".\n\nIf Codex has suggestions, it will comment; otherwise it will react with 👍.\n\n\n\n\nCodex can also answer questions or update the PR. Try commenting \"@codex address that feedback\".\n            \n</details>";
+ok(is(judge(pull, [real(REAL_RECEIPT)]), false, "no security review") && judge(pull, [real(REAL_RECEIPT)]).warning === undefined && is(judge(pull, [real(REAL_RECEIPT), summary(done)]), true, "has run")
+  && is(judge(pull, [summary(open), real(REAL_RECEIPT, "2026-11-12T12:00:00Z"), said("Security review: the fix checked")]), true, "its open finding is not among the comments"), "a real receipt of Codex's is read as no summary, brings no warning, hides no summary after it and is no finding");
 
 // Nothing to mark.
 ok(judge({ ...pull, state: "closed" }, [summary(done)]) === undefined && judge({ ...pull, draft: true }, [summary(done)]) === undefined, "a closed pull request and a draft get no status");
@@ -221,12 +226,24 @@ ok(is(byRights([as("helper", "NONE")], [right("helper")]), false, "no security r
   "the rights count only for the comment's own login, a person's on both sides, and never where GitHub gives the comment no say in the repository");
 ok(is(byRights([as("SomeOne", "OWNER")], []), true, "is posted") && is(byRights([as("helper")], undefined), false, "no security review") && is(judge(pull, [as("helper")], [], undefined, undefined, true, { reviewers: ["helper"], rights: [right("helper", "read")] }), true, "is posted"),
   "with no rights read the owner's and the named accounts count as before, and an account named counts whatever its rights (AGENTS.md, \"Nothing locks a project\")");
+// an organisation's repository: its owner is the organisation, which posts nothing, so a person who owns it counts only
+// through the rights the host gives that person
+const ofOrg = { ...pull, base: { repo: { owner: { login: "some-org", type: "Organization" } } } };
+ok(["OWNER", "MEMBER"].every((assoc) => is(judge(ofOrg, [as("boss", assoc)]), false, "no security review") && is(judge(ofOrg, [as("boss", assoc)], [], undefined, undefined, true, { rights: [right("boss", "admin")] }), true, "is posted"))
+  && is(judge(ofOrg, [as("boss", "OWNER")], [], undefined, undefined, true, { rights: [right("boss", "read")] }), false, "no security review"), "in an organisation's repository, an owner's or a member's review counts only where the host gives that person the right to write");
+// an app's account the project names: it counts where GitHub gives it a say in the repository, never with none
+const app = (assoc) => ({ ...said("Security review: fine", assoc), user: { login: "review-app[bot]", type: "Bot" } });
+ok(is(judge(pull, [app("COLLABORATOR")], [], undefined, undefined, true, { reviewers: reviewersOf("review-app[bot]") }), true, "is posted") && is(judge(pull, [app("NONE")], [], undefined, undefined, true, { reviewers: reviewersOf("review-app[bot]") }), false, "no security review"),
+  "an app's account named in reviewers counts as a collaborator, and not with no say in the repository");
 const opened = { ...pull, created_at: "2026-11-12T10:00:00Z" };
 ok(boundOf("false", opened, "2026-11-12T11:00:00Z") === false && boundOf("false", opened, "2026-11-12T09:00:00Z") === true && boundOf("false", opened, "2026-11-12T10:00:00Z") === true
   && ["", undefined, "soon"].every((since) => boundOf("false", opened, since) === true) && boundOf("false", { ...pull, created_at: "soon" }, "2026-11-12T11:00:00Z") === true && [undefined, "true", ""].every((held) => boundOf(held, opened, "2026-11-12T11:00:00Z") === true),
-  "a pull request is taken as from before the check only where the host says it was opened before the default branch's copy came; one opened since, or with either time unread, is held, whatever its head holds");
-const unnamedOld = judge(pull, [as("helper")], [], undefined, undefined, false);
-ok(unnamedOld.done === true && unnamedOld.why.endsWith("a review from an account not named counts, as before this check came") && is(judge(pull, [as("helper", "NONE")], [], undefined, undefined, false), false, "no security review") && is(judge(pull, [as("SomeOne", "OWNER")], [], undefined, undefined, false), true, "is posted on the pull request"), "a pull request from before the check: a member's or collaborator's review counts as it did then, said in the status, and no one else's");
+  "a pull request is taken as from before the check only where the host says it was opened before the script first came to the default branch; one opened since, or with either time unread, is held, whatever its head holds");
+const helperOld = (rights) => judge(pull, [as("helper")], [], undefined, undefined, false, { rights });
+ok(is(helperOld(undefined), false, "no security review") && is(helperOld([right("helper", "read")]), false, "no security review") && is(helperOld([right("helper")]), true, "is posted on the pull request")
+  && is(judge(pull, [as("helper", "NONE")], [], undefined, undefined, false), false, "no security review") && is(judge(pull, [as("SomeOne", "OWNER")], [], undefined, undefined, false), true, "is posted on the pull request")
+  && is(judge(pull, [{ ...as("helper"), updated_at: "2026-11-14T12:30:00Z" }], [], undefined, undefined, false, { rights: [right("helper")] }), true, "is posted on the pull request"),
+  "a pull request from before the check counts a review only from an account it counts, as any other does: a member whose right was not read, or who may only read, counts not; a writer, the owner, and an edited review of theirs do");
 
 // What a review must have seen (#99): a review of an earlier commit stands only where nothing but updates from main
 // follow it; otherwise a posted review names the head, or such a commit, by its whole SHA.
@@ -241,6 +258,7 @@ ok(is(saw(pushed, [summary(onOld)]), false, "Codex saw ccccccc, not head. Mend: 
 ok(is(saw(pushed, [summary(onOld), said(`Security review: the later commit checked, on ${HEAD}`)]), true, "a security review is posted on the pull request; Codex's saw ccccccc, earlier") && is(saw(pushed, [summary(onOld), said(`Security review: on ${HEAD.toUpperCase()}`)]), true, "Codex's saw"), "a posted review naming the head's whole SHA, in any case, settles it");
 ok(is(saw(pushed, [summary(onOld), said(`Security review: on ${OLD}`)]), false, "Codex saw") && is(saw(pushed, [summary(onOld), said(`Security review: on ${HEAD.slice(0, 39)}`)]), false, "Codex saw") && is(saw(pushed, [summary(onOld), said(`Security review: on ${HEAD}0`)]), false, "Codex saw"), "one naming an earlier commit, part of the head's SHA, or a longer one, does not");
 ok(is(saw(pushed, [said(`Security review: on ${HEAD}`)]), true, "is posted on the pull request") && is(saw(updated, [said(`Security review: on ${OLD}`)]), true, "posted on an earlier commit, only updates from main since") && is(saw(pushed, [said(`Security review: on ${OLD}`)]), false, "review not on head. Mend:") && is(saw(pushed, [said("Security review: none needed")]), false, "not on head"), "with no review of Codex's: a posted one, or the note that none is needed, names the head, or a commit only updates from main follow");
+ok(is(saw(pushed, [said(`Security review: none is needed (floor rule 8: it touches no way in), on ${HEAD}`)]), true, "is posted on the pull request") && is(saw(pushed, [said(`Security review: none is needed (floor rule 8: it touches no way in), on ${OLD}`)]), false, "not on head"), "the note that none is needed, naming the head, counts as a posted review; naming an earlier commit after a push of its own, it does not");
 ok(is(saw([step(OLD, "e".repeat(40)), step(HEAD, OLD, OLD)], [summary(onOld)]), false, "Codex saw") && is(saw([step(OLD, "e".repeat(40)), step("f".repeat(40), OLD), step(HEAD, OLD, "f".repeat(40))], [summary(onOld)]), false, "Codex saw") && is(saw([step(HEAD, OLD, {})].map((c) => ({ ...c, parents: [{ sha: OLD }, {}] })), [summary(onOld)]), false, "Codex saw"), "a merge of a commit of the pull request's own, or of one not named, is no update from main");
 ok(is(judge({ ...pull, commits: 300 }, [summary(onOld)], [], updated), false, "Codex saw") && is(judge(pull, [summary(onOld)], [], updated), false, "Codex saw"), "a list of commits GitHub cut short, or with no count to hold it to, proves no update from main");
 ok([-1, -300, 1.5, "2"].every((commits) => is(judge({ ...pull, commits }, [summary(onOld)], [], updated), false, "Codex saw")), "a count of commits that is no whole number of at least none proves no update from main");
@@ -281,6 +299,18 @@ ok(is(pure([]), true, "a pure sync, as pure-sync.mjs proves") && is(pure([summar
 ok(is(pure([summary(running)]), false, "no security review") && is(pure([summary({ ...running, status: "queued" })]), false, "no security review") && is(pure([summary(open)], syncs), false, "Mend: fallback"), "a review that began by itself is waited for, and its open finding answered");
 ok(is(pure([summary(done)], syncs), true, `has run (on ${SEEN.slice(0, 7)}`) && is(judge(pull, [], [], [], undefined, true, { pure: false }), false, "no security review"), "one that has run, on any commit of the sync, is done with; not proved pure, it is any pull request");
 
+// A pull request its caller proved queue-only (#750): queue-only.mjs, which the caller runs, proves it, and the check
+// honours the proof only where GitHub's whole list of its files is one Markdown file that runs nothing, since a proof
+// handed by a caller changed in the pull request itself must wave through nothing more.
+const lineOf = file("QUEUE.md", "@@ -1 +1 @@\n-| #1 | builder | |\n+| #2 | builder | |");
+const queued = (comments, files, p = counted(pull, files), proved = true) => judge(p, comments, [], [], [files], true, { queue: proved });
+ok(is(queued([], [lineOf]), true, "queue-only, as queue-only.mjs proves") && is(queued([], [lineOf], undefined, false), false, "no security review"),
+  "proved queue-only, its one file the progress file, it passes with no review; not proved, it is any pull request");
+ok(is(queued([], [lineOf, file("README.md", patch(["a", "b"]))]), false, "no security review") && is(queued([], [file("QUEUE.yml", patch(["a", "b"]))]), false, "no security review")
+  && is(queued([], [file(".github/workflows/x.md", patch(["a", "b"]))]), false, "no security review") && is(queued([], [lineOf], { ...pull, changed_files: 2 }), false, "no security review"),
+  "but not where its files are two, one is no Markdown, one runs by itself, or GitHub's list is cut short, whatever its caller says");
+ok(is(queued([summary(running)], [lineOf]), false, "no security review") && is(queued([summary(done)], [lineOf]), true, "has run"), "a review that began by itself is waited for, as of a pure sync");
+
 // From the command line, as the workflow runs it.
 const dir = mkdtempSync(join(tmpdir(), "security-review-"));
 try {
@@ -304,8 +334,11 @@ try {
   ok(asked.status.state === "pending" && asked.status.description.startsWith("Waiting: floor rule 3 asks two") && run(counted(pull, [pinMove]), [[summary(onHead)]], { ADVISORY: "false" }, [], [], [[pinMove]]).status.state === "success"
     && run({ ...counted(pull, [stepChange]), created_at: "2026-11-12T09:00:00Z" }, [[summary(onHead)]], { ADVISORY: "false", BOUND: "false", SINCE: "2026-11-12T10:00:00Z" }, [], [], [[stepChange]]).status.state === "success"
     && ["2026-11-12T08:00:00Z", ""].every((since) => run({ ...counted(pull, [stepChange]), created_at: "2026-11-12T09:00:00Z" }, [[summary(onHead)]], { ADVISORY: "false", BOUND: "false", SINCE: since }, [], [], [[stepChange]]).status.state === "pending"),
-  "given the files too, it asks two where what runs by itself changed, and says how to mend it; told the pull request is from before the check and opened before the default branch's copy came, it waits not; opened since, or with no time for that, it waits");
+  "given the files too, it asks two where what runs by itself changed, and says how to mend it; told the pull request is from before the check and opened before the script first came to the default branch, it waits not; opened since, or with no time for that, it waits");
   ok(run(pull, [], { ADVISORY: "false", PURE: HEAD }).status.description === "a pure sync, as pure-sync.mjs proves: no review needed, none begun by itself yet (floor rule 8)" && run(pull, [], { ADVISORY: "false", PURE: SEEN }).status.state === "pending" && run({ ...pull, head: { sha: "main" } }, [], { PURE: "main" }).sha === undefined, "told the workflow's proof holds for the head, a sync needs no review; for another commit it does");
+  ok(run(counted(pull, [lineOf]), [], { ADVISORY: "false", QUEUE: HEAD }, [], [], [[lineOf]]).status.state === "success" && run(counted(pull, [lineOf]), [], { ADVISORY: "false", QUEUE: SEEN }, [], [], [[lineOf]]).status.state === "pending"
+    && run(counted(pull, [lineOf]), [], { ADVISORY: "false", QUEUE: HEAD }).status.state === "pending",
+  "told the caller's proof holds for the head, a queue-only pull request needs no review; for another commit, or with no files to read, it does");
   ok(run(pull, [[as("helper")]], { ADVISORY: "false", REVIEWERS: "x helper" }).status.state === "success" && run(pull, [[as("helper")]], { ADVISORY: "false" }).status.state === "pending", "the accounts the workflow names count, and no others");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   ok(run(pull, [[real(REAL_CLEAN.replace("codex-review-state:v1", "codex-review-state:v2"))]]).warning === UNREAD && run(pull, [[real(REAL_CLEAN)]]).warning === undefined, "run as the workflow runs it, it prints the warning beside the status, for the workflow to show");

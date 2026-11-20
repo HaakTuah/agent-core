@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
-import { carriedAt, corePath, floorCopyIn, hookCommands, projectAt, readCore } from "../scripts/core-path.mjs";
+import { carriedAt, corePath, floorCopy, floorCopyIn, hookCommands, manifestText, projectAt, readCore } from "../scripts/core-path.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { pathIn } from "../scripts/reading.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
@@ -100,9 +100,32 @@ if (process.platform !== "win32") {
   fs.mkdirSync(linked); fs.mkdirSync(outside);
   fs.symlinkSync(outside, path.join(linked, "vendor"));
   fs.writeFileSync(path.join(linked, "core-manifest.md"), copied("vendor/the-core/"));
+  spawnSync("git", ["init", "-q"], { cwd: linked }); // (a project is a git repository, whose files the sync reads: own-files.mjs)
   const r = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/sync.mjs", import.meta.url))], { cwd: linked, encoding: "utf8" });
   ok(r.status === 1 && /vendor, on the way to the copy's path vendor\/the-core\/, is a link/.test(r.stderr) && mended(r.stderr) && fs.readdirSync(outside).length === 0, "the sync refuses a path through a link, saying the mend, and writes nothing", r.stderr);
 } else console.log("note a link cannot be made here (Windows), so the sync's refusal of one is not tried");
+// a manifest that is no regular file, or past a mebibyte, reads as empty: the usual path, no floor copy, and nothing
+// that stops the script reading it (a manifest linked to a device once took every reader down: #593, point 8)
+const odd = path.join(tmp, "odd");
+fs.mkdirSync(path.join(odd, "core-manifest.md"), { recursive: true });
+const big = path.join(tmp, "big");
+fs.mkdirSync(big);
+fs.writeFileSync(path.join(big, "core-manifest.md"), `${copied("vendor/core/")}${"x".repeat(1 << 20)}`);
+ok(manifestText(path.join(odd, "core-manifest.md")) === "" && corePath(odd) === "core/" && floorCopy(odd) === null && corePath(big) === "core/" && manifestText(path.join(tmp, "nowhere", "core-manifest.md")) === null,
+  "a manifest that is a folder, or past a mebibyte, reads as empty and so as the usual path; none, as null");
+const edge = path.join(tmp, "edge");
+fs.mkdirSync(edge);
+fs.writeFileSync(path.join(edge, "core-manifest.md"), carried().padEnd(1 << 20, " "));
+ok(corePath(edge) === "lib/core/" && floorCopy(edge) === "floor-copy/", "a manifest of a mebibyte exactly is read, its path and its floor copy among it");
+// (through a link too: to a folder here, never to a device, which a mutant of the check would read without end and
+// take the machine's memory with it)
+if (process.platform !== "win32") {
+  const linked = path.join(tmp, "linked-manifest");
+  fs.mkdirSync(path.join(linked, "elsewhere"), { recursive: true });
+  fs.symlinkSync(path.join(linked, "elsewhere"), path.join(linked, "core-manifest.md"));
+  const r = spawnSync(process.execPath, [script], { cwd: linked, encoding: "utf8", timeout: 20000 });
+  ok(corePath(linked) === "core/" && floorCopy(linked) === null && r.status === 1 && mended(r.stderr), "a manifest that is a link to what is no regular file reads as empty, and the script says the mend", `${r.status} ${r.signal} ${r.stderr}`);
+}
 
 // Claude Code's hooks for a core at another path: for core/ the helper's and the stop's are the starter kit's own, and
 // where a submodule carries the core, the start reads the work-saved hook from the library's commit main pins, never
@@ -148,7 +171,10 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
   // that carries its scripts)
   {
     const lib2 = path.join(tmp, "a-library-with-scripts"), consumer = path.join(tmp, "a-consumer");
-    for (const f of ["pointers.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) put(lib2, `core/scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(`./${f}`, new URL("../scripts/", import.meta.url))), "utf8"));
+    for (const f of ["pointers.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs"]) put(lib2, `core/scripts/${f}`, fs.readFileSync(fileURLToPath(new URL(`./${f}`, new URL("../scripts/", import.meta.url))), "utf8"));
+    // (and the package the check reads Markdown with, as the core's install leaves it: the lock file, npm's record of
+    // the install and the package)
+    for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/marked"]) fs.cpSync(fileURLToPath(new URL(`../.packages/${f}`, import.meta.url)), path.join(lib2, "core/.packages", f), { recursive: true });
     put(lib2, "core/floor/security.md", "# The floor\n\n**1. Nothing secret in the repository.**\n");
     put(lib2, "core-manifest.md", copied());
     put(lib2, "AGENTS.md", "# The library\n");

@@ -10,7 +10,8 @@
 // core-address.mjs, beside this file. Where the line says a library carries the core, it syncs nothing: the library's
 // own repository does (tasks/repositories.md).
 //
-//   node core/scripts/sync.mjs              to the newest of what the project follows: the core's main, or its newest
+//   node core/scripts/sync.mjs              to the newest of what the project follows: the core's main at its newest
+//                                           commit whose checks all passed (greenMain), or its newest
 //                                           release where it follows the releases (releases.mjs, beside this file),
 //                                           unless that release changes nothing the project takes (staysAt there)
 //   node core/scripts/sync.mjs <full SHA>   to that commit of the core's main, whatever the project follows
@@ -25,7 +26,11 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
 import { readCore } from "./core-path.mjs";
-import { NOTES, asksBetween, fetchCore, followsOf, hostSaid, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
+import { READ_MOST, ownFiles } from "./own-files.mjs";
+import { everyInstall } from "./packages.mjs";
+import { started } from "./started.mjs";
+import { NOTES, asksBetween, fetchCore, followsOf, greenMain, hostSaid, inBare, newestRelease, past, releasesIn, staysAt } from "./releases.mjs";
+import { FOLDER } from "./sync-notes.mjs";
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
 // git's own variables that point elsewhere left out: releases.mjs)
@@ -65,8 +70,18 @@ function targetOf({ manifest, text, old, first, at }, tmp) {
   const pin = arg ?? (first ? old : null);
   if (pin) return { pin, release: "" };
   const follows = followsOf(text, hostSaid()) ?? fail(`${manifest} does not say what the project follows: its *follows* row is \`main\` or \`releases\`, once, or left out where the owner's account is read: its one row, or the repository's own account where the host says a person holds it`);
-  if (follows === "main") return { pin: git(["rev-parse", "refs/heads/main"], tmp), release: "" };
+  if (follows === "main") return greenToTake({ old, at }, tmp);
   return releaseToTake({ text, old, at }, tmp);
+}
+
+// The newest commit of the core's main whose checks all passed, where the project follows main (releases.mjs,
+// greenMain; floor rule 12, #733); null, said, where none has passed or the copy is past it already.
+function greenToTake({ old, at }, tmp) {
+  const green = greenMain(tmp);
+  console.log(green.said);
+  if (!green.sha) { console.log("nothing to sync until one has (a full SHA takes a commit of its main)"); return null; }
+  if (old && green.sha !== old && past(green.sha, old, tmp)) { console.log(`${at} at ${old.slice(0, 7)} is past it already: nothing to sync`); return null; }
+  return { pin: green.sha, release: "" };
 }
 
 // The core's newest release, where the project follows the releases; null, said, where it brings nothing to sync.
@@ -78,13 +93,14 @@ function releaseToTake({ text, old, at }, tmp) {
   return { pin: newest.sha, release: ` (${newest.name})` };
 }
 
-// Each call to a core workflow whose workflow changed between its pin and `pin`, moved to `pin`; the list of those moved.
-function moveCalls(pin, tmp) {
-  const moved = [];
-  const wf = ".github/workflows";
-  for (const file of fs.existsSync(wf) ? fs.readdirSync(wf).filter(f => /\.ya?ml$/.test(f)) : []) {
-    const p = path.join(wf, file);
-    const src = fs.readFileSync(p, "utf8");
+// Each call to a core workflow whose workflow changed between its pin and `pin`, moved to `pin`: { moved, unread }, the
+// calls moved and the workflows not read. A workflow is read as the steps read it (`own`: own-files.mjs): one that is no
+// regular file of the project's own, a link that leads out among them, is left as it is, named, and never written through.
+export function moveCalls(pin, tmp, own) {
+  const moved = [], unread = [];
+  for (const p of own.listed.filter(f => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(f))) {
+    const file = p.slice(".github/workflows/".length), src = own.read(p, true);
+    if (src === null) { unread.push(p); continue; }
     const out = src.replace(new RegExp(`${CORE}/\\.github/workflows/([A-Za-z0-9._-]+\\.ya?ml)@([0-9a-f]{40})`, "g"),
       (call, name, sha) => {
         let same = false;
@@ -95,21 +111,22 @@ function moveCalls(pin, tmp) {
       });
     if (out !== src) fs.writeFileSync(p, out);
   }
-  return moved;
+  return { moved, unread };
 }
 
 // What the sync moved (the copy, the manifest's line and the workflow calls), and what it asks beyond the copy.
-function sayMoved({ at, old, pin, release, manifest, moved }, tmp) {
+function sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp) {
   const changed = git(["diff", "--stat", "--format=", old, pin], tmp).split("\n").pop() || "no files";
   console.log(`${at} ${old.slice(0, 7)} -> ${pin.slice(0, 7)}${release} (${changed.trim()}); ${manifest} moved.`);
   console.log(moved.length
     ? `Workflow calls moved:\n  ${moved.join("\n  ")}`
     : "No workflow call moved: the PR changes no workflow.");
+  if (unread.length) console.log(`Workflows not read, so no call in them moved, each no regular file of the project's own of at most ${READ_MOST} bytes: ${unread.join(", ")}. Make each a file of the project's own, then move its calls by hand to ${pin}.`);
   // What this sync asks of the project beyond the copy: the entries the core's sync notes gained between the two pins.
   // (A pin from before the notes gives every entry. Where the entries cannot be read, it says so: never an all-clear.)
   const asks = asksBetween(old, pin, tmp);
   console.log(asks === null
-    ? `What this sync asks of the project beyond the copy could not be read: read ${at}${NOTES} for the entries newer than the old pin.`
+    ? `What this sync asks of the project beyond the copy could not be read: read the entries of ${at}${FOLDER}/ newer than the old pin.`
     : asks.length
       ? `This sync asks more of the project than the copy (${at}${NOTES}). Not in this PR, a pure sync: do each in a PR of its own once this one is merged, or file it for the queue where it is large.\n${asks.join("\n")}`
       : `This sync asks nothing of the project beyond the copy (${at}${NOTES}).`);
@@ -147,8 +164,12 @@ function report(at, dir, kits) {
 
 function sync(tmp) {
   const manifest = "core-manifest.md";
-  if (!fs.existsSync(manifest)) fail(`run it from a project's root, beside ${manifest}`);
-  const text = fs.readFileSync(manifest, "utf8"), line = ownCopy(text);
+  // (read as the steps read it: own-files.mjs; one that is no regular file of the project's own is none)
+  let own;
+  try { own = ownFiles("."); } catch { fail(`run it from a project's root, a git repository, beside ${manifest}`); }
+  const text = own.read(manifest, true);
+  if (text === null) fail(`run it from a project's root, beside ${manifest}, a regular file of the project's own of at most ${READ_MOST} bytes`);
+  const line = ownCopy(text);
   if (!line) return;
   const at = line.path, dir = at.slice(0, -1), old = line.pin, lineRe = new RegExp(`^Core: ${CORE} at ([0-9a-f]{40}), copied whole under `, "m");
   const first = !fs.existsSync(dir); // (the first copy: the manifest is written, the copy not yet)
@@ -165,20 +186,35 @@ function sync(tmp) {
   // ("-f -": Windows' own tar reads a tape drive unless told to read its input)
   execFileSync("tar", ["-x", "-f", "-", "-C", dir], { input: inBare(tmp, ["archive", pin], { encoding: "buffer", maxBuffer: 1 << 28 }) });
   fs.writeFileSync(manifest, text.replace(lineRe, line => line.replace(old, pin)));
+  install(dir);
 
-  const moved = moveCalls(pin, tmp);
+  const { moved, unread } = moveCalls(pin, tmp, own);
   if (first) { console.log(`${at} written at ${pin.slice(0, 7)}, the first copy; ${manifest} names it.`); return; }
-  sayMoved({ at, old, pin, release, manifest, moved }, tmp);
+  sayMoved({ at, old, pin, release, manifest, moved, unread }, tmp);
   report(at, dir, kitsOf(old, tmp));
 }
 
+// The new copy's packages, installed from its lock file by its own install script, into its .packages/node_modules/,
+// which git does not track (#654); a copy from before it has none. One that fails twice leaves the copy written and says so, with the
+// command to run again: the sync's pull request holds the copy alone, and no registry's silence fails it.
+function install(dir) {
+  const script = path.join(dir, "scripts", "install.mjs");
+  if (!fs.existsSync(script)) return;
+  // (every install of the copy's, the parser's too, for the session that works in the project: #719)
+  const r = spawnSync(process.execPath, [script, ...everyInstall(dir)], { encoding: "utf8" });
+  process.stdout.write(r.stdout ?? "");
+  if (r.status !== 0) console.log(`note the copy is written, but its packages are not installed: ${(r.stderr ?? "").trim().split("\n").slice(-1)[0]}. Mend: run node ${path.relative(process.cwd(), script)} before running a check`);
+}
+
 // The core is fetched into a temporary folder, removed however the sync ends.
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-sync-"));
-try {
-  sync(tmp);
-} catch (e) {
-  console.error(`FAIL: ${e instanceof Failure ? e.message : e.stack}`);
-  process.exitCode = 1;
-} finally {
-  fs.rmSync(tmp, { recursive: true, force: true });
+if (started(import.meta.url)) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-sync-"));
+  try {
+    sync(tmp);
+  } catch (e) {
+    console.error(`FAIL: ${e instanceof Failure ? e.message : e.stack}`);
+    process.exitCode = 1;
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }
