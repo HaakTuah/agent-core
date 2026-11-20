@@ -43,6 +43,14 @@
       "mark": 33545,
       "why": "#888: the list it prints apart from what it reads from the host and its record."
     },
+    "tasks/game-design.md": {
+      "mark": 25119,
+      "why": "#441: the game rules split into a base and a file for each kind (#484, points 6 and 7)."
+    },
+    "tests/steps-test.mjs": {
+      "mark": 138318,
+      "why": "#916: a file for each reader its sections test."
+    },
     "scripts/read-total.mjs": {
       "mark": 20690,
       "why": "Whoever changes how the total is counted reads its tree reader, its readers, its cut and its conditions together, each calling the others; split, that session opens more files and reads no less, and no other task reads it."
