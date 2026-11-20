@@ -25,6 +25,13 @@ project's own guidelines, its `SECURITY.md` and the floor.
   sample, and each file the comparison of old against new flags. It does not mean a security review is skipped (floor
   rule 8), nor a move with judgement in each file. Reason: reading hundreds of like changes one by one finds no more,
   and takes rounds. Held by no check.
+- **A change that keeps the meaning is stated so** (#886). By default a change to the floor or these guidelines asks
+  the owner's yes (floor rule 3). Where it only keeps the meaning (a path or pointer after a move, a spelling or grammar
+  mend, text moved or merged unchanged, a name updated), `scripts/path-only.mjs` proves a moved path, or else the design
+  check states it on a line `Meaning unchanged:` and the paths, each script as `main` holds it; in doubt it leaves it
+  out. It does not mean a new rule, one loosened or tightened, a move that changes who reads a rule or when, or a change
+  to a check, a protected file or who decides goes without the yes. Reason: a yes asked for what means
+  nothing becomes a formality. Held by `scripts/meaning-kept.mjs`, in the description check, and the state report.
 - **A later round** checks that the earlier points were fixed. Something new about work it already saw is raised only
   if it blocks.
 

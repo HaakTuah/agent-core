@@ -73,17 +73,20 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **An idea is built only from a line, and a line joins in a PR of its own.** A new or changed rule
   joins only where that PR relays the owner's yes to its issue, as the chat session records it ("Whose words an issue
   holds"): that PR is the gate, so no verdict of the stand-in's queues one here, a difference from `roles/shared/inbox.md`.
-  A test, a check for a rule that already stands, a task the scheduled look opens (#248) and a small finding of an
-  audit (#259) join without the owner's word. A bug waits for no line, as that module says. A line does not leave in
-  the PR that closes its issue: the readers of the file skip the line of a closed issue, and the next PR that changes
-  the file takes such lines out together (`node scripts/queue.mjs --clear`; #750, point 1), as that module says, since
-  PRs merging side by side collided on it. Held here by `own-description.yml`, which fails a ready PR that changes the
+  A test, a check for a rule that already stands, a task the scheduled look opens (#248), a small finding of an
+  audit (#259) and a change to a rule that keeps its meaning (#886, point 2) join without the owner's word: the design
+  check of the PR that builds such a change states it, as `roles/shared/review-guidelines.md` says of the floor ("A
+  change that keeps the meaning is stated so"), and where it does not, that PR waits for the owner's yes, held for the
+  floor and the guidelines by `scripts/meaning-kept.mjs` and for any other rule by nothing yet. A bug waits for no
+  line, as that module says. A line does not leave in the PR that closes its issue: the readers of the file skip the
+  line of a closed issue, and the next PR that changes the file takes such lines out together (`node scripts/queue.mjs
+  --clear`; #750, point 1), as that module says, since PRs merging side by side collided on it. Held here by `own-description.yml`, which fails a ready PR that changes the
   file and leaves one.
 - **Queued means wanted: nothing queued waits for a second word.** Where the floor asks the owner's
-  yes in a PR (floor rule 3: a change to the floor or the review guidelines), the yes the owner gave when its issue was
-  queued is that yes: the builder relays it into the PR word for word as it was recorded (floor rule 3), and it covers
-  the change as the issue describes it. A PR that goes beyond its issue is not covered by it, and the design check
-  says so.
+  yes in a PR (floor rule 3: a change to the floor or the review guidelines that means something), the yes the owner
+  gave when its issue was queued is that yes: the builder relays it into the PR word for word as it was recorded
+  (floor rule 3), and it covers the change as the issue describes it. A PR that goes beyond its issue is not covered by
+  it, and the design check says so.
 - **The file holds no note.** Where a module asks for one in the *progress file* (a lane that waits), it goes in the
   description of the line's own PR, which the next builder reads with the branch, as a hand-off note does
   (`tasks/tools.md`, "A change of tool loses nothing").
@@ -153,7 +156,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   says ("Git and GitHub", and point 1). A PR that changes a rule says what it changes in every project.
 - **Every PR gets Codex's code and security reviews,** save one of queue lines alone that `scripts/queue-only.mjs`
   proves (floor rule 8; `tasks/reviews.md`, point 3); one that changes the floor or the review guidelines needs the
-  owner's yes in it, save a path that follows a moved file as floor rule 3 says: that of its queued issue ("Queued
+  owner's yes in it, save one that keeps the meaning as floor rule 3 says: that of its queued issue ("Queued
   means wanted"), or, for one that goes beyond it, a new yes, for which it waits unmerged while its builder takes the
   next line.
 - **The size caps keep the rules lean and decide nothing else** (`scripts/size.mjs`).

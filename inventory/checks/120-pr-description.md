@@ -1,6 +1,6 @@
 - `scripts/pr-description.mjs`, `.github/workflows/pr-description.yml`, `.github/workflows/own-description.yml`,
   `scripts/milestones.mjs`, `scripts/done-when.mjs`, `scripts/owner-yes.mjs`, `scripts/path-only.mjs`,
-  `scripts/weakened.mjs`, `tests/weakened-test.mjs`, `tests/path-only-test.mjs`: fail a ready pull request whose
+  `scripts/meaning-kept.mjs`, `scripts/weakened.mjs`, `tests/weakened-test.mjs`, `tests/path-only-test.mjs`: fail a ready pull request whose
   description lacks a heading the project names, and, here, the lines the core asks, a test file weakened among them
   (#307), saying so of a draft. *Runs:* the runners, where the description is; any session given it. *Else:* Danger JS
   (MIT), its rules written in JavaScript and run with a token, dropped on a measure: 14.1.0 installs 86 packages (34

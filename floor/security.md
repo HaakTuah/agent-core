@@ -25,10 +25,10 @@ might attack: `floor/threat-model.md`.
   own copy, and any other file a tool takes its instructions from, wherever it lies: an `AGENTS.md` or `CLAUDE.md` in
   any folder, a GEMINI.md or REVIEW.md, a folder .agents or .agent); and the checks on the
   work (the copies and licence checks and their configs).
-- **The owner's yes in the PR** is needed only for a change to the floor or the review guidelines, save one whose only
-  change to such a file is a path that follows a file the PR moves (`scripts/path-only.mjs`, as `main` holds it, proves
-  it): the owner's word that asked for the change, quoted there, is that yes for the change as asked; one beyond it
-  waits for a new yes.
+- **The owner's yes in the PR** is needed only for a change to the floor or the review guidelines that alters what a
+  session must or may do, what protects the owner or who decides (one that keeps the meaning, stated by a reviewer who
+  did not write it: `roles/shared/review-guidelines.md`): the owner's word that asked for it, quoted there, is that yes
+  for the change as asked; one beyond it waits for a new yes.
   Reason: the yes keeps a session from widening its own mandate, a floor change made to get some other task through
   above all; it is never a second question about what the owner asked for.
 - A change to what runs by itself or with credentials passes two security reviews instead, the security reviewer's and
