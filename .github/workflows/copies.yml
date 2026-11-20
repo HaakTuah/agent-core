@@ -1,7 +1,8 @@
 # The copies check ("One fact, one place" in the core's roles/shared/how-to-work.md), for every project that takes the core:
 # a new copy of code, or of the rule files' prose, fails; the old ones its baseline lists are removed over time, and
 # against the branch a PR merges into the baseline may only shrink. With it, the pointer check (every pointer in the
-# rule files leads somewhere; in an agent tool's files, what the base already held noted and passed, as the copies
+# rule files leads somewhere, a Markdown link and the heading it names read by lychee, fetched at set-up, what the base
+# already held noted and passed; in an agent tool's files, what the base already held noted and passed, as the copies
 # check notes a copy there its baseline does not list yet) and the reading-size check (the files every session reads
 # keep to their marks, and a file past the split mark is split before it is changed), with the marks the project names;
 # and checks that need no config: the workflow check (floor rule 2: no workflow names the trigger it forbids; and zizmor's
@@ -69,6 +70,12 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
         run: if [ -f "${CORE_AT}scripts/workflow-tools.sh" ]; then bash "${CORE_AT}scripts/workflow-tools.sh" >> "$GITHUB_ENV"; fi
+      # (the link checker the pointer check runs, fetched at its pin outside the repository: the core's scripts/lychee.sh;
+      # where it cannot be fetched, the check says it did not run it and reads the links its own way; #582)
+      - name: lychee, which the pointer check runs, fetched at its pin (the core's scripts/lychee.sh)
+        timeout-minutes: 5
+        continue-on-error: true
+        run: if [ -f "${CORE_AT}scripts/lychee.sh" ]; then bash "${CORE_AT}scripts/lychee.sh" >> "$GITHUB_ENV"; fi
       - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks (each its own script's, run through scripts/checks.mjs, which holds their steps)
         env:
           BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}

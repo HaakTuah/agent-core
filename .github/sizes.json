@@ -31,8 +31,12 @@
       "mark": 38816,
       "why": "#929: the cases of how Betterleaks reads apart from what the check reads."
     },
+    ".github/shape-baseline.json": {
+      "mark": 20951,
+      "why": "The shape check's one baseline (scripts/shape.mjs), which it reads whole and a session reads by the id of the one entry it adds or takes out, found by its name; main stood past the mark at 20,580 bytes with no entry here when #582 added its test's."
+    },
     ".github/workflows/tests.yml": {
-      "mark": 72196,
+      "mark": 75194,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {
@@ -98,6 +102,10 @@
     "scripts/security-review.mjs": {
       "mark": 39696,
       "why": "#931: along what it reads, Codex's summary, who counts as a reviewer, what a review stands for, floor rule 3's count and the status posted."
+    },
+    "scripts/pointers.mjs": {
+      "mark": 26061,
+      "why": "One check whose forms of a pointer are read from one parse of each rule file and joined into one pointer by one glue (atoms(), GLUE), so one who changes a form reads how the others join it; the Markdown links' reading with lychee stands apart in links.mjs (#582), which is what a split along a part that is read on its own gave."
     },
     "scripts/nuget.mjs": {
       "mark": 84129,

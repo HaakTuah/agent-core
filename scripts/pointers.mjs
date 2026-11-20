@@ -6,7 +6,9 @@
 // whatever the directory it is started from; the copies workflow (.github/workflows/copies.yml) runs it on every PR.
 //
 //   `path`                     a tracked file or folder (a bare name, such as `net.js`, if exactly one file has it)
-//   [text](path)               a tracked file or folder, relative to the file it is in (a web address is not checked)
+//   [text](path)               a tracked file or folder, relative to the file it is in (a web address is not checked), and
+//                              the heading after "#": read by lychee, a maintained tool, where the job fetched it, and its
+//                              other forms of a link too (links.mjs; #582), else by the core's own reading of this form
 //   @path.md                   a line that is an import and nothing else: a tracked file, relative to the file it is in
 //   `path`, "Section"          a heading, or a bold lead-in, in that file ("Section" in `path` and `path` ("Section") too);
 //                              through a file of the core's that only points (at a path its rules left), in what it names
@@ -24,7 +26,8 @@
 // The files an agent tool takes its instructions from are rule files too, read since #405 (rule-files.mjs, `toolFiles`).
 // Nothing locks a project: with POINTERS_BASE set to the pull request's base (as the copies workflow sets it), a broken
 // pointer in one of those files that the base held, in the same file and the same words, is noted and fails nothing,
-// and one it did not hold fails; with no base, as on a push to main, each is noted. The sync's step lists the old ones
+// and one it did not hold fails; with no base, as on a push to main, each is noted. So is a link lychee finds broken in
+// any rule file, read again from the base's tree (links.mjs), and in the core's own run each fails. The sync's step lists the old ones
 // until they are gone (core/setup/sync-notes.md, 16 November 2026).
 //
 //   node core/scripts/pointers.mjs
@@ -38,6 +41,7 @@ import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { corePath, projectAt } from "./core-path.mjs";
 import { logged } from "./guards.mjs";
+import { checkRules } from "./links.mjs";
 import { markdownReader } from "./markdown.mjs";
 import { installed, unreached } from "./packages.mjs";
 import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
@@ -158,6 +162,19 @@ const broken = [], unread = [], notFound = [], quotes = [];
 const named = new Set(RULES.flatMap(rf => [...text(rf).matchAll(/`([\w./-]+\.md)`/g)]
   .map(m => files.has(m[1]) ? m[1] : tracked.filter(t => t.endsWith('/' + m[1]))).flat()).concat(RULES));
 let count = 0;
+// (Markdown's own links: lychee's, run offline on the rule files it can read, where the job's set-up fetched it
+// (lychee.sh), never at a commit; where it was not fetched, or could not run, the core's own reading below stands in, and
+// the check says so; #582)
+const LYCHEE = AT ? "" : process.env.LYCHEE || "", byTool = new Set();
+let tool = null;
+if (LYCHEE) {
+  let base = CORE ? "" : null;
+  // (the pull request's base, whose tree links.mjs reads only where lychee finds a broken link)
+  if (!CORE && process.env.POINTERS_BASE) { try { base = git(["rev-parse", "--verify", "--quiet", "--end-of-options", `${process.env.POINTERS_BASE}^{commit}`]).trim(); } catch { console.error(`FAIL: ${logged(`POINTERS_BASE ${process.env.POINTERS_BASE} is not a commit here`)}. Mend: fetch it (git fetch origin <the base branch>) before the check runs`); process.exit(1); } }
+  tool = checkRules({ program: LYCHEE, rules: RULES, tracked: files, folders: dirs, text, base });
+  if (tool.unread) console.log(`::warning::${logged(`The pointer check could not run lychee on the rule files (${tool.unread}), so their links were read by the core's own reading alone. Mend: run this job again; if it fails again, file it as a fault`)}`);
+  else { for (const f of tool.read) byTool.add(f); count += tool.count; }
+} else if (!AT) console.log("::warning::The pointer check did not run lychee: it was not fetched here, which only the job's set-up step does (core/scripts/lychee.sh), so the rule files' links were read by the core's own reading alone, which reads no heading after \"#\". Mend: none in a session; the pull request's checks run it");
 for (const rf of RULES) {
   const { lines } = parse(rf);
   // (a line that is an import and nothing else, "@<a path to a Markdown file>", leads to that file from the folder it
@@ -172,7 +189,7 @@ for (const rf of RULES) {
   for (const b of parse(rf).blocks) {
     const own = parse(rf).heads.filter(h => h.i <= b.i).pop();
     // a link's destination, when it is in this repository, must be a tracked file or folder too
-    for (const m of b.text.matchAll(/\]\(([^)\s]+)\)/g)) {
+    for (const m of byTool.has(rf) ? [] : b.text.matchAll(/\]\(([^)\s]+)\)/g)) {
       if (/^([a-z]+:|#)/i.test(m[1])) continue;
       count++;
       const p = posix.normalize(posix.join(posix.dirname(rf), m[1].split('#')[0])).replace(/\/$/, '');
@@ -278,6 +295,9 @@ if (!CORE && broken.some(inTool)) {
   }
   for (let k = broken.length - 1; k >= 0; k--) { const t = inTool(broken[k]); if (t && (!held || held.has(key(t)))) old.push(...broken.splice(k, 1)); }
 }
+// (lychee's findings, as links.mjs decided them against the base: #582)
+for (const n of tool?.notes ?? []) console.log(`note ${logged(n)}`);
+broken.push(...(tool?.fails ?? []));
 for (const u of new Set(unread)) console.log(`note ${logged(u)}`);
 // (in a project, a floor rule or an archive item that is not there is listed apart, read but found nowhere)
 for (const u of new Set(notFound)) console.log(`note ${logged(u)} (read, and not found: listed, not failed, in a project)`);
