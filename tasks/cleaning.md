@@ -102,7 +102,7 @@ code is held to: `tasks/code-shape.md`.
   older than the core's last two releases; the sync says so (`core/scripts/sync.mjs`), and the session that syncs takes
   the record out in a pull request of its own, so that the next reading is whole. The trigger is the sync's step,
   which the scheduled look's issue of steps not done keeps: `core/scripts/core-reading.mjs` reads the record
-  `checks/core-reading.json`, a mark of each rule of the copy at the last reading, those of modules not taken too, and asks a whole reading where it stands nowhere,
+  of the readings that its `--recorded` writes in the project, a mark of each rule of the copy at the last reading, those of modules not taken too, and asks a whole reading where it stands nowhere,
   else names each rule the project takes (the floor's and its modules', `--rules`) that no reading covered. The session
   that takes the task starts an auditor (`roles/auditor.md`) and, in one pull request, puts its answers in the
   *audits* as an audit's report is put there, files each gap as a task the project's agents take at the dose, a step
