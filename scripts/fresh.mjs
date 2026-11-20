@@ -132,6 +132,19 @@ function shapeBaseline(p) {
   return typeof config?.baseline === "string" ? config.baseline : "checks/shape-baseline.json";
 }
 
+// A file of the kit's as a project whose manifest names the copy's path holds it (#628): the kit writes the copy as core/, and
+// its hooks for that path as the commands core-path.mjs gives for another; a core a library carries, which the kit does not
+// write, is the manifest's own line, with the floor's own copy's line that follows it. The manifest's "Differences" is the
+// project's own to fill: of it, the kit asks only the heading, not its "None.".
+function asHeld(p, to, text) {
+  const core = readCore(p.manifest), copy = copyAt(p);
+  if (to === ".claude/settings.json" && !core.wrong) return hooksAt(atCopy(text, copy), core);
+  if (to !== "core-manifest.md") return atCopy(text, copy);
+  const own = core.form === "carried" ? /^Core: .*(?:\nFloor copy: .*)?$/m.exec(p.manifest)?.[0] : null;
+  const bare = text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences");
+  return atCopy(own ? bare.replace(/^Core: .*$/m, () => own) : bare, copy);
+}
+
 // What the kit of this copy would write for the project `p`; with `templates`, the folder of an earlier kit's
 // templates, what that kit would have written: a template it lacks, one this kit added since, gives that file nothing;
 // one whose words this kit no longer fills, and a folder with no kit, give that kit nothing.
@@ -152,13 +165,7 @@ export function fresh(p, templates = path.join(HERE, TEMPLATES)) {
     // read)
     const at = configs(p);
     const placed = { [CHOICES]: where(p.manifest) ?? CHOICES, [SHAPE]: shapeAt(p.manifest), [KIT_CONFIGS.copies]: at.copies, [KIT_CONFIGS.audit]: at.audit };
-    // (the kit's templates name the copy of the core core/; a project whose manifest names another path names that one in its
-    // files, and a core a library carries, which the kit does not write, is the manifest's own line, with the floor's own
-    // copy's line that follows it: #628)
-    const core = readCore(p.manifest), copy = copyAt(p), carried = core.form === "carried" ? /^Core: .*(?:\nFloor copy: .*)?$/m.exec(p.manifest)?.[0] : null;
-    const withCore = text => carried ? text.replace(/^Core: .*$/m, () => carried) : text;
-    const kit = built.filter(([to]) => !gone.has(to) && placed[to] !== null)
-      .map(([to, text]) => [placed[to] ?? to, to === ".claude/settings.json" && !core.wrong ? hooksAt(atCopy(text, copy), core) : atCopy(to === "core-manifest.md" ? withCore(text.replace(/^## Differences\r?\n+None\.[ \t]*$/m, "## Differences")) : text, copy)]);
+    const kit = built.filter(([to]) => !gone.has(to) && placed[to] !== null).map(([to, text]) => [placed[to] ?? to, asHeld(p, to, text)]);
     if (older) return kit;
     // the configs the kit writes beside its templates, by the paths the project runs its checks with, each read by its keys
     // (sizes.json's optional "skip" and "past" left out)
