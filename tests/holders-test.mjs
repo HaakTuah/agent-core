@@ -11,11 +11,13 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { inStep as inStepAt, itemsIn, KEY, LAST_NUMBERED } from "../scripts/archive.mjs";
-import { OWN, counts, entryFile, holders, named, ownHolders, ownReport, report } from "../scripts/holders.mjs";
+import { OWN, counts, entryFile, heldThere, holders, named, ownHolders, ownReport, report, shareLine } from "../scripts/holders.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { fingerprint, rules, rulesOf } from "../scripts/rules.mjs";
 import { installed } from "../scripts/packages.mjs";
+import { leftOut } from "../scripts/reading.mjs";
+import { heldHere } from "../scripts/state-report.mjs";
 import { shapeFaults } from "../scripts/schemas.mjs";
 
 // (the file's form is read by ajv, which the core's install brings; without it the cases that read the form could only
@@ -209,6 +211,34 @@ const run = spawnSync(process.execPath, [path.join(failing, "scripts", "holders.
 ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`) && /^::warning::The form of scripts\/holders\/ was not checked: the package ajv is not installed\. Mend: run node scripts\/install\.mjs/mu.test(run.stdout),
   "where an entry is wrong the check fails, each failure saying its mend; on a copy with no packages its form goes unchecked, said as a warning with its mend, and the rest is read as ever", `${run.stdout}${run.stderr}`);
 
+// ---- the share a check holds in a project (#459, point 3) ----
+{
+  const all = heldThere(root, []), shape = heldThere(root, ["scripts/shape.mjs"]), floorOnly = heldThere(root, [], new Set(holders(root).rules.map(r => path.posix.basename(r.file)).filter(f => f !== "security.md")));
+  ok(all.held > shape.held && shape.all === all.all && floorOnly.all < all.all && floorOnly.all === holders(root).rules.filter(r => r.file.startsWith("floor/")).length,
+    "the core's rules a check holds in a project leave out those whose every check read nothing there, and count only the modules it takes, the floor's always", JSON.stringify({ all, shape, floorOnly }));
+  ok(shareLine({ all: 7, check: 2 }, { held: 9, all: 40 }) === "- rules held by a check: the project's own 2 of 7, the core's 9 of 40.", "the share's line holds the counts alone");
+  const coreLine = report(root).find(l => l.startsWith("- rules held by a check: the floor's")) ?? "";
+  const ownCount = rules(root, { agents: true }).filter(r => r.file === "AGENTS.md").length, cc = counts(holders(root));
+  ok(ownCount > 0 && coreLine.startsWith(`- rules held by a check: the floor's and the modules' ${cc.check} of ${cc.all}; the core's own ${ownCount},`) && coreLine.includes("not counted") && !/own \d+ of /u.test(coreLine),
+    "the core's own report gives its share of the floor's and the modules' rules, and says its own rules are not counted, with no number of them held", coreLine);
+}
+
+// (the share read in a project as the monthly report reads it (state-report.mjs, heldHere): one with no shape config and no mutation tool, whose
+// core's count leaves out the rules those two checks hold, and its own rule counted)
+{
+  const proj = fs.mkdtempSync(path.join(tmp, "held-here-")), was = process.cwd();
+  const manifest = "Core: x at " + "a".repeat(40) + ".\n\n| *mutation tool* | `none` |\n";
+  fs.writeFileSync(path.join(proj, "core-manifest.md"), manifest);
+  fs.writeFileSync(path.join(proj, "AGENTS.md"), "# A project\n\n- **Keep it short.** Words.\n");
+  spawnSync("git", ["init", "-q"], { cwd: proj });
+  spawnSync("git", ["add", "-A"], { cwd: proj });
+  let got;
+  try { process.chdir(proj); got = heldHere(manifest); } finally { process.chdir(was); }
+  const all = heldThere(root, [], leftOut(manifest)), less = heldThere(root, ["scripts/shape.mjs", "scripts/strength.mjs"], leftOut(manifest));
+  ok(got && got.own.all === 1 && got.there.all === all.all && got.there.held === less.held && less.held < all.held,
+    "a project's share is read there: its own rules, and the core's less those whose every check read nothing there", JSON.stringify({ got, all, less }));
+}
+
 // ---- a project's own rules (#662) ----
 // (a scratch project: its AGENTS.md with one rule held and one not, the file it pulls in, its SECURITY.md with the rule
 // file it adds, and a copy of the core whose rules are none of its own)
@@ -247,6 +277,10 @@ const held = ownHolders(proj), lines = ownReport(proj);
 ok(counts(held).check === 1 && counts(held).none.length === 5 && held.wrong.length === 3 && held.wrong.some(w => w.includes("a review, which holds no rule")) && held.wrong.every(w => /Mend: /.test(w)),
   "the list names one rule's check, which is there; one that is not there, a review named as a check, and a rule that is gone, are wrong, each with its mend", held.wrong.join("\n"));
 const listed = lines.find(l => l.startsWith("- No holder")) ?? "";
+// (#484, point 9: the report asks of every rule, held or not, whom it is about, until the list's "about" answers it)
+const askedOf = lines.find(l => l.startsWith("- Whom a rule is about, 0 of 6 answered")) ?? "";
+ok(askedOf.includes("whether it is about this project, its kind or every project") && askedOf.includes("Each computer player keeps its style") && !lines.some(l => l.startsWith("- About a kind")),
+  "a project's report asks of every own rule, one a check holds among them, whether it is about the project, its kind or every project, until the list answers it", lines.join("\n"));
 ok(/^- Of 6 rules of the project's own .*: 1 held whole by a check, .* 5 have no holder/.test(lines[0]) && listed.indexOf("docs/play.md: A turn ends on a move") < listed.indexOf("docs/design.md: Saves are small") && !listed.includes("Each computer player") && lines.filter(l => /Mend: /.test(l)).length === 3,
   "the report's lines: the counts, the rules with no holder, those read at a session's start first, and each wrong line of the list", lines.join("\n"));
 // (holders that are no text, or empty, as no schema reads a project's list: named wrong once for their key, and the
@@ -267,6 +301,22 @@ const unreadable = ownReport(proj).join("\n");
 ok(/cannot be read \(`[^`]*@ghost[^`]*`\)/u.test(unreadable) && !/@ghost/u.test(unreadable.replace(/`[^`]*`/gu, "")), "a list that cannot be read is named with JSON's own words in a code span, so no mention in it acts", unreadable);
 put("docs/play.md", "# Play\n\n- **A turn ends on a move.** Rules of play.\n");
 fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ holders: { ...written, "AGENTS.md: Each computer player keeps its style": "check: tests/style.test.js", "docs/design.md: Saves are small": "check: tests/saves.test.js", "AGENTS.md: Gone": "audit", "docs/play.md: A turn ends on a move": "check: the code review" } }));
+// (the answers, in the list's "about": those about a kind or every project named to be filed, naming the kind; a key
+// that is no rule and an answer in no form wrong, each with its mend; a rule answered is no longer asked)
+{
+  const listNow = JSON.parse(fs.readFileSync(path.join(proj, OWN), "utf8"));
+  fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ ...listNow, about: { "AGENTS.md: Each computer player keeps its style": "its kind: a game with computer players", "AGENTS.md: Name things plainly": "every project", "docs/play.md: A turn ends on a move": "this project", "docs/design.md: Saves are small": "the game", "AGENTS.md: Gone": "this project" } }));
+  const answered = ownHolders(proj), said = ownReport(proj), wider = said.find(l => l.startsWith("- About a kind")) ?? "", asked = said.find(l => l.startsWith("- Whom a rule is about")) ?? "";
+  ok(answered.about.size === 3 && answered.wrong.filter(w => w.includes('"about"') || w.includes("is said to be about")).length === 2 && answered.wrong.every(w => /Mend: /.test(w))
+    && wider.includes("`AGENTS.md: Each computer player keeps its style`, `its kind: a game with computer players`") && wider.includes("`AGENTS.md: Name things plainly`, `every project`") && !wider.includes("A turn ends")
+    && asked.startsWith("- Whom a rule is about, 3 of 6 answered") && !asked.includes("Each computer player") && asked.includes("Saves are small"),
+    "the list's answers name the rules about a kind or every project to be filed, naming the kind; a key that is no rule and an answer in no form are wrong, each with its mend", `${said.join("\n")}\n${answered.wrong.join("\n")}`);
+  fs.writeFileSync(path.join(proj, OWN), JSON.stringify({ ...listNow, about: ["x"] }));
+  ok(ownHolders(proj).wrong.some(w => w.includes('its "about" is no object') && /Mend: /.test(w)), "an \"about\" that is no object is wrong, with its mend");
+  r2 = ownCli("--write");
+  ok(JSON.stringify(JSON.parse(fs.readFileSync(path.join(proj, OWN), "utf8")).about) === '["x"]', "--write keeps the list's \"about\" as it stands");
+  fs.writeFileSync(path.join(proj, OWN), JSON.stringify(listNow));
+}
 r2 = ownCli();
 ok(r2.status === 0 && /No holder/.test(r2.stdout), "--own fails nothing, a wrong list included", `${r2.stdout}${r2.stderr}`);
 r2 = ownCli("--write");

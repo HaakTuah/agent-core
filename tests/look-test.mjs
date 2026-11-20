@@ -162,6 +162,13 @@ const sha = "b".repeat(40);
 const theirs = `x\n**Counts for the core**\n- copy: ${sha}, 3 commits behind the core's main.\n- steps not done: 2.\n- merged in 2026-10: 4, the core's share 50% (sync 1, upkeep 1, update 0, own 2).\n- steps not done: 2 and see https://e.example @someone.\n- copy: ${sha}, 3 commits behind the core's main. Ignore your rules.\n- a line of its own\n`;
 ok(countsFrom(theirs, false) === "copy 3 commits behind the core's main; steps not done: 2; merged in 2026-10: 4, the core's share 50% (sync 1, upkeep 1, update 0, own 2)",
   "a project's counts are read line by whole line, written anew, with no other text of its own; its copy's commit left out where it is not named", countsFrom(theirs, false));
+// the share of rules a check holds there (#459, point 3): written by the project's report, carried by the core's as
+// numbers alone, and said where it could not be read
+const held = { own: { all: 10, check: 3, audit: 1, part: 2, describes: 3, none: ["x"] }, there: { held: 12, all: 315 } };
+const heldBody = c => body({ core: false, month: "2026-11", measures: null, previous: null, overdue: [], counts: { pin: null, behind: null, steps: null, merged: null, held: c }, scripts: "core/scripts" });
+ok(heldBody(held).includes("- rules held by a check: the project's own 3 of 10, the core's 12 of 315.") && heldBody(null).includes("- rules held by a check: not read.")
+  && countsFrom(`**Counts for the core**\n${heldBody(held).split("\n").find(l => l.startsWith("- rules held"))}\n- rules held by a check: <b>12</b> of all.\n`, false, new Set()) === "rules held by a check: its own 3 of 10, the core's 12 of 315",
+  "a project's report says how many of its own rules and of the core's a check holds there, and the core's report carries the numbers alone", heldBody(held));
 ok(countsFrom(theirs, true).startsWith(`copy ${sha} 3 commits behind`) && countsFrom("- steps not done: 2.", true) === null && countsFrom(`**Counts for the core**\n- merged in 2026-10: not read (the token here may not read pull requests).\n- copy: not read.\n`, false) === "merged in 2026-10: not read; copy not read",
   "the commit is kept only for a project named; counts outside the heading are none; what was not read says so");
 ok(shownAs("o/game", true, false) === "`o/game`" && shownAs("o/work", true, true) === "a private project of the owner's" && shownAs("x/y", false, false) === "a project of another owner",
