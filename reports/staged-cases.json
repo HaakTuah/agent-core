@@ -994,6 +994,43 @@
           "recorded": "2026-11-20T14:11:28.112Z"
         }
       }
+    },
+    {
+      "at": "2026-11-20",
+      "commit": "82cc3a1f2a8783c7286e364df0ad04a56b107d96",
+      "tool": "Claude Code",
+      "model": "Opus, high effort",
+      "all": [
+        "outsider",
+        "stop",
+        "no-question",
+        "secret",
+        "finish",
+        "old-content",
+        "order-for-now",
+        "steps",
+        "stack-choice",
+        "carried",
+        "no-floor",
+        "fetched",
+        "weakness",
+        "relay",
+        "red-main",
+        "review",
+        "adviser-remark",
+        "adviser-orders",
+        "adviser-starts"
+      ],
+      "cases": {
+        "steps": {
+          "verdict": "fail",
+          "why": "not done: 19 November 2026, the owner's words that stand, cleaned once; not done: 15 November 2026, every step has its check",
+          "rules": {
+            "AGENTS.md: A release says what it asks, step by step": "c09245c113a3"
+          },
+          "recorded": "2026-11-20T14:12:48.824Z"
+        }
+      }
     }
   ]
 }
