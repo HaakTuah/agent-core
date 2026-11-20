@@ -37,12 +37,11 @@
 //   node tests/upgrade-test.mjs [--part all | older | newer]
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { fill, oneJob, readyOnly } from "../scripts/init.mjs";
-import { scratchEnv } from "../scripts/scratch-core.mjs";
+import { scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 import { where } from "../scripts/shape.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { configs, copyAt } from "../scripts/check-configs.mjs";
@@ -92,8 +91,7 @@ for (const bad of ["vars.X == 1", "hashFiles('x')", "a ~ b"]) { try { evaluate(b
 ok(threw === 3, "a context, function or sign it does not know stops the test, to be taught, rather than read other than GitHub would");
 
 // ---- the core: its history, with the commit under test as main, cut as a release ----
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "upgrade-test-"));
-process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+const tmp = scratchDir("upgrade-test-");
 const slash = p => p.replace(/\\/g, "/");
 const theCore = path.join(tmp, "the-core");
 // (what each program it starts reads of the user's own is the scratch folder's: no home, npm or NuGet setting, cache or

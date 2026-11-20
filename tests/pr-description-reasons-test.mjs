@@ -3,18 +3,17 @@
 //   node tests/pr-description-reasons-test.mjs
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
 import { differencesAdded, reasonsMend } from "../scripts/pr-reasons.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
 
 // the line "Reasons read:", asked of a pull request that adds a line under the manifest's "Differences" (#756)
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pr-description-reasons-"));
-  process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+  const tmp = scratchDir("pr-description-reasons-");
   const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1" };
   const git = (...a) => execFileSync("git", a, { cwd: tmp, env, stdio: ["ignore", "pipe", "pipe"] });
   const manifest = (...lines) => `# Core manifest\r\n\r\n## Differences\r\n\r\n${lines.join("\r\n")}\r\n\r\n## Slots\r\n\r\n- a slot: its row\r\n`;

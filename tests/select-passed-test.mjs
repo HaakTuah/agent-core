@@ -8,18 +8,17 @@
 import { execFileSync, spawn } from "node:child_process";
 import http from "node:http";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { passedWhole } from "../scripts/select-passed.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
 const script = fileURLToPath(new URL("../scripts/select.mjs", import.meta.url));
 
 // ---- a scratch repository: a project of one source file and its test, and a base the pull requests branch from ----
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "select-passed-test-"));
-process.on("exit", () => fs.rmSync(dir, { recursive: true, force: true }));
+const dir = scratchDir("select-passed-test-");
 const git = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const put = (file, text) => { fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.writeFileSync(path.join(dir, file), text); };
 put("src/tool.js", "export const tool = 2;\n"); put("test/run.test.js", "import '../src/tool.js';\n");

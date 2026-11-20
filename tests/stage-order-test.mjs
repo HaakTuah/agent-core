@@ -6,10 +6,10 @@
 //
 //   node tests/stage-order-test.mjs
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { billedOf, byThemselves, isTool, known, main, order, rateOf, read, said } from "../scripts/stage-order.mjs";
 import { NONE } from "../scripts/tools-read.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -71,7 +71,7 @@ ok(byThemselves([{ number: 1, login: "o", reviews: [bot("r[bot]")], comments: [p
   "an ask is a comment of the owner's or a bot's that opens with the mention: one inside the text, another word, or another account's ask, is none");
 
 // ---- read from a set-up made for each, through a stand-in for gh ----
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "stage-order-test-"));
+const scratch = scratchDir("stage-order-test-");
 try {
   const flows = path.join(scratch, "workflows");
   fs.mkdirSync(flows);

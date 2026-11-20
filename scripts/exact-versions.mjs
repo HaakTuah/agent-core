@@ -14,7 +14,7 @@
 //
 // Usage, from the project's root:  node core/scripts/exact-versions.mjs <the licence check's config>
 import { readFileSync } from "node:fs";
-import { posix } from "node:path";
+import { join, posix, resolve } from "node:path";
 import { inProject, logged, parseBounded } from "./guards.mjs";
 import { started } from "./started.mjs";
 
@@ -127,16 +127,27 @@ export function check(lockfile, read) {
   return problems;
 }
 
-if (started(import.meta.url)) {
-  const configPath = process.argv[2];
-  if (!configPath) { console.error("usage: node core/scripts/exact-versions.mjs <the licence check's config>"); process.exit(2); }
+// What the command prints and exits with, given the licence check's config as the project's root holds it, read from
+// `root`: { status, out, err } (the lines for stdout and stderr).
+export function report(configPath, root = ".") {
+  const failed = (message, status = 1) => ({ status, out: [], err: [message] });
+  if (!configPath) return failed("usage: node core/scripts/exact-versions.mjs <the licence check's config>", 2);
   let lockfiles;
-  try { lockfiles = JSON.parse(readFileSync(configPath, "utf8")).lockfiles ?? []; } catch (e) { console.error(`FAIL: ${configPath} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`); process.exit(1); }
-  if (!Array.isArray(lockfiles) || lockfiles.some((f) => typeof f !== "string")) { console.error(`FAIL: "lockfiles" in ${configPath} is no list of paths. Mend: write it as a list of the lock files' paths`); process.exit(1); }
+  try { lockfiles = JSON.parse(readFileSync(resolve(root, configPath), "utf8")).lockfiles ?? []; } catch (e) { return failed(`FAIL: ${configPath} cannot be read (${logged(e.message)}). Mend: name the licence check's config, written as JSON`); }
+  if (!Array.isArray(lockfiles) || lockfiles.some((f) => typeof f !== "string")) return failed(`FAIL: "lockfiles" in ${configPath} is no list of paths. Mend: write it as a list of the lock files' paths`);
   const outside = lockfiles.filter((f) => !inProject(f));
-  if (outside.length) { console.error(`FAIL: ${logged(`"lockfiles" in ${configPath} names a path outside the project: ${outside.join(", ")}`)}. Mend: name each lock file by its path from the project's root, with no ".." that leads above it`); process.exit(1); }
-  const problems = lockfiles.flatMap((f) => check(posix.normalize(f), (p) => readFileSync(p, "utf8")));
-  for (const p of problems) console.error(`FAIL: ${logged(p)}`);
-  console.log(problems.length ? `${problems.length} dependencies not at one exact version (floor rule 7)` : `ok   every dependency of ${lockfiles.length} lock file${lockfiles.length === 1 ? "" : "s"} is at the one exact version it installs`);
-  process.exit(problems.length ? 1 : 0);
+  if (outside.length) return failed(`FAIL: ${logged(`"lockfiles" in ${configPath} names a path outside the project: ${outside.join(", ")}`)}. Mend: name each lock file by its path from the project's root, with no ".." that leads above it`);
+  const problems = lockfiles.flatMap((f) => check(posix.normalize(f), (p) => readFileSync(join(root, p), "utf8")));
+  return {
+    status: problems.length ? 1 : 0,
+    out: [problems.length ? `${problems.length} dependencies not at one exact version (floor rule 7)` : `ok   every dependency of ${lockfiles.length} lock file${lockfiles.length === 1 ? "" : "s"} is at the one exact version it installs`],
+    err: problems.map((p) => `FAIL: ${logged(p)}`),
+  };
+}
+
+if (started(import.meta.url)) {
+  const { status, out, err } = report(process.argv[2]);
+  for (const line of err) console.error(line);
+  for (const line of out) console.log(line);
+  process.exit(status);
 }

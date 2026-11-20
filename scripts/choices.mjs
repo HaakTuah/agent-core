@@ -55,7 +55,7 @@ export function where(rules) {
 }
 
 // (control characters, and those that reorder or hide text, so a name reads as its bytes)
-const plain = text => String(text ?? "").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/gu, " ").trim().slice(0, 120);
+export const plain = text => String(text ?? "").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/gu, " ").trim().slice(0, 120);
 
 // The measures a line "Trips when:" may name, each [what it counts, how it is read from the dose's reading]: numbers
 // the shape check reads on every run (shape.mjs, survey()), never a command.
@@ -349,37 +349,6 @@ export function checkOf(got, base, root = ".") {
     ...failed.map(r => `FAIL: \`${got.file}\`: the record "${r.name}", which this change adds, is argued on no line that opens ${r.lacks.map(l => `"${l}"`).join(", ")}. ${MEND}argue it as ${rule}, says, each on its own line in the record: "Looked for:", the challenger's search for options the list lacks, with the writer's answer to each; "The blind pick:", the pick of a fresh session given the problem and the criteria and never the record; "The judgment:", the decision of a fresh session that wrote no part of it. A record of a choice the project had already made, as a first audit writes it, takes instead a line that opens "Stood before:", saying when.`),
     ...listed.map(r => `- listed, not failed: "${r.name}" ${r.stood ? "records a choice already made" : "stood before this change"}, argued on no line that opens ${r.lacks.map(l => `"${l}"`).join(", ")}`),
     `\`${got.file}\`: ${failed.length ? `${failed.length} record${failed.length === 1 ? "" : "s"} this change adds not argued in full` : "every record this change adds is argued in full"}${listed.length ? `; ${listed.length} that stood before listed` : ""}.`], failed.length + gapless.length > 0];
-}
-
-// The form a records file takes where its records stand in a folder (#870), for the core's own, whose test runs it: the
-// file holds no record itself, and the folder it names holds a file for each record, named NNN-<name>.md, whose first
-// line is that record's heading and that holds no other. { faults } at `root` for the file `file`, each a line that says
-// the mend; none where the file names no folder (a project's records may stand whole).
-export const PART = /^\d{3}-[a-z0-9-]+\.md$/u;
-export function folderFaults(file, root = ".") {
-  const text = fs.readFileSync(path.join(root, file), "utf8").replace(/\r\n/gu, "\n");
-  const folders = text.split("\n").map(l => POINTER.exec(l)?.[1]).filter(Boolean);
-  if (!folders.length) return [];
-  const faults = [];
-  let total = Buffer.byteLength(text);
-  for (const m of text.matchAll(/^## Choice: (.+)$/gmu)) faults.push(`FAIL: \`${file}\` holds the record "${plain(m[1])}" itself. ${MEND}move it, byte for byte, into a file of its own in \`${folders[0]}/\`, named NNN-<name>.md to stand in order between its neighbours, as AGENTS.md, "A record pull requests add to is a folder of one file per entry", says.`);
-  for (const folder of folders) {
-    let entries = [];
-    // (no link is followed, as records() follows none: a folder that is one is no folder of the records)
-    const plainFolder = folder.split("/").every((_, i, at) => { try { const st = fs.lstatSync(path.join(root, ...at.slice(0, i + 1))); return !st.isSymbolicLink() && (i < at.length - 1 || st.isDirectory()); } catch { return false; } });
-    let readable = plainFolder;
-    try { if (plainFolder) entries = fs.readdirSync(path.join(root, folder), { withFileTypes: true }); } catch { readable = false; }
-    if (!readable) faults.push(`FAIL: \`${file}\` names \`${folder}/\`, which is no folder here. ${MEND}make the folder, a file for each record in it, or take the line that names it out of \`${file}\`.`);
-    for (const e of entries) {
-      const at = `${folder}/${e.name}`;
-      if (!e.isFile() || !PART.test(e.name)) { faults.push(`FAIL: \`${at}\` is no file of a record named NNN-<name>.md. ${MEND}rename it so, to stand in order between its neighbours, or take it out of \`${folder}/\`.`); continue; }
-      if ((total += fs.statSync(path.join(root, at)).size) > MOST) { faults.push(`FAIL: \`${at}\` takes \`${file}\` with its folder past ${MOST} bytes. ${MEND}keep the file and the folder together under that size, which is the most the readers read: shorten a record, or move what is not a record out.`); continue; }
-      const body = fs.readFileSync(path.join(root, at), "utf8").replace(/\r\n/gu, "\n");
-      const heads = [...body.matchAll(/^## Choice: /gmu)].length;
-      if (!body.startsWith("## Choice: ") || heads !== 1) faults.push(`FAIL: \`${at}\` holds ${heads} records and does not open with a record's heading "## Choice: ". ${MEND}make it one record from its heading on, and each other record a file of its own.`);
-    }
-  }
-  return faults;
 }
 
 // The dose's reading the script reads the measures from, or why it could not.
