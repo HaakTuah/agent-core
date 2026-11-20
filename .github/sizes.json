@@ -32,7 +32,7 @@
       "why": "#929: the cases of how Betterleaks reads apart from what the check reads."
     },
     ".github/workflows/tests.yml": {
-      "mark": 55491,
+      "mark": 71338,
       "why": "A session reads the one step it changes, found by its name; split into workflows, each would be a job of its own, billed by the minute on a private repository's free plan, and its suites share one matrix."
     },
     "AGENTS.md": {
@@ -262,10 +262,6 @@
     "scripts/check-configs.mjs": {
       "mark": 40791,
       "why": "#919: the reading of a workflow's runs apart from the reading of each check's config; the steps' readers, which import it, move first."
-    },
-    "tests/agent-tools-test.mjs": {
-      "mark": 114595,
-      "why": "#919: split with agent-tools.mjs, a file of cases for each tool's configuration."
     },
     "tests/core-path-test.mjs": {
       "mark": 25409,
