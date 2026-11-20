@@ -7,12 +7,12 @@
 //   node tests/labels-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LIST, SENDERS, SEVERAL, SINCE, STATES, byAgent, cameOn, check, found, opens, report, strayViews, toMake } from "../scripts/labels.mjs";
 import { SENDERS as FILE_SENDERS, STATES as FILE_STATES } from "../scripts/inbox.mjs";
 import { shapeFaults } from "../scripts/schemas.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -136,7 +136,7 @@ ok(marked.find(f => f.what.includes("stand-in-yes"))?.items.join() === "#8 (to m
 
 // The script where gh gives no answer: it says so and fails nothing.
 if (process.platform !== "win32") {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "labels-test-"));
+  const tmp = scratchDir("labels-test-");
   try {
     const bin = path.join(tmp, "bin"), repo = path.join(tmp, "repo");
     fs.mkdirSync(bin); fs.mkdirSync(repo);
@@ -156,7 +156,7 @@ if (process.platform !== "win32") {
 
 // The day the rule came for the copy here (sinceHere): from git's history, in a shallow clone and with no git at all.
 if (process.platform !== "win32") {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "labels-since-"));
+  const tmp = scratchDir("labels-since-");
   try {
     const full = path.join(tmp, "full"), env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(tmp, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
     const git = (cwd, date, ...a) => spawnSync("git", a, { cwd, env: { ...env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date }, encoding: "utf8" });

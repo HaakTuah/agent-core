@@ -41,6 +41,7 @@ const owner = () => `${os.hostname()}:${process.pid}`;
 const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code !== "ESRCH"; } };
 
 let swept = false;
+const made = new Set();
 
 /** The scratch folders in the temporary folder whose process is gone (a test the mutation tool or a time-out stopped
  *  with SIGKILL, which no handler sees) taken away; one whose process still runs, or that another machine's process
@@ -72,8 +73,12 @@ export function scratchDir(prefix) {
   sweep();
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   fs.writeFileSync(path.join(tmp, OWNER), owner());
-  // (a program a test started may hold a file a moment longer, on Windows: tried again, and never the test's failure)
-  process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
+  made.add(tmp);
+  // (one listener for all of a process's folders: a test that makes one for each of its cases would pass Node's limit of ten)
+  if (made.size === 1) process.on("exit", () => {
+    // (a program a test started may hold a file a moment longer, on Windows: tried again, and never the test's failure)
+    for (const dir of made) { try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } }
+  });
   return tmp;
 }
 

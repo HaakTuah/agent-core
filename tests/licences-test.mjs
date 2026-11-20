@@ -11,10 +11,10 @@ import { installed } from "../scripts/packages.mjs";
 import { keysOf } from "../scripts/schemas.mjs";
 import { actionLists, check, licenceOk, movedOff, policy, registryName, registryOverrides, registryVersion, releaseAge, scriptsOff, WAIT } from "../scripts/licences.mjs";
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what, more = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) { failed++; if (more) console.log(more); } };
@@ -94,7 +94,7 @@ ok(!scriptsOff("ignore-scripts=\rtrue\n") && releaseAge("min-release-age=\r7\n")
 const ships = policy().allowedFor("x", true);
 ok(!ships.has("MS-PL") && policy().allowedFor("x", false).has("MS-PL") && movedOff("MS-PL", ships) && !movedOff("MIT OR MS-PL", ships) && !movedOff("GPL-3.0-only", ships), "MS-PL is off the list for what ships and on the tools', and only it is a licence moved off");
 {
-  const dir = mkdtempSync(join(tmpdir(), "licences-test-moved-"));
+  const dir = scratchDir("licences-test-moved-");
   const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
   const git = (...args) => execFileSync("git", args, { cwd: dir, env: gitEnv, stdio: ["ignore", "pipe", "pipe"] });
   const lock = (deps) => JSON.stringify({ lockfileVersion: 3, packages: { "": { name: "p", dependencies: Object.fromEntries(deps.map(([n, v]) => [n, v])) }, ...Object.fromEntries(deps.map(([n, v, l]) => [`node_modules/${n}`, { version: v, license: l, resolved: `https://registry.npmjs.org/${n}/-/${n}-${v}.tgz` }])) } });
@@ -145,7 +145,7 @@ ok(WAIT === 7 && releaseAge("ignore-scripts=true\nmin-release-age=7\n") === 7 &&
 ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 && JSON.stringify(registryOverrides("min-release-age-exclude[]=@x/*\nbefore=2026-01-01\n")) === JSON.stringify(["min-release-age-exclude[]=@x/*", "before=2026-01-01"]),
   "takes the wait among the harmless settings, and never what undoes it");
 {
-  const dir = mkdtempSync(join(tmpdir(), "licences-test-wait-"));
+  const dir = scratchDir("licences-test-wait-");
   const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
   const git = (...args) => execFileSync("git", args, { cwd: dir, env: gitEnv, stdio: ["ignore", "pipe", "pipe"] });
   const commit = (files) => { for (const [f, text] of Object.entries(files)) writeFileSync(join(dir, f), text); git("add", "-A"); git("commit", "-q", "-m", "c"); };
@@ -186,7 +186,7 @@ ok(registryOverrides("ignore-scripts=true\nmin-release-age=7\n").length === 0 &&
   }
   for (const v of [undefined, null, [], {}, "x", { served: [] }, { served: [""] }, { served: ["./x"] }, { served: ["/x"] }, { served: ["."] }, { served: [""], skip: [""] }, { served: [], tools: [5] },
     { served: "x" }, { servd: [] }, { served: [], servd: [] }, { tools: [] }, { served: ["../x"] }, { served: ["a//b"] }]) configs.push(set(base, "scan", v), set(set(base, "audit", undefined), "scan", v));
-  const dir = mkdtempSync(join(tmpdir(), "licence-config-")), bare = join(dir, "bare"), file = join(dir, "c.json");
+  const dir = scratchDir("licence-config-"), bare = join(dir, "bare"), file = join(dir, "c.json");
   try {
     // (with no packages here, both readings would be the fallback and agree with themselves)
     ok(installed("ajv"), "the core's packages are installed, so the schema is read against the fallback", "Mend: run node scripts/install.mjs, then this test again");

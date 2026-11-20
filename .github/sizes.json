@@ -195,6 +195,46 @@
       "mark": 32922,
       "why": "One module's cases (releases.mjs, and release.mjs that cuts one) on the one scratch core it sets up with its release tags; split, each file would set it up again, adding to the suite's time (tasks/tests.md), and a session changing the module reads every case."
     },
+    "tests/code-review-wait-test.mjs": {
+      "mark": 33431,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/comment-only-test.mjs": {
+      "mark": 32403,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/core-yml-test.mjs": {
+      "mark": 22488,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/hostile-build-files-test.mjs": {
+      "mark": 29868,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/hostile-github-test.mjs": {
+      "mark": 22575,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/hostile-pr-comments-test.mjs": {
+      "mark": 22109,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/licence-scan-test.mjs": {
+      "mark": 46036,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/licences-test.mjs": {
+      "mark": 24020,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/lookup-test.mjs": {
+      "mark": 63511,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
+    "tests/merge-line-test.mjs": {
+      "mark": 23054,
+      "why": "Its cases are unchanged in what they hold; #965 changed only how its scratch folder is made, and no split was weighed for it there."
+    },
     "tests/size-test.mjs": {
       "mark": 28199,
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
