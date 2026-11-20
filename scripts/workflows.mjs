@@ -105,7 +105,7 @@ export function foreignBreaks(text) {
 // that text as the line an editor counts, which the three do not end (#876). A text with none is itself.
 export function asLF(text) {
   text = String(text);
-  if (!/[\u0085\u2028\u2029]/u.test(text)) return { text, line: n => n };
+  if (text.length > LONGEST || !/[\u0085\u2028\u2029]/u.test(text)) return { text, line: n => n }; // (a text past the length read is not read: yaml-keys.mjs)
   const at = [0, 1];
   let editor = 1;
   for (const m of text.matchAll(/\r\n?|\n|[\u0085\u2028\u2029]/gu)) { if (!/^[\u0085\u2028\u2029]$/u.test(m[0])) editor++; at.push(editor); }
