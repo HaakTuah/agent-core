@@ -8,7 +8,6 @@
 //   node tests/hostile-issues-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LIST, SINCE, cameOn, check, found, opens, strayViews, toMake } from "../scripts/labels.mjs";
@@ -16,6 +15,7 @@ import { entry, lacking, tally, verdict } from "../scripts/stand-in-record.mjs";
 import { blockingOf, broughtBy, bugs, otherOf, perPull, postedKind, rulesIn } from "../scripts/review-record.mjs";
 import { lastRun, mine, RECORD } from "../scripts/look.mjs";
 import { answer, items, report, repoOf } from "../scripts/inbox.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -27,8 +27,7 @@ const all = Object.entries({ ...LIST.state, ...LIST.sender, ...LIST.mark }).map(
 const L = (...n) => n.map(name => ({ name }));
 const sure = "The stand-in's verdict: yes, sure.";
 const kinds = got => got.map(f => f.items.join());
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "hostile-issues-test-"));
-process.on("exit", () => fs.rmSync(scratch, { recursive: true, force: true }));
+const scratch = scratchDir("hostile-issues-test-");
 
 // ---- too long ----
 {

@@ -5,13 +5,13 @@
 //   node tests/core-moved-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { ISSUES, TITLE, body, openIssue, pinOf, plan } from "../scripts/core-moved.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { ownerOf } from "../scripts/releases.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (!cond) { failed++; console.error(`FAIL: ${what}${detail && `\n     ${detail}`}`); } };
@@ -52,7 +52,7 @@ const script = fileURLToPath(new URL("../scripts/core-moved.mjs", import.meta.ur
 // (`runs`: for each commit of main, the host's list of the runs its push started, as text, or "fail" where the host
 // does not answer; a commit not named has none)
 function program(pin, newest, issues, args = [], follows = undefined, core = "", extra = "", repository = "someone/project", runs = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "core-moved-test-"));
+  const dir = scratchDir("core-moved-test-");
   const bin = path.join(dir, "bin"), log = path.join(dir, "calls");
   fs.mkdirSync(bin);
   fs.writeFileSync(path.join(dir, "core-manifest.md"), manifest(pin, undefined, follows) + extra);
@@ -79,7 +79,7 @@ else {
   }
   // A project that follows main takes its newest commit whose checks all passed (floor rule 12; #733): a core of three
   // commits, the runs of each push as the host lists them.
-  const main = fs.mkdtempSync(path.join(os.tmpdir(), "core-moved-main-"));
+  const main = scratchDir("core-moved-main-");
   const gm = (...a) => execFileSync(realGit, a, { cwd: main, encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } }).trim();
   gm("init", "-q", "-b", "main");
   const commit = n => { fs.writeFileSync(path.join(main, "f.md"), n); gm("add", "-A"); gm("commit", "-q", "-m", n); return gm("rev-parse", "HEAD"); };
@@ -124,7 +124,7 @@ else {
   r = program(A, B, "", [], "| *follows* | whatever |");
   ok(r.status === 1 && r.calls === "", "a row that says neither fails before anything is asked");
   // A release that changes nothing the project takes asks no sync of it (#242; the cases themselves: releases-test.mjs).
-  const core = fs.mkdtempSync(path.join(os.tmpdir(), "core-moved-core-"));
+  const core = scratchDir("core-moved-core-");
   const g = (...a) => execFileSync(realGit, a, { cwd: core, encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } }).trim();
   const release = (file, text, tag) => { fs.mkdirSync(path.dirname(path.join(core, file)), { recursive: true }); fs.writeFileSync(path.join(core, file), text); g("add", "-A"); g("commit", "-q", "-m", tag); g("tag", tag); return g("rev-parse", "HEAD"); };
   g("init", "-q", "-b", "main");

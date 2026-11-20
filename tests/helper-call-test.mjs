@@ -6,10 +6,10 @@
 //   node tests/helper-call-test.mjs
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { COMMAND, defines, firstTry, refusal } from "../scripts/helper-call.mjs";
+import { OWNER, scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -17,8 +17,7 @@ const agent = (tool_input, tool_name = "Agent", session_id = "s1") => ({ session
 const text = (...args) => JSON.stringify(agent(...args));
 const whole = { description: "x", prompt: "y", subagent_type: "general-purpose", model: "sonnet", effort: "medium" };
 const WINDOWS = process.platform === "win32";
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "helper-call-test-"));
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("helper-call-test-");
 
 // which calls it refuses, with what it is asked (own: the project's types; first: the call's first try) stubbed
 const why = (tool_input, own, first) => refusal(text(tool_input), own, first) ?? "";
@@ -57,7 +56,7 @@ fs.mkdirSync(marks);
 const one = agent({ prompt: "y" }), other = agent({ prompt: "z" });
 ok(firstTry(one, marks) && firstTry(other, marks) && !firstTry(one, marks) && firstTry(one, marks) && !firstTry(other, marks), "a first try is counted, and the call made again goes on, once; made again after that it is a first try anew; each prompt by itself");
 ok(!firstTry(agent({ prompt: "y", model: "opus", subagent_type: "Explore" }), marks) && firstTry(agent({ prompt: "y" }, "Agent", "s2"), marks), "the call made again is known by its session and prompt alone: one that adds a model or changes its type is the same call; another session's is its own");
-ok(firstTry(agent({ prompt: "odd" }, "Agent", "../../a/b"), marks) && firstTry(agent({ prompt: "odd" }, "Agent", ""), marks) && fs.readdirSync(marks).every(f => /^helper-call-[0-9a-f]{32}$/u.test(f) && fs.statSync(path.join(marks, f)).size === 0) && fs.readdirSync(tmp).sort().join() === "marks,odd,project", "a mark is an empty file in the temp folder named by a hash alone, whatever shape the session has");
+ok(firstTry(agent({ prompt: "odd" }, "Agent", "../../a/b"), marks) && firstTry(agent({ prompt: "odd" }, "Agent", ""), marks) && fs.readdirSync(marks).every(f => /^helper-call-[0-9a-f]{32}$/u.test(f) && fs.statSync(path.join(marks, f)).size === 0) && fs.readdirSync(tmp).filter(f => f !== OWNER).sort().join() === "marks,odd,project", "a mark is an empty file in the temp folder named by a hash alone, whatever shape the session has");
 ok([agent({ prompt: "y" }, "Agent", 5), { tool_name: "Agent", tool_input: { prompt: "y" } }, agent({ prompt: 5 }), agent({}), agent(null), null].every(input => !firstTry(input, marks)) && !firstTry(one, path.join(tmp, "none")) && !firstTry(one, path.join(project, "secret.md")), "a call it cannot name (no session or no prompt as text), or a mark it cannot make (no temp folder, a file in its place), is never counted, so never refused");
 const markFor = input => { const dir = fs.mkdtempSync(path.join(tmp, "m-")); firstTry(input, dir); return path.join(dir, fs.readdirSync(dir)[0]); };
 const there = file => fs.lstatSync(file, { throwIfNoEntry: false });

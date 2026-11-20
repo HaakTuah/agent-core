@@ -6,11 +6,11 @@
 //   node tests/manifest-reads-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { markGap, markGaps, modulesOf, notes, slotTable } from "../scripts/manifest-reads.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, more = "") => { count++; if (!cond) { failed++; console.error(`FAIL: ${what}${more ? `\n${more}` : ""}`); } };
@@ -55,7 +55,7 @@ const m = modulesOf(manifest("`tasks/a.md`, `b`", "Not taken: `g.md` (no game; n
 ok(m.taken.has("a.md") && m.taken.has("b.md") && m.notTaken.get("g.md") === "no game; none", "names are read with or without the folder and the extension");
 
 // a project staged with the core's own files as its copy
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "manifest-reads-"));
+const root = scratchDir("manifest-reads-");
 const core = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 try {
   fs.mkdirSync(path.join(root, "core"));
@@ -84,7 +84,7 @@ try {
 const self = spawnSync(process.execPath, [path.join(core, "scripts/manifest-reads.mjs"), "--core"], { encoding: "utf8" });
 ok(self.status === 0, "each slot of the core's own README carries its mark", self.stderr);
 { // the core's own, with a slot's mark taken out: fails, saying its mend
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "manifest-reads-core-"));
+  const dir = scratchDir("manifest-reads-core-");
   try {
     for (const d of ["scripts", ".packages"]) fs.cpSync(path.join(core, d), path.join(dir, d), { recursive: true });
     fs.writeFileSync(path.join(dir, "README.md"), fs.readFileSync(path.join(core, "README.md"), "utf8").replace(/^(\| \*large file\* \|[^|\n]*\|)[^|\n]*\|$/m, "$1 |"));

@@ -11,7 +11,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    shape and refuse where it fails, as floor topic 5 asks, its hostile tests trying each case. Each answers in 5 s at
    most, as its hostile tests time it (`scripts/hostile.mjs`), and each JSON it parses is nested 200 deep at most
    (`scripts/guards.mjs`); its limits name what it reads beyond that.
-   - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the line
+   - a pull request's description: read by the description checks (`scripts/pr-description.mjs`, and the lines it asks in `scripts/pr-waits.mjs`, `scripts/pr-cost.mjs`, `scripts/pr-number.mjs` and `scripts/pr-reasons.mjs`, and the line
      "Read for it:" by `scripts/reading.mjs`, and the line "Never needed:" by `scripts/read-total.mjs`, line by line);
      limits: none of its own on the text, which GitHub holds to 65,536 characters; 100 commits, one page; 8 s for the
      reading list's calls; hostile tests: `tests/hostile-pr-text-test.mjs`.
@@ -27,7 +27,7 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
-     a pull request adds under its manifest's "Differences" (`scripts/pr-description.mjs`), the rule files a checkout
+     a pull request adds under its manifest's "Differences" (`scripts/pr-reasons.mjs`), the rule files a checkout
      holds, the manifest too (`scripts/reading.mjs`, and `scripts/rules.mjs` for the rules in them, which read only
      regular files in real folders of the checkout's own, a pipe or device as no file and a link at any depth refused
      with its mend, and the first tries the changed paths on the path patterns within 16 million steps for each
@@ -39,15 +39,15 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      comments proof, the selection and the total read, 16 MB for the manifest, past which it is reported unread), and
      none in count, since every changed path is read, save the total read's 1 MB of a file's text, past which its size
      alone is counted, and 8 MB of all their text, 200 rule files, 100 kinds of task, 300 names they give and 16
-     million steps of each tree's tries, past which it fails with its mend; and of each file of code the selection
-     reads through the shape check's readers (`scripts/shape-readers.mjs`), 500,000 characters of JavaScript,
-     TypeScript or Python and 200,000 of C#, past which the parser reads none of it (of Python and C#, neither
-     functions, imports nor tokens; of JavaScript and TypeScript, no functions, their imports read without it), 2 s
-     for the parser on each and 250,000 nodes in the tree it gives, past which the parser reads none of it either
-     (`scripts/tree-walk.mjs`), and of all the files a pull request changes together, 4,000,000 characters and 1.5 s of
-     reading, and 1.5 s to link the files and follow the links from each test, past which the selection reads no more
-     and runs the whole suite (`scripts/hurry.mjs`); hostile tests:
-     `tests/hostile-pr-changes-test.mjs`.
+     million steps of each tree's tries, past which it fails with its mend; and of each file of Python or C# the
+     selection reads through the shape check's readers (`scripts/shape-readers.mjs`), 500,000 characters of Python
+     and 200,000 of C#, past which the parser reads none of it (neither functions, imports nor tokens), 2 s for the
+     parser on each and 250,000 nodes in the tree it gives, past which the parser reads none of it either
+     (`scripts/tree-walk.mjs`), while of JavaScript and TypeScript it gives the parser nothing, reading their imports
+     without it; and of all the files a pull request changes together, 4,000,000 characters and 1.5 s of reading, of any
+     one file of JavaScript, TypeScript or Python it leaves as it was, 4,000,000 characters, 1.5 s to link the files and follow
+     the links from each test, and 3 s for the whole of it, the project's own files read too, past which the selection
+     reads no more and runs the whole suite (`scripts/hurry.mjs`); hostile tests: `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
      of the work standing still (`scripts/look.mjs`, through `queue.mjs`'s placing and reading), with the open issues
@@ -105,10 +105,12 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      does not read as one, fail a file that is new or changed,
      with their mend, and are only noted in one unchanged from the base or where a project's run is told no base, what
      stands behind such a break being read as a YAML 1.1 reader reads it (as line feeds, as the sync's mend leaves it and
-     as it stands, whichever finds most), a key given twice or a call left without ready_for_review there found and
-     failed or noted as any other, and each file that holds one named at a sync; where a base's breaks, read so, leave
-     it no YAML to the package (such as a break inside a single-quoted string whose next line is under-indented), what it held behind them cannot be told, and
-     what the changed file then shows is noted, not failed; in the core's own run each fails), and NuGet's lock file version 2, a newer refused (npm's
+     as it stands, whichever finds most, a reading that is no YAML to the package, where the text as it stands is, leaving its keys out), a key given twice or a call left without ready_for_review there found and
+     failed or noted as any other, a file's lines of one kind cut at 25 with the rest counted, each reading of a text kept for the next
+     reader, a hostile file of the longest text read costing both readers, head and base, no more than five times (and 0.3 s) the
+     time of the same file with no break, and each file that holds one named at a sync; where a base's breaks, read so, leave
+     it no YAML to the package for their sake alone (such as a break inside a single-quoted string whose next line is under-indented), what it held behind them cannot be told, and
+     what the changed file then shows is noted, not failed (a base no YAML for another reason is read as it stands); in the core's own run each fails), and NuGet's lock file version 2, a newer refused (npm's
      lock file's number is not read yet: #663); hostile tests: `tests/hostile-build-files-test.mjs`, and for the
      reader of where the tests run `tests/runners-test.mjs`.
    - what a package brings, from a registry or installed (its manifest, licence files and content hash), and what its

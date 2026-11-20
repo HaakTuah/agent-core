@@ -2,12 +2,13 @@
 // Tests of exact-versions.mjs: each case a made-up project in memory (a lock file and its package lists), never a real
 // one. Run: node tests/exact-versions-test.mjs
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { check } from "../scripts/exact-versions.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const reader = (files) => (p) => { if (!Object.hasOwn(files, p)) throw new Error(`no such file: ${p}`); return files[p]; };
@@ -114,7 +115,7 @@ expect("a name that is also a key of every object is not found by mistake", proj
 
 // Run as a project runs it: from its root, with the licence check's config, on files on disk.
 function run(spec, lockfile = "tools/package-lock.json") {
-  const dir = mkdtempSync(join(tmpdir(), "exact-versions-"));
+  const dir = scratchDir("exact-versions-");
   try {
     mkdirSync(join(dir, "tools"));
     writeFileSync(join(dir, "licences.json"), JSON.stringify({ lockfiles: [lockfile] }));

@@ -3,13 +3,13 @@
 // the registry gives, trimmed to what the lookup reads, and handed to it in place of the network (floor rule 8: no
 // live call, no real package). Run: node tests/lookup-test.mjs
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { lookUp, newPackages, npmPackages, nugetPackages, run, YOUNG } from "../scripts/lookup.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { notDone, STEPS } from "../scripts/steps.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { if (!cond) { failed++; console.error(`FAIL ${what}`); } };
@@ -184,7 +184,7 @@ ok(r.failures.length === 1 && /outside the registry/u.test(r.failures[0]), "NuGe
 
 // ---- Every lock entry from npm's registry, with an integrity value (#488, point 4)
 {
-  const at = mkdtempSync(join(tmpdir(), "lookup-source-"));
+  const at = scratchDir("lookup-source-");
   const g = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: at, encoding: "utf8" }).trim();
   try {
     g("init", "-q");
@@ -221,7 +221,7 @@ ok(r.failures.length === 1 && /outside the registry/u.test(r.failures[0]), "NuGe
 }
 
 // ---- The check on a project
-const tmp = mkdtempSync(join(tmpdir(), "lookup-test-"));
+const tmp = scratchDir("lookup-test-");
 const git = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: tmp, encoding: "utf8" }).trim();
 try {
   git("init", "-q");
@@ -253,7 +253,7 @@ try {
   ok(r.code === 1 && /^FAIL: package-lock\.json: never-published-moss@1\.0\.0/mu.test(r.lines.join("\n")), `a lock file the pull request newly names in the config makes no name held (${r.lines})`);
   writeFileSync(join(tmp, "licences.json"), JSON.stringify({ lockfiles: ["package-lock.json"], ships: [] }));
   // A lock file the pull request makes a link to a file outside the project: refused, and nothing of the file printed.
-  const outside = mkdtempSync(join(tmpdir(), "lookup-outside-"));
+  const outside = scratchDir("lookup-outside-");
   writeFileSync(join(outside, "secret.txt"), "invented-secret-text-not-json");
   rmSync(join(tmp, "package-lock.json"));
   symlinkSync(join(outside, "secret.txt"), join(tmp, "package-lock.json"));

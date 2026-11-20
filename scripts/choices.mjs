@@ -34,6 +34,18 @@ export const TRIPPED = "A choice's measured sign to act on";
 export const LISTED = 30;
 // Twice a year: the pass is due once the day on the line "Read whole:" is this many days old.
 export const DAYS = 182;
+// The line of a records file that names the folder its records stand in, a file each, read in the order of their names
+// (AGENTS.md, "A record pull requests add to is a folder of one file per entry"; #870): the folder is a plain path
+// from the project's root.
+export const POINTER = /^Its records stand in `([\w][\w.-]*(?:\/[\w][\w.-]*)*)\/`, a file each, read in the order of their names\.$/u;
+// The records file's text with each line POINTER reads replaced by the records `partsOf(folder)` gives (their texts), a
+// blank line between; a folder a second line names again is read once.
+export const wholeOf = (text, partsOf) => { const seen = new Set(); return String(text).split("\n").map(line => { const m = POINTER.exec(line.replace(/\r$/u, "")); if (!m) return line; if (seen.has(m[1])) return ""; seen.add(m[1]); return partsOf(m[1]).join("\n\n"); }).join("\n"); };
+const trimmed = text => text.replace(/\r?\n$/u, "");
+// The records of one folder, in the order of the files' names: the texts `read(name)` gives of those of `names` that end
+// ".md", each without its last line ending (the one place the order and the trim stand, for the disk, a commit and a
+// project's files alike).
+export const inFolder = (names, read) => names.filter(n => n.endsWith(".md")).sort().map(n => trimmed(String(read(n) ?? "")));
 
 // The path a project's rules name for its *choice records* (the manifest's row, or a line of the core's AGENTS.md that
 // gives the slot), else KIT; null where the name is no plain path inside the project.
@@ -43,7 +55,7 @@ export function where(rules) {
 }
 
 // (control characters, and those that reorder or hide text, so a name reads as its bytes)
-const plain = text => String(text ?? "").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/gu, " ").trim().slice(0, 120);
+export const plain = text => String(text ?? "").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/gu, " ").trim().slice(0, 120);
 
 // The measures a line "Trips when:" may name, each [what it counts, how it is read from the dose's reading]: numbers
 // the shape check reads on every run (shape.mjs, survey()), never a command.
@@ -130,8 +142,8 @@ export function due(found, at) {
 export const MOST = 256 * 1024;
 
 // The records of the project at `root`, read from inside it alone: { file, text } (text null where there is no such
-// file), or { file, unread } where its name or the file cannot be read so: no link is followed, at the file or at any
-// folder on its way, and no file past MOST is read.
+// file), or { file, unread } where its name or the file cannot be read so: no link is followed, at the file, at any
+// folder on its way or at a folder a line POINTER names, and no file past MOST is read, nor a folder's whole past it.
 export function records(rules, root = ".") {
   const file = where(rules);
   if (!file) return { file: null, unread: "the *choice records* named in the rules is no plain path inside the project" };
@@ -143,7 +155,27 @@ export function records(rules, root = ".") {
     if (i === parts.length && !stat.isFile()) return { file, unread: `${file} is no regular file (a folder)` };
     if (i === parts.length && stat.size > MOST) return { file, unread: `${file} is past ${MOST} bytes` };
   }
-  try { return { file, text: fs.readFileSync(path.join(root, file), "utf8") }; } catch { return { file, unread: `${file} could not be read` }; }
+  let text, unread = null, total = 0;
+  try { text = fs.readFileSync(path.join(root, file), "utf8"); } catch { return { file, unread: `${file} could not be read` }; }
+  total = Buffer.byteLength(text);
+  text = wholeOf(text, folder => {
+    const at = folder.split("/");
+    try {
+      for (let i = 1; i <= at.length; i++) {
+        const stat = fs.lstatSync(path.join(root, ...at.slice(0, i)));
+        if (stat.isSymbolicLink() || (i === at.length && !stat.isDirectory())) throw new Error("no plain folder");
+      }
+      const names = fs.readdirSync(path.join(root, folder), { withFileTypes: true }).filter(e => e.isFile()).map(e => e.name);
+      return inFolder(names, name => {
+        if ((total += fs.statSync(path.join(root, folder, name)).size) > MOST) throw new RangeError("past");
+        return fs.readFileSync(path.join(root, folder, name), "utf8");
+      });
+    } catch (e) {
+      unread ??= e instanceof RangeError ? `${file} with ${folder}/ is past ${MOST} bytes` : `${folder}/ is no plain folder, or could not be read (a link, or none, stands on its way)`;
+      return [];
+    }
+  });
+  return unread ? { file, unread } : { file, text };
 }
 
 // The scheduled look's reader (look.mjs, DUE): the pass's issue, its body null where nothing is due, so the look closes
@@ -266,16 +298,34 @@ export function atCommit(commit, file, root = ".") {
 }
 
 // The records at the base, by the path the base's own rules name (its manifest's row, or the core's AGENTS.md), so a
-// pull request that moves them reads the records they held: their text, null where the base held none, undefined where
-// `base` is no commit here, and LINK where the records, or the manifest that names them, were a link there. The core's
-// AGENTS.md, read where the base holds no manifest, is read as naming none where it was a link, so the records are
-// read at the starter kit's path, as before (#541).
+// pull request that moves them reads the records they held: their text, with the records of a folder a line POINTER
+// names put in its place, null where the base held none, undefined where `base` is no commit here, and LINK where the
+// records, or the manifest that names them, or that folder were a link there. The core's AGENTS.md, read where the base
+// holds no manifest, is read as naming none where it was a link, so the records are read at the starter kit's path, as
+// before (#541).
 export function baseRecords(base, root = ".") {
   const manifest = atCommit(base, "core-manifest.md", root);
   if (manifest === undefined || manifest === LINK) return manifest;
   const rules = manifest ?? atCommit(base, "AGENTS.md", root);
   const file = where(rules === LINK ? "" : rules ?? "");
-  return file ? atCommit(base, file, root) : null;
+  const text = file ? atCommit(base, file, root) : null;
+  if (typeof text !== "string") return text;
+  const git = args => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: MOST * 2 });
+  // (a folder the base held as a link, or that cannot be read there, or is past MOST with the file, reads as a link: its
+  // records are listed and none fails, as with no base to compare with, since any of them may have stood there)
+  let unreadable = false, total = Buffer.byteLength(text);
+  const whole = wholeOf(text, folder => {
+    const at = folder.split("/");
+    try {
+      for (let i = 1; i <= at.length; i++) if (/^120000 /u.test(git(["ls-tree", base, "--", at.slice(0, i).join("/")]))) throw new Error("a link");
+      const entries = git(["ls-tree", "-z", base, "--", `${folder}/`]).split("\0").filter(Boolean).map(l => /^100(?:644|755) blob \w+\t(.+)$/u.exec(l)?.[1]).filter(Boolean);
+      return inFolder(entries, name => {
+        if ((total += Number(git(["cat-file", "-s", `${base}:${name}`]))) > MOST) throw new RangeError("past");
+        return git(["show", `${base}:${name}`]);
+      });
+    } catch { unreadable = true; return []; }
+  });
+  return unreadable ? LINK : whole;
 }
 
 // What the check prints and whether it failed: `got`, the records at the head (records()); `base`, the commit the

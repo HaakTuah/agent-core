@@ -11,9 +11,11 @@
 // a changed file is no code the readers read and no test, a file that is gone, C# (whose types are reached by their
 // full names too, with no using directive), a script of the global space, or anything the config does not name
 // under "select.none" (the files no test reads), the whole suite runs, and so it does where no base is told (on main, on
-// a schedule, before a release), where the shape check's config cannot be read and where the files the change holds are
-// more than the readers take in time (hurry.mjs). A fault the whole suite finds that
+// a schedule, before a release), where the shape check's config cannot be read and where the files the change holds, or
+// the project's files all together, are more than the readers take in time (hurry.mjs). A fault the whole suite finds that
 // the selection left out is a fault of this map, mended at once.
+//
+// The pathspec matcher is select-matcher.mjs and the question of a tree that passed is select-passed.mjs, beside this file.
 //
 // The config is the shape check's (shape.mjs, where()): its "code", "tests", "aliases" and "select" ({ "proof",
 // "whole", "none" }, each git pathspecs).
@@ -34,7 +36,6 @@
 //       that follow, or NAME=none where nothing is selected; --passed, on a push alone (no SELECT_BASE), names the check
 //       whose pass on the merged head lets the run select nothing. Reads only, but for those two files and that one question to the host; git and Node's own
 //       modules.
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,81 +44,14 @@ import { logged } from "./guards.mjs";
 import { WORDS, mentioned, nameTrie } from "./name-trie.mjs";
 import { Late, hurry } from "./hurry.mjs";
 import { notLinked, parseConfig, standing, survey, where } from "./shape.mjs";
+import { matcher } from "./select-matcher.mjs";
+import { git, passedWhole } from "./select-passed.mjs";
 import { isCode } from "./shape-readers.mjs";
 import { started } from "./started.mjs";
 
 class Refused extends Error {}
 const refuse = (what, mend) => { throw new Refused(`${what}. Mend: ${mend}`); };
-const git = args => execFileSync("git", ["-c", "core.fsmonitor=false", ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
 const PLAIN = /^[\w@+.,=-][\w@+./,=-]*$/u;
-
-// A pattern as a list of steps, matched by walking every step a path could stand at at once, so a match takes time in
-// proportion to the path's length times the pattern's, whatever runs of wildcards it holds: each step is a character
-// ({ one: test }), a run of any length ({ run: test }), or a choice that consumes nothing ({ fork: n }: the next step,
-// or the step n on, as "**/" is nothing or a run that ends in "/", the choice made before the run, never inside it).
-const LINE_END = /[\n\r\u2028\u2029]/u; // (where a wildcard of git's default stops, as "." does in a regular expression)
-const literal = c => ({ one: ch => ch === c });
-// One part of a pathspec with git's default wildcards: "*" any run (across folders too), "?" one character, "[...]"
-// one of a set ("[!...]" one not in it), anything else itself.
-function wild(spec) {
-  const steps = [];
-  for (const p of spec.split(/(\*+|\?|\[!?[^\]]+\])/u)) {
-    if (/^\*+$/u.test(p)) steps.push({ run: ch => !LINE_END.test(ch) }); // (a run of stars is one star)
-    else if (p === "?") steps.push({ one: ch => !LINE_END.test(ch) });
-    else if (/^\[!?[^\]]+\]$/u.test(p)) {
-      const not = p.startsWith("[!"), set = new RegExp(`^[${p.slice(not ? 2 : 1, -1).replace(/[\\\]^]/gu, "\\$&")}]$`, "u");
-      steps.push({ one: ch => set.test(ch) !== not });
-    } else for (const c of p) steps.push(literal(c));
-  }
-  return steps;
-}
-// One of ":(glob)": "**/" any folders, "**" any run, "*" a run within one folder, anything else itself.
-function globSteps(spec) {
-  const steps = [];
-  for (const p of spec.split(/(\*\*\/|\*\*|\*)/u)) {
-    if (p === "**/") steps.push({ fork: 3 }, { run: () => true }, literal("/"));
-    else if (p === "**") steps.push({ run: () => true });
-    else if (p === "*") steps.push({ run: ch => ch !== "/" });
-    else for (const c of p) steps.push(literal(c));
-  }
-  return steps;
-}
-// Whether the steps match the whole path.
-function walks(steps, f) {
-  const close = at => {
-    const all = new Set(at);
-    for (const i of all) if (steps[i]?.run || steps[i]?.fork) { all.add(i + 1); if (steps[i].fork) all.add(i + steps[i].fork); }
-    return all;
-  };
-  let at = close([0]);
-  for (const ch of f) {
-    const next = new Set();
-    for (const i of at) {
-      const step = steps[i];
-      if (step?.run) { if (step.run(ch)) next.add(i); }
-      else if (step?.one?.(ch)) next.add(i + 1);
-    }
-    if (!next.size) return false;
-    at = close(next);
-  }
-  return at.has(steps.length);
-}
-
-// Whether a path is one of git pathspecs': a plain one is the path or a folder above it, or, where it holds a
-// wildcard, matches as git's default does ("*", "?" and "[...]", across folders too); one of ":(glob)" is a glob ("**" any
-// folders, "*" within one); and ":!" or ":(exclude)" leaves out what it matches.
-export function matcher(specs) {
-  const one = spec => {
-    const glob = spec.startsWith(":(glob)"), body = spec.replace(/^:\((glob|exclude)\)|^:!/u, "");
-    if (!glob && /[*?[]/u.test(body)) { const steps = wild(body); return f => walks(steps, f); }
-    if (!glob) { const plain = body.replace(/\/$/u, ""); return f => plain === "." || f === plain || f.startsWith(`${plain}/`); }
-    const steps = globSteps(body);
-    return f => walks(steps, f);
-  };
-  const out = s => s.startsWith(":!") || s.startsWith(":(exclude)");
-  const ins = specs.filter(s => !out(s)).map(one), outs = specs.filter(out).map(one);
-  return f => ins.some(m => m(f)) && !outs.some(m => m(f));
-}
 
 // A file of JavaScript or TypeScript without its comments, as far as a line tells them: a line that opens with one, and
 // one that ends a line after a space. What is left over names more, never less.
@@ -252,49 +186,8 @@ function configOf(at) {
   try { return fs.existsSync(notLinked(at)) ? parseConfig(fs.readFileSync(at, "utf8"), at) : null; } catch { return null; }
 }
 
-// Whether the tree HEAD holds passed whole on the pull request it merges (the header): { none: true, why } where it did,
-// else { all: true, why }. `selects` gives what the change from HEAD's first parent selects; `asked` answers whether
-// the check `check` passed on a commit, from the host.
-export async function passedWhole({ check, selects, asked = askHost }) {
-  let parents;
-  try { parents = git(["rev-list", "--parents", "-n", "1", "HEAD"]).trim().split(" "); } catch { parents = []; }
-  if (parents.length !== 3) return { all: true, why: "HEAD merges no two commits (a squash, a rebase, or no merge), so what ran on a pull request's head cannot be told" };
-  const [, , head] = parents, tree = c => { try { return git(["rev-parse", "--verify", "--quiet", `${c}^{tree}`]).trim(); } catch { return null; } };
-  const at = tree("HEAD");
-  if (!at || at !== tree(head)) return { all: true, why: `the merged head ${head.slice(0, 12)} held another tree: it was not up to date with the branch it merged into` };
-  const s = selects();
-  if (!s.all) return { all: true, why: `the pull request's run selected ${s.tests.length} tests, not the whole suite` };
-  const passed = await asked(head, check);
-  if (passed !== true) return { all: true, why: `the check ${check} did not pass on the merged head ${head.slice(0, 12)}${typeof passed === "string" ? ` (${passed})` : ""}` };
-  return { none: true, why: `the merged head ${head.slice(0, 12)} held this tree, ran the whole suite and passed ${check} on it: a tree that passed is not run again` };
-}
-
-// The newest of a check's runs on one head, which decides, as it does for a ruleset: a draft's gate fails by design and
-// the run started when the pull request was marked ready, on the same head, is the newer (#733). A run with no start
-// time reads as the oldest; of two that started together, the higher id.
-const startOf = run => (typeof run?.started_at === "string" ? Date.parse(run.started_at) || 0 : 0);
-const newestOf = runs => runs.reduce((a, b) => (startOf(b) > startOf(a) || (startOf(b) === startOf(a) && Number(b?.id ?? 0) > Number(a?.id ?? 0)) ? b : a));
-
-// Whether the check `check` passed on the commit `sha`, as the host says: true; else what kept it from saying so.
-async function askHost(sha, check) {
-  const api = process.env.GITHUB_API_URL || "https://api.github.com", repo = process.env.GITHUB_REPOSITORY || "", token = process.env.GH_TOKEN || "";
-  if (!/^[\w.-]+\/[\w.-]+$/u.test(repo) || !token) return "no repository or token to ask the host with (GITHUB_REPOSITORY, GH_TOKEN)";
-  try {
-    const r = await fetch(`${api}/repos/${repo}/commits/${sha}/check-runs?check_name=${encodeURIComponent(check)}&filter=latest&per_page=100`,
-      { headers: { authorization: `Bearer ${token}`, accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(20000) });
-    if (!r.ok) return `the host answered ${r.status}`;
-    const runs = (await r.json())?.check_runs;
-    if (!Array.isArray(runs) || !runs.length) return "the host knows no such run";
-    // (only GitHub Actions' own runs: an app of another's, or a check of that name it posts, says nothing of the suite)
-    const ours = runs.filter(run => run?.app?.slug === "github-actions");
-    if (!ours.length) return "no run of it by GitHub Actions";
-    const newest = newestOf(ours);
-    return (newest?.name === check && newest?.status === "completed" && newest?.conclusion === "success") || "its newest run did not pass";
-  } catch (e) { return `the host could not be asked: ${String(e?.message ?? e).slice(0, 80)}`; }
-}
-
-// What the change from `from` selects, or the whole suite where the files it changes are too many or too slow to read
-// within the time rule 5 of SECURITY.md allows (hurry.mjs; #881).
+// What the change from `from` selects, or the whole suite where the files it changes, or the project's files all
+// together, are too many or too slow to read within the time rule 5 of SECURITY.md allows (hurry.mjs; #881, #962).
 function selectedFrom(from, { now, config, failed }) {
   const changed = changedSince(from), watch = hurry({ files: new Set(changed) });
   try { return selection({ changed, texts: now.texts, tests: now.tests, ...pick(survey(now.texts, config, now.tests, watch)), unread: unreadConftests(now.texts), failed, config, watch }); }
