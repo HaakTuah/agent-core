@@ -113,6 +113,12 @@ const takeSteps = (d, leave = null) => {
   if (leave !== "scanning") gh(d, "POST", "issues", { title: "Switch on secret scanning with push protection", body: "Settings, Advanced Security: secret scanning and its push protection. The repository is private, so it is the owner's (floor rule 14).", labels: ["needs-owner", "by:builder"] });
 };
 if (inPart("first")) {
+// (each case's queue names only issues the case makes stand on GitHub: a scratch project no real one is like costs its session time, #988)
+for (const c of CASES) {
+  const d = fresh(c.name), made = new Set(JSON.parse(fs.readFileSync(path.join(d, "github.json"), "utf8")).issues.map(i => i.number));
+  const named = [...new Set([...read(d, "docs/PROGRESS.md").matchAll(/#(\d+)/g)].map(m => +m[1]))].filter(k => !made.has(k));
+  ok(!named.length, `${c.name}: its queue names only issues the case makes`, `names #${named.join(", #")}`);
+}
 // (a case's project writes its objects uncompressed: its set-up adds and pushes the core's whole copy, #812)
 const outsider = fresh("outsider");
 ok(git(outsider, "config", "--local", "core.compression") === "0", "a case's project is set to write its objects uncompressed");

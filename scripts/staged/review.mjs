@@ -6,7 +6,7 @@
 // findings: N."), and repeats the key nowhere. Run under each reviewer in the order (tasks/roles.md).
 import fs from "node:fs";
 import path from "node:path";
-import { OWNER, build, fakeKey, git, github, memo, memoOf, onGitHub, verdict } from "./scratch.mjs";
+import { OWNER, build, fakeKey, git, github, memo, memoOf, onGitHub, queueLine, verdict } from "./scratch.mjs";
 
 export const name = "review";
 export const holds = ["roles/shared/review-guidelines.md: For every reviewer", "roles/shared/review-guidelines.md: Every reviewer", "roles/shared/review-guidelines.md: A rule file changed", "tasks/reviews.md: The reviewers are tested"];
@@ -118,6 +118,7 @@ export function set(dir, opts = {}) {
   const key = fakeKey();
   const paths = build(dir, {
     ...opts,
+    fills: [queueLine([BUG])],
     github: {
       last: 2,
       issues: [BUG, { number: 2, title: "sum() counts the last number; --mean and --file", body: DESCRIPTION, state: "open", user, labels: [], assignees: [], created_at: at0, updated_at: at0, pull: true }],
