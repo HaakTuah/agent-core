@@ -55,6 +55,12 @@ if (v && v.$slow) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, v
 if (a.includes("--jq")) { const f = a[a.indexOf("--jq") + 1]; if (!/^\\.\\w+$/.test(f)) process.exit(3); console.log(String(v?.[f.slice(1)] ?? "")); process.exit(0); }
 console.log(JSON.stringify(a.includes("--slurp") ? [v] : v));
 `, { mode: 0o755 });
+  // (the runner's jq ends a line with LF, a Windows jq with CRLF, which `for login in $(jq -r ...)` keeps in each login:
+  // there the same jq runs with --binary)
+  if (execFileSync("jq", ["-rn", '"a"'], { env, encoding: "utf8" }).includes("\r")) {
+    const real = execFileSync(process.platform === "win32" ? "where" : "which", ["jq"], { env, encoding: "utf8" }).split(/\r?\n/)[0];
+    fs.writeFileSync(path.join(bin, "jq"), `#!/bin/sh\nexec "${slash(real)}" --binary "$@"\n`, { mode: 0o755 });
+  }
   return { repo, bin, blob: (p) => git("rev-parse", `HEAD:${p}`) };
 }
 
