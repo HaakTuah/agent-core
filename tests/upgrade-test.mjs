@@ -689,7 +689,7 @@ function kinds(dir, git, tmp) {
   const links = { "kinds/to-text": "text.txt", "kinds/to-link": "to-text", "kinds/to-ignored": "../dist/ignored.txt", "kinds/to-outside": slash(path.relative(path.join(home, "kinds"), outside)),
     "kinds/to-absolute": slash(path.join(home, "kinds/text.txt")), "kinds/to-nothing": "nothing-here.txt", "kinds/to-folder": "." };
   for (const [link, target] of Object.entries(links)) {
-    const oid = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: dir, input: target, encoding: "utf8" }).trim();
+    const oid = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: dir, env, input: target, encoding: "utf8" }).trim();
     git(dir, "update-index", "--add", "--cacheinfo", `120000,${oid},${link}`);
   }
   git(dir, "checkout", "--", ...Object.keys(links));
@@ -732,7 +732,7 @@ function againstGit(p, dir, git, ok) {
 // The text of each blob, by its object id, in one call of git's.
 function blobTexts(dir, oids) {
   const unique = [...new Set(oids)], out = new Map();
-  const bytes = execFileSync("git", ["cat-file", "--batch"], { cwd: dir, input: unique.map(o => `${o}\n`).join(""), maxBuffer: 1 << 30 });
+  const bytes = execFileSync("git", ["cat-file", "--batch"], { cwd: dir, env, input: unique.map(o => `${o}\n`).join(""), maxBuffer: 1 << 30 });
   for (let at = 0, k = 0; k < unique.length; k++) {
     const nl = bytes.indexOf(10, at), [oid, , size] = bytes.subarray(at, nl).toString("utf8").split(" ");
     out.set(oid, bytes.subarray(nl + 1, nl + 1 + Number(size)).toString("utf8"));
