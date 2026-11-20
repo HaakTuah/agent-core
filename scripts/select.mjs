@@ -141,8 +141,9 @@ export function links(texts, tests, reach, pace = () => {}) {
     pace();
     const to = new Set(reach.get(file) ?? []), py = file.endsWith(".py");
     if (py || CODE.includes(path.posix.extname(file))) {
-      const plain = uncommented(text, py), named = mentioned(byName, plain, WORDS.name);
-      if (py) for (const f of mentioned(byDotted, plain, WORDS.dotted)) named.add(f);
+      // (a Python module's dotted name is looked for in every text of code, as its pattern was, JavaScript's that starts `python -m` too)
+      const plain = uncommented(text, py), named = mentioned(byName, plain, WORDS.name, pace);
+      for (const f of mentioned(byDotted, plain, WORDS.dotted, pace)) named.add(f);
       for (const f of named) if (f !== file) to.add(f);
     }
     // (Python runs a package's __init__.py on each import under it, and pytest a folder's conftest.py with no import)

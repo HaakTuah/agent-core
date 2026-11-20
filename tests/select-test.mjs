@@ -130,6 +130,12 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
     }
     ok(!bad && hit >= 40, `${kind}: 3000 random names and texts, ${hit} of them holding a name, give the files the regular expression of each name gave`, bad);
   }
+  // (a Python module's dotted name is held in a text of JavaScript too, as it was: a test that starts `python -m pkg.rules`)
+  const py = links({ "pkg/rules.py": "x = 1\n", "test/run.test.js": "spawnSync('python', ['-m', 'pkg.rules']);\n", "test/other.test.js": "spawnSync('python', ['-m', 'pkg.rulesx']);\n" }, new Set(), new Map());
+  ok(py.get("test/run.test.js").has("pkg/rules.py") && !py.get("test/other.test.js").has("pkg/rules.py"), "a Python module's dotted name links from a text of JavaScript, as the pattern of each name did");
+  let asks = 0;
+  mentioned(nameTrie([["ab", "f"]]), "x".repeat(10000), WORDS.name, () => asks++);
+  ok(asks === 3, "mentioned asks its pace every 4096 places a name may start at", `${asks} asks`);
   const trie = nameTrie([["select.mjs", "s"], ["a.js", "x/a.js"], ["a.js", "y/a.js"], ["b", "b"], ["ab", "ab"]]), holds = text => [...mentioned(trie, text, WORDS.name)].sort().join(" ");
   ok(holds("node scripts/select.mjs") === "s" && holds("xselect.mjs") === "" && holds("select.mjsx") === "" && holds("my-select.mjs") === "" && holds("a.jsx a.js") === "x/a.js y/a.js" && holds("ab b") === "ab b" && holds("a b") === "b" && holds("b-") === "" && holds("a.js-x") === "" && holds("-b") === "" && holds("") === "",
     "a name is held between characters that are no part of a word, files that share one together, and one that another holds by its end");

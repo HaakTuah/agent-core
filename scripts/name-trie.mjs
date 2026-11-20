@@ -27,10 +27,13 @@ export const WORDS = {
 };
 
 /** The files whose name `trie` holds that `text` holds as a word: starting at its start or after a character that is no
- *  part of one (`words.before`), and followed by its end or by one that is none (`words.after`). */
-export function mentioned(trie, text, words) {
+ *  part of one (`words.before`), and followed by its end or by one that is none (`words.after`). The walk from each start
+ *  goes as deep as the names it follows, so `pace` is asked every 4096 starts, to stop a text of many starts over long
+ *  names (it throws where it must stop). */
+export function mentioned(trie, text, words, pace = () => {}) {
   const found = new Set();
   for (let at = 0; at < text.length; at++) {
+    if ((at & 4095) === 0) pace();
     if (at > 0 && words.before(text[at - 1])) continue;
     let node = trie;
     for (let i = at; i < text.length; i++) {
