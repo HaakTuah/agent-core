@@ -216,16 +216,16 @@ async function fromSource(source, id, version) {
 // Whether the base held this config with the same sources: true with no base to read against.
 // (a tool counts as the base's only where the base held this config, with the same sources: one a pull request's new
 // source gives, or read by a config the base did not hold, is judged as new)
-function sameSourcesOf(config, base, baseConfig) {
+function sameSourcesOf(config, base, baseConfig, copy) {
   let sameSources = base === null;
-  try { if (baseConfig) sameSources = sameSources || [...nugetConfig(baseConfig).sources].sort().join("\n") === [...nugetConfig(config).sources].sort().join("\n"); } catch { /* (judged as new) */ }
+  try { if (baseConfig) sameSources = sameSources || [...nugetConfig(baseConfig, copy).sources].sort().join("\n") === [...nugetConfig(config, copy).sources].sort().join("\n"); } catch { /* (judged as new) */ }
   return sameSources;
 }
 // The lock files the base's config listed.
 // (a lock file as the base held it, and listed by the base's config, so the check read it there: two content hashes
 // it already named are reported; one a pull request lists for the first time is not held)
-function listedBy(baseConfig) {
-  try { if (baseConfig) return [...nugetConfig(baseConfig).ships, ...nugetConfig(baseConfig).tools]; } catch { /* (none listed) */ }
+function listedBy(baseConfig, copy) {
+  try { if (baseConfig) return [...nugetConfig(baseConfig, copy).ships, ...nugetConfig(baseConfig, copy).tools]; } catch { /* (none listed) */ }
   return [];
 }
 // A file's text, read once; null, failed in `failures`, where it is no file of bytes.
@@ -355,10 +355,10 @@ async function eightAtATime(list, work) {
  * { failures, notes, reports, summary }.
  */
 export async function fetchAll(config, root, tracked, into, sources = sourcesOf(config, root), { base = null, baseConfig = null } = {}) {
-  const { ships, tools: toolLocks } = nugetConfig(config);
-  const sameSources = sameSourcesOf(config, base, baseConfig);
+  const copy = copyOf(root), { ships, tools: toolLocks } = nugetConfig(config, copy);
+  const sameSources = sameSourcesOf(config, base, baseConfig, copy);
   const failures = [], notes = [], reports = [], wanted = new Map();
-  const listedThen = listedBy(baseConfig);
+  const listedThen = listedBy(baseConfig, copy);
   const textOf = reader(root, failures);
   const asBase = (f) => base === null || (listedThen.includes(f) && textAt(root, base, f) === textOf(f));
   const ctx = { root, base, tracked, sameSources, textOf, asBase, failures, reports, wanted };

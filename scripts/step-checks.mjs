@@ -19,8 +19,8 @@ import { ruleFiles } from "./rule-files.mjs";
 import { toolOf } from "./strength.mjs";
 import { Unread, calls, commands, copyAt, uncommented, copiesConfig, folded, given, licenceConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
-import { draftHoles, reads } from "./workflows.mjs";
-import { DEEPEST, LONGEST, twice } from "./yaml-keys.mjs";
+import { draftHoles, foreignBreaks, keysTwice, reads, reads11 } from "./workflows.mjs";
+import { DEEPEST, LONGEST } from "./yaml-keys.mjs";
 import { releaseAge, WAIT } from "./licences.mjs";
 import { codeOf, covers, pinFault, pinRead } from "./licence-scan.mjs";
 import { npmPackages, offRegistry } from "./lookup.mjs";
@@ -105,7 +105,7 @@ export function keysOnce(p) {
   // (with the core's packages not installed, as after a sync made by a copy from before #654, this step cannot be read:
   // it says so, with the install, and every other step is still told)
   if (!installed("yaml")) return `The core's packages are not installed, so the workflows could not be read for a key given twice: run \`node ${copyAt(p)}scripts/install.mjs\`, then \`node ${copyAt(p)}scripts/steps.mjs\` again.`;
-  const read = reads(p.files).map(f => [f, twice(p.read(f) ?? "")]);
+  const read = reads(p.files, copyAt(p)).map(f => [f, keysTwice(p.read(f) ?? "")]);
   const found = read.flatMap(([f, keys]) => keys.filter(k => k.key !== null).map(k => `\`${f}\` line ${k.line}, "${k.key}" (first on line ${k.first})`));
   const unread = by => read.filter(([, keys]) => keys.some(k => k.key === null && Boolean(k.size) === by)).map(([f]) => `\`${f}\``), deep = unread(false), long = unread(true);
   const said = [
@@ -113,6 +113,15 @@ export function keysOnce(p) {
     deep.length ? `In one pull request, nest the lists and mappings of these workflows or actions no deeper than a workflow needs, a few levels, since past ${DEEPEST} deep a key given twice in them cannot be read: ${deep.join("; ")}.` : "",
     long.length ? `In one pull request, cut these workflows or actions to under ${LONGEST} characters, the steps they repeat moved to a script or a workflow of their own, since past that a key given twice in them cannot be read: ${long.join("; ")}.` : ""];
   return said.filter(Boolean).join(" ") || null;
+}
+
+// Each workflow or action of the project's own that holds a line break YAML 1.1 reads and the YAML package the workflow check
+// reads with does not (U+0085, U+2028, U+2029), as the workflow check reads them (workflows.mjs, foreignBreaks): the old
+// ones, which the check notes and passes, listed here at every sync until they are gone (#876). Null where none is.
+export function lineBreaksMended(p) {
+  const found = reads(p.files, copyAt(p)).map(f => [f, foreignBreaks(p.read(f) ?? "")]).filter(([, b]) => b)
+    .map(([f, b]) => `\`${f}\` line ${b.line}, ${b.code}${b.count > 1 ? ` and ${b.count - 1} more` : ""}`);
+  return found.length ? `In one pull request, replace each U+0085, U+2028 or U+2029 of a workflow or an action of the project's with an ordinary line feed (inside a double-quoted string, with the escape of its own code, \\u0085, \\u2028 or \\u2029), since a reader of YAML 1.1 reads each as a line end and the workflow check's does not: ${found.join("; ")}.` : null;
 }
 
 // Whether what the copies and pointer checks hold against in an agent tool's files is listed (#405; AGENTS.md of the
@@ -442,8 +451,12 @@ export function nugetPathsHold(p) {
 // ready (#375, #502): without that, the check a draft skipped never runs on that head, and a ruleset counts the skip as
 // passed. Each workflow where a call does so is named, as the workflow check reads it (workflows.mjs, draftHoles).
 export function readyOnlyHolds(p) {
-  readable(p, text => /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget|pr-description)\.yml@/i.test(text));
-  const wrong = Object.entries(p.workflows).filter(([, w]) => w.yaml && draftHoles(w.yaml).length);
+  // (a workflow with a line break the YAML package does not read is read from its text, as a YAML 1.1 reader reads it, never from the
+  // YAML the package gave, which may be none, and as it stands too; where neither reads, it is said unread as any other: #876)
+  const mentions = text => /\/\.github\/workflows\/(core|copies|personal-terms|signatures|nuget|pr-description)\.yml@/i.test(text);
+  const odd = text => installed("yaml") && foreignBreaks(text ?? "") !== null;
+  readable(p, text => !(odd(text) && reads11(text)) && mentions(text));
+  const wrong = Object.entries(p.workflows).filter(([, w]) => draftHoles(odd(w.text) ? w.text : w.yaml).length);
   return wrong.length ? `A call to the core's checks whose job is skipped on a draft never runs once the pull request is marked ready, since its trigger leaves that out: add \`ready_for_review\` to the \`types:\` under \`pull_request:\` (where it lists none, \`types: [opened, reopened, synchronize, ready_for_review]\`) in ${wrong.map(([f]) => `\`.github/workflows/${shown(f)}\``).join(", ")}.` : null;
 }
 

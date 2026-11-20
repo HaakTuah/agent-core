@@ -30,7 +30,7 @@ import { fileURLToPath } from "node:url";
 import { leadsOut, logged, parseBounded } from "./guards.mjs";
 import { baseOf, configAt, loadConfig, lockInstalled, registryName, textAt } from "./licences.mjs";
 import { lockPackages, nugetConfig } from "./nuget.mjs";
-import { projectAt } from "./core-path.mjs";
+import { copyOf, projectAt } from "./core-path.mjs";
 import { started } from "./started.mjs";
 
 export const YOUNG = 90;
@@ -357,7 +357,7 @@ export async function pool(items, size, work) {
  *  held, so no file merged as data first, and named in the config only by the pull request, makes a name count as held:
  *  a lock file the pull request newly names is new, and each of its packages is looked up. */
 export function packagesOf(config, root, base, nuget, baseConfig = null) {
-  const named = (c) => { try { return nuget ? [...nugetConfig(c).ships, ...nugetConfig(c).tools] : Array.isArray(c?.lockfiles) ? c.lockfiles : []; } catch { return []; } };
+  const named = (c) => { try { return nuget ? [...nugetConfig(c, copyOf(root)).ships, ...nugetConfig(c, copyOf(root)).tools] : Array.isArray(c?.lockfiles) ? c.lockfiles : []; } catch { return []; } };
   const read = nuget ? nugetPackages : npmPackages;
   const head = named(config).map((f) => {
     // (a lock file the pull request makes a link out of the project is never read: floor rule 5)
@@ -394,7 +394,7 @@ export async function run(configPath, { root, base, nuget = false, get = fetched
     const config = loadConfig(configPath);
     ({ head, base: held } = packagesOf(config, root, base, nuget, configAt(root, base, configPath)));
     found = newPackages(head, held, nuget);
-    if (nuget) sources = nugetConfig(config).sources.length;
+    if (nuget) sources = nugetConfig(config, copyOf(root)).sources.length;
   } catch (e) { return { lines: [`FAIL: ${logged(mended(e.message, "write the config as JSON, and each lock file it names anew with its package manager, never by hand"))}`], code: 1 }; }
   const { failures, reports } = await lookUp(found, { get, now, nuget, sources });
   // (on NuGet the lock file's content hash is held by the NuGet check, and where each package comes from by its restore)

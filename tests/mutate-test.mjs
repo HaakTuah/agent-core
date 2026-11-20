@@ -4,13 +4,14 @@
 // they were. Run by the core's tests workflow (.github/workflows/tests.yml).
 //
 //   node tests/mutate-test.mjs
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { faults, report, testsOf } from "../scripts/mutate.mjs";
+import { OWNER } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -116,6 +117,38 @@ try {
   const bare = spawnSync(process.execPath, [SCRIPT], { cwd: dir, encoding: "utf8" });
   ok(outside.status === 1 && mended(outside.stderr) && bare.status === 1 && mended(bare.stderr), "a file outside the code, and a run told no report, are refused with their mend", outside.stderr + bare.stderr);
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+
+// ---- a test the run stops leaves no scratch folder behind (#934) ----
+// A test stopped with SIGKILL runs no handler, so its scratch folder stays until the next test starts and takes away
+// those whose process is gone; one whose process still runs is never taken.
+{
+  const scratchCore = path.join(path.dirname(SCRIPT), "scratch-core.mjs");
+  const code = `import { scratchDir } from ${JSON.stringify(pathToFileURL(scratchCore).href)}; console.log(scratchDir("stopped-test-")); if (process.argv[1] === "wait") setInterval(() => {}, 1000);`;
+  const start = mode => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ["--input-type=module", "-e", code, mode], { stdio: ["ignore", "pipe", "inherit"] });
+    let out = "";
+    child.stdout.on("data", d => { out += d; if (out.includes("\n")) resolve({ child, dir: out.trim() }); });
+    child.on("error", reject);
+    child.on("close", () => resolve({ child, dir: out.trim() }));
+  });
+  const ended = child => new Promise(r => child.exitCode !== null || child.signalCode ? r() : child.on("close", r));
+  const stopped = await start("wait"), running = await start("wait");
+  stopped.child.kill("SIGKILL");
+  await ended(stopped.child);
+  const next = await start("end");
+  await ended(next.child);
+  ok(!fs.existsSync(stopped.dir), "the next test to start takes away the scratch folder of a test that was stopped", stopped.dir);
+  ok(fs.existsSync(running.dir), "the scratch folder of a test still running is left where it is", running.dir);
+  ok(!fs.existsSync(next.dir), "a test that ends takes away its own scratch folder as before");
+  // (a folder another machine's process made, over a temporary folder shared between machines, is no business of this one's)
+  const foreign = fs.mkdtempSync(path.join(os.tmpdir(), "stopped-test-"));
+  fs.writeFileSync(path.join(foreign, OWNER), `${os.hostname()}-elsewhere:999999999`);
+  await ended((await start("end")).child);
+  ok(fs.existsSync(foreign), "the scratch folder of a process on another machine is left where it is", foreign);
+  running.child.kill("SIGKILL");
+  await ended(running.child);
+  for (const dir of [running.dir, stopped.dir, foreign]) fs.rmSync(dir, { recursive: true, force: true });
+}
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

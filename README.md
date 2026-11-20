@@ -439,7 +439,8 @@ same byte for byte. What a check leaves out of the copy in a project was held in
 merge, by what the last column names. No check leaves another publisher's code out for anyone (#654).
 
 Each row is for a copy at `core/`. Where the manifest names another path, the rows of `security-review.mjs`,
-`personal-terms.yml`, `workflows.mjs`, `shape.mjs` and `nuget.mjs` still read `core/` (#628). `tests/copy-left-out-test.mjs`
+`personal-terms.yml`, `workflows.mjs` and `nuget.mjs` read the copy at that path (#628, #918), and `shape.mjs`' row is the
+project's config, which the starter kit writes for the copy's path and a sync's fresh comparison reads there. `tests/copy-left-out-test.mjs`
 holds the list to what the checks do: it stages each check's fault inside the copy and outside it. It also fails a
 check a project runs that the list leaves out.
 
