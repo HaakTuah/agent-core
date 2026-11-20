@@ -1,6 +1,7 @@
 // What the core costs a project and what the project gets done beside it (AGENTS.md of the core, "The core is measured
 // as a feature is"): run in a project's clone, it reads every pull request merged into the default branch (the merge
-// commits on its first-parent line; a pull request merged any other way is not seen) and sorts each by what it
+// commits on its first-parent line; a pull request merged any other way is not seen; a shallow clone that cannot show every merge is refused, with its
+// mend, #1027) and sorts each by what it
 // changed:
 //   sync     only the copy of the core, the manifest and workflows, the copy among them: what a sync PR holds
 //   upkeep   only the copy, the manifest, the rule files (rule-files.mjs), .github/ and .claude/: rules and checks
