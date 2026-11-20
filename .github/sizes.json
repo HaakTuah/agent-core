@@ -80,7 +80,7 @@
       "why": "#441: the game rules split into a base and a file for each kind (#484, points 6 and 7)."
     },
     "tests/steps-test.mjs": {
-      "mark": 138318,
+      "mark": 115750,
       "why": "#916: a file for each reader its sections test."
     },
     "tests/upgrade-test.mjs": {
@@ -242,10 +242,6 @@
     "tests/select-test.mjs": {
       "mark": 32013,
       "why": "#943: the matcher's cases and the cases of a tree that passed are split out; what is left is the selection's, whose cases (what a test reaches, the time the reading is allowed, the names a text holds, a pull request's run) read the one fixture project, texts and config, and split, each file would write it again."
-    },
-    "scripts/step-checks.mjs": {
-      "mark": 75102,
-      "why": "#919: split by step, so the session that changes one step's check opens that step's file alone."
     },
     "scripts/check-configs.mjs": {
       "mark": 40791,

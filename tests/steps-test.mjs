@@ -10,18 +10,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { differences, fresh, kind, report as freshReport } from "../scripts/fresh.mjs";
 import { CORE } from "../scripts/core-address.mjs";
-import { hookCommands, readCore } from "../scripts/core-path.mjs";
-import { READ, TEMPLATES, files, licences, sizes } from "../scripts/init.mjs";
 import { notes as manifestNotes } from "../scripts/manifest-reads.mjs";
 import { FOLDER, NOTES, NOTICE, POINTER, entries, notes as notesWhole } from "../scripts/sync-notes.mjs";
-import { READERS, isCode } from "../scripts/shape-readers.mjs";
+import { isCode } from "../scripts/shape-readers.mjs";
 import { leftOut } from "../scripts/reading.mjs";
 import { readNothing } from "../scripts/read-nothing.mjs";
 import { holders } from "../scripts/holders.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
-import { parseYaml, pathsLetThrough } from "../scripts/workflow-run.mjs";
-import { toolFilesRead, toolFilesState } from "../scripts/step-checks.mjs";
-import { COST, MOVED_GLOB, NEW_GLOBS, STEPS, Unread, configs, leads, moved, notDone, plain, project, report, runsOwn } from "../scripts/steps.mjs";
+import { TEMPLATES } from "../scripts/init.mjs";
+import { kitIn, linear } from "../scripts/steps-kit.mjs";
+import { parseYaml } from "../scripts/workflow-run.mjs";
+import { COST, STEPS, Unread, configs, leads, notDone, plain, project, report, runsOwn } from "../scripts/steps.mjs";
 import { READ_MOST } from "../scripts/own-files.mjs";
 
 let failed = 0, count = 0;
@@ -29,33 +28,9 @@ const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   $
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "steps-test-"));
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
-const PIN = "a".repeat(40);
 // (a test that reads one step's answer asks for that step alone: the others' checks, the agent tools' files among them, which run
 // the copies and pointers checks on the whole project, answer nothing it reads, and a Windows runner pays for each)
 const only = lead => STEPS.filter(s => s.lead === lead);
-// What a reader's "one pass" or its bound means is that its work grows in step with its text (or stops at
-// its bound), never a time of its own on a real clock, which a busy machine stretches: `read(n, k)` reads a text of
-// size n (its k-th, so that none is read from the reader's memory) and says whether it was read right, or does what
-// needs building first and returns what then reads it, which alone is timed; the least of a few readings at each of two
-// sizes, taken in turn so that a pause lands on none of them, is compared, the smaller held to at least 10 ms, below
-// which a clock tells nothing; and a reader that is linear keeps the larger over the smaller near the sizes' own ratio,
-// where one gone quadratic takes it to its square. The sizes are small, so that the parser's own time
-// (bash-commands.mjs) stays far from its end however busy the machine. The factor of three and the smaller sizes hold
-// "one pass" as "not quadratic at these sizes", a small term that shows only past them unseen.
-const linear = (read, small, large, runs = 5) => {
-  read(small, -1)?.call?.(); // (the first reading starts the parser)
-  const least = new Map([[small, Infinity], [large, Infinity]]);
-  let right = true;
-  for (let k = 0; k < runs; k++) for (const n of [small, large]) {
-    let at = Date.now(), got = read(n, k);
-    if (typeof got === "function") { at = Date.now(); got = got(); }
-    right = got && right;
-    least.set(n, Math.min(least.get(n), Date.now() - at));
-  }
-  const ratio = least.get(large) / Math.max(10, least.get(small));
-  return { right, linear: ratio < 3 * (large / small), shown: `${small} took ${least.get(small)} ms, ${large} took ${least.get(large)} ms` };
-};
-const modules = ["roles/shared", "tasks", "tools"].flatMap(d => fs.readdirSync(path.join(root, d)).filter(n => n.endsWith(".md")));
 const texts = dir => Object.fromEntries(fs.readdirSync(path.join(root, dir)).filter(n => n.endsWith(".md")).map(n => [n, fs.readFileSync(path.join(root, dir, n), "utf8")]));
 
 // ---- every entry of the sync notes has its step, and each step is told done one way ----
@@ -85,61 +60,9 @@ const stray = stageFiles.filter(f => !f.endsWith(".mjs") || !withCheck.includes(
 ok(!stray.length && stageFiles.length === Object.keys(STAGES).length, "each file of scripts/stages/ is the stage of the step of the same name in scripts/steps/, a step with a check", stray.join(", "));
 
 // ---- a project the starter kit writes: every step done, no difference from a fresh start ----
-// (`at`: where the project's copy of the core stands, as its manifest names it, "core/" the default. Its own files then
-// name that path wherever the kit wrote core/, as a project that moved its copy has them: #628. `library`: the folder of a
-// library that carries the core, its files committed here, at `at` inside it, as the manifest's line and the library's
-// own manifest say it, with the floor's own copy in floor-copy/; `submodule`: the library a submodule of the project,
-// which git lists by its commit alone)
-function kit(name, o, { held = true, at = "core/", library = null, submodule = false } = {}) {
-  const dir = path.join(tmp, name);
-  fs.mkdirSync(dir);
-  execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
-  const there = text => at === "core/" ? text : text.replace(/(?<![\w-])core\//gu, at);
-  const readAt = f => at === "core/" ? f : f.replace(/^core\//u, at);
-  for (const [to, text] of files({ owner: "someone-else", name, ...o }, PIN, modules, n => fs.readFileSync(path.join(root, TEMPLATES, n), "utf8"))) {
-    fs.mkdirSync(path.dirname(path.join(dir, there(to))), { recursive: true });
-    fs.writeFileSync(path.join(dir, there(to)), there(text));
-  }
-  if (library) {
-    const manifest = path.join(dir, "core-manifest.md"), own = /^Core: .*$/m.exec(fs.readFileSync(manifest, "utf8"))[0];
-    fs.writeFileSync(manifest, fs.readFileSync(manifest, "utf8").replace(own, `Core: ${CORE}, carried by ${library} under ${at} (never edited here).\nFloor copy: floor-copy/`));
-    fs.mkdirSync(path.join(dir, library), { recursive: true });
-    fs.writeFileSync(path.join(dir, library, "core-manifest.md"), `${own.replace(`under ${at}`, `under ${at.slice(library.length)}`)}\n`);
-    fs.cpSync(path.join(root, "floor"), path.join(dir, "floor-copy"), { recursive: true });
-  }
-  if (at !== "core/") {
-    // (its hooks are the commands core-path.mjs gives for that path, which stop a session whose floor cannot be read there)
-    const settings = path.join(dir, ".claude/settings.json"), hooks = JSON.parse(fs.readFileSync(settings, "utf8")), commands = hookCommands(readCore(fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8")));
-    hooks.hooks.SessionStart[0].hooks[0].command = commands.start; hooks.hooks.PreToolUse[0].hooks[0].command = commands.helper; hooks.hooks.Stop[0].hooks[0].command = commands.stop;
-    fs.writeFileSync(settings, `${JSON.stringify(hooks, null, 2)}\n`);
-  }
-  fs.mkdirSync(path.join(dir, "checks"), { recursive: true });
-  fs.writeFileSync(path.join(dir, "checks/licences.json"), `${JSON.stringify(licences(o, () => false), null, 2)}\n`);
-  // (the copy of the core the project holds, as far as its checks read it, its .gitignore too, which keeps the installed packages out of git as in a
-  // synced project, where staging them cost a Windows runner over a minute; and the size marks the kit writes for it)
-  for (const part of ["floor", "modules", "roles", "tasks", "tools", "scripts", ".packages", "setup", ".gitignore"]) fs.cpSync(path.join(root, part), path.join(dir, at, part), { recursive: true });
-  if (submodule) {
-    const lib = path.join(dir, library), git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", "-c", "protocol.file.allow=always", ...args], { cwd: lib, stdio: "ignore" });
-    git("init", "-q", "-b", "main");
-    git("add", "-A");
-    git("commit", "-q", "-m", "the library");
-    execFileSync("git", ["-c", "protocol.file.allow=always", "submodule", "add", "-q", `${lib.replace(/\\/g, "/")}-origin.git`, library.replace(/\/$/, "")], { cwd: dir, stdio: "ignore" });
-  }
-  // (the files the marks name stand under the copy's path; the total counts the project's own alone, as for core/)
-  const marks = sizes(Object.fromEntries(READ.map(f => [f, fs.statSync(path.join(dir, readAt(f))).size])));
-  marks.read = Object.fromEntries(Object.entries(marks.read).map(([f, mark]) => [readAt(f), mark]));
-  fs.writeFileSync(path.join(dir, "checks/sizes.json"), `${JSON.stringify(marks, null, 2)}\n`);
-  execFileSync("git", ["add", "-A"], { cwd: dir });
-  // (the copies check's first baseline as the starter kit writes it, its two entry files' shared sentence listed)
-  execFileSync(process.execPath, [`${at}scripts/copies.mjs`, "checks/copies.json", "--first"], { cwd: dir, stdio: "ignore" });
-  fs.writeFileSync(path.join(dir, "checks/shape-baseline.json"), `${JSON.stringify({ reads: Object.keys(READERS), listed: {} }, null, 2)}\n`);
-  // (the first list of what holds the project's own rules, as the starter kit writes it: #662)
-  execFileSync(process.execPath, [`${at}scripts/holders.mjs`, "--own", "--write"], { cwd: dir, stdio: "ignore" });
-  // (a reading of the project against the core, recorded as the pull request of its first reading records it: #464)
-  execFileSync(process.execPath, [`${at}scripts/core-reading.mjs`, "--recorded"], { cwd: dir, stdio: "ignore" });
-  if (held) roundTrip(name, o, dir);
-  return dir;
-}
+// (`kit` writes the starter kit's project, as steps-kit.mjs says, and reads it back at once unless `held` is false)
+const writeKit = kitIn(tmp);
+const kit = (name, o, { held = true, ...where } = {}) => { const dir = writeKit(name, o, where); if (held) roundTrip(name, o, dir); return dir; };
 // (every kit, as it is written and before any case changes it: every step done, its kind read back, no difference from a
 // fresh start; so each value of each option the kit takes is held wherever a kit is made with it, and a kit made with
 // options another already holds is made with held: false, which spares the suite's time its round trip)
@@ -193,7 +116,7 @@ for (const [name, at] of [["a-vendored-npm-project", "vendor/core/"], ["a-vendor
 // (a core a library carries, its files committed in the project: the library's own manifest pins it, and the floor's own
 // copy stands beside it until every tool has passed the staged cases)
 kit("a-library-carried-project", { packages: "." }, { at: "lib/core/", library: "lib/" });
-const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at: "lib/core/", library: "lib/", submodule: true });
+kit("a-submodule-carried-project", { packages: "." }, { at: "lib/core/", library: "lib/", submodule: true });
 const kinds = { "an-npm-project": { packages: "." }, "a-dotnet-project": { nuget: "src", private: true }, "a-game": { packages: "web", game: true } };
 const dirs = Object.fromEntries(Object.entries(kinds).map(([name, o]) => [name, kit(name, o)]));
 // (the pairs of options no other kit of this file is made with: npm in a private repository, a private game and an npm
@@ -212,40 +135,6 @@ const pairs = Object.fromEntries(Object.entries({ "a-private-npm-game": { packag
   }
   fs.writeFileSync(manifest, was);
 }
-// (a named tool is done only where a workflow on pull requests runs the check with its base)
-{
-  const dir = dirs["an-npm-project"], manifest = path.join(dir, "core-manifest.md"), was = fs.readFileSync(manifest, "utf8");
-  const step = STEPS.find(s => s.lead === "16 November 2026, how strong the tests are"), flow = path.join(dir, ".github/workflows/strength.yml");
-  fs.writeFileSync(manifest, was.replace(/^\| \*mutation tool\* \|.*$/m, "| *mutation tool* | `node core/scripts/mutate.mjs --report {report} {lines}` |"));
-  const said = body => { fs.writeFileSync(flow, `name: strength\non:\n  pull_request:\njobs:\n  tests:\n    runs-on: ubuntu-latest\n    steps:\n${body}`); return step.check(project(dir)); };
-  const comment = said("      # TODO: node core/scripts/strength.mjs\n      - run: echo later\n");
-  const bare = said("      - run: node core/scripts/strength.mjs\n");
-  const runs = said("      - run: node core/scripts/strength.mjs\n        env:\n          STRENGTH_BASE: origin/main\n");
-  ok(comment !== null && bare !== null && runs === null, "a named mutation tool reads done only where a workflow on pull requests runs the strength check with its base, never where one only mentions it", `${comment}\n${bare}\n${runs}`);
-  fs.writeFileSync(manifest, was); fs.rmSync(flow);
-}
-// (the starter kit's `none`: no tests yet stands until the project's own code holds a test)
-{
-  const dir = dirs["an-npm-project"], test = path.join(dir, "src", "first.test.js");
-  fs.mkdirSync(path.dirname(test), { recursive: true });
-  fs.writeFileSync(test, "export {};\n");
-  execFileSync("git", ["add", "-A"], { cwd: dir });
-  const said = notDone(dir, only("16 November 2026, how strong the tests are")).find(s => s.lead === "16 November 2026, how strong the tests are");
-  ok(said?.mend.includes("has tests now"), "the starter kit's mutation-tool row, none for no tests yet, is reported once the project's own code holds a test", JSON.stringify(said));
-  execFileSync("git", ["rm", "-q", "--cached", "src/first.test.js"], { cwd: dir });
-  fs.rmSync(test);
-  // (a test folder the config names beside its code, not inside it: its tests count too)
-  const config = path.join(dir, "checks/shape.json"), was = fs.readFileSync(config, "utf8"), apart = path.join(dir, "test", "a.js");
-  fs.writeFileSync(config, `${JSON.stringify({ ...JSON.parse(was), code: ["src"], tests: ["test"] }, null, 2)}\n`);
-  fs.mkdirSync(path.dirname(apart), { recursive: true }); fs.writeFileSync(apart, "export {};\n");
-  execFileSync("git", ["add", "-A"], { cwd: dir });
-  const beside = notDone(dir, only("16 November 2026, how strong the tests are")).find(s => s.lead === "16 November 2026, how strong the tests are");
-  ok(beside?.mend.includes("has tests now"), "and once a test stands in a folder of tests the config names apart from its code", JSON.stringify(beside));
-  execFileSync("git", ["rm", "-q", "--cached", "test/a.js"], { cwd: dir });
-  fs.rmSync(path.join(dir, "test"), { recursive: true }); fs.writeFileSync(config, was);
-  execFileSync("git", ["add", "-A"], { cwd: dir });
-}
-
 // ---- each step taken out: exactly it is reported, with its mend; the mend as written makes it done ----
 const dir = dirs["a-dotnet-project"];
 for (const step of STEPS.filter(s => s.check)) {
@@ -376,58 +265,6 @@ for (const lead of some) STAGES[lead].after?.(lockProject);
   ok(!notDone(at).length, "and the project as it was reads every step done again", report(notDone(at)));
 }
 
-// ---- a suite's path filter, read as GitHub reads one: `?` and `+` repeat the character before them (#379) ----
-const SUITE_LEAD = "12 November 2026, a sync and the project's own suites";
-const suiteFile = path.join(lockProject, ".github/workflows/suites-filtered.yml");
-const suiteBy = filter => { fs.writeFileSync(suiteFile, `name: s\non:\n  pull_request:\n${filter}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo t\n`); return notDone(lockProject, only(SUITE_LEAD)).some(m => m.lead === SUITE_LEAD); };
-ok(suiteBy("    paths: ['.github/workflows/core.ya?ml']") && suiteBy("    paths: ['.github/workflows/co+re.yml']") && !suiteBy("    paths: ['.github/workflows/core\\?.yml']")
-  && suiteBy("    paths-ignore: ['core/**']") && !suiteBy("    paths: ['src/**']"), "a suite whose filter starts on a call's file alone is reported, its `?` and `+` read as GitHub reads them");
-fs.rmSync(suiteFile);
-ok(pathsLetThrough(["+x.yml"], ["+x.yml"]) && pathsLetThrough(["?y.yml"], ["?y.yml"]) && pathsLetThrough(["a[b.yml"], ["a[b.yml"])
-  && pathsLetThrough(["c]d.yml"], ["c]d.yml"]) && pathsLetThrough(["dir/+e"], ["dir//e"]) && !pathsLetThrough(["a[b.yml"], ["ab.yml"]),
-  "a filter's `?` or `+` with nothing before it, and a lone `[` or `]`, is read as itself, and one after a character repeats it, as GitHub reads them");
-{
-  // (patterns that would keep a backtracking expression busy for minutes: each shape of them grows with its size, and the
-  // time with it must not grow faster)
-  const long = `.github/workflows/${"a".repeat(200)}.yml`;
-  const quick = [[n => [`**a${"+a".repeat(n)}+b`, long], 3, 6], [n => [`${"*".repeat(n)}z`, ".github/workflows/core.yml"], 10, 30], [n => [`*a${"+a".repeat(n)}+b`, "a".repeat(500)], 5, 10],
-    [n => [`${"**/".repeat(n)}x`, `${"a/".repeat(300)}y`], 3, 5], [n => [`${"**/a/".repeat(n)}x`, `${"a/".repeat(2000)}y`], 250, 500]]
-    .map(([make, small, large]) => linear(n => { const [pattern, name] = make(n); return !pathsLetThrough([pattern], [name]); }, small, large));
-  const reported = suiteBy("    paths: ['*a+a+a+a+a+a+a+a+a+b', '.github/workflows/**']");
-  ok(quick.every(q => q.right && q.linear) && reported, "a filter that would keep a backtracking expression busy is read at once, and read right", quick.map(q => q.shown).join("; "));
-  fs.rmSync(suiteFile);
-}
-
-// ---- a tree that passed (#457): a job that selects on a push alone ran nowhere else, and is not asked --passed ----
-{
-  const PASSED_LEAD = "18 November 2026, a tree that passed is not run again", pushed = path.join(lockProject, ".github/workflows/pushed.yml");
-  const asked = on => { fs.writeFileSync(pushed, `name: p\non:\n${on}\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node core/scripts/select.mjs --env RUN\n`); return notDone(lockProject, only(PASSED_LEAD)).some(m => m.lead === PASSED_LEAD); };
-  ok(!asked("  push:\n    branches: [main]") && asked("  push:\n  pull_request:") && asked("  pull_request:\n  push:\n    branches: [main]"),
-    "a job that selects on a push alone is not asked --passed, since its suite ran nowhere else; one a pull request runs too is");
-  const job = (select, runner) => { fs.writeFileSync(pushed, `name: p\non:\n  pull_request:\n  push:\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ${select}\n      - ${runner}\n`); return notDone(lockProject, only(PASSED_LEAD)).some(m => m.lead === PASSED_LEAD); };
-  const sel = 'node core/scripts/select.mjs --env RUN ${SELECT_PASSED:+--passed "$SELECT_PASSED"}';
-  ok(job(sel, 'run: if [ "$RUN" = all ]; then node --test; else node --test $RUN; fi') && !job(sel, 'run: if [ "$RUN" = all ]; then node --test; elif [ "$RUN" != none ]; then node --test $RUN; fi')
-    && !job(sel, "if: env.RUN == 'all'\n        run: node --test") && !job(sel, "if: ${{ env.RUN == 'all' || contains(env.RUN, ' test/a.test.mjs ') }}\n        run: node --test test/a.test.mjs")
-    && job(sel, "if: env.RUN == 'all'\n        run: node --test\n      - if: env.RUN != 'all'\n        run: node --test $RUN") && job(sel, "if: contains(env.RUN, 'no')\n        run: node --test")
-    && job(sel, "if: ${{ !(env.RUN == 'all') }}\n        run: node --test") && job(sel, "if: ${{ env.RUN == 'all' || github.event_name == 'push' }}\n        run: node --test")
-    && !job(sel, "if: ${{ !cancelled() && (env.RUN == 'all' || contains(env.RUN, ' test/a.test.mjs ')) }}\n        run: node --test test/a.test.mjs")
-    && job(sel, 'run: [ "$RUN" != none ] || true; node --test $RUN')
-    && job("node core/scripts/select.mjs --env RUN", 'run: if [ "$RUN" = all ]; then node --test; elif [ "$RUN" != none ]; then node --test $RUN; fi'),
-    "it reads done only where the selection gives --passed and every step that reads RUN runs nothing on \"none\", in a shape it can read so: an if: whose parts joined by && hold RUN in one part, nothing but == 'all' and contains(env.RUN, ' <file> ') joined by ||, or the run line the mend gives; any other shape is reported: != 'all', a negation, an || with another term, a contains that \"none\" could hold, a run line of another shape");
-  fs.rmSync(pushed);
-}
-
-// ---- a shape baseline written before the check read C#, Python, JSX and shared scripts (#354): its mend names them ----
-const shapeBaseline = path.join(lockProject, "checks/shape-baseline.json"), shapeAsKit = fs.readFileSync(shapeBaseline, "utf8");
-fs.writeFileSync(shapeBaseline, "{\n  \"listed\": {}\n}\n");
-let shapeMissed = notDone(lockProject);
-ok(shapeMissed.length === 4 && shapeMissed[3].lead === "19 November 2026, the shape check reads the functions of Python on the parser" && /written before the check read Python, by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[3].mend) && shapeMissed[2].lead === "19 November 2026, the shape check reads the functions of JavaScript and TypeScript on the parser" && /written before the check read JavaScript and TypeScript, their functions by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[2].mend) && shapeMissed[1].lead === "18 November 2026, the shape check reads C#'s functions on the parser" && /written before the check read C#, by the parser: run `node core\/scripts\/shape\.mjs checks\/shape\.json --write`/.test(shapeMissed[1].mend) && shapeMissed[0].lead === "16 November 2026, how code is put together" && /written before the check read files that hold JSX, C#, its functions by the lexer, Python, its functions by the lexer, scripts that share one global space, the tests that open a screen, a window or a device, the tests that reach a real clock, the tests that start another process, the comments that mark a change:/.test(shapeMissed[0].mend) && /node core\/scripts\/shape\.mjs checks\/shape\.json --write/.test(shapeMissed[0].mend),
-  "a shape baseline that names no reader is reported by each of its steps, each mend to write it with every reader", report(shapeMissed));
-execFileSync(process.execPath, ["core/scripts/shape.mjs", "checks/shape.json", "--write"], { cwd: lockProject, env: { ...process.env, SHAPE_BASE: "" } });
-shapeMissed = notDone(lockProject);
-ok(!shapeMissed.length && JSON.parse(fs.readFileSync(shapeBaseline, "utf8")).reads.length === Object.keys(READERS).length, "and the mend as written makes it done", report(shapeMissed));
-fs.writeFileSync(shapeBaseline, shapeAsKit);
-
 // ---- a pull request's trigger in each form GitHub takes: one name, a list, a mapping ----
 const signatures = path.join(lockProject, ".github/workflows/signatures.yml");
 const asKit = fs.readFileSync(signatures, "utf8");
@@ -448,53 +285,6 @@ for (const [broken, what] of [["{ not json", "no JSON"], ['{"each": 1}', "the wr
     && missed[1].lead.startsWith("15 November 2026, the progress file") && missed[1].mend.includes("could not read the project"), `size marks of ${what} are reported as not read, by both steps that read them`, report(missed));
 }
 fs.writeFileSync(marksFile, marksAsKit);
-
-// ---- rule 5's inputs as SECURITY.md lists them: "None", items naming their tests, nested and wrapped lines ----
-const inputs = only("16 November 2026, hostile tests for every named input");
-const secFile = path.join(lockProject, "SECURITY.md"), secAsKit = fs.readFileSync(secFile, "utf8");
-const rule5 = body => { fs.writeFileSync(secFile, secAsKit.replace(/^(5\. .*\n)(?:(?!\d+\. |#).*\n)*/m, `$1${body}`)); return notDone(lockProject, inputs); };
-fs.mkdirSync(path.join(lockProject, "tests/hostile"), { recursive: true });
-fs.writeFileSync(path.join(lockProject, "tests/hostile/link.test.mjs"), "\n");
-ok(!rule5("   None: it takes no input but its user's.\n").length, "rule 5 that says \"None\" names no input, and reads done");
-ok(!rule5("   - a shared link: its parts checked against their shape, limits: 2,000 characters, 5 s,\n     its hostile tests: `tests/hostile/link.test.mjs`.\n     - its query string, read by the same check.\n").length,
-  "an item that names, on a wrapped line, a file that is there reads done, the item nested in it part of it");
-ok(!rule5("   - a shared link: limits: none, a link's length is the browser's; its hostile tests in `tests/hostile/`.\n").length, "a folder that is there counts as named, and \"limits: none\" is an answer");
-fs.mkdirSync(path.join(lockProject, "src"), { recursive: true });
-fs.writeFileSync(path.join(lockProject, "src/peer.mjs"), "\n");
-let missedInputs = rule5("   - a shared link: limits: 2 KB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: checked on arrival by `src/peer.mjs`; limits: 64 KB, 5 s; hostile tests: `tests/hostile/peer.test.mjs`.\n");
-ok(missedInputs.length === 1 && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
-  "an item whose hostile tests are not there is reported, by its words, and only it, though the file of what checks it is there", report(missedInputs));
-missedInputs = rule5("   - a shared link: limits: 2 KB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: limits: 64 KB; hostile tests: FILL IN\n");
-ok(missedInputs.length === 1 && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
-  "a \"FILL IN\" left in one item reads no other item as done: the item it stands in is reported", report(missedInputs));
-missedInputs = rule5("   - a shared link: limits: 2 KB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message: limits: FILL IN; hostile tests: `tests/hostile/link.test.mjs`.\n");
-ok(missedInputs.length === 1 && /"limits:"/u.test(missedInputs[0].mend) && missedInputs[0].mend.includes("a peer's message") && !missedInputs[0].mend.includes("a shared link"),
-  "an item whose limits name no number and not \"none\" is reported, by its words, and only it", report(missedInputs));
-missedInputs = rule5("   - a peer's message: hostile tests: `tests/hostile/link.test.mjs`, limits: `64` in backticks\n");
-ok(missedInputs.length === 1 && /"limits:"/u.test(missedInputs[0].mend), "a number in backticks, a path's or a name's, states no limit", report(missedInputs));
-missedInputs = rule5("   - a saved game, its version read first; limits: 1 MB, 5 s; hostile tests: `tests/hostile/link.test.mjs`.\n   - a peer's message, checked by `src/version-check.mjs`; limits: 64 KB; hostile tests: `tests/hostile/link.test.mjs`.\n");
-ok(missedInputs.length === 1 && /newest version/u.test(missedInputs[0].mend) && missedInputs[0].mend.includes("a saved game") && !missedInputs[0].mend.includes("a peer's message"),
-  "an item that says its input carries a version, and names no version among its limits, is reported; a path in backticks says nothing of one", report(missedInputs));
-ok(!rule5("   - a saved game, its version read first; limits: 1 MB, 5 s, version 3; hostile tests: `tests/hostile/link.test.mjs`.\n").length,
-  "an item whose limits name the newest version its reader knows reads done");
-ok(rule5("   - a saved game, its version read first; limits: 1 MB, 5 s, a newer version refused; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1
-  && rule5("   - a saved game, its version read first, `limits: version 3`; limits: 1 MB; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1,
-  "a version named among the limits with no number, or a version only in backticks, does not read done");
-ok(rule5("   - a saved game, its version read first; limits: 1 MB, a newer version refused, 5 s; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1
-  && rule5("   - a saved game, `limits: x`, its version read first; limits: 1 MB; hostile tests: `tests/hostile/link.test.mjs`.\n").length === 1,
-  "a later number in the clause is no version's, and a \"limits:\" in backticks hides none of the item's words");
-ok(!rule5("   - a peer's message, which carries no version number; limits: 64 KB; hostile tests: `tests/hostile/link.test.mjs`.\n").length,
-  "an item that says its input carries no version is not asked to name one");
-missedInputs = rule5("   - a saved game, refused without a version; limits: 1 MB; hostile tests: `tests/hostile/link.test.mjs`.\n   - a save, \u001b[31mred\u0007\u009b\u200f\u2028\u202e\u2066\ufeff; limits: 1 MB; hostile tests: none\n");
-ok(missedInputs.length === 1 && /newest version/u.test(missedInputs[0].mend) && missedInputs[0].mend.includes("a saved game") && !/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/u.test(missedInputs[0].mend),
-  "an item that names its version otherwise is still asked to name the newest, and an item's control characters never reach the mend", report(missedInputs));
-missedInputs = rule5("   Each message a peer sends, its size checked.\n");
-ok(missedInputs.length === 1 && missedInputs[0].mend.includes("as an item of its own"), "inputs written as a paragraph, no item in it, are reported, the mend saying to list them", report(missedInputs));
-fs.writeFileSync(secFile, secAsKit.replace(/^5\. .*\n/m, ""));
-ok(notDone(lockProject, inputs)[0]?.mend.includes("could not read the project"), "a SECURITY.md with no rule 5 is reported as not read, never as done");
-fs.writeFileSync(secFile, secAsKit);
-// (only what this block wrote goes: an earlier stage's mend may have written its own tests there)
-for (const f of ["tests/hostile/link.test.mjs", "src/peer.mjs"]) fs.rmSync(path.join(lockProject, f));
 
 // ---- a step left undone on purpose, on the owner's word: declared, not reported ----
 const declare = (d, line) => fs.writeFileSync(path.join(d, "core-manifest.md"), fs.readFileSync(path.join(d, "core-manifest.md"), "utf8").replace(/^## Differences\n+None\.\n?/m, `## Differences\n- ${line}\n`));
@@ -1151,215 +941,6 @@ fs.writeFileSync(path.join(ownDir, ".github/workflows/checks.yml"), ownRun.repla
 missedOwn = notDone(ownDir);
 const toolsMend = missedOwn.find(m => m.lead === "16 November 2026, an agent's own tools listed")?.mend ?? "";
 ok(toolsMend.includes("runs `node core/scripts/agent-tools.mjs config/licences.json` beside it") && !/`(reads|takes)`/.test(toolsMend), "where it does not run the agent-tools check, the step's mend names the config the licence check is passed (#364)", toolsMend);
-
-// the step of the rules' move, on a project of its own making: a config that stands outside checks/, a copies config
-// written a pattern a line, a file a tool pulls the core's files in by, two old paths that are now one file, and a
-// dated record, which is left as it stands
-{
-  const moveDir = path.join(tmp, "moved-project"), put = (f, text) => { fs.mkdirSync(path.dirname(path.join(moveDir, f)), { recursive: true }); fs.writeFileSync(path.join(moveDir, f), text); };
-  const step = STEPS.find(x => x.lead === "16 November 2026, the rules in folders that say who reads them or when");
-  put("core-manifest.md", "# Core manifest\n\nPaths: in the core's files, one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/; any other is ours.\n");
-  put("AGENTS.md", "# A project\n\n@core/modules/work-flow.md\n@core/modules/git.md\n");
-  put("config/sizes.json", `${JSON.stringify({ read: ["core/modules/how-to-work.md"] })}\n`);
-  put("config/copies.json", `{\n  "prose": [\n    "core/floor/*.md",\n    ${MOVED_GLOB}\n  ]\n}\n`);
-  put("docs/2026-01-05-what-was-read.md", "Read that day: `core/modules/inbox.md`.\n");
-  put("docs/reports/first.md", "Read: `core/modules/inbox.md`.\n");
-  execFileSync("git", ["init", "-q"], { cwd: moveDir });
-  let said = step.check(project(moveDir)) ?? "";
-  ok(said.startsWith("In one pull request") && said.includes("`core/modules/how-to-work.md` is now `core/roles/shared/how-to-work.md` (in `config/sizes.json`)") && said.includes(`after the pattern ${MOVED_GLOB} add the patterns`) && said.includes("(in `config/copies.json`)")
-    && said.includes("a file that named `core/modules/work-flow.md` beside the other path that now leads to `core/roles/shared/work-flow.md` names that file once") && !said.includes("inbox"),
-    "the step names an old path in a config wherever it stands, a copies config that reads the old folder alone, and two old paths that are now one file; a dated record it leaves as it stands", said);
-  // (a rule file is read whatever its name or its folder, a config in a folder named as a dated record's too)
-  put("SECURITY.md", "# Security\n\n**3. The protected files,** here, **the rule files:** `.cursorrules`, `docs/records/standing.md`;\n");
-  put(".cursorrules", "Read core/modules/screens.md first.\n"); put("docs/records/standing.md", "As `core/modules/choices.md` says.\n"); put(".github/reports/sizes.json", `${JSON.stringify(["core/modules/cleaning.md"])}\n`); put(".cursor/rules/core.mdc", "Read core/modules/helpers.md.\n"); put(".windsurfrules", "Read core/modules/reviews.md.\n");
-  said = step.check(project(moveDir)) ?? "";
-  ok(said.includes("`core/modules/screens.md` is now `core/tasks/screens.md` (in `.cursorrules`)") && said.includes("(in `docs/records/standing.md`)") && said.includes("(in `.github/reports/sizes.json`)") && said.includes("(in `.cursor/rules/core.mdc`)") && said.includes("(in `.windsurfrules`)") && !said.includes("inbox"),
-    "a rule file is read whatever its name or folder, a file where a tool keeps what it reads whatever its name, and a config wherever it lies; the dated records still are not", said);
-  for (const f of ["SECURITY.md", ".cursorrules", "docs/records/standing.md", ".github/reports/sizes.json", ".cursor/rules/core.mdc", ".windsurfrules"]) fs.rmSync(path.join(moveDir, f));
-  put(".kiro/steering/core.md", "#[[file:core/modules/how-to-work.md]]\n");
-  said = step.check(project(moveDir)) ?? "";
-  ok(said.startsWith("Before any other task, since a tool whose entry file pulls the core's files in follows no further import"), "where a file a tool pulls the core's files in by still names an old path, the step comes before any other task, and says why", said);
-  fs.rmSync(path.join(moveDir, ".kiro"), { recursive: true });
-  put("AGENTS.md", "# A project\n\n@core/roles/shared/work-flow.md\n"); put("config/sizes.json", `${JSON.stringify({ read: ["core/roles/shared/how-to-work.md"] })}\n`);
-  put("config/copies.json", `{\n  "prose": [\n    "core/floor/*.md",\n    ${MOVED_GLOB},\n    ${NEW_GLOBS.join(",\n    ")}\n  ]\n}\n`);
-  ok(step.check(project(moveDir)) === null, "and it is done once each is named by its new path and the copies config reads the new folders beside the old, however its patterns are laid out", step.check(project(moveDir)) ?? "");
-}
-// (the same where the copy stands at another path: the paths the step names, and the patterns of a copies config it reads,
-// are that path's, in what it says too: #628)
-{
-  const dir = path.join(tmp, "vendored-moved-project"), put = (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
-  const step = STEPS.find(x => x.lead === "16 November 2026, the rules in folders that say who reads them or when");
-  put("core-manifest.md", `# Core manifest\n\nCore: ${CORE} at ${PIN}, copied whole under vendor/core/ (never edited here).\nPaths: in the core's files, one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under vendor/core/; any other is ours.\n`);
-  put("AGENTS.md", "# A project\n\n@vendor/core/modules/work-flow.md\n");
-  put("config/copies.json", `{\n  "prose": [\n    "vendor/core/floor/*.md",\n    "vendor/core/modules/*.md"\n  ]\n}\n`);
-  put("core/notes.md", "A file of the project's own, which names vendor/core/modules/how-to-work.md.\n");
-  put("core/AGENTS.md", "A rule file of the project's own, which names vendor/core/modules/inbox.md.\n");
-  execFileSync("git", ["init", "-q"], { cwd: dir });
-  const said = notDone(dir, [step])[0]?.mend ?? "";
-  ok(said.includes("`vendor/core/modules/work-flow.md` is now `vendor/core/roles/shared/work-flow.md` (in `AGENTS.md`)") && said.includes('after the pattern "vendor/core/modules/*.md" add the patterns "vendor/core/floor/topics/*.md", "vendor/core/roles/*.md"') && said.includes("`core/notes.md`") && said.includes("`core/AGENTS.md`") && !/(?<![\w/-])core\//.test(said.replace("`core/notes.md`", "").replace("`core/AGENTS.md`", "")),
-    "where the copy stands at another path, the step reads a copies config's patterns at it and names the files and patterns by it, and a file of the project's own that stands at core/ by its own name", said);
-}
-// the files that point from the paths the rules left: each names a file or a folder the core holds, and what one says
-// stands elsewhere than the rest of it stands there
-const coreRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const there = to => fs.existsSync(path.join(coreRoot, to)) && fs.statSync(path.join(coreRoot, to)).isDirectory() === to.endsWith("/");
-ok(Object.keys(moved()).length > 0 && Object.values(moved()).every(there) && Object.values(moved.apart()).flat().every(a => there(a.to) && fs.readFileSync(path.join(coreRoot, a.to), "utf8").includes(`**${a.lead}**`)),
-  "each file at a path the rules left names a file or a folder that stands, and a rule it says stands elsewhere stands there", JSON.stringify([moved(), moved.apart()]));
-
-// the agent tools' files step: where the copies or pointer check cannot run to its verdict, it is not read, never done
-{
-  const step = STEPS.find(s => s.lead === "16 November 2026, the agent tools' files read for copies and pointers"), d = dirs["an-npm-project"];
-  const unread = () => { try { step.check(project(d)); return ""; } catch (e) { return e instanceof Unread ? e.message : `${e}`; } };
-  const cfg = path.join(d, "checks/copies.json"), was = fs.readFileSync(cfg, "utf8");
-  fs.writeFileSync(cfg, "{ not json");
-  let said = unread();
-  fs.writeFileSync(cfg, was);
-  ok(/the copies check did not run to its verdict on checks\/copies\.json/.test(said), "where the copies check stops before its verdict, the step is not read", said);
-  for (const script of ["copies.mjs", "pointers.mjs"]) {
-    const at = path.join(d, "core/scripts", script);
-    fs.renameSync(at, `${at}.away`);
-    said = unread();
-    fs.renameSync(`${at}.away`, at);
-    ok(said === `no copy of ${script} to run`, `with no copy of ${script}, the step is not read`, said);
-  }
-  if (process.platform !== "win32") {
-    const outside = path.join(tmp, "copies-outside.json");
-    fs.writeFileSync(outside, was); fs.rmSync(cfg); fs.symlinkSync(outside, cfg);
-    said = unread();
-    fs.rmSync(cfg); fs.writeFileSync(cfg, was);
-    ok(/the copies check's config `checks\/copies\.json` is no regular file of the project's own/.test(said), "a copies config whose link leads out of the project is not handed to the check", said);
-  }
-  ok(step.check(project(d)) === null, "and with each put back, the starter kit's project has nothing to list", step.check(project(d)) ?? "");
-  if (process.platform !== "win32") {
-    // (a tracked link to a file git does not track: what the step says follows that file, read through the link)
-    fs.mkdirSync(path.join(d, "notes"), { recursive: true });
-    fs.writeFileSync(path.join(d, "notes/g.md"), "# G\n\nAs `docs/nowhere-g.md` says.\n");
-    fs.symlinkSync("../../notes/g.md", path.join(d, ".kiro/steering/g.md"));
-    execFileSync("git", ["add", ".kiro/steering/g.md"], { cwd: d });
-    const before = step.check(project(d)) ?? "";
-    fs.writeFileSync(path.join(d, "notes/g.md"), "# G\n\nAs `AGENTS.md` says.\n");
-    const after = step.check(project(d));
-    execFileSync("git", ["rm", "-q", "-f", ".kiro/steering/g.md"], { cwd: d }); fs.rmSync(path.join(d, "notes"), { recursive: true });
-    ok(before.includes(".kiro/steering/g.md:3") && after === null, "a broken pointer in a tool's file that links to a file git does not track is named, and once that file is mended, no longer", `${before}\n${after}`);
-    // (a tracked link to a device, or to a file outside the project, is never opened: the step reads on)
-    fs.symlinkSync("/dev/zero", path.join(d, "zero")); fs.symlinkSync(path.join(tmp, "copies-outside.json"), path.join(d, "outside.json"));
-    execFileSync("git", ["add", "zero", "outside.json"], { cwd: d });
-    const linked = step.check(project(d));
-    execFileSync("git", ["rm", "-q", "-f", "zero", "outside.json"], { cwd: d });
-    ok(linked === null, "a tracked link to a device or to a file outside the project is never opened, and the step reads on", `${linked}`);
-  }
-  // (what the step's cache is keyed by, #812: the files the two checks read, and no other; a change to a file they read asks
-  // a new run, and one to a file they do not, in the work tree or staged, leaves the state as it was and the checks' words
-  // the same, run again to see it)
-  {
-    const state = () => toolFilesState(project(d)).key, said = () => { const p = project(d), { config } = toolFilesState(p); return toolFilesRead(p, config) ?? ""; };
-    const original = f => fs.readFileSync(path.join(d, f), "utf8"), put = (f, text) => { fs.mkdirSync(path.dirname(path.join(d, f)), { recursive: true }); fs.writeFileSync(path.join(d, f), text); };
-    const stage = f => execFileSync("git", ["add", "--", f], { cwd: d }), unstage = f => execFileSync("git", ["rm", "-q", "-f", "--cached", "--", f], { cwd: d });
-    const flows = fs.readdirSync(path.join(d, ".github/workflows")).filter(f => f.endsWith(".yml"));
-    const base = state(), words = said();
-    const changed = (f, text = `${original(f)}\n`) => { const was = original(f); put(f, text); const now = state(); put(f, was); return now !== base; };
-    const unread = [".claude/settings.json", "checks/licences.json", `.github/workflows/${flows[0]}`, "checks/sizes.json"];
-    ok(flows.length > 0 && unread.every(f => !changed(f)), "a change to a workflow, a setting or a config of another check, which neither check reads, leaves the state of the project as it was", unread.filter(f => changed(f)).join(", "));
-    const copies = unread.map(original);
-    unread.forEach(f => put(f, `${original(f)}\n`));
-    const staged = unread.map(f => { stage(f); return state() === base; });
-    unread.forEach((f, i) => { put(f, copies[i]); stage(f); });
-    ok(staged.every(Boolean) && state() === base && said() === words, "nor does the same change staged, and the checks run again say what they said", `${staged}`);
-    const reads = ["AGENTS.md", "core-manifest.md", "docs/PROGRESS.md", "core/scripts/guards.mjs", "checks/copies.json", "checks/copies-baseline.json", ".kiro/steering/core.md"];
-    const restaged = f => {
-      const [mode, sha] = execFileSync("git", ["ls-files", "-s", "--", f], { cwd: d, encoding: "utf8" }).split(/\s/u), was = original(f);
-      put(f, `${was}\n`); stage(f); const now = state(); put(f, was);
-      execFileSync("git", ["update-index", "--cacheinfo", `${mode},${sha},${f}`], { cwd: d });
-      return now !== base;
-    };
-    ok(reads.every(f => changed(f)) && reads.every(restaged), "a change to a rule file, a Markdown file, a file of the copy of the core, the config or its baseline asks a new run, in the work tree or staged", reads.filter(f => !changed(f) || !restaged(f)).join(", "));
-    // (with an answer to keep: a broken pointer in a tool's file is named, a change to a file the checks do not read leaves
-    // the state and the words as they were, and mending the pointer changes both)
-    const n = ".kiro/steering/n.md";
-    put(n, "# N\n\nAs `docs/nowhere-n.md` says.\n"); stage(n);
-    const asked = said(), held = state();
-    unread.forEach(f => put(f, `${original(f)}\n`));
-    const kept = state() === held && said() === asked;
-    unread.forEach((f, i) => put(f, copies[i]));
-    put(n, "# N\n\nAs `AGENTS.md` says.\n");
-    const mended = said(), moved = state() !== held;
-    unstage(n); fs.rmSync(path.join(d, n));
-    ok(asked.includes(n) && kept && mended === "" && moved, "a change to a file the checks do not read leaves the state and the words of a step that has something to list as they were, and mending what it lists changes both", `${asked}\n${kept} ${mended} ${moved}`);
-    // (what the config names, what SECURITY.md lists and what a tool's folder holds is read, and what they leave out is not:
-    // each scene adds its files, changes the config or SECURITY.md, and says which of its files moves the state)
-    const config = original("checks/copies.json"), spec = JSON.parse(config), security = original("SECURITY.md");
-    const listed = (...more) => security.replace("`docs/threat-model.md`;", `\`docs/threat-model.md\`${more.map(f => `, \`${f}\``).join("")};`);
-    // (a glob among the rule files is no tracked file, which the pointer check fails on without a verdict: such scenes run no check)
-    const scene = (files, { config: change = {}, security: more = [], run: runs = true } = {}) => {
-      Object.keys(files).forEach(f => put(f, files[f]));
-      put("checks/copies.json", `${JSON.stringify({ ...spec, ...change })}\n`); put("SECURITY.md", listed(...more));
-      [...Object.keys(files), "checks/copies.json", "SECURITY.md"].forEach(stage);
-      const named = state(), moves = Object.keys(files).filter(f => { put(f, `${files[f]}${files[f]}`); const now = state(); put(f, files[f]); return now !== named; });
-      const run = runs ? said() : words;
-      Object.keys(files).forEach(f => { unstage(f); fs.rmSync(path.join(d, f)); });
-      put("checks/copies.json", config); put("SECURITY.md", security); stage("checks/copies.json"); stage("SECURITY.md");
-      return { moves: moves.join(","), run };
-    };
-    const code = scene({ "app/a.txt": "a\n", "app/b.txt": "b\n" }, { config: { code: ["app/a.txt"] } });
-    const prose = scene({ "notes/p.txt": "p\n", "notes/q.dat": "q\n" }, { config: { prose: [...spec.prose, "notes/*.txt"] } });
-    const named = scene({ "data/r.txt": "r\n", "data/s.dat": "s\n" }, { security: ["data/*.txt"], run: false });
-    const unlisted = scene({ "data/r.txt": "r\n" }, { config: { proseFromSecurity: false }, security: ["data/*.txt"], run: false });
-    const literal = scene({ "checks/rule.dat": "r\n" }, { config: { proseFromSecurity: false }, security: ["checks/rule.dat"] });
-    // (a ":!" in one list leaves out only what that list read: copies.mjs lists the code and the prose each by itself)
-    const apart = scene({ "src/a.js": "a\n", "vendor/lib.js": "v\n" }, { config: { code: ["src/", ":!vendor/lib.js"], prose: [...spec.prose, "vendor/"] }, run: false });
-    const only = scene({ "src/b.js": "b\n", "vendor/c.js": "c\n" }, { config: { code: [":!vendor/"], prose: ["docs/*.md"] }, run: false });
-    const tools = scene({ ".kiro/agents/x.json": "{}\n", ".agent/rules": "r\n", ".kiro/other.json": "{}\n" });
-    ok(code.moves === "app/a.txt" && prose.moves === "notes/p.txt" && named.moves === "data/r.txt" && unlisted.moves === "" && literal.moves === "checks/rule.dat" && tools.moves === ".kiro/agents/x.json,.agent/rules" && apart.moves === "src/a.js,vendor/lib.js" && only.moves === "src/b.js",
-      "a file the config's code or prose names, one SECURITY.md lists (a glob only where the config reads its list as prose), a rule file it names and a file in an agent tool's folder is read, and a file they leave out is not",
-      JSON.stringify([code, prose, named, unlisted, literal, tools, apart, only].map(x => x.moves)));
-    ok([code, prose, named, unlisted, literal, tools, apart, only].every(x => x.run === words), "and the checks, run again with such files held, say what they said", [code, prose, named, unlisted, literal, tools, apart, only].map(x => x.run).join("\n"));
-    // (what the old key held, still held: a library's submodule that moves on, and a file in a tool's folder too big to be read,
-    // which the checks read all the same, staged)
-    const inLib = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: path.join(submoduleKit, "lib"), stdio: "ignore" });
-    const before = toolFilesState(project(submoduleKit)).key;
-    fs.writeFileSync(path.join(submoduleKit, "lib/moved.txt"), "moved\n"); inLib("add", "-A"); inLib("commit", "-q", "-m", "moved");
-    const big = ".kiro/agents/big.json";
-    put(big, "{}\n"); stage(big);
-    const small = state();
-    fs.writeFileSync(path.join(d, big), Buffer.alloc(READ_MOST + 1, 32)); stage(big);
-    const large = state();
-    fs.writeFileSync(path.join(d, big), Buffer.alloc(READ_MOST + 1, 33)); stage(big);
-    const edited = state();
-    unstage(big); fs.rmSync(path.join(d, big));
-    ok(toolFilesState(project(submoduleKit)).key !== before && small !== large && large !== edited, "a submodule that moved, and a staged change to a tool's file past what is read, ask a new run", `${toolFilesState(project(submoduleKit)).key !== before} ${small !== large} ${large !== edited}`);
-    // (git's own files that change what a check lists)
-    const git = [".gitattributes", ".gitmodules"].map(f => { put(f, "\n"); stage(f); const was = state(); put(f, "# x\n"); const now = state(); unstage(f); fs.rmSync(path.join(d, f)); return was !== now; });
-    ok(git.every(Boolean), "a change to .gitattributes or .gitmodules asks a new run", `${git}`);
-    // (where the rule files cannot be read, no file is left out)
-    put("SECURITY.md", security.replace(/\*\*the rule files:\*\*/u, "**the files of rules:**"));
-    const whole = state(), flow = `.github/workflows/${flows[0]}`;
-    put(flow, `${original(flow)}\n`); const every = state() !== whole;
-    put(flow, copies[2]); put("SECURITY.md", security);
-    ok(every && state() === base, "where the project's rule files cannot be read, every file counts as read", `${every}`);
-  }
-}
-
-// ---- a call that skips a draft is read in every form of its trigger (#375) ----
-{
-  const step = STEPS.find(s => s.lead === "16 November 2026, checks once a pull request is ready");
-  const call = (on, types = "") => { const text = `name: core\n\non:${on}${types}\n\njobs:\n  core:\n    if: \${{ !github.event.pull_request.draft }}\n    uses: ${CORE}/.github/workflows/core.yml@${PIN}\n`; return { workflows: { "core.yml": { text, yaml: parseYaml(text) } } }; };
-  const reported = ["  pull_request", " pull_request", " [push, pull_request]", "\n  pull_request:", "\n  pull_request:\n    types: [opened, synchronize]"].filter(on => step.check(call(on)));
-  ok(reported.length === 5 && !step.check(call("\n  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]")) && !step.check(call("\n  push:")),
-    "a call that skips its job on a draft is reported wherever its pull_request trigger leaves ready_for_review out, in each form `on:` takes, and read done where it lists it or where no pull request starts it", reported.join(" | "));
-}
-
-// ---- a call to core.yml that folds part of the one job: what it leaves out, and what it runs twice (#376) ----
-{
-  const step = STEPS.find(s => s.lead === "17 November 2026, the checks as one job");
-  const wf = (name, uses, w = "") => [name, { text: `jobs:\n  j:\n    uses: ${CORE}/.github/workflows/${uses}@${PIN}\n${w}`, yaml: parseYaml(`jobs:\n  j:\n    uses: ${CORE}/.github/workflows/${uses}@${PIN}\n${w}`) }];
-  const of = (...files) => step.check({ workflows: Object.fromEntries(files), files: [], read: () => null, root: "." });
-  const all = "    with:\n      copies: c.json\n      sizes: s.json\n      description: true\n      signatures: web\n";
-  ok(of(wf("core.yml", "core.yml")) === null && of(wf("core.yml", "core.yml", all)) === null && of(wf("core.yml", "core.yml", "    with:\n      signatures: web\n"), wf("copies.yml", "copies.yml"), wf("d.yml", "pr-description.yml")) === null,
-    "a call to core.yml alone, or one that folds each check, or one whose other checks are still called on their own, reads done");
-  const left = of(wf("core.yml", "core.yml", "    with:\n      description: true\n")), twice = of(wf("core.yml", "core.yml", all), wf("s.yml", "signatures.yml")), bare = of(wf("core.yml", "core.yml", "    with:\n      copies: c.json\n      description: true\n"));
-  ok(/pass it `copies: checks\/copies\.json`/.test(left ?? "") && /`signatures\.yml`, which its `signatures:` runs too/.test(twice ?? "") && /`sizes: checks\/sizes\.json` beside its `copies:`/.test(bare ?? ""),
-    "one that leaves the copies checks out, runs the signature check twice, or passes copies without its marks is reported, each with its mend", [left, twice, bare].join("\n"));
-}
 
 // ---- a step's commands on the parser's bash grammar (bash-commands.mjs; #530, item 3): where the grammar the core
 // installs reads otherwise than bash, the reader mends it from the tree ----

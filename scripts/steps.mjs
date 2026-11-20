@@ -27,9 +27,11 @@ import { parseYaml } from "./workflow-run.mjs";
 import { copyAt } from "./check-configs.mjs";
 import { mendAt, plain, shown } from "./step-checks.mjs";
 
-// What a step reads a project with, and the words of an error with no path of the machine's in them: step-checks.mjs,
-// beside this file.
-export { COST, MOVED_GLOB, MOVED_GLOBS, NEW_GLOBS, callers, moved, plain } from "./step-checks.mjs";
+// What a step reads a project with, and the words of an error with no path of the machine's in them: step-checks.mjs
+// and the files named step-checks-<what it reads>.mjs, beside this file.
+export { COST, plain } from "./step-checks.mjs";
+export { MOVED_GLOB, MOVED_GLOBS, NEW_GLOBS, moved } from "./step-checks-moved.mjs";
+export { callers } from "./step-checks-ready.mjs";
 
 // The entries' leads, in the order the notes hold them: "12 November 2026, builders named by role".
 export const leads = text => [...String(text).matchAll(/^- \*\*([^*]+?)\.\*\*/gm)].map(m => m[1]);
