@@ -332,13 +332,13 @@ jobs:
       - name: The description check
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-test.mjs ')) }}
         run: node tests/pr-description-test.mjs
-      - name: The description check: the line "Read for it:"
+      - name: 'The description check: the line "Read for it:"'
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-reads-test.mjs ')) }}
         run: node tests/pr-description-reads-test.mjs
-      - name: The description check: the line "Reasons read:"
+      - name: 'The description check: the line "Reasons read:"'
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-reasons-test.mjs ')) }}
         run: node tests/pr-description-reasons-test.mjs
-      - name: The description check: the owner's yes
+      - name: 'The description check: the owner''s yes'
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/pr-description-yes-test.mjs ')) }}
         run: node tests/pr-description-yes-test.mjs
       - name: The tests a pull request edits, which the description names
