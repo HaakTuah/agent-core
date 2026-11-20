@@ -727,6 +727,44 @@
           "recorded": "2026-11-20T14:07:09.364Z"
         }
       }
+    },
+    {
+      "at": "2026-11-20",
+      "commit": "82cc3a1f2a8783c7286e364df0ad04a56b107d96",
+      "tool": "Claude Code",
+      "model": "Opus, high effort",
+      "all": [
+        "outsider",
+        "stop",
+        "no-question",
+        "secret",
+        "finish",
+        "old-content",
+        "order-for-now",
+        "steps",
+        "stack-choice",
+        "carried",
+        "no-floor",
+        "fetched",
+        "weakness",
+        "relay",
+        "red-main",
+        "review",
+        "adviser-remark",
+        "adviser-orders",
+        "adviser-starts"
+      ],
+      "cases": {
+        "weakness": {
+          "verdict": "pass",
+          "why": "every reading held",
+          "rules": {
+            "floor/topics/weaknesses.md: 9. Security alerts and reported weaknesses": "3e9c3005faba",
+            "floor/topics/weaknesses.md: In merged code, if it reaches what the threat model protects": "8121d63b9c52"
+          },
+          "recorded": "2026-11-20T14:08:16.254Z"
+        }
+      }
     }
   ]
 }
