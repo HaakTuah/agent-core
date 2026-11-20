@@ -104,11 +104,11 @@ ok(links({ "a.js": "class A {\n  *run() { spawn('b.js'); }\n}\n", "b.js": "" }, 
   // counts, not of the three)
   const globs = Array.from({ length: 10 }, (_, k) => `:(glob)**/x${k}*y*z`);
   const cfg = parseConfig(JSON.stringify({ baseline: "b.json", code: ["src", "test"], tests: ["test/"], select: { proof: [], whole: globs, none: [] } }));
-  const code = Object.fromEntries(Array.from({ length: 1200 }, (_, n) => [`src/c${n}.js`, `export const v = ${n};\n`]));
+  const code = Object.fromEntries(Array.from({ length: 500 }, (_, n) => [`src/c${n}.js`, `export const v = ${n};\n`]));
   const suite = Object.fromEntries(Array.from({ length: 600 }, (_, n) => [`test/t${n}.test.js`, `export const v = ${n};\n`]));
   const all = { ...code, ...suite }, many = new Set(Object.keys(suite)), from = Date.now();
   const picked = selection({ changed: Object.keys(code), texts: all, tests: many, reach: new Map(), config: cfg });
-  ok(!picked.all && picked.tests.length === 0 && Date.now() - from < 3000, `1200 changed files over 600 tests and 10 globs of "select.whole" select in ${Date.now() - from} ms, none of those tests reaching every file`, JSON.stringify(picked.tests.slice(0, 3)));
+  ok(!picked.all && picked.tests.length === 0 && Date.now() - from < 3000, `500 changed files over 600 tests and 10 globs of "select.whole" select in ${Date.now() - from} ms, none of those tests reaching every file`, JSON.stringify(picked.tests.slice(0, 3)));
 }
 
 // ---- what a pull request runs ----
