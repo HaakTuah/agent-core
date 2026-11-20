@@ -204,7 +204,7 @@ export function read({ repo, dir = ".github/workflows", manifest = null, gh = gh
   // (where every merge goes live, each merge is a release: the slow suites run before it, on its pull request)
   const users = override(manifest, "users get", ["merges", "releases"]) ?? "merges";
   const cadence = users === "merges" ? "merge" : s.where === "local" ? "release" : s.where === "self-hosted" || s.billed ? "nightly" : "hourly";
-  const advice = (w.selfHosted || w.unknown) && priv === false
+  const advice = (w.selfHosted || w.unknown || w.unlisted) && priv === false
     ? `A public repository runs a job on ${w.selfHosted ? "a runner of the owner's own" : "a runner that could not be read, perhaps the owner's own"}, where a stranger's pull request would run its code (floor rule 18): keep pull requests from forks off that job at once (an \`if:\` that its head repository is this one), and, where no open issue names it, file one for the owner, labelled needs-owner, to move that job to the host's runners or have every outside contributor's run approved first; nothing else waits on it.`
     : null;
   const usersSaid = `its users get: ${users === "releases" ? "a release" : "each merge"}${override(manifest, "users get", ["merges", "releases"]) ? ", as the manifest's row *users get* says" : ", as no row *users get* says otherwise (it cannot be read)"}`;

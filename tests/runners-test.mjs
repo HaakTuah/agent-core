@@ -54,11 +54,15 @@ try {
     r = read({ repo: "o/n", dir, manifest: rel, gh: host(false) });
     ok(w.unlisted && w.unread.includes(dir) && r.where === "self-hosted" && /workflows not read: /.test(r.said.join("\n")) && /could not be listed/.test(r.said[0]), `${what}: not read, said so, and taken as the owner's own, never as no jobs`, r.said.join(" | "));
   }
-  // (hostile: the path is one a pull request writes; a link to itself or to a plain file is no folder either)
-  fs.mkdirSync(at("hostile", ".github"), { recursive: true }); fs.writeFileSync(at("plain"), "on: push\n");
-  for (const target of [at("hostile", ".github", "workflows"), at("plain")]) {
-    fs.rmSync(at("hostile", ".github", "workflows"), { force: true }); fs.symlinkSync(target, at("hostile", ".github", "workflows"));
-    ok(workflowsIn(at("hostile", ".github", "workflows")).unlisted === true, "a workflows path that is a link to itself, or to a plain file, is not read, never read as no jobs");
+  // (hostile: the path is one a pull request writes; a link to itself or to a plain file is no folder either, and a public
+  // repository whose folder is not read is advised as one whose runner is not read)
+  fs.mkdirSync(at("hostile", ".git"), { recursive: true }); fs.mkdirSync(at("hostile", ".github")); fs.writeFileSync(at("plain"), "on: push\n");
+  const hostile = at("hostile", ".github", "workflows");
+  for (const target of [hostile, at("plain")]) {
+    fs.rmSync(hostile, { force: true }); fs.symlinkSync(target, hostile);
+    r = read({ repo: "o/n", dir: hostile, manifest: rel, gh: host(false) });
+    ok(workflowsIn(hostile).unlisted === true && r.where === "self-hosted" && /workflows not read: /.test(r.said.join("\n")) && /forks off that job/.test(r.advice ?? ""),
+      "a workflows path that is a link to itself, or to a plain file, in a checkout's root is not read, never read as no jobs, and a public repository is advised", r.said.join(" | "));
   }
   if (process.platform !== "win32" && process.getuid?.() !== 0) {
     const shut = at("shut", ".github", "workflows");
