@@ -197,8 +197,18 @@ export function report(root = ROOT) {
   const c = counts(holders(root));
   return [
     `- Of ${c.all} rules of the floor and the modules: ${c.check} held whole by a check, ${c.case} by a staged case, ${c.audit} by the audit, ${c.part} in part; ${c.describes} describe and bind no one; ${c.none.length} have no holder${c.hooked.length ? `, ${c.hooked.length} of them held by a hook alone, which a session of another tool never runs` : ""} (\`scripts/holders.mjs\`).`,
+    coreShare(root, c),
     ...(c.none.length ? [`- No holder, each until it gains one or goes on the owner's word: ${c.none.join("; ")}.`] : []),
   ];
+}
+
+// The core's own share (#459, point 3), as a project's report gives its own: the rules of the core's AGENTS.md held
+// whole by a check, as their entries under scripts/holders/ name them (each names its holder in its own text, which
+// the count does not read), beside the floor's and the modules' (`c`, as counts() gives them).
+function coreShare(root, c) {
+  const own = rules(root, { agents: true }).filter(r => r.file === "AGENTS.md"), list = named(root).named;
+  const held = own.filter(r => [list[r.key] ?? []].flat().map(v => holderOf(r.key, v, root)).some(x => x && typeof x !== "string" && x.kind === "check" && !x.part && !hook(x))).length;
+  return `- rules held by a check: the core's own ${held} of ${own.length} (\`AGENTS.md\`, by their entries under \`${FILE}/\`; each names its holder in its own text, which this does not read), the floor's and the modules' ${c.check} of ${c.all}.`;
 }
 
 // Of the core's rules a project takes (the floor's always, a module's unless its manifest leaves it out: `out`, by the

@@ -406,11 +406,11 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   the report's list, and by the step `scripts/steps.mjs` reads for the first list; the answers, by the report's lists
   of the rules not yet answered and of those to file, in part.
 - **A rule of a game's kind moves to the core once a second game needs it** (#484, point 10). By default a rule a game
-  writes for itself stays in that game, and an idea filed here as about its kind waits. The one condition that changes
-  it: a second game needs the same rule, one that stands or one the owner has planned, and the idea's line joins
-  `QUEUE.md` as any idea's does, on the owner's word. Then whoever builds that line writes the rule into the game
-  module for the kind, never for the game it came from, naming the kind, and the game's own copy goes at its next sync,
-  as the game module says of its sync (`tasks/game-design.md`). It does not mean a
+  writes for itself stays in that game, and an idea filed here as about its kind, or about every game, waits. The one
+  condition that changes it: a second game needs the same rule, one that stands or one the owner has planned, and the
+  idea's line joins `QUEUE.md` as any idea's does, on the owner's word. Then whoever builds that line writes the rule
+  into the game module for the kind, or for every game, never for the game it came from, naming the kind, and the game's
+  own copy goes at its next sync, as the game module says of its sync (`tasks/game-design.md`). It does not mean a
   game's rule is taken from it before the owner's word, nor that a kind with one game gets a part in the core. Reason:
   two games each held rules true of their kind (on what a request to a model may imply, on how fast a computer player
   may react), and a new game of that kind would have had to find them again. Held by none yet.
@@ -420,17 +420,19 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   tests' strength where the manifest names no *mutation tool*, or `none`, or the shape check's config names none. Then
   `scripts/read-nothing.mjs` names it, with the rules of the modules the project takes that it holds, in the report
   every sync prints (`scripts/steps.mjs`), and where it cannot tell, the report says so. The trigger is such a check,
-  written or widened: whoever builds it gives it its case in `read-nothing.mjs` in the same pull request. It does not mean that it fails anything. Reason: a check that passes on nothing makes its rule
-  look held: in a project of another owner a check held 10 of the 75 of the core's rules that applied there, and
-  nothing told its owner which. Held by `tests/steps-test.mjs`, for the sync's report; that a new check gives its case,
-  by none.
+  written or widened: whoever builds it gives it its case in `read-nothing.mjs` in the same pull request. It does not
+  mean that it fails anything. Reason: a check that passes on nothing makes its rule look held: in a project of another
+  owner a check held 10 of the 75 of the core's rules that applied there, and nothing told its owner which. Held by
+  `tests/steps-test.mjs`, for the sync's report; that a new check gives its case, by none.
 - **The share a check holds is reported** (#459, point 3). By default a project's monthly state report counts its own
   rules by what holds them. The session that takes it gives, on its line "rules held by a check", how many of the
   project's own rules a check holds whole and how many of the core's it takes, as the core's list maps them, counting
   none whose every check read nothing there ("A check that read nothing says so"); the core's report of the projects
-  carries it as numbers alone. Nothing changes it. It does not mean the share is a target, nor that a check the core's list names (a
-  ruleset of the host's) is read as set up in the project. Reason: the owner sees how much of what binds a project a
-  check holds there, which a count of the core alone hides. Held by `tests/look-test.mjs` and `tests/holders-test.mjs`.
+  carries it as numbers alone, and the core's own report gives the same of the core's own rules, those of this file,
+  beside the floor's and the modules'. Nothing changes it. It does not mean the share is a target, nor that a check the
+  core's list names (a ruleset of the host's) is read as set up in the project. Reason: the owner sees how much of what
+  binds a project a check holds there, which a count of the core alone hides. Held by `tests/look-test.mjs` and
+  `tests/holders-test.mjs`.
 - **Staged cases hold what no check reads** (#235). By default a rule is held by a check; where none
   can read its breach exactly, since the breach lies in what a session does, a staged case holds it: a scratch project
   (`scripts/staged/`) in which a fresh session is given a task where the rule is easy to break, passed or failed by

@@ -215,6 +215,10 @@ ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`) && /^::warning::The 
   ok(all.held > shape.held && shape.all === all.all && floorOnly.all < all.all && floorOnly.all === holders(root).rules.filter(r => r.file.startsWith("floor/")).length,
     "the core's rules a check holds in a project leave out those whose every check read nothing there, and count only the modules it takes, the floor's always", JSON.stringify({ all, shape, floorOnly }));
   ok(shareLine({ all: 7, check: 2 }, { held: 9, all: 40 }) === "- rules held by a check: the project's own 2 of 7, the core's 9 of 40.", "the share's line holds the counts alone");
+  const coreLine = report(root).find(l => l.startsWith("- rules held by a check: the core's own")) ?? "";
+  const ownCount = rules(root, { agents: true }).filter(r => r.file === "AGENTS.md").length, cc = counts(holders(root));
+  ok(ownCount > 0 && coreLine.includes(` of ${ownCount} (`) && coreLine.endsWith(`the floor's and the modules' ${cc.check} of ${cc.all}.`),
+    "the core's own report gives its share: its own rules of AGENTS.md a check holds whole, beside the floor's and the modules'", coreLine);
 }
 
 // ---- a project's own rules (#662) ----
