@@ -58,12 +58,12 @@ reads is the *shape check*'s config.
 - **No test run on a draft** (#733). By default the job that runs a project's tests on its host starts on a pull request
   once it is marked ready, and again on each push after, and runs nothing on a draft. Nothing changes it. The trigger is
   a workflow that runs tests on a pull request: whoever writes or changes it gives its trigger the types opened,
-  synchronize, reopened and ready_for_review and skips each of its jobs on a draft; and a builder runs in its own
-  working copy the suites its change reaches first (`tasks/reviews.md`, "The session's own run comes first"). It does
-  not mean a builder pushes less: it pushes after every commit (`roles/shared/work-flow.md`). Reason: in the core 43% of
-  the job-minutes of 24 hours went to runs that a newer push replaced before they finished. Held by
-  `tests/workflows-test.mjs`, for the core's own workflow; in a project, by nothing yet: which of its workflows runs its
-  tests cannot be read without guessing.
+  synchronize, reopened and ready_for_review and skips each of its jobs on a draft; and a builder, before it marks its
+  pull request ready, runs in its own working copy the suites its change reaches (`core/scripts/select.mjs`, with
+  `SELECT_BASE` the default branch). It does not mean a builder pushes less: it pushes after every commit
+  (`roles/shared/work-flow.md`). Reason: in the core 43% of the job-minutes of 24 hours went to runs that a newer push
+  replaced before they finished. Held by `tests/workflows-test.mjs`, for the core's own workflow; in a project, by
+  nothing yet: which of its workflows runs its tests cannot be read without guessing.
 - **The default branch is tested at its newest commit** (#733; #810). By default a run of the tests on the default
   branch that has started runs to its end, and a newer merge's run waits behind it; of the runs waiting only the newest
   is kept, so that when merges come fast one run covers every merge that landed while the one before it ran: whoever
