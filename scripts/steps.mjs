@@ -23,7 +23,8 @@ import { FOLDER as NOTES_FOLDER, NOTES } from "./sync-notes.mjs";
 import { READ_MOST, ownFiles } from "./own-files.mjs";
 import { started } from "./started.mjs";
 import { parseYaml } from "./workflow-run.mjs";
-import { plain, shown } from "./step-checks.mjs";
+import { copyAt } from "./check-configs.mjs";
+import { atCopy, plain, shown } from "./step-checks.mjs";
 
 // What a step reads a project with, and the words of an error with no path of the machine's in them: step-checks.mjs,
 // beside this file.
@@ -62,23 +63,27 @@ export const declared = (p, step) => p.differences.some(l => l.includes(`"${step
 // The steps not done in the project at `root`: each { lead, owner, cost, mend }. A check that throws is not read as
 // done: it is reported, with what went wrong.
 export function notDone(root, steps = STEPS) {
-  const p = project(root);
+  const p = project(root), copy = copyAt(p);
   const out = [];
   for (const step of steps) {
     if (!step.check || declared(p, step)) continue;
     let mend;
     try { mend = step.check(p); } catch (e) { mend = `Its check could not read the project (${plain(e.message, root)}): read its entry in \`core/${NOTES_FOLDER}/\` against it.`; }
-    if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend });
+    // (the entries and the checks say core/, the starter kit's path for the copy; a project that keeps it elsewhere is
+    // told its own: #628)
+    if (mend) out.push({ lead: step.lead, owner: !!step.owner, cost: step.cost, mend: atCopy(mend, copy) });
   }
   out.unread = p.unread;
+  out.copy = copy;
   return out;
 }
 
 // The report a sync prints for its pull request's description: the steps not done, and nothing where all are.
 export function report(missed) {
   const unread = missed.unread?.length ? `\n\nLeft unread, each past ${READ_MOST} bytes, which no file a step reads reaches: ${missed.unread.map(f => `\`${shown(f)}\``).join(", ")}. A step that reads one may have read it as missing: make it smaller, or take it out of git if it is no file of the project's.` : "";
-  if (!missed.length) return `Every step a check reads is done (\`core/scripts/steps.mjs\`).${unread}`;
-  return [`Steps not done (\`core/scripts/steps.mjs\`; core/${NOTES}): each a task the project's agents take, in a pull request of its own, none waiting on another${missed.some(m => m.owner) ? "; one marked \"the owner's\" waits on the owner and is labelled so" : ""}.`,
+  const copy = missed.copy ?? "core/";
+  if (!missed.length) return `Every step a check reads is done (\`${copy}scripts/steps.mjs\`).${unread}`;
+  return [`Steps not done (\`${copy}scripts/steps.mjs\`; ${copy}${NOTES}): each a task the project's agents take, in a pull request of its own, none waiting on another${missed.some(m => m.owner) ? "; one marked \"the owner's\" waits on the owner and is labelled so" : ""}.`,
     ...missed.map(m => `- ${m.lead}${m.owner ? " (the owner's)" : ""}: ${m.mend}`)].join("\n") + unread;
 }
 

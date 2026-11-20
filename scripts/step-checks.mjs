@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "./core-address.mjs";
-import { corePath } from "./core-path.mjs";
+import { atCopy, corePath, inCopy } from "./core-path.mjs";
 import { installed } from "./packages.mjs";
 import { leadsOut } from "./guards.mjs";
 import { importsOf, projectFilesByContent, readProject as readBuildFile } from "./nuget.mjs";
@@ -17,7 +17,7 @@ import { parseBaseline, parseConfig, where as shapeAt } from "./shape.mjs";
 import { READERS } from "./shape-readers.mjs";
 import { ruleFiles } from "./rule-files.mjs";
 import { toolOf } from "./strength.mjs";
-import { Unread, calls, commands, uncommented, copiesConfig, folded, given, licenceConfig, readable, runFiles } from "./check-configs.mjs";
+import { Unread, calls, commands, copyAt, uncommented, copiesConfig, folded, given, licenceConfig, readable, runFiles } from "./check-configs.mjs";
 import { parseYaml, pathsLetThrough } from "./workflow-run.mjs";
 import { draftHoles, reads } from "./workflows.mjs";
 import { DEEPEST, LONGEST, twice } from "./yaml-keys.mjs";
@@ -28,6 +28,9 @@ import { npmPackages, offRegistry } from "./lookup.mjs";
 export const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 // Roughly what a step costs a project where it is not done yet (a step done costs nothing).
+// (`atCopy` and `inCopy` of core-path.mjs: the starter kit's and the notes' words for the copy, in the project's own)
+export { atCopy, inCopy };
+
 export const COST = {
   check: "nothing while its check passes; else what the failure says, in the pull request it fails",
   line: "a line or two of a protected file: one small pull request of a builder's",
@@ -564,7 +567,8 @@ function namedStill(p, map) {
   return found;
 }
 // A copies config that reads the old folder and not yet each folder the rules stand in, however its patterns are laid out.
-const readsOldAlone = (p, f) => f.endsWith(".json") && (p.read(f) ?? "").includes(MOVED_GLOB) && !NEW_GLOBS.every(g => (p.read(f) ?? "").includes(g));
+// (the patterns as a project whose copy stands at `copy` holds them: #628)
+const readsOldAlone = (p, f, copy) => f.endsWith(".json") && (p.read(f) ?? "").includes(atCopy(MOVED_GLOB, copy)) && !NEW_GLOBS.every(g => (p.read(f) ?? "").includes(atCopy(g, copy)));
 // Where two old paths now lead to one file, the word that it is named once; and, where a file a tool takes its
 // instructions from by pulling files in (Kiro's steering, Antigravity's rules) still names an old path, that the step
 // comes before any other task, since such a session reads each rule on one line's word until then.
@@ -577,7 +581,7 @@ export function movedPaths(p) {
   const map = moved(), found = Object.keys(map).length > 0 ? namedStill(p, map) : new Map(), said = files => files.map(f => `\`${shown(f)}\``).join(", ");
   const apart = from => (moved.apart()[from] ?? []).map(a => `, but its "${a.lead}" is now in \`core/${a.to}\``).join("");
   const wrong = [...found].map(([from, files]) => `\`core/${from}\` is now \`core/${map[from]}\`${map[from].endsWith("/") ? ", a file a topic: name the topic's own file" : ""}${apart(from)} (in ${said(files)})`).concat(once(found, map));
-  const globs = Object.keys(map).length > 0 ? namers(p).filter(f => readsOldAlone(p, f)) : [];
+  const globs = Object.keys(map).length > 0 ? namers(p).filter(f => readsOldAlone(p, f, corePath(p.root) || "core/")) : [];
   if (globs.length) wrong.push(`after the pattern ${MOVED_GLOB} add the patterns ${MOVED_GLOBS}, leaving it where it is, since a copies config may read more and never less (in ${said(globs)})`);
   if (!/^Paths:.*\btasks\/.*\btools\//mu.test(p.manifest)) wrong.push('the "Paths:" line of `core-manifest.md` reads "one into floor/, roles/, tasks/, tools/, scripts/, setup/ or archive/ is under core/"');
   return wrong.length ? `${first(found)} one pull request, name each of the core's files by the path it now has: ${wrong.join("; ")}.` : null;

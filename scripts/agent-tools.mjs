@@ -68,7 +68,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { corePath } from "./core-path.mjs";
+import { atCopy, corePath, hookCommands, manifestText, readCore } from "./core-path.mjs";
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
 import { fetchedBy } from "./hook-source.mjs";
@@ -479,10 +479,25 @@ function npxPackage(args) {
 // The hooks the starter kit writes, Claude Code's, Kiro's and Codex's, each by what it is (configured()'s ids): the
 // core's, listed by it. `template(name)` gives the text of one of the kit's templates as a copy holds it, or null.
 const kitTemplate = name => { try { return fs.readFileSync(path.join(KIT_DIR, name), "utf8"); } catch { return null; } };
-export function kitHooks(template = kitTemplate) {
-  const read = f => (Object.hasOwn(KITS, f) ? template(KITS[f]) : null);
+// `core` is the manifest's "Core:" line as core-path.mjs reads it, or null for the usual core/: the kit writes the copy as
+// core/, and a project whose manifest names another path holds the hooks with that path, either the kit's own with it
+// written in or the commands `core-path.mjs --hooks` gives for it (#628).
+export const coreOf = text => { const core = text === null || text === undefined ? null : readCore(text); return core && !core.wrong ? core : null; };
+export function kitHooks(template = kitTemplate, core = null) {
+  const copy = core?.path ?? "core/";
+  const read = f => { const text = Object.hasOwn(KITS, f) ? template(KITS[f]) : null; return text === null ? text : atCopy(text, copy); };
+  const swapped = f => {
+    const text = read(f);
+    if (f !== ".claude/settings.json" || text === null || copy === "core/") return text;
+    const settings = JSON.parse(text), commands = hookCommands(core);
+    settings.hooks.SessionStart[0].hooks[0].command = commands.start;
+    settings.hooks.PreToolUse[0].hooks[0].command = commands.helper;
+    settings.hooks.Stop[0].hooks[0].command = commands.stop;
+    return JSON.stringify(settings);
+  };
   const files = dir => Object.keys(KITS).filter(f => path.posix.dirname(f) === dir).map(f => path.posix.basename(f));
-  return [...configured(read, () => [], files).ids.values()].flatMap(set => [...set]);
+  const ids = r => [...configured(r, () => [], files).ids.values()].flatMap(set => [...set]);
+  return copy === "core/" ? ids(read) : [...new Set([...ids(read), ...ids(swapped)])];
 }
 
 // The list a config holds: { keys, versions, from, problems }, keys the "kind name" of each well-formed entry, versions
@@ -1029,7 +1044,7 @@ export function run(root, file, { core = false, base = baseOf(root), ways = inst
   }
   const head = readProject(root, null, base ? at => notFile(listing(root, base), at) || shownNotBlob(root, base, at) : undefined);
   const atBase = name => textAt(root, base, path.relative(root, path.join(KIT_DIR, name)).split(path.sep).join("/"));
-  const kit = [...kitHooks(), ...(base ? kitHooks(atBase) : [])];
+  const place = coreOf(manifestText(path.join(root, "core-manifest.md"))), kit = [...kitHooks(undefined, place), ...(base ? kitHooks(atBase, place) : [])];
   let list = listed(config, file);
   const baseConfig = configAtBase(root, base, file);
   // (a list the base held is no longer missing: taking it out does not bring back the time before it was written)

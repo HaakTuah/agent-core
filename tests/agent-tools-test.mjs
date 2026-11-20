@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { installedBy, kitHooks, listed, printed } from "../scripts/agent-tools.mjs";
 import { CORE } from "../scripts/core-address.mjs";
+import { hookCommands, readCore } from "../scripts/core-path.mjs";
 import { kitForm } from "../scripts/hook-source.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { STEPS, notDone } from "../scripts/steps.mjs";
@@ -98,6 +99,18 @@ const slower = JSON.parse(KIT);
 slower.hooks.Stop[0].hooks[0].timeout = 600;
 fails(run(project({ ".claude/settings.json": JSON.stringify(slower), "checks/licences.json": { lockfiles: [], agentTools: [] } })), "a kit's command with another timeout is not the kit's hook", 'the hook "Stop: ');
 passes(run(project()), "a project as the starter kit writes it, with no list, passes");
+// (a copy at another path than core/, which its manifest names: the kit's hooks with that path written in, or the commands
+// core-path.mjs gives for it, are the kit's own; the kit's hooks naming core/ are not, there: #628)
+{
+  const line = `Core: ${CORE} at ${"a".repeat(40)}, copied whole under vendor/core/ (never edited here).\n`, empty = { lockfiles: [], agentTools: [] };
+  const given = JSON.parse(KIT), commands = hookCommands(readCore(line));
+  given.hooks.SessionStart[0].hooks[0].command = commands.start;
+  given.hooks.PreToolUse[0].hooks[0].command = commands.helper;
+  given.hooks.Stop[0].hooks[0].command = commands.stop;
+  passes(run(project({ "core-manifest.md": line, ".claude/settings.json": KIT.replaceAll("origin/main:core/", "origin/main:vendor/core/"), "checks/licences.json": empty })), "the kit's hooks with the copy's path written in, the manifest naming it, are the kit's own");
+  passes(run(project({ "core-manifest.md": line, ".claude/settings.json": given, "checks/licences.json": empty })), "the commands core-path.mjs gives for the copy's path are the kit's own");
+  fails(run(project({ "core-manifest.md": line, "checks/licences.json": empty })), "the kit's hooks naming core/ where the manifest names another path are not the kit's own", "is not listed");
+}
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } })), "and with an empty list");
 passes(run(project({ "checks/licences.json": { lockfiles: [], agentTools: [] } }), "--core"), "in the core's own repository too");
 // (the command prints what the check gives, and exits as it says, as the cases here read it)

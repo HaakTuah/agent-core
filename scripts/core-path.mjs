@@ -62,6 +62,17 @@ export function manifestText(file) {
   try { return fs.readFileSync(file, "utf8"); } catch { return null; }
 }
 
+/** A text of the starter kit's or of the sync notes' as the project holds it, whose copy of the core stands at `copy`
+ *  (corePath's, a path ending in "/"): the kit and the notes write the copy as core/, so each core/ that begins a path
+ *  (not agent-core/, and not one already behind the copy's own folders, as vendor/core/ is) is the copy's path (#628). */
+export const atCopy = (text, copy) => {
+  if (copy === "core/") return text;
+  const before = copy.endsWith("/core/") ? copy.slice(0, -"core/".length) : null;
+  return text.replace(/(?<![\w-])core\//gu, (hit, at) => before && text.slice(0, at).endsWith(before) ? hit : copy);
+};
+/** The copy's path as the pattern of a regular expression. */
+export const inCopy = copy => copy.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&");
+
 /** The core's copy as a path prefix, for a check to leave out of a project's own files: the manifest's path at `root`, or
  *  core/ where there is none to read (the core's own root, which holds no folder of that name). Read once for each root
  *  in a run, so a check may ask it for every file. */

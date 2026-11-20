@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
-import { carriedAt, corePath, floorCopy, floorCopyIn, hookCommands, manifestText, projectAt, readCore } from "../scripts/core-path.mjs";
+import { atCopy, carriedAt, corePath, floorCopy, floorCopyIn, hookCommands, manifestText, projectAt, readCore } from "../scripts/core-path.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { pathIn } from "../scripts/reading.mjs";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
@@ -126,6 +126,12 @@ if (process.platform !== "win32") {
   const r = spawnSync(process.execPath, [script], { cwd: linked, encoding: "utf8", timeout: 20000 });
   ok(corePath(linked) === "core/" && floorCopy(linked) === null && r.status === 1 && mended(r.stderr), "a manifest that is a link to what is no regular file reads as empty, and the script says the mend", `${r.status} ${r.signal} ${r.stderr}`);
 }
+
+// The starter kit's and the notes' words for the copy, in the project's own (#628): each core/ that begins a path
+ok(atCopy("read core/tasks/x.md", "core/") === "read core/tasks/x.md" && atCopy("core/a ../../core/b `core/c` agent-core/d", "vendor/core/") === "vendor/core/a ../../vendor/core/b `vendor/core/c` agent-core/d",
+  "a bare core/ is the copy's path, and agent-core/ is not");
+ok(atCopy("refs/remotes/origin/main:vendor/core/a core/b", "vendor/core/") === "refs/remotes/origin/main:vendor/core/a vendor/core/b" && atCopy("core/a", "lib/the-core/") === "lib/the-core/a",
+  "one already behind the copy's own folders is left as it stands");
 
 // Claude Code's hooks for a core at another path: for core/ the helper's and the stop's are the starter kit's own, and
 // where a submodule carries the core, the start reads the work-saved hook from the library's commit main pins, never

@@ -73,7 +73,7 @@ const inside = (f, what) => {
 };
 
 // The copy's folder, from the manifest (core-path.mjs), "core/" where it names none.
-const copyOf = p => { try { return (p.root && corePath(p.root)) || "core/"; } catch { return "core/"; } };
+export const copyAt = p => { try { return (p.root && corePath(p.root)) || "core/"; } catch { return "core/"; } };
 
 // A shell's line without its comment: a "#" that starts a word, outside quotes and outside an expression of GitHub's.
 export function uncommented(line) {
@@ -458,7 +458,7 @@ function steps(p) {
 // from, unread }: the file the step stands in and the workflow that runs it.
 export function runsOwn(p, name) {
   readable(p, text => text.includes(name));
-  const script = `${copyOf(p)}scripts/${name}`;
+  const script = `${copyAt(p)}scripts/${name}`;
   return steps(p).flatMap(s => {
     if (s.tooMany) return [{ where: s.where, from: s.from, unread: `the project's workflows and actions hold more steps, or actions calling each other more deeply, than the reader follows`, unsure: true }];
     if (s.unreadable !== undefined) return s.unreadable.includes(name) ? [{ where: s.where, from: s.from, unread: `the core's reader cannot read ${s.where}, in a form it does not know`, unsure: true }] : [];
@@ -482,7 +482,7 @@ const fromRuns = (p, name) => runsOwn(p, name).filter(r => !r.none).map(r => {
 // scripts. The reader does not run them, so a check run from one alone is not read, never read at the slot's path.
 const OTHER_RUNNERS = /(?:^|\/)(?:[^/]+\.(?:sh|bash|zsh|ps1|psm1|cmd|bat|mk)|Makefile|GNUmakefile|makefile|justfile|package\.json)$/u;
 function namedElsewhere(p, names) {
-  const at = copyOf(p);
+  const at = copyAt(p);
   const own = (p.files ?? []).filter(f => OTHER_RUNNERS.test(f) && !f.startsWith(at) && !f.split("/").includes("node_modules"));
   const of = new RegExp(`(?:^|[^\\w.-])(?:\\./)?${at.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&").replace(/\//gu, "[\\\\/]")}scripts[\\\\/](?:${names.map(n => n.replace(/[\\^$.*+?()[\]{}|]/gu, "\\$&")).join("|")})(?![\\w.-])`, "u");
   return own.filter(f => {
@@ -493,7 +493,7 @@ function namedElsewhere(p, names) {
 }
 const notElsewhere = (p, names) => {
   const named = namedElsewhere(p, names);
-  if (named.length) throw new Unread(`${named.join(", ")} ${named.length > 1 ? "name" : "names"} ${names.map(n => `${copyOf(p)}scripts/${n}`).join(" or ")}, run from a file the core's reader does not run`);
+  if (named.length) throw new Unread(`${named.join(", ")} ${named.length > 1 ? "name" : "names"} ${names.map(n => `${copyAt(p)}scripts/${n}`).join(" or ")}, run from a file the core's reader does not run`);
 };
 
 // The one file the sources give, undefined where none gives one; where they give different files, not read.

@@ -14,6 +14,16 @@ export const READ_MOST = 64 << 20;
 export function ownFiles(root) {
   const listed = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 })
     .split("\0").filter(f => f && fs.existsSync(path.join(root, f)));
+  // (a checked-out submodule's files too, at their paths from here, as git lists them with --recurse-submodules, which it
+  // gives for the committed files alone: a library that carries the core brings its copy so (core-path.mjs), and
+  // without this git lists the library by its commit only; #628)
+  if (fs.existsSync(path.join(root, ".gitmodules"))) {
+    try {
+      const have = new Set(listed);
+      for (const f of execFileSync("git", ["ls-files", "--cached", "--recurse-submodules", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] }).split("\0"))
+        if (f && !have.has(f) && fs.existsSync(path.join(root, f))) listed.push(f);
+    } catch { /* (a submodule that is not checked out is listed by its commit alone) */ }
+  }
   // (what is read is a regular file of the project's own, at most READ_MOST bytes, by a path that, every link on it
   // followed, ends inside the project (#362, #423): a path or link that leads out, a device, a pipe or a folder reads as
   // missing, and a file past the size as missing too, named in `unread`, so that no file the project holds stops the
