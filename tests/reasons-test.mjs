@@ -58,4 +58,13 @@ ok(several.status === 1 && mended(several.stdout) && several.stdout.includes("ro
 ok(nothing.status === 1 && mended(nothing.stdout) && nothing.stdout.includes('as `node scripts/reasons.mjs "security.md: 3. The protected files"`'), "run with a part that names none, it fails with the mend, naming the command as seen from where it is run", nothing.stdout);
 ok(report("no rule is named so", root, path.join(root, "scripts")).out.includes("`node reasons.mjs "), "the command named in the mend is the path from the folder it is run in");
 
+const listed = report("rule", tmp, tmp).out.split("\n");
+ok(listed.length === 5 && listed.slice(1).every(k => k.startsWith("  ") && !k.startsWith("   ")) && listed[1] === "  AGENTS.md: An own rule", "a part that names several rules lists each on a line of its own, set in", listed.join("|"));
+ok(report("a first rule", tmp, tmp).status === 0 && report("a first rule", tmp, tmp).out === lines(first, tmp, tmp).join("\n"), "the report of one rule is the lines it gives, joined");
+const bare = path.join(tmp, "bare");
+fs.mkdirSync(path.join(bare, "tasks"), { recursive: true });
+fs.writeFileSync(path.join(bare, "tasks", "x.md"), "# A module\n\n**A lone rule.** Said.\n");
+const wrong = report("a lone rule", bare, bare);
+ok(wrong.status === 0 && wrong.out.startsWith("FAIL ") && wrong.out.includes("Mend:") && wrong.out.split("\n")[1] === "tasks/x.md: A lone rule", "where the list cannot be read it says so first, with its mend, and the rule's lines follow", wrong.out);
+
 process.exit(failed ? 1 : 0);

@@ -3,6 +3,8 @@
 // Node's own modules.
 //
 //   node tests/own-modules-test.mjs
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
@@ -50,6 +52,21 @@ const own = report();
 ok(own.status === 0 && own.err.length === 0 && /^each of the \d+ modules is taken here/u.test(own.out.join("\n")), `the core's own AGENTS.md: ${own.err.join("; ")}`);
 const missing = report(path.join(fileURLToPath(new URL("..", import.meta.url)), "no-such-folder"));
 ok(missing.status === 1 && missing.out.length === 0 && mended(missing.err.join("\n")) && missing.err[0].includes("could not be read"), "where AGENTS.md cannot be read it fails, saying its mend");
+
+// a made root: its modules counted, and a fault of its AGENTS.md reported as a failure, saying its mend
+const made = fs.mkdtempSync(path.join(os.tmpdir(), "own-modules-test-"));
+try {
+  const stand = (folder, ...files) => { fs.mkdirSync(path.join(made, folder), { recursive: true }); for (const f of files) fs.writeFileSync(path.join(made, folder, f), "x\n"); };
+  stand("tasks", "a.md", "b.txt"); stand("roles/shared", "c.md"); stand("tools");
+  fs.writeFileSync(path.join(made, "AGENTS.md"), agents("@tasks/a.md and `roles/shared/c.md`."));
+  const fine = report(made);
+  ok(fine.status === 0 && fine.err.length === 0 && fine.out.join() === "each of the 2 modules is taken here, or given its reason", `a root whose modules are all taken, only the Markdown files counted: ${fine.out}`);
+  fs.writeFileSync(path.join(made, "AGENTS.md"), agents("@tasks/a.md."));
+  const bad = report(made);
+  ok(bad.status === 1 && bad.out.length === 0 && bad.err.length === 1 && bad.err[0].startsWith("FAIL: ") && bad.err[0].includes("roles/shared/c.md is neither taken") && mended(bad.err.join("\n")), `a module neither taken nor given a reason fails, saying its mend: ${bad.err}`);
+  fs.rmSync(path.join(made, "tools"), { recursive: true });
+  ok(report(made).status === 1 && report(made).err[0].includes("could not be read"), "a folder of the modules that is not there fails, saying so");
+} finally { fs.rmSync(made, { recursive: true, force: true }); }
 
 console.log(`${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

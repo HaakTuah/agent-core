@@ -126,6 +126,38 @@ if (run("1.2.3") !== 0) { failed++; console.error("FAIL run from a project's roo
 if (run("^1.2.3") !== 1) { failed++; console.error("FAIL run from a project's root: a range does not fail, saying its mend"); }
 if (run("1.2.3", "../tools/package-lock.json") !== 1 || run("1.2.3", join(tmpdir(), "package-lock.json")) !== 1) { failed++; console.error("FAIL a lock file named outside the project is not refused, saying its mend"); }
 
+// What the command says, whole: its usage, a config it cannot read or that names no list or a path outside, and its count.
+{
+  const dir = mkdtempSync(join(tmpdir(), "exact-versions-"));
+  try {
+    const say = (name, text) => writeFileSync(join(dir, name), text);
+    const lock = (list) => { mkdirSync(join(dir, "t"), { recursive: true }); say("t/package.json", JSON.stringify(list)); say("t/package-lock.json", JSON.stringify({ lockfileVersion: 3, packages: { "": {}, "node_modules/a": { version: "1.2.3" }, "node_modules/b": { version: "2.0.0" } } })); };
+    const is = (what, r, status, out, err) => { if (r.status !== status || r.out.join("\n") !== out || r.err.join("\n") !== err) { failed++; console.error(`FAIL ${what}: ${JSON.stringify(r)}`); } };
+    is("no config named", report(undefined, dir), 2, "", "usage: node core/scripts/exact-versions.mjs <the licence check's config>");
+    const none = report("nope.json", dir);
+    if (none.status !== 1 || none.out.length || none.err.length !== 1 || !none.err[0].startsWith("FAIL: nope.json cannot be read (") || !mended(none.err[0])) { failed++; console.error(`FAIL a config that is not there: ${JSON.stringify(none)}`); }
+    say("c.json", "{ not json");
+    if (report("c.json", dir).status !== 1 || !report("c.json", dir).err[0].includes("c.json cannot be read")) { failed++; console.error("FAIL a config that is no JSON"); }
+    say("c.json", JSON.stringify({ lockfiles: "t/package-lock.json" }));
+    is("lockfiles that is no list", report("c.json", dir), 1, "", 'FAIL: "lockfiles" in c.json is no list of paths. Mend: write it as a list of the lock files\' paths');
+    say("c.json", JSON.stringify({ lockfiles: ["t/package-lock.json", 3] }));
+    if (report("c.json", dir).status !== 1 || !report("c.json", dir).err[0].includes("is no list of paths")) { failed++; console.error("FAIL a list with a path that is none"); }
+    say("c.json", JSON.stringify({ lockfiles: ["t/package-lock.json", "../x/package-lock.json", "/y/package-lock.json"] }));
+    const out = report("c.json", dir);
+    if (out.status !== 1 || out.err.length !== 1 || !out.err[0].includes("names a path outside the project: ../x/package-lock.json, /y/package-lock.json.") || !mended(out.err[0])) { failed++; console.error(`FAIL paths outside the project: ${JSON.stringify(out)}`); }
+    say("c.json", JSON.stringify({}));
+    is("no lock file named", report("c.json", dir), 0, "ok   every dependency of 0 lock files is at the one exact version it installs", "");
+    say("c.json", JSON.stringify({ lockfiles: ["t/package-lock.json"] }));
+    lock({ dependencies: { a: "1.2.3" } });
+    is("one lock file, exact", report("c.json", dir), 0, "ok   every dependency of 1 lock file is at the one exact version it installs", "");
+    lock({ dependencies: { a: "^1.2.3", b: "~2.0.0" } });
+    const two = report("c.json", dir);
+    if (two.status !== 1 || two.out.join() !== "2 dependencies not at one exact version (floor rule 7)" || two.err.length !== 2 || !two.err.every((e) => e.startsWith("FAIL: t/package.json: ") && mended(e))) { failed++; console.error(`FAIL two ranges: ${JSON.stringify(two)}`); }
+    say("c2.json", JSON.stringify({ lockfiles: ["./t/../t/package-lock.json"] }));
+    if (report("c2.json", dir).status !== 1) { failed++; console.error("FAIL a path written with dots is read as the path it leads to"); }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
 // A package list or lock file nested past the bound is refused, saying its mend, never read by recursion.
 const deep = (inner) => `${"{\"a\":".repeat(20000)}${inner}${"}".repeat(20000)}`;
 expect("overrides nested past the bound are refused", check("package-lock.json", reader({ "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {} } }), "package.json": `{"overrides":${deep('"1.2.3"')}}` })), ["cannot be read as JSON (it nests deeper than 200 objects and lists). Mend: "]);
