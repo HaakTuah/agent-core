@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TESTS, fullRun } from "../scripts/release.mjs";
-import { NARROWED, WORKFLOW, fullLists, pick, run } from "../scripts/tests-parts.mjs";
+import { FULL, NARROWED, WORKFLOW, fullLists, pick, run } from "../scripts/tests-parts.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500)}`}`); } };
@@ -58,6 +58,11 @@ ok(parts(got) === "win:network" && ups(got) === "win:third", "parts of both jobs
 // ---- what is refused ----
 const refusals = [pick(L, ""), pick(L, "  , "), pick(L, "windows kitt"), pick(L, "linux faults"), pick(L, "windows; rm")];
 ok(refusals.every(r => r.refused && mended(`FAIL: ${r.refused}`)), "no word, a word no job carries and words that pick no job are each refused, saying the mend", refusals.map(r => r.refused).join(" | "));
+// (the fallback security review's findings 1 to 3 on 77a7abb: a name GitHub might trim or cut at a line's end, and a
+// narrowed run that is a full one in all but its name)
+const odd = ["\nwindows kit", " windows kit", "windows kit ", "windows\tkit", "windows kit\r"].map(w => pick(L, w)), every = [pick(L, "linux windows"), pick(L, "staged network kit core rest steps faults places terms licences upgrade")];
+ok(odd.every(r => r.refused && mended(`FAIL: ${r.refused}`) && /letters/.test(r.refused)) && every.every(r => r.refused && mended(`FAIL: ${r.refused}`) && /every job/.test(r.refused)) && !pick(L, "windows kit,core").refused,
+  "words with anything before, after or between them but spaces and commas are refused, and so are words that pick every job, each saying the mend", [...odd, ...every].map(r => r.refused).join(" | "));
 ok(/kitt/.test(refusals[2].refused) && /windows/.test(refusals[2].refused) && /faults/.test(refusals[2].refused) && /picks no job/.test(refusals[3].refused) && /;/.test(refusals[4].refused),
   "a refusal names the word it could not use and what it may name");
 
@@ -87,12 +92,15 @@ ok(/have not run in full on it yet/.test(fullRun(listOf(narrowed("success", 10))
   && fullRun(listOf(runOf("schedule", "success", 9), narrowed("failure", 10), narrowed(null, 11, "in_progress"))) === null
   && fullRun(listOf(runOf("workflow_dispatch", "success", 10))) === null && /hand-started run\): failure/.test(fullRun(listOf(runOf("schedule", "success", 9), runOf("workflow_dispatch", "failure", 10)))),
   "a start by hand that named parts is never read as the tests in full: its pass lets no release stand, and its failure or its run still going holds none; one that named none, by the workflow's own name, is read as before");
+ok(["tests, only", "tests, only\nwindows kit", "Tests", "", null].every(t => /have not run in full on it yet/.test(fullRun(listOf(runOf("workflow_dispatch", "success", 10, "completed", t)))))
+  && fullRun(listOf(runOf("schedule", "success", 10, "completed", "anything"))) === null && text.includes(`\nname: ${FULL}\n`),
+  "a start by hand is read as full only by the workflow's own name, which the workflow bears: a name trimmed, cut, of another case or missing is not, so a run that cannot be read either way never lets a release stand; an hourly run is read by its event");
 
 // ---- the workflow's own use of it ----
 const NAMED = "github.event_name == 'workflow_dispatch' && inputs.only != ''";
 ok(text.includes(`run-name: \${{ ${NAMED} && format('${NARROWED}{0}', inputs.only) || '' }}`),
   "a run that names parts is named so, the name a release and the hourly run read to tell it from a full one; any other keeps GitHub's own");
-ok(text.includes(`startswith("${NARROWED}") | not`), "the hourly run's skip on main reads no narrowed run as a full one");
+ok(text.includes(`(.event == "schedule" or (.event == "workflow_dispatch" and .display_title == "${FULL}"))`), "the hourly run's skip on main reads a start by hand as full only by the workflow's own name, so no narrowed run");
 ok(text.includes(`    name: \${{ ${NAMED} && '${NARROWED}the parts named' || 'tests' }}\n    needs: [moved, pick, suites, upgrade]`),
   "its gate is named apart, so its pass never stands for the check \"tests\" a pull request's head or a push's selection reads; the gate of any other run keeps that name");
 ok(text.includes(`  pick:\n    if: \${{ ${NAMED} }}`) && /ONLY: \$\{\{ inputs\.only \}\}\n\s+run: node scripts\/tests-parts\.mjs "\$ONLY" --output "\$GITHUB_OUTPUT"/u.test(text),

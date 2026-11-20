@@ -100,8 +100,10 @@ reads is the *shape check*'s config.
   run on the default branch after every merge holds most of the host's jobs at once and leaves the pull requests
   waiting, and a slow suite run once per change costs most where it is paid for, in money or in a machine's hours; in
   the core Windows took 69% of the pull requests' job-minutes, where about three of its bugs were found by Windows
-  alone. Held by `tests/runners-test.mjs`, for what is read, and in the core by its workflow's schedule and matrix,
-  which the workflows test reads.
+  alone, and five runs started by hand in full, each change needing one Windows part, took 38% of an hour's runner
+  minutes. Held by `tests/runners-test.mjs`, for what is read, and in the core by its workflow's schedule and matrix,
+  which the workflows test reads, and by `scripts/release.mjs` (`fullRun`), which reads no narrowed run as full; the
+  parts a builder names, by none: read from the tests a change reaches, most changes would reach every part.
 
 - **A test that reaches the network runs once per batch** (#733). By default a test is self-contained: what it fetches
   comes from a copy the test makes on the machine (a package file, a feed in a folder, a repository read by its path).

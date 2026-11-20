@@ -4,7 +4,8 @@
 // full run, those of a named system where one is named that carry a named part where one is named; with no input the
 // workflow runs in full and this script is not run. The full run's jobs are read from the workflow itself, the last
 // list of each job's matrix, so they stand in one place. A run so narrowed is named NARROWED and its words, and is never
-// read as a full run (release.mjs, fullRun; the hourly run's skip in the workflow). Node's own modules only.
+// read as a full run (release.mjs, fullRun; the hourly run's skip in the workflow), which a start by hand is only where
+// it bears the workflow's own name, FULL. Node's own modules only.
 //
 //   node scripts/tests-parts.mjs "<words>" [--output <file>]
 //       prints the jobs it picks; with --output, adds the lines suites=<json> and upgrade=<json> to the file, as
@@ -15,8 +16,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { started } from "./started.mjs";
 export const WORKFLOW = ".github/workflows/tests.yml";
-// (the name a narrowed run is given, and by which a full run is told from it)
+// (the name a narrowed run is given; a run started by hand is read as full only where it bears the workflow's own name,
+// FULL, which GitHub gives it where run-name is empty, so a name that cannot be read either way is never read as full)
 export const NARROWED = "tests, only ";
+export const FULL = "tests";
 const SYSTEMS = { "ubuntu-latest": "linux", "windows-latest": "windows" };
 
 // The jobs of a full run in the workflow's text: { suites, upgrade }, each the last list its job's matrix holds, which
@@ -47,6 +50,8 @@ export function pick(lists, only) {
   const parts = [...new Set(["suites", "upgrade"].flatMap(job => lists[job].flatMap(x => wordsOf(job, x))))].sort();
   const known = `a system (${[...new Set(Object.values(SYSTEMS))].join(", ")}) and the parts (${parts.join(", ")})`;
   if (!words.length) return { refused: `the input "only" names no part. Mend: leave it empty for the tests in full, or name ${known}` };
+  // (letters, and spaces or commas between them, nothing before or after, so the run's name is the words as they stand)
+  if (!/^[a-z]+(?:[ ,]+[a-z]+)*$/iu.test(String(only))) return { refused: `the input "only", ${JSON.stringify(String(only))}, holds more than words of letters with spaces or commas between them. Mend: start the run again naming ${known}, as such words alone` };
   const unknown = words.filter(w => !parts.includes(w) && !Object.values(SYSTEMS).includes(w));
   if (unknown.length) return { refused: `the input "only" names what no job carries: ${unknown.join(", ")}. Mend: start the run again naming ${known}` };
   const systems = words.filter(w => Object.values(SYSTEMS).includes(w)), named = words.filter(w => parts.includes(w));
@@ -54,6 +59,8 @@ export function pick(lists, only) {
     && (!named.length || wordsOf(job, x).some(w => named.includes(w))));
   const out = { suites: picked("suites"), upgrade: picked("upgrade") };
   if (!out.suites.length && !out.upgrade.length) return { refused: `the input "only", ${words.join(" ")}, picks no job: no job of that system carries those parts. Mend: start the run again naming a part a job of that system carries, or no system` };
+  // (a run so named is never read as full, so words that pick every job would spend a full run's minutes for nothing)
+  if (out.suites.length === lists.suites.length && out.upgrade.length === lists.upgrade.length) return { refused: `the input "only", ${words.join(" ")}, picks every job of the full run, which a run so named is never read as. Mend: leave it empty for the tests in full` };
   return out;
 }
 
