@@ -13,7 +13,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { RECORD, due, record, said } from "../scripts/core-reading.mjs";
+import { RECORD, due, main, record, said } from "../scripts/core-reading.mjs";
+import { mended } from "../scripts/mend.mjs";
 import { ROOT, rulesAt, takenRules, rules } from "../scripts/rules.mjs";
 import { tally } from "../scripts/scratch-core.mjs";
 
@@ -122,15 +123,14 @@ const commits = {
 }
 {
   const here = fs.mkdtempSync(path.join(os.tmpdir(), "core-reading-cli-"));
-  const run = (...args) => spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/core-reading.mjs", import.meta.url)), ...args], { cwd: here, encoding: "utf8" });
-  ok(/takes no copy/.test(run().stdout), "where no manifest stands, as in the core's own repository, nothing is read");
+  ok(/takes no copy/.test(main([], here)), "where no manifest stands, as in the core's own repository, nothing is read");
   fs.writeFileSync(path.join(here, "core-manifest.md"), "Modules: all\n");
-  ok(/A whole reading of the project against the core is due/.test(run().stdout), "a project with no record is asked a whole reading");
-  ok(run("--rules").stdout.split("\n").includes("floor/security.md: 1. Nothing secret in the repository"), "--rules lists every rule it takes, by its key");
-  const r = run("--recorded");
-  ok(r.status === 0 && fs.existsSync(path.join(here, RECORD)) && /No reading of the project against the core is due/.test(run().stdout), "--recorded writes the record, and then nothing is due", r.stderr);
-  const wrong = run("--all");
-  ok(wrong.status === 1 && /Mend: /.test(wrong.stderr), "an option it does not know fails, with its mend", wrong.stderr);
+  ok(/A whole reading of the project against the core is due/.test(main([], here)), "a project with no record is asked a whole reading");
+  ok(main(["--rules"], here).split("\n").includes("floor/security.md: 1. Nothing secret in the repository"), "--rules lists every rule it takes, by its key");
+  ok(/recorded/.test(main(["--recorded"], here)) && fs.existsSync(path.join(here, RECORD)) && /No reading of the project against the core is due/.test(main([], here)), "--recorded writes the record, and then nothing is due");
+  // (the command's own exit code and failure line, which only a process shows)
+  const wrong = spawnSync(process.execPath, [fileURLToPath(new URL("../scripts/core-reading.mjs", import.meta.url)), "--all"], { cwd: here, encoding: "utf8" });
+  ok(wrong.status === 1 && mended(wrong.stderr.trim()), "an option it does not know fails, with its mend", wrong.stderr);
   fs.rmSync(here, { recursive: true, force: true });
 }
 done("what rulesAt reads once and what it reads each time, and what a reading against the core finds due");

@@ -56,7 +56,8 @@ export function record(manifest, day, root = ROOT) {
   return `${JSON.stringify({ day, read: marks }, null, 2)}\n`;
 }
 
-function main(args, cwd = process.cwd()) {
+// What the command prints, run in `cwd` with `args`; it writes the record with --recorded.
+export function main(args, cwd = process.cwd()) {
   const read = f => { const at = path.join(cwd, f); return fs.existsSync(at) ? fs.readFileSync(at, "utf8") : null; };
   const manifest = read("core-manifest.md");
   if (manifest === null) return "No core-manifest.md here: the core's own repository takes no copy, so it is read against nothing (#259 is its reading); run this from a project's root.";
