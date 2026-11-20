@@ -985,6 +985,17 @@ ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks
   ok(!strengthOf(goSaid) && goSaid.some(n => n.script === "scripts/shape.mjs") && /names under "code" no file it measures/u.test(strengthOf(shSaid)?.why ?? "") && !shSaid.some(n => n.script === "scripts/shape.mjs"),
     "the strength is said to read nothing by what it measures, a file of a language the shape check's readers do not know among it, never by the shape check's languages", JSON.stringify({ goSaid, shSaid }));
   execFileSync("git", ["rm", "-q", "-r", "-f", "--", "go", "bin", "t"], { cwd: bare });
+  // (a file of code the shape check does not read, a link or one listed and gone from the disk, makes it read nothing)
+  fs.mkdirSync(path.join(bare, "ln"), { recursive: true });
+  fs.writeFileSync(path.join(bare, "ln", "gone.js"), "export {};\n");
+  execFileSync("git", ["add", "-A"], { cwd: bare });
+  fs.rmSync(path.join(bare, "ln", "gone.js"));
+  let linked = true;
+  try { fs.symlinkSync(path.join(bare, "core-manifest.md"), path.join(bare, "ln", "a.js")); } catch { linked = false; }
+  ok(readNothing(bare, withTool, withConfig({ code: ["ln/"], tests: [] })).some(n => n.script === "scripts/shape.mjs"),
+    `the shape check is said to read nothing where its only files of code are ${linked ? "a link and " : ""}one gone from the disk, which it does not read`);
+  fs.rmSync(path.join(bare, "ln"), { recursive: true, force: true });
+  execFileSync("git", ["add", "-A"], { cwd: bare });
   // (where which checks read nothing cannot be read, the report says so, never that every check read something)
   const unreadNothing = Object.assign([], { nothing: null, nothingWhy: "a reason" });
   ok(report(unreadNothing).includes("Which checks read nothing here could not be read (a reason)") && !report(Object.assign([], { nothing: [] })).includes("read nothing"),

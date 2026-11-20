@@ -204,7 +204,8 @@ export function report(root = ROOT) {
 
 // The core's own share (#459, point 3), as a project's report gives its own: the floor's and the modules' rules held
 // whole by a check (`c`, as counts() gives them); the core's own rules, those of its AGENTS.md, are said not to be
-// counted, since each names its holder in its own text and their entries under scripts/holders/ carry none (#925).
+// counted, since each names its holder in its own text and their entries under scripts/holders/ carry none: a departure
+// from AGENTS.md's "The share a check holds is reported" until #925 lets the list carry them.
 function coreShare(root, c) {
   const own = rules(root, { agents: true }).filter(r => r.file === "AGENTS.md").length;
   return `- rules held by a check: the floor's and the modules' ${c.check} of ${c.all}; the core's own ${own}, those of \`AGENTS.md\`, not counted, each naming its holder in its own text and its entry under \`${FILE}/\` none (#925).`;

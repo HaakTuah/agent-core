@@ -544,15 +544,17 @@ const SAFE = ["-c", "core.fsmonitor=false"];
 const git = (args, opts = {}) => execFileSync("git", [...SAFE, ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["pipe", "pipe", "ignore"], ...opts });
 const lsFiles = (specs, root) => (specs.length ? git(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...specs], { cwd: root }).split("\0").filter(Boolean) : []);
 const readable = f => isCode(f) || isPackageFile(f);
+// A file the check reads in the working folder: one on disk that is no link, as standing() reads it.
+const onDisk = (f, root) => { try { return !fs.lstatSync(path.join(root, f)).isSymbolicLink(); } catch { return false; } };
 // The files of code its readers know that the check reads under the config's "code" and "tests", in the working folder
 // (read-nothing.mjs counts them, so that the two lists cannot drift; #459).
-export const codeListed = (config, root = ".") => lsFiles([...config.code, ...config.tests], root).filter(isCode);
+export const codeListed = (config, root = ".") => lsFiles([...config.code, ...config.tests], root).filter(f => isCode(f) && onDisk(f, root));
 
 // The project's files as they stand in the working folder: { texts, tests }, never through a link.
 export function standing(config, root = ".") {
   const texts = {};
   for (const f of new Set([...lsFiles([...config.code, ...config.tests], root), ...lsFiles(PACKAGE_FILES, root)].filter(readable))) {
-    try { if (!fs.lstatSync(path.join(root, f)).isSymbolicLink()) texts[f] = fs.readFileSync(path.join(root, f), "utf8"); } catch { /* listed, not on disk */ }
+    try { if (onDisk(f, root)) texts[f] = fs.readFileSync(path.join(root, f), "utf8"); } catch { /* listed, not on disk */ }
   }
   return { texts, tests: new Set(lsFiles(config.tests, root)) };
 }
