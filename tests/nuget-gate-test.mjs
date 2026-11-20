@@ -18,8 +18,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { runWorkflow } from "../scripts/workflow-run.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { CORE } from "../scripts/core-address.mjs";
 import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 
 const { ok, done } = tally();
 const workflow = fs.readFileSync(path.join(root, ".github/workflows/nuget.yml"), "utf8");
