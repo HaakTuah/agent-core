@@ -121,7 +121,9 @@ function stagesOf(short, reviewers, themselves) {
   });
   const p = groups.findIndex(g => g.kind === "proof"), auto = list => list.filter(r => themselves.includes(r));
   const free = left.length ? `the reviews by ${named(left)} and ` : "";
-  const reviews = g => `every review a session of ${named(g.tools)} gives, such as the fallback reviewer's and the design check`;
+  // (the fallback reviewer's and the design check are named as examples only where one tool's stage stands)
+  const one = groups.filter(g => g.kind !== "proof").length === 1;
+  const reviews = g => `every review a session of ${named(g.tools)} gives${one ? ", such as the fallback reviewer's and the design check" : ""}`;
   const after = g => `once the checks passed and the reviews before hold nothing blocking on that head: ${reviews(g)}${auto(g.mine).length ? `; one that starts by itself (${named(auto(g.mine))}) has started at the ready, and is waited for and read` : ""}`;
   const out = [];
   if (p < 0) out.push(`the pull request marked ready: the host's checks, ${free}every review not named below, asked or starting by itself, together`);

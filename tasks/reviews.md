@@ -166,8 +166,9 @@ path `scripts/stage-order.mjs`. What reviewers judge by: `roles/shared/review-gu
     (its header): the proof billed (a private repository whose suites run on the host's runners, their rate printed),
     the allowance of a tool that builds, or that of the session's own tool while the session sees its usage warning,
     which it tells the script. Then a stage goes early where it spends little of what is short and often sends the work
-    back, one that spends less of it before one that spends more, and the stage that spends most goes last, once, on
-    settled code: where it is the proof, the reviews are asked on the draft and their blocking findings mended before
+    back, one that spends a thing ranked less short before one ranked more (the script's header ranks them), and the
+    stage that spends most goes last, once, on settled code (the script reads what is short, never how often a stage
+    sends the work back, which the review record shows): where it is the proof, the reviews are asked on the draft and their blocking findings mended before
     it is marked ready; where it is a tool's reviews, they are asked once the host's checks passed and the reviews
     before hold nothing blocking on that head. The builder runs the script at its task's start or, at the latest, before it asks its first
     review, and follows the order it prints; the owner's word, said in person, for now or as the pace, overrides it. It

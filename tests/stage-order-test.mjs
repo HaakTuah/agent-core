@@ -46,8 +46,8 @@ ok(o.short.map(s => s.kind).join() === "proof,review" && /2× a Linux minute/.te
   "a billed proof outranks a building tool's allowance: the reviews that spend nothing short on the draft first, then the building tool's, the proof last, once, a review that starts by itself starting with it (the design check's finding on #898)", stages(o));
 o = order({ billed: true, builders: [["Claude Code", 3]], reviewers: ["Claude Code", "codex-app[bot]"], warning: "Codex" });
 ok(o.short.map(s => s.kind).join() === "review,proof,review" && o.short[0].said.includes("Codex, which shows its usage warning") && o.stages.length === 5 && /^on the draft: every review not named below/.test(o.stages[1])
-  && /a session of Claude Code gives/.test(o.stages[2]) && /^once: the pull request marked ready/.test(o.stages[3]) && /^last, once the checks passed .*a session of Codex gives/.test(o.stages[4]),
-  "the tool under its usage warning outranks the billed proof, which outranks a building tool: each stage that spends something short after those that spend less, the warned tool's reviews last", stages(o));
+  && /a session of Claude Code gives/.test(o.stages[2]) && /^once: the pull request marked ready/.test(o.stages[3]) && /^last, once the checks passed .*a session of Codex gives/.test(o.stages[4]) && !/design check/.test(stages(o)),
+  "the tool under its usage warning outranks the billed proof, which outranks a building tool: each stage that spends something short after those that spend less, the warned tool's reviews last, and no review named as an example in two stages", stages(o));
 o = order({ billed: false, builders: [["Claude Code", 3]], reviewers: ["Claude Code"], warning: "claude code" });
 ok(o.short.length === 1 && o.stages.length === 3, "a tool under its warning that also builds is short once, at its higher rank", JSON.stringify(o.short));
 o = order({ billed: false, builders: [["Claude Code", 30]], reviewers: ["Claude Code", "codex-app[bot]"], themselves: ["codex-app[bot]"] });
