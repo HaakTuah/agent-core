@@ -180,7 +180,7 @@ const FOREIGN = /[\u0085\u2028\u2029]/u;
 // entries are left out; the text as it stands is read as ever (#970). Where the text as it stands is no YAML either, every
 // reading is kept, so a key that is not there may be named in a file that is refused all the same.
 export const keysTwice = remember(text => {
-  if (!FOREIGN.test(String(text))) return twice(text);
+  if (!FOREIGN.test(String(text))) return Object.freeze(twice(text).map(Object.freeze)); // (shared between the readers, so none can change it)
   const by = ({ text: read, line }) => {
     const groups = new Map();
     for (const found of twice(read)) {
