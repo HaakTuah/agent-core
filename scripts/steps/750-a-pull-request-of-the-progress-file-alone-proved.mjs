@@ -2,7 +2,8 @@
 // of their names.
 import { readable } from "../check-configs.mjs";
 import { CORE } from "../core-address.mjs";
-import { COST, shown, topLevel, unwrapped } from "../step-checks.mjs";
+import { COST, shown } from "../step-checks.mjs";
+import { topLevel, unwrapped } from "../step-checks-tests.mjs";
 
 // Where a workflow of the project's calls the core's security-review.yml without the proof that a pull request is
 // queue-only before it (#750): each such workflow, with the review call's pin, and each job calling the core's
