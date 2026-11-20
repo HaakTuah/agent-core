@@ -40,7 +40,7 @@ import { notLinked, parseBaseline, parseConfig, where } from "./shape.mjs";
 import { started } from "./started.mjs";
 
 const SAFE = ["-c", "core.fsmonitor=false", "-c", "core.quotePath=false"];
-const git = args => execFileSync("git", [...SAFE, ...args], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
+const git = (args, cwd) => execFileSync("git", [...SAFE, ...args], { cwd, encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
 const tolerant = read => { try { return read(); } catch { return null; } };
 const CAUGHT = ["Killed", "Timeout"], SURVIVED = ["Survived", "NoCoverage"];
 const ROW = "*mutation tool*";
@@ -355,20 +355,24 @@ const deletedTests = (base, tests) => (tests.length ? git(["diff", "--name-only"
 
 const summary = lines => { if (process.env.GITHUB_STEP_SUMMARY) tolerant(() => fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.map(l => `- ${l}`).join("\n")}\n`)); };
 
-// The files git lists under pathspecs, none a link.
-const listed = specs => (specs.length ? git(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...specs]).split("\0").filter(f => f && !tolerant(() => fs.lstatSync(f).isSymbolicLink())) : []);
+// The files git lists under pathspecs in the working folder at `root`, none a link.
+const listed = (specs, root) => (specs.length ? git(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...specs], root).split("\0").filter(f => f && !tolerant(() => fs.lstatSync(path.join(root ?? ".", f)).isSymbolicLink())) : []);
+// The code the measure reads under a config: each file of its "code" in a language the core knows by its ending,
+// JavaScript's, TypeScript's or another's, that is no test (read-nothing.mjs names the check where it is none; #459).
+export function measuredCode(config, root) {
+  const tests = new Set(listed(config.tests, root));
+  return listed(config.code, root).filter(f => !tests.has(f) && [...CODE, ...OTHER].includes(path.posix.extname(f)));
+}
 
-// The project as the check reads it: its tool, its config, its code (each file of the config's "code" in a language
-// the core knows by its ending, JavaScript's, TypeScript's or another's, that is no test) and the baseline's path. A
+// The project as the check reads it: its tool, its config, its code (measuredCode) and the baseline's path. A
 // change "touches" the code or the tests where it changes any file their pathspecs read (data the code reads too),
 // but the two baselines and a text in Markdown, such as an audit's report.
 function project() {
   const { text, home } = rulesHere(), tool = toolOf(text);
   const configAt = where(text);
   if (!fs.existsSync(unlinked(configAt))) return { tool, home, config: null };
-  const config = parseConfig(fs.readFileSync(configAt, "utf8"), configAt), tests = new Set(listed(config.tests));
-  const code = listed(config.code).filter(f => !tests.has(f) && [...CODE, ...OTHER].includes(path.posix.extname(f)));
-  return { tool, home, config, code, at: baselineOf(config) };
+  const config = parseConfig(fs.readFileSync(configAt, "utf8"), configAt);
+  return { tool, home, config, code: measuredCode(config), at: baselineOf(config) };
 }
 
 // A pull request's run: the tool on the changed lines; then, where a kind's survivors there or its entries lowered

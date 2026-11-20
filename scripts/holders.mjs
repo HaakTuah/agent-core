@@ -215,7 +215,8 @@ function coreShare(root, c) {
 // file's name), how many a check holds whole there, by the core's own list: { held, all }, none counted whose every
 // check read nothing there (`nothing`, the scripts read-nothing.mjs names, by their path in the core, scripts/shape.mjs;
 // #459, point 3). A check the core's list names that a project may not have set up (a ruleset of the host's) counts as
-// the list names it: the count is the core's map less what read nothing, which the share's line says.
+// the list names it: the count is the core's map less what read nothing, as AGENTS.md's "The share a check holds is
+// reported" says.
 export function heldThere(root, nothing, out = new Set()) {
   const h = holders(root), gone = new Set(nothing);
   const taken = h.rules.filter(r => r.file.startsWith("floor/") || !out.has(path.posix.basename(r.file)));

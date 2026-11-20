@@ -417,13 +417,14 @@ one says it does, and its conditions stand there. The main lane is the lines in 
 - **A check that read nothing says so** (#459, point 2). By default a check of the core's that reads a project's code
   passes where it finds nothing wrong. The one condition that changes it: it found no file there it could read, the
   shape check where its config is missing or its "code" and "tests" name no file of a language its readers know, the
-  tests' strength where the manifest names no *mutation tool*, or `none`, or the shape check's config names none. Then
-  `scripts/read-nothing.mjs` names it, with the rules of the modules the project takes that it holds, in the report
-  every sync prints (`scripts/steps.mjs`), and where it cannot tell, the report says so. The trigger is such a check,
-  written or widened: whoever builds it gives it its case in `read-nothing.mjs` in the same pull request. It does not
-  mean that it fails anything. Reason: a check that passes on nothing makes its rule look held: in a project of another
-  owner a check held 10 of the 75 of the core's rules that applied there, and nothing told its owner which. Held by
-  `tests/steps-test.mjs`, for the sync's report; that a new check gives its case, by none.
+  tests' strength where the manifest names no *mutation tool*, or `none`, or the shape check's config, whose files it
+  measures, is missing or names no file it measures. Then `scripts/read-nothing.mjs` names it, with the rules of the
+  modules the project takes that it holds, in the report every sync prints (`scripts/steps.mjs`), and where it cannot
+  tell, the report says so. The trigger is such a check, written or widened: whoever builds it gives it its case in
+  `read-nothing.mjs` in the same pull request. It does not mean that it fails anything. Reason: a check that passes on
+  nothing makes its rule look held: in a project of another owner a check held 10 of the 75 of the core's rules that
+  applied there, and nothing told its owner which. Held by `tests/steps-test.mjs`, for the sync's report; that a new
+  check gives its case, by none.
 - **The share a check holds is reported** (#459, point 3). By default a project's monthly state report counts its own
   rules by what holds them. The session that takes it gives, on its line "rules held by a check", how many of the
   project's own rules a check holds whole and how many of the core's it takes, as the core's list maps them, counting

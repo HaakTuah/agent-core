@@ -2,7 +2,7 @@
 // check (shape.mjs), where its config is missing or its "code" and "tests" name no file of a language its readers know
 // (shape-readers.mjs, LANGUAGES), listed by the shape check's own lister (codeListed) so that the two cannot drift; and
 // the strength of the tests (strength.mjs), where the manifest names no mutation tool, or `none`, or the shape check's
-// config, whose files it measures, is missing or names none. Each comes with the rules it holds, as scripts/holders/ says (one fact,
+// config, whose files it measures, is missing or names none it measures (measuredCode, its own lister). Each comes with the rules it holds, as scripts/holders/ says (one fact,
 // one place), so that a report can say those rules are held by nothing there: a check that passes on nothing makes its
 // rule look held. A check that holds no rule of the modules the project takes is not named. It fails nothing (AGENTS.md
 // of the core, "Nothing locks a project"); the sync's report (steps.mjs) and a project's state report
@@ -14,7 +14,7 @@ import { leftOut } from "./reading.mjs";
 import { ROOT } from "./rules.mjs";
 import { LANGUAGES } from "./shape-readers.mjs";
 import { codeListed, parseConfig, where } from "./shape.mjs";
-import { toolOf } from "./strength.mjs";
+import { measuredCode, toolOf } from "./strength.mjs";
 
 // The rules each of the core's scripts holds, by its path under scripts/, as scripts/holders/ names them: those of the
 // modules a project takes alone (`out`, the names of those its manifest leaves out; the floor is never left out).
@@ -25,20 +25,24 @@ function rulesHeldBy(out) {
   return by;
 }
 
+// How many files a lister gives, or null where git refuses its pathspecs (one that leaves the project): the check then
+// fails with its own mend, and is no check that passes on nothing.
+const count = list => { try { return list().length; } catch { return null; } };
+
 // Each check that read nothing in the project at `root` (its manifest's text `manifest`, a file read by `read`, null
 // where there is none): [{ script, check, holds, why }], `script` its path in the core (scripts/shape.mjs), `check` the
 // same as the project calls it (by its copy's path), `holds` the rules it holds.
 export function readNothing(root, manifest, read) {
-  const found = [], at = where(manifest), text = read(at);
-  let code = null;
+  const found = [], at = where(manifest), text = read(at), tool = toolOf(manifest);
+  let config = null;
   if (text === null) found.push({ script: "scripts/shape.mjs", why: `the project holds no \`${at}\`, the check's config` });
   else {
-    try { code = codeListed(parseConfig(text, at), root).length; } catch { /* (a config the check cannot read fails the check itself, with its mend: it is no check that passes on nothing) */ }
-    if (code === 0) found.push({ script: "scripts/shape.mjs", why: `\`${at}\` names under "code" and "tests" no file the check's readers know (${LANGUAGES.join(", ")})` });
+    try { config = parseConfig(text, at); } catch { /* (a config the check cannot read fails the check itself, with its mend: it is no check that passes on nothing) */ }
+    if (config && count(() => codeListed(config, root)) === 0) found.push({ script: "scripts/shape.mjs", why: `\`${at}\` names under "code" and "tests" no file the check's readers know (${LANGUAGES.join(", ")})` });
   }
-  const tool = toolOf(manifest);
   if (tool === null || tool.none !== undefined) found.push({ script: "scripts/strength.mjs", why: tool === null ? "the manifest names no *mutation tool*" : "the manifest's *mutation tool* is `none`" });
-  else if (text === null || code === 0) found.push({ script: "scripts/strength.mjs", why: text === null ? `the measure waits for \`${at}\`, the shape check's config, whose files it measures` : `it measures the files \`${at}\` names, and none is of a language the readers know` });
+  else if (text === null) found.push({ script: "scripts/strength.mjs", why: `the measure waits for \`${at}\`, the shape check's config, whose files it measures` });
+  else if (config && count(() => measuredCode(config, root)) === 0) found.push({ script: "scripts/strength.mjs", why: `\`${at}\` names under "code" no file it measures: none that is no test, in a language the core knows by its ending` });
   if (!found.length) return [];
   const held = rulesHeldBy(leftOut(manifest)), copy = copyOf(root);
   return found.map(f => ({ ...f, check: `${copy}${f.script}`, holds: held.get(f.script) ?? [] })).filter(f => f.holds.length);

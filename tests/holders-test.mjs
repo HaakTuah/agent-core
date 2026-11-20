@@ -16,6 +16,8 @@ import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { fingerprint, rules, rulesOf } from "../scripts/rules.mjs";
 import { installed } from "../scripts/packages.mjs";
+import { leftOut } from "../scripts/reading.mjs";
+import { heldHere } from "../scripts/state-report.mjs";
 import { shapeFaults } from "../scripts/schemas.mjs";
 
 // (the file's form is read by ajv, which the core's install brings; without it the cases that read the form could only
@@ -219,6 +221,22 @@ ok(run.status === 1 && mended(`${run.stdout}${run.stderr}`) && /^::warning::The 
   const ownCount = rules(root, { agents: true }).filter(r => r.file === "AGENTS.md").length, cc = counts(holders(root));
   ok(ownCount > 0 && coreLine.includes(` of ${ownCount} (`) && coreLine.endsWith(`the floor's and the modules' ${cc.check} of ${cc.all}.`),
     "the core's own report gives its share: its own rules of AGENTS.md a check holds whole, beside the floor's and the modules'", coreLine);
+}
+
+// (the share read in a project as the monthly report reads it (state-report.mjs, heldHere): one with no shape config and no mutation tool, whose
+// core's count leaves out the rules those two checks hold, and its own rule counted)
+{
+  const proj = fs.mkdtempSync(path.join(tmp, "held-here-")), was = process.cwd();
+  const manifest = "Core: x at " + "a".repeat(40) + ".\n\n| *mutation tool* | `none` |\n";
+  fs.writeFileSync(path.join(proj, "core-manifest.md"), manifest);
+  fs.writeFileSync(path.join(proj, "AGENTS.md"), "# A project\n\n- **Keep it short.** Words.\n");
+  spawnSync("git", ["init", "-q"], { cwd: proj });
+  spawnSync("git", ["add", "-A"], { cwd: proj });
+  let got;
+  try { process.chdir(proj); got = heldHere(manifest); } finally { process.chdir(was); }
+  const all = heldThere(root, [], leftOut(manifest)), less = heldThere(root, ["scripts/shape.mjs", "scripts/strength.mjs"], leftOut(manifest));
+  ok(got && got.own.all === 1 && got.there.all === all.all && got.there.held === less.held && less.held < all.held,
+    "a project's share is read there: its own rules, and the core's less those whose every check read nothing there", JSON.stringify({ got, all, less }));
 }
 
 // ---- a project's own rules (#662) ----

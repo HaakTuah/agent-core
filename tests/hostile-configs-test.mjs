@@ -23,6 +23,7 @@ import { answered, capsOf, whoseOf } from "../scripts/size.mjs";
 const owner = whoseOf("someone", []), me = { login: "someone", type: "User" };
 import { STEPS, notDone } from "../scripts/steps.mjs";
 import { readNothing } from "../scripts/read-nothing.mjs";
+import { ownFiles } from "../scripts/own-files.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
 import { shapeFaults } from "../scripts/schemas.mjs";
 
@@ -246,8 +247,9 @@ ok(unread(notDone(p, inputs)), "steps.mjs: SECURITY.md that is a folder, the wro
 // that names a config with markup or a path out: each is read in time as the shape check reads it, a config the check
 // cannot read naming no check, a config not there naming it with that why, and no file outside the project listed)
 {
-  const shapeAt = "checks/shape.json", readP = f => { try { return fs.readFileSync(path.join(p, f), "utf8"); } catch { return null; } };
-  const named = (config, manifest = "") => { if (config === null) fs.rmSync(path.join(p, shapeAt), { force: true }); else write(shapeAt, typeof config === "string" ? config : JSON.stringify(config)); return readNothing(p, manifest, readP); };
+  // (read as the steps read the project: its own files alone, through own-files.mjs, listed afresh at each call)
+  const shapeAt = "checks/shape.json", readP = f => ownFiles(p).read(f);
+  const named = (config, manifest = "") => { if (config === null) fs.rmSync(path.join(p, shapeAt), { force: true }); else { write(shapeAt, typeof config === "string" ? config : JSON.stringify(config)); gitP("add", "-A"); } return readNothing(p, manifest, readP); };
   const shapeSaid = l => l.find(n => n.script === "scripts/shape.mjs");
   for (const [c, what] of [[{ ...SHAPE, code: ["../outside/"] }, "a path that leaves the project"], [{ ...SHAPE, code: [outside] }, "an absolute path outside"], [{ ...SHAPE, code: [":(top)../"] }, "a magic pathspec"],
     [{ ...SHAPE, code: "src/" }, "code that is no list"], ["<b>", "markup"], ["", "nothing at all"]]) {
@@ -258,12 +260,18 @@ ok(unread(notDone(p, inputs)), "steps.mjs: SECURITY.md that is a folder, the wro
   [said, ms] = timed(() => named({ ...SHAPE, code: Array.from({ length: BIG }, (_, i) => `src/d${i}/`) }));
   ok(ms < 5000, `read-nothing.mjs: a shape config of ${BIG} pathspecs is read in ${ms} ms`);
   ok(/holds no `checks\/shape\.json`/u.test(shapeSaid(named(null))?.why ?? ""), "read-nothing.mjs: a project with no shape config is said to have none, never to name nothing");
-  for (const m of ["| *shape check* | `<img src=x>.json` |", "| *shape check* | `../outside/x.json` |"]) {
-    let thrownBy = null;
-    try { named(SHAPE, m); } catch (e) { thrownBy = e; }
-    ok(thrownBy === null, `read-nothing.mjs: a manifest that names the shape config as ${m.split("`")[1]} is read with nothing thrown and nothing outside read`);
+  // (a config outside the project, which would change the verdict were it read: the manifest that names it gets the
+  // verdict of no config at all)
+  fs.writeFileSync(path.join(outside, "x.json"), JSON.stringify({ ...SHAPE, code: ["."] }));
+  // (markup is no path, so the kit's config is read in its place; a path out is read as no config)
+  for (const [m, none] of [["| *shape check* | `<img src=x>.json` |", false], ["| *shape check* | `../outside/x.json` |", true]]) {
+    let thrownBy = null, said = null;
+    try { said = named(SHAPE, m); } catch (e) { thrownBy = e; }
+    ok(thrownBy === null && /holds no `/u.test(shapeSaid(said)?.why ?? "") === none, `read-nothing.mjs: a manifest that names the shape config as ${m.split("`")[1]} is read with nothing thrown and nothing outside read`);
   }
+  fs.rmSync(path.join(outside, "x.json"));
   fs.rmSync(path.join(p, shapeAt), { force: true });
+  gitP("add", "-A");
 }
 
 // ---- nothing written outside the project ----

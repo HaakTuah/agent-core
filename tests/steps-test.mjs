@@ -967,9 +967,24 @@ ok(nugetMend.includes("`config/licences.json` has a \"nuget\" part") && !/checks
   const toolNoCode = readNothing(bare, withTool, readBare), noConfig = readNothing(bare, withTool, f => (f === "checks/shape.json" ? null : readBare(f)));
   const strengthOf = l => l.find(n => n.script === "scripts/strength.mjs");
   ok(/`none`/u.test(strengthOf(before.nothing)?.why ?? "") && strengthOf(before.nothing).check === "core/scripts/strength.mjs" && withTool !== manifestOf("")
-    && /none is of a language/u.test(strengthOf(toolNoCode)?.why ?? "") && /waits for `checks\/shape\.json`/u.test(strengthOf(noConfig)?.why ?? "")
+    && /names under "code" no file it measures/u.test(strengthOf(toolNoCode)?.why ?? "") && /waits for `checks\/shape\.json`/u.test(strengthOf(noConfig)?.why ?? "")
     && /holds no `checks\/shape\.json`/u.test(noConfig.find(n => n.script === "scripts/shape.mjs")?.why ?? ""),
     "the strength of the tests is said to read nothing where no mutation tool is named, or where the shape check's config names no file it reads or is not there, and a missing config is said as missing", JSON.stringify({ toolNoCode, noConfig }));
+  // (strength is decided by what it measures, never by the shape check's languages: a Go file under "code" is
+  // measured, so the strength read something there while the shape check did not; and code of none it measures, a
+  // JavaScript test beside it, leaves the strength with nothing while the shape check reads the test)
+  fs.mkdirSync(path.join(bare, "go"), { recursive: true });
+  fs.writeFileSync(path.join(bare, "go", "main.go"), "package main\n");
+  fs.mkdirSync(path.join(bare, "bin"), { recursive: true });
+  fs.writeFileSync(path.join(bare, "bin", "run.sh"), "echo\n");
+  fs.mkdirSync(path.join(bare, "t"), { recursive: true });
+  fs.writeFileSync(path.join(bare, "t", "a.test.js"), "export {};\n");
+  execFileSync("git", ["add", "-A"], { cwd: bare });
+  const withConfig = c => f => (f === "checks/shape.json" ? JSON.stringify({ baseline: "checks/shape-baseline.json", ...c }) : readBare(f));
+  const goSaid = readNothing(bare, withTool, withConfig({ code: ["go/"], tests: [] })), shSaid = readNothing(bare, withTool, withConfig({ code: ["bin/", "t/"], tests: ["t/"] }));
+  ok(!strengthOf(goSaid) && goSaid.some(n => n.script === "scripts/shape.mjs") && /names under "code" no file it measures/u.test(strengthOf(shSaid)?.why ?? "") && !shSaid.some(n => n.script === "scripts/shape.mjs"),
+    "the strength is said to read nothing by what it measures, a file of a language the shape check's readers do not know among it, never by the shape check's languages", JSON.stringify({ goSaid, shSaid }));
+  execFileSync("git", ["rm", "-q", "-r", "-f", "--", "go", "bin", "t"], { cwd: bare });
   // (where which checks read nothing cannot be read, the report says so, never that every check read something)
   const unreadNothing = Object.assign([], { nothing: null, nothingWhy: "a reason" });
   ok(report(unreadNothing).includes("Which checks read nothing here could not be read (a reason)") && !report(Object.assign([], { nothing: [] })).includes("read nothing"),
