@@ -1,4 +1,4 @@
-// The check of the line "Waits on:", read as the description's last line (split from pr-description.mjs, #888; "Nothing waits silently" in roles/shared/work-flow.md). pr-description.mjs,
+// The check of the line "Waits on:", read from the last line that starts with it (split from pr-description.mjs, #888; "Nothing waits silently" in roles/shared/work-flow.md). pr-description.mjs,
 // beside this file, says what the check asks as a whole, runs this one and exports what it holds.
 import { textOf } from "./reading.mjs";
 
