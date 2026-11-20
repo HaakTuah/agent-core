@@ -1,6 +1,5 @@
 {
   "rule": "AGENTS.md: A rule is written in the form a check can hold",
-  "holder": "check: scripts/pruning.mjs, in part",
   "behind": ["#887"],
   "number": "findings; outcome: fast"
 }
