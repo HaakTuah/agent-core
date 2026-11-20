@@ -139,10 +139,6 @@
       "mark": 84826,
       "why": "#884: along its sections, the survey apart from the baseline and the verdict."
     },
-    "scripts/code-shape.mjs": {
-      "mark": 39684,
-      "why": "#973: a split along its sections (the lexer, the import and cycle readers, the measure, the history, the command) is a pull request of its own, which proves the behaviour unchanged."
-    },
     "scripts/state-report.mjs": {
       "mark": 22381,
       "why": "Its sections are other scripts' already (holders, pruning, cited, read-total, merge-line); what stands is the one body that sets them in order, which whoever changes a section reads."
