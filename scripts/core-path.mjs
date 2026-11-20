@@ -146,7 +146,7 @@ export function hookCommands(core) {
     const own = `git -C ${dir} --no-replace-objects show refs/remotes/origin/main:${core.path}scripts/${script} 2>/dev/null`;
     if (core.form !== "carried") return own;
     const lib = core.library.slice(0, -1), rest = core.path.slice(core.library.length);
-    return `${own} || { s=$(git -C ${dir} --no-replace-objects rev-parse refs/remotes/origin/main:${lib} 2>/dev/null) && git -C ${dir}/${lib} --no-replace-objects show "$s:${rest}scripts/${script}" 2>/dev/null; }`;
+    return `${own} || { s=$(git -C ${dir} --no-replace-objects rev-parse refs/remotes/origin/main:${lib} 2>/dev/null) && git -c safe.bareRepository=explicit -C ${dir}/${lib} --no-replace-objects show "$s:${rest}scripts/${script}" 2>/dev/null; }`;
   };
   const stop = `echo "STOP: the floor cannot be read at ${core.path}floor/security.md, where core-manifest.md says the core stands. Do nothing else in this session until it is mended. Mend: bring the files of the core into the checkout (git submodule update --init, where a submodule carries them), or, where that cannot be done here, say so to the owner and stop."`;
   return {

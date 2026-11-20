@@ -9,6 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import zlib from "node:zlib";
 import { CORE } from "../scripts/core-address.mjs";
 import { atCopy, carriedAt, corePath, floorCopy, floorCopyIn, hookCommands, manifestText, mendAt, projectAt, readCore } from "../scripts/core-path.mjs";
 import { mended } from "../scripts/mend.mjs";
@@ -215,6 +216,29 @@ ok(usual.helper === kit.PreToolUse[0].hooks[0].command && usual.stop === kit.Sto
     git(consumer, "checkout", "-q", "-b", "a-note"); put(consumer, "note.txt", "a note\n");
     const said = spawnSync("sh", ["-c", hookCommands(readCore(carried())).start], { input: "{}", encoding: "utf8", env: { ...env, CLAUDE_PROJECT_DIR: consumer } }).stdout;
     ok(/calls for `lib\/core\/tasks\/notes\.md`/.test(said), "the start hook, from a core a submodule carries, names the module the branch's changed paths call for", said);
+  }
+  // (a branch that commits, where the library stands, files that form a bare repository: its tree object under the genuine
+  // name holds another script. The commands read the library's commit main pins, from the repository named, never one git
+  // finds in the working tree; without safe.bareRepository=explicit the forged script runs)
+  {
+    const evil = path.join(tmp, "a-forged-project"), bare = path.join(tmp, "the-library.git"), origin3 = path.join(tmp, "a-forged-project.git");
+    git(tmp, "init", "-q", "-b", "main", evil);
+    git(evil, "submodule", "add", "-q", lib, "lib");
+    git(evil, "add", "-A"); git(evil, "commit", "-q", "-m", "a project");
+    git(tmp, "init", "-q", "--bare", "-b", "main", origin3);
+    git(evil, "remote", "add", "origin", origin3); git(evil, "push", "-q", "-u", "origin", "main");
+    git(tmp, "clone", "-q", "--bare", lib, bare);
+    const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: bare, env, input: "echo FORGED\n", encoding: "utf8" }).trim();
+    const tree = git(bare, "rev-parse", "HEAD:core/scripts").trim(), body = Buffer.concat([Buffer.from("100644 work-saved.sh\0"), Buffer.from(blob, "hex")]);
+    const loose = path.join(bare, "objects", tree.slice(0, 2), tree.slice(2));
+    fs.rmSync(loose, { force: true }); fs.mkdirSync(path.dirname(loose), { recursive: true });
+    fs.writeFileSync(loose, zlib.deflateSync(Buffer.concat([Buffer.from(`tree ${body.length}\0`), body])));
+    git(evil, "checkout", "-q", "-b", "forged"); git(evil, "rm", "-q", "-f", "lib");
+    fs.cpSync(bare, path.join(evil, "lib"), { recursive: true });
+    git(evil, "add", "-A", "-f"); git(evil, "commit", "-q", "-m", "a bare repository where the library stood");
+    const stop = hookCommands(readCore(carried())).stop, at = command => spawnSync("sh", ["-c", command], { input: "{}", encoding: "utf8", env: { ...env, CLAUDE_PROJECT_DIR: evil } }).stdout;
+    ok(/FORGED/.test(at(stop.replace("-c safe.bareRepository=explicit ", ""))) && !/FORGED/.test(at(stop)),
+      "a bare repository a branch commits where the library stands is not read by the commands for a carried core, though git reads it without safe.bareRepository=explicit", `${at(stop.replace("-c safe.bareRepository=explicit ", ""))}|${at(stop)}`);
   }
   git(project, "submodule", "deinit", "-q", "-f", "lib");
   said = run(hooks.start);
