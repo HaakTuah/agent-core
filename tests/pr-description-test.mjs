@@ -134,11 +134,11 @@ ok(Date.now() - slow < 2000, "a long description of signs and spaces is read in 
   git("reset", "-q", "--hard", "HEAD^1"); write("floor/security.md", "Read `scripts/newer.mjs`; only actions/ run.\n"); git("commit", "-qam", "a rule naming what is not here");
   write("actions/a.txt", "planted\n"); git("add", "-A"); git("commit", "-qm", "planted under its words");
   git("mv", "actions", "some-org"); write("floor/security.md", "Read `scripts/newer.mjs`; only some-org/ run.\n"); git("commit", "-qam", "the planted folder moved");
-  ok(proven(tmp, "HEAD^1", "HEAD", asked).length === 0, "a path that did not stand when the rule's line was written follows no move: a folder planted under a rule's words later, then moved, is not proven");
+  ok(proven(tmp, "HEAD^1", "HEAD", asked).length === 0, "a path outside the core's own folders follows no move: a folder planted under a rule's words, then moved, is not proven");
   git("reset", "-q", "--hard", "HEAD^1"); git("mv", "scripts/newer.mjs", "scripts/newest.mjs"); write("floor/security.md", "Read `scripts/newest.mjs`; only actions/ run.\n"); git("commit", "-qam", "a move that rewrites the line");
   const between = proven(tmp, "HEAD^1", "HEAD", asked);
   git("mv", "actions", "some-org"); write("floor/security.md", "Read `scripts/newest.mjs`; only some-org/ run.\n"); git("commit", "-qam", "the planted folder moved after");
-  ok(between.length === 1 && proven(tmp, "HEAD^1", "HEAD", asked).length === 0, "nor does a move proven between the plant and its move, which rewrote the line, make the planted path stand: each commit that wrote its spelling is read");
+  ok(between.length === 1 && proven(tmp, "HEAD^1", "HEAD", asked).length === 0, "nor does a move proven between the plant and its move, which rewrote the line, make it follow: the list of the core's own folders is fixed, read from no history");
 }
 // the line "Reasons read:", asked of a pull request that adds a line under the manifest's "Differences" (#756)
 {

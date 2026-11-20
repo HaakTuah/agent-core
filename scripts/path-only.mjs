@@ -11,8 +11,8 @@
 // files all moved so: the old path stands no more at the head, the new one stood nowhere at the base, and the new one
 // holds what the old held. A file that asks the yes (owner-yes.mjs's asks) is proven where it is changed in place, a
 // regular file on both sides, and its two versions are the same text but where a path of such a move stands in the old
-// and that move's new path in the same place in the new, the old path having stood in each commit that added or took
-// out its spelling in the file (git's pickaxe on the base, so a file planted under a rule's words later moves nothing); a path stands where no letter, digit, "_", ".", "/" or "-"
+// and that move's new path in the same place in the new, both paths in the core's own folders (OWN, so that a path a
+// rule writes for something outside the repository, `actions/`, is never one a file planted under it moves); a path stands where no letter, digit, "_", ".", "/" or "-"
 // comes before it and no letter, digit, "_" or "-", nor "." or "/" before one, comes after. It refuses, never guessing,
 // a file that asks the yes and is added, deleted or moved itself, a move into or out of such a path, every other change
 // of a word, and every file where the pull request changes this script, the description check, its workflow, what that
@@ -21,7 +21,6 @@
 // `main`'s, as floor rule 3 asks, though the description check runs the pull request's copy. Git and Node's own
 // modules; it changes nothing.
 import { spawnSync } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 import { asks } from "./owner-yes.mjs";
 import { started } from "./started.mjs";
@@ -68,6 +67,9 @@ const escape = s => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 // name alone follows nothing either.
 // (a path any part of which starts with ".", or whose file is named as a tool reads it)
 const FIXED = p => p.split("/").some(part => part.startsWith(".")) || /^(?:AGENTS|CLAUDE|GEMINI|REVIEW|SECURITY)\.md$|^(?:LICENSE|NOTICE)(?:\.\w+)?$/u.test(p.split("/").at(-1));
+// (the core's own top folders, a fixed list no pull request steers: a path a rule writes under one names the core's file)
+export const OWN = ["archive", "inventory", "modules", "reports", "roles", "scripts", "setup", "tasks", "tests", "tools", "words"];
+const own = p => OWN.includes(p.split("/")[0]) && p.includes("/");
 const SAFE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const named = p => /\.[A-Za-z0-9]+$/u.test(p.split("/").at(-1));
 const bare = p => p.includes("/") && (p.endsWith("/") || named(p));
@@ -75,7 +77,7 @@ export function spellings(moves) {
   const pairs = new Map();
   const add = (a, b) => { if (a.includes("/") && b.includes("/")) pairs.set(`\`${a}\``, `\`${b}\``); if (bare(a) && bare(b)) pairs.set(a, b); };
   for (const { from, to, folder } of moves) {
-    if (asks(from) || asks(to) || from === to || !SAFE.test(from) || !SAFE.test(to) || FIXED(from) || FIXED(to)) continue;
+    if (asks(from) || asks(to) || from === to || !SAFE.test(from) || !SAFE.test(to) || FIXED(from) || FIXED(to) || !own(from) || !own(to)) continue;
     add(from, to);
     if (folder) add(`${from}/`, `${to}/`);
   }
@@ -98,17 +100,14 @@ export function tokens(text, names) {
 const near = (one, other) => { let i = 0; while (i < one.length && one[i] === other[i]) i++; return one.slice(Math.max(0, i - 20), i + 20).replace(/\s+/gu, " "); };
 
 // Why `after` is not `before` with paths of `pairs` (spellings) followed, or null where it is.
-// `stood(at, path)`: whether `path`, at offset `at` of `before`, stood whenever the file's history wrote it, so that the
-// rule named a file that was there when it was written, not one planted under its words later; true where unasked.
-export function follows(before, after, pairs, stood = () => true) {
+export function follows(before, after, pairs) {
   const names = [...new Set([...pairs.keys(), ...pairs.values()])];
   const a = tokens(before, names), b = tokens(after, names);
   if (a.length !== b.length) return "it changes more than paths: a path stands where the other side has none";
-  for (let i = 0, at = 0; i < a.length; at += a[i].length, i++) {
+  for (let i = 0; i < a.length; i++) {
     if (a[i] === b[i]) continue;
     if (i % 2 === 0) return `it changes words that are no path of a move: "${near(a[i], b[i])}" becomes "${near(b[i], a[i])}"`;
     if (pairs.get(a[i]) !== b[i]) return `the path ${a[i]} becomes ${b[i]}, which is not where the pull request moves it`;
-    if (!stood(at, a[i].replace(/^`|`$/gu, "").replace(/\/$/u, ""))) return `the path ${a[i]} is not shown to have stood in each commit that wrote or took out its spelling in the file (git log -S on the base, which needs the whole history), so the rule may name something else, and a file planted under its words moves nothing`;
   }
   return null;
 }
@@ -125,7 +124,7 @@ export function verdicts({ changed, moves, self = false }) {
       : f.status !== "M" ? "it is added, deleted or moved, not changed in place"
       : f.modes?.[0] !== REGULAR || f.modes?.[1] !== REGULAR ? "it is not a regular file on both sides, its mode kept"
       : f.before === INVALID || f.after === INVALID ? "a side of it is no UTF-8 text"
-      : follows(f.before, f.after, pairs, f.stood);
+      : follows(f.before, f.after, pairs);
     if (why) refused.push({ path: f.path, why }); else proven.push(f.path);
   }
   return { proven, refused };
@@ -136,6 +135,13 @@ export function foldersOf(from, to) {
   const a = from.split("/"), b = to.split("/"), out = [];
   while (a.length > 1 && b.length > 1 && a.at(-1) === b.at(-1)) { a.pop(); b.pop(); out.push({ from: a.join("/"), to: b.join("/") }); }
   return out;
+}
+
+// Whether `to` names, but for the case of its letters, another file or folder of `files` (the head's), as one file to a
+// checkout on a file system that ignores case, where a pointer to it would open the other.
+export function collides(to, files) {
+  const low = to.toLowerCase();
+  return files.some(f => f !== to && !f.startsWith(`${to}/`) && (f.toLowerCase() === low || f.toLowerCase().startsWith(`${low}/`)));
 }
 
 // Whether a line of `git diff --raw` (":<mode> <mode> <id> <id> <status>") is a regular file renamed whole.
@@ -151,6 +157,9 @@ function movesOf(cwd, base, head) {
   const moves = [], r = fields(renamed);
   // (a link's text kept is not what it points to kept, so a link, or anything but a regular file, moves nothing)
   for (let i = 0; i + 2 < r.length; i += 3) if (moved(r[i])) moves.push({ from: r[i + 1], to: r[i + 2] });
+  const atHead = run(cwd, ["ls-tree", "-r", "--name-only", "-z", head]);
+  if (atHead === null) return null;
+  const headFiles = fields(atHead);
   const files = new Set(moves.map(m => `${m.from}\0${m.to}`)), seen = new Set();
   const stands = (at, p) => run(cwd, ["cat-file", "-e", `${at}:${p}`]) !== null;
   // (both ways: each file of the old folder moved to the new, and each file of the new came from the old, none added)
@@ -161,7 +170,8 @@ function movesOf(cwd, base, head) {
     seen.add(`${d.from}\0${d.to}`);
     if (!stands(head, d.from) && !stands(base, d.to) && whole(d)) moves.push({ ...d, folder: true });
   }
-  return moves;
+  // (a move to a path another of the head's bears but for case follows nothing)
+  return moves.filter(m => !collides(m.to, headFiles));
 }
 
 // One changed file as verdicts takes it: of one that asks the yes, its modes and, changed in place, its two texts.
@@ -170,26 +180,7 @@ function fileOf(cwd, base, head, status, path) {
   const mode = at => (run(cwd, ["ls-tree", at, "--", path]) ?? "").split(" ")[0];
   // (read as bytes and refused where they are no UTF-8, which would decode two different bytes the same)
   const text = at => { if (status !== "M") return null; const r = spawnSync("git", ["show", `${at}:${path}`], { cwd, maxBuffer: 1 << 26 }); try { return r.status === 0 ? UTF8.decode(r.stdout) : null; } catch { return INVALID; } };
-  const before = text(base);
-  return { path, status, modes: [mode(base), mode(head)], before, after: text(head), stood: typeof before === "string" ? stoodIn(cwd, base, path) : undefined };
-}
-
-// For a file of the base, stood(at, path) as follows takes it: `path` stood in each commit up to the base that added
-// or took out a spelling of it in the file (git's pickaxe, -S), so that a later commit that only rewrote the line around
-// it, a move followed among them, counts for nothing. Where git lists none, or a shallow clone's cut, which stands for
-// the history it lacks, nothing stood.
-function stoodIn(cwd, base, file) {
-  const seen = new Map();
-  const shallow = run(cwd, ["rev-parse", "--git-path", "shallow"])?.trim(), cut = new Set();
-  try { for (const c of fs.readFileSync(path.resolve(cwd, shallow ?? ""), "utf8").split("\n")) if (c) cut.add(c); } catch { /* not shallow */ }
-  return (at, p) => {
-    if (!seen.has(p)) {
-      const listed = run(cwd, ["log", "--format=%H", `-S${p}`, base, "--", file]);
-      const commits = (listed ?? "").split("\n").filter(Boolean);
-      seen.set(p, listed !== null && commits.length > 0 && commits.every(c => !cut.has(c) && run(cwd, ["cat-file", "-e", `${c}:${p}`]) !== null));
-    }
-    return seen.get(p);
-  };
+  return { path, status, modes: [mode(base), mode(head)], before: text(base), after: text(head) };
 }
 
 // What git says of the change from `base` to `head` in `cwd`, as verdicts takes it, or null where git cannot say.

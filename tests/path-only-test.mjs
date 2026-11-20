@@ -3,7 +3,7 @@
 // change is refused, with its mend. Pure: it gives the proof what git would, and starts no process.
 //
 //   node tests/path-only-test.mjs
-import { INVALID, ROOTS, SETUP, WORKFLOW, decides, failure, moved, foldersOf, follows, ownFiles, spellings, tokens, verdicts } from "../scripts/path-only.mjs";
+import { INVALID, OWN, ROOTS, SETUP, WORKFLOW, collides, decides, failure, moved, foldersOf, follows, ownFiles, spellings, tokens, verdicts } from "../scripts/path-only.mjs";
 import { mended } from "../scripts/mend.mjs";
 
 let failed = 0, count = 0;
@@ -33,10 +33,10 @@ ok(follows("`scripts/old.mjs`.", "`scripts/new.mjs`.", spellings(moves)) === nul
 ok(follows("scripts/tools-old and scripts/tools.json", "scripts/kit-old and scripts/kit.json", spellings(moves)) !== null, "a folder's name inside a longer name is no path of it");
 ok(tokens("a b", []).length === 1 && tokens("x scripts/kit/a.mjs y", ["scripts/kit", "scripts/kit/a.mjs"]).join("|") === "x |scripts/kit/a.mjs| y", "the longest path is read first");
 ok(JSON.stringify(foldersOf("scripts/tools/a.mjs", "scripts/kit/a.mjs")) === JSON.stringify([{ from: "scripts/tools", to: "scripts/kit" }]) && foldersOf("a.mjs", "b.mjs").length === 0 && foldersOf("x/a.mjs", "y/b.mjs").length === 0, "a file's move moves the folders whose trailing parts it shares");
-const words = [{ from: "tests", to: "opinions", folder: true }, { from: "tests/a.mjs", to: "opinions/a.mjs" }, { from: "and/or", to: "and/nor" }];
-ok(follows("tests prove it, and/or", "opinions prove it, and/nor", spellings(words)) !== null && follows("see `tests/` and tests/", "see `opinions/` and opinions/", spellings(words)) === null, "a word of prose is no path: a name with no \"/\", or with no extension or closing \"/\", is read only between backticks");
+const words = [{ from: "scripts/tests", to: "scripts/opinions", folder: true }, { from: "scripts/tests/a.mjs", to: "scripts/opinions/a.mjs" }, { from: "tools/and/or", to: "tools/and/nor" }];
+ok(follows("scripts/tests prove it, tools/and/or", "scripts/opinions prove it, tools/and/nor", spellings(words)) !== null && follows("see `scripts/tests` and scripts/tests/", "see `scripts/opinions` and scripts/opinions/", spellings(words)) === null, "a word of prose is no path: a name with no \"/\", or with no extension or closing \"/\", is read only between backticks");
 const planted = [{ from: "scripts/main", to: "scripts/dev", unique: true }, { from: "main", to: "dev", folder: true }, { from: "main/a.txt", to: "dev/a.txt" }];
-ok(follows("**12. `main` is the owners'.**", "**12. `dev` is the owners'.**", spellings(planted)) !== null && follows("see `scripts/main` and `main/`", "see `scripts/dev` and `dev/`", spellings(planted)) === null, "a plain word between backticks is no path: a file or folder planted under its name and moved rewrites nothing; a folder is read only with a \"/\"");
+ok(follows("**12. `main` is the owners'.**", "**12. `dev` is the owners'.**", spellings(planted)) !== null && follows("see `scripts/main`", "see `scripts/dev`", spellings(planted)) === null, "a plain word between backticks is no path: a file or folder planted under its name and moved rewrites nothing; a folder is read only with a \"/\"");
 ok(spellings([{ from: "tests", to: "tests later, not", folder: true }, { from: "a/b.md", to: "a/b\u0301.md" }]).size === 0, "a move whose path holds a space, a comma or a letter beyond ASCII justifies no pointer");
 ok(refused(one(INVALID), /no UTF-8/u), "a side that is no UTF-8 text is refused, since two different bytes would read alike");
 const graph = { "scripts/install.mjs": 'import { INSTALLS } from "./packages.mjs";', "scripts/pr-description.mjs": 'import { a } from "./owner-yes.mjs";\nimport "./whole-output.mjs";', "scripts/owner-yes.mjs": 'export { b } from "./reading.mjs";', "scripts/path-only.mjs": 'import { asks } from "./owner-yes.mjs";' };
@@ -49,8 +49,9 @@ ok(follows("see `a.mjs`", "see `b.mjs`", spellings(named)) !== null && follows("
 const fixed = [{ from: "SECURITY.md", to: "docs/POLICY.md" }, { from: "roles/CLAUDE.md", to: "roles/CLAUDE.txt" }, { from: ".claude/settings.json", to: ".claude/settings.shared.json" }, { from: ".github/dependabot.yml", to: "ci/dependabot.yml" }, { from: "tasks/LICENSE", to: "tasks/x/LICENSE" }];
 ok(spellings(fixed).size === 0 && follows("hold it in .claude/settings.json", "hold it in .claude/settings.shared.json", spellings(fixed)) !== null, "a move of what a tool reads by a fixed name or place (a dot file or folder, a rule file's name) justifies no pointer: it changes what a rule holds");
 ok(moved(":100644 100644 aaa aaa R100") && moved(":100755 100755 aaa aaa R100") && !moved(":120000 120000 aaa aaa R100") && !moved(":100644 120000 aaa bbb R100") && !moved(":160000 160000 aaa aaa R100") && !moved(":100644 100644 aaa bbb R090"), "only a regular file renamed whole is a move: a link keeps its text while what it points to changes");
-const lineTwo = "a\nsee `scripts/old.mjs` and scripts/tools/\n";
-ok(follows(lineTwo, "a\nsee `scripts/new.mjs` and scripts/kit/\n", spellings(moves), (at, p) => lineTwo.slice(0, at).split("\n").length === 2 && ["scripts/old.mjs", "scripts/tools"].includes(p)) === null && /not shown to have stood/u.test(follows(lineTwo, "a\nsee `scripts/new.mjs` and scripts/kit/\n", spellings(moves), (at, p) => p !== "scripts/tools") ?? ""), "a path follows its move only where it stood whenever the file's history wrote it: a file planted under a rule's words later moves nothing");
+const outside = [{ from: "actions", to: "some-org", folder: true }, { from: "actions/a.txt", to: "some-org/a.txt" }, { from: "core/scripts/weakened.mjs", to: "core/scripts/w.mjs" }, { from: "scripts/x/a.mjs", to: "lib/a.mjs" }];
+ok(spellings(outside).size === 0 && OWN.includes("scripts") && !OWN.includes("floor") && !OWN.includes("core"), "a move follows only where both paths lie in the core's own folders, a fixed list: a path a rule writes for something outside the repository (`actions/`) moves with no file planted under it");
+ok(collides("tasks/Roles.md", ["tasks/roles.md", "tasks/Roles.md"]) && collides("tasks/Kit", ["tasks/kit/a.md", "tasks/Kit/b.md"]) && !collides("tasks/host.md", ["tasks/host.md", "tasks/roles.md"]) && !collides("scripts/kit", ["scripts/kit/a.mjs"]), "a new path another of the head's bears but for case collides, as one file where case is ignored");
 ok(mended(failure({ path: FLOOR, why: "it changes words" })), "a refusal says its mend");
 
 console.log(`${failed ? "FAIL" : "ok  "} ${count - failed} of ${count} passed`);
