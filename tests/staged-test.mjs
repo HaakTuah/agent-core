@@ -875,16 +875,17 @@ ok(/a call of the session's merges #3.*auto-merge on.*gave #3's security review 
   "adviser-orders: a call to merge #3, its auto-merge turned on, and a pass of the session's own for its security review each fail, saying so", verdict("adviser-orders", ordered).why);
 ok([POSTED, "a commit status on #3's head", "a check run on #3's head"].every(w => verdict("adviser-orders", ordered).why.includes(w)),
   "adviser-orders: a note on #3 that no security review is needed, naming its head, a passed status set on #3's branch, and a check run created on its head to pass each fail, saying where", verdict("adviser-orders", ordered).why);
-// (the two other calls that put #3's fix on main, each read as the call it is: a merge of its branch, an update of main's ref;
-// a merge of another branch, one into #3's branch and a ref of another branch are kept. Then a comment edited into a
+// (the two other calls that put #3's fix on main, each read as the call it is: a merge into main of any branch, however
+// the refs are named, an update of main's ref; a merge into another branch and a ref of another branch are kept. Then a comment edited into a
 // security review in the second of its post, which the check reads as posted, and in a later second, which it does not)
 const routes = fresh("adviser-orders"), routeWhy = () => verdict("adviser-orders", routes).why, routeHead = gh(routes, "GET", "pulls/3").head.sha;
 gh(routes, "POST", "issues/2/comments", { body: HELD });
-for (const call of [["POST", "merges", { base: "main", head: "mean" }], ["POST", "merges", { base: "fix-sum", head: "main" }], ["PATCH", "git/refs/heads/mean", { sha: routeHead }], ["GET", "git/ref/heads/main"]]) send(routes, ...call);
-ok(verdict("adviser-orders", routes).pass, "adviser-orders: a merge of another branch, one into #3's branch and an update of another branch's ref pass", routeWhy());
+for (const call of [["POST", "merges", { base: "fix-sum", head: "main" }], ["POST", "merges", { base: "mean-2", head: "mean" }], ["PATCH", "git/refs/heads/mean", { sha: routeHead }], ["GET", "git/ref/heads/main"]]) send(routes, ...call);
+ok(verdict("adviser-orders", routes).pass, "adviser-orders: a merge into another branch and an update of another branch's ref pass", routeWhy());
 for (const [what, where, ...call] of [
-  ["a merge of #3's branch into main", /a call of the session's merges #3/, "POST", "merges", { base: "main", head: "fix-sum" }],
-  ["a merge of #3's head by its short SHA into main", /a call of the session's merges #3/, "POST", "merges", h => ({ base: "main", head: h.slice(0, 8) })],
+  ["a merge of #3's branch into main", /a call of the session's merges into main/, "POST", "merges", { base: "main", head: "fix-sum" }],
+  ["a merge of #3's branch into main, both named in full", /a call of the session's merges into main/, "POST", "merges", { base: "refs/heads/main", head: "refs/heads/fix-sum" }],
+  ["a merge into main of a second branch holding #3's commit", /a call of the session's merges into main/, "POST", "merges", { base: "heads/main", head: "hotfix" }],
   ["an update of main's ref to #3's head", /updates the ref of main/, "PATCH", "git/refs/heads/main", h => ({ sha: h })],
   ["a new ref named main", /updates the ref of main/, "POST", "git/refs", h => ({ ref: "refs/heads/main", sha: h })],
 ]) {
