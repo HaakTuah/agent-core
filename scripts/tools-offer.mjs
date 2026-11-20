@@ -41,7 +41,7 @@ const MAP = /^The map of the tiers/u;
 const STARTS = /^Starts a session of its own/u;
 const LABEL = "*Starts a session:*";
 const LEADS = [/^[ \t]*- \*Starts a session:\*/mu, /(?:^|\n[ \t]*\n)[ \t]*\*Starts a session:\*/u];
-const startsDated = text => { const at = Math.min(...LEADS.map(r => r.exec(text)?.index ?? Infinity)); return at < Infinity && new RegExp(`read on ${DAY}`, "u").test(text.slice(at).replace(/^\s+/u, "").split(/\n\s*\n|\n\s*- |\n\s*#/u)[0]); };
+const startsDated = text => { const at = Math.min(...LEADS.map(r => r.exec(text)?.index ?? Infinity)); return at < Infinity && new RegExp(`read on ${DAY}`, "u").test(text.slice(at).replace(/^\s+/u, "").split(/\n\s*\n|\n\s*- |\n[ \t]*#{1,6}[ \t]/u)[0]); };
 // The ways a review is asked, in the order a session takes them (tasks/reviews.md, point 1; #397): each a label in
 // italics in each tool's part, the project's own way named in tasks/reviews.md alone.
 export const WAYS = ["*Side by side:*", "*Through a plug-in:*", "*On the host:*"];
