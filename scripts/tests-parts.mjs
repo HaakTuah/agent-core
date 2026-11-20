@@ -13,6 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { started } from "./started.mjs";
 export const WORKFLOW = ".github/workflows/tests.yml";
 // (the name a narrowed run is given, and by which a full run is told from it)
 export const NARROWED = "tests, only ";
@@ -74,7 +75,7 @@ export function run(argv, text, { log = console.log, err = console.error } = {})
   return 0;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (started(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   let text;
   try { text = fs.readFileSync(path.join(root, WORKFLOW), "utf8"); } catch { text = ""; }
