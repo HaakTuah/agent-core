@@ -9,6 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ARGUED, UNREAD, DAYS, KIT, LINK, LISTED, MEASURES, MOST, TITLE, TRIPPED, argued, atCommit, baseRecords, checkOf, due, look, parse, records, report, signs, tripped, trippedBody, where } from "../scripts/choices.mjs";
+import { CORE } from "../scripts/core-address.mjs";
 import { DUE } from "../scripts/look.mjs";
 import { mended } from "../scripts/mend.mjs";
 
@@ -261,15 +262,17 @@ fs.rmSync(tmp, { recursive: true, force: true });
   h2("init", "-q", "-b", "main");
   const base2 = put2(old);
   const check2 = b => check(b, hist2);
-  let c;
-  // (a stack's record the change adds closes with what the core cannot read in it; one that stood is no task; #486)
+  // (a stack's record the change adds closes with what the core cannot read in it, each gap's issue named, or "none";
+  // one that stood is no task; #486)
   const stack = full.replace(/^## Choice: [^\n]*/mu, "## Choice: the project's stack, Rust and Bevy");
-  put2(`${old}\n${stack}`);
-  c = check2(base2);
-  ok(c.status === 1 && new RegExp(`a choice of stack this change adds, does not close with a line that opens "${UNREAD}"`).test(c.out) && mended(c.out), "a stack's record a change adds without what the core cannot read in it fails, saying its mend", c.out);
-  put2(`${old}\n${stack}\n- ${UNREAD} the shape check and the copies check read no Rust yet: #900, #901.\n`);
-  c = check2(base2);
-  ok(c.status === 0, "with its line, it passes", c.out);
+  const fails = (text, why) => { put2(text); const r = check2(base2); ok(r.status === 1 && new RegExp(`a choice of stack this change adds, does not close with a line that opens "${UNREAD}" and names an issue or says "none"`).test(r.out) && mended(r.out), why, r.out); };
+  const passes = (text, why) => { put2(text); const r = check2(base2); ok(r.status === 0, why, r.out); };
+  fails(`${old}\n${stack}`, "a stack's record a change adds without what the core cannot read in it fails, saying its mend");
+  fails(`${old}\n${stack}\n- ${UNREAD} the shape check and the copies check read no Rust yet.\n`, "and so does one whose line names no issue for its gaps");
+  fails(`${old}\n${stack}\n- ${UNREAD} none.\n\nA last paragraph.\n`, "and one whose line is not its last");
+  passes(`${old}\n${stack}\n- ${UNREAD} the shape check and the copies check read no Rust yet: ${CORE}#900, ${CORE}#901.\n`, "with its line naming each gap's issue, it passes");
+  passes(`${old}\n${stack}\n- **${UNREAD}** https://github.com/${CORE}/issues/900\n`, "and so with an issue's address");
+  passes(`${old}\n${stack}\n- ${UNREAD} "none".\n`, "and with \"none\" where the core reads the stack whole");
   const stood = `${old}\n${stack}`, stoodAt = put2(stood);
   put2(`${stood}\n`);
   ok(check2(stoodAt).status === 0 && argued(stood, stood).gapless.length === 0, "a stack's record that stood before is never failed for the line");

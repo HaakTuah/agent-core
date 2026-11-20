@@ -22,6 +22,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { reading, rulesOf } from "./dose.mjs";
+import { CORE } from "./core-address.mjs";
 import { MEND } from "./mend.mjs";
 import { started } from "./started.mjs";
 
@@ -76,10 +77,17 @@ function tripsOf(body) {
 // challenger's search for what the list lacks, the pick of a session that never saw the record, and the judge's.
 export const ARGUED = ["Looked for:", "The blind pick:", "The judgment:"];
 // The line a record of a choice of stack closes with (tasks/choices.md, "A choice of stack ends with what the core cannot
-// read in it"; #486, point 1): which of the core's checks cannot yet read the stack picked. A record is of a stack where
-// its heading names one ("## Choice: the project's stack", as the starter kit writes it).
+// read in it"; #486, point 1): which of the core's checks cannot yet read the stack picked, each with the issue filed to
+// the core for it, or "none". A record is of a stack where its heading names one ("## Choice: the project's stack", as
+// the starter kit writes it). The line is its record's last that is not blank, and it names an issue (#12,
+// owner/repo#12, or an address under /issues/) or says "none" and nothing more.
 export const UNREAD = "The core cannot read:";
 export const STACK = /\bstacks?\b/iu;
+const closesGaps = body => {
+  const last = body.split("\n").filter(l => l.trim()).at(-1) ?? "";
+  const said = new RegExp(`${labelled(UNREAD)}(\\S.*)$`, "u").exec(last)?.[1].trim();
+  return !!said && (/^["`*]*none["`*]*\.?$/iu.test(said) || /(?:#|\/issues\/)\d+\b/u.test(said));
+};
 // (the label bold whole, or plain and not followed by the bold's close, then content: an empty bold label is none)
 const labelled = label => { const l = label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"); return `^[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*${l}\\*\\*|${l}(?!\\*))[ \\t]*`; };
 const opens = (body, label) => new RegExp(`${labelled(label)}\\S`, "mu").test(body);
@@ -100,7 +108,7 @@ export function parse(text) {
   const records = heads.map((m, i) => {
     const body = t.slice(m.index + m[0].length, i + 1 < heads.length ? heads[i + 1].index : t.length).split(/^#{1,2} /mu)[0];
     return { name: plain(m[1]), today: TODAY.test(m[1]), sign: opens(body, "Reopens it:"), lacks: ARGUED.filter(label => !opens(body, label)),
-      gaps: !STACK.test(m[1]) || opens(body, UNREAD),
+      gaps: !STACK.test(m[1]) || closesGaps(body),
       stood: opens(body, "Stood before:"), suggestion: new RegExp(`${labelled("The suggestion:")}(#\\d+)\\b`, "mu").exec(body)?.[1] ?? null, ...tripsOf(body) };
   }).filter(r => !r.name.startsWith("FILL IN:"));
   const read = /^(?:\*\*)?Read whole:(?:\*\*)?[ \t]*(\d{4}-\d\d-\d\d)\b/mu.exec(t)?.[1] ?? null;
@@ -286,7 +294,7 @@ export function checkOf(got, base, root = ".") {
   if (then === undefined) return unlisted(`No base to compare with${base ? ` (${base} is no commit here)` : ""}`);
   if (then === LINK) return unlisted(`The base held the records as a link, which is not read`);
   const { failed, listed, gapless } = argued(got.text, then);
-  return [[...gapless.map(r => `FAIL: \`${got.file}\`: the record "${r.name}", a choice of stack this change adds, does not close with a line that opens "${UNREAD}". ${MEND}add that line, naming each of the core's checks that cannot yet read the stack picked (or "none"), and file each gap to the core as a task ("Reporting to the core" in its README), as core/tasks/choices.md, "A choice of stack ends with what the core cannot read in it", says.`),
+  return [[...gapless.map(r => `FAIL: \`${got.file}\`: the record "${r.name}", a choice of stack this change adds, does not close with a line that opens "${UNREAD}" and names an issue or says "none". ${MEND}file each of the core's checks that cannot yet read the stack picked to the core as an issue ("Reporting to the core" in its README), and end the record with that line, naming each such check with its issue (as \`${CORE}#12\` or the issue's address), or saying "none" where the core reads the stack whole, as core/tasks/choices.md, "A choice of stack ends with what the core cannot read in it", says.`),
     ...failed.map(r => `FAIL: \`${got.file}\`: the record "${r.name}", which this change adds, is argued on no line that opens ${r.lacks.map(l => `"${l}"`).join(", ")}. ${MEND}argue it as ${rule}, says, each on its own line in the record: "Looked for:", the challenger's search for options the list lacks, with the writer's answer to each; "The blind pick:", the pick of a fresh session given the problem and the criteria and never the record; "The judgment:", the decision of a fresh session that wrote no part of it. A record of a choice the project had already made, as a first audit writes it, takes instead a line that opens "Stood before:", saying when.`),
     ...listed.map(r => `- listed, not failed: "${r.name}" ${r.stood ? "records a choice already made" : "stood before this change"}, argued on no line that opens ${r.lacks.map(l => `"${l}"`).join(", ")}`),
     `\`${got.file}\`: ${failed.length ? `${failed.length} record${failed.length === 1 ? "" : "s"} this change adds not argued in full` : "every record this change adds is argued in full"}${listed.length ? `; ${listed.length} that stood before listed` : ""}.`], failed.length + gapless.length > 0];
