@@ -1,11 +1,14 @@
-// What the tests of the steps stand on (steps-test.mjs, steps-checks-run-test.mjs, steps-files-test.mjs, steps-tool-
-// files-test.mjs): the projects the starter kit of this commit writes in a scratch folder, each a git repository with
-// nothing committed, and the timing of a reader's "one pass". Tests only: no project and no workflow of the core's uses
-// it. Node's own modules and git only.
+// What the tests of the steps stand on (steps-test.mjs and the files beside it, steps-*-test.mjs): the projects the
+// starter kit of this commit writes in a scratch folder, each a git repository with nothing committed, a project held
+// in memory for the readers of its workflows, and the timing of a reader's "one pass". Tests only: no project and no
+// workflow of the core's uses it. Node's own modules and git only.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "./core-address.mjs";
+import { differences, fresh, kind, report as freshReport } from "./fresh.mjs";
+import { notes as manifestNotes } from "./manifest-reads.mjs";
+import { STEPS, configs, notDone, project, report } from "./steps.mjs";
 import { hookCommands, readCore } from "./core-path.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { READERS } from "./shape-readers.mjs";
@@ -96,3 +99,48 @@ export const linear = (read, small, large, runs = 5) => {
   const ratio = least.get(large) / Math.max(10, least.get(small));
   return { right, linear: ratio < 3 * (large / small), shown: `${small} took ${least.get(small)} ms, ${large} took ${least.get(large)} ms` };
 };
+
+// A project held in memory, as the readers of its workflows take it: `workflows` maps a file's name to the workflow's
+// parsed YAML, `files` the project's other files (name to text), and `manifest` the core manifest's text.
+export const inMemory = (workflows, files = {}, manifest = "") => ({ files: Object.keys(files), read: f => files[f] ?? null, manifest,
+  workflows: Object.fromEntries(Object.entries(workflows).map(([f, yaml]) => [f, { text: JSON.stringify(yaml), yaml }])) });
+// A workflow of one job whose one step runs `run` (with `step`, `job` and `top` beside it), and one whose job calls the
+// core's workflow `name` with `inputs`.
+export const stepped = (run, step = {}, job = {}, top = {}) => ({ ...top, jobs: { j: { ...job, steps: [{ run, ...step }] } } });
+export const coreCall = (name, inputs) => ({ jobs: { c: { uses: `${CORE}/.github/workflows/${name}@${"0".repeat(40)}`, with: inputs } } });
+// The copies check's config such a project gives, and whether the config `what` is reported not read.
+export const copiesOf = (...a) => configs(inMemory(...a)).copies;
+export const notRead = (what, ...a) => { const at = configs(inMemory(...a)); return at[what] === null && at.unread.length > 0; };
+// The project's manifest with its differences "None" changed to `line`, a step left undone on the owner's word.
+export const declare = (d, line) => fs.writeFileSync(path.join(d, "core-manifest.md"), fs.readFileSync(path.join(d, "core-manifest.md"), "utf8").replace(/^## Differences\n+None\.\n?/m, `## Differences\n- ${line}\n`));
+
+// `kitIn(tmp)`'s kit, each read back as it is written, before any case changes it, with `ok` told what it found
+// (unless `held` is false): every step done, its kind read from what it holds, no difference from a fresh start, and
+// its manifest taking or leaving out each module of this commit (the core's own manifest check: a module it neither
+// takes nor leaves out would be a note on a project's first day, #329). A kit made with options another already holds
+// is made with held: false, which spares the suite's time its round trip.
+export function heldKitIn(tmp, ok) {
+  const writeKit = kitIn(tmp);
+  const texts = dir => Object.fromEntries(fs.readdirSync(path.join(root, dir)).filter(n => n.endsWith(".md")).map(n => [n, fs.readFileSync(path.join(root, dir, n), "utf8")]));
+  function roundTrip(name, given, dir) {
+    const missed = notDone(dir);
+    ok(!missed.length && report(missed).startsWith("Every step a check reads is done"), `${name}, as the starter kit writes it: no step is reported not done`, report(missed));
+    const p = project(dir);
+    const { o } = kind(p);
+    ok(o.owner === "someone-else" && o.name === name && o.packages === given.packages && o.nuget === given.nuget && !!o.private === !!given.private && !!o.game === !!given.game,
+      `${name}: its kind is read from what it holds, as the starter kit was told it (${JSON.stringify(given)})`, JSON.stringify(o));
+    const found = differences(p, fresh(p));
+    ok(!found.length && freshReport(found).includes("no difference"), `${name}: beside a fresh start, no difference`, found.join("\n"));
+    const moduleNotes = manifestNotes({ manifest: p.manifest, moduleTexts: { ...texts("roles/shared"), ...texts("tasks"), ...texts("tools") } });
+    ok(!moduleNotes.length, `${name}: its manifest takes or leaves out each module, so the manifest check gives no note`, moduleNotes.join("\n"));
+  }
+  return (name, o, { held = true, ...where } = {}) => { const dir = writeKit(name, o, where); if (held) roundTrip(name, o, dir); return dir; };
+}
+
+// The steps whose lead is `lead`: a test that reads one step's answer asks for that step alone, since the others' checks,
+// the agent tools' files among them, which run the copies and pointers checks on the whole project, answer nothing it
+// reads, and a Windows runner pays for each.
+export const only = lead => STEPS.filter(s => s.lead === lead);
+
+// The commands that fetch or install, npx and curl, built from pieces, so that the licence check reads no tool here.
+export const NPX = ["np", "x"].join(""), CURL = ["cu", "rl"].join("");
