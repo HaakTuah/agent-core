@@ -23,6 +23,11 @@ const pulls = [
 const t = tally(pulls, OWNER);
 ok(JSON.stringify(t.builders) === JSON.stringify([[NONE, 1], ["Another Tool", 1], ["Claude Code", 1]].sort(([a], [b]) => a.localeCompare(b))), "each pull request's builder is the tool its description's attribution line names, or none named; ties by name", JSON.stringify(t.builders));
 ok(JSON.stringify(t.reviewers) === JSON.stringify([["a-bot[bot]", 1], ["a-reviewer[bot]", 1], ["Another Tool", 1], ["Claude Code", 1]]), "a bot's review counts by its login, once a pull request; a led comment by the tool it names, or a bot's login; a person's review and an unled comment count for no tool", JSON.stringify(t.reviewers));
+const carried = tally([{ login: "dep[bot]", type: "Bot", body: `Bumps x.${sig("Some Tool")}`, reviews: [], comments: [] },
+  { login: OWNER, type: "User", body: `Notes:${sig("Some Tool")}\nmore text`, reviews: [{ login: OWNER, type: "User", body: `${sig("Other Tool")}\nlater` }], comments: [] },
+  { login: OWNER, type: "User", body: `x${sig("Claude Code")}\n\nhttps://e.invalid/session\n`, reviews: [{ login: "r[bot]", type: "Bot", body: `x${sig("Codex")}` }], comments: [] }], OWNER);
+ok(carried.builders.map(([n, k]) => `${n} ${k}`).join() === `${NONE} 2,Claude Code 1` && carried.reviewers.map(([n]) => n).join() === "r[bot]",
+  "builders are counted from the owner's own pull requests and the closing attribution line alone: a bot's pull request, and a line inside a description or review that more text follows, name no tool; a bare link after the line is no text; a bot's review is its login, whatever its text names", JSON.stringify(carried));
 const most = tally([pulls[0], { ...pulls[0], number: 4 }, pulls[1]], OWNER);
 ok(most.builders[0][0] === "Claude Code" && most.builders[0][1] === 2 && most.reviewers[0][0] === "a-reviewer[bot]", "most first", JSON.stringify(most));
 ok(tally([{ ...own, number: 9, body: `x${sig("Old Tool")}\nlater${sig("New Tool")}` }], OWNER).builders[0][0] === "New Tool", "the last attribution line names the tool");
