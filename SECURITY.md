@@ -42,8 +42,9 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      million steps of each tree's tries, past which it fails with its mend; and of each file of code the selection
      reads through the shape check's readers (`scripts/shape-readers.mjs`), 500,000 characters of JavaScript,
      TypeScript or Python and 200,000 of C#, past which the parser reads none of it (of Python and C#, neither
-     functions, imports nor tokens; of JavaScript and TypeScript, no functions, their imports read without it), and 2 s
-     for the parser on each (`scripts/tree-walk.mjs`); hostile tests:
+     functions, imports nor tokens; of JavaScript and TypeScript, no functions, their imports read without it), 2 s
+     for the parser on each and 250,000 nodes in the tree it gives, past which the parser reads none of it either
+     (`scripts/tree-walk.mjs`); hostile tests:
      `tests/hostile-pr-changes-test.mjs`.
    - a *progress file* as a pull request changes it, a fork's among them, the path a project's manifest gives it, and
      GitHub's list of open issues: read by the queue's reader (`scripts/queue.mjs`), and by the scheduled look's reader
