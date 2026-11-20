@@ -368,6 +368,15 @@ export function twiceUnfetched(files) {
   return { fails };
 }
 
+// A folder of this run's own for the base's texts, made a git repository (#580): actionlint reads a workflow with its
+// project (local reusable workflows, its own config's place) only inside one, so a base read outside one would lack
+// findings the head has, and a defect that stood would read as new.
+export function baseFolder(under) {
+  const dir = fs.mkdtempSync(path.join(under, "workflows-base-"));
+  try { execFileSync("git", ["init", "-q", dir], { stdio: "ignore" }); } catch { /* (no git: the base is read as it can be, and the head's run says what fails) */ }
+  return dir;
+}
+
 if (started(import.meta.url)) {
   const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   process.chdir(fileURLToPath(new URL(".", import.meta.url)));
@@ -407,7 +416,7 @@ if (started(import.meta.url)) {
   const head = run(".", toRead, tools);
   let held = core ? [] : null;
   if (!core && base && head.unrun.length < 2) {
-    const dir = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "workflows-base-")), there = [];
+    const dir = baseFolder(process.env.RUNNER_TEMP || os.tmpdir()), there = [];
     try {
       for (const file of toRead) { const was = show(file); if (was !== null) { fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true }); fs.writeFileSync(path.join(dir, file), was); there.push(file); } }
       held = run(dir, there, tools).found;

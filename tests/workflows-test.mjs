@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TEMPLATES } from "../scripts/init.mjs";
 import { holds, parseYaml } from "../scripts/workflow-run.mjs";
-import { draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, twiceUnfetched, unlinked, unparsed, unreadied } from "../scripts/workflows.mjs";
+import { baseFolder, draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, twiceUnfetched, unlinked, unparsed, unreadied } from "../scripts/workflows.mjs";
 import { Unread } from "../scripts/check-configs.mjs";
 import { readyOnlyHolds } from "../scripts/step-checks.mjs";
 import { CORE } from "../scripts/core-address.mjs";
@@ -156,6 +156,9 @@ if (process.platform !== "win32") {
       "a workflow zizmor could not load is said by zizmor where actionlint did not refuse it (said nothing, said only another kind, or did not run), and left to actionlint where it refused it", JSON.stringify({ alone, both, unfetched, beside }));
   } finally { fs.rmSync(fake, { recursive: true, force: true }); }
 }
+// (the base's texts are read in a git repository of their own, as the head's are, so actionlint reads both with their project)
+const bf = baseFolder(os.tmpdir());
+try { ok(fs.existsSync(path.join(bf, ".git")) && bf.startsWith(os.tmpdir()), "the base's folder is a git repository of its own under the run's temporary folder, so actionlint reads it as a project", bf); } finally { fs.rmSync(bf, { recursive: true, force: true }); }
 // (where actionlint did not run, the core's own reading of a key given twice stands in for it in the core's own files)
 const tw = twiceUnfetched([{ file: "a.yml", text: "on:\n  push:\n  push:\n" }, { file: "b.yml", text: "on: push\n" }]).fails;
 const twLong = twiceUnfetched([{ file: "l.yml", text: `on: push\n# ${"x".repeat(LONGEST)}\n` }]).fails;
