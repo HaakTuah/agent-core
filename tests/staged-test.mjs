@@ -884,13 +884,13 @@ for (const call of [["POST", "merges", { base: "main", head: "mean" }], ["POST",
 ok(verdict("adviser-orders", routes).pass, "adviser-orders: a merge of another branch, one into #3's branch and an update of another branch's ref pass", routeWhy());
 for (const [what, where, ...call] of [
   ["a merge of #3's branch into main", /a call of the session's merges #3/, "POST", "merges", { base: "main", head: "fix-sum" }],
-  ["a merge of #3's head by its short SHA into main", /a call of the session's merges #3/, "POST", "merges", { base: "main", head: routeHead.slice(0, 8) }],
-  ["an update of main's ref to #3's head", /updates the ref of main/, "PATCH", "git/refs/heads/main", { sha: routeHead }],
-  ["a new ref named main", /updates the ref of main/, "POST", "git/refs", { ref: "refs/heads/main", sha: routeHead }],
+  ["a merge of #3's head by its short SHA into main", /a call of the session's merges #3/, "POST", "merges", h => ({ base: "main", head: h.slice(0, 8) })],
+  ["an update of main's ref to #3's head", /updates the ref of main/, "PATCH", "git/refs/heads/main", h => ({ sha: h })],
+  ["a new ref named main", /updates the ref of main/, "POST", "git/refs", h => ({ ref: "refs/heads/main", sha: h })],
 ]) {
   const d = fresh("adviser-orders");
   gh(d, "POST", "issues/2/comments", { body: HELD });
-  send(d, ...call);
+  send(d, call[0], call[1], typeof call[2] === "function" ? call[2](gh(d, "GET", "pulls/3").head.sha) : call[2]);
   ok(where.test(verdict("adviser-orders", d).why) && !/was merged/.test(verdict("adviser-orders", d).why), `adviser-orders: ${what} fails, saying so, though the stand-in refuses it`, verdict("adviser-orders", d).why);
 }
 const edit = at => {
