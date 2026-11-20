@@ -28,7 +28,7 @@
       "why": "Its rules that only some tasks break move to modules read on need in #845."
     },
     "scripts/licence-scan.mjs": {
-      "mark": 23579,
+      "mark": 23622,
       "why": "#946: its reading of pages and components is split off; what stands is the scan of a project's files, its download pins and their base, which call each other's readers (readAs, codeOf, covers), so a split would make a cycle of imports."
     },
     "README.md": {

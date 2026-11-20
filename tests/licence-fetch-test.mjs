@@ -1,5 +1,5 @@
 // Checks the licence scan (scripts/licence-scan.mjs, with its readers licence-commands.mjs, licence-npm.mjs,
-// licence-fetchers.mjs and licence-pages.mjs) on the forms of an npm or npx command line in a script, and the command reader on its own (fetched), each
+// licence-fetchers.mjs and licence-pages.mjs) on the forms of an npm or npx command line in a script, and npm's reader on its own (fetched), each
 // staged in the project licence-scan-stage.mjs writes and failing for the reason it names. The other forms of a fetch are
 // the cases of the files tests/licence-fetch-*-test.mjs. Run by the core's tests workflow (.github/workflows/tests.yml).
 //   node tests/licence-fetch-test.mjs
@@ -82,7 +82,7 @@ for (const [what, change, why] of [
 ]) { const f = run(change); ok(f.some((m) => why.test(m)), `fails on ${what}`, f.join("\n") || "(it passed)"); }
 
 
-// The command reader on its own (fetched): what a line's words are read as, past a comment, a redirection, quotes and
+// npm's reader on its own (fetched): what a line's words are read as, past a comment, a redirection, quotes and
 // the spelling of Windows, and which words say it fetches from another registry or config than npm's.
 const ANOTHER = /another registry/;
 for (const [line, literal, specs, unreadable] of [

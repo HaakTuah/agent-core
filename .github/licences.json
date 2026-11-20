@@ -9,9 +9,7 @@
     "skip": [
       "scripts/licence-scan.mjs",
       "scripts/licence-commands.mjs",
-      "scripts/licence-fetchers.mjs",
       "scripts/licence-npm.mjs",
-      "scripts/licence-pages.mjs",
       "scripts/licence-scan-stage.mjs",
       "tests/licence-scan-test.mjs",
       "tests/licence-fetch-test.mjs",
