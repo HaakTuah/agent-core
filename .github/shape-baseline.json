@@ -38,35 +38,10 @@
       "depth": 2,
       "branches": 51
     },
-    "function: scripts/licence-commands.mjs#commandLines": {
-      "lines": 21,
-      "depth": 1,
-      "branches": 18
-    },
     "function: scripts/licence-commands.mjs#commands": {
       "lines": 34,
       "depth": 1,
       "branches": 29
-    },
-    "function: scripts/licence-commands.mjs#fetched": {
-      "lines": 106,
-      "depth": 4,
-      "branches": 107
-    },
-    "function: scripts/licence-commands.mjs#opensCommand": {
-      "lines": 23,
-      "depth": 2,
-      "branches": 20
-    },
-    "function: scripts/licence-scan.mjs#attributesOf": {
-      "lines": 17,
-      "depth": 3,
-      "branches": 21
-    },
-    "function: scripts/licence-scan.mjs#executable": {
-      "lines": 35,
-      "depth": 2,
-      "branches": 27
     },
     "process: tests/agent-tools-test.mjs -> node:child_process": true,
     "process: tests/check-test.mjs -> node:child_process": true,
