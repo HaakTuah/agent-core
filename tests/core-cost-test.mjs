@@ -4,9 +4,8 @@
 //
 //   node tests/core-cost-test.mjs
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { CAP_DAYS, mergedPulls, shallowGap, EVERY, REPO, cap, classify, pullsOf, sumOf, summed, sums, rulesFor, dayOf, defaultRef, median, priced, print, reading, readings, sessionOf, table, weekOf } from "../scripts/core-cost.mjs";
 import { CORE } from "../scripts/core-address.mjs";
@@ -94,7 +93,7 @@ ok(!print(rows, false).includes("answers"), "without --cost the table says nothi
 
 // A shallow clone holds only the merges after its boundary: a reader says so, with its mend, never counts a part as the whole (#1027).
 {
-  const dir = mkdtempSync(join(tmpdir(), "shallow-")), here = process.cwd();
+  const dir = scratchDir("shallow-"), here = process.cwd();
   const run = (cwd, ...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   try {
     const src = join(dir, "src");
@@ -117,7 +116,7 @@ ok(!print(rows, false).includes("answers"), "without --cost the table says nothi
     let thrown = "";
     try { mergedPulls([]); } catch (e) { thrown = e.message; }
     ok(thrown === gap, "mergedPulls throws it rather than count the merges the clone holds as all of them", thrown);
-  } finally { process.chdir(here); rmSync(dir, { recursive: true, force: true }); }
+  } finally { process.chdir(here); }
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the core's measurement`);
