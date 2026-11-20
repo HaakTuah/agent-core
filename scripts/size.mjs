@@ -84,7 +84,8 @@ import { started } from "./started.mjs";
 // the name of another rule ("Bugs don't wait"), so none was made, and neither start would fit all the same.
 // The reviewer's, raised one step on 20 November 2026 for #887, the review guidelines' point on a rule held by reading
 // alone where a form a check can hold exists: an eleventh fresh leanness check read the reviewer's start whole and
-// found 8 bytes of valid trim, in the point itself, which was made, for 290 over.
+// found 8 bytes of valid trim, in the point itself, which was made, for 312 over once the point read a project's own
+// rules too.
 export const CAPS = {
   builder: 32 * 1024,
   design: 33 * 1024,
