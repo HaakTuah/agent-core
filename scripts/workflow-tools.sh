@@ -11,7 +11,9 @@
 #
 # It prints ZIZMOR=<path> and ACTIONLINT=<path> for each tool it fetched, which the check reads; for one it could not,
 # it says why on its error output and prints nothing, and the check then says it did not run that part and decides
-# nothing by it. A new pin moves the version and every sum at once (zizmor's in requirements.txt). Always exits 0.
+# nothing by it. Each download is bounded (pip's and curl's limits below) well inside the five minutes the jobs give
+# this step, and the jobs let the step fail without failing them, so a stalled fetch only leaves its tool unfetched.
+# A new pin moves the version and every sum at once (zizmor's in requirements.txt). Always exits 0.
 core=$(cd "$(dirname "$0")/.." && pwd) || exit 0
 temp="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
 digest() { { sha256sum < "$1" || shasum -a 256 < "$1"; } 2> /dev/null | cut -c1-64; }
@@ -22,7 +24,7 @@ python=$(command -v python3 || command -v python)
 if [ -z "$z" ] || [ -z "$python" ]; then echo "zizmor is not fetched: ${python:+no temporary folder could be made}${python:-no Python here to run pip}." >&2
 elif ! awk '/^zizmor==/ { on = 1 } on { print; if ($0 !~ /\\$/) exit }' "$core/.packages/requirements.txt" > "$z/zizmor.txt" 2> /dev/null || [ ! -s "$z/zizmor.txt" ]; then
   echo "zizmor is not fetched: the core's .packages/requirements.txt names no version of it." >&2
-elif ! "$python" -I -m pip install --require-hashes --no-deps --only-binary=:all: --no-compile --no-input --disable-pip-version-check \
+elif ! "$python" -I -m pip install --require-hashes --no-deps --only-binary=:all: --no-compile --no-input --disable-pip-version-check --timeout 30 --retries 1 \
     --target "$z/pypi" -r "$z/zizmor.txt" > "$z/log" 2>&1; then
   echo "zizmor is not fetched: pip could not install it from PyPI by the sums the core names. Of the install:" >&2; tail -n 5 "$z/log" >&2
 else
@@ -43,7 +45,7 @@ case $(uname -s)/$(uname -m) in
 esac
 a=$(mktemp -d "$temp/actionlint.XXXXXX" 2> /dev/null) || { echo "actionlint $version is not fetched: no temporary folder could be made." >&2; exit 0; }
 bin="actionlint$exe" got="archive.${file#*.}"
-if (cd "$a" && curl -fsSL --proto =https --proto-redir =https --connect-timeout 30 --max-time 300 --retry 2 -o "$got" \
+if (cd "$a" && curl -fsSL --proto =https --proto-redir =https --connect-timeout 20 --max-time 90 --retry 1 -o "$got" \
     "https://github.com/rhysd/actionlint/releases/download/v$version/actionlint_${version}_$file" \
   && [ "$(digest "$got")" = "$archive" ] \
   && case $file in

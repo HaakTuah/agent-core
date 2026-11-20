@@ -188,6 +188,7 @@ jobs:
       - name: zizmor and actionlint, which the workflow check and its test run, fetched at their pins outside the repository (scripts/workflow-tools.sh; #580)
         if: ${{ contains(matrix.parts, 'rest') }}
         timeout-minutes: 5
+        continue-on-error: true
         run: bash scripts/workflow-tools.sh >> "$GITHUB_ENV"
       - name: The suites this change can reach (on main, and in a re-run, every one, but none where the merged head passed this tree whole)
         env:

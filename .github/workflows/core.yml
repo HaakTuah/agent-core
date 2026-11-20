@@ -343,6 +343,7 @@ jobs:
       - name: zizmor and actionlint, which the workflow check runs, fetched at their pins (the core's scripts/workflow-tools.sh)
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.copies != '' }}
         timeout-minutes: 5
+        continue-on-error: true
         run: if [ -f "${CORE_AT}scripts/workflow-tools.sh" ]; then bash "${CORE_AT}scripts/workflow-tools.sh" >> "$GITHUB_ENV"; fi
       - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks
         if: ${{ !cancelled() && steps.core-at.outcome == 'success' && inputs.copies != '' }}

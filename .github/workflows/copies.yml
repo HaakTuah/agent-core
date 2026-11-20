@@ -67,6 +67,7 @@ jobs:
       # #580)
       - name: zizmor and actionlint, which the workflow check runs, fetched at their pins (the core's scripts/workflow-tools.sh)
         timeout-minutes: 5
+        continue-on-error: true
         run: if [ -f "${CORE_AT}scripts/workflow-tools.sh" ]; then bash "${CORE_AT}scripts/workflow-tools.sh" >> "$GITHUB_ENV"; fi
       - name: The copies, pointer, reading-size, workflow, entry-file, manifest, shape and choice records' checks (each its own script's, run through scripts/checks.mjs, which holds their steps)
         env:
