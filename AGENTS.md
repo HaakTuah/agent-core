@@ -113,7 +113,7 @@ one says it does, and its conditions stand there. The main lane is the lines in 
   on Sonnet; a line that writes or changes a rule, touches security or reads a format another publisher defines stays
   on Opus at high. The first trial is settled: on 20 November 2026 `node scripts/builder-trial.mjs`, setting the
   Sonnet builders of those two kinds since 18 November 2026 beside the Opus builders', read the bug fixes' findings,
-  rounds of review and bugs that reached `main` each "no worse within noise", as its note on #767 gives in numbers, so
+  rounds of review and bugs that reached `main` each "no worse within noise", as #1023 gives in numbers, so
   Claude's part (`tools/claude.md`) gives its builder of a bug fix the middle tier, Sonnet, beside the routine lanes the
   tier table of `tasks/roles.md` gives it (#1023). The second trial changes the effort alone: from 20 November 2026, the
   day #1023 merged, the orchestrator starts the builder of each such line on Sonnet at medium and at high in turn, its

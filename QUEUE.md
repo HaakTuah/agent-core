@@ -78,8 +78,6 @@ They read and change no rule.
 | #557 | builder | #556 |
 | #558 | builder | #557 |
 | #895 | builder; a test split; `tests.yml` names the suite | #715 |
-| #901 | builder; `scripts/tools-read.mjs` | |
-| #912 | builder | |
 | #916, with #922 | builder; one PR | #917 |
 | #931 | builder | |
 | #892 | builder | |

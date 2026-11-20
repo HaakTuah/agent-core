@@ -15,12 +15,11 @@
 // the same, and what its session-cost line rose by (core-cost.mjs, priced: answers, output and tokens carried in), each
 // over the pull requests it could be read for. Then, for each kind, on findings, rounds and bugs alone, whether the
 // first group comes out worse than the second: its mean above the other's by more than twice the standard error of
-// the difference. The bug fixes' verdicts decided the first trial, since tests were Sonnet's already: it is settled,
-// every verdict "no worse within noise" on 20 November 2026, and Claude's part gives a bug fix's builder Sonnet (#1023).
-// In the second, which started on 20 November 2026, the day #1023 merged, each kind's verdicts decide its own lane. It
-// reads; it writes nothing. Git, gh and Node's own modules.
+// the difference. The bug fixes' verdicts decided the first trial, since tests were Sonnet's already; in the second,
+// each kind's verdicts decide its own lane. Where each trial stands, and the day the second started, the rule says.
+// It reads; it writes nothing. Git, gh and Node's own modules.
 //
-//   node core/scripts/builder-trial.mjs [--since YYYY-MM-DD] [--effort --since 2026-11-20] [--owner login]
+//   node core/scripts/builder-trial.mjs [--since YYYY-MM-DD] [--effort --since YYYY-MM-DD] [--owner login]
 import { execFileSync } from "node:child_process";
 import { DAY, grid, priced, readings } from "./core-cost.mjs";
 import { REVIEWS, bugs, gather, perPull, reviewEvents } from "./review-record.mjs";
