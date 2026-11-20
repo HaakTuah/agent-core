@@ -15,14 +15,14 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      "Read for it:" by `scripts/reading.mjs`, and the line "Never needed:" by `scripts/read-total.mjs`, line by line);
      limits: none of its own on the text, which GitHub holds to 65,536 characters; 100 commits, one page; 8 s for the
      reading list's calls; hostile tests: `tests/hostile-pr-text-test.mjs`.
-   - the comments and reviews on a pull request, their bodies and authors: read by the security-review check and
-     the code-review wait (`scripts/security-review.mjs`, `scripts/code-review-wait.mjs`) and the size check's reader
-     of a "Leanness check:" answer (`scripts/size.mjs`), with the descriptions of merged pull requests by the tools
-     reader (`scripts/tools-read.mjs`), and, of any pull request's, by the scheduled look's reader of late review
-     findings (`scripts/look.mjs` through `scripts/review-marks.mjs`), which puts a replier's login in a request's
-     route; limits: 64 MB of an answer (256 MB for the look's), 20 pages of 100 for the tools reader and 50 for the
-     look's, every page for the review checks, whose jobs stop at 6 and 5 minutes; hostile tests:
-     `tests/hostile-pr-comments-test.mjs`.
+   - the comments and reviews on a pull request, their bodies and authors: read by the security-review check and the
+     code-review wait (`scripts/security-review.mjs`, `scripts/code-review-wait.mjs`) and the size check's reader of a
+     "Leanness check:" answer (`scripts/size.mjs`), with the descriptions of merged pull requests by the tools reader
+     (`scripts/tools-read.mjs`) and the order of checks and reviews through it (`scripts/stage-order.mjs`), and, of any
+     pull request's, by the scheduled look's reader of late review findings (`scripts/look.mjs` through
+     `scripts/review-marks.mjs`), which puts a replier's login in a request's route; limits: 64 MB of an answer (256 MB
+     for the look's), 20 pages of 100 for the tools reader and 50 for the look's, every page for the review checks,
+     whose jobs stop at 6 and 5 minutes; hostile tests: `tests/hostile-pr-comments-test.mjs`.
    - what a pull request changes, its files' paths and content and its commits, a fork's among them: read by the
      proofs of a pure sync and of a change of comments alone (`scripts/pure-sync.mjs`, `scripts/comment-only.mjs`),
      the selection of tests (`scripts/select.mjs`), the tree a copy must be (`scripts/copy-tree.mjs`) and the lines
@@ -60,8 +60,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
    - what GitHub's API answers, releases and tags, runs and checks, pull requests, whose account holds a repository (the
      workflow's event too) and an account's rights to it: read by `scripts/core-moved.mjs`, `scripts/releases.mjs`,
      `scripts/wait.mjs`, `scripts/stalled.mjs`, `scripts/core-cost.mjs`, `scripts/clean-merges.mjs`,
-     `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs`, `scripts/tools-offer.mjs` and the
-     scheduled look's reader of the default branch's newest commit, read as a time alone (`scripts/look.mjs`), and
+     `scripts/security-review.mjs`, `scripts/merge-line.mjs`, `scripts/runners.mjs`, `scripts/stage-order.mjs`,
+     `scripts/tools-offer.mjs` and the scheduled look's reader of the default branch's newest commit, read as a time alone (`scripts/look.mjs`), and
      an account's rights by the code-review wait (`scripts/code-review-wait.mjs`), the scheduled look
      (`scripts/look.mjs`) and the size check (`scripts/size.mjs`, from `size.yml`) through `security-review.mjs`'s
      reader, and a pull request's one file and the issues its lines name, by `scripts/queue-only.mjs`; limits: 1 MB of

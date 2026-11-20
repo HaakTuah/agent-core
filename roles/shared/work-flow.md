@@ -4,8 +4,8 @@ Read at the start of every task.
 
 1. **Review in the background.**
    - When the work is done, read the task's spec again: build what changed, or queue it if large.
-   - Mark the draft PR ready and ask for its reviews (`tasks/reviews.md`). Fix every review's findings together.
-   - Once every review asked for has answered on the head commit with no finding open, turn on auto-merge
+   - Ask its reviews and mark it ready in `tasks/reviews.md`'s order (point 10). Fix every review's findings together.
+   - Once every review asked has answered on the head commit with no finding open, turn on auto-merge
      (`tasks/github-calls.md`; a sync PR is merged by hand: floor rule 8) and go on: GitHub merges when the checks are
      green and, where asked, the branch is up to date. Where it refuses, the PR already `clean` or `unstable`, merge it
      yourself as floor rule 12 says. A check that then fails on `main` is yours while you run (`tasks/tests.md`).
