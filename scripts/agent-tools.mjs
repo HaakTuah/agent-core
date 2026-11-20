@@ -73,7 +73,8 @@ import { atCopy, corePath, hooksAt, manifestText, readCore } from "./core-path.m
 import { exact } from "./exact-versions.mjs";
 import { DEEPEST, logged, parseBounded } from "./guards.mjs";
 import { fetchedBy, libraryOf } from "./hook-source.mjs";
-import { baseOf, textAt } from "./licences.mjs";
+import { exactPath, objectAt as objectIn, textAt } from "./git-objects.mjs";
+import { baseOf } from "./licences.mjs";
 import { unreached } from "./packages.mjs";
 import { started } from "./started.mjs";
 import { TomlUnreached, parseToml } from "./toml.mjs";
@@ -741,10 +742,15 @@ function shownNotBlob(root, rev, at, gitDir = null) {
   const key = `${root}\0${rev}\0${at}\0${gitDir}`;
   if (!shown.has(key)) {
     const ask = (args, input = "") => { try { return execFileSync("git", [...(gitDir ? ["--git-dir", gitDir] : []), "--no-replace-objects", ...args], { cwd: root, encoding: "utf8", input, stdio: ["pipe", "pipe", "ignore"] }); } catch { return ""; } };
-    const [mode = "", , oid = ""] = ask(["ls-tree", "-z", rev, "--", at]).split("\0")[0].split("\t")[0].split(" ");
-    // (the object git show resolves and its kind, asked in one process: "<object> <kind> <size>", or "<name> missing";
-    // a path that holds a line's end could not be asked so, and is no plain file either)
-    const [resolved = "", type = ""] = /[\r\n]/u.test(at) ? ["?", "?"] : /^([0-9a-f]{40,64}) (\w+) \d+$/u.exec(ask(["cat-file", "--batch-check"], `${rev}:${at}\n`).trim())?.slice(1) ?? [];
+    // (the entry's mode and object `git ls-tree` names for this path alone: read from the commit's own listing, which git
+    // gave once for all, where the path is one git takes as written and that listing is whole; else asked for this path)
+    const whole = gitDir || !exactPath(at) ? null : listing(root, rev);
+    const [mode = "", oid = ""] = whole && !whole.failed ? whole.first.get(at) ?? [] : [(([m = "", , o = ""]) => [m, o])(ask(["ls-tree", "-z", rev, "--", at]).split("\0")[0].split("\t")[0].split(" "))][0];
+    // (the object git show resolves and its kind, by the long-lived `cat-file --batch-check` where it can be asked, else
+    // in a process: "<object> <kind> <size>", or "<name> missing"; a path that holds a line's end could not be asked so,
+    // and is no plain file either)
+    const held = /[\r\n]/u.test(at) ? undefined : objectIn(root, rev, at, { gitDir });
+    const [resolved = "", type = ""] = /[\r\n]/u.test(at) ? ["?", "?"] : held ? [held.oid, held.type] : held === null ? [] : /^([0-9a-f]{40,64}) (\w+) \d+$/u.exec(ask(["cat-file", "--batch-check"], `${rev}:${at}\n`).trim())?.slice(1) ?? [];
     // (and the entry named must be the object git show resolves: where a tree git would refuse holds two of a name, or
     // out of order, the two can differ, and then nothing shows what is run)
     shown.set(key, resolved !== oid || (mode !== "" && mode !== "100644" && mode !== "100755") || (type !== "" && type !== "blob"));
@@ -863,7 +869,7 @@ function reached(f, blobs, dirs, others) {
 }
 
 // The files and links of the commit `rev`, git asked once for each commit: { blobs, links, linked, ids, others, dirs,
-// children, failed }; its bound (bytes of names) may be lowered for a test.
+// children, first, failed }; its bound (bytes of names) may be lowered for a test.
 const listings = new Map(), LISTING_MAX = Number(process.env.AGENT_TOOLS_LISTING_MAX) > 0 ? Number(process.env.AGENT_TOOLS_LISTING_MAX) : 1 << 28;
 function listing(root, rev) {
   const key = `${root}\0${rev}`;
@@ -872,8 +878,13 @@ function listing(root, rev) {
   // (a commit git cannot list, an error or names past the bound, is said, never read as one with nothing in it; where
   // there is no such commit, as before a project's first, there is nothing to list)
   const git = (args, opts = {}) => execFileSync("git", ["--no-replace-objects", ...args], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], ...opts });
-  try { out = git(["ls-tree", "-r", "-z", rev], { maxBuffer: LISTING_MAX }); } catch { try { git(["rev-parse", "-q", "--verify", `${rev}^{commit}`]); failed = true; } catch { /* (no commit) */ } }
-  const entries = out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"), [mode, , id] = l.slice(0, tab).split(" "); return [mode, l.slice(tab + 1), id]; });
+  try { out = git(["ls-tree", "-r", "-t", "-z", rev], { maxBuffer: LISTING_MAX }); } catch { try { git(["rev-parse", "-q", "--verify", `${rev}^{commit}`]); failed = true; } catch { /* (no commit) */ } }
+  const listed = out.split("\0").filter(Boolean).map(l => { const tab = l.indexOf("\t"), [mode, , id] = l.slice(0, tab).split(" "); return [mode, l.slice(tab + 1), id]; });
+  // (each path's first entry, a folder's too, an empty one among them, as `git ls-tree rev -- path` names it first; the
+  // folders are no file, link or submodule, so the rest of the listing reads the other entries)
+  const first = new Map();
+  for (const [mode, at, id] of listed) if (!first.has(at)) first.set(at, [mode, id]);
+  const entries = listed.filter(([mode]) => mode !== "040000");
   // (a file is a plain or an executable blob; a submodule's entry, 160000, is no file the commit holds)
   const found = { blobs: new Set(entries.filter(([mode]) => mode === "100644" || mode === "100755").map(([, at]) => at)), links: entries.filter(([mode]) => mode === "120000").map(([, at]) => at) };
   found.linked = new Set(found.links);
@@ -891,6 +902,7 @@ function listing(root, rev) {
     if (!found.children.has(dir)) found.children.set(dir, new Set());
     found.children.get(dir).add(at.slice(cut + 1));
   }
+  found.first = first;
   found.failed = failed;
   listings.set(key, found);
   return found;
