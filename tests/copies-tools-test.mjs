@@ -7,18 +7,18 @@
 //   node tests/copies-tools-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what, detail = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) { failed++; if (detail) console.log(`     ${detail.replaceAll("\n", "\n     ")}`); } };
 const here = fileURLToPath(new URL("../scripts/", import.meta.url));
 const SAID = "every pull request is reviewed in the background while the next task goes on without waiting for it";
 const OTHER = "a release is cut only on the word of the owner and never by the choice of a session alone";
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "copies-tools-test-"));
+const dir = scratchDir("copies-tools-test-");
 try {
   const put = (f, body) => { fs.mkdirSync(path.join(dir, path.dirname(f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), body); };
   const g = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -132,7 +132,7 @@ try {
 
   // (a file in a tool's folder whose link leads out of the project is not read)
   if (process.platform !== "win32") {
-    const away = fs.mkdtempSync(path.join(os.tmpdir(), "copies-tools-away-"));
+    const away = scratchDir("copies-tools-away-");
     try {
       fs.writeFileSync(path.join(away, "out.md"), `# Out\n\n${OTHER}.\n`);
       fs.symlinkSync(path.join(away, "out.md"), path.join(dir, ".kiro/steering/out.md"));

@@ -5,13 +5,13 @@
 //   node tests/choices-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ARGUED, UNREAD, DAYS, KIT, LINK, LISTED, MEASURES, MOST, TITLE, TRIPPED, argued, atCommit, baseRecords, checkOf, due, look, parse, records, report, signs, tripped, trippedBody, where } from "../scripts/choices.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { DUE } from "../scripts/look.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -47,7 +47,7 @@ ok(/2026-11-15, 182 days before 2027-05-16/.test(due(found, at("2027-05-16")) ??
 ok(/holds no day/.test(due(parse("## Choice: a\n"), at("2026-11-15")) ?? ""), "records whose pass has no day are due");
 
 // ---- the look's reader ----
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "choices-"));
+const tmp = scratchDir("choices-");
 const project = (name, files) => {
   const dir = path.join(tmp, name);
   for (const [f, t] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), t); }
@@ -117,7 +117,7 @@ ok(MEASURES.debt[1](thin) > 0 && tripped(parse("## Choice: a\nTrips when: `debt 
   "a share is compared exact, and only shown rounded: one breach in 3000 trips debt > 0");
 ok(JSON.stringify(tripped(parse("## Choice: a\nTrips when: `files > 150`, `files > 151`, `debt <= 2`\n"), reads).map(c => `${c.measure}${c.op}${c.limit}=${c.value}`)) === JSON.stringify(["files>150=151", "debt<=2=2"]),
   "a condition trips where the number read holds it, and only then");
-const measuredProject = fs.mkdtempSync(path.join(os.tmpdir(), "choices-measured-"));
+const measuredProject = scratchDir("choices-measured-");
 const g = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: measuredProject, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const putIn = (f, t) => { fs.mkdirSync(path.dirname(path.join(measuredProject, f)), { recursive: true }); fs.writeFileSync(path.join(measuredProject, f), t); };
 const sign = cond => `Read whole: 2026-11-15\n\n## Choice: one \`folder\` @someone\n\n- Reopens it: the folder grows.\n- Trips when: ${cond}\n`;
@@ -185,7 +185,7 @@ const made = "## Choice: made\n- Stood before: chosen at the start, in 2025.\n- 
 ok(argued(`${old}\n${made}`, old).failed.length === 0 && argued(`${old}\n${made}`, old).listed.map(r => r.name).join() === "old,made", "a record of a choice already made is listed, never failed");
 ok(argued(`${old}\n${half}`, null).failed.length === 2 && argued(full, null).failed.length === 0, "where the base held no records, each record is the change's own");
 // the check from the command line, on a project's history
-const hist = fs.mkdtempSync(path.join(os.tmpdir(), "choices-argued-"));
+const hist = scratchDir("choices-argued-");
 const h = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: hist, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const put = text => { fs.mkdirSync(path.join(hist, "docs"), { recursive: true }); fs.writeFileSync(path.join(hist, "docs/choices.md"), text); h("add", "-A"); h("commit", "-q", "-m", "records"); return h("rev-parse", "HEAD").trim(); };
 h("init", "-q", "-b", "main");
@@ -233,7 +233,7 @@ fs.rmSync(hist, { recursive: true, force: true });
 // still has them read at the kit's path, so an unargued record the change adds fails; and records under a folder that
 // was a link at the base read as a link, so the records that stood there are listed, not failed
 const repo = (files, links = {}) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "choices-link-"));
+  const dir = scratchDir("choices-link-");
   const g = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   g("init", "-q", "-b", "main");
   for (const [f, text] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); }
@@ -256,7 +256,7 @@ if (link) {
 fs.rmSync(tmp, { recursive: true, force: true });
 {
   // (in a history of its own, so the cases above keep theirs)
-  const hist2 = fs.mkdtempSync(path.join(os.tmpdir(), "choices-stack-"));
+  const hist2 = scratchDir("choices-stack-");
   const h2 = (...args) => execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: hist2, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   const put2 = text => { fs.mkdirSync(path.join(hist2, "docs"), { recursive: true }); fs.writeFileSync(path.join(hist2, "docs/choices.md"), text); h2("add", "-A"); h2("commit", "-q", "-m", "records"); return h2("rev-parse", "HEAD").trim(); };
   h2("init", "-q", "-b", "main");

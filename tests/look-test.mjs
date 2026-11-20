@@ -9,6 +9,7 @@ import { before, body, copies, countsFrom, reportOf, share, SHARES, shownAs } fr
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -175,7 +176,7 @@ ok(shownAs("o/game", true, false) === "`o/game`" && shownAs("o/work", true, true
   "only the owner's own public project is named");
 const reps = [{ title: "State report, 2026-11", user: { login: "intruder" }, body: "a" }, { title: "State report, 2026-10", user: { login: "github-actions[bot]" }, body: "b" }, { title: "State report, 2026-09", user: { login: "TheOwner" }, body: "c" }, { title: "State report, 2026-12", user: { login: "github-actions[bot]" }, body: "d", pull_request: {} }];
 ok(reportOf(reps, "theowner")?.body === "b" && reportOf([reps[0]], "theowner") === null, "a project's report is its look's own, by GitHub's job or its owner's account, the newest; another account's is never read");
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "look-test-"));
+const dir = scratchDir("look-test-");
 fs.mkdirSync(path.join(dir, "checks"));
 fs.writeFileSync(path.join(dir, "checks/copies.json"), JSON.stringify({ baseline: "checks/copies-baseline.json" }));
 fs.writeFileSync(path.join(dir, "checks/copies-baseline.json"), JSON.stringify({ windows: { a: 1, b: 2 } }));

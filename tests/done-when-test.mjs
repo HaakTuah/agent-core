@@ -5,11 +5,11 @@
 //   node tests/done-when-test.mjs
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { closes, currentText, CURRENT, doneMends, entryFaults, entryOf, isFeature, joined, MOST, ownerAt, PAGES, progressOf, provedFaults, queueAt, readItem, section, takesIt } from "../scripts/done-when.mjs";
 import { OWNER } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what, got) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}${cond || got === undefined ? "" : `\n     got: ${JSON.stringify(got).slice(0, 400)}`}`); if (!cond) failed++; };
@@ -100,7 +100,7 @@ ok(r.mends.length === 0 && r.notes.length === 1, "a closed issue that cannot be 
 // the progress file, by the slot, read from git as the merge commit against its base
 ok(progressOf("| *progress file* | `docs/QUEUE.md` |\n") === "docs/QUEUE.md" && progressOf("the *progress file*: `QUEUE.md` (\"The queue\")") === "QUEUE.md" && progressOf("") === "docs/PROGRESS.md",
   "the progress file is the manifest's row, the core's own slot, else the kit's");
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "done-when-"));
+const dir = scratchDir("done-when-");
 const git = (...a) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", ...a], { cwd: dir, encoding: "utf8" });
 const put = (f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
 try {

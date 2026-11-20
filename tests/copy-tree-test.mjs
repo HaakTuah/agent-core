@@ -6,16 +6,15 @@
 //   node tests/copy-tree-test.mjs
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { KEPT, copyTree, coreIsFolder, entries } from "../scripts/copy-tree.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "copy-tree-test-"));
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("copy-tree-test-");
 // (git's own variables that point at a repository are left out, so every call lands in the scratch one)
 const outer = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)$/i.test(name)));
 // (copy-tree.mjs calls git with this process's own variables, so they are set here, not handed to each call)

@@ -7,7 +7,6 @@
 //   node tests/holders-test.mjs
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { inStep as inStepAt, itemsIn, KEY, LAST_NUMBERED } from "../scripts/archive.mjs";
@@ -19,6 +18,7 @@ import { installed } from "../scripts/packages.mjs";
 import { leftOut } from "../scripts/reading.mjs";
 import { heldHere } from "../scripts/state-report.mjs";
 import { shapeFaults } from "../scripts/schemas.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 // (the file's form is read by ajv, which the core's install brings; without it the cases that read the form could only
 // fail on a message they never get, among the lines of the cases that ran, so the test stops and says what it lacks, #905)
@@ -27,8 +27,7 @@ if (!installed("ajv")) { console.error("FAIL: the core's packages are not instal
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1200)}`}`); } };
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "holders-test-"));
-process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const tmp = scratchDir("holders-test-");
 
 // ---- what counts as a rule ----
 const text = [

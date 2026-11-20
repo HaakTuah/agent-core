@@ -26,7 +26,7 @@ import { draftHoles, lines, readable, repeated } from "../scripts/workflows.mjs"
 import { twice } from "../scripts/yaml-keys.mjs";
 import { parserLeftOut } from "../scripts/packages.mjs";
 import { read as runnersRead, workflowsIn } from "../scripts/runners.mjs";
-import os from "node:os";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -215,7 +215,7 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
 
 // ---- the reader of where the tests run (runners.mjs; #733): a workflow file that anyone's pull request writes ----
 {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hostile-runners-"));
+  const dir = scratchDir("hostile-runners-");
   const one = (name, body) => { for (const f of fs.readdirSync(dir)) fs.rmSync(path.join(dir, f)); fs.writeFileSync(path.join(dir, name), body); return workflowsIn(dir); };
   try {
     let w = one("loop.yml", "on: push\njobs:\n  t: &a\n    runs-on: [ubuntu-latest, *a]\n    steps: *a\n");

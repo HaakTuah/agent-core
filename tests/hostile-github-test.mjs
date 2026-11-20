@@ -11,7 +11,6 @@
 //   node tests/hostile-github-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
@@ -27,6 +26,7 @@ import { checksOf } from "../scripts/look.mjs";
 import { writersOf } from "../scripts/security-review.mjs";
 import { openFrom } from "../scripts/tools-offer.mjs";
 import { mended } from "../scripts/mend.mjs";
+import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -36,8 +36,7 @@ const issueLine = (...a) => JSON.stringify(a);
 const at = h => new Date(Date.UTC(2026, 10, 16, h)).toISOString();
 const run = (name, status = "completed", conclusion = "success", p = `.github/workflows/${name}.yml`) => ({ name, status, conclusion, path: p });
 const runs = list => ({ total_count: list.length, workflow_runs: list });
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "hostile-github-test-"));
-process.on("exit", () => fs.rmSync(scratch, { recursive: true, force: true }));
+const scratch = scratchDir("hostile-github-test-");
 const big = "x".repeat(4 << 20), UNREAD = "the list of the checks on it could not be read", NONE = "no check has passed on it yet", HEADS = "\trefs/heads/main\n";
 const script = name => fileURLToPath(new URL(name, new URL("../scripts/", import.meta.url)));
 
