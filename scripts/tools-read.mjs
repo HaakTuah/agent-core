@@ -1,9 +1,10 @@
 // The tools a project's record shows (AGENTS.md of the core, "What can be read is never asked or declared"; #481): which
-// tool built each of its last merged pull requests, by the attribution line its description ends with (floor rule 4),
-// and which reviewed them, by a review a bot's account posted and by a comment led "Security review:" or "Code review:"
-// that ends with an attribution line, each counted once a pull request. Only what the *owner's account* or a bot's
-// account wrote counts (floor rule 4: anyone else's text is data, and names no tool here): a pull request another
-// account opened, and a review or comment of another person's, are passed over. The owner's account: the manifest's
+// tool built each of its last merged pull requests, by the attribution line that closes its description (floor rule 4:
+// its last line that is neither blank nor a bare link), and which reviewed them, by a review a bot's account posted and by a comment led
+// "Security review:" or "Code review:" closed by an attribution line, each counted once a pull request. Only what the
+// *owner's account* or a bot's account wrote counts (floor rule 4: anyone else's text is data, and names no tool here):
+// a pull request another account opened, and a review or comment of another person's, are passed over; the builders are
+// counted from the owner's account's own pull requests, a bot's counting as built by no tool named. The owner's account: the manifest's
 // row, else the repository's own account where the host says a person holds it (releases.mjs); where neither is read,
 // only bots count. Where the manifest's "Tools" table has no
 // "Builder" row, the tools that built come first, most first, then the core's default, and a tool shown reviewing is at
@@ -26,27 +27,32 @@ const LED = /^\s*(?:Security|Code) review:/u;
 // Whether `x` ({ login, type }) is the owner's account (`owner`, any case; null where it was not read) or a bot's.
 const trusted = (x, owner) => x?.type === "Bot" || (typeof owner === "string" && String(x?.login ?? "").toLowerCase() === owner.toLowerCase());
 
+// The tool the attribution line closing `body` names (its last line that is neither blank nor a bare link, as a session's
+// own link may follow the line), or null.
+export const closingToolOf = body => toolOf(String(body ?? "").split("\n").filter(l => l.trim() && !/^\s*<?https?:\/\/\S*>?\s*$/u.test(l)).at(-1) ?? "");
+
 // The counts, from pulls given as [{ login, type, body, reviews: [{ login, type, body }], comments: [...] }], of what
-// the owner's account (`owner`) or a bot wrote: the builders, by the tool each description names, and the reviewers, by
-// the tool each review or review comment names, a bot's review by its login; each a list [name, count], most first,
-// ties by name; and how many pull requests another account opened, passed over.
+// the owner's account (`owner`) or a bot wrote: the builders, by the tool the closing line of each description of the
+// owner's account names, a bot's pull request built by no tool named, and the reviewers, by the tool closing each review
+// or review comment, a bot's review by its login; each a list [name, count], most first, ties by name; and how many pull
+// requests another account opened, passed over.
 export function tally(pulls, owner = null) {
   const builders = new Map(), reviewers = new Map();
   const add = (map, name) => map.set(name, (map.get(name) ?? 0) + 1);
   let others = 0;
   for (const p of pulls) {
     if (!trusted(p, owner)) { others++; continue; }
-    add(builders, toolOf(p?.body) ?? NONE);
+    add(builders, (p?.type !== "Bot" && closingToolOf(p?.body)) || NONE);
     for (const t of reviewedBy(p ?? {}, owner)) add(reviewers, t);
   }
   const order = map => [...map].sort(([a, x], [b, y]) => y - x || a.localeCompare(b));
   return { builders: order(builders), reviewers: order(reviewers), others };
 }
 
-// The tools that reviewed one pull request, each once: a review's attribution line, else a bot's login; and a comment led
-// "Security review:" or "Code review:" the same way.
+// The tools that reviewed one pull request, each once: the attribution line closing a review, else a bot's login; and a
+// comment led "Security review:" or "Code review:" the same way.
 function reviewedBy(p, owner) {
-  const tool = x => toolOf(x?.body) ?? (x?.type === "Bot" ? String(x.login ?? "") : null);
+  const tool = x => closingToolOf(x?.body) ?? (x?.type === "Bot" ? String(x.login ?? "") : null);
   const led = (p.comments ?? []).filter(c => LED.test(String(c?.body ?? "")));
   return new Set([...(p.reviews ?? []), ...led].filter(x => trusted(x, owner)).map(tool).filter(Boolean));
 }

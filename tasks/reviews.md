@@ -163,12 +163,13 @@ path `scripts/stage-order.mjs`. What reviewers judge by: `roles/shared/review-gu
 10. **The order follows cost** (#397). By default every stage of a pull request's proof and review (the host's checks,
     and each review, asked or starting by itself) starts together once it is marked ready. The one condition that
     changes it: `core/scripts/stage-order.mjs` reads that the run is short of something, from what it can read exactly
-    (its header): the proof billed (a private repository whose suites run on the host's runners, weighed by their rate),
+    (its header): the proof billed (a private repository whose suites run on the host's runners, their rate printed),
     the allowance of a tool that builds, or that of the session's own tool while the session sees its usage warning,
-    which it tells the script. Then the stage that spends most of what is short goes last, once, on settled code: where
-    it is the proof, the reviews are asked on the draft and their blocking findings mended before it is marked ready;
-    where it is a tool's reviews, they are asked once the host's checks passed and the other reviews hold nothing
-    blocking on that head. The builder runs the script at its task's start or, at the latest, before it asks its first
+    which it tells the script. Then a stage goes early where it spends little of what is short and often sends the work
+    back, one that spends less of it before one that spends more, and the stage that spends most goes last, once, on
+    settled code: where it is the proof, the reviews are asked on the draft and their blocking findings mended before
+    it is marked ready; where it is a tool's reviews, they are asked once the host's checks passed and the reviews
+    before hold nothing blocking on that head. The builder runs the script at its task's start or, at the latest, before it asks its first
     review, and follows the order it prints; the owner's word, said in person, for now or as the pace, overrides it. It
     does not mean that a review that starts by itself is not waited for and read (floor rule 8), that a stage is left
     out, that the host's run stops being the proof floor rule 12 gates on (it runs once, when the pull request is ready:

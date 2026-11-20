@@ -189,6 +189,12 @@ function runSize(baseFile, commentsText) {
   const big = "Generated with [".repeat(1 << 18), at = Date.now();
   tally([{ login: "o", type: "User", body: big, reviews: [{ login: "b", type: "Bot", body: big }], comments: [{ login: "o", type: "User", body: `Code review: ${big}` }] }], "o");
   ok(Date.now() - at < 3000, `tools-read.mjs: bodies of 4 MB of half-made attribution lines are read in ${Date.now() - at} ms`);
+  const sig = tool => `\n🤖 Generated with [${tool}](https://e.invalid)`;
+  const carried = tally([{ login: "dep[bot]", type: "Bot", body: `Bumps x.${sig("Some Tool")}`, reviews: [], comments: [] },
+    { login: "o", type: "User", body: `Notes:${sig("Some Tool")}\nmore text`, reviews: [{ login: "o", type: "User", body: `${sig("Other Tool")}\nlater` }], comments: [] },
+    { login: "o", type: "User", body: `x${sig("Claude Code")}\n\nhttps://e.invalid/session\n`, reviews: [], comments: [] }], "o");
+  ok(carried.builders.map(([n, k]) => `${n} ${k}`).join() === `${NONE} 2,Claude Code 1` && carried.reviewers.length === 0,
+    "tools-read.mjs: builders are counted from the owner's own pull requests and the closing attribution line alone: a bot's pull request, and a line inside a description or review that more text follows, name no tool; a bare link after the line is no text", JSON.stringify(carried));
 }
 
 // the late findings' reader (review-marks.mjs: repliersOf, lateOf; look.mjs: lateFinding): a replier's login goes into

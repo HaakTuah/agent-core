@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { billedOf, byThemselves, isTool, main, order, rateOf, read, said } from "../scripts/stage-order.mjs";
+import { billedOf, byThemselves, isTool, known, main, order, rateOf, read, said } from "../scripts/stage-order.mjs";
 import { NONE } from "../scripts/tools-read.mjs";
 
 let failed = 0, count = 0;
@@ -39,15 +39,29 @@ ok(o.stages.length === 2 && /own run.*select\.mjs/.test(o.stages[0]) && /every r
 o = order({ billed: false, builders: [[NONE, 2]], reviewers: ["r[bot]"] });
 ok(o.stages.length === 2 && /nothing read being short/.test(o.stages[1]), "read, and nothing short: every stage together after the session's own run", stages(o));
 o = order({ billed: true, rate: 2, builders: [["Claude Code", 3]], reviewers: ["Claude Code", "codex-app[bot]"], themselves: ["codex-app[bot]"] });
-ok(o.short.map(s => s.kind).join() === "proof,review" && /2× a Linux minute/.test(o.short[0].said) && /^on the draft: every review/.test(o.stages[1]) && /^last, once: the pull request marked ready, and the host's checks/.test(o.stages[2]) && /starts by itself \(codex-app\[bot\]\)/.test(o.stages[2]),
-  "a billed proof outranks a building tool's allowance: the reviews on the draft, the proof last, once, a review that starts by itself starting with it", stages(o));
+ok(o.short.map(s => s.kind).join() === "proof,review" && /2× a Linux minute/.test(o.short[0].said) && o.stages.length === 4 && /^on the draft: the reviews by codex-app\[bot\] and every review not named below/.test(o.stages[1])
+  && /^on the draft, once those before hold nothing blocking: every review a session of Claude Code gives/.test(o.stages[2]) && /^last, once: the pull request marked ready, and the host's checks/.test(o.stages[3]) && /starts by itself \(codex-app\[bot\]\)/.test(o.stages[3]),
+  "a billed proof outranks a building tool's allowance: the reviews that spend nothing short on the draft first, then the building tool's, the proof last, once, a review that starts by itself starting with it (the design check's finding on #898)", stages(o));
 o = order({ billed: true, builders: [["Claude Code", 3]], reviewers: ["Claude Code", "codex-app[bot]"], warning: "Codex" });
-ok(o.short[0].said.includes("Codex, which shows its usage warning") && /host's checks and the reviews by Claude Code, together/.test(o.stages[1]) && /^last, once the checks passed .*a session of Codex gives/.test(o.stages[2]),
-  "the tool under its usage warning outranks the billed proof: its reviews last, once the checks passed and the others hold nothing blocking", stages(o));
+ok(o.short.map(s => s.kind).join() === "review,proof,review" && o.short[0].said.includes("Codex, which shows its usage warning") && o.stages.length === 5 && /^on the draft: every review not named below/.test(o.stages[1])
+  && /a session of Claude Code gives/.test(o.stages[2]) && /^once: the pull request marked ready/.test(o.stages[3]) && /^last, once the checks passed .*a session of Codex gives/.test(o.stages[4]),
+  "the tool under its usage warning outranks the billed proof, which outranks a building tool: each stage that spends something short after those that spend less, the warned tool's reviews last", stages(o));
+o = order({ billed: false, builders: [["Claude Code", 3]], reviewers: ["Claude Code"], warning: "claude code" });
+ok(o.short.length === 1 && o.stages.length === 3, "a tool under its warning that also builds is short once, at its higher rank", JSON.stringify(o.short));
 o = order({ billed: false, builders: [["Claude Code", 30]], reviewers: ["Claude Code", "codex-app[bot]"], themselves: ["codex-app[bot]"] });
-ok(/host's checks and the reviews by codex-app\[bot\], together/.test(o.stages[1]) && /a session of Claude Code gives/.test(o.stages[2]) && !/starts by itself/.test(o.stages[2]), "a tool that builds is short for reviewing too: its reviews last", stages(o));
+ok(/host's checks, the reviews by codex-app\[bot\] and every review not named below, asked or starting by itself, together/.test(o.stages[1]) && /^last, .*a session of Claude Code gives/.test(o.stages[2]) && !/starts by itself \(/.test(o.stages[2]), "a tool that builds is short for reviewing too: its reviews last", stages(o));
+o = order({ billed: false, builders: [["Claude Code", 1]], reviewers: [] });
+ok(/^the pull request marked ready: the host's checks, every review not named below, asked or starting by itself, together$/.test(o.stages[1]), "with no reviewer read, the stage after the session's run still names every other review, so none is left out (the security review's finding on #898)", stages(o));
 o = order({ billed: false, builders: [["Codex", 2]], reviewers: ["chatgpt-codex-connector[bot]"], themselves: ["chatgpt-codex-connector[bot]"] });
-ok(/^the pull request marked ready: the host's checks$/.test(o.stages[1]) && /has started at the ready, and is waited for and read/.test(o.stages[2]), "a building tool's review that starts by itself is said to have started already, and is waited for and read", stages(o));
+ok(/^the pull request marked ready: the host's checks, every review not named below/.test(o.stages[1]) && /has started at the ready, and is waited for and read/.test(o.stages[2]), "a building tool's review that starts by itself is said to have started already, and is waited for and read", stages(o));
+o = order({ billed: true, builders: [[NONE, 2]], reviewers: [] });
+ok(/^on the draft: every review not named below/.test(o.stages[1]) && /^last, once: .*; any review that starts by itself starts then/.test(o.stages[2]), "with the proof last and no reviewer read, a review that starts by itself is still said to start with it", stages(o));
+
+// ---- names from the record, whoever wrote them ----
+ok(known("Claude Code") && known("codex") && known("chatgpt-codex-connector[bot]") && !known("Some Tool") && !known("x\n::error::y[bot]") && !known("a b[bot]") && !known("[bot]") && !known(""),
+  "a name from the record stands in the order only where it is a tool the core knows or a bot's login of the plain form");
+ok(byThemselves([{ number: 1, login: "o", reviews: [bot("r[bot]")], comments: [person("x\n@r review"), person("@r reviewing"), person("@r review", "outsider")] }], "o").join() === "r[bot]",
+  "an ask is a comment of the owner's or a bot's that opens with the mention: one inside the text, another word, or another account's ask, is none");
 
 // ---- read from a set-up made for each, through a stand-in for gh ----
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "stage-order-test-"));
@@ -70,7 +84,7 @@ try {
   ok(r.priv === true && r.billed === true && r.rate === 10 && r.builders[0][0] === "Claude Code" && r.reviewers.join() === "codex-app[bot]" && r.themselves.join() === "codex-app[bot]",
     "it reads the host's word that the repository is private, the macOS runner a suite takes, who built and reviewed the last merged pull request, and the review that started by itself", JSON.stringify(r));
   let out = said("o/r", r);
-  ok(/the proof: billed, .*10× a Linux minute/.test(out) && /built by Claude Code 1; reviewed by codex-app\[bot\]; starting by themselves: codex-app\[bot\]/.test(out) && /usage warning: not said/.test(out) && /short, most first: the billed proof, at 10× a Linux minute; the allowance of Claude Code, which builds/.test(out) && /3\. last, once: the pull request marked ready/.test(out) && /overrides it/.test(out),
+  ok(/the proof: billed, .*10× a Linux minute/.test(out) && /built by Claude Code 1; reviewed by codex-app\[bot\]; starting by themselves: codex-app\[bot\]/.test(out) && /usage warning: not said/.test(out) && /short, most first: the billed proof, at 10× a Linux minute; the allowance of Claude Code, which builds/.test(out) && /4\. last, once: the pull request marked ready/.test(out) && /overrides it/.test(out),
     "it prints what it read, what is short and the order, and that the owner's word overrides it", out);
   out = said("o/r", read({ repo: "o/r", dir: path.join(scratch, "none"), ask: () => { throw new Error("no gh"); }, local: false }));
   ok(/the proof: not read: the host did not say/.test(out) && /the merged pull requests: not read/.test(out) && /every review together, as before/.test(out), "where the host answers nothing, it says so, and every stage starts together", out);
@@ -84,6 +98,23 @@ try {
   fs.writeFileSync(path.join(flows, "ci.yml"), "on: [pull_request]\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo lint\n");
   out = said("o/r", read({ repo: "o/r", dir: flows, ask: gh(true), local: false }));
   ok(/the proof: not read: a job's runner, a workflow a job calls/.test(out), "a private repository whose suite runs through a workflow of another repository is not read as unbilled", out);
+  const hostile = args => {
+    const r = args.find(a => /^repos\//.test(a)) ?? "";
+    if (/pulls\?state=closed/.test(r)) return JSON.stringify(/page=1\b/.test(r) ? [
+      { user: { login: "dep[bot]", type: "Bot" }, number: 6, merged_at: "2026-11-02T00:00:00Z", body: `notes${sig("Claude Code")}` },
+      { user: { login: "o", type: "User" }, number: 5, merged_at: "2026-11-01T00:00:00Z", body: `x${sig("Some Tool")}` }] : []);
+    if (/pulls\/[56]\/reviews/.test(r)) return JSON.stringify(/page=1\b/.test(r) ? [{ user: { login: "x\n::error::y[bot]", type: "Bot" }, body: "" }, { user: { login: "o", type: "User" }, body: `x${sig("Odd\n::error::")}` }] : []);
+    if (/issues\/[56]\/comments/.test(r)) return "[]";
+    return gh(true)(args);
+  };
+  r = read({ repo: "o/r", dir: flows, ask: hostile, local: false });
+  out = said("o/r", r);
+  ok(r.builders.map(([n, k]) => `${n} ${k}`).join() === `${NONE} 2` && !r.reviewers.length && !order(r).short.some(s => s.kind === "review") && !/Some Tool|::error/.test(out),
+    "a builder a bot's pull request names, a tool the core does not know and a login of no plain form are passed over, and none reaches what is short or the order", out);
+  out = said("o/r", read({ repo: "o/r", dir: path.join(scratch, "a", "b", "workflows"), ask: gh(true), local: false }));
+  ok(/the proof: not read: no workflows folder was found here/.test(out), "a workflows folder missing outside a checkout's root leaves a private repository's proof not read (the security review's finding on #898)", out);
+  fs.mkdirSync(path.join(scratch, "root", ".git"), { recursive: true });
+  ok(read({ repo: "o/r", dir: path.join(scratch, "root", ".github", "workflows"), ask: gh(true), local: false }).billed === false, "and a checkout's root with none is not billed");
   const printed = [];
   main(["--repo", "X/Y"], { say: l => printed.push(l), here: "o/r", ask: a => { if (a.join(" ") === "api repos/X/Y") return JSON.stringify({ private: true }); throw new Error("no gh"); } });
   main(["--repo", "O/R"], { say: l => printed.push(l), here: "o/r", ask: a => { if (a.join(" ") === "api repos/O/R") return JSON.stringify({ private: true }); throw new Error("no gh"); } });

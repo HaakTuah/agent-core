@@ -3,22 +3,28 @@
 // declared"); nothing of it is written in the repository, and no manifest row is read. It reads:
 // - whether the host bills the proof: the repository is private (the host says) and a job that starts a suite runs on
 //   the host's runners (the checkout's workflows, as runners.mjs reads them, and none for another repository; with no
-//   suite read there, a runner, called workflow or file not read leaves it not read), weighed by the costliest such
-//   runner's rate, a Linux minute 1, a Windows one 2, a macOS one 10;
-// - which agent tools built the last 30 merged pull requests and which reviewed them (tools-read.mjs), a tool that
-//   builds counting as short for reviewing too, its allowance being the one the owner works from;
+//   suite read there, a runner, called workflow or file not read leaves it not read, and so does a workflows folder
+//   missing where no checkout's root holds it), with the costliest such runner's rate, a Linux minute 1, a Windows one
+//   2, a macOS one 10, which is printed and weighed against no allowance;
+// - which agent tools built the last 30 merged pull requests and which reviewed them (tools-read.mjs: the owner's own
+//   pull requests and the closing attribution line), a tool that builds counting as short for reviewing too, its
+//   allowance being the one the owner works from; a name is taken only where it is a tool the core knows
+//   (staged-tools.json) or a bot's login of the plain form, and any other is passed over as not read;
 // - which reviews start by themselves: a bot's review on a pull request where no comment asked one by mention;
 // - whether the session's own tool shows its usage warning, which the session says (--warning <its tool, as its
 //   attribution line names it>), since only the session sees it.
 // What is short, most first: the allowance of the tool under its warning, then the billed proof, then the allowance of a
-// tool that builds. The stage that spends most of what is short goes last, once, on settled code; the session's own run
-// of the tests its change can reach comes first; the rest start together. Where none of these is read, every stage
+// tool that builds. The session's own run of the tests its change can reach comes first, then the stages that spend
+// nothing short, together; then each stage that spends something short, the least short first, so the stage that spends
+// most of it goes last, once, on settled code. Where none of these is read, every stage
 // starts together when the pull request is ready, as before. It prints what it read and the order, writes nothing and
 // fails nothing; the owner's word, said in person, for now or as the pace, overrides it. gh, Node's own modules and the
 // core's yaml package (runners.mjs).
 //
 //   node core/scripts/stage-order.mjs [--repo <owner/name>] [--last <n, 30 where none is given>] [--warning <tool>]
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { aRepository, logged } from "./guards.mjs";
 import { repoOf } from "./inbox.mjs";
 import { workflowsIn } from "./runners.mjs";
@@ -29,6 +35,13 @@ export const LAST = 30;
 // (the host's own runners' labels, as runners.mjs names them, each with its minute's rate against a Linux one)
 const RATES = [[/^macos(-|$)/u, 10], [/^windows(-|$)/u, 2], [/^ubuntu(-|$)/u, 1]];
 const ASKED = /^\s*@[\w-]+(?:\[bot\])?\s+review\b/iu;
+// (the agent tools the core knows, each with its part in tools/, beside this file; and a bot's login of the plain form)
+const TOOLS = JSON.parse(fs.readFileSync(new URL("./staged-tools.json", import.meta.url), "utf8")).tools;
+const PLAIN_BOT = /^[a-z0-9][a-z0-9-]{0,38}\[bot\]$/iu;
+
+/** Whether a name read from the record may stand in the order: a tool the core knows, in any case, or a bot's login of
+ *  the plain form. */
+export const known = name => TOOLS.some(t => t.toLowerCase() === String(name).toLowerCase()) || PLAIN_BOT.test(String(name));
 
 /** The costliest rate among a suite's runners' labels, as a Linux minute's multiple; null where none is the host's. */
 export function rateOf(labels) {
@@ -46,8 +59,12 @@ export function billedOf(priv, w) {
   return w.testRunners.includes(null) || w.unknown || w.unread?.length ? null : false;
 }
 
-// (the workflows of a repository other than the checkout, which are not read: only the checkout's own are)
+// (the workflows of a repository other than the checkout, which are not read: only the checkout's own are; and those
+// of a folder that is not there, not read where the script runs outside a checkout's root, none where it runs there)
 const ELSEWHERE = Object.freeze({ testRunners: [], testLabels: [], unknown: true, unread: [], elsewhere: true });
+const NOWHERE = Object.freeze({ testRunners: [], testLabels: [], unknown: true, unread: [], nowhere: true });
+const NONE_HERE = Object.freeze({ testRunners: [], testLabels: [], unknown: false, unread: [] });
+const workflowsAt = (dir, parse) => (dir === null ? ELSEWHERE : fs.existsSync(dir) ? workflowsIn(dir, parse) : fs.existsSync(path.join(dir, "..", "..", ".git")) ? NONE_HERE : NOWHERE);
 
 /** Whether a reviewer, a tool by its attribution line's name or a bot by its login, is the tool `tool`: the same name in
  *  any case, or a login one of whose words is the tool's first word ("codex" of "Codex" in "chatgpt-codex-connector"). */
@@ -73,7 +90,7 @@ export function byThemselves(pulls, owner = null) {
 /** What is short, most first, from what was read (order's input): each { kind: "review" with its tools, or "proof",
  *  said }. */
 export function shortOf({ billed = null, rate = null, builders = null, warning = null }) {
-  const building = (builders ?? []).map(([name]) => name).filter(name => name !== NONE);
+  const building = (builders ?? []).map(([name]) => name).filter(name => name !== NONE && !(warning && isTool(name, warning)));
   const proof = billed === true ? [{ kind: "proof", said: `the billed proof${rate ? `, at ${rate}× a Linux minute` : ""}` }] : [];
   const builds = building.length ? [{ kind: "review", tools: building, said: `the allowance of ${building.map(logged).join(" and ")}, which ${building.length > 1 ? "build" : "builds"}` }] : [];
   return [...warning ? [{ kind: "review", tools: [warning], said: `the allowance of ${logged(warning)}, which shows its usage warning` }] : [], ...proof, ...builds];
@@ -82,18 +99,31 @@ export function shortOf({ billed = null, rate = null, builders = null, warning =
 const FIRST = "the session's own run, where it works, of the tests its change can reach (core/scripts/select.mjs), and what fails mended";
 const named = list => list.map(logged).join(", ");
 
-// The stages after the first, where `last` (shortOf's first) goes last, of the reviewers read and those that start by
-// themselves.
-function lastOf(last, reviewers, themselves) {
-  const auto = list => list.filter(r => themselves.includes(r));
-  if (last.kind === "proof") {
+// The stages after the first, from what is short (shortOf's, most first), the reviewers read and those that start by
+// themselves: the stages that spend nothing short, together, then the others, the least short first; a review spends the
+// first short thing whose tool gives it. Where the proof is short, the stages before it run on the draft.
+function stagesOf(short, reviewers, themselves) {
+  let left = [...reviewers];
+  const groups = short.map(s => {
+    if (s.kind === "proof") return s;
+    const mine = left.filter(r => s.tools.some(t => isTool(r, t)));
+    left = left.filter(r => !mine.includes(r));
+    return { ...s, mine };
+  });
+  const p = groups.findIndex(g => g.kind === "proof"), auto = list => list.filter(r => themselves.includes(r));
+  const free = left.length ? `the reviews by ${named(left)} and ` : "";
+  const reviews = g => `every review a session of ${named(g.tools)} gives, such as the fallback reviewer's and the design check`;
+  const after = g => `once the checks passed and the reviews before hold nothing blocking on that head: ${reviews(g)}${auto(g.mine).length ? `; one that starts by itself (${named(auto(g.mine))}) has started at the ready, and is waited for and read` : ""}`;
+  const out = [];
+  if (p < 0) out.push(`the pull request marked ready: the host's checks, ${free}every review not named below, asked or starting by itself, together`);
+  else {
     const started = auto(reviewers);
-    return ["on the draft: every review that can be asked there, together, and its blocking findings mended",
-      `last, once: the pull request marked ready, and the host's checks, its proof, run on that settled head${started.length ? `; a review that starts by itself (${named(started)}) starts then, and is waited for and read` : ""}`];
+    out.push(`on the draft: ${free}every review not named below that can be asked there, together, and their blocking findings mended`,
+      ...groups.slice(p + 1).reverse().map(g => `on the draft, once those before hold nothing blocking: ${reviews(g)}, and its blocking findings mended`),
+      `once: the pull request marked ready, and the host's checks, its proof, run on that settled head; ${started.length ? `a review that starts by itself (${named(started)})` : "any review that starts by itself"} starts then, and is waited for and read`);
   }
-  const theirs = reviewers.filter(r => last.tools.some(t => isTool(r, t))), others = reviewers.filter(r => !theirs.includes(r)), started = auto(theirs);
-  return [`the pull request marked ready: the host's checks${others.length ? ` and the reviews by ${named(others)}, together` : ""}`,
-    `last, once the checks passed and the other reviews hold nothing blocking on that head: every review a session of ${named(last.tools)} gives, the fallback reviewer's and the design check among them${started.length ? `; one that starts by itself (${named(started)}) has started at the ready, and is waited for and read` : ""}`];
+  out.push(...groups.slice(0, p < 0 ? groups.length : p).reverse().map(after));
+  return out.map((x, i) => (i === out.length - 1 && out.length > 1 ? `last, ${x}` : x));
 }
 
 /** What is short, most first, and the order, from what was read: { billed, rate, builders, reviewers, themselves,
@@ -102,7 +132,7 @@ export function order(r) {
   const short = shortOf(r);
   if ((r.billed ?? null) === null && (r.builders ?? null) === null && !r.warning) return { short, stages: [FIRST, "the pull request marked ready: the host's checks and every review together, as before, nothing being read of what the run is short of"] };
   if (!short.length) return { short, stages: [FIRST, "the pull request marked ready: the host's checks and every review together, nothing read being short"] };
-  return { short, stages: [FIRST, ...lastOf(short[0], r.reviewers ?? [], r.themselves ?? [])] };
+  return { short, stages: [FIRST, ...stagesOf(short, r.reviewers ?? [], r.themselves ?? [])] };
 }
 
 /** What it read, from the host through `ask` (gh's arguments, its output back) and from the workflows in `dir`, the
@@ -110,12 +140,14 @@ export function order(r) {
 export function read({ repo, last = LAST, warning = null, dir = ".github/workflows", ask, local = true, parse }) {
   let priv = null;
   try { const v = JSON.parse(ask(["api", `repos/${repo}`]))?.private; priv = typeof v === "boolean" ? v : null; } catch { /* (not read) */ }
-  const w = dir === null ? ELSEWHERE : workflowsIn(dir, parse);
+  const w = workflowsAt(dir, parse);
   const billed = billedOf(priv, w), rate = billed ? rateOf(w.testLabels) : null;
   let pulls = null, owner = null;
   try { pulls = readPulls(repo, last, ask); owner = ownerFor(repo, local, ask, () => {}); } catch { pulls = null; }
   const t = pulls ? tally(pulls, owner) : null;
-  return { priv, billed, rate, pulls, builders: t?.builders ?? null, reviewers: t ? t.reviewers.map(([name]) => name) : null, themselves: pulls ? byThemselves(pulls, owner) : [], warning, unread: w.unread, elsewhere: !!w.elsewhere };
+  // (a name the core does not know, a tool's or a bot's, is passed over: a builder counts as no tool named)
+  const builders = t ? [...t.builders.reduce((m, [n, k]) => { const name = known(n) ? n : NONE; return m.set(name, (m.get(name) ?? 0) + k); }, new Map())].sort(([a, x], [b, y]) => y - x || a.localeCompare(b)) : null;
+  return { priv, billed, rate, pulls, builders, reviewers: t ? t.reviewers.map(([name]) => name).filter(known) : null, themselves: pulls ? byThemselves(pulls, owner).filter(known) : [], warning, unread: w.unread, elsewhere: !!w.elsewhere, nowhere: !!w.nowhere };
 }
 
 /** The lines it prints: what was read, what is short, the order. */
@@ -125,6 +157,7 @@ export function said(repo, r) {
     : r.billed === false ? (r.priv === false ? "not billed, the repository being public" : "not billed, no job that starts a suite running on the host's runners")
     : r.priv === null ? "not read: the host did not say whether the repository is private"
     : r.elsewhere ? "not read: the workflows are read only from the repository's own checkout, so run it there"
+    : r.nowhere ? "not read: no workflows folder was found here, so run it from the project's root"
     : "not read: a job's runner, a workflow a job calls or a workflow file could not be read";
   const record = r.pulls ? `the last ${r.pulls.length} merged pull requests${r.pulls.length ? ` (#${r.pulls.at(-1).number} to #${r.pulls[0].number})` : ""}: built by ${list(r.builders)}; reviewed by ${r.reviewers.length ? r.reviewers.map(logged).join(", ") : "none"}; starting by themselves: ${r.themselves.length ? r.themselves.map(logged).join(", ") : "none"}`
     : "the merged pull requests: not read";
