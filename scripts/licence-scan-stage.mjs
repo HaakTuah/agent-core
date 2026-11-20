@@ -1,4 +1,4 @@
-// The staged project the licence check's tests run on (tests/licence-scan-test.mjs and tests/licence-fetch-*-test.mjs, beside this
+// The staged project the licence check's tests run on (tests/licence-scan-test.mjs, licence-yes-test.mjs, licence-scan-limits-test.mjs, licence-scan-pins-test.mjs and licence-fetch-*-test.mjs, beside this
 // file): a small project, written into a fresh temporary git repository for each case, with the changes a case makes to
 // it, and the check's failures on it (every name invented).
 import { execFileSync } from "node:child_process";
@@ -10,6 +10,8 @@ import { check, loadConfig } from "./licences.mjs";
 
 let failed = 0;
 export const ok = (cond, what, more = "") => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) { failed++; if (more) console.log(more); } };
+// (the check's failures as it prints them, one a config's fault throws too, for mend.mjs's `mended` to read: each says its mend)
+export const asOutput = (failures) => failures.map((m) => `FAIL: ${m.replace(/^threw: /u, "")}`).join("\n");
 export const done = () => process.exit(failed ? 1 : 0);
 
 export const PROJECT = {

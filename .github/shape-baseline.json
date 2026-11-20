@@ -19,6 +19,7 @@
     "changes"
   ],
   "grown": {
+    "process: tests/licence-scan-pins-test.mjs -> node:child_process": "Split from tests/licence-scan-test.mjs (#1008), whose scratch project it commits through git: that a download a pull request adds or unpins is read against the base, from git, is what it guards.",
     "process: tests/comment-only-run-test.mjs -> node:child_process": "Split from tests/comment-only-test.mjs (#1008), whose scratch clone it runs the script in through git: that the script reads a pull request's branch from git and refuses what it cannot is what it guards.",
     "process: tests/lookup-run-test.mjs -> node:child_process": "Split from tests/lookup-test.mjs (#1008), whose scratch git repository it runs the check in: that a pull request's lock file is read against its base, from git, is what it guards.",
     "process: tests/lookup-step-test.mjs -> node:child_process": "Split from tests/lookup-test.mjs (#1008): the sync's step reads a project through git (git ls-files), so the scratch project is one, which is what the step guards.",
@@ -100,7 +101,7 @@
     "process: tests/issue-terms-test.mjs -> node:child_process": true,
     "process: tests/labels-test.mjs -> node:child_process": true,
     "process: tests/licence-installed-test.mjs -> node:child_process": true,
-    "process: tests/licence-scan-test.mjs -> node:child_process": true,
+    "process: tests/licence-scan-pins-test.mjs -> node:child_process": true,
     "process: tests/licences-test.mjs -> node:child_process": true,
     "process: tests/lookup-test.mjs -> node:child_process": true,
     "process: tests/lookup-run-test.mjs -> node:child_process": true,
