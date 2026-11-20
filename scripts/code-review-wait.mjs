@@ -100,7 +100,7 @@ function judgeWith(sha, list, review, pull, commits, files, rules, bound, merges
   }
   if (commits === undefined || files === undefined || (whole(pull, files) && !needs(pull, flat(files), rules, copy))) return { sha, done: true, why: "no code review is running" };
   // (one its caller proved queue-only, its files as queueOnly reads them, needs none: floor rule 8, #750)
-  if (more?.queue === true && queueOnly(pull, files)) return { sha, done: true, why: "queue-only, as queue-only.mjs proves: no code review needed" };
+  if (more?.queue === true && queueOnly(pull, files, copy ?? undefined)) return { sha, done: true, why: "queue-only, as queue-only.mjs proves: no code review needed" };
   return reviewRan(sha, posted, review, pull, commits, bound, merges);
 }
 // whether a code review has run on the head, or on a commit only updates from main follow: posted, or Codex's completed

@@ -16,7 +16,7 @@ import path from "node:path";
 import { loadConfig } from "../scripts/licences.mjs";
 import { notes } from "../scripts/manifest-reads.mjs";
 import { mended } from "../scripts/mend.mjs";
-import { scratchDir, root } from "../scripts/scratch-core.mjs";
+import { OWNER, scratchDir, root } from "../scripts/scratch-core.mjs";
 import { parseConfig, survey, where, KIT } from "../scripts/shape.mjs";
 import { answered, capsOf, whoseOf } from "../scripts/size.mjs";
 // (the size check counts an answer from the repository's owner, "someone" here, with no right read)
@@ -278,6 +278,6 @@ ok(unread(notDone(p, inputs)), "steps.mjs: SECURITY.md that is a folder, the wro
 }
 
 // ---- nothing written outside the project ----
-ok(fs.readdirSync(outside).join() === "tests,x" && fs.readdirSync(tmp).sort().join() === "outside,project,size-base.mjs,comments.json".split(",").sort().join(), "nothing was written outside the project");
+ok(fs.readdirSync(outside).join() === "tests,x" && fs.readdirSync(tmp).filter(n => n !== OWNER).sort().join() === "outside,project,size-base.mjs,comments.json".split(",").sort().join(), "nothing was written outside the project");
 
 process.exit(failed ? 1 : 0);

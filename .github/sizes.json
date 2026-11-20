@@ -43,6 +43,10 @@
       "mark": 74465,
       "why": "Past the large file mark, it is read by the section a task needs, found by searching, never whole (roles/shared/how-to-work.md, \"Read little\"), so no split lets a session read less; GitHub shows it whole as the repository's front page, to people."
     },
+    "tests/releases-test.mjs": {
+      "mark": 32769,
+      "why": "#958: the tests of cutting a release (release.mjs) apart from those of what a project follows (releases.mjs)."
+    },
     "tests/pruning-test.mjs": {
       "mark": 23922,
       "why": "#895: its section on the rules with no holder moves to a test of its own."
@@ -79,14 +83,6 @@
       "mark": 25119,
       "why": "#441: the game rules split into a base and a file for each kind (#484, points 6 and 7)."
     },
-    "tasks/tests.md": {
-      "mark": 26094,
-      "why": "#943: along the readers it has."
-    },
-    "tests/workflows-test.mjs": {
-      "mark": 51121,
-      "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."
-    },
     "tests/steps-test.mjs": {
       "mark": 138318,
       "why": "#916: a file for each reader its sections test."
@@ -110,6 +106,34 @@
     "scripts/security-review.mjs": {
       "mark": 39696,
       "why": "#931: along what it reads, Codex's summary, who counts as a reviewer, what a review stands for, floor rule 3's count and the status posted."
+    },
+    "scripts/nuget.mjs": {
+      "mark": 84129,
+      "why": "The NuGet check's readers of a project's build files, lock files and sources that all read one config and one tree through the one check(); a task that changes one reads how the others count against it, so a split would make it open each part."
+    },
+    "scripts/lookup.mjs": {
+      "mark": 32467,
+      "why": "One check's readers of a new package's registry entry (npm's and NuGet's, the lock files each reads, the pool of answers and their records) that all read the same lists against the same base through packagesOf(); a task that changes one reads how the others count, so a split would make it open each part."
+    },
+    "scripts/nuget-fetch.mjs": {
+      "mark": 27143,
+      "why": "The NuGet fetch before the restore: the sources, the base's lists, each package's content hash and the tools' lock files, read through the one fetchAll(); a task that changes one reads how the others count against the base, so a split would make it open each part."
+    },
+    "tests/nuget-gate-test.mjs": {
+      "mark": 20574,
+      "why": "The cases of the NuGet check's first look and its whole job, on the one scratch project they share; split, each file would write the project again, adding to the suite's time (tasks/tests.md)."
+    },
+    "tests/nuget-test.mjs": {
+      "mark": 98920,
+      "why": "One script's cases (nuget.mjs) on the helpers and config they share; split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."
+    },
+    "tests/security-review-test.mjs": {
+      "mark": 71102,
+      "why": "One script's cases (security-review.mjs, judge() and its helpers) on the fixtures they share; split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."
+    },
+    "tests/security-review-workflow-test.mjs": {
+      "mark": 21768,
+      "why": "One workflow's cases (security-review.yml run as GitHub runs it) on the one scratch repository and stand-ins for GitHub's API they share; split, each file would set them up again, adding to the suite's time (tasks/tests.md)."
     },
     "scripts/shape.mjs": {
       "mark": 84826,
@@ -167,6 +191,18 @@
       "mark": 28199,
       "why": "One script's cases (size.mjs) and the size.yml steps that run it, on the one scratch core it sets up; split, each file would write it again, adding to the suite's time (tasks/tests.md), and a session changing the script reads every case."
     },
+    "scripts/select.mjs": {
+      "mark": 23258,
+      "why": "#943: the pathspec matcher, and the question of whether a tree passed whole, each in a file of its own apart from what a change selects."
+    },
+    "tasks/tests.md": {
+      "mark": 25951,
+      "why": "#943: the selection's rules apart from those of the suites' time and of the run of a tree that passed."
+    },
+    "tests/select-test.mjs": {
+      "mark": 29583,
+      "why": "#943: split as its script is: the matcher's cases, the host question's cases and the selection's."
+    },
     "scripts/step-checks.mjs": {
       "mark": 75102,
       "why": "#919: split by step, so the session that changes one step's check opens that step's file alone."
@@ -194,6 +230,14 @@
     "tests/staged-test.mjs": {
       "mark": 125729,
       "why": "#937: split into the three parts it already runs in, with the shared set-up in a module of its own."
+    },
+    "scripts/workflows.mjs": {
+      "mark": 26933,
+      "why": "One check's readers (the word, the keys given twice, the calls a draft skips, the line breaks) that all read the same texts against the same base through the one baseOf(); a task that changes one reads how the others count against the base, so a split would make it open each part."
+    },
+    "tests/workflows-test.mjs": {
+      "mark": 57789,
+      "why": "One script's cases (workflows.mjs) on the texts and helpers they share (call, TYPES, hiding); split along the script's parts, each file would write them again and add to the suite's time (tasks/tests.md)."
     }
   }
 }

@@ -20,7 +20,8 @@ reads is the *shape check*'s config.
   failed last time; and the tests the config names under "select.proof", the project's proof that behaviour was kept
   (a simulation's fingerprint, a replay, a save's round trip), which are never selected out. The one condition that
   changes it: where a changed file's reach cannot be told (a file of no code the readers follow, data, a file gone),
-  where no base is told and where the config cannot be read, the whole suite runs. The whole suite runs where it ran
+  where no base is told, where the config cannot be read and where the files changed are more than the readers take in
+  time (`scripts/hurry.mjs`), the whole suite runs. The whole suite runs where it ran
   before: on the default branch, save where the tree passed whole ("A tree that passed is not run again", below), on a
   schedule, before a release, so no job is added. A test that reaches an import the
   readers cannot follow (a path built at run time, a file they do not read) runs on any change; one that reaches files

@@ -11,8 +11,11 @@ import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { TEMPLATES } from "../scripts/init.mjs";
 import { holds, parseYaml } from "../scripts/workflow-run.mjs";
-import { draftHoles, foreignBreaks, foreignBroken, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
+import { draftHoles, foreignBreaks, foreignBroken, keysTwice, lines, readable, reads, repeated, unlinked, unreadied } from "../scripts/workflows.mjs";
+import { Unread } from "../scripts/check-configs.mjs";
+import { readyOnlyHolds } from "../scripts/step-checks.mjs";
 import { CORE } from "../scripts/core-address.mjs";
+import { keysOnce } from "../scripts/step-checks.mjs";
 import { LONGEST, twice, uncommented } from "../scripts/yaml-keys.mjs";
 
 let failed = 0;
@@ -36,6 +39,10 @@ ok(readable("on: push\n") && readable("\ufeffon: push # \u00e6\u00f8\u00e5 \u271
 const files = [".github/workflows/a.yml", ".github/workflows/b.yaml", ".github/actions/setup/action.yml", ".github/actions/setup/steps.yml", "tools/act/action.yaml", "action.yml",
   ".github/workflows/c.YML", ".github/dependabot.yml", ".github/ISSUE_TEMPLATE/config.yml", "core/.github/workflows/a.yml", "core/tools/action.yml", "tools/node_modules/a/action.yml", "docs/a.yml", "docs/reaction.yml"];
 ok(reads(files).join() === files.slice(0, 7).join(), "it reads the project's own workflows and its actions wherever they lie, whatever the case of the ending, and neither the core's copy nor an installed package's");
+const vendored = [...files, "vendor/core/.github/workflows/a.yml", "vendor/core/tools/action.yml"], atVendor = reads(vendored, "vendor/core/");
+ok(!atVendor.some(f => f.startsWith("vendor/")) && atVendor.includes("core/tools/action.yml") && files.slice(0, 7).every(f => atVendor.includes(f))
+  && reads(vendored).includes("vendor/core/tools/action.yml") && !reads(vendored).some(f => f.startsWith("core/")),
+  "where the manifest names the copy at another path, it is that path that is left out and the project's own core/ folder is read; the default stays core/ (#918)", atVendor.join());
 ok(unlinked([".github", ".GitHub/workflows", ".github/workflows", ".github/dependabot.yml", "tools/act/action.yaml", "tools/act", "docs/a.yml", ".githubs", "core/.github/workflows/a.yml"]).join() === ".github,.GitHub/workflows,.github/workflows,.github/dependabot.yml,tools/act/action.yaml", "what may be no link: what it reads, and .github itself with everything in it (a linked folder is one entry to git)");
 
 // ---- a key given twice in one mapping, which GitHub refuses (#393) ----
@@ -99,6 +106,18 @@ ok(twice(hiding("\u2028")).length === 0 && brks.every(({ br, found }) => found.l
   && brokenNew.fails.length === 1 && mended(brokenNew.fails[0]) && /^FAIL w\.yml:1: the file holds the line break U\+2028 and 1 more/u.test(brokenNew.fails[0]) && brokenChanged.fails.length === 1
   && brokenSame.fails.length === 0 && brokenSame.notes.length === 1 && /as on the base\. Mend:/u.test(brokenSame.notes[0]) && foreignBroken(one(hiding("\u2028")), null).fails.length === 0 && foreignBroken(one(hiding("\u2028")), null).notes.length === 1 && foreignBroken(one("on: push\nx: 1\n"), () => null).fails.length === 0,
   "a line break the package does not read hides a key given twice from its reader, and the check fails a file with one that is new or changed, with its mend, and notes one unchanged or read with no base", [brokenNew, brokenSame].flatMap(r => [...r.fails, ...r.notes]).join("\n"));
+// (what stands behind such a break is read as a YAML 1.1 reader reads it, in head and base alike, the failure above kept,
+// and a line is told as an editor counts it: #876)
+const behind = ["\u0085", "\u2028", "\u2029"].map(br => {
+  const text = `a: 1\n# c${br}x: 1\nx: 2\n`; // (the break ends the comment: the keys are on the next lines)
+  return { keys: repeated(one(text), () => null), same: repeated(one(text), () => text), grown: repeated(one(`${text}# b\n`), () => text), none: repeated(one(text), null), found: keysTwice(text) };
+});
+ok(behind.every(({ keys, same, grown, none, found }) => keys.fails.length === 1 && /^FAIL w\.yml:3: the key "x" is given twice in one mapping \(first on line 2\)/u.test(keys.fails[0]) && mended(keys.fails[0])
+  && same.fails.length === 0 && same.notes.length === 1 && grown.fails.length === 0 && none.fails.length === 0 && none.notes.length === 1 && found.length === 1 && found[0].line === 3 && found[0].first === 2)
+  && keysTwice("a: 1\r\n# c\u2028x: 1\rx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && keysTwice(hiding("\u2028")).map(k => `${k.line}<${k.first}`).join() === "1<1"
+  && keysTwice("a: 1\r\u2028x: 1\nx: 2\n").map(k => `${k.line}<${k.first}`).join() === "3<2" && foreignBreaks("a\rb\r\u2028c\n")?.line === 3
+  && keysTwice("a: 1\nb: 2\n").length === 0 && repeated(one('a: 1\nb: "x\\u2028y"\nb: 2\n'), () => 'a: 1\nb: "x\u2028y"\nb: 2\n').fails.length === 0 && keysTwice(`a: ${"\u2028".repeat(LONGEST)}\n`).map(k => `${k.line}:${k.size}`).join() === "1:true",
+  "a key given twice behind a line break the package does not read is found, a new one failing, the base's own noted, and told on the line an editor counts", behind.flatMap(r => [...r.keys.fails, ...r.same.notes]).join("\n"));
 // (Codex's case: a call of a check skipped on a draft whose ready_for_review a same-length edit moves into a comment, in a
 // file past the length read, its words counted as often as before, fails)
 const commented = types => `on:\n  pull_request:\n    types: ${types}\njobs:\n  check:\n    uses: ${CORE}/.github/workflows/copies.yml@${"a".repeat(40)}\n    if: \${{ !github.event.pull_request.draft }}\n# ${"x".repeat(LONGEST)}\n`;
@@ -133,6 +152,43 @@ ok(none.fails.length === 0 && none.notes.length === 3 && !none.notes[0].includes
 const call = (on, uses, extra = "") => `on:\n${on}\njobs:\n  check:\n    uses: ${CORE}/.github/workflows/${uses}@${"a".repeat(40)}\n${extra}`;
 const NOT_DRAFT = "    if: ${{ !github.event.pull_request.draft }}\n";
 const TYPES = "  pull_request:\n    types: [opened, synchronize]\n", FULL = "  pull_request:\n    types: [opened, reopened, synchronize, ready_for_review]\n";
+const skipping = br => `# c${br}${call(TYPES, "copies.yml", NOT_DRAFT)}`;
+const readied = ["\u0085", "\u2028", "\u2029"].map(br => ({ yes: draftHoles(skipping(br)), fresh: unreadied(one(skipping(br)), () => null), same: unreadied(one(skipping(br)), () => skipping(br)) }));
+ok(readied.every(({ yes, fresh, same }) => yes.join() === "check" && fresh.fails.length === 1 && mended(fresh.fails[0]) && same.fails.length === 0 && same.notes.length === 1) && draftHoles(`# c\n${call(TYPES, "copies.yml", NOT_DRAFT)}`).join() === "check",
+  "a call skipped on a draft without ready_for_review behind such a break is found, a new one failing and the base's own noted", readied.flatMap(r => [...r.fresh.fails, ...r.same.notes]).join("\n"));
+// (a base's break inside a double-quoted string, which the sync's mend writes as an escape, is read as the mend leaves it: what
+// stands behind a later break in a comment is then held by the base, and a head that mends the breaks passes; and a new defect
+// the mending head adds, against a base with only the quoted break, still fails: #876)
+const quoted = br => `name: ${br}x\u2028y${br}\n# c\u2028on:\n  pull_request:\n    types: [opened, synchronize]\njobs:\n  check:\n    if: \${{ !github.event.pull_request.draft }}\n    uses: ${CORE}/.github/workflows/copies.yml@${"a".repeat(40)}\n`;
+const mend = (text, br) => text.replace(`${br}x\u2028y${br}`, `${br}x\\u2028y${br}`).replace("# c\u2028on:", "# c\non:");
+const dupBase = br => `jobs:\n  b:\n    name: ${br}x\u2028y${br}\n    # c\u2028    a: 1\n    a: 2\n`, dupHead = (br, text) => text.replace(`${br}x\u2028y${br}`, `${br}x\\u2028y${br}`).replace("# c\u2028", "# c\n");
+const heldDup = repeated(one(dupHead('"', dupBase('"'))), () => dupBase('"')), heldCall = unreadied(one(mend(quoted('"'), '"')), () => quoted('"'));
+const newDup = repeated(one('name: "x\\u2028y"\njobs:\n  b:\n    a: 1\n    a: 2\n'), () => 'name: "x\u2028y"\njobs:\n  b:\n    a: 1\n'), newCall = unreadied(one(mend(quoted('"'), '"')), () => 'name: "x\u2028y"\non: push\njobs: {}\n');
+const hiddenDup = repeated(one(dupHead("'", dupBase("'"))), () => dupBase("'")), hiddenCall = unreadied(one(mend(quoted("'"), "'")), () => quoted("'")), knownNew = unreadied(one(mend(quoted('"'), '"')), () => "on: push\n");
+ok(heldDup.fails.length === 0 && heldDup.notes.length === 1 && /as it did on the base/u.test(heldDup.notes[0]) && heldCall.fails.length === 0 && heldCall.notes.length === 1 && /as on the base/u.test(heldCall.notes[0])
+  && newDup.fails.length === 1 && newCall.fails.length === 1 && knownNew.fails.length === 1,
+  "a base with a break in a double-quoted string is read as the mend leaves it: what it held is noted, and a defect the mending head adds fails", [...heldDup.notes, ...heldCall.notes, ...newDup.fails, ...newCall.fails].join("\n"));
+// (a break in a single-quoted string, which no mend of the step makes valid, leaves the base no YAML either way: what it held
+// is not known, and what the head shows is noted)
+ok(hiddenDup.fails.length === 0 && hiddenDup.notes.length === 1 && /the base being no YAML/u.test(hiddenDup.notes[0]) && hiddenCall.fails.length === 0 && /the base being no YAML/u.test(hiddenCall.notes.join()),
+  "a base no YAML to the package either way its breaks are read holds what stands behind them unknown: the head's findings are noted, not failed", [...hiddenDup.notes, ...hiddenCall.notes, ...hiddenDup.fails, ...hiddenCall.fails].join("\n"));
+// (only the reading as the mend leaves it finds the key given twice here, the folded text being no YAML: it is told on the line
+// an editor counts; and a text the escapes would take past the length read is read as line feeds, never as too long)
+const onlyMended = 'jobs:\n  b:\n    name: "x\u2028y"\n    # c\u2028    a: 1\n    a: 2\n';
+const nearLong = `${"# c\n".repeat(52412)}a: "${"\u2028".repeat(3)}${"x".repeat(LONGEST - 52412 * 4 - 9)}"\n`;
+ok(keysTwice(onlyMended).map(k => `${k.key}@${k.line}<${k.first}`).join() === "a@5<4" && nearLong.length <= LONGEST && nearLong.length + 12 > LONGEST && !keysTwice(nearLong).some(k => k.size),
+  "the key given twice that only the mended reading finds is told on its editor line, and a text that only the escapes make too long is not said so", String(keysTwice(onlyMended).map(k => `${k.key}@${k.line}`)));
+const t0 = Date.now(), manyKeys = keysTwice(`${Array.from({ length: 10000 }, (_, i) => `k${i}: 1\nk${i}: 2\n`).join("")}# c\u2028\n`).length;
+ok(manyKeys === 10000 && Date.now() - t0 < 10000, "ten thousand keys given twice behind a break are read in well under ten seconds, the two readings merged in one pass", `${manyKeys} in ${Date.now() - t0} ms`);
+// (a call the package shows in a file with a break inside a quoted string, no YAML once folded, is found by the plain reading)
+ok(unreadied(one(`name: "x\u2028y"\n${call(TYPES, "copies.yml", NOT_DRAFT)}`), null).notes.length === 1 && draftHoles(`name: "x\u2028y"\n${call(TYPES, "copies.yml", NOT_DRAFT)}`).join() === "check",
+  "a call a draft skips that the package shows in a file with a break inside a quoted string, which is no YAML once folded, is still found");
+// (the sync's step for such a call names it behind a break too, reading the workflow's text, not the YAML the package gave)
+const stepOf = text => readyOnlyHolds({ root: ".", files: [], workflows: { "a.yml": { text, yaml: (() => { try { return parseYaml(text); } catch { return null; } })() } } });
+ok(["\u0085", "\u2028", "\u2029"].every(br => /workflows\/a\.yml`/u.test(stepOf(skipping(br)) ?? "")) && stepOf(`# c\n${call(FULL, "copies.yml", NOT_DRAFT)}`) === null, "the step that names a call a draft skips names one behind such a break too", String(stepOf(skipping("\u2028"))));
+// (and says it could not read a workflow with such a break that is no YAML once the breaks are line feeds, as it says of any other)
+const unread = (() => { try { return stepOf(`${skipping("\u2028")}bad: [\n`); } catch (e) { return e; } })();
+ok(unread instanceof Unread && /workflows\/a\.yml`/u.test(stepOf(`${call(TYPES, "copies.yml", NOT_DRAFT)}# c\u2028bad: [\n`)), "the step that names a call a draft skips says it could not read a workflow with such a break that is no YAML either", String(unread));
 ok(draftHoles(call(TYPES, "copies.yml", NOT_DRAFT)).join() === "check" && draftHoles(call("  pull_request:\n", "personal-terms.yml", NOT_DRAFT)).length === 1
   && draftHoles(call(TYPES, "pr-description.yml")).length === 1 && draftHoles(call(TYPES, "core.yml", "    with:\n      description: true\n")).length === 1,
   "a call skipped on a draft, by its if: or by a check that skips one itself, whose trigger leaves out ready_for_review is found");
@@ -189,6 +245,32 @@ try {
   const u = keyRun([], { CORE_PACKAGES_UNREACHED: "1" }), uOut = u.stdout + u.stderr;
   ok(u.status === 1 && /^::warning::The check for a key given twice did not run, nor the one for a call a draft skips/m.test(uOut) && /d\.yml:2: pull_request_target/.test(uOut) && !/e\.yml|is not installed/.test(uOut) && mended(uOut), `where the install could not reach the registry, the keys given twice and the calls a draft skips did not run, said as a warning, and a forbidden trigger still fails${u.status === 1 ? "" : `:\n${uOut}`}`);
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+// ---- a copy of the core at the path the manifest names (#918): the check leaves it out, and reads the project's own core/ ----
+const vend = fs.mkdtempSync(path.join(os.tmpdir(), "workflows-vendored-"));
+try {
+  const at = "vendor/core/", put = (f, text) => { fs.mkdirSync(path.dirname(path.join(vend, f)), { recursive: true }); fs.writeFileSync(path.join(vend, f), text); };
+  fs.mkdirSync(path.join(vend, at, "scripts"), { recursive: true });
+  for (const f of ["workflows.mjs", "guards.mjs", "started.mjs", "yaml-keys.mjs", "packages.mjs", "core-path.mjs", "core-address.mjs"]) fs.copyFileSync(fileURLToPath(new URL(f, new URL("../scripts/", import.meta.url))), path.join(vend, at, "scripts", f));
+  fs.cpSync(fileURLToPath(new URL("../.packages", import.meta.url)), path.join(vend, at, ".packages"), { recursive: true });
+  put("core-manifest.md", `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${at} (never edited here).\n`);
+  put(`${at}tools/action.yml`, "on:\n  pull_request_target:\n"); // (the copy's own, which the core's run holds)
+  put(".github/workflows/own.yml", "on: push\n");
+  for (const args of [["init", "-q"], ["add", "-A", "-f"]]) execFileSync("git", args, { cwd: vend, stdio: "ignore" });
+  const vRun = () => spawnSync(process.execPath, [path.join(vend, at, "scripts/workflows.mjs")], { cwd: vend, encoding: "utf8", env: { ...process.env, WORKFLOWS_BASE: "" } });
+  const inCopy = vRun();
+  // (the sync's step for a key given twice reads the same files: the copy's left out, the project's own core/ read)
+  const twiceIn = "on: push\njobs:\n  a:\n    steps:\n      - run: x\n        if: a\n        if: b\n";
+  put(`${at}tools/action.yml`, twiceIn);
+  put("core/tools/action.yml", twiceIn);
+  const stepSees = keysOnce({ root: vend, files: [`${at}tools/action.yml`, "core/tools/action.yml", ".github/workflows/own.yml"], read: f => fs.readFileSync(path.join(vend, f), "utf8") });
+  ok(typeof stepSees === "string" && stepSees.includes("`core/tools/action.yml` line 7") && !stepSees.includes("vendor/core"), "the sync's step for a key given twice leaves the copy at the manifest's path out and reads the project's own core/ folder", String(stepSees));
+  put(`${at}tools/action.yml`, "on:\n  pull_request_target:\n");
+  put("core/tools/action.yml", "on:\n  pull_request_target:\n"); // (the project's own folder of that name)
+  execFileSync("git", ["add", "-A", "-f"], { cwd: vend, stdio: "ignore" });
+  const own = vRun();
+  ok(inCopy.status === 0 && !/vendor\/core/u.test(inCopy.stdout + inCopy.stderr) && own.status === 1 && /^FAIL core\/tools\/action\.yml:2: pull_request_target/m.test(own.stdout) && !/vendor\/core\/tools/u.test(own.stdout),
+    "run in a project whose manifest names the copy at another path, an action.yml in the copy is left out and the project's own core/ is read", `${inCopy.stdout}${inCopy.stderr}\n${own.stdout}${own.stderr}`);
+} finally { fs.rmSync(vend, { recursive: true, force: true }); }
 // ---- a pull request's run gives way to a newer one, and nothing else is cancelled (#388) ----
 // Each job of the core's that a pull request starts, its own or one a project calls, is in a group of the workflow and
 // the pull request, cancelled once a newer run starts for it; a run on main, a schedule or a start by hand is a group of
