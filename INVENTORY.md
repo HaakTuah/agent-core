@@ -90,7 +90,7 @@ What is no part of the core, each with why; every other tracked file is claimed 
   read as content.
 - `.github/ISSUE_TEMPLATE/`: the core's own issue forms and `config.yml`, the setting with which the host offers them:
   text a person or a session fills, weighed as the starter kit's forms are, on its line above.
-- `CHOICES.md`, `INVENTORY.md`, `inventory/`, `reports/`: records of work done and choices made, which the parts
+- `CHOICES.md`, `choices/`, `INVENTORY.md`, `inventory/`, `reports/`: records of work done and choices made, which the parts
   above read and none of which runs.
 - `archive/`, `words/`: the archive of the owner's decisions and, in this repository alone, the owner's words.
 - `LICENSE`, `NOTICE`: the core's licence and its holder's notice, which the holder alone writes (floor rule 11).

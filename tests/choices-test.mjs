@@ -164,7 +164,8 @@ const widest = trippedBody("docs/choices.md", tripped(wide, reads), wide, "core/
 ok(widest.length < 30000 && /, and 37 more/.test(widest), "nor does a file of long names and long lines of what names no measure take the body past it", `${widest.length}`);
 ok(DUE.includes(signs), "the scheduled look reads the signs too");
 const ownSigns = signs({ manifest: null, root: path.join(here, "..") });
-ok(!ownSigns.unread && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.some(rec => rec.conditions.length) && parse(fs.readFileSync(path.join(here, "..", "CHOICES.md"), "utf8")).records.every(rec => !rec.unknown.length),
+const ownRecords = parse(records(fs.readFileSync(path.join(here, "..", "AGENTS.md"), "utf8"), path.join(here, "..")).text ?? ""); // (the core's records, from the file its AGENTS.md names and the folder that file names)
+ok(!ownSigns.unread && ownRecords.records.some(rec => rec.conditions.length) && ownRecords.records.every(rec => !rec.unknown.length),
   "the core's own records name a measure the look reads, and every condition they write reads (whether one holds is the look's to say, never a test's: a sign that trips fails no pull request)", JSON.stringify(ownSigns));
 
 // ---- argued on its lines (#515) ----
@@ -283,5 +284,6 @@ fs.rmSync(tmp, { recursive: true, force: true });
   passes(`${old}\n${recorded}- ${UNREAD} none.\n`, "and passes it with the line");
   fs.rmSync(hist2, { recursive: true, force: true });
 }
+
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

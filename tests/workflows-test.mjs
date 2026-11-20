@@ -172,6 +172,36 @@ ok(heldDup.fails.length === 0 && heldDup.notes.length === 1 && /as it did on the
 // is not known, and what the head shows is noted)
 ok(hiddenDup.fails.length === 0 && hiddenDup.notes.length === 1 && /the base being no YAML/u.test(hiddenDup.notes[0]) && hiddenCall.fails.length === 0 && /the base being no YAML/u.test(hiddenCall.notes.join()),
   "a base no YAML to the package either way its breaks are read holds what stands behind them unknown: the head's findings are noted, not failed", [...hiddenDup.notes, ...hiddenCall.notes, ...hiddenDup.fails, ...hiddenCall.fails].join("\n"));
+// (#970, 1: a reading that is no YAML to the package once the breaks are folded shows keys no reader has: a double-quoted value
+// whose breaks, folded, put its continuation lines at the parent's indent gives no key, and a hostile file's many such lines
+// are not all printed)
+const falseKeys = 'a: 1\nb: "x\u2028c: 1\u2028c: 2"\n';
+const flood = `${Array.from({ length: 3000 }, (_, i) => `k${i}: 1\nk${i}: 2\n`).join("")}# c\u2028\n`, flooded = repeated(one(flood), null), floodedFails = repeated(one(flood), () => "a: 1\n");
+ok(keysTwice(falseKeys).length === 0 && repeated(one(falseKeys), () => null).notes.length === 0 && repeated(one(falseKeys), () => 'a: 1\nb: "x\u2028c: 1\u2028"\n').fails.length === 0
+  && flooded.notes.length === 26 && /^note w\.yml: and 2975 more keys/u.test(flooded.notes[25]) && floodedFails.fails.length === 26 && /^FAIL w\.yml: and 2975 more keys/u.test(floodedFails.fails[25]) && mended(floodedFails.fails[25]) && keysTwice(flood).length === 3000,
+  "a reading that is no YAML to the package once the breaks are folded names no key given twice, and a file's lines of one kind are cut at twenty-five and the rest counted", `${keysTwice(falseKeys).length} ${flooded.notes.length} ${floodedFails.fails.length}`);
+const manyOld = keysOnce({ root: ".", files: [".github/workflows/w.yml"], read: () => flood });
+ok(/"k24"/u.test(manyOld ?? "") && !/"k25"/u.test(manyOld ?? "") && /and 2975 more, which show once/u.test(manyOld ?? "") && (manyOld ?? "").length < 5000, "the sync's step for a key given twice names at most twenty-five and counts the rest", String(manyOld).slice(0, 200));
+// (a file that is no YAML for another reason keeps the readings: here the aliases, more than the package expands, and a key
+// that only a YAML 1.1 reader sees twice)
+const aliased = `x: &a 1\n${Array.from({ length: 120 }, (_, i) => `y${i}: *a\n`).join("")}on: pull_request\n# c\u2028on: [push]\n`;
+ok(keysTwice(aliased).map(k => k.key).join() === "on" && repeated(one(aliased), () => "").fails.length === 1, "a file that is no YAML to the package for a reason that is not its breaks keeps the readings, so a key given twice behind a break is found in it too");
+// (#970, 3: a base that is no YAML for a reason of its own, and holds a break, is read as it stands: a new key given twice fails
+// and a call left without ready_for_review, as the mending head holds it, fails, the base's own noted)
+const otherBase = 'x: 1\nx: 2\n# c\u2028\nbad: [\n';
+const ownError = repeated(one(`y: 1\ny: 2\n${otherBase}`), () => otherBase), otherCall = unreadied(one(`# c\u2028\n${call(TYPES, "copies.yml", NOT_DRAFT)}`), () => `# c\u2028\nbad: [\n`);
+ok(ownError.fails.length === 1 && /^FAIL w\.yml:2: the key "y"/u.test(ownError.fails[0]) && ownError.notes.length === 1 && !/the base being no YAML/u.test(ownError.notes[0]) && otherCall.fails.length === 1 && mended(otherCall.fails[0]),
+  "a base that is no YAML for a reason that is not its breaks is read as it stands: a new key given twice and a call left without ready_for_review fail", [...ownError.fails, ...ownError.notes, ...otherCall.fails, ...otherCall.notes].join("\n"));
+// (#970, 2: a file with such a break is lexed and parsed up to three ways, and was by each reader, for the head and the base: read
+// against the same file without the breaks, in the same run, the cost of both readers is a small multiple of it. The worst
+// shape: as many keys as fit, each a double-quoted string holding a break)
+const hostileKeys = (br, mark) => `${Array.from({ length: 65000 }, () => `k: "x${br}"\n`).join("").slice(0, LONGEST - 40)}# ${mark}\n`, spent = br => {
+  const files = one(hostileKeys(br, "head")), before = () => hostileKeys(br, "base"), t1 = Date.now();
+  repeated(files, before); unreadied(files, before); foreignBroken(files, before);
+  return Date.now() - t1;
+};
+const withBreaks = spent("\u2028"), without = spent("");
+ok(withBreaks < 5 * without + 300 && withBreaks < 60000, "a hostile file of the longest text read, a key given twice on every line behind a break in a double-quoted string, costs the two readers, head and base, a small multiple of the same file with no break", `${withBreaks} ms against ${without} ms`);
 // (only the reading as the mend leaves it finds the key given twice here, the folded text being no YAML: it is told on the line
 // an editor counts; and a text the escapes would take past the length read is read as line feeds, never as too long)
 const onlyMended = 'jobs:\n  b:\n    name: "x\u2028y"\n    # c\u2028    a: 1\n    a: 2\n';

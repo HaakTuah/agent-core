@@ -323,6 +323,9 @@ jobs:
       - name: The choice records
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-test.mjs ')) }}
         run: node tests/choices-test.mjs
+      - name: The choice records that stand a file each in a folder
+        if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/choices-folder-test.mjs ')) }}
+        run: node tests/choices-folder-test.mjs
       - name: The fixed bugs the record on types reads at each pass
         if: ${{ !cancelled() && contains(matrix.parts, 'rest') && (env.RUN == 'all' || contains(env.RUN, ' tests/fixes-test.mjs ')) }}
         run: node tests/fixes-test.mjs
