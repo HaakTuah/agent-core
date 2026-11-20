@@ -66,12 +66,14 @@ const NOWHERE = Object.freeze({ testRunners: [], testLabels: [], unknown: true, 
 const NONE_HERE = Object.freeze({ testRunners: [], testLabels: [], unknown: false, unread: [] });
 function workflowsAt(dir, parse) {
   if (dir === null) return ELSEWHERE;
-  try { fs.statSync(dir); return workflowsIn(dir, parse); } catch (e) {
-    // (only a path that is not there at all, no dangling link, is no folder; any other failure leaves it not read)
-    let link = false;
-    try { fs.lstatSync(dir); link = true; } catch { /* (not there) */ }
-    return e?.code === "ENOENT" && !link && fs.existsSync(path.join(dir, "..", "..", ".git")) ? NONE_HERE : NOWHERE;
-  }
+  // (a path that is there is read only where it is a folder that can be listed; any other leaves it not read)
+  const at = p => { try { return fs.lstatSync(p); } catch (e) { return e?.code === "ENOENT" ? null : false; } };
+  const here = at(dir);
+  if (here === false) return NOWHERE;
+  if (here) { try { if (!fs.statSync(dir).isDirectory()) return NOWHERE; fs.readdirSync(dir); } catch { return NOWHERE; } return workflowsIn(dir, parse); }
+  // (not there: none only where its parent is a real folder or not there either, in a checkout's root, which holds .git)
+  const up = at(path.dirname(dir));
+  return up === false || (up && !up.isDirectory()) || !fs.existsSync(path.join(dir, "..", "..", ".git")) ? NOWHERE : NONE_HERE;
 }
 
 /** Whether a reviewer, a tool by its attribution line's name or a bot by its login, is the tool `tool`: the same name in

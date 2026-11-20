@@ -120,6 +120,11 @@ try {
   fs.mkdirSync(path.join(scratch, "root", ".github"));
   fs.symlinkSync(path.join(scratch, "gone"), path.join(scratch, "root", ".github", "workflows"));
   ok(read({ repo: "o/r", dir: path.join(scratch, "root", ".github", "workflows"), ask: gh(true), local: false }).billed === null, "a dangling link for the folder leaves the proof not read, never not billed");
+  fs.mkdirSync(path.join(scratch, "file", ".github"), { recursive: true }); fs.mkdirSync(path.join(scratch, "file", ".git"));
+  fs.writeFileSync(path.join(scratch, "file", ".github", "workflows"), "x");
+  fs.mkdirSync(path.join(scratch, "link", ".git"), { recursive: true }); fs.symlinkSync(path.join(scratch, "gone"), path.join(scratch, "link", ".github"));
+  ok(["file", "link"].every(d => read({ repo: "o/r", dir: path.join(scratch, d, ".github", "workflows"), ask: gh(true), local: false }).billed === null),
+    "a file where the folder stands, or a .github that leads nowhere, leaves the proof not read (the security review's finding on #898)");
   const printed = [];
   main(["--repo", "X/Y"], { say: l => printed.push(l), here: "o/r", ask: a => { if (a.join(" ") === "api repos/X/Y") return JSON.stringify({ private: true }); throw new Error("no gh"); } });
   main(["--repo", "O/R"], { say: l => printed.push(l), here: "o/r", ask: a => { if (a.join(" ") === "api repos/O/R") return JSON.stringify({ private: true }); throw new Error("no gh"); } });
