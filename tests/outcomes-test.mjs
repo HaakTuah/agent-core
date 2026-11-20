@@ -1,8 +1,8 @@
 // Tests outcomes.mjs and outcomes-read.mjs, the outcomes the monthly state report leads with (#302): how a correction
 // is read (its label, its kind, the pull request it names, the owner's account alone), each measure over a span, the
 // months added where a count is small, the report's form under the five outcomes, what is read through a gh that
-// answers from fixtures, the line a project's report gives the core's, and the command's failure with its mend. Its
-// tests workflow runs it on every pull request here. Node's own modules.
+// answers from fixtures, the line a project's report gives the core's, and the command's failure with its mend; the blind
+// sample's are blind-sample-test.mjs's. Its tests workflow runs it on every pull request here. Node's own modules.
 //
 //   node tests/outcomes-test.mjs
 import { spawnSync } from "node:child_process";
@@ -13,7 +13,6 @@ import { mended } from "../scripts/mend.mjs";
 import { FIRST, HEADING, KINDS, LABEL, LEAST, MEASURES, MONTHS, OUTCOMES, corrections, counted, kindOf, lines, measure, outcomesFrom, windowOf } from "../scripts/outcomes.mjs";
 import { CALLS, firstOf, gather, read, report as monthly, spending } from "../scripts/outcomes-read.mjs";
 import { body, countsFrom } from "../scripts/state-report.mjs";
-import { COUNT, LINES, TITLE as BLIND_TITLE, answersOf, bodyOf, draw, drawOf, earlierOf, laidOut, line as blindLine, reader as blindReader, shareOf } from "../scripts/blind-sample.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
@@ -176,54 +175,6 @@ for (const args of [[], ["--repo", "o/r"], ["--repo", "../x", "--month", "2026-1
   ok(r.status === 1 && mended(r.stderr), `a wrong call (${args.join(" ") || "none"}) fails with its mend`, r.stderr);
 }
 ok(KINDS.length === 4, "four kinds of correction");
-
-// ---- the blind sample (#594): drawn by the month alone, laid out without its story, answered by the owner ----
-const merged = Array.from({ length: 30 }, (_, i) => ({ number: i + 1, merged_at: "2026-10-05T00:00:00Z", head: { ref: i === 3 ? "dependabot/npm/x" : `b${i}` }, user: { login: i === 4 ? "dependabot[bot]" : "o" } }));
-const picked = draw(merged, "o/n", "2026-10");
-ok(picked.length === COUNT && JSON.stringify(picked) === JSON.stringify(draw([...merged].reverse(), "O/N", "2026-10")) && !picked.includes(4) && !picked.includes(5)
-  && JSON.stringify(picked) !== JSON.stringify(draw(merged, "o/n", "2026-09")) && draw(merged.slice(0, 3), "o/n", "2026-10").length === 3,
-  "the draw: ten of the month's merges, the same whatever their order, none of Dependabot's, another for another month", JSON.stringify(picked));
-const long = laidOut([{ filename: "a`b.md", status: "modified", additions: 99, deletions: 1, patch: Array.from({ length: 80 }, (_, i) => `+line ${i} \`\`\``).join("\n") }]);
-ok(long.includes("- `a?b.md` (modified, +99 -1)") && !long.split("```diff")[1].split("\n```")[0].includes("```") && long.includes(`(${81 - LINES} more lines of the diff not shown)`),
-  "a change is laid out by its files and its diff, capped, its own fences and backticks made harmless", long.slice(0, 300));
-const sample = bodyOf("2026-10", "2026-11-01T05:00:00Z", [7, 9, 12], n => [{ filename: `f${n}.mjs`, status: "added", additions: 1, deletions: 0, patch: "+x" }]);
-ok(/^### 3$/m.test(sample) && !/#7\b|Fixes|merged by|author/i.test(sample.split("<!--")[0]) && JSON.stringify(drawOf(sample)) === JSON.stringify({ month: "2026-10", drawn: "2026-11-01T05:00:00Z", pulls: [7, 9, 12] }) && drawOf("no draw") === null,
-  "the issue's text shows each change by its place alone; the draw it holds is read back from it", sample.slice(0, 400));
-// (a diff that holds a draw's own mark is not taken for it; the draws before are kept; the whole stays under the limit)
-const copied = bodyOf("2026-10", "2026-11-01T05:00:00Z", [7], () => [{ filename: "x.md", status: "modified", patch: "+<!-- blind-sample 2020-01 drawn 2020-02-01T00:00:00Z pulls 999 -->" }], [{ month: "2026-09", drawn: "2026-10-01T05:00:00Z", pulls: [3, 4] }]);
-ok(drawOf(copied)?.month === "2026-10" && JSON.stringify(drawOf(copied).pulls) === "[7]" && earlierOf(copied).length === 1 && earlierOf(copied)[0].pulls.join() === "3,4",
-  "a mark inside a diff is no draw's, and the draws before stay noted", JSON.stringify(drawOf(copied)));
-const wide = bodyOf("2026-10", "2026-11-01T05:00:00Z", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], () => Array.from({ length: 40 }, (_, i) => ({ filename: `f${i}.md`, status: "modified", patch: Array.from({ length: 60 }, () => `+${"x".repeat(300)}`).join("\n") })));
-ok(wide.length < 65536 && drawOf(wide)?.pulls.length === 10 && /and 20 more files/.test(wide), "ten wide changes stay under GitHub's limit for an issue's text", wide.length);
-const at = t => `2026-11-0${t}T00:00:00Z`, me = { login: "owner" };
-const said = [
-  { user: me, created_at: "2026-10-30T00:00:00Z", body: "1: no, misread" },
-  { user: me, created_at: at(2), body: "1: yes\n2: no, looks wrong\n9: yes\nwhy not" },
-  { user: { login: "someone" }, created_at: at(3), body: "3: yes" },
-  { user: me, created_at: at(4), body: "From a builder session, on #1: 3: yes\n\n---\n_Generated by [Claude Code](https://claude.ai/code)_" },
-  { user: me, created_at: at(5), body: "1: No" },
-];
-const d = drawOf(sample), answers = answersOf(d, said, "OWNER"), share = shareOf({ body: sample }, said, "owner");
-ok(Object.keys(answers).join() === "1,2" && answers[1].yes === false && answers[2].kind === "looks wrong" && answers[2].pull === 9
-  && share.answered === 2 && share.approved === 0 && share.no.map(x => x.pull).join() === "7,9",
-  "the owner's own answers since the draw count, the last to each place; an agent's, another account's, an earlier one and a place past the draw do not", JSON.stringify(answers));
-const late = answersOf(d, [...said, { user: me, created_at: at(6), body: "2026-09 2: yes\n2026-10 3: yes" }], "owner");
-ok(late[2].yes === false && late[3]?.yes === true, "an answer that names another month's draw is not this one's, and one that names this month is", JSON.stringify(late));
-ok(blindLine(share) === "- the share of the blind sample approved: 0 (± 0) of 2 answered, 0%, of 3 drawn from 2026-10." && /not read, none of 3 drawn from 2026-10 answered/.test(blindLine({ ...share, answered: 0 })) && /not read, none drawn yet/.test(blindLine(null)),
-  "the report's line: the share approved of those answered, or not read", blindLine(share));
-const withBlind = lines({ rows, grown, blind: blindLine(share) }), blindReport = `**${HEADING} in 2026-10**\n${withBlind.join("\n")}`;
-ok(withBlind.some(l => l === `  ${blindLine(share)}`) && outcomesFrom(blindReport).includes("the share of the blind sample approved 0 (± 0) of 2 answered, 0%, of 3 drawn from 2026-10"),
-  "the share stands beside the other outcomes, and a project's reaches the core's report", outcomesFrom(blindReport));
-const pullsOct = JSON.stringify(merged.slice(0, 2).map(p => ({ ...p, updated_at: p.merged_at })));
-const ghOf = issues => route => (route.includes("/issues?") ? (route.includes("page=1") || !route.includes("page=") ? JSON.stringify(issues) : "[]") : route.includes("/pulls?") ? (route.includes("page=1") ? pullsOct : "[]") : route.includes("/files") ? JSON.stringify([{ filename: "x.md", status: "modified", patch: "+y" }]) : "[]");
-const fresh = blindReader({ repo: "o/n", at: "2026-11-01T05:12:34.567Z", gh: ghOf([]) });
-ok(fresh.title === BLIND_TITLE && fresh.owner === true && drawOf(fresh.body)?.month === "2026-10" && drawOf(fresh.body).drawn === "2026-11-01T05:12:34Z" && drawOf(fresh.body).pulls.length === 2,
-  "the look's reader lays out the month before's draw on the month's first run, needs-owner, drawn at that run", fresh.body?.slice(-120));
-const rolled = blindReader({ repo: "o/n", at: "2026-12-01T05:00:00Z", gh: ghOf([{ number: 3, title: BLIND_TITLE, body: fresh.body }]) });
-ok(drawOf(rolled.body)?.month === "2026-11" && earlierOf(rolled.body).map(d => d.month).join() === "2026-10", "the next month's draw keeps the one it replaces noted", rolled.body?.slice(-200));
-const stands = blindReader({ repo: "o/n", at: "2026-11-09T05:00:00Z", gh: ghOf([{ number: 3, title: BLIND_TITLE, body: fresh.body }]) });
-ok(stands.unread && !stands.body && blindReader({ repo: "o/n", at: "2026-11-09T05:00:00Z", gh: () => { throw new Error("403"); } }).unread && blindReader({ at: "2026-11-09T05:00:00Z" }) === null,
-  "on later runs of the month the issue stands as it is; where GitHub does not answer, nothing is changed", JSON.stringify(stands));
 
 console.log(`\n${count - failed} of ${count} passed`);
 if (failed) process.exit(1);

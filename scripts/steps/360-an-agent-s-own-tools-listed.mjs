@@ -1,6 +1,8 @@
 // The step of setup/sync-notes/360-an-agent-s-own-tools-listed.md, which steps.mjs, beside this folder, loads with the rest in the order
 // of their names.
-import { coreOf, kitHooks, listed, readProject, check as toolsCheck } from "../agent-tools.mjs";
+import { coreOf, kitHooks, check as toolsCheck } from "../agent-tools.mjs";
+import { listed } from "../agent-tools-entries.mjs";
+import { readProject } from "../agent-tools-project.mjs";
 import { installed } from "../packages.mjs";
 import { calls, copyAt, licenceConfig, runFiles } from "../check-configs.mjs";
 import { COST } from "../step-checks.mjs";

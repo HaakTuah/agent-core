@@ -1,5 +1,5 @@
 // A reader of TOML for what the core's checks read in a project's own files, Codex's `.codex/config.toml` first
-// (agent-tools.mjs): the `smol-toml` package, installed from the core's lock file (#654), reads it (#530), and this module gives what it read
+// (agent-tools-codex.mjs): the `smol-toml` package, installed from the core's lock file (#654), reads it (#530), and this module gives what it read
 // as JSON would hold it: true and false as booleans, a whole number JavaScript holds exactly as a number, and any other
 // number or a date as text, which no check here reads. Text the package cannot read as TOML, a key given twice
 // included, is refused, as the tool that reads the file refuses it, and so is a value nested deeper than guards.mjs's
