@@ -64,6 +64,26 @@ try {
     ok(workflowsIn(hostile).unlisted === true && r.where === "self-hosted" && /workflows not read: /.test(r.said.join("\n")) && /forks off any such job/.test(r.advice ?? "") && /from the project's root/.test(r.said[0]) && /from the project's root/.test(r.advice ?? ""),
       "a workflows path that is a link to itself, or to a plain file, in a checkout's root is not read, never read as no jobs, and a public repository is advised", r.said.join(" | "));
   }
+  // (hostile: a link that leads out of the checkout is not followed, and no file is read without end, #936; GitHub reads no
+  // workflow through a link, so one met there is said not read, never read as the host's runners nor as no jobs)
+  fs.mkdirSync(at("outside", "workflows"), { recursive: true }); fs.writeFileSync(at("outside", "workflows", "ci.yml"), ci);
+  const checkout = d => { fs.mkdirSync(at(d, ".git"), { recursive: true }); return at(d, ".github", "workflows"); };
+  const linkedFolder = checkout("out-folder"); fs.mkdirSync(path.dirname(linkedFolder)); fs.symlinkSync(at("outside", "workflows"), linkedFolder);
+  const linkedGithub = checkout("out-github"); fs.symlinkSync(at("outside"), path.dirname(linkedGithub));
+  for (const [dir, what] of [[linkedFolder, "a .github/workflows that is a link to a folder outside the checkout"], [linkedGithub, "a .github that is a link to a folder outside the checkout"]]) {
+    r = read({ repo: "o/n", dir, manifest: rel, gh: host(false) });
+    ok(workflowsIn(dir).unlisted === true && r.where === "self-hosted" && /could not be listed/.test(r.said[0]), `${what} is not listed, its workflows not read through it, and taken as the owner's own`, r.said.join(" | "));
+  }
+  const files = checkout("out-files"); fs.mkdirSync(files, { recursive: true });
+  fs.writeFileSync(path.join(files, "big.yml"), `${ci}#${"x".repeat(256 * 1024)}\n`);
+  fs.symlinkSync(at("outside", "workflows", "ci.yml"), path.join(files, "ci.yml"));
+  fs.mkdirSync(path.join(files, "dir.yml"));
+  if (fs.existsSync("/dev/zero")) fs.symlinkSync("/dev/zero", path.join(files, "zero.yml"));
+  const w = workflowsIn(files);
+  r = read({ repo: "o/n", dir: files, manifest: rel, gh: host(false) });
+  const notRead = ["big.yml", "ci.yml", "dir.yml", ...fs.existsSync("/dev/zero") ? ["zero.yml"] : []];
+  ok(notRead.every(f => w.unread.includes(f)) && !w.onHost && r.where === "self-hosted" && /workflows not read: .*ci\.yml/.test(r.said.join("\n")) && /a workflow named below could not be read, so taken as the owner's own; mend: /.test(r.said[0]) && /workflows named above could not be read/.test(r.advice ?? ""),
+    "a workflow that is a link out of the checkout, to a file or to a device that reads without end, a folder and a file past its size are not read, named, and never read as no jobs, and a public repository is advised", r.said.join(" | ") + (r.advice ?? ""));
   if (process.platform !== "win32" && process.getuid?.() !== 0) {
     const shut = at("shut", ".github", "workflows");
     fs.mkdirSync(shut, { recursive: true }); fs.chmodSync(shut, 0);

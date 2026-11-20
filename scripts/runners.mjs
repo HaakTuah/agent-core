@@ -1,7 +1,8 @@
 // Where a project's tests run and who pays for them (tasks/tests.md, "The slow suites run once per batch, wherever
 // they run"; #733, point 6), read and never asked (the core's AGENTS.md, "What can be read is never asked or
-// declared"). From the project's workflows (.github/workflows/) it reads the jobs on a pull request or a push that
-// start a suite through the shape check (`shape.mjs ... --suite`), as every suite is started, and the runner each takes
+// declared"). From the project's workflows (.github/workflows/, a folder that is no link, each a file of bytes of at
+// most LONGEST bytes that leads nowhere outside the checkout; what is not is said not read) it reads the jobs on a pull
+// request or a push that start a suite through the shape check (`shape.mjs ... --suite`), as every suite is started, and the runner each takes
 // (`self-hosted` or a runner group: the owner's own; only the host's own labels: the host's; else not read). From the host it reads whether the
 // repository is private, so its minutes are billed. A row of the manifest only overrides each: *test runners*
 // (`hosted`, `self-hosted` or `local`) and *billed minutes* (merge-line.mjs, beside this file). It prints what it
@@ -21,11 +22,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "./core-address.mjs";
-import { aRepository, oneLine } from "./guards.mjs";
+import { aRepository, leadsOut, oneLine } from "./guards.mjs";
 import { ghApi } from "./labels.mjs";
 import { coreOwn, override } from "./merge-line.mjs";
 import { loadSync } from "./packages.mjs";
 import { started } from "./started.mjs";
+import { LONGEST } from "./yaml-keys.mjs";
 
 const WHERE = ["hosted", "self-hosted", "local"];
 const ON = ["pull_request", "pull_request_target", "push", "merge_group"];
@@ -97,9 +99,17 @@ export function workflowsIn(dir, parse = loadSync("yaml").parse) {
   const names = listing(dir);
   if (names === false) return { ...out, unread: [dir], unlisted: true };
   const files = names.filter(f => /\.ya?ml$/u.test(f));
-  const read = {};
+  const read = {}, root = path.resolve(dir, "..", "..");
+  // (a file is read only where it is a file of bytes of the checkout's own of at most LONGEST bytes (floor/topics/input.md,
+  // point 5): one whose real place, its links followed, lies outside the checkout, a device, a pipe, a folder and one past
+  // the size are not read, and are named in `unread`)
   for (const f of files) {
-    try { read[f] = parse(fs.readFileSync(path.join(dir, f), "utf8")); } catch { out.unread.push(f); }
+    const at = path.join(dir, f);
+    try {
+      const st = leadsOut(root, at) ? null : fs.statSync(at);
+      if (!st?.isFile() || st.size > LONGEST) throw new Error("not read");
+      read[f] = parse(fs.readFileSync(at, "utf8"));
+    } catch { out.unread.push(f); }
   }
   const seen = reached(read);
   try {
@@ -122,14 +132,15 @@ export function workflowsIn(dir, parse = loadSync("yaml").parse) {
 }
 
 // The names in the workflows folder `dir`, [] where it is not there and so holds none, or false where it is not read: a
-// path that is there and is no folder that can be listed (a file, a link leading nowhere, a folder whose rights stop its
-// listing), and one not there where it cannot be told that none stands: only where its parent is a real folder or not
+// path that is there and is no folder that can be listed (a file, a link of any kind, since GitHub reads no workflow
+// through one, a folder whose real place, its links followed, lies outside the checkout, two folders above it, a folder
+// whose rights stop its listing), and one not there where it cannot be told that none stands: only where its parent is a real folder or not
 // there either, in a checkout's root, which holds .git, does a missing folder hold none. Listed once, here.
 function listing(dir) {
   const at = p => { try { return fs.lstatSync(p); } catch (e) { return e?.code === "ENOENT" ? null : false; } };
   const here = at(dir);
   if (here === false) return false;
-  if (here) { try { return fs.statSync(dir).isDirectory() ? fs.readdirSync(dir) : false; } catch { return false; } }
+  if (here) { try { return here.isDirectory() && !leadsOut(path.resolve(dir, "..", ".."), dir) ? fs.readdirSync(dir) : false; } catch { return false; } }
   const up = at(path.dirname(dir));
   return up === false || (up && !up.isDirectory()) || !fs.existsSync(path.join(dir, "..", "..", ".git")) ? false : [];
 }
@@ -178,13 +189,14 @@ function privateOf(repo, gh) {
 function settled(w, priv, manifest) {
   // (where the tests run: the runners of the jobs that start a suite; one that cannot be read is taken as the owner's
   // own, the stricter reading, and said so)
-  // (a folder that could not be listed is a runner not read as well: nothing of it is known)
-  const testsUnknown = w.testRunners.includes(null) || !!w.unlisted;
+  // (a folder that could not be listed, or a workflow not read, is a runner not read as well: nothing of it is known)
+  const unreadFiles = !w.unlisted && w.unread.length > 0;
+  const testsUnknown = w.testRunners.includes(null) || !!w.unlisted || unreadFiles;
   const whereRead = w.testRunners.includes("own") || testsUnknown ? "self-hosted" : w.onHost ? "hosted" : "local";
   const whereRow = runnersRow(manifest), billedRow = override(manifest, "billed minutes", ["yes", "no"]);
   // (where whether it is private was not read: taken as billed, the cheaper way)
   const billed = billedRow ? billedRow === "yes" : priv !== false;
-  return { where: whereRow ?? whereRead, whereRead, whereRow, billed, billedRow, unknown: testsUnknown && !w.testRunners.includes("own"), unlisted: !!w.unlisted };
+  return { where: whereRow ?? whereRead, whereRead, whereRow, billed, billedRow, unknown: testsUnknown && !w.testRunners.includes("own"), unlisted: !!w.unlisted, labelUnread: w.testRunners.includes(null), unreadFiles };
 }
 
 const PLACES = { hosted: "the host's runners", "self-hosted": "a runner of the owner's own", local: "a session's or the owner's computer alone, no job on a pull request or a push starting a suite through the shape check" };
@@ -195,15 +207,21 @@ function saidOf(s, priv, unread) {
   const whereBy = s.whereRow ? `, as the manifest's row *test runners* says (read: ${s.whereRead})` : "";
   const paidBy = s.billedRow ? ", as the manifest's row *billed minutes* says"
     : priv === null ? " (whether the repository is private was not read, so taken as billed)" : `, the repository being ${priv ? "private" : "public"}`;
-  return [`where the tests run: ${PLACES[s.where]}${whereBy}${s.unknown && !s.whereRow ? ` (${s.unlisted ? "the workflows folder could not be listed" : "a job's runner, named by a label of its own or an expression, could not be read"}, so taken as the owner's own${s.unlisted ? "; mend: run this script from the project's root, and there make .github/workflows a folder that can be listed" : ""})` : ""}`, `who pays: ${s.billed ? "minutes billed" : "the host's free minutes"}${paidBy}`,
+  const why = s.unlisted ? "the workflows folder could not be listed"
+    : [s.labelUnread && "a job's runner, named by a label of its own or an expression, could not be read", s.unreadFiles && "a workflow named below could not be read"].filter(Boolean).join(", and ");
+  const mend = s.unlisted ? "; mend: run this script from the project's root, and there make .github/workflows a folder of the checkout's own that can be listed, not a link"
+    : s.unreadFiles ? `; mend: make each workflow named below a file of the checkout's own, not a link that leads out of it, of at most ${LONGEST} bytes, whose YAML parses` : "";
+  return [`where the tests run: ${PLACES[s.where]}${whereBy}${s.unknown && !s.whereRow ? ` (${why}, so taken as the owner's own${mend})` : ""}`, `who pays: ${s.billed ? "minutes billed" : "the host's free minutes"}${paidBy}`,
     ...unread.length ? [`workflows not read: ${unread.map(f => oneLine(f).slice(0, 60)).join(", ")}`] : []];
 }
 
 // The floor rule 18 advice for a public repository whose jobs may run on a runner of the owner's own, or null.
 function adviceOf(w, priv) {
-  const notListed = w.unlisted, job = notListed ? "any such job" : "that job";
-  return (w.selfHosted || w.unknown || w.unlisted) && priv === false
-    ? `A public repository ${notListed ? "whose workflows folder could not be listed may run a job on a runner of the owner's own (run this script from the project's root first, and there make .github/workflows a folder that can be listed, so that it is read)" : `runs a job on ${w.selfHosted ? "a runner of the owner's own" : "a runner that could not be read, perhaps the owner's own"}`}, where a stranger's pull request would run its code (floor rule 18): keep pull requests from forks off ${job} at once (an \`if:\` that its head repository is this one), and, where no open issue names it, file one for the owner, labelled needs-owner, to move ${job} to the host's runners or have every outside contributor's run approved first; nothing else waits on it.`
+  // (a workflow not read, beside no runner of the owner's own or not read, may hold one: advised as a folder not listed is)
+  const notListed = w.unlisted, notRead = !notListed && !w.selfHosted && !w.unknown && w.unread.length > 0;
+  const job = notListed || notRead ? "any such job" : "that job";
+  return (w.selfHosted || w.unknown || w.unlisted || notRead) && priv === false
+    ? `A public repository ${notListed ? "whose workflows folder could not be listed may run a job on a runner of the owner's own (run this script from the project's root first, and there make .github/workflows a folder of the checkout's own that can be listed, not a link, so that it is read)" : notRead ? "whose workflows named above could not be read may run a job on a runner of the owner's own (make each a file of the checkout's own that can be read, so that it is read)" : `runs a job on ${w.selfHosted ? "a runner of the owner's own" : "a runner that could not be read, perhaps the owner's own"}`}, where a stranger's pull request would run its code (floor rule 18): keep pull requests from forks off ${job} at once (an \`if:\` that its head repository is this one), and, where no open issue names it, file one for the owner, labelled needs-owner, to move ${job} to the host's runners or have every outside contributor's run approved first; nothing else waits on it.`
     : null;
 }
 
