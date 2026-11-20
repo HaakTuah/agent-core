@@ -32,7 +32,9 @@ export const SELF = "scripts/path-only.mjs";
 // that runs is not `main`'s.
 export const ROOTS = ["scripts/pr-description.mjs", "scripts/install.mjs", SELF];
 export const WORKFLOW = ".github/workflows/own-description.yml";
-export const SETUP = [".node-version", ".packages/"];
+// (the root's package files and .npmrc too: setup-node would restore its npm cache from them, its cache turned off
+// in the workflow all the same; .gitattributes decides the bytes the checkout writes)
+export const SETUP = [".node-version", ".packages/", ".gitattributes", "package.json", "package-lock.json", "npm-shrinkwrap.json", ".npmrc"];
 export const decides = (own, p) => own.has(p) || SETUP.some(s => (s.endsWith("/") ? p.startsWith(s) : p === s));
 const IMPORT = /^\s*(?:import|export)\b[^"'`]*?\bfrom\s*["'](\.{1,2}\/[^"']+)["']|^\s*import\s*["'](\.{1,2}\/[^"']+)["']/gmu;
 
@@ -56,24 +58,24 @@ const escape = s => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 // The spellings of each move, old to new. A path is read bare where it has a "/" and names a file by its extension or a
 // folder by its closing "/"; otherwise only between backticks, so that no word of prose ("tests", "and/or") is read as
-// one; and a spelling with no "/" only where it is a file's name with its extension, so that no plain word between
-// backticks (`main`) is rewritten by moving a file or folder planted under its name. A move is left out where either
+// one; and a spelling with no "/" never, so that neither a plain word between backticks (`main`) nor a name the floor
+// writes for a kind of file (`README.md`) is rewritten by moving a file or folder at the root that bears it. A move is left out where either
 // path holds anything but ASCII letters, digits, ".", "_", "-" and "/", or asks the yes: such a move is refused, and
-// justifies no pointer. A file's name alone, between backticks, follows its move where the base holds no other file of
-// that name (`unique`).
+// justifies no pointer. So does a move of what a tool reads by a fixed name or place (FIXED: a dot file or folder, such
+// as .claude/settings.json or .github/, and a rule file's name): it changes what a rule holds, not a pointer. A file's
+// name alone follows nothing either.
+// (a path any part of which starts with ".", or whose file is named as a tool reads it)
+const FIXED = p => p.split("/").some(part => part.startsWith(".")) || /^(?:AGENTS|CLAUDE|GEMINI|REVIEW|SECURITY)\.md$|^(?:LICENSE|NOTICE)(?:\.\w+)?$/u.test(p.split("/").at(-1));
 const SAFE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const named = p => /\.[A-Za-z0-9]+$/u.test(p.split("/").at(-1));
 const bare = p => p.includes("/") && (p.endsWith("/") || named(p));
 export function spellings(moves) {
   const pairs = new Map();
-  const quoted = (p, folder) => p.includes("/") || (!folder && named(p));
-  const add = (a, b, folder) => { if (quoted(a, folder) && quoted(b, folder)) pairs.set(`\`${a}\``, `\`${b}\``); if (bare(a) && bare(b)) pairs.set(a, b); };
-  for (const { from, to, folder, unique } of moves) {
-    if (asks(from) || asks(to) || from === to || !SAFE.test(from) || !SAFE.test(to)) continue;
-    add(from, to, folder);
-    if (folder) add(`${from}/`, `${to}/`, true);
-    const [a, b] = [from, to].map(p => p.split("/").at(-1));
-    if (unique && a !== b && named(a) && named(b)) pairs.set(`\`${a}\``, `\`${b}\``);
+  const add = (a, b) => { if (a.includes("/") && b.includes("/")) pairs.set(`\`${a}\``, `\`${b}\``); if (bare(a) && bare(b)) pairs.set(a, b); };
+  for (const { from, to, folder } of moves) {
+    if (asks(from) || asks(to) || from === to || !SAFE.test(from) || !SAFE.test(to) || FIXED(from) || FIXED(to)) continue;
+    add(from, to);
+    if (folder) add(`${from}/`, `${to}/`);
   }
   return pairs;
 }
@@ -154,10 +156,6 @@ function movesOf(cwd, base, head) {
     seen.add(`${d.from}\0${d.to}`);
     if (!stands(head, d.from) && !stands(base, d.to) && whole(d)) moves.push({ ...d, folder: true });
   }
-  // (a file's name alone follows it only where no other file of the base bears that name, nor the new one)
-  const names = new Map();
-  for (const f of fields(run(cwd, ["ls-tree", "-r", "--name-only", "-z", base]) ?? "")) { const n = f.split("/").at(-1); names.set(n, (names.get(n) ?? 0) + 1); }
-  for (const m of moves) if (!m.folder && names.get(m.from.split("/").at(-1)) === 1 && !names.has(m.to.split("/").at(-1))) m.unique = true;
   return moves;
 }
 
