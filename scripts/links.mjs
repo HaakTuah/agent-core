@@ -11,6 +11,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { inProject } from "./guards.mjs";
 import { readAt } from "./rule-files.mjs";
 
 export const TIMEOUT = 120000; // (ms lychee may take on the rule files: the core's take well under one second)
@@ -100,28 +101,34 @@ export function run({ program, root, files, ...at }) {
 }
 
 // The base's files (`sha`) that run() reads in a folder of this run's own, written from git's own blobs, so that no
-// attribute of the base's (export-ignore, export-subst) changes them and no link is followed out: each regular Markdown
-// file, which a link's heading may be looked for in, and each rule file of `rules`, through a link inside the project
-// as readAt() follows it; with what git tracks there. Null where git could not give them.
+// attribute of the base's (export-ignore, export-subst) changes them: each Markdown or HTML file, in which a link's
+// heading may be looked for, and each rule file of `rules`, a link inside the project read through as readAt() reads it
+// and one leading out of it not written; a path that could lead out of the folder (a part empty, "." or "..", a
+// backslash) is never written. Returns { dir, tracked, folders }, or null where git could not give them or one could not
+// be written.
+const PAGE = /\.html?$/iu, safe = f => inProject(f) && !f.includes("\\") && f.split("/").every(p => p && p !== "." && p !== "..");
 export function baseTree(sha, under, rules) {
   const git = (args, input) => spawnSync("git", args, { input, maxBuffer: 1 << 30 });
   const ls = git(["ls-tree", "-r", "-z", sha]);
   if (ls.status !== 0) return null;
   const entries = String(ls.stdout).split("\0").map(e => /^(\d+) \S+ (\S+)\t([\s\S]+)$/u.exec(e)).filter(Boolean);
-  const tracked = new Set(entries.map(m => m[3])), want = entries.filter(m => /^100/u.test(m[1]) && (MARKDOWN.test(m[3]) || rules.includes(m[3])));
-  const blobs = git(["cat-file", "--batch"], want.map(m => m[2]).join("\n") + "\n");
+  const tracked = new Set(entries.map(m => m[3])), wanted = m => safe(m[3]) && (MARKDOWN.test(m[3]) || PAGE.test(m[3]) || rules.includes(m[3]));
+  const plain = entries.filter(m => /^100/u.test(m[1]) && wanted(m)), linked = entries.filter(m => m[1] === "120000" && wanted(m));
+  const blobs = git(["cat-file", "--batch"], plain.map(m => m[2]).join("\n") + "\n");
   if (blobs.status !== 0) return null;
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(under, "links-base-"))), put = (f, data) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), data); };
-  let at = 0;
-  for (const m of want) {
-    const head = /^\S+ blob (\d+)\n/u.exec(blobs.stdout.subarray(at, at + 200).toString("latin1"));
-    if (!head) { fs.rmSync(dir, { recursive: true, force: true }); return null; }
-    const from = at + head[0].length, size = Number(head[1]);
-    put(m[3], blobs.stdout.subarray(from, from + size));
-    at = from + size + 1;
-  }
-  const read = readAt(sha);
-  for (const f of rules.filter(r => tracked.has(r) && !fs.existsSync(path.join(dir, r)))) { const t = read(f); if (t !== null) put(f, t); }
+  try {
+    let at = 0;
+    for (const m of plain) {
+      const head = /^\S+ blob (\d+)\n/u.exec(blobs.stdout.subarray(at, at + 200).toString("latin1"));
+      if (!head) throw new Error("git's answer was not the blobs asked for");
+      const from = at + head[0].length, size = Number(head[1]);
+      put(m[3], blobs.stdout.subarray(from, from + size));
+      at = from + size + 1;
+    }
+    const read = readAt(sha);
+    for (const m of linked) { const t = read(m[3]); if (t !== null) put(m[3], t); }
+  } catch { fs.rmSync(dir, { recursive: true, force: true }); return null; }
   return { dir, tracked, folders: new Set([...tracked].flatMap(f => f.split("/").slice(0, -1).map((_, i, p) => `${p.slice(0, i + 1).join("/")}/`))) };
 }
 
@@ -134,14 +141,15 @@ export function checkRules({ program, rules, tracked, folders, text, base }) {
   const read = rules.filter(f => lycheeReads(f) && readable(fs.readFileSync(f)));
   const head = run({ program, root: fs.realpathSync("."), files: read, tracked, folders, text });
   if (head.unread || !head.found.length || !base) return { read, ...head, ...(head.unread ? {} : compared(head.found, base === "" ? [] : null)) };
-  const was = baseTree(base, process.env.RUNNER_TEMP || os.tmpdir(), read);
+  let was = null;
   try {
+    was = baseTree(base, process.env.RUNNER_TEMP || os.tmpdir(), read);
     const file = f => fs.lstatSync(path.join(was.dir, f), { throwIfNoEntry: false });
     const there = was ? read.filter(f => file(f)?.isFile() && readable(fs.readFileSync(path.join(was.dir, f)))) : [];
     const r = was && run({ program, root: was.dir, files: there, tracked: was.tracked, folders: was.folders, text: f => fs.readFileSync(path.join(was.dir, f), "utf8") });
     if (r && !r.unread) return { read, count: head.count, ...compared(head.found, r.found) };
     // (a base whose links could not be read decides nothing: each finding is noted, so that nothing locks a project)
-    const { notes } = compared(head.found, null);
+    const notes = compared(head.found, null).notes.map(n => n.replace("with no base to read against", "the base unread"));
     return { read, count: head.count, fails: [], notes: [`the rule files' links at the pull request's base could not be read${r?.unread ? ` by lychee (${r.unread})` : ""}, so each broken link below is only noted. Mend: run this job again; if it says so again, file it as a fault`, ...notes] };
   } finally { if (was) fs.rmSync(was.dir, { recursive: true, force: true }); }
 }

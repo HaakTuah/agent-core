@@ -8,7 +8,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { compared, listed, lycheeReads, readable, reported, run, target } from "../scripts/links.mjs";
+import { baseTree, compared, listed, lycheeReads, readable, reported, run, target } from "../scripts/links.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -55,7 +55,7 @@ ok(compared([out("../away.md")], [out("../../x/away.md")]).fails.length === 0 &&
 // Markdown it reads no such link, as lychee reads it as plain text
 const FAKE = `import fs from "node:fs"; import path from "node:path"; import { pathToFileURL } from "node:url";
 const a = process.argv.slice(2), root = a[a.indexOf("--root-dir") + 1];
-if (process.env.FAKE_LYCHEE_FAIL) { console.error("it broke"); process.exit(1); }
+if (process.env.FAKE_LYCHEE_FAIL || (process.env.FAKE_LYCHEE_FAIL_BASE && /links-base-/.test(root))) { console.error("it broke"); process.exit(1); }
 const links = file => !/\\.md$/.test(file) ? [] : [...fs.readFileSync(file, "utf8").matchAll(/\\]\\(([^)\\s]+)\\)/g)].map(m => m[1]).filter(l => !/^[a-z]+:/i.test(l))
   .map(l => { const [p, h] = l.split("#"); const at = p === "" ? file : p.startsWith("/") ? path.join(root, p) : path.resolve(path.dirname(file), p); return { href: pathToFileURL(at).href + (h ? "#" + h : ""), at, h }; });
 if (a.includes("--dump")) { for (const l of links(a.at(-1))) console.log(l.href); process.exit(0); }
@@ -97,6 +97,13 @@ if (process.platform !== "win32") {
     ok(r.code === 0 && /note .*docs\/developing\.md#running-it .*as on the base, so it fails nothing/.test(r.out), "one the base held is noted and fails nothing (nothing locks a project)", r.out);
     r = check({ LYCHEE });
     ok(r.code === 0 && /with no base to read against/.test(r.out), "with no base, as on a push to main, it is noted", r.out);
+    // (a base lychee could not read decides nothing: a new broken link is only noted, the lead line saying why)
+    put("AGENTS.md", `${AGENTS}\nAnd [more](docs/developing.md#also-gone).\n`);
+    g("add", "AGENTS.md");
+    r = check({ LYCHEE, POINTERS_BASE: "HEAD", FAKE_LYCHEE_FAIL_BASE: "1" });
+    ok(r.code === 0 && /note the rule files' links at the pull request's base could not be read by lychee \(it ended with status 1: it broke\), so each broken link below is only noted\. Mend: /.test(r.out) && /note .*#also-gone .*the base unread, so it fails nothing/.test(r.out),
+      "a base lychee could not read decides nothing: each finding is noted, and the note says the base was unread", r.out);
+    g("checkout", "-q", "--", "AGENTS.md"); g("reset", "-q");
     // (a file git does not track is no file the link leads to, though it stands on the disk; nor one out of the project)
     put("AGENTS.md", `${AGENTS}\nAnd [the notes](notes.md) and [one away](../away.md).\n`);
     put("notes.md", "# Notes\n");
@@ -127,6 +134,24 @@ if (process.platform !== "win32") {
     const r = spawnSync(process.execPath, [path.join(two, "core/scripts/pointers.mjs")], { cwd: two, encoding: "utf8", env: { ...process.env, LYCHEE: STANDIN, POINTERS_BASE: "HEAD" } });
     ok(r.status === 0 && /note .*AGENTS\.md:5: the link to docs\/developing\.md#gone .*as on the base, so it fails nothing/.test(r.stdout + r.stderr), "a rule file the base's attributes leave out of an archive is read from git's own blobs: what the base held is noted", r.stdout + r.stderr);
   } finally { for (const d of [two, tools]) fs.rmSync(d, { recursive: true, force: true }); }
+}
+// (the base's files written from git's own blobs: a tree that names "..", a link inside the project and one out of it, and
+// a page; nothing is written out of the folder, the link inside is read through, the one out is not; #582's review)
+{
+  const repo = scratchDir("links-test-tree-"), under = scratchDir("links-test-under-"), gi = (args, input) => execFileSync("git", args, { cwd: repo, input, encoding: "utf8" }).trim();
+  try {
+    gi(["init", "-q"]);
+    const blob = t => gi(["hash-object", "-w", "--stdin"], t);
+    const evil = gi(["mktree"], `100644 blob ${blob("# Evil\n")}\tevil.md\n`);
+    const tree = gi(["mktree"], [`040000 tree ${evil}\t..`, `100644 blob ${blob("# Agents\n\n## Here\n")}\tAGENTS.md`, `120000 blob ${blob("AGENTS.md")}\tlink.md`, `120000 blob ${blob("/etc/hostname")}\tout.md`, `100644 blob ${blob("<h2 id=\"x\">X</h2>\n")}\tapi.html`].join("\n") + "\n");
+    const sha = gi(["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit-tree", tree, "-m", "base"]);
+    process.chdir(repo);
+    const was = baseTree(sha, under, ["AGENTS.md", "link.md"]);
+    const at = f => fs.existsSync(path.join(was?.dir ?? "/nowhere", f));
+    ok(was && at("AGENTS.md") && at("api.html") && fs.readFileSync(path.join(was.dir, "link.md"), "utf8").includes("## Here") && !at("out.md") && !fs.readdirSync(under).some(f => f === "evil.md") && !fs.existsSync(path.join(path.dirname(was.dir), "evil.md")) && was.tracked.has("AGENTS.md"),
+      "the base's files are written from git's blobs: a page and a link inside the project read through, a link out of it not, and nothing out of the folder for a tree that names \"..\"", JSON.stringify(was && fs.readdirSync(was.dir)));
+    if (was) fs.rmSync(was.dir, { recursive: true, force: true });
+  } finally { process.chdir(path.dirname(fileURLToPath(import.meta.url))); for (const d of [repo, under]) fs.rmSync(d, { recursive: true, force: true }); }
 }
 // (lychee itself, where the job's set-up fetched it, never in a session: its command line and its report as the glue reads them)
 if (process.env.LYCHEE) {
