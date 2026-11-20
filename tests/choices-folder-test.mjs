@@ -47,6 +47,14 @@ let link = true;
   const faults = folderFaults("CHOICES.md", dir);
   ok(faults.length === 3 && faults.every(f => mended(f)) && /Notes\.md` is no file of a record named/.test(faults.join()) && /sub` is no file/.test(faults.join()) && /050-two\.md` holds 2 records/.test(faults.join()),
     "a file of a folder not named so, a folder inside it and a file of two records each fail, saying the mend", faults.join("\n"));
+  write("choices/060-big.md", `${rec("g")}${"x".repeat(MOST)}\n`);
+  ok(/060-big\.md` is past/.test(folderFaults("CHOICES.md", dir).join()) && mended(folderFaults("CHOICES.md", dir).join("\n")), "a file of the folder past the size the readers read fails, saying the mend");
+  fs.rmSync(path.join(dir, "choices/060-big.md"));
+  if (link) {
+    fs.renameSync(path.join(dir, "choices"), path.join(dir, "choices-real")); fs.symlinkSync("choices-real", path.join(dir, "choices"));
+    ok(/is no folder here/.test(folderFaults("CHOICES.md", dir).join()), "a folder that is a link is no folder of the records, and is not read");
+    fs.rmSync(path.join(dir, "choices")); fs.renameSync(path.join(dir, "choices-real"), path.join(dir, "choices"));
+  }
   ok(PART.test("010-a.md") && !PART.test("10-a.md") && !PART.test("010-A.md"), "a part's name is three digits, a dash and a name of lower case");
   write("CHOICES.md", `${head}${pointer.replace("choices", "elsewhere")}\n`);
   ok(mended(folderFaults("CHOICES.md", dir).join("\n")) && folderFaults("CHOICES.md", dir).length === 1, "a folder the file names that is not there fails, saying the mend");

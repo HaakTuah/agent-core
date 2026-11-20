@@ -364,10 +364,14 @@ export function folderFaults(file, root = ".") {
   for (const m of text.matchAll(/^## Choice: (.+)$/gmu)) faults.push(`FAIL: \`${file}\` holds the record "${plain(m[1])}" itself. ${MEND}move it, byte for byte, into a file of its own in \`${folders[0]}/\`, named NNN-<name>.md to stand in order between its neighbours, as AGENTS.md, "A record pull requests add to is a folder of one file per entry", says.`);
   for (const folder of folders) {
     let entries = [];
-    try { entries = fs.readdirSync(path.join(root, folder), { withFileTypes: true }); } catch { faults.push(`FAIL: \`${file}\` names \`${folder}/\`, which is no folder here. ${MEND}make the folder, a file for each record in it, or take the line that names it out of \`${file}\`.`); }
+    // (no link is followed, as records() follows none: a folder that is one is no folder of the records)
+    const plainFolder = folder.split("/").every((_, i, at) => { try { const st = fs.lstatSync(path.join(root, ...at.slice(0, i + 1))); return !st.isSymbolicLink() && (i < at.length - 1 || st.isDirectory()); } catch { return false; } });
+    try { if (plainFolder) entries = fs.readdirSync(path.join(root, folder), { withFileTypes: true }); } catch { /* (said below) */ }
+    if (!plainFolder) faults.push(`FAIL: \`${file}\` names \`${folder}/\`, which is no folder here. ${MEND}make the folder, a file for each record in it, or take the line that names it out of \`${file}\`.`);
     for (const e of entries) {
       const at = `${folder}/${e.name}`;
       if (!e.isFile() || !PART.test(e.name)) { faults.push(`FAIL: \`${at}\` is no file of a record named NNN-<name>.md. ${MEND}rename it so, to stand in order between its neighbours, or take it out of \`${folder}/\`.`); continue; }
+      if (fs.statSync(path.join(root, at)).size > MOST) { faults.push(`FAIL: \`${at}\` is past ${MOST} bytes. ${MEND}keep each record under that size, which is the most the readers read.`); continue; }
       const body = fs.readFileSync(path.join(root, at), "utf8").replace(/\r\n/gu, "\n");
       const heads = [...body.matchAll(/^## Choice: /gmu)].length;
       if (!body.startsWith("## Choice: ") || heads !== 1) faults.push(`FAIL: \`${at}\` holds ${heads} records and does not open with a record's heading "## Choice: ". ${MEND}make it one record from its heading on, and each other record a file of its own.`);
