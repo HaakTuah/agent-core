@@ -57,6 +57,8 @@ const withSessions = to => check(text, { read: f => (f === "tools/claude-session
 ok(says(withSessions("- *Starts a session:* yes, by its command.\n\n- Another item, read on 20 November 2026.\n"), "holds no line *Starts a session:*")
   && says(withSessions("- *Starts a session:* yes, by its command.\n- Another item, read on 20 November 2026.\n"), "holds no line *Starts a session:*"),
   "a line that says no day before its item ends fails, a day in a later item or paragraph not counting for it");
+ok(says(withSessions("A note that names *Starts a session:* in its prose, read on 20 November 2026.\n"), "holds no line *Starts a session:*"),
+  "a mention of the label in prose, not at a line's or an item's start, does not count as the line");
 // (Kiro's part as it stands, read through `read`, with its ways' lines written anew)
 const kiro = fs.readFileSync(path.join(root, "tools/kiro.md"), "utf8");
 const withKiro = to => check(text, { read: f => (f === "tools/kiro.md" ? to : fs.readFileSync(path.join(root, f), "utf8")) });

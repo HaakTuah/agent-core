@@ -36,11 +36,11 @@ const FORMS = [/^carried: \S.*$/u, new RegExp(String.raw`^cannot: \S.*, read ${D
 const ISSUES = /^Its issue for what is not yet carried$/u;
 const MAP = /^The map of the tiers/u;
 // The row of a session of its own (tasks/tools.md, "Each tool's part says whether it starts a session of its own";
-// #492): its file holds the line *Starts a session:*, which says, before the next item or paragraph, the day its
+// #492): its file holds the line *Starts a session:*, at a line's or a list item's start, which says, before the next item or paragraph, the day its
 // documentation was read.
 const STARTS = /^Starts a session of its own/u;
 const LABEL = "*Starts a session:*";
-const startsDated = text => { const at = text.indexOf(LABEL); return at >= 0 && new RegExp(`read on ${DAY}`, "u").test(text.slice(at).split(/\n\s*\n|\n\s*- /u)[0]); };
+const startsDated = text => { const at = /^\s*(?:- )?\*Starts a session:\*/mu.exec(text)?.index; return at !== undefined && new RegExp(`read on ${DAY}`, "u").test(text.slice(at).replace(/^\s+/u, "").split(/\n\s*\n|\n\s*- /u)[0]); };
 // The ways a review is asked, in the order a session takes them (tasks/reviews.md, point 1; #397): each a label in
 // italics in each tool's part, the project's own way named in tasks/reviews.md alone.
 export const WAYS = ["*Side by side:*", "*Through a plug-in:*", "*On the host:*"];
